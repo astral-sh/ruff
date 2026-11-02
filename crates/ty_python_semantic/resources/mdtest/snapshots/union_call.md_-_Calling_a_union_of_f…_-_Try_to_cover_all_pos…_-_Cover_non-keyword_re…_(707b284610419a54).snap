@@ -40,7 +40,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 25 | @overload
 26 | def f6(x: str, y: str) -> str: ...
 27 | def f6(x: str | None = None, y: str | None = None) -> str | None:
-28 |     return x + y if x and y else None
+28 |     return x + y if x is not None and y is not None else None
 29 | 
 30 | def _(n: int):
 31 |     class PossiblyNotCallable:

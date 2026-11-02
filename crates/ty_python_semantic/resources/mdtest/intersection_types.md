@@ -226,6 +226,142 @@ def simplifications_for_same_elements(
     reveal_type(i4)  # revealed: P | Q
 ```
 
+### Union of intersections with disjoint exclusions
+
+When two intersections have the same positive elements and disjoint sets of differing exclusions,
+their union is just the common part. Every value in the common part must satisfy at least one of the
+two sets of exclusions. This also preserves shared exclusions and gradual types:
+
+```py
+from typing import Any, Literal
+from ty_extensions._internal import Unknown
+
+def disjoint(
+    literals: (Any & ~Literal[1]) | (Any & ~Literal[2]),
+    shared: (Unknown & ~str & ~Literal[1]) | (Unknown & ~Literal[2] & ~str),
+    earlier: int | (~str & ~Literal[1]) | (~str & ~Literal[2]),
+):
+    reveal_type(literals)  # revealed: Any
+    reveal_type(shared)  # revealed: Unknown & ~str
+    reveal_type(earlier)  # revealed: ~str
+```
+
+Each side can exclude several values, and the two sets need not have the same size. Only shared
+exclusions remain after merging:
+
+```py
+def groups(
+    disjoint: (Unknown & ~str & ~Literal[10, 11]) | (Unknown & ~Literal[20, 21] & ~str),
+    unequal: (Any & ~Literal[10]) | (Any & ~Literal[20, 21]),
+    shared: (Unknown & ~str & ~Literal[10, 11]) | (Unknown & ~str & ~Literal[11, 12, 13]),
+):
+    reveal_type(disjoint)  # revealed: Unknown & ~str
+    reveal_type(unequal)  # revealed: Any
+    reveal_type(shared)  # revealed: Unknown & ~str & ~Literal[11]
+```
+
+If the exclusions might overlap, a value in both excluded types is still absent from the union, so
+we keep the exclusions:
+
+```py
+class P: ...
+class Q: ...
+
+def overlapping(value: (Any & ~str & ~Literal[10] & ~P) | (Any & ~str & ~Literal[20] & ~Q)):
+    reveal_type(value)  # revealed: (Any & ~str & ~Literal[10] & ~P) | (Any & ~str & ~Literal[20] & ~Q)
+```
+
+### Union elements cover exclusions
+
+Adding an excluded type back to a union makes the exclusion redundant: `(P & ~Q) | Q = P | Q`. This
+also applies when the added type is a supertype of the exclusion.
+
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class P: ...
+class Q: ...
+class SubQ(Q): ...
+class R: ...
+
+static_assert(is_equivalent_to((P & ~Q) | Q, P | Q))
+static_assert(is_equivalent_to(Q | (P & ~Q), Q | P))
+static_assert(is_equivalent_to((P & ~SubQ) | Q, P | Q))
+static_assert(is_equivalent_to(Q | (P & ~SubQ), Q | P))
+```
+
+Other exclusions remain in place. Removing an exclusion can also make an earlier union element
+redundant, regardless of the order of the elements:
+
+```pyi
+static_assert(is_equivalent_to((P & ~Q & ~R) | Q, (P & ~R) | Q))
+static_assert(is_equivalent_to(Q | (P & ~Q & ~R), Q | (P & ~R)))
+static_assert(is_equivalent_to((P & R) | (P & ~Q) | Q, P | Q))
+static_assert(is_equivalent_to((P & R) | Q | (P & ~Q), P | Q))
+
+def unrelated(value: (P & ~Q) | R):
+    reveal_type(value)  # revealed: (P & ~Q) | R
+```
+
+The covering type must contain every materialization of the exclusion. Repeating a gradual type does
+not guarantee this, but a fully static supertype can cover a gradual exclusion:
+
+```pyi
+from typing import Any
+
+def gradual(value: (P & ~tuple[Any]) | tuple[Any]):
+    reveal_type(value)  # revealed: (P & ~tuple[Any]) | tuple[Any]
+
+static_assert(is_equivalent_to((P & ~tuple[Any]) | tuple[object], P | tuple[object]))
+static_assert(is_equivalent_to((Any & ~Q) | Q, Any | Q))
+```
+
+`Hashable` does not cover every subclass of a non-final class: a subclass can disable hashing.
+
+```pyi
+from collections.abc import Hashable
+
+class Unhashable(P):
+    __hash__: None = None
+
+def hashable_last(value: (Any & ~P) | Hashable):
+    reveal_type(value)  # revealed: (Any & ~P) | Hashable
+
+def hashable_first(value: Hashable | (Any & ~P)):
+    reveal_type(value)  # revealed: Hashable | (Any & ~P)
+
+hashable_last(Unhashable())  # error: [invalid-argument-type]
+hashable_first(Unhashable())  # error: [invalid-argument-type]
+```
+
+The same simplification applies to literal union members, including unions that restore only some of
+the excluded literals:
+
+```pyi
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def literals(
+    ints: (Any & ~Literal[1]) | Literal[1],
+    reverse_ints: Literal[1] | (Any & ~Literal[1]),
+    strings: (Any & ~Literal["a"]) | Literal["a"],
+    bytes_: (Any & ~Literal[b"a"]) | Literal[b"a"],
+    enums: (Any & ~Literal[Color.RED]) | Literal[Color.RED],
+    partial: (Any & ~Literal[1, 2, 3]) | Literal[1, 2],
+):
+    reveal_type(ints)  # revealed: Any | Literal[1]
+    reveal_type(reverse_ints)  # revealed: Literal[1] | Any
+    reveal_type(strings)  # revealed: Any | Literal["a"]
+    reveal_type(bytes_)  # revealed: Any | Literal[b"a"]
+    reveal_type(enums)  # revealed: Any | Literal[Color.RED]
+    reveal_type(partial)  # revealed: (Any & ~Literal[3]) | Literal[1, 2]
+```
+
 ### Negation distributes over union
 
 Distribution also applies to a negation operation. This is a manifestation of one of
@@ -924,6 +1060,11 @@ def any(
     reveal_type(i1)  # revealed: Any
     reveal_type(i2)  # revealed: P & Any
     reveal_type(i3)  # revealed: Never
+
+type AnyAlias = Any
+
+def aliased_any(value: ~AnyAlias) -> None:
+    reveal_type(value)  # revealed: Any
 
 def unknown(
     i1: ~Unknown,

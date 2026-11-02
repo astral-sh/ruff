@@ -47,10 +47,7 @@ fn format_document_range(
         .context("Failed to get text document for the format range request")
         .unwrap();
     let query = snapshot.query();
-    let backend = snapshot
-        .client_settings()
-        .editor_settings()
-        .format_backend();
+    let backend = snapshot.format_backend();
     format_text_document_range(text_document, range, query, snapshot.encoding(), backend)
 }
 

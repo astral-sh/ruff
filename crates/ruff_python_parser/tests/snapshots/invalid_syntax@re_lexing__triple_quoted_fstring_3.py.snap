@@ -36,51 +36,49 @@ Module(
                                             range: 239..253,
                                             value: FStringValue {
                                                 inner: Single(
-                                                    FString(
-                                                        FString {
-                                                            range: 239..253,
-                                                            node_index: NodeIndex(None),
-                                                            elements: [
-                                                                Interpolation(
-                                                                    InterpolatedElement {
-                                                                        range: 243..250,
-                                                                        node_index: NodeIndex(None),
-                                                                        expression: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 244..245,
-                                                                                id: Name("x"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        debug_text: None,
-                                                                        conversion: None,
-                                                                        format_spec: Some(
-                                                                            InterpolatedStringFormatSpec {
-                                                                                range: 246..250,
-                                                                                node_index: NodeIndex(None),
-                                                                                elements: [
-                                                                                    Literal(
-                                                                                        InterpolatedStringLiteralElement {
-                                                                                            range: 246..250,
-                                                                                            node_index: NodeIndex(None),
-                                                                                            value: ".3f\n",
-                                                                                        },
-                                                                                    ),
-                                                                                ],
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            flags: FStringFlags {
-                                                                quote_style: Single,
-                                                                prefix: Regular,
-                                                                triple_quoted: true,
-                                                                unclosed: false,
-                                                            },
+                                                    FString {
+                                                        range: 239..253,
+                                                        node_index: NodeIndex(None),
+                                                        elements: [
+                                                            Interpolation(
+                                                                InterpolatedElement {
+                                                                    range: 243..250,
+                                                                    node_index: NodeIndex(None),
+                                                                    expression: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 244..245,
+                                                                            id: Name("x"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: Some(
+                                                                        InterpolatedStringFormatSpec {
+                                                                            range: 246..250,
+                                                                            node_index: NodeIndex(None),
+                                                                            elements: [
+                                                                                Literal(
+                                                                                    InterpolatedStringLiteralElement {
+                                                                                        range: 246..250,
+                                                                                        node_index: NodeIndex(None),
+                                                                                        value: ".3f\n",
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ],
+                                                        flags: FStringFlags {
+                                                            quote_style: Single,
+                                                            prefix: Regular,
+                                                            triple_quoted: true,
+                                                            unclosed: false,
                                                         },
-                                                    ),
+                                                    },
                                                 ),
                                             },
                                         },

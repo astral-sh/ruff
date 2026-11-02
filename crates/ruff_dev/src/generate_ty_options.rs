@@ -5,7 +5,7 @@ use std::{fmt::Write, path::PathBuf};
 
 use anyhow::bail;
 use itertools::Itertools;
-use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionField, OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
 use ty_project::metadata::Options;
 
@@ -183,7 +183,7 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
     let header = if header.is_empty() {
         String::new()
     } else {
-        format!("\n    {header}")
+        format!("\n{}", textwrap::indent(header, "    "))
     };
     format!(
         "=== \"{}\"\n\n    ```toml{}\n{}\n    ```\n",
@@ -215,21 +215,50 @@ fn format_snippet<'a>(
         example = example.replace("[tool.ty.", "[").into();
     }
 
-    // Ex) `[[tool.ty.xx]]`
-    if example.starts_with(&format!("[[{header}")) {
-        return (String::new(), example);
+    let mut headers = Vec::new();
+    for (index, parent) in parents.iter().enumerate() {
+        let OptionSetKind::Array { example: fields } = parent.metadata().kind() else {
+            continue;
+        };
+
+        let array = configuration
+            .parent_table()
+            .into_iter()
+            .chain(parents[..=index].iter().filter_map(|parent| parent.name()))
+            .join(".");
+
+        // Explicit examples can supply the array entry and its nested tables themselves.
+        // Ex) `[[tool.ty.overrides]]` in the `overrides.rules` example.
+        if example.starts_with(&format!("[[{array}]]")) {
+            return (headers.join("\n\n"), example);
+        }
+
+        if (index + 1 == parents.len() && scope.is_none()) || fields.is_empty() {
+            headers.push(format!("[[{array}]]"));
+        } else {
+            // Ex) `[[tool.ty.overrides]]` with `include = ["src"]` before
+            // `[tool.ty.overrides.analysis]`.
+            headers.push(format!("[[{array}]]\n{fields}"));
+        }
     }
 
-    // Ex) `[tool.ty.rules]`
-    if example.starts_with(&format!("[{header}")) {
-        return (String::new(), example);
+    // Ex) `overrides.include` belongs directly to `[[tool.ty.overrides]]`,
+    // so it must not also get a `[tool.ty.overrides]` header.
+    let is_array_entry = scope.is_none()
+        && parents
+            .last()
+            .is_some_and(|parent| matches!(parent.metadata().kind(), OptionSetKind::Array { .. }));
+
+    // Ex) `[tool.ty.rules]` is already part of the field example.
+    if !header.is_empty()
+        && !is_array_entry
+        && !example.starts_with(&format!("[{header}"))
+        && !example.starts_with(&format!("[[{header}"))
+    {
+        headers.push(format!("[{header}]"));
     }
 
-    if header.is_empty() {
-        (String::new(), example)
-    } else {
-        (format!("[{header}]"), example)
-    }
+    (headers.join("\n\n"), example)
 }
 
 #[derive(Default)]

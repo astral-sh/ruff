@@ -214,4 +214,51 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 232 |     ) in ["a", "b", "c"]:
 233 |         result[k] = k
     |         ^^^^^^^^^^^^^
+234 |
+235 | def f(values):
+    |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:239:9
+    |
+237 |     result = {}
+238 |     for key, value in [values] if isinstance(values, tuple) else values:
+239 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+240 |     return result
+    |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:246:9
+    |
+244 |     result = {0: 0}
+245 |     for key, value in ([values] if isinstance(values, tuple) else values):
+246 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+247 |     return result
+    |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:253:9
+    |
+251 |     result = {}
+252 |     for key, value in lambda: values:
+253 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+254 |     return result
+    |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:276:9
+    |
+274 |         values if values else ()
+275 |     ):
+276 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+277 |     return result
+    |
 help: Replace for loop with dict comprehension

@@ -68,3 +68,29 @@ class Sit:
         self = object()
         alias = self
         print(alias._x)  # error (self is not an instance parameter)
+
+
+# https://github.com/astral-sh/ruff/issues/28989
+
+class Amet:
+    def __new__(cls):
+        instance = object().__new__(cls)
+        instance._value = 1  # fine
+
+    def __new__(cls):
+        instance = object.__new__(cls)
+        instance._value = 1  # fine
+
+    @classmethod
+    def m(cls):
+        instance = object.__new__(Amet)
+        instance._value = 1  # fine
+
+    def __new__(cls):
+        instance = object(1).__new__(cls)
+        instance._value = 1  # error (not a bare `object()`)
+
+    def __new__(cls):
+        object = Lorem
+        instance = object.__new__(cls)
+        instance._value = 1  # error (`object` is not the builtin)

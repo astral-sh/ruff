@@ -24,4 +24,4 @@ a = 20 / 2
 
 This rule is skipped if
 [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false`.
+is set to `false`.

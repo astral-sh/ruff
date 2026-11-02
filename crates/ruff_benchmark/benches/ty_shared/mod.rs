@@ -59,7 +59,7 @@ pub(super) fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Ca
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
+    metadata.set_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python,

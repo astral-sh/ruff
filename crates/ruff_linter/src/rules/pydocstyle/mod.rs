@@ -198,7 +198,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                // With explicit numpy convention, we shouldn't flag anything.
+                // With explicit numpy convention, we should only flag the NumPy-style docstrings.
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
                     ..Settings::default()

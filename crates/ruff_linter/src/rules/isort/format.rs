@@ -156,7 +156,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_width(2).add_str(comment);
+        line_width = line_width.add_comment(comment);
     }
 
     for (_, comments) in aliases {
@@ -164,21 +164,21 @@ fn format_single_line(
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = line_width.add_comment(comment);
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = line_width.add_comment(comment);
         }
 
         for comment in &comments.trailing {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = line_width.add_width(2).add_str(comment);
+            line_width = line_width.add_comment(comment);
         }
     }
 
@@ -186,7 +186,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = line_width.add_width(2).add_str(comment);
+        line_width = line_width.add_comment(comment);
     }
 
     output.push_str(&stylist.line_ending());

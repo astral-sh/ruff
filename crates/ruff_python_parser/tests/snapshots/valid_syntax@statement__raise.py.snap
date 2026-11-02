@@ -79,19 +79,19 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 41..46,
-                                left: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 41..42,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
                                 ops: [
                                     Lt,
                                 ],
-                                comparators: [
+                                operands: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 41..42,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
                                     NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
@@ -342,19 +342,19 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 186..191,
-                                left: NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 186..187,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
                                 ops: [
                                     Lt,
                                 ],
-                                comparators: [
+                                operands: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 186..187,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
                                     NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),

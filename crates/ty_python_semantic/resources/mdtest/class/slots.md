@@ -461,8 +461,8 @@ IntegerChild().value = "wrong"  # error: [invalid-assignment]
 
 ## Subclass annotations override inherited slot types
 
-A subclass can narrow an inherited attribute declaration even when its storage remains in a base
-class's slot. Reads and writes use the subclass's declared type, as they do without slots.
+A subclass declaration determines its read and write types even when storage remains in a base
+class's slot. Narrowing the type is unsafe because it rejects writes accepted by the base.
 
 ```py
 class Base:
@@ -471,8 +471,7 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-    value: int
+    value: int  # error: [invalid-mutable-override]
 
 reveal_type(Child().value)  # revealed: int
 Child().value = 2
@@ -484,8 +483,7 @@ An annotation on an assignment in the subclass's initializer establishes the sam
 ```py
 class InitializedChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: int = 1
+        self.value: int = 1  # error: [invalid-mutable-override]
 
     def get(self) -> int:
         return self.value
@@ -499,8 +497,7 @@ As with an ordinary instance attribute, an overriding annotation replaces the in
 ```py
 class StringChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: str = "valid"
+        self.value: str = "valid"  # error: [invalid-attribute-override]
 
 reveal_type(StringChild().value)  # revealed: str
 StringChild().value = 1  # error: [invalid-assignment]
@@ -885,19 +882,53 @@ class CustomSetter:
 CustomSetter().shared = 1
 ```
 
-## Instance dictionaries and inherited annotations
+## Instance dictionaries require dictionary storage
 
-Typeshed declares `__dict__` on `object`. As an intentional limitation, the attribute therefore
-remains available through ordinary attribute lookup even when accessing it would raise an
-`AttributeError` at runtime.
+A slotted instance without dictionary storage does not expose `__dict__`, even though typeshed
+declares the attribute on `object`. The class itself still has its own namespace.
 
 ```py
 class Slotted:
     __slots__ = ("value",)
 
-reveal_type(Slotted().__dict__)  # revealed: dict[str, Any]
+Slotted().__dict__  # error: [unresolved-attribute]
 reveal_type(Slotted.__dict__)  # revealed: dict[str, Any]
 ```
+
+A slotted dataclass also omits the instance dictionary.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class SlottedDataclass:
+    value: int
+
+SlottedDataclass(1).__dict__  # error: [unresolved-attribute]
+```
+
+An explicit dictionary slot restores access to the instance dictionary.
+
+```py
+class WithDictionary:
+    __slots__ = ("value", "__dict__")
+
+reveal_type(WithDictionary().__dict__)  # revealed: dict[str, Any]
+```
+
+An ordinary base class can also provide inherited dictionary storage.
+
+```py
+class OrdinaryBase:
+    pass
+
+class InheritedDictionary(OrdinaryBase):
+    __slots__ = ("value",)
+
+reveal_type(InheritedDictionary().__dict__)  # revealed: dict[str, Any]
+```
+
+## Guarded instance dictionary access
 
 An unslotted subclass can introduce an instance dictionary, so methods on a slotted base may access
 the dictionary after checking whether it exists.
@@ -917,6 +948,33 @@ class OrdinaryChild(SlottedBase):
     pass
 
 reveal_type(OrdinaryChild().__dict__)  # revealed: dict[str, Any]
+```
+
+A positive `hasattr` check can also establish that a value annotated with the slotted base is
+actually an instance of a subclass with a dictionary.
+
+```py
+def attributes(instance: SlottedBase) -> dict[str, Any]:
+    if hasattr(instance, "__dict__"):
+        reveal_type(instance.__dict__)  # revealed: dict[str, Any]
+        return instance.__dict__
+    return {}
+```
+
+## Virtual instance dictionaries
+
+A custom attribute getter can expose a virtual dictionary without providing dictionary-backed
+attribute storage.
+
+```py
+class VirtualDictionary:
+    __slots__ = ()
+
+    def __getattr__(self, name: str) -> int:
+        return 1
+
+reveal_type(VirtualDictionary().__dict__)  # revealed: int
+VirtualDictionary().extra = 1  # error: [unresolved-attribute]
 ```
 
 ## Weak-reference slots create descriptors

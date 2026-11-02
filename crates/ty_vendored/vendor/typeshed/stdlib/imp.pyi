@@ -123,7 +123,7 @@ def load_module(name: str, file: _FileLike | None, filename: str, details: tuple
 
 # IO[Any] is a TextIOWrapper if name is a .py file, and a FileIO otherwise.
 def find_module(
-    name: str, path: None | list[str] | list[PathLike[str]] | list[StrPath] = None
+    name: str, path: list[str] | list[PathLike[str]] | list[StrPath] | None = None
 ) -> tuple[IO[Any], str, tuple[str, str, int]]:
     """**DEPRECATED**
 

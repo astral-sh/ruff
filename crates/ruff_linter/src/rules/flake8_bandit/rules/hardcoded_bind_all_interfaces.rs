@@ -49,12 +49,12 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
         StringLike::FString(ast::ExprFString { value, .. }) => {
             for part in value {
                 match part {
-                    ast::FStringPart::Literal(literal) => {
+                    ast::FStringPartRef::Literal(literal) => {
                         if &**literal == "0.0.0.0" {
                             checker.report_diagnostic(HardcodedBindAllInterfaces, literal.range());
                         }
                     }
-                    ast::FStringPart::FString(f_string) => {
+                    ast::FStringPartRef::FString(f_string) => {
                         for literal in f_string.elements.literals() {
                             if &**literal == "0.0.0.0" {
                                 checker

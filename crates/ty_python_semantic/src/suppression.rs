@@ -213,26 +213,29 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
 
 struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
-    file: File,
+    python_file: PythonFile<'a>,
     suppressions: &'a Suppressions,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
-        let suppressions = suppressions(db, file);
+    fn new(db: &'a dyn Db, python_file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
         Self {
             db,
-            file: file.file(db),
-            suppressions,
+            python_file,
+            suppressions: suppressions(db, python_file),
             diagnostics: diagnostics.into(),
         }
+    }
+
+    fn file(&self) -> File {
+        self.python_file.file(self.db)
     }
 
     fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
         !self
             .db
-            .rule_selection(self.file)
+            .rule_selection(self.file())
             .is_enabled(LintId::of(lint))
     }
 
@@ -281,7 +284,10 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
         lint: &'static LintMetadata,
         range: TextRange,
     ) -> Option<Self> {
-        let severity = ctx.db.rule_selection(ctx.file).severity(LintId::of(lint))?;
+        let severity = ctx
+            .db
+            .rule_selection(ctx.file())
+            .severity(LintId::of(lint))?;
 
         Some(Self {
             ctx,
@@ -301,9 +307,10 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     fn into_diagnostic(self, message: impl IntoDiagnosticMessage) -> DiagnosticGuard<'ctx> {
         let mut diag = Diagnostic::new(self.id, self.severity, message);
 
-        let primary_span = Span::from(self.ctx.file).with_range(self.range);
+        let file = self.ctx.file();
+        let primary_span = Span::from(file).with_range(self.range);
         diag.annotate(Annotation::primary(primary_span));
-        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
+        DiagnosticGuard::new(file, &self.ctx.diagnostics, diag)
     }
 }
 

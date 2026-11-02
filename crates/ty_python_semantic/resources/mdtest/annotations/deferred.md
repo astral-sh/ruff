@@ -113,6 +113,78 @@ class Foo:
     type Baz = Foo
 ```
 
+## Class bindings shadow types in string annotations
+
+A class attribute with a value shadows an outer type of the same name, including in its own string
+annotation. An annotation without a value does not create a class binding, so it can still refer to
+the outer type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class C:
+    bytes: "bytes"
+    str: "str" = ""  # error: [invalid-type-form]
+```
+
+The built-in `type` is an instance of itself, so assigning it to an attribute with this cyclic
+annotation is valid:
+
+```py
+class C:
+    type: "type" = type
+
+reveal_type(C.type)  # revealed: type
+```
+
+## Class bindings shadow types with future annotations
+
+With `from __future__ import annotations`, unquoted annotations follow the same name-resolution
+rules.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+class C:
+    bytes: bytes
+    str: str = ""  # error: [invalid-type-form]
+```
+
+## Class bindings shadow types with deferred evaluation
+
+Python 3.14 defers annotation evaluation without requiring a future import. The same class binding
+rules apply.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C:
+    bytes: bytes
+    str: str = ""  # error: [invalid-type-form]
+```
+
+## Mutually recursive class annotations with values
+
+These integer and string values are not valid types. We reject both annotations even though
+inferring either annotation depends on the other attribute.
+
+```py
+class C:
+    first: "second" = 1  # error: [invalid-type-form]
+    second: "first" = ""  # error: [invalid-type-form]
+```
+
 ## Non-deferred self-reference annotations in a class definition
 
 ```toml

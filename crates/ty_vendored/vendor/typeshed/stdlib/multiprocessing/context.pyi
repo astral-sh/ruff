@@ -248,7 +248,12 @@ class Process(BaseProcess):
 
 class DefaultContext(BaseContext):
     Process: ClassVar[type[Process]]
-    def __init__(self, context: BaseContext) -> None: ...
+    if sys.version_info >= (3, 14):
+        # The context parameter became optional in Python 3.14.9 and 3.15.1.
+        def __init__(self, context: BaseContext | None = None) -> None: ...
+    else:
+        def __init__(self, context: BaseContext) -> None: ...
+
     def get_start_method(self, allow_none: bool = False) -> str: ...
     def get_all_start_methods(self) -> list[str]:
         """Returns a list of the supported start methods, default first."""

@@ -10,6 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -84,7 +85,10 @@ impl Violation for ManualDictComprehension {
 
 /// PERF403
 pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let ast::StmtFor { body, target, .. } = for_stmt;
+    let ast::StmtFor {
+        body, target, iter, ..
+    } = for_stmt;
+
     let body = body.as_slice();
     let target = target.as_ref();
     let (stmt, if_test) = match body {
@@ -139,6 +143,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     else {
         return;
     };
+
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
+    if any_over_expr(iter, &Expr::is_named_expr) {
+        return;
+    }
 
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError. Make sure none
@@ -332,22 +342,8 @@ fn convert_to_dict_comprehension(
         None => String::new(),
     };
 
-    // if the loop target was an implicit tuple, add parentheses around it
-    // ```python
-    //  for i in a, b:
-    //      ...
-    // ```
-    // becomes
-    // {... for i in (a, b)}
-    let iter_str = if let Expr::Tuple(ast::ExprTuple {
-        parenthesized: false,
-        ..
-    }) = &*for_stmt.iter
-    {
-        format!("({})", locator.slice(for_stmt.iter.range()))
-    } else {
-        locator.slice(for_stmt.iter.range()).to_string()
-    };
+    let (iter_str, iter_range) =
+        parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let target_str = locator.slice(for_stmt.target.range());
     let for_type = if for_stmt.is_async {
@@ -391,7 +387,7 @@ fn convert_to_dict_comprehension(
     let mut ranges_to_ignore = vec![
         key.range(),
         value.range(),
-        for_stmt.iter.range(),
+        iter_range,
         for_stmt.target.range(),
     ];
     if let Some(test) = if_test {

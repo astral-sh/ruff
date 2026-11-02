@@ -469,3 +469,189 @@ reveal_type(Both().both)  # revealed: str
 reveal_type(Impl().impl)  # revealed: str
 reveal_type(Fake().fake)  # revealed: Unknown
 ```
+
+## Partial stub for a legacy namespace package
+
+A partial stub package takes precedence over a legacy namespace package for modules it defines.
+Subpackages missing from the stubs still resolve from the runtime package.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4767>.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs/py.typed`:
+
+```text
+partial
+```
+
+`/packages/foo-stubs/__init__.pyi`:
+
+```pyi
+x: int
+```
+
+`/packages/foo/__init__.py`:
+
+```py
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+x = "runtime"
+```
+
+`/packages/foo/sub/__init__.py`:
+
+```py
+y = 1
+```
+
+`main.py`:
+
+```py
+from foo import x
+from foo.sub import y
+
+reveal_type(x)  # revealed: int
+reveal_type(y)  # revealed: Literal[1]
+```
+
+## Partial stub for an implicit namespace package
+
+The runtime package can also be an implicit namespace package, without an `__init__.py`.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs/py.typed`:
+
+```text
+partial
+```
+
+`/packages/foo-stubs/__init__.pyi`:
+
+```pyi
+```
+
+`/packages/foo/impl.py`:
+
+```py
+x = 1
+```
+
+`main.py`:
+
+```py
+from foo.impl import x
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+## Complete stub with a partial subpackage in a namespace package
+
+Although the root stub package is complete, its `bar` subpackage declares itself partial. Missing
+modules within `bar` still resolve from the runtime package, even when its root is a namespace
+package. Runtime-only siblings of `bar` remain inaccessible through the complete root stub.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs/__init__.pyi`:
+
+```pyi
+```
+
+`/packages/foo-stubs/bar/py.typed`:
+
+```text
+partial
+```
+
+`/packages/foo-stubs/bar/__init__.pyi`:
+
+```pyi
+```
+
+`/packages/foo/__init__.py`:
+
+```py
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+```
+
+`/packages/foo/bar/__init__.py`:
+
+```py
+```
+
+`/packages/foo/bar/impl.py`:
+
+```py
+x = 1
+```
+
+`/packages/foo/hidden.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import foo.hidden  # error: [unresolved-import]
+from foo.bar.impl import x
+
+reveal_type(x)  # revealed: Literal[1]
+```
+
+## Partial stubs preserve runtime package precedence
+
+A regular runtime package shadows a runtime namespace package, even when the namespace comes first
+on the search path. Partial stubs fall back to the regular package without exposing modules from the
+shadowed namespace.
+
+```toml
+[environment]
+extra-paths = ["/first", "/second"]
+```
+
+`/first/foo-stubs/py.typed`:
+
+```text
+partial
+```
+
+`/first/foo-stubs/__init__.pyi`:
+
+```pyi
+```
+
+`/first/foo/hidden.py`:
+
+```py
+```
+
+`/second/foo/__init__.py`:
+
+```py
+```
+
+`/second/foo/impl.py`:
+
+```py
+x = 1
+```
+
+`main.py`:
+
+```py
+import foo.hidden  # error: [unresolved-import]
+from foo.impl import x
+
+reveal_type(x)  # revealed: Literal[1]
+```

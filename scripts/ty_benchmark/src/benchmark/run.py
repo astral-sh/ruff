@@ -139,7 +139,7 @@ def main() -> None:
     first = True
 
     for project in projects:
-        if skip_reason := project.skip:
+        if (skip_reason := project.skip) is not None:
             print(f"Skipping {project.name}: {skip_reason}")
             continue
 

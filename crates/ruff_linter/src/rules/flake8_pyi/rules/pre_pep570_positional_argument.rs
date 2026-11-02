@@ -84,7 +84,9 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
     // If the method has a `self` or `cls` argument, skip it.
     let skip = usize::from(matches!(
         function_type,
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ));
 
     if let Some(param) = function_def.parameters.args.get(skip) {

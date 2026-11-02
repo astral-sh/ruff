@@ -1,0 +1,35 @@
+version = 1
+revision = 5
+requires-python = "==3.13.*"
+
+[[package]]
+name = "django-types"
+version = "0.24.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "types-psycopg2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d7/7b/8e05b8631fa7de84038d4f24fa57e983107aff889a6d88a9c40a21e15d1c/django_types-0.24.0.tar.gz", hash = "sha256:af903de8b9ee963b7594459a7a20cb8eaaab176ae2b3244ecaa089e0c570b0d1", size = 208426, upload-time = "2026-04-22T22:19:01.999Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/ab/f5c37ecc08c396df62579246597796697b58253c8b30206870e8d0f644d0/django_types-0.24.0-py3-none-any.whl", hash = "sha256:ddb478ca733e0dde5475118dd59ab340156980f9659fd92de2083326ae96100a", size = 379436, upload-time = "2026-04-22T22:19:03.368Z" },
+]
+
+[[package]]
+name = "mdtest-deps"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "django-types" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "django-types", specifier = "==0.24.0" }]
+
+[[package]]
+name = "types-psycopg2"
+version = "2.9.21.20261008"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/31/936ed138b7b891e5e7e281ae6850c9beb4f82d7631130e5094e7a038fd02/types_psycopg2-2.9.21.20261008.tar.gz", hash = "sha256:6211642ac3ed423de069669d2d4516dfd02451049201c3ecb2740f5083cfccaa", size = 27860, upload-time = "2026-10-08T08:06:21.143Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/1f/e46bf261dff17ee1b8e69bce5d2627583ab69754c204d8ecc4399d54280a/types_psycopg2-2.9.21.20261008-py3-none-any.whl", hash = "sha256:4fe092ebf1b61c8b63a376dd8fa41f9bc0c3876948c1d3c0a039d1a0e842df07", size = 25035, upload-time = "2026-10-08T08:06:20.24Z" },
+]

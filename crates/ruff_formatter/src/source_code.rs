@@ -13,6 +13,7 @@ impl<'a> SourceCode<'a> {
         Self { text }
     }
 
+    #[inline]
     pub fn slice(self, range: TextRange) -> SourceCodeSlice {
         assert!(
             usize::from(range.end()) <= self.text.len(),
@@ -64,6 +65,7 @@ pub struct SourceCodeSlice {
 
 impl SourceCodeSlice {
     /// Returns the slice's text.
+    #[inline]
     pub fn text<'a>(&self, code: SourceCode<'a>) -> &'a str {
         assert!(
             usize::from(self.range.end()) <= code.text.len(),

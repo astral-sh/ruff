@@ -1,7 +1,11 @@
 ## What it does
 
 Detects attribute overrides that change whether an inherited attribute is reachable through the
-class object or only through an instance.
+class object or only through an instance, expose an incompatible value type, or make a writable
+attribute read-only.
+
+Narrowing a mutable attribute's type is checked separately by the `invalid-mutable-override` rule.
+Overrides involving properties are checked by `invalid-property-type-override`.
 
 ## Why is this bad?
 
@@ -17,13 +21,14 @@ so that case is allowed.
 ## Example
 
 ```python
-from typing import ClassVar
+from typing import ClassVar, Final
 
 
 class Base:
     instance_attr: int
     class_attr: ClassVar[int]
-    other_class_attr: ClassVar[int]
+    name: str
+    count: int
 
 
 class Sub(Base):
@@ -35,11 +40,11 @@ class Sub(Base):
     # and an instance, so overriding a `ClassVar` with one is fine.
     class_attr: int
 
-    # A property is only reachable as a value through an instance: reading
-    # `Sub.other_class_attr` yields the `property` object itself.
-    @property
-    def other_class_attr(self) -> int:  # error: [invalid-attribute-override]
-        return 1
+    name: bytes  # error: [invalid-attribute-override]
+    count: Final[int] = 0  # error: [invalid-attribute-override]
 ```
+
+Code that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also
+assign to `count`; making it final in the subclass removes that operation.
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle

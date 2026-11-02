@@ -216,7 +216,7 @@ info:  - or as part of an argument list when specializing a generic class
 ```
 
 ```
-error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type alias value
+error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a type alias definition
   --> src/mdtest_snippet.py:33:19
    |
 33 | type Alias[**P] = P

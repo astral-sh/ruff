@@ -1,69 +1,30 @@
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
-use std::io::Write;
 use std::num::NonZeroUsize;
 
 use colored::Colorize;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::render::Renderer;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
 use ruff_diagnostics::Applicability;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext};
 
-pub(crate) struct GroupedEmitter {
-    show_fix_status: bool,
-    applicability: Applicability,
-    preview: bool,
-    prefer_rule_codes: bool,
+pub(crate) struct GroupedRenderer<'a> {
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
-impl Default for GroupedEmitter {
-    fn default() -> Self {
-        Self {
-            show_fix_status: false,
-            applicability: Applicability::Safe,
-            preview: false,
-            prefer_rule_codes: false,
-        }
+impl<'a> GroupedRenderer<'a> {
+    pub(crate) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 }
 
-impl GroupedEmitter {
-    #[must_use]
-    pub(crate) fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.show_fix_status = show_fix_status;
-        self
-    }
-
-    #[must_use]
-    pub(crate) fn with_applicability(mut self, applicability: Applicability) -> Self {
-        self.applicability = applicability;
-        self
-    }
-
-    #[must_use]
-    pub(crate) fn with_preview(mut self, preview: bool) -> Self {
-        self.preview = preview;
-        self
-    }
-
-    #[must_use]
-    pub(crate) fn with_prefer_rule_codes(mut self, prefer_rule_codes: bool) -> Self {
-        self.prefer_rule_codes = prefer_rule_codes;
-        self
-    }
-}
-
-impl Emitter for GroupedEmitter {
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        context: &EmitterContext,
-    ) -> anyhow::Result<()> {
+impl Renderer for GroupedRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for (filename, messages) in group_diagnostics_by_filename(diagnostics) {
             // Compute the maximum number of digits in the row and column, for messages in
             // this file.
@@ -80,28 +41,31 @@ impl Emitter for GroupedEmitter {
             let column_length = max_column_length.digits();
 
             // Print the filename.
-            writeln!(writer, "{}:", relativize_path(&*filename).underline())?;
+            writeln!(f, "{}:", relativize_path(&*filename).underline())?;
 
             // Print each message.
             for message in messages {
                 write!(
-                    writer,
+                    f,
                     "{}",
                     DisplayGroupedMessage {
-                        notebook_index: context.notebook_index(&message.expect_ruff_filename()),
+                        notebook_index: self
+                            .resolver
+                            .notebook_index(message.expect_primary_span().file())
+                            .as_ref(),
                         message,
-                        show_fix_status: self.show_fix_status,
-                        applicability: self.applicability,
+                        show_fix_status: self.config.show_fix_status(),
+                        applicability: self.config.fix_applicability(),
                         row_length,
                         column_length,
-                        preview: self.preview,
-                        prefer_rule_codes: self.prefer_rule_codes,
+                        preview: self.config.preview_enabled(),
+                        prefer_rule_codes: self.config.is_prefer_rule_codes_enabled(),
                     }
                 )?;
             }
 
             // Print a blank line between files.
-            writeln!(writer)?;
+            writeln!(f)?;
         }
 
         Ok(())
@@ -252,45 +216,58 @@ impl Display for RuleCodeAndBody<'_> {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use rustc_hash::FxHashMap;
 
+    use ruff_db::diagnostic::DisplayDiagnosticConfig;
+    use ruff_db::diagnostic::render::Renderer;
     use ruff_diagnostics::Applicability;
 
-    use crate::message::GroupedEmitter;
-    use crate::message::tests::{
-        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
-    };
+    use crate::message::tests::{create_diagnostics, create_syntax_error_diagnostics};
+    use crate::message::{GroupedRenderer, RenderContext};
 
     #[test]
     fn default() {
-        let mut emitter = GroupedEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
+        assert_snapshot!(
+            GroupedRenderer::new(
+                &RenderContext::new(&FxHashMap::default()),
+                &DisplayDiagnosticConfig::new("ruff"),
+            )
+            .display(&create_diagnostics())
+        );
     }
 
     #[test]
     fn syntax_errors() {
-        let mut emitter = GroupedEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
-
-        assert_snapshot!(content);
+        assert_snapshot!(
+            GroupedRenderer::new(
+                &RenderContext::new(&FxHashMap::default()),
+                &DisplayDiagnosticConfig::new("ruff"),
+            )
+            .display(&create_syntax_error_diagnostics())
+        );
     }
 
     #[test]
     fn fix_status() {
-        let mut emitter = GroupedEmitter::default().with_show_fix_status(true);
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
+        assert_snapshot!(
+            GroupedRenderer::new(
+                &RenderContext::new(&FxHashMap::default()),
+                &DisplayDiagnosticConfig::new("ruff").with_show_fix_status(true),
+            )
+            .display(&create_diagnostics())
+        );
     }
 
     #[test]
     fn fix_status_unsafe() {
-        let mut emitter = GroupedEmitter::default()
-            .with_show_fix_status(true)
-            .with_applicability(Applicability::Unsafe);
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
+        assert_snapshot!(
+            GroupedRenderer::new(
+                &RenderContext::new(&FxHashMap::default()),
+                &DisplayDiagnosticConfig::new("ruff")
+                    .with_show_fix_status(true)
+                    .with_fix_applicability(Applicability::Unsafe),
+            )
+            .display(&create_diagnostics())
+        );
     }
 }

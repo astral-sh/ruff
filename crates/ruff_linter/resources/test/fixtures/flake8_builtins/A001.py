@@ -30,6 +30,25 @@ with open('file') as str, open('file2') as (all, any):
 [0 for sum in ()]
 
 
+class C:
+    # Attribute bindings are handled by A003, not A001.
+    id = 1
+    id: int = 2
+
+    def id(self):
+        pass
+
+    # Other class-scope bindings shadow the builtin like at module level.
+    # See https://github.com/astral-sh/ruff/issues/20179
+    for id in [1]:
+        pass
+
+    (id := 2)
+
+    with open('file') as id:
+        pass
+
+
 # These should not report violations as discussed in
 # https://github.com/astral-sh/ruff/issues/16373
 from importlib.machinery import SourceFileLoader

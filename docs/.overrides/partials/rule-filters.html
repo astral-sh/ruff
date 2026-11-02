@@ -1,0 +1,59 @@
+<form id="rule-filters" class="rule-filters" role="search" aria-label="Filter rules" hidden>
+  <div class="rule-filters__controls">
+    <label class="rule-filters__search">
+      Search rules
+      <input type="search" name="rule-search" placeholder="Code or name"
+             autocomplete="off" spellcheck="false">
+    </label>
+
+    <fieldset class="rule-filters__category">
+      <legend>Category</legend>
+      <div data-filter="category">
+        <button type="button" popovertarget="rule-category-options"><span>All</span><span aria-hidden="true">▾</span></button>
+        <div id="rule-category-options" class="rule-filters__options" popover>
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="default">Default</button>
+            <button type="button" data-preset="none">None</button>
+          </div>
+          {category_options}
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="rule-filters__linter">
+      <legend>Linter</legend>
+      <div data-filter="linter">
+        <button type="button" popovertarget="rule-linter-options"><span>All</span><span aria-hidden="true">▾</span></button>
+        <div id="rule-linter-options" class="rule-filters__options" popover>
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="none">None</button>
+          </div>
+          {linter_options}
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="rule-filters__status">
+      <legend>Status</legend>
+      <div data-filter="status">
+        <button type="button" popovertarget="rule-status-options"><span>All</span><span aria-hidden="true">▾</span></button>
+        <div id="rule-status-options" class="rule-filters__options" popover>
+          <div class="rule-filters__actions">
+            <button type="button" data-preset="all">All</button>
+            <button type="button" data-preset="none">None</button>
+          </div>
+          <label><input type="checkbox" name="status" value="stable" checked> Stable</label>
+          <label><input type="checkbox" name="status" value="preview" checked> Preview</label>
+          <label><input type="checkbox" name="status" value="deprecated" checked> Deprecated</label>
+          <label><input type="checkbox" name="status" value="removed" checked> Removed</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <button type="reset">Clear filters</button>
+  </div>
+  <p class="rule-filters__count" role="status" aria-live="polite" aria-atomic="true"></p>
+  <p class="rule-filters__empty" hidden>No matching rules. Try another search or clear the filters.</p>
+</form>

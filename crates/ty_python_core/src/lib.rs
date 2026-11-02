@@ -6,12 +6,12 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 
 use ruff_index::{FrozenIndexVec, IndexSlice};
-use ruff_python_ast::NodeIndex;
+use ruff_python_ast::{HasNodeIndex, NodeIndex};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
@@ -33,7 +33,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
+    BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidate,
+    ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
     PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
@@ -45,6 +46,7 @@ mod db;
 pub mod definition;
 pub mod expression;
 pub mod frozen;
+mod interned_nodes;
 pub(crate) mod member;
 pub mod narrowing_constraints;
 pub mod node_key;
@@ -56,6 +58,7 @@ mod re_exports;
 pub mod reachability_constraints;
 pub mod scope;
 pub mod statement;
+pub mod static_dunder_all;
 pub mod symbol;
 pub mod unpack;
 mod use_def;
@@ -89,7 +92,7 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+    index.shared_place_table(scope.file_scope_id(db))
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -345,6 +348,11 @@ pub struct SemanticIndex<'db> {
     /// Set of all asynchronous comprehensions in this file.
     async_comprehensions: FrozenSet<FileScopeId>,
 
+    /// Node indices of syntactic annotation roots, sorted in source order. Annotations cannot
+    /// contain other syntactic annotations, so their ranges do not overlap. Storing only indices
+    /// avoids duplicating ranges and scopes already available from the AST and expression scope map.
+    annotations: Box<[NodeIndex]>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
@@ -358,6 +366,14 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Returns the recorded use of an expression, if it loads a tracked place.
+    pub fn try_expression_use_id(
+        &self,
+        expression: ast::ExprRef<'_>,
+    ) -> Option<ast_ids::ScopedUseId> {
+        self.ast_ids.try_use_id(expression)
+    }
+
     /// Returns the place table for a specific scope.
     ///
     /// Use the Salsa cached [`place_table()`] query if you only need the
@@ -365,6 +381,11 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Shares the existing place table with another per-scope query result.
+    pub fn shared_place_table(&self, scope_id: FileScopeId) -> Arc<PlaceTable> {
+        Arc::clone(&self.place_tables[scope_id])
     }
 
     /// Returns alias metadata for an alias Name node in a predicate, if one exists.
@@ -414,6 +435,40 @@ impl<'db> SemanticIndex<'db> {
         E: HasTrackedScope,
     {
         self.scopes_by_expression.try_get(expression)
+    }
+
+    /// Returns the scope enclosing the syntactic annotation containing `expression`, if any.
+    ///
+    /// `module` must correspond to the same file and revision as this index.
+    ///
+    /// ```python
+    /// from typing import Annotated
+    ///
+    /// def example(items: list[int]) -> None:
+    ///     result: Annotated[int, (item for item in items)]
+    /// ```
+    ///
+    /// The yielded `item` belongs to the generator's scope, and the iterable `items` belongs to
+    /// `example`'s scope. This method returns `example`'s scope for both, because both expressions
+    /// occur in the annotation on `result`.
+    pub fn annotation_parent_scope_id(
+        &self,
+        module: &ParsedModuleRef,
+        expression: &impl Ranged,
+    ) -> Option<FileScopeId> {
+        let index = self
+            .annotations
+            .partition_point(|index| module.get_by_index(*index).start() <= expression.start())
+            .checked_sub(1)?;
+        let ast::AnyRootNodeRef::Expr(annotation) = module.get_by_index(self.annotations[index])
+        else {
+            return None;
+        };
+        if annotation.range().contains_range(expression.range()) {
+            self.try_expression_scope_id(annotation)
+        } else {
+            None
+        }
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
@@ -551,6 +606,36 @@ impl<'db> SemanticIndex<'db> {
             self.use_def_map(scope_id)
                 .is_range_in_type_checking_block(range)
         })
+    }
+
+    /// Return `true` if `expression` is an outermost "boolean test".
+    ///
+    /// A boolean test is an expression that Python tests for truthiness, such as an `if`
+    /// condition or the operand of a `not` expression. ty's `redundant-condition` and
+    /// `redundant-condition-strict` rules can warn when such a test is always true or
+    /// always false. The rules try hard to avoid emitting duplicate diagnostics on the
+    /// same boolean test, however: in this case, a naive implementation would emit two
+    /// diagnostics on the `if` test, since there is both an `if` condition that is always
+    /// falsy and a `not` operand that is always truthy:
+    ///
+    /// ```py
+    /// def func(): ...
+    ///
+    /// if not func:  # one diagnostic, or two?
+    ///     pass
+    /// ```
+    ///
+    /// This method returns `true` when passed the expression `not func` in the above
+    /// example, but `false` for `func`, which is part of a nested boolean test.
+    ///
+    /// See `SemanticIndexBuilder::visit_boolean_test` for details on how we compute
+    /// and store the required data for answering this query during semantic indexing.
+    pub fn is_boolean_test_root(&self, expression: &ast::Expr) -> bool {
+        self.try_expression_scope_id(expression)
+            .is_some_and(|scope| {
+                self.use_def_map(scope)
+                    .is_boolean_test_root(expression.node_index().load())
+            })
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
@@ -939,6 +1024,8 @@ pub enum Truthiness {
     AlwaysFalse,
     /// For an object `x`, `bool(x)` could return either `True` or `False`
     Ambiguous,
+    /// No object or boolean outcome is possible, as with a value of type `Never`.
+    Uninhabited,
 }
 
 impl Truthiness {
@@ -946,12 +1033,20 @@ impl Truthiness {
         matches!(self, Truthiness::Ambiguous)
     }
 
+    pub const fn is_uninhabited(self) -> bool {
+        matches!(self, Truthiness::Uninhabited)
+    }
+
     pub const fn is_always_false(self) -> bool {
         matches!(self, Truthiness::AlwaysFalse)
     }
 
     pub const fn may_be_true(self) -> bool {
-        !self.is_always_false()
+        matches!(self, Self::AlwaysTrue | Self::Ambiguous)
+    }
+
+    pub const fn may_be_false(self) -> bool {
+        matches!(self, Self::AlwaysFalse | Self::Ambiguous)
     }
 
     pub const fn is_always_true(self) -> bool {
@@ -964,6 +1059,7 @@ impl Truthiness {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
             Self::Ambiguous => Self::Ambiguous,
+            Self::Uninhabited => Self::Uninhabited,
         }
     }
 
@@ -972,13 +1068,35 @@ impl Truthiness {
         if condition { self.negate() } else { self }
     }
 
+    /// Combine the possible outcomes of alternative paths or types.
+    ///
+    /// For types with truthiness `left` and `right`, `left.union(right)` describes the truthiness
+    /// of their union: a value can come from either type. For example,
+    /// `AlwaysTrue.union(AlwaysFalse)` is `Ambiguous`, since both boolean outcomes are possible.
+    /// In contrast, [`Truthiness::or`] models Python's `or` operator, which can skip its second
+    /// operand: `AlwaysTrue.or(AlwaysFalse)` is `AlwaysTrue`.
+    #[must_use]
+    pub fn union(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Uninhabited, other) | (other, Self::Uninhabited) => other,
+            (left, right) if left == right => left,
+            _ => Self::Ambiguous,
+        }
+    }
+
+    /// Combine conditions using Python's short-circuit `and` semantics.
+    ///
+    /// Short-circuiting makes this operation non-commutative when an operand is `Uninhabited`.
+    /// If `stop()` returns `Never`, `flag and stop()` can complete only when `flag` is false:
+    /// `Ambiguous.and(Uninhabited)` is `AlwaysFalse`. Reversing the operands always evaluates
+    /// `stop()` first, so `Uninhabited.and(Ambiguous)` is `Uninhabited`.
     #[must_use]
     pub fn and(self, other: Self) -> Self {
         match self {
             Truthiness::AlwaysTrue => other,
-            Truthiness::AlwaysFalse => self,
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => self,
             Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysFalse => Truthiness::AlwaysFalse,
+                Truthiness::AlwaysFalse | Truthiness::Uninhabited => Truthiness::AlwaysFalse,
                 Truthiness::AlwaysTrue | Truthiness::Ambiguous => Truthiness::Ambiguous,
             },
         }
@@ -988,18 +1106,24 @@ impl Truthiness {
     #[must_use]
     pub fn and_then(self, other: impl FnOnce() -> Self) -> Self {
         match self {
-            Truthiness::AlwaysFalse => self,
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => self,
             Truthiness::AlwaysTrue | Truthiness::Ambiguous => self.and(other()),
         }
     }
 
+    /// Combine conditions using Python's short-circuit `or` semantics.
+    ///
+    /// Short-circuiting makes this operation non-commutative when an operand is `Uninhabited`.
+    /// If `stop()` returns `Never`, `flag or stop()` can complete only when `flag` is true:
+    /// `Ambiguous.or(Uninhabited)` is `AlwaysTrue`. Reversing the operands always evaluates
+    /// `stop()` first, so `Uninhabited.or(Ambiguous)` is `Uninhabited`.
     #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
-            Truthiness::AlwaysTrue => self,
+            Truthiness::AlwaysTrue | Truthiness::Uninhabited => self,
             Truthiness::AlwaysFalse => other,
             Truthiness::Ambiguous => match other {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
+                Truthiness::AlwaysTrue | Truthiness::Uninhabited => Truthiness::AlwaysTrue,
                 Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
             },
         }
@@ -1008,12 +1132,8 @@ impl Truthiness {
     #[must_use]
     pub fn or_else(self, other: impl Fn() -> Self) -> Self {
         match self {
-            Truthiness::AlwaysTrue => self,
-            Truthiness::AlwaysFalse => other(),
-            Truthiness::Ambiguous => match other() {
-                Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
-                Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
-            },
+            Truthiness::AlwaysTrue | Truthiness::Uninhabited => self,
+            Truthiness::AlwaysFalse | Truthiness::Ambiguous => self.or(other()),
         }
     }
 }
@@ -1090,7 +1210,7 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use std::assert_matches;
+    use std::{assert_matches, cell::Cell};
 
     use ruff_db::{
         files::{File, system_path_to_file},
@@ -1098,15 +1218,17 @@ mod tests {
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
+    use test_case::test_case;
 
-    use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous};
+    use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
     use super::*;
 
     use crate::{
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
         definition::{
-            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+            DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
+            ParameterDefinitionNodeKind,
         },
         program::Program,
     };
@@ -1159,33 +1281,63 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn truthiness_and() {
-        for (left, right, expected) in [
-            (AlwaysTrue, AlwaysTrue, AlwaysTrue),
-            (AlwaysTrue, AlwaysFalse, AlwaysFalse),
-            (AlwaysTrue, Ambiguous, Ambiguous),
-            (AlwaysFalse, AlwaysTrue, AlwaysFalse),
-            (AlwaysFalse, AlwaysFalse, AlwaysFalse),
-            (AlwaysFalse, Ambiguous, AlwaysFalse),
-            (Ambiguous, AlwaysTrue, Ambiguous),
-            (Ambiguous, AlwaysFalse, AlwaysFalse),
-            (Ambiguous, Ambiguous, Ambiguous),
-        ] {
-            assert_eq!(left.and(right), expected, "{left:?}.and({right:?})");
+    #[test_case(AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue; "true_true")]
+    #[test_case(AlwaysTrue, AlwaysFalse, AlwaysFalse, AlwaysTrue, Ambiguous; "true_false")]
+    #[test_case(AlwaysTrue, Ambiguous, Ambiguous, AlwaysTrue, Ambiguous; "true_ambiguous")]
+    #[test_case(AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue, AlwaysTrue; "true_uninhabited")]
+    #[test_case(AlwaysFalse, AlwaysTrue, AlwaysFalse, AlwaysTrue, Ambiguous; "false_true")]
+    #[test_case(AlwaysFalse, AlwaysFalse, AlwaysFalse, AlwaysFalse, AlwaysFalse; "false_false")]
+    #[test_case(AlwaysFalse, Ambiguous, AlwaysFalse, Ambiguous, Ambiguous; "false_ambiguous")]
+    #[test_case(AlwaysFalse, Uninhabited, AlwaysFalse, Uninhabited, AlwaysFalse; "false_uninhabited")]
+    #[test_case(Ambiguous, AlwaysTrue, Ambiguous, AlwaysTrue, Ambiguous; "ambiguous_true")]
+    #[test_case(Ambiguous, AlwaysFalse, AlwaysFalse, Ambiguous, Ambiguous; "ambiguous_false")]
+    #[test_case(Ambiguous, Ambiguous, Ambiguous, Ambiguous, Ambiguous; "ambiguous_ambiguous")]
+    #[test_case(Ambiguous, Uninhabited, AlwaysFalse, AlwaysTrue, Ambiguous; "ambiguous_uninhabited")]
+    #[test_case(Uninhabited, AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue; "uninhabited_true")]
+    #[test_case(Uninhabited, AlwaysFalse, Uninhabited, Uninhabited, AlwaysFalse; "uninhabited_false")]
+    #[test_case(Uninhabited, Ambiguous, Uninhabited, Uninhabited, Ambiguous; "uninhabited_ambiguous")]
+    #[test_case(Uninhabited, Uninhabited, Uninhabited, Uninhabited, Uninhabited; "uninhabited_uninhabited")]
+    fn truthiness_short_circuit(
+        left: Truthiness,
+        right: Truthiness,
+        expected_and: Truthiness,
+        expected_or: Truthiness,
+        expected_union: Truthiness,
+    ) {
+        assert_eq!(left.and(right), expected_and, "{left:?}.and({right:?})");
+        assert_eq!(left.or(right), expected_or, "{left:?}.or({right:?})");
+        assert_eq!(
+            left.union(right),
+            expected_union,
+            "{left:?}.union({right:?})"
+        );
 
-            let mut calls = 0;
-            let lazy_result = left.and_then(|| {
-                calls += 1;
-                right
-            });
-            assert_eq!(lazy_result, expected, "{left:?}.and_then(|| {right:?})");
-            assert_eq!(
-                calls,
-                usize::from(left != AlwaysFalse),
-                "{left:?}.and_then call count"
-            );
-        }
+        let mut calls = 0;
+        let lazy_result = left.and_then(|| {
+            calls += 1;
+            right
+        });
+        assert_eq!(lazy_result, expected_and, "{left:?}.and_then(|| {right:?})");
+        assert_eq!(
+            calls,
+            usize::from(left.may_be_true()),
+            "{left:?}.and_then call count"
+        );
+
+        let calls = Cell::new(0);
+        let lazy_result = left.or_else(|| {
+            calls.set(calls.get() + 1);
+            right
+        });
+        assert_eq!(lazy_result, expected_or, "{left:?}.or_else(|| {right:?})");
+        assert_eq!(calls.get(), usize::from(left.may_be_false()));
+    }
+
+    #[test]
+    fn uninhabited_truthiness() {
+        assert!(!Uninhabited.may_be_true());
+        assert!(!Uninhabited.may_be_false());
+        assert_eq!(Uninhabited.negate(), Uninhabited);
     }
 
     #[test]
@@ -1273,6 +1425,43 @@ mod tests {
             .first_public_binding(global_table.symbol_id("foo").expect("symbol to exist"))
             .unwrap();
         assert_matches!(binding.kind(&db), DefinitionKind::ImportFrom(_));
+    }
+
+    #[test]
+    fn imported_final_candidates_are_separate_from_declarations() {
+        for annotation in ["", "x: int\n"] {
+            let TestCase { db, file } = test_case(&format!(
+                "{annotation}if condition:\n    from source import value as x\nx = 0\n"
+            ));
+            let scope = global_scope(&db, program_file(&db, file));
+            let symbol = place_table(&db, scope).symbol_id("x").unwrap();
+            let use_def = use_def_map(&db, scope);
+            let assignment = use_def.first_public_binding(symbol).unwrap();
+            let declaration = use_def.first_public_declaration(symbol);
+            assert_eq!(declaration.is_some(), !annotation.is_empty());
+            if let Some(declaration) = declaration {
+                assert_matches!(
+                    declaration.kind(&db),
+                    DefinitionKind::AnnotatedAssignment(_)
+                );
+            }
+            assert_eq!(
+                use_def
+                    .declarations_at_binding(assignment)
+                    .map(|declaration| declaration.declaration)
+                    .collect::<Vec<_>>(),
+                [declaration.map_or(DefinitionState::Undefined, DefinitionState::Defined)]
+            );
+
+            let mut candidates = use_def.imported_final_candidates_at_binding(assignment);
+            assert_matches!(
+                candidates
+                    .next()
+                    .map(|candidate| candidate.definition.kind(&db)),
+                Some(DefinitionKind::ImportFrom(_))
+            );
+            assert!(candidates.next().is_none());
+        }
     }
 
     #[test]
@@ -1882,23 +2071,38 @@ class C[T]:
 
     #[test]
     fn expression_scope() {
-        let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
+        // Annotation tracking preserves lexical scope lookup, including for attribute identifiers
+        // inside annotations, which are not registered separately in the expression scope map.
+        // `annotation_parent_scope_id` returns the module scope for `module.Type`, the annotation
+        // on `x`. It returns `None` for `x` itself and for `y`, since neither is inside an annotation.
+        let TestCase { db, file } = test_case("x: module.Type = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, program_file(&db, file));
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let ast = module.syntax();
 
-        let x_stmt = ast.body[0].as_assign_stmt().unwrap();
-        let x = &x_stmt.targets[0];
+        let x_stmt = ast.body[0].as_ann_assign_stmt().unwrap();
+        let x = x_stmt.target.as_ref();
 
         assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
         assert_eq!(index.expression_scope_id(x), FileScopeId::global());
+        assert_matches!(
+            x_stmt.annotation.as_ref(),
+            ast::Expr::Attribute(attribute)
+                if index.try_expression_scope_id(&attribute.attr) == Some(FileScopeId::global())
+        );
+        assert_eq!(index.annotation_parent_scope_id(&module, x), None);
+        assert_eq!(
+            index.annotation_parent_scope_id(&module, x_stmt.annotation.as_ref()),
+            Some(FileScopeId::global())
+        );
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();
         let y = &y_stmt.targets[0];
 
         assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
+        assert_eq!(index.annotation_parent_scope_id(&module, y), None);
     }
 
     #[test]

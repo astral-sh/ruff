@@ -13,39 +13,37 @@ expression: suite
                     range: 0..7,
                     value: FStringValue {
                         inner: Single(
-                            FString(
-                                FString {
-                                    range: 0..7,
-                                    node_index: NodeIndex(None),
-                                    elements: [
-                                        Interpolation(
-                                            InterpolatedElement {
-                                                range: 3..6,
-                                                node_index: NodeIndex(None),
-                                                expression: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 4..5,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                debug_text: None,
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                    ],
-                                    flags: FStringFlags {
-                                        quote_style: Double,
-                                        prefix: Raw {
-                                            uppercase_r: false,
+                            FString {
+                                range: 0..7,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 3..6,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4..5,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
                                         },
-                                        triple_quoted: false,
-                                        unclosed: false,
+                                    ),
+                                ],
+                                flags: FStringFlags {
+                                    quote_style: Double,
+                                    prefix: Raw {
+                                        uppercase_r: false,
                                     },
+                                    triple_quoted: false,
+                                    unclosed: false,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

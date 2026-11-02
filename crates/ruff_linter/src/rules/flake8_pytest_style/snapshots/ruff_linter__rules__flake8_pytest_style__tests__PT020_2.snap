@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+ --> PT020_2.py:4:1
+  |
+4 | @other_name.yield_fixture()
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | def error_aliased_module():
+6 |     return 0
+  |
+help: Replace with `pytest.fixture`

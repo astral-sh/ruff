@@ -319,6 +319,15 @@ def nested_impossible_operands(other: object, value: bool, marker: int):
         reveal_type(marker)  # revealed: Never
 ```
 
+An assignment expression can rebind a name tested earlier in the chain. Reaching the final operand
+requires the new value to be `None`, so the branch is unreachable.
+
+```py
+def reassigned_operand(value: int | None, replacement: int | None, marker: int):
+    if value is not None and (value := replacement) is None and value is None and isinstance(value, int):
+        reveal_type(marker)  # revealed: Never
+```
+
 ## Conditions with aliased `Never` operands
 
 A call cannot produce a result when its return type is an alias of `Never`. Only the preceding

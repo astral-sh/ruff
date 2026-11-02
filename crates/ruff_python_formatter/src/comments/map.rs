@@ -251,11 +251,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     /// Returns the *leading*, *dangling*, and *trailing* parts of `key`.
     pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<'_, V> {
         match self.index.get(key) {
-            None => LeadingDanglingTrailing {
-                leading: &[],
-                dangling: &[],
-                trailing: &[],
-            },
+            None => LeadingDanglingTrailing::EMPTY,
             Some(Entry::InOrder(entry)) => LeadingDanglingTrailing {
                 leading: &self.parts[entry.leading_range()],
                 dangling: &self.parts[entry.dangling_range()],
@@ -312,6 +308,12 @@ pub(crate) struct LeadingDanglingTrailing<'a, T> {
 }
 
 impl<'a, T> LeadingDanglingTrailing<'a, T> {
+    pub(super) const EMPTY: Self = Self {
+        leading: &[],
+        dangling: &[],
+        trailing: &[],
+    };
+
     fn from_entry<K>(entry: &Entry, map: &'a MultiMap<K, T>) -> Self {
         match entry {
             Entry::InOrder(entry) => LeadingDanglingTrailing {

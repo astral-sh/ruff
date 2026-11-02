@@ -164,7 +164,7 @@ from functools import cache
 def f(x: int) -> int:
     return x**2
 
-# revealed: _lru_cache_wrapper[int]
+# revealed: _lru_cache_wrapper[int, Hashable]
 reveal_type(f)
 # revealed: int
 reveal_type(f(1))
@@ -274,6 +274,26 @@ def f(x): ...
 reveal_type(f)  # revealed: str
 ```
 
+Each error in a decorator stack describes the value received at that step. An inner decorator can
+replace the function before a failing call, and an outer decorator can replace the result again.
+
+```py
+def returns_bytes(value: object) -> bytes:
+    return b""
+
+def requires_bytes(value: bytes) -> bool:
+    return bool(value)
+
+# error: [invalid-argument-type] "Expected `bytes`, found `str`"
+@requires_bytes
+# error: [invalid-argument-type] "Expected `int`, found `bytes`"
+@wrong_signature
+@returns_bytes
+def stacked(): ...
+
+reveal_type(stacked)  # revealed: bool
+```
+
 #### Wrong number of arguments
 
 Decorators need to be callable with a single argument. If they are not, we emit a diagnostic:
@@ -294,6 +314,25 @@ def takes_no_argument() -> str:
 # error: [too-many-positional-arguments] "Too many positional arguments to function `takes_no_argument`: expected 0, got 1"
 @takes_no_argument
 def g(x): ...
+```
+
+#### No matching overload
+
+An overloaded decorator is rejected when none of its signatures accepts the function being
+decorated.
+
+```py
+from typing import overload
+
+@overload
+def scalar(value: int) -> None: ...
+@overload
+def scalar(value: str) -> None: ...
+def scalar(value: int | str) -> None: ...
+
+# error: [no-matching-overload]
+@scalar
+def f() -> None: ...
 ```
 
 ### Class, with wrong signature, used as a decorator
@@ -504,7 +543,11 @@ When a class decorator returns `Unknown`, we preserve the current binding. Unann
 have an `Unknown` return type because we do not infer returned classes from decorator bodies:
 
 ```py
-def personify(cls):
+from ty_extensions._internal import Unknown
+
+# TODO: remove this explicit `Unknown` return type when type inference does not expose
+# the internal `Wrapped` class anymore.
+def personify(cls) -> Unknown:
     class Wrapped(cls):
         full_name: str
 
@@ -894,11 +937,11 @@ Reporting a dynamic return must not eagerly infer a self-referential default. Ev
 assertion on the same name, the diagnostic identifies the function's signature.
 
 ```py
-def dynamic(function: object):
+def dynamic(function):
     return function
 
 f = lambda: f
-assert f
+assert f  # error: [redundant-condition] "always truthy"
 
 # snapshot: dynamic-function-decorator-return
 @dynamic
@@ -916,8 +959,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/mdtest_snippet.py:1:5
   |
-1 | def dynamic(function: object):
-  |     ------------------------- `dynamic` defined here
+1 | def dynamic(function):
+  |     ----------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -928,7 +971,7 @@ annotation when that method is unannotated.
 
 ```py
 class CallableDecorator:
-    def __call__(self, function: object):
+    def __call__(self, function):
         return function
 
 # snapshot: dynamic-function-decorator-return
@@ -948,8 +991,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/mdtest_snippet.py:2:9
   |
-2 |     def __call__(self, function: object):
-  |         -------------------------------- `CallableDecorator.__call__` defined here
+2 |     def __call__(self, function):
+  |         ------------------------ `CallableDecorator.__call__` defined here
 help: Add a return type annotation to `CallableDecorator.__call__`
 ```
 
@@ -986,7 +1029,7 @@ triggered due to a missing return-type annotation, we suggest adding one:
 `decorator.py`:
 
 ```py
-def dynamic(value: object):
+def dynamic(value):
     return value
 ```
 
@@ -1012,8 +1055,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/decorator.py:1:5
   |
-1 | def dynamic(value: object):
-  |     ---------------------- `dynamic` defined here
+1 | def dynamic(value):
+  |     -------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1188,7 +1231,7 @@ python = "/.venv"
 `/.venv/<path-to-site-packages>/dependency.py`:
 
 ```py
-def dynamic(value: object):
+def dynamic(value):
     return value
 ```
 
@@ -1214,8 +1257,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: .venv/<path-to-site-packages>/dependency.py:1:5
   |
-1 | def dynamic(value: object):
-  |     ---------------------- `dynamic` defined here
+1 | def dynamic(value):
+  |     -------------- `dynamic` defined here
 ```
 
 ### Edge case: dynamic decorators defined in non-module scripts
@@ -1228,7 +1271,7 @@ path", but we nonetheless recognise it as a first-party file and offer the sugge
 `typed-script.py`:
 
 ```py
-def dynamic(function: object):
+def dynamic(function):
     return function
 
 # snapshot: dynamic-function-decorator-return
@@ -1248,8 +1291,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/typed-script.py:1:5
   |
-1 | def dynamic(function: object):
-  |     ------------------------- `dynamic` defined here
+1 | def dynamic(function):
+  |     ----------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1265,7 +1308,7 @@ from typing import Any
 def annotated_dynamic(function: Callable[..., object]) -> Any:
     return function
 
-def unannotated_dynamic(function: Callable[..., object]):
+def unannotated_dynamic(function):
     return function
 
 def condition() -> bool:

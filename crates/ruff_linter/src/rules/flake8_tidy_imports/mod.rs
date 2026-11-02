@@ -11,6 +11,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use rustc_hash::FxHashMap;
+    use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
@@ -150,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch() -> Result<()> {
+    fn lazy_import_mismatch() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254.py"),
             &LinterSettings {
@@ -167,7 +168,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         )?;
@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_all() -> Result<()> {
+    fn lazy_import_mismatch_all() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254.py"),
             &LinterSettings {
@@ -185,7 +185,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         )?;
@@ -194,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_pre_py315() -> Result<()> {
+    fn lazy_import_mismatch_pre_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254_py314.py"),
             &LinterSettings {
@@ -203,7 +202,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY314)
             },
         )?;
@@ -212,19 +210,58 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_immediately_resolved() -> Result<()> {
+    fn lazy_import_immediately_resolved() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID255.py"),
             &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
-                .with_preview_mode()
                 .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
     }
 
+    /// Test that `__lazy_modules__` properly handles relative imports.
+    ///
+    /// In this example, `.` resolves to `mypackage`, so both `helper` and `func` are imported from
+    /// modules that have been declared lazy. As with other lazy imports, the full module path has
+    /// to match, so `mypackage.sub` is _not_ lazy.
+    #[test_case("mymodule.py")]
+    #[test_case("__init__.py")]
+    fn declared_lazy_relative_imports(filename: &str) {
+        let source_kind = SourceKind::Python {
+            code: dedent(
+                r#"
+                __lazy_modules__ = ["mypackage", "mypackage.sub.utils"]
+                from . import helper
+                from .sub.utils import func
+                from .sub import eager
+
+                helper()
+                func()
+                eager()
+                "#,
+            )
+            .to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, _) = test_contents(
+            &source_kind,
+            &Path::new("mypackage").join(filename),
+            &LinterSettings {
+                namespace_packages: vec![Path::new("mypackage").to_path_buf()],
+                ..LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
+                    .with_target_version(PythonVersion::PY315)
+            },
+        );
+        assert_diagnostics!(
+            format!("declared_lazy_relative_imports_{filename}"),
+            diagnostics
+        );
+    }
+
     #[test]
-    fn preview_lazy_import_immediately_resolved_fix() {
+    fn lazy_import_immediately_resolved_fix() {
         let source = dedent(
             r#"
             lazy  import foo
@@ -253,7 +290,6 @@ mod tests {
             &source_kind,
             Path::new("flake8_tidy_imports/TID255_fix.py"),
             &LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
-                .with_preview_mode()
                 .with_target_version(PythonVersion::PY315),
         );
 
@@ -262,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_fix() {
+    fn lazy_import_mismatch_fix() {
         let source = dedent(
             r#"
             from __future__ import annotations
@@ -330,7 +366,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         );
@@ -340,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_dotted_module() {
+    fn lazy_import_mismatch_dotted_module() {
         let source = dedent(
             r#"
             import foo
@@ -376,7 +411,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         );
@@ -386,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_exclude() {
+    fn lazy_import_mismatch_exclude() {
         let source = dedent(
             r#"
             import sitecustomize
@@ -419,7 +453,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         );
@@ -429,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_ban_lazy() {
+    fn lazy_import_mismatch_ban_lazy() {
         let source = dedent(
             r#"
             lazy import sitecustomize
@@ -462,7 +495,6 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
                     .with_target_version(PythonVersion::PY315)
             },
         );

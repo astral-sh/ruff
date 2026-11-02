@@ -1,0 +1,3 @@
+# uv cannot install SQLAlchemy 2.1.0 from its source distribution:
+# https://github.com/sqlalchemy/sqlalchemy/issues/13604
+SQLAlchemy!=2.1.0

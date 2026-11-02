@@ -118,3 +118,11 @@ PYI063 Use PEP 570 syntax for positional-only parameters
 58 | class GoodMetaclass(type):
    |
 help: Add `/` to function signature
+
+PYI063 Use PEP 570 syntax for positional-only parameters
+  --> PYI063.pyi:67:22
+   |
+66 | class NewMethod:
+67 |     def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
+   |                      ^^^^^^
+help: Add `/` to function signature

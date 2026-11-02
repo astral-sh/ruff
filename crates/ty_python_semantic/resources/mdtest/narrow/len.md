@@ -317,6 +317,151 @@ def never_prefix[*Ts](value: tuple[Never, *Ts]) -> str:
     return ""
 ```
 
+## Ordered length comparisons
+
+Ordered length comparisons select the compatible tuple alternatives in both branches. A length check
+can establish that an index is valid, including when `len` appears on the right:
+
+```py
+def _(value: tuple[int] | tuple[int, int]):
+    if len(value) > 1:
+        reveal_type(value)  # revealed: tuple[int, int]
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if 2 <= len(value):
+        reveal_type(value)  # revealed: tuple[int, int]
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: tuple[int]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+
+    if 1 >= len(value):
+        reveal_type(value)  # revealed: tuple[int]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+```
+
+## Ordered length comparisons with variable tuples
+
+A variable-length tuple remains possible when some of its lengths satisfy the comparison. Its
+required elements can rule it out when the comparison requires a shorter tuple:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def _(value: tuple[str] | tuple[int, *tuple[bytes, ...], int]):
+    if len(value) > 2:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+    else:
+        reveal_type(value)  # revealed: tuple[str] | tuple[int, *tuple[bytes, ...], int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: tuple[str]
+    else:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+
+    if len(value) <= 1:
+        reveal_type(value)  # revealed: tuple[str]
+
+    if len(value) > 1_000_000_000:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+```
+
+## Ordered length comparisons with string and bytes literals
+
+String and bytes literals encode their lengths, so ordered comparisons can select between them.
+String lengths count Unicode code points:
+
+```py
+from typing import Literal
+
+def _(text: Literal["é", "ab"], data: Literal[b"", b"a"]):
+    if len(text) >= 2:
+        reveal_type(text)  # revealed: Literal["ab"]
+    else:
+        reveal_type(text)  # revealed: Literal["é"]
+
+    if 0 < len(data):
+        reveal_type(data)  # revealed: Literal[b"a"]
+    else:
+        reveal_type(data)  # revealed: Literal[b""]
+```
+
+## Ordered length comparisons with custom lengths
+
+A custom type is excluded only when none of its declared lengths satisfy the comparison. A list
+remains possible in either branch because its type does not encode its length:
+
+```py
+from typing import Literal
+
+class Short:
+    def __len__(self) -> Literal[1, 2]:
+        return 1
+
+class Long:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+def _(value: Short | Long | list[int]):
+    if len(value) > 2:
+        reveal_type(value)  # revealed: Long | list[int]
+    else:
+        reveal_type(value)  # revealed: Short | list[int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: Short | list[int]
+    else:
+        reveal_type(value)  # revealed: Short | Long | list[int]
+```
+
+## Ordered length comparisons with type variables
+
+Filtering a type variable's upper bound preserves the type variable, so the narrowed value can still
+be returned with its original type:
+
+```py
+from typing import TypeVar
+
+TupleValue = TypeVar("TupleValue", bound=tuple[int] | tuple[str, str])
+
+def identity(value: TupleValue) -> TupleValue:
+    if len(value) >= 2:
+        reveal_type(value)  # revealed: TupleValue@identity & tuple[str, str]
+        return value
+    else:
+        reveal_type(value)  # revealed: TupleValue@identity & tuple[int]
+        return value
+```
+
+## Ordered length comparisons at zero
+
+Lengths are nonnegative, and boolean literals compare as their integer values. Zero separates empty
+tuples from nonempty tuples, while a negative upper bound excludes both alternatives:
+
+```py
+from typing_extensions import assert_never
+
+def _(value: tuple[()] | tuple[int]):
+    if len(value) <= False:
+        reveal_type(value)  # revealed: tuple[()]
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if len(value) < -1:
+        assert_never(value)
+    else:
+        reveal_type(value)  # revealed: tuple[()] | tuple[int]
+```
+
 ## Regression tests
 
 Length constraints must not become stale after mutating a value that does not encode its length:

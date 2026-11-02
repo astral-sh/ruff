@@ -106,6 +106,50 @@ darwin
 other
 ```
 
+### `sys.platform` membership in inline containers
+
+Membership in an inline list or set of platform names is statically known when the target platform
+is configured. Assignments in matching branches replace the initial value.
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import sys
+
+x = 0
+if sys.platform in {"linux", "windows"}:
+    x = 1
+reveal_type(x)  # revealed: Literal[1]
+
+y = 0
+if sys.platform in ["linux", "windows"]:
+    y = 1
+reveal_type(y)  # revealed: Literal[1]
+```
+
+An absent platform leaves the initial value unchanged. Negating a membership test reverses which
+branch is reachable.
+
+```py
+absent = 0
+if sys.platform in ["darwin", "win32"]:
+    absent = 1
+reveal_type(absent)  # revealed: Literal[0]
+
+excluded = 0
+if sys.platform not in {"darwin", "win32"}:
+    excluded = 1
+reveal_type(excluded)  # revealed: Literal[1]
+
+present = 0
+if sys.platform not in ["linux", "win32"]:
+    present = 1
+reveal_type(present)  # revealed: Literal[0]
+```
+
 ### `typing.TYPE_CHECKING`
 
 ```py
@@ -181,6 +225,7 @@ class AlwaysTrue:
 ```py
 from module import AlwaysTrue
 
+# error: [redundant-condition] "always truthy"
 if AlwaysTrue():
     yes = True
 else:
@@ -277,6 +322,101 @@ else:
     x = 3
 
 reveal_type(x)  # revealed: Literal[2]
+```
+
+### Uninhabited conditions
+
+A condition of type `Never` cannot produce either boolean outcome, so neither its `if` branch nor
+its `else` branch is reachable. Negating the condition does not change this.
+
+```py
+from typing_extensions import Never
+
+def uninhabited(condition: Never, value: int):
+    if condition:
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
+
+    if not condition:
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+A path that skips an uninhabited condition remains reachable. Here, only the path where `flag` is
+true can reach the final use of `value`.
+
+```py
+def skipped_condition(condition: Never, flag: bool):
+    value = 1
+    if flag:
+        value = 2
+    elif condition:
+        value = 3
+
+    reveal_type(value)  # revealed: Literal[2]
+```
+
+### Uninhabited call arguments
+
+A call cannot finish evaluating if a required argument has type `Never`. This makes both branches
+unreachable even when the call's inferred return type is inhabited.
+
+```py
+from typing_extensions import Never
+
+def predicate(arg: object) -> bool:
+    return bool(arg)
+
+def call_conditions(condition: Never, value: int):
+    reveal_type(bool(condition))  # revealed: bool
+
+    if bool(condition):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
+
+    if predicate(arg=condition):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+A boolean operation within an argument must evaluate its first operand before it can short-circuit.
+
+```py
+def nested_call(condition: Never, value: int):
+    if bool(bool(condition) or False):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+A short-circuit path can skip the call and reach a branch.
+
+```py
+def skipped_call(condition: Never, flag: bool, value: int):
+    if flag or bool(condition):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+### Uninhabited comparison operands
+
+A membership test has type `bool`, but cannot finish evaluating an uninhabited operand.
+
+```py
+from typing_extensions import Never
+
+def membership(condition: Never, value: int):
+    reveal_type(condition in (False,))  # revealed: bool
+
+    if condition in (False,):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: Never
 ```
 
 ### `elif` branches

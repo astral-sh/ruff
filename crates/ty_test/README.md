@@ -15,6 +15,7 @@ configuration.
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
 ````markdown
+
 ```py
 reveal_type(1)  # revealed: Literal[1]
 ```
@@ -37,7 +38,8 @@ See actual example mdtest suites in
 
 ## Assertions
 
-Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
+Three kinds of assertions are supported: `# revealed:` (shown above), `# error:`, and
+[`# snapshot`](#diagnostic-snapshotting).
 
 ### Assertion kinds
 
@@ -142,40 +144,51 @@ f(2)  # error: [invalid-argument-type]
 
 ## Diagnostic Snapshotting
 
-Inline snapshots store the rendered diagnostics directly in the Markdown file.
+Inline snapshots store the rendered diagnostics directly in the Markdown file. The test compares
+these diagnostics with the contents of the corresponding `snapshot` block.
 
-Add `# snapshot: <code?>` to the lines you want to snapshot, then add a fenced
-`snapshot` block after the corresponding `py` / `pyi` file block:
+Add `# snapshot` or `# snapshot: <code>` to the lines you want to snapshot. The unqualified form
+matches one unmatched diagnostic on the line to which the assertion applies; the qualified form
+matches one with the given rule or diagnostic code.
+
+For example, an mdtest with a generated snapshot block looks like this:
 
 ````markdown
-```py
-x: int = "a"  # snapshot: [invalid-assignment]
-y: int = "b"  # snapshot
+# Snapshot example
 
-reveal_type(x)  # snapshot: revealed-type
+```py
+x: int = "a"  # snapshot: invalid-assignment
+y: int = "b"  # snapshot
 ```
 
 Some explanatory prose can go here.
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | x: int = "a"  # snapshot: invalid-assignment
+  |    ---   ^^^ Incompatible value of type `Literal["a"]`
+  |    |
+  |    Declared type
+
+
+error[invalid-assignment]: Object of type `Literal["b"]` is not assignable to `int`
  --> src/mdtest_snippet.py:2:10
   |
-2 | x: int = "a"  # error: [invalid-assignment]
-  |          ^^^
-
-info: Revealed type is `int`
- --> src/mdtest_snippet.py:5:13
-  |
-5 | reveal_type(x)  # revealed: int
-  |             ^
+2 | y: int = "b"  # snapshot
+  |    ---   ^^^ Incompatible value of type `Literal["b"]`
+  |    |
+  |    Declared type
 ```
 ````
 
-`# snapshot:` follows the same placement rules as other inline assertions.
+Snapshot assertions follow the same placement rules as other inline assertions.
 
 To insert or rewrite inline snapshots automatically, run mdtest with
-`MDTEST_UPDATE_SNAPSHOTS=1` set. For example:
+`MDTEST_UPDATE_SNAPSHOTS=1` set. This generates a `snapshot` block after each Python code block
+containing snapshot assertions, or updates the existing block for that code. The test path is relative to
+`crates/ty_python_semantic/resources/mdtest`. For example:
 
 ```sh
 MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diagnostics/missing_argument.md
@@ -586,17 +599,16 @@ I/O error on read.
 ### Asserting on full diagnostic output
 
 > [!NOTE]
-> At present, one can opt into diagnostic snapshotting that is managed via external files. See
-> the section above for more details. The feature outlined below, *inline* diagnostic snapshotting,
-> is still desirable.
+> [Inline diagnostic snapshots](#diagnostic-snapshotting) use `# snapshot` assertions. The proposal
+> below would allow full output assertions without an inline assertion.
 
 The inline comment diagnostic assertions are useful for making quick, readable assertions about
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
 output of checking an embedded Python file. Or sometimes (see “incremental tests” below) we will
 want to assert on diagnostics in a file, without impacting the contents of that file by changing a
 comment in it. In these cases, a Python code block in a test could be followed by a fenced code
-block with language `output`; this would contain the full diagnostic output for the preceding test
-file:
+block with language `output`; this would contain the full diagnostic output for the default file or
+for an explicitly specified file, as described below:
 
 ````markdown
 # full output
@@ -610,7 +622,7 @@ This is just an example, not a proposal that ty would ever actually output diagn
 precisely this format:
 
 ```output
-mdtest_snippet.py, line 1, col 1: revealed type is 'Literal[1]'
+mdtest_snippet.py, line 2, col 1: revealed type is 'Literal[1]'
 ```
 ````
 

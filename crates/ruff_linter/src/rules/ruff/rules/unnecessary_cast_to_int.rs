@@ -1,13 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use ruff_python_trivia::{CommentRanges, lines_after_ignoring_trivia};
-use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::ruff::rules::unnecessary_round::{
@@ -81,50 +78,20 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    let fix = unwrap_int_expression(
+    let parent = checker
+        .semantic()
+        .current_expression_parent()
+        .map_or_else(|| checker.semantic().current_statement().into(), Into::into);
+    let content = unwrapped_call_argument(
         call,
         argument,
-        applicability,
-        checker.semantic(),
-        checker.locator(),
+        Some(parent),
         checker.tokens(),
-        checker.comment_ranges(),
         checker.source(),
     );
-    checker
-        .report_diagnostic(UnnecessaryCastToInt, call.range())
-        .set_fix(fix);
-}
 
-/// Creates a fix that replaces `int(expression)` with `expression`.
-#[expect(clippy::too_many_arguments)]
-fn unwrap_int_expression(
-    call: &ExprCall,
-    argument: &Expr,
-    applicability: Applicability,
-    semantic: &SemanticModel,
-    locator: &Locator,
-    tokens: &Tokens,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> Fix {
-    let content = if let Some(range) =
-        parenthesized_range(argument.into(), (&call.arguments).into(), tokens)
-    {
-        locator.slice(range).to_string()
-    } else {
-        let parenthesize = semantic.current_expression_parent().is_some()
-            || argument.is_named_expr()
-            || locator.count_lines(argument.range()) > 0;
-        if parenthesize && !has_own_parentheses(argument, tokens, source) {
-            format!("({})", locator.slice(argument.range()))
-        } else {
-            locator.slice(argument.range()).to_string()
-        }
-    };
-
-    // Since we're deleting the complement of the argument range within
-    // the call range, we have to check both ends for comments.
+    // Comments outside the argument's range can be lost when removing the call,
+    // so check both ends.
     //
     // For example:
     // ```python
@@ -135,6 +102,7 @@ fn unwrap_int_expression(
     // )
     // ```
     let applicability = {
+        let comment_ranges = checker.comment_ranges();
         let call_to_arg_start = TextRange::new(call.start(), argument.start());
         let arg_to_call_end = TextRange::new(argument.end(), call.end());
         if comment_ranges.intersects(call_to_arg_start)
@@ -147,7 +115,10 @@ fn unwrap_int_expression(
     };
 
     let edit = Edit::range_replacement(content, call.range());
-    Fix::applicable_edit(edit, applicability)
+    let fix = Fix::applicable_edit(edit, applicability);
+    checker
+        .report_diagnostic(UnnecessaryCastToInt, call.range())
+        .set_fix(fix);
 }
 
 /// Returns `Some` if `call` in `int(call(...))` is a method that returns an `int`
@@ -252,50 +223,5 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
         ) => Some(Applicability::Unsafe),
 
         _ => None,
-    }
-}
-
-/// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
-fn has_own_parentheses(expr: &Expr, tokens: &Tokens, source: &str) -> bool {
-    match expr {
-        Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_) => true,
-        Expr::Call(call_expr) => {
-            // A call where the function and parenthesized
-            // argument(s) appear on separate lines
-            // requires outer parentheses. That is:
-            // ```
-            // (f
-            // (10))
-            // ```
-            // is different than
-            // ```
-            // f
-            // (10)
-            // ```
-            let func_end =
-                parenthesized_range(call_expr.func.as_ref().into(), call_expr.into(), tokens)
-                    .unwrap_or(call_expr.func.range())
-                    .end();
-            lines_after_ignoring_trivia(func_end, source) == 0
-        }
-        Expr::Subscript(subscript_expr) => {
-            // Same as above
-            let subscript_end = parenthesized_range(
-                subscript_expr.value.as_ref().into(),
-                subscript_expr.into(),
-                tokens,
-            )
-            .unwrap_or(subscript_expr.value.range())
-            .end();
-            lines_after_ignoring_trivia(subscript_end, source) == 0
-        }
-        Expr::Generator(generator) => generator.parenthesized,
-        Expr::Tuple(tuple) => tuple.parenthesized,
-        _ => false,
     }
 }

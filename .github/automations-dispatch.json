@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "repositories": {
+    "ruff": {
+      "name": "astral-sh/ruff",
+      "id": 523043277
+    }
+  },
+  "rules": [
+    {
+      "repository": "ruff",
+      "on": {
+        "pull_request": ["opened", "reopened", "ready_for_review"]
+      },
+      "workflow": "pull-request-reviewers.yml"
+    },
+    {
+      "repository": "ruff",
+      "on": {
+        "pull_request": ["labeled"]
+      },
+      "conditions": {
+        "/label/name": {
+          "one_of": ["bot:ai-policy-comment", "bot:ai-policy-close"]
+        }
+      },
+      "allow_draft": true,
+      "allow_forks": true,
+      "allow_stale_head": true,
+      "workflow": "ai-policy.yml",
+      "inputs": {
+        "label": "/label/name"
+      }
+    },
+    {
+      "repository": "ruff",
+      "on": {
+        "issues": ["labeled"]
+      },
+      "conditions": {
+        "/label/name": {
+          "one_of": ["bot:ai-policy-comment", "bot:ai-policy-close"]
+        },
+        "/issue/state": "open"
+      },
+      "workflow": "ai-policy.yml",
+      "inputs": {
+        "issue": "/issue/number",
+        "label": "/label/name"
+      }
+    }
+  ]
+}

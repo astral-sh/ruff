@@ -320,6 +320,24 @@ class Table:
 [[reveal_type((cell, row)) for cell in row] for row in Table()]
 ```
 
+## Filter that depends on a later loop variable
+
+The filter tests a callable that closes over `i`. Inferring its return type requires checking the
+final `for` clause, which is reachable only when the filter passes.
+
+```py
+from collections.abc import Callable
+
+def readers(limits: list[int], enabled: bool) -> list[Callable[[], int]]:
+    return [
+        read
+        for limit in limits
+        for read, end in [((lambda: i) if enabled else None, limit)]
+        if read is not None and 0 < end < 10
+        for i in range(end)
+    ]
+```
+
 ## Comprehension with unbound iterable
 
 Iterating over an unbound iterable yields `Unknown`:

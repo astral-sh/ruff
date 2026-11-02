@@ -4,29 +4,34 @@ use std::hash::Hasher;
 use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_db::files::Files;
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::system_module_search_paths;
 
+use crate::Project;
 use crate::db::{Db, ProjectDatabase};
+use crate::script::Script;
+use crate::uv::UvMetadata;
 use crate::watch::Watcher;
 
 /// Wrapper around a [`Watcher`] that watches the relevant paths of a project.
 pub struct ProjectWatcher {
     watcher: Watcher,
 
-    /// The paths that need to be watched. This includes paths for which setting up file watching failed.
+    /// The paths currently watched, in registration order.
     watched_paths: Vec<SystemPathBuf>,
 
     /// True if registering a watcher for any path failed.
     has_errored_paths: bool,
 
-    /// Cache key over the paths that need watching. It allows short-circuiting if the paths haven't changed.
+    /// Cache key over the paths requested by the project and its scripts.
     cache_key: Option<u64>,
 }
 
 impl ProjectWatcher {
     /// Create a new project watcher.
-    pub fn new(watcher: Watcher, db: &ProjectDatabase) -> Self {
+    pub fn new(watcher: Watcher, db: &mut ProjectDatabase) -> Self {
         let mut watcher = Self {
             watcher,
             watched_paths: Vec::new(),
@@ -39,74 +44,78 @@ impl ProjectWatcher {
         watcher
     }
 
-    pub fn update(&mut self, db: &ProjectDatabase) {
-        let environment = db.project().program(db).resolver_environment(db);
-        let search_paths: Vec<_> = system_module_search_paths(db, environment).collect();
-        let project_path = db.project().root(db);
+    pub fn update(&mut self, db: &mut ProjectDatabase) {
+        const MAX_RECONCILIATION_PASSES: usize = 10;
 
-        let new_cache_key = Self::compute_cache_key(project_path, &search_paths);
+        for _ in 0..MAX_RECONCILIATION_PASSES {
+            if !self.update_once(db) {
+                return;
+            }
 
-        if self.cache_key == Some(new_cache_key) {
-            return;
-        }
-
-        let mut watcher_paths = self.watcher.paths_mut();
-
-        // Unregister all watch paths because ordering is important for linux because
-        // it only emits an event for the last added watcher if a subtree is covered by multiple watchers.
-        // A path can be covered by multiple watchers if a subdirectory symlinks to a path that's covered by another watch path:
-        // ```text
-        // - bar
-        //   - baz.py
-        // - project
-        //   - bar -> /bar
-        //   - foo.py
-        // ```
-        for path in self.watched_paths.drain(..) {
-            if let Err(error) = watcher_paths.remove(&path) {
-                info!("Failed to remove the file watcher for path `{path}`: {error}");
+            // `watch_paths` reads `.pth` files to find editable module search paths. If a
+            // script's `site-packages` was unwatched when a `.pth` file changed from `/old`
+            // to `/new`, this pass registered `/old` using stale contents. The refresh above
+            // updates the `.pth` file; recompute the plan and register `/new` before returning.
+            if self.cache_key == Some(watch_paths(db, db.project()).cache_key()) {
+                return;
             }
         }
 
+        tracing::warn!(
+            "File watcher paths did not stabilize after {MAX_RECONCILIATION_PASSES} updates; changes outside the registered paths may be missed until the next update"
+        );
+    }
+
+    /// Returns whether newly covered paths were refreshed.
+    fn update_once(&mut self, db: &mut ProjectDatabase) -> bool {
+        let watch_plan = watch_paths(db, db.project());
+
+        if self.cache_key == Some(watch_plan.cache_key()) {
+            return false;
+        }
+
+        let paths = watch_plan.paths();
+        let previously_watched = self.watched_paths.clone();
+        let mut watcher_paths = self.watcher.paths_mut();
+        let mut newly_covered_paths = Vec::new();
+
+        // On Linux, overlapping watches through a symlink report events using the path of the
+        // last registered watch. If `/project/bar` points to `/bar`, the module search path
+        // `/bar` must be watched after `/project` so imports receive events under `/bar`.
+        // Configuration paths come last so their events use their explicit paths. Appending
+        // preserves this precedence; other changes require re-registering in the new order.
+        let first_new_path = if !self.has_errored_paths && paths.starts_with(&self.watched_paths) {
+            self.watched_paths.len()
+        } else {
+            for path in self.watched_paths.drain(..) {
+                if let Err(error) = watcher_paths.remove(&path) {
+                    info!("Failed to remove the file watcher for path `{path}`: {error}");
+                }
+            }
+            0
+        };
+
         self.has_errored_paths = false;
 
-        let config_paths = db.project().metadata(db).extra_configuration_paths();
-
-        // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
-        // This is necessary to observe changes to files that are outside the project root.
-        // We always need to watch the project root to observe changes to its configuration.
-        let included_paths = ruff_db::system::deduplicate_nested_paths(
-            std::iter::once(project_path).chain(
-                db.project()
-                    .included_paths_list(db)
-                    .iter()
-                    .map(SystemPathBuf::as_path),
-            ),
-        );
-
-        // Find the non-overlapping module search paths and filter out paths that are already covered by the project.
-        // Module search paths are already canonicalized.
-        let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
-            search_paths
-                .into_iter()
-                .filter(|path| !path.starts_with(project_path)),
-        );
-
-        // Now add the new paths, first starting with the project path and then
-        // adding the library search paths, and finally the paths for configurations.
-        for path in included_paths
-            .chain(unique_module_paths)
-            .chain(config_paths)
-            .map(SystemPath::to_path_buf)
-        {
-            if let Err(error) = watcher_paths.add(&path) {
+        for path in paths.iter().skip(first_new_path) {
+            if let Err(error) = watcher_paths.add(path) {
                 // TODO: Log a user-facing warning.
                 tracing::warn!(
                     "Failed to setup watcher for path `{path}`: {error}. You have to restart ty after making changes to files under this path or you might see stale results."
                 );
                 self.has_errored_paths = true;
             } else {
-                self.watched_paths.push(path);
+                // A previous recursive watch already covered this path, even if it must be
+                // re-registered for precedence. Skip initial setup to avoid rescanning every
+                // project file immediately after discovery.
+                if self.cache_key.is_some()
+                    && !previously_watched
+                        .iter()
+                        .any(|watched| path.starts_with(watched))
+                {
+                    newly_covered_paths.push(path.clone());
+                }
+                self.watched_paths.push(path.clone());
             }
         }
 
@@ -124,15 +133,17 @@ impl ProjectWatcher {
             }
         );
 
-        self.cache_key = Some(new_cache_key);
-    }
+        self.cache_key = Some(watch_plan.cache_key());
 
-    fn compute_cache_key(project_root: &SystemPath, search_paths: &[&SystemPath]) -> u64 {
-        let mut cache_key_hasher = CacheKeyHasher::new();
-        search_paths.cache_key(&mut cache_key_hasher);
-        project_root.cache_key(&mut cache_key_hasher);
+        if newly_covered_paths.is_empty() {
+            return false;
+        }
 
-        cache_key_hasher.finish()
+        // A newly covered path may contain known files that changed while it was unwatched.
+        // Registering the watch does not update their cached contents, so refresh them here.
+        Files::sync_all_recursive(db, newly_covered_paths);
+
+        true
     }
 
     /// Returns `true` if setting up watching for any path failed.
@@ -146,6 +157,156 @@ impl ProjectWatcher {
 
     pub fn stop(self) {
         self.watcher.stop();
+    }
+}
+
+/// The paths watched for a project and its scripts, with a key for detecting changes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WatchPaths {
+    cache_key: u64,
+    paths: Box<[SystemPathBuf]>,
+}
+
+impl WatchPaths {
+    /// A key for changes to the watched paths.
+    pub fn cache_key(&self) -> u64 {
+        self.cache_key
+    }
+
+    /// Paths whose changes need watching.
+    pub fn paths(&self) -> &[SystemPathBuf] {
+        &self.paths
+    }
+}
+
+/// Workspace and project watches come first, followed by Python environment, module, and
+/// configuration watches. On Linux, the last registered watch determines the path reported for
+/// overlapping symlinks.
+///
+/// uv discovers the workspace root from `pyproject.toml`, so a successful metadata request tells
+/// us where to watch even if `uv.lock` is created later. A member's ty project root may be inside
+/// that workspace; changes to the lockfile at the workspace root can then change `members` and
+/// `resolution` in `uv workspace metadata`.
+///
+/// The workspace root, project root, and explicitly included paths share recursive watches where
+/// possible. A virtual environment outside the project needs its own watch because
+/// `pyvenv.cfg` can change the inferred Python version and import search paths. Watching its
+/// `site-packages` alone does not cover that file. System environment roots are excluded to
+/// avoid recursively watching a system prefix such as `/usr`.
+///
+/// Module search paths follow the environment so imports are reported relative to their
+/// search roots, rather than through symlinks inside the project. Configuration paths come last
+/// so their events use the explicit paths checked for configuration changes.
+///
+/// # Known limitations
+///
+/// ## Virtual environments
+///
+/// These limitations apply to virtual environments outside the project directory unless another
+/// watch already covers the relevant paths. Environments inside the project are covered by the project watch.
+///
+/// - Creating an initially missing environment: If environment resolution fails, there is no
+///   resolved root to add to the watch list. Supporting later creation would require choosing an
+///   existing ancestor to watch from an unresolved `environment.python` path, which can name
+///   either a directory or an interpreter. We accept this limitation to avoid additional path
+///   discovery and watch-registration logic for environments that could not be resolved.
+/// - Deleting and recreating an environment: Deleting the environment can remove its native
+///   watch, so its recreation goes unnoticed. Watching a surviving parent would cover this, but
+///   our watches are recursive: the parent could contain every environment in a shared Poetry
+///   directory, or even be the user's home directory. We accept this limitation to avoid watching
+///   those unrelated directories. A nonrecursive parent watch would need additional logic to
+///   register the environment watch again after recreation.
+///
+/// ## uv workspace metadata
+///
+/// Metadata refreshes use the existing workspace, project, environment, and module search-path
+/// watches. We do not register additional watches for every local dependency's source directory.
+/// Deleting or moving an ancestor of an external search path may go unnoticed unless another
+/// watch, such as the workspace watch, covers that ancestor.
+///
+/// - Non-editable local dependencies: For a dependency installed from `../helper`, the search
+///   path points to its installed copy in `site-packages`. Moving or deleting `../helper` can
+///   affect uv's resolution without producing an event on a watched path.
+/// - Initial metadata failure: uv may fail before reporting the workspace root or dependencies.
+///   Creating or repairing an external dependency then goes unnoticed unless an existing watch
+///   covers it. Directory changes under ty's project root can still request a retry.
+/// - Excluded workspace members: We use `src.include` and `src.exclude` to avoid refreshing uv
+///   metadata for unrelated directory changes, such as creating a package directory inside `.venv`.
+///   We intentionally make an exception for directories containing a module search path:
+///   excluding a dependency from checking does not stop the application from importing it.
+///   For example, an app can import an editable dependency at `packages/lib/src` while
+///   `src.include` selects only `packages/app`. Deleting `packages/lib` removes dependency
+///   sources and can change uv's resolution, so it should trigger a refresh.
+///   For excluded members with no module search path, a directory event alone does not trigger
+///   a refresh, so the cached uv member list can become stale. A separate event for the member's
+///   `pyproject.toml` or the workspace's `uv.lock` still triggers a refresh.
+///
+/// We accept these gaps to avoid retaining additional dependency paths, repeating uv's discovery
+/// after errors, or refreshing metadata for every directory change under the workspace root.
+#[salsa::tracked(returns(ref))]
+pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
+    let project_path = project.root(db);
+    let workspace_root = project
+        .metadata(db)
+        .uv_workspace_metadata()
+        .map(UvMetadata::workspace_root);
+    let virtual_environment = project
+        .program_settings(db)
+        .virtual_environment()
+        .filter(|environment| !environment.starts_with(project_path));
+
+    // Watch the workspace and project roots and any paths provided by the user on the CLI.
+    // A recursive parent watch also covers nested paths, including member projects.
+    let included_paths = ruff_db::system::deduplicate_nested_paths(
+        std::iter::once(project_path).chain(workspace_root).chain(
+            project
+                .included_paths_list(db)
+                .iter()
+                .map(SystemPathBuf::as_path),
+        ),
+    );
+
+    let environment = project.program(db).resolver_environment(db);
+    let mut search_paths: Vec<_> = system_module_search_paths(db, environment).collect();
+    for file in project.script_files(db).iter() {
+        if let Some(script) = Script::for_file(db, file) {
+            search_paths.extend(system_module_search_paths(
+                db,
+                script.program(db).resolver_environment(db),
+            ));
+        }
+    }
+
+    // Register module search paths after their parents even when a recursive watch already
+    // covers them. On Linux, a parent watch can report changes through another symlink,
+    // such as `.venv/lib64` instead of `.venv/lib`, leaving import resolution stale.
+    let module_paths = search_paths
+        .into_iter()
+        .filter(|path| *path != project_path);
+
+    let paths: Vec<_> = included_paths
+        .chain(virtual_environment)
+        .chain(module_paths)
+        .chain(project.metadata(db).extra_configuration_paths())
+        .map(SystemPath::to_path_buf)
+        .collect();
+
+    // Keep the last occurrence so later groups retain their registration precedence.
+    let mut seen = FxHashSet::default();
+    let mut unique_paths = Vec::new();
+    for path in paths.into_iter().rev() {
+        if seen.insert(path.clone()) {
+            unique_paths.push(path);
+        }
+    }
+    unique_paths.reverse();
+    let paths = unique_paths.into_boxed_slice();
+
+    let mut hasher = CacheKeyHasher::new();
+    paths.cache_key(&mut hasher);
+    WatchPaths {
+        cache_key: hasher.finish(),
+        paths,
     }
 }
 

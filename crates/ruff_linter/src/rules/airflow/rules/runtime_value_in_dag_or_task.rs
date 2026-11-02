@@ -230,13 +230,9 @@ fn find_runtime_varying_call<'a>(
         Expr::Yield(ast::ExprYield { value, .. }) => value
             .as_ref()
             .and_then(|v| find_runtime_varying_call(v, semantic)),
-        Expr::Compare(ast::ExprCompare {
-            left, comparators, ..
-        }) => find_runtime_varying_call(left, semantic).or_else(|| {
-            comparators
-                .iter()
-                .find_map(|c| find_runtime_varying_call(c, semantic))
-        }),
+        Expr::Compare(ast::ExprCompare { operands, .. }) => operands
+            .iter()
+            .find_map(|operand| find_runtime_varying_call(operand, semantic)),
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
             .find_map(|element| find_runtime_in_interpolated_element(element, semantic)),

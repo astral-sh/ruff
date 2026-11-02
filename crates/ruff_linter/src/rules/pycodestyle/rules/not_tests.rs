@@ -86,18 +86,14 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
         return;
     }
 
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-        node_index: _,
-    }) = unary_op.operand.as_ref()
-    else {
+    let Expr::Compare(compare) = unary_op.operand.as_ref() else {
         return;
     };
 
-    match &**ops {
+    let left = compare.first_operand();
+    let comparators = compare.comparators();
+
+    match &*compare.ops {
         [CmpOp::In] if checker.is_rule_enabled(Rule::NotInTest) => {
             let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

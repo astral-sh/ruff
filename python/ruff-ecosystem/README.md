@@ -46,6 +46,8 @@ ruff-ecosystem format black ruff -v --cache python/checkouts --format-comparison
 The default output format is markdown, which includes nice summaries of the changes. You can use `--output-format json` to display the raw data — this is
 particularly useful when making changes to the ecosystem checks.
 
+Add `--html-output report.html` to also write a searchable HTML report containing all changes.
+
 ## Development
 
 When developing, it can be useful to set the `--pdb` flag to drop into a debugger on failure:

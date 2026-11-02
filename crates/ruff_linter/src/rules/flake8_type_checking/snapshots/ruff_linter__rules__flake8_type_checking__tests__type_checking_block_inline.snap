@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002 [*] Make third-party import `pandas` lazy
  --> <filename>:6:18
   |
 4 | from typing import TYPE_CHECKING
@@ -11,13 +11,11 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 7 |
 8 | if TYPE_CHECKING: import os
   |
-help: Move into type-checking block
+help: Convert to a lazy import (or move into a type-checking block)
   |
 5 |
   - import pandas as pd
-6 |
-  - if TYPE_CHECKING: import os
-7 + if TYPE_CHECKING: import pandas as pd; import os
-8 |
+6 + lazy import pandas as pd
+7 |
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -2,6 +2,24 @@
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 E274 [*] Tab before keyword
+  --> E27.py:13:5
+   |
+11 | True and        False
+12 | #: E273 E274
+13 | True        and    False
+   |     ^^^^^^^^
+14 | #: E271
+15 | a and  b
+   |
+help: Replace with single space
+   |
+12 | #: E273 E274
+   - True		and	False
+13 + True and	False
+14 | #: E271
+   |
+
+E274 [*] Tab before keyword
   --> E27.py:29:2
    |
 27 | a and    b
@@ -36,3 +54,21 @@ help: Replace with single space
 31 + this and	False
 32 | #: Okay
    |
+
+E274 [*] Tab before keyword
+   --> E27.py:107:9
+    |
+105 | x = a is    None
+106 | #: E274
+107 | x = None    if y else 1
+    |         ^^^^
+108 | #: E271 E272
+109 | x = None  and  True
+    |
+help: Replace with single space
+    |
+106 | #: E274
+    - x = None	if y else 1
+107 + x = None if y else 1
+108 | #: E271 E272
+    |

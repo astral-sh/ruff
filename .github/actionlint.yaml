@@ -13,6 +13,31 @@ self-hosted-runner:
     - namespace-profile-windows-2022-x86-64-16x32
     - depot-ubuntu-22.04-arm-4
     - depot-ubuntu-24.04-arm-8
+    - github-ubuntu-24.04-x86_64-2
+    - github-ubuntu-24.04-x86_64-4
+    - github-ubuntu-24.04-x86_64-32
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  ".github/workflows/*.{yml,yaml}":
+    ignore:
+      # `actionlint` does not yet recognize GitHub's `$/` syntax.
+      # https://github.com/rhysd/actionlint/issues/711
+      - '^reusable workflow call "\$/\.github/workflows/[^"/]+\.ya?ml" at "uses" is not following the format '
+  ".github/workflows/pull-request-reviewers.yml":
+    ignore:
+      # actionlint doesn't yet support concurrency queues. The schema hook validates them.
+      - '^unexpected key "queue" for "concurrency" section\.'
+  ".github/workflows/publish-pull-request-report.yml":
+    ignore:
+      # actionlint doesn't yet support concurrency queues. The schema hook validates them.
+      - '^unexpected key "queue" for "concurrency" section\.'
+      # actionlint doesn't yet recognize the reusable workflow's own revision context.
+      - 'property "workflow_(repository|sha)" is not defined in object type'
+  ".github/workflows/{ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
+    ignore:
+      # actionlint doesn't yet support the cache-mode feature.
+      # The schema hook validates it.
+      - '^unexpected key "cache-mode" for "workflow" section\.'

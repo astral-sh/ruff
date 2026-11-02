@@ -10,7 +10,7 @@ use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{
     CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
-    completion,
+    MarkupKind, completion,
 };
 use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::ProgramEnvironment;
@@ -49,14 +49,14 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
@@ -120,11 +120,14 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .resolved_client_capabilities()
                         .prefers_markdown_in_completion()
                     {
-                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                        (
+                            lsp_types::MarkupKind::Markdown,
+                            docstring.render(MarkupKind::Markdown),
+                        )
                     } else {
                         (
                             lsp_types::MarkupKind::PlainText,
-                            docstring.render_plaintext(),
+                            docstring.render(MarkupKind::PlainText),
                         )
                     };
 

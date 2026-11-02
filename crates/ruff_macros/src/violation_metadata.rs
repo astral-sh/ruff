@@ -36,8 +36,8 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
                 crate::registry::Rule::#name
             }
 
-            fn explain() -> Option<&'static str> {
-                Some(#docs)
+            fn explain() -> &'static str {
+                #docs
             }
 
             fn status() -> crate::codes::RuleStatus {

@@ -36,5 +36,14 @@
 # Leave these files unowned to avoid notifying the crate teams for release PRs.
 /crates/ty*/Cargo.toml
 /crates/ty*/README.md
+/crates/ruff_annotate_snippets/Cargo.toml
 /crates/ruff_db/Cargo.toml
 /crates/ruff_db/README.md
+/crates/ruff_formatter/Cargo.toml
+/crates/ruff_formatter/README.md
+/crates/ruff_notebook/Cargo.toml
+/crates/ruff_notebook/README.md
+/crates/ruff_python_formatter/Cargo.toml
+/crates/ruff_python_formatter/README.md
+/crates/ruff_python_parser/Cargo.toml
+/crates/ruff_python_parser/README.md

@@ -95,7 +95,7 @@ Module(
 1 | {x:
 2 |
 3 | def foo():
-  |     ^^^ Syntax Error: Expected `,`, found name
+  |     ^^^ Syntax Error: Expected `,`, found identifier
 4 |     pass
   |
 

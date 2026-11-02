@@ -119,7 +119,7 @@ fn is_static_method(
 
 /// Return `true` if a [`Decorator`] is indicative of a class method.
 /// Note: Implicit class methods like `__init_subclass__` and `__class_getitem__` are not considered.
-fn is_class_method(
+pub fn is_class_method(
     decorator: &Decorator,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],

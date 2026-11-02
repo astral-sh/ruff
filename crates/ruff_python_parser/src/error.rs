@@ -948,6 +948,17 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 750]: https://peps.python.org/pep-0750/
     TemplateStrings,
+
+    /// Represents the use of a unary plus in a `match` literal pattern before Python 3.15.
+    ///
+    /// Before 3.15, unary minus was allowed but not plus:
+    ///
+    /// ```python
+    /// match foo:
+    ///     case -1: ...  # okay
+    ///     case +1: ...  # error before 3.15
+    /// ```
+    UnaryPlusMatchPattern,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -1045,6 +1056,9 @@ impl Display for UnsupportedSyntaxError {
                 "Multiple exception types must be parenthesized"
             }
             UnsupportedSyntaxErrorKind::TemplateStrings => "Cannot use t-strings",
+            UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern => {
+                "Unary '+' is not allowed in a literal pattern"
+            }
         };
 
         write!(
@@ -1120,6 +1134,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY314)
             }
             UnsupportedSyntaxErrorKind::TemplateStrings => Change::Added(PythonVersion::PY314),
+            UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern => {
+                Change::Added(PythonVersion::PY315)
+            }
         }
     }
 
