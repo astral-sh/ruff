@@ -1746,6 +1746,24 @@ def target(name: str, callback: Callable[[int], Any]): ...
 forward(target, callback=lambda value: value)  # error: [missing-argument]
 ```
 
+### Capturing a generic callable from a list
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+
+class Selector(Protocol):
+    def __call__[**P, R](self, callbacks: list[Callable[P, R]], /) -> Callable[P, R]: ...
+
+def _(primary: Selector, fallback: Selector):
+    select = primary([fallback])
+
+    def fetch(key: str) -> bytes:
+        return key.encode()
+
+    reveal_type(select([fetch]))  # revealed: (key: str) -> bytes
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py

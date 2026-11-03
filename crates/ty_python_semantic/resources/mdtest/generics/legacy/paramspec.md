@@ -1899,6 +1899,17 @@ def identity(value: T) -> T:
 forward(identity, b"text")  # ok
 ```
 
+### Forwarding a callback to another exit stack
+
+```py
+from contextlib import ExitStack
+
+def cleanup() -> None: ...
+def _(deferred: ExitStack, final: ExitStack):
+    deferred.callback(final.callback, cleanup)
+    deferred.callback(final.callback)  # error: [missing-argument]
+```
+
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
