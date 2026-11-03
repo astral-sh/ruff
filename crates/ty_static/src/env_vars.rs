@@ -61,11 +61,11 @@ impl EnvVars {
     /// Accepts the same values as the `--output-format` command-line argument.
     pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
-    /// Enable uv integration.
+    /// When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+    /// Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
     ///
-    /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
-    /// root and initialize script environments. When set to `"scripts"`, only script environments
-    /// are initialized.
+    /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+    /// environment.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
