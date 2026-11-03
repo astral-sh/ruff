@@ -16,13 +16,14 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
         GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
-        MaterializationKind, Parameter, Parameters, Specialization, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        MaterializationKind, Parameter, Parameters, RecursiveType, Specialization, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
-        generics::enclosing_binding_contexts,
+        generics::{enclosing_binding_contexts, walk_specialization_types},
         tuple::Tuple,
+        type_alias::walk_type_alias_arguments,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -886,7 +887,7 @@ impl TypeVarNonce {
         self.0
     }
 
-    pub(crate) fn increment(self) -> Self {
+    fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
@@ -955,72 +956,73 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
-pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
+/// Returns a freshening delta if a binder would collide with an occurrence in `types`.
+pub(super) fn freshening_delta<'db>(
     db: &'db dyn Db,
     types: impl IntoIterator<Item = Type<'db>>,
     generic_context: GenericContext<'db>,
-) -> Option<TypeVarNonce> {
-    struct MatchingFreshnessCollector<'a, 'db> {
+) -> Option<u32> {
+    struct Freshness<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
-        base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
-        recursion_guard: TypeCollector<'db>,
-        max_freshness: Cell<Option<TypeVarNonce>>,
+        binders: GenericContext<'db>,
+        seen: TypeCollector<'db>,
+        collides: Cell<bool>,
+        max: Cell<TypeVarNonce>,
     }
 
-    impl<'a, 'db> MatchingFreshnessCollector<'a, 'db> {
-        fn new(
-            db: &'db dyn Db,
-            env: &'a ProgramEnvironment<'db>,
-            generic_context: GenericContext<'db>,
-        ) -> Self {
-            let base_identities = generic_context
-                .variables(db)
-                .map(|typevar| typevar.identity(db).unfreshened_binder())
-                .collect();
-            Self {
-                env,
-                base_identities,
-                recursion_guard: TypeCollector::default(),
-                max_freshness: Cell::default(),
-            }
-        }
-    }
-
-    impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'_, 'db> {
+    impl<'db> TypeVisitor<'db> for Freshness<'_, 'db> {
         fn program_environment(&self) -> &ProgramEnvironment<'db> {
             self.env
         }
-
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
         }
 
-        fn visit_bound_type_var_type(
-            &self,
-            db: &'db dyn Db,
-            bound_typevar: BoundTypeVarInstance<'db>,
-        ) {
-            let identity = bound_typevar.identity(db).unfreshened_binder();
-            if self.base_identities.contains(&identity) {
-                self.max_freshness.set(
-                    self.max_freshness
-                        .get()
-                        .max(Some(bound_typevar.freshness(db))),
-                );
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            // Separate the arguments from the definition so recursion through a growing
+            // specialization cannot keep introducing new types to visit.
+            walk_type_alias_arguments(db, alias, self);
+            self.visit_type(db, alias.raw_value_type(db));
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            if let Some(arguments) = recursive.arguments(db) {
+                walk_specialization_types(db, arguments, self);
             }
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            if let Type::TypeVar(var) = ty {
+                let id = var.identity(db);
+                if self.binders.contains(db, id) {
+                    self.collides.set(true);
+                } else if !self.binders.variables(db).any(|binder| {
+                    binder.identity(db).unfreshened_binder() == id.unfreshened_binder()
+                }) {
+                    return;
+                }
+                self.max.set(self.max.get().max(var.freshness(db)));
+            } else {
+                walk_type_with_recursion_guard(db, ty, self, &self.seen);
+            }
         }
     }
 
     let env = ProgramEnvironment::from_program(generic_context.program(db));
-    let collector = MatchingFreshnessCollector::new(db, &env, generic_context);
+    let visitor = Freshness {
+        env: &env,
+        binders: generic_context,
+        seen: TypeCollector::default(),
+        collides: Cell::new(false),
+        max: Cell::new(TypeVarNonce::NONE),
+    };
     for ty in types {
-        collector.visit_type(db, ty);
+        visitor.visit_type(db, ty);
     }
-    collector.max_freshness.get()
+    visitor
+        .collides
+        .get()
+        .then(|| visitor.max.get().increment().value())
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a

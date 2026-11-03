@@ -1640,6 +1640,37 @@ def check[T](other: Box[T], arg: int) -> None:
     pair: tuple[T, int] = result  # no diagnostic
 ```
 
+## Aliases in the owner of a generic method
+
+Calling a generic method leaves the enclosing method's type parameter fixed, whether an alias
+receives it as an argument or captures it in its definition.
+
+```py
+type Items[A] = list[A]
+type Nested[A] = A | list[Nested[tuple[A]]]
+
+class Box[C]:
+    @staticmethod
+    def get[T](value: T) -> C:
+        type LocalItems = list[T]
+
+        def check(explicit: "Box[Items[T]]", captured: "Box[LocalItems]", n: int) -> None:
+            from_argument = explicit.get(n)
+            ok: list[T] = from_argument
+            wrong: list[int] = from_argument  # error: [invalid-assignment]
+
+            from_definition = captured.get(n)
+            ok_again: list[T] = from_definition
+            wrong_again: list[int] = from_definition  # error: [invalid-assignment]
+
+        def recursive(other: "Box[Nested[T]]", n: int) -> None:
+            result = other.get(n)
+            ok: Nested[T] = result
+            wrong: Nested[int] = result  # error: [invalid-assignment]
+
+        raise NotImplementedError
+```
+
 ## Inferred returns of specialized generic methods
 
 An inferred return can refer to both the owner's type argument and the called method's type

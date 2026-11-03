@@ -39,16 +39,13 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{
-    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
-};
+use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
     MaterializationKind, ParamSpecAttrKind, ParamSpecValue, ParameterDescription, SelfBinding,
-    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types,
-    todo_type,
+    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypedDictType,
+    UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -1285,24 +1282,24 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         specialization: Specialization<'db>,
     ) -> Self {
-        if let Some(generic_context) = self.generic_context
-            && specialization.types(db).iter().any(|ty| {
-                any_over_type(db, env, *ty, false, |ty| {
-                    matches!(ty, Type::TypeVar(typevar)
-                        if generic_context.contains(db, typevar.identity(db))
-                            && !specialization.generic_context(db).contains(db, typevar.identity(db)))
-                })
-            })
-            && let Some(freshness) = max_typevar_freshness_matching_generic_context(
-                db,
-                specialization.types(db).iter().copied(),
-                generic_context,
-            )
-        {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+        let arguments = specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .filter_map(|(parameter, &argument)| {
+                (argument
+                    .as_typevar()
+                    .is_none_or(|var| !var.is_same_typevar_as(db, parameter)))
+                .then_some(argument)
+            });
+        if let Some(delta) = freshening_delta(db, arguments, generic_context) {
             // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
             // from the projected method's local T. Rename the method's binders before
             // substituting the class arguments, while those occurrences are distinguishable.
-            self.freshen_bound_typevars(db, env, freshness.increment().value())
+            self.freshen_bound_typevars(db, env, delta)
         } else {
             // Identity substitutions introduce no new occurrences. A different nonce already
             // distinguishes two occurrences; freshening just because they share a declaration
@@ -1311,11 +1308,11 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn max_typevar_freshness_matching_generic_context(
+    fn freshening_delta_for(
         &self,
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
-    ) -> Option<TypeVarNonce> {
+    ) -> Option<u32> {
         let typevars = self
             .generic_context
             .into_iter()
@@ -1329,7 +1326,7 @@ impl<'db> Signature<'db> {
             .chain(parameters)
             .chain(std::iter::once(self.return_ty));
 
-        max_typevar_freshness_matching_generic_context(db, types, generic_context)
+        freshening_delta(db, types, generic_context)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -2909,9 +2906,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let freshened_source;
         let source = if signature_context(source) != signature_context(target)
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = target.freshening_delta_for(db, generic_context)
         {
             freshened_source = source.freshen_bound_typevars(db, env, delta);
             &freshened_source
@@ -2921,9 +2916,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = source.freshening_delta_for(db, generic_context)
         {
             freshened_target = target.freshen_bound_typevars(db, env, delta);
             &freshened_target
