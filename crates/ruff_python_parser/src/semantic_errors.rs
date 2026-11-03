@@ -1059,7 +1059,7 @@ impl SemanticSyntaxChecker {
                         WriteToDebugKind::Store
                     }
                     ExprContext::Store if version >= PythonVersion::PY314 => {
-                        WriteToDebugKind::AugmentedAssign
+                        WriteToDebugKind::AugAssignAttribute
                     }
                     ExprContext::Del if version >= PythonVersion::PY314 => {
                         WriteToDebugKind::DeleteAttribute
@@ -1437,7 +1437,7 @@ impl Display for SemanticSyntaxError {
                     "cannot delete `__debug__` on Python {} (syntax was removed in 3.14)",
                     self.python_version,
                 ),
-                WriteToDebugKind::AugmentedAssign => write!(
+                WriteToDebugKind::AugAssignAttribute => write!(
                     f,
                     "cannot assign to `__debug__` on Python {} (syntax was removed in 3.14)",
                     self.python_version,
@@ -2110,10 +2110,35 @@ impl Display for InvalidExpressionKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum WriteToDebugKind {
+    /// An assignment to `__debug__`, invalid on all Python versions:
+    ///
+    /// ```py
+    /// __debug__ = 1
+    /// __debug__ += 1
+    /// x.__debug__ = 1
+    /// ```
     Store,
+
+    /// A deletion of `__debug__`, invalid since Python 3.9:
+    ///
+    /// ```py
+    /// del __debug__
+    /// ```
     Delete,
+
+    /// A deletion of a `__debug__` attribute, invalid since Python 3.14:
+    ///
+    /// ```py
+    /// del x.__debug__
+    /// ```
     DeleteAttribute,
-    AugmentedAssign,
+
+    /// An augmented assignment to a `__debug__` attribute, also invalid since Python 3.14:
+    ///
+    /// ```py
+    /// x.__debug__ += 1
+    /// ```
+    AugAssignAttribute,
 }
 
 fn comprehension_target_names(
