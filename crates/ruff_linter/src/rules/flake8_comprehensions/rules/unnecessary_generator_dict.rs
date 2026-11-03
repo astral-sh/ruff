@@ -48,7 +48,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
 pub(crate) fn unnecessary_generator_dict(checker: &Checker, call: &ExprCallFields<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("dict", call.node) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
     let ExprKind::Generator(generator_node) = argument.classify() else {

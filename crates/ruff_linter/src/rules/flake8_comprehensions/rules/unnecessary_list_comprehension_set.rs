@@ -49,7 +49,7 @@ pub(crate) fn unnecessary_list_comprehension_set(
     checker: &Checker,
     call: &ast::ExprCallFields<'_>,
 ) {
-    let Some(argument) = exactly_one_argument_with_matching_function("set", call.node) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
         return;
     };
     if !checker.semantic().has_builtin_binding("set") {

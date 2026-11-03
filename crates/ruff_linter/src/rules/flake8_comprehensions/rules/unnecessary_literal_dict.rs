@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 
 /// C406 (`dict([(1, 2)])`)
 pub(crate) fn unnecessary_literal_dict(checker: &Checker, call: &ExprCallFields<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("dict", call.node) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
     let (kind, elts) = match argument.classify() {
