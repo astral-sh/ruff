@@ -41,7 +41,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
     uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@f11dbff15181b71f2cc5e8487b1ac7d7bb03ea7d
     with:
-      runner: nscloud-ubuntu-22.04-amd64-16x64
+      # The review sandbox requires `bubblewrap` to create its root filesystem.
+      runner: namespace-profile-ubuntu-24-04-16;container.privileged=true
       helper-runner: github-ubuntu-24.04-x86_64-4
       # renovate: datasource=github-release-attachments depName=astral-sh/uv
       uv-version: "0.13.6"

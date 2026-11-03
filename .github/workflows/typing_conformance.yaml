@@ -47,7 +47,7 @@ env:
 jobs:
   typing_conformance:
     name: Compute diagnostic diff
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-32x128' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
