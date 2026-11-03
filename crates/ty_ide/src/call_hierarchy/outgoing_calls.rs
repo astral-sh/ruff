@@ -52,13 +52,16 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         let Some(def) = resolved.definition() else {
             continue;
         };
-        let parsed = parsed_module(db, def.python_file(db)).load(db);
+        // An edit can move the prepared item's range onto an imported symbol. Outgoing
+        // call-site ranges are relative to the item's file, so only walk definitions in it.
+        if def.program_file(db) != file {
+            continue;
+        }
 
-        let model = SemanticModel::new(db, def.program_file(db));
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
-            tokens: parsed.tokens(),
+            tokens: module.tokens(),
             by_callee: &mut groups,
             ancestors: Vec::new(),
         };
@@ -68,7 +71,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         // the visitor stops at nested callables — see `OutgoingCallsFinder`.
         match def.kind(db) {
             DefinitionKind::Function(fn_ref) => {
-                let func = fn_ref.node(&parsed);
+                let func = fn_ref.node(&module);
                 finder.walk_callable_signature(
                     &func.decorator_list,
                     func.type_params.as_deref(),
@@ -78,7 +81,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
                 walk_body(&mut finder, &func.body);
             }
             DefinitionKind::Class(class_ref) => {
-                let class = class_ref.node(&parsed);
+                let class = class_ref.node(&module);
                 finder.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
@@ -758,6 +761,42 @@ mod tests {
         LL | class super:
            |       ^^^^^
         ");
+    }
+
+    #[test]
+    fn inherited_property_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "base.py",
+                "
+def default_name():
+    return 'untitled'
+
+class Record:
+    @property
+    def name(self):
+        return default_name()
+",
+            )
+            .source(
+                "main.py",
+                "
+from base import Record
+
+class Local(Record):
+    @Record.name.setter
+    def na<CURSOR>me(self, value):
+        print(value)
+",
+            )
+            .build();
+        let calls = outgoing_calls(
+            &test.db,
+            test.program_file(test.cursor.file),
+            test.cursor.offset,
+        );
+        assert!(calls.iter().any(|call| call.to.name == "print"));
+        assert!(!calls.iter().any(|call| call.to.name == "default_name"));
     }
 
     #[test]

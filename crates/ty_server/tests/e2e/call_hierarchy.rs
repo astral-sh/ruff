@@ -139,6 +139,49 @@ def caller():
 }
 
 #[test]
+fn stale_outgoing_calls_on_an_imported_decorator() -> anyhow::Result<()> {
+    let content = "from hooks import record_call, trace
+
+@trace
+def run():
+    record_call('café')
+";
+    let hooks = r#"def record_call(message):
+    pass
+
+def trace(func):
+    """Record registration, then return the original function."""
+    record_call('registered')
+    return func
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_file("main.py", content)?
+        .with_file("hooks.py", hooks)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document("main.py", content, 1);
+    let items = prepare(&mut server, "main.py", Position::new(3, 4)).unwrap();
+
+    // The saved range for `run` now points at `trace`, whose body is in hooks.py.
+    server.change_text_document(
+        "main.py",
+        vec![
+            lsp_types::TextDocumentContentChangeWholeDocument {
+                text: format!("\n{content}"),
+            }
+            .into(),
+        ],
+        2,
+    );
+    assert!(outgoing(&mut server, items[0].clone()).is_none());
+
+    let items = prepare(&mut server, "main.py", Position::new(4, 4)).unwrap();
+    let calls = outgoing(&mut server, items[0].clone()).unwrap();
+    assert!(calls.iter().any(|call| call.to.name == "record_call"));
+    Ok(())
+}
+
+#[test]
 fn incoming_calls_multi_file() -> anyhow::Result<()> {
     let lib = r#"def func():
     pass
