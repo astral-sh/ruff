@@ -1682,6 +1682,8 @@ python-version = "3.13"
 ```
 
 ```py
+from collections.abc import Callable
+
 def at_least_one(*args: *tuple[*tuple[int, ...], int]) -> None: ...
 def exactly_two(*args: *tuple[int, str]) -> None: ...
 def exactly_zero(*args: *tuple[()]) -> None: ...
@@ -1701,6 +1703,10 @@ exactly_two(1, "two", 3)  # error: [too-many-positional-arguments]
 
 exactly_zero()
 exactly_zero(1)  # error: [too-many-positional-arguments]
+
+def register[**P](callback: Callable[P, None], *args: *tuple[()], enabled: bool) -> None: ...
+
+register(register, enabled=True)
 ```
 
 ### Unpacked variadic arity errors preserve element diagnostics

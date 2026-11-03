@@ -285,15 +285,6 @@ enum CallErrorPriority {
     BindingError = 2,
 }
 
-fn generic_context_has_paramspec<'db>(
-    db: &'db dyn Db,
-    generic_context: GenericContext<'db>,
-) -> bool {
-    generic_context
-        .variables(db)
-        .any(|typevar| typevar.is_paramspec(db))
-}
-
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
@@ -3652,17 +3643,6 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .all(|overload| overload.signature.generic_context.is_none())
         {
-            return;
-        }
-
-        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
-        // quantify away `P` before call specialization can use it.
-        if self.overloads.iter().any(|overload| {
-            overload
-                .signature
-                .generic_context
-                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
-        }) {
             return;
         }
 
@@ -7416,7 +7396,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut expected_ty = declared_type;
         if let Some(specialization) = self.merged_specialization() {
             if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(db, specialization);
+                argument_type = argument_type.apply_argument_specialization(db, specialization);
             }
             expected_ty = expected_ty.apply_specialization(db, specialization);
         }
@@ -8870,36 +8850,22 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let infer = |binding: &Self| {
-            CallInference {
-                db,
-                env,
-                signature: &binding.signature,
-                arguments,
-                argument_matches: &binding.argument_matches,
-                call_expression_tcx,
-                return_ty: binding.return_ty,
-                is_partial_application: binding.is_partial_application,
-                is_constructor: binding.constructor_context.is_some(),
-                inferable_typevars: binding
-                    .signature
-                    .generic_context
-                    .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
-            }
-            .infer(constraints)
-        };
-
-        let mut inferred = infer(self);
-        if let Some(freshness) = inferred
-            .inference
-            .and_then(|inference| inference.captured_paramspec_freshness(db))
-        {
-            // If a decorator captures another occurrence of itself, its parameter list can
-            // refer to the callee's own variables. Give the callee a separate set before
-            // substituting into the captured callback.
-            self.freshen_bound_typevars(db, env, freshness.increment().value());
-            inferred = infer(self);
+        let inferred = CallInference {
+            db,
+            env,
+            signature: &self.signature,
+            arguments,
+            argument_matches: &self.argument_matches,
+            call_expression_tcx,
+            return_ty: self.return_ty,
+            is_partial_application: self.is_partial_application,
+            is_constructor: self.constructor_context.is_some(),
+            inferable_typevars: self
+                .signature
+                .generic_context
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
         }
+        .infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,

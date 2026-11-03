@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use std::borrow::Cow;
 use std::cell::LazyCell;
 use std::fmt;
 use std::num::NonZeroU32;
@@ -436,6 +437,10 @@ impl<'db> CallableSignature<'db> {
             type_mapping
         {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
+                let freshened = visitor
+                    .argument_scope
+                    .and_then(|scope| signature.freshen_for_argument(db, visitor.env, scope));
+                let signature = freshened.as_ref().unwrap_or(signature);
                 if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
                     && let Some(value) = specialization.get_parameter_list(db, paramspec)
                     && let Some(value) = value.as_paramspec_value(db)
@@ -1263,6 +1268,32 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         )
+    }
+
+    /// Keep a callback's own variables independent when applying the callee's specialization
+    /// to an argument. An inherited class parameter still belongs to the receiver.
+    fn freshen_for_argument(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        callee: GenericContext<'db>,
+    ) -> Option<Self> {
+        let bound = self.generic_context?;
+        if self.is_paramspec_value() {
+            return None;
+        }
+        let freshness = callee
+            .variables(db)
+            .filter(|typevar| {
+                typevar.is_paramspec(db)
+                    && bound.contains(db, typevar.identity(db))
+                    && self.definition().is_none_or(|definition| {
+                        typevar.binding_context(db).definition() == Some(definition)
+                    })
+            })
+            .map(|typevar| typevar.freshness(db))
+            .max()?;
+        Some(self.freshen_bound_typevars(db, env, freshness.increment().value()))
     }
 
     fn max_typevar_freshness_matching_generic_context(
@@ -2618,6 +2649,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
+        // A callback may be another occurrence of the callee, as in `inner.callback(outer.callback, cleanup)`.
+        // Its locally bound variables must be distinct before we capture its parameters or constrain its return.
+        let mut freshened_sources = Cow::Borrowed(source_overloads);
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy
+            && let [target] = target_overloads
+            && let Some((_, paramspec)) = target.parameters.as_paramspec_with_prefix()
+        {
+            for (index, source) in source_overloads.iter().enumerate() {
+                if !source.is_paramspec_value()
+                    && let Some(context) = source.generic_context
+                    && context.contains(db, paramspec.identity(db))
+                {
+                    let delta = target
+                        .max_typevar_freshness_matching_generic_context(db, context)
+                        .unwrap_or(paramspec.freshness(db))
+                        .increment()
+                        .value();
+                    freshened_sources.to_mut()[index] =
+                        source.freshen_bound_typevars(db, self.env, delta);
+                }
+            }
+        }
+        let source_overloads = freshened_sources.as_ref();
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =

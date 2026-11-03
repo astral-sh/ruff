@@ -1352,6 +1352,22 @@ def run_previous(previous: C[[]]) -> int:
 reveal_type(C(run_previous).f)  # revealed: (previous: C[()]) -> int
 ```
 
+A constructor can receive itself as a callback and still infer a class type argument from a value.
+
+```py
+from typing import overload
+
+class Box[T]:
+    @overload
+    def __init__[**P](self, callback: Callable[P, object], value: T) -> None: ...
+    @overload
+    def __init__(self, callback: object, value: T) -> None: ...
+    def __init__(self, callback, value):
+        self.value = value
+
+reveal_type(Box(Box, 1))  # revealed: Box[Literal[1]]
+```
+
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
@@ -1751,14 +1767,15 @@ def target(name: str, callback: Callable[[int], Any]): ...
 forward(target, callback=lambda value: value)  # error: [missing-argument]
 ```
 
-### Capturing a generic callable from a list
+### Capturing a generic callable from a sequence
 
 ```py
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from functools import partial
 from typing import Protocol
 
 class Selector(Protocol):
-    def __call__[**P, R](self, callbacks: list[Callable[P, R]], /) -> Callable[P, R]: ...
+    def __call__[**P, R](self, callbacks: Sequence[Callable[P, R]], /) -> Callable[P, R]: ...
 
 def _(primary: Selector, fallback: Selector):
     select = primary([fallback])
@@ -1767,6 +1784,23 @@ def _(primary: Selector, fallback: Selector):
         return key.encode()
 
     reveal_type(select([fetch]))  # revealed: (key: str) -> bytes
+    reveal_type(primary((partial(fallback),))([fetch]))  # revealed: (key: str) -> bytes
+```
+
+Overload resolution still checks arguments forwarded to a callback fetched from a list.
+
+```py
+from typing import overload
+
+@overload
+def invoke[**P](callbacks: list[Callable[P, object]], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+@overload
+def invoke(callbacks: list[object], /, flag: None) -> None: ...
+def invoke(callbacks, /, *args, **kwargs):
+    for callback in callbacks:
+        callback(*args, **kwargs)
+
+invoke([invoke], 1)  # error: [no-matching-overload]
 ```
 
 ### Specializing `ParamSpec` with another `ParamSpec`
@@ -2642,6 +2676,11 @@ def first[**P, T](callback: Callable[P, None], value: tuple[T, ...]) -> T:
 def callback(*, label: str) -> None: ...
 def check(value: tuple[int] | tuple[str]):
     reveal_type(first(callback, value))  # revealed: int | str
+
+def tag[**P, R, *Ts](func: Callable[P, R], *tags: *Ts) -> Callable[P, R]:
+    return func
+
+reveal_type(tag(tag)(callback))  # revealed: (*, label: str) -> None
 ```
 
 ### Overloads with substitution of `P.args` and `P.kwargs`
@@ -2667,6 +2706,8 @@ def returns_str(x: int) -> str:
 
 def never_returns(x: int) -> Never:
     raise Exception()
+
+reveal_type(Task(Task)(returns_str)(1))  # revealed: str
 
 t1 = Task(returns_str)
 reveal_type(t1)  # revealed: Task[(x: int), str]
@@ -2772,6 +2813,8 @@ from ty_extensions._internal import generic_context
 def decorator[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     return func
 
+reveal_type(decorator(decorator))  # revealed: [**P, T](func: (**P) -> T) -> ((**P) -> T)
+
 @decorator
 def identity[T](value: T) -> T:
     return value
@@ -2790,6 +2833,18 @@ reveal_type(identity("hello"))  # revealed: Literal["hello"]
 
 reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
+```
+
+A nested callback can close over the decorator's parameter list and return type.
+
+```py
+def decorate[**P, R](func: Callable[P, R], *, repeat: bool = False) -> Callable[P, R]:
+    def wrap(callback: Callable[P, R]) -> Callable[P, R]:
+        return callback
+
+    return decorate(wrap)(func) if repeat else func
+
+reveal_type(decorate(identity, repeat=True)(1))  # revealed: Literal[1]
 ```
 
 ### Chained decorators with generic functions
@@ -3141,4 +3196,21 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     # error: [missing-argument]
     # error: [missing-argument]
     box.invoke(callback, 1)
+```
+
+Lambda arguments are checked for both possible receivers.
+
+```py
+from typing import Concatenate
+
+class Result:
+    def pipe[**P, R](self, callback: Callable[Concatenate[Self, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return callback(self, *args, **kwargs)
+
+class Ok(Result): ...
+class Err(Result): ...
+
+def process(result: Ok) -> None: ...
+def check(result: Ok | Err):
+    result.pipe(lambda value: process(value))  # error: [invalid-argument-type]
 ```

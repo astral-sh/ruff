@@ -515,6 +515,15 @@ struct DependentMaterialization<'db> {
     dependencies: Box<[MaterializationDependency<'db>]>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum SpecializationMode {
+    Ordinary,
+    /// Project a member, including the declared domain of a retained synthetic `Self`.
+    Owner,
+    /// Specialize a contextually inferred argument containing its own generic callbacks.
+    CallArgument,
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
@@ -523,6 +532,8 @@ struct DependentMaterialization<'db> {
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    /// The callee's variables while specializing an argument that can contain generic callbacks.
+    argument_scope: Option<GenericContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -543,6 +554,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            argument_scope: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -683,6 +695,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            argument_scope: self.argument_scope,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9576,7 +9589,7 @@ impl<'db> Type<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Type<'db> {
         if let Some(specialization) = specialization {
-            self.apply_specialization_impl(db, specialization, true)
+            self.apply_specialization_impl(db, specialization, SpecializationMode::Owner)
         } else {
             self
         }
@@ -9593,18 +9606,29 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        self.apply_specialization_impl(db, specialization, false)
+        self.apply_specialization_impl(db, specialization, SpecializationMode::Ordinary)
     }
 
-    /// Applies either an ordinary specialization or an enclosing-owner specialization.
-    ///
-    /// Both modes share the same leaf fast paths. They differ only in whether a retained synthetic
-    /// `Self` domain is part of the substitution.
+    /// Applies a callee's specialization to a contextually inferred argument while preserving
+    /// any generic callbacks inside the argument.
+    fn apply_argument_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let mode = if specialization.generic_context(db).has_paramspec(db) {
+            SpecializationMode::CallArgument
+        } else {
+            SpecializationMode::Ordinary
+        };
+        self.apply_specialization_impl(db, specialization, mode)
+    }
+
     fn apply_specialization_impl(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-        specialize_self_domain: bool,
+        mode: SpecializationMode,
     ) -> Type<'db> {
         if let Type::NominalInstance(instance) = self
             && !instance.is_definition_generic(db)
@@ -9617,7 +9641,9 @@ impl<'db> Type<'db> {
         {
             match specialization.get(db, typevar) {
                 Some(mapped) if specialization.materialization_kind(db).is_none() => return mapped,
-                None if !specialize_self_domain || !typevar.typevar(db).is_self(db) => return self,
+                None if mode != SpecializationMode::Owner || !typevar.typevar(db).is_self(db) => {
+                    return self;
+                }
                 _ => {}
             }
         }
@@ -9675,7 +9701,7 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization, specialize_self_domain)
+        self.apply_specialization_inner(db, specialization, mode)
     }
 
     #[salsa::tracked(
@@ -9693,12 +9719,12 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-        specialize_self_domain: bool,
+        mode: SpecializationMode,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         let apply_specialization = ApplySpecialization::Specialization {
             specialization,
-            specialize_self_domain,
+            specialize_self_domain: mode == SpecializationMode::Owner,
         };
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(apply_specialization),
@@ -9708,7 +9734,11 @@ impl<'db> Type<'db> {
             },
         };
 
-        self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
+        let mut visitor = ApplyTypeMappingVisitor::new(env);
+        if mode == SpecializationMode::CallArgument {
+            visitor.argument_scope = Some(specialization.generic_context(db));
+        }
+        self.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
     }
 
     fn apply_type_mapping<'a>(

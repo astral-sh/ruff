@@ -1903,10 +1903,12 @@ forward(identity, b"text")  # ok
 
 ```py
 from contextlib import ExitStack
+from functools import partial
 
 def cleanup() -> None: ...
 def _(deferred: ExitStack, final: ExitStack):
     deferred.callback(final.callback, cleanup)
+    deferred.callback(partial(final.callback), cleanup)
     deferred.callback(final.callback)  # error: [missing-argument]
 ```
 

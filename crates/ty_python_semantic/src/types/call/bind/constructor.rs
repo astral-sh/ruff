@@ -1,6 +1,4 @@
-use super::{
-    Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
-};
+use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
@@ -115,7 +113,7 @@ impl<'db> ConstructorBinding<'db> {
                 .is_some_and(|owned| generic_context.is_subset_of(db, owned))
         });
         if !owns_generic_context
-            || generic_context_has_paramspec(db, generic_context)
+            || generic_context.has_paramspec(db)
             || !nonce_generator.should_freshen(db, generic_context)
         {
             return;
