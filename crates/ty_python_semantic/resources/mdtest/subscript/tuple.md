@@ -519,6 +519,41 @@ def _(c: Tuple, d: Tuple[int, A], e: Tuple[Any, ...]):
     reveal_type(e)  # revealed: tuple[Any, ...]
 ```
 
+### Conditional import with a `tuple` fallback
+
+```py
+try:
+    from typing import Tuple
+except ImportError:
+    Tuple = tuple
+
+def _(pair: Tuple[int, str]):
+    reveal_type(pair)  # revealed: tuple[int, str]
+```
+
+An invalid element type produces one diagnostic.
+
+```py
+pair: Tuple[int, 1]  # error: [invalid-type-form] "Int literals are not allowed"
+```
+
+### Conditional alias with an invalid alternative
+
+When one binding is invalid in a type expression, ty keeps the tuple type from the valid binding.
+
+```py
+from typing import _SpecialForm
+
+def _(flag: bool, form: _SpecialForm):
+    if flag:
+        Alias = tuple
+    else:
+        Alias = form
+
+    def check(pair: Alias[int, str]):  # error: [invalid-type-form]
+        reveal_type(pair)  # revealed: tuple[int, str] | Unknown
+```
+
 ### Inheritance
 
 Inheriting from `Tuple` results in a MRO with `builtins.tuple` and `typing.Generic`. `Tuple` itself

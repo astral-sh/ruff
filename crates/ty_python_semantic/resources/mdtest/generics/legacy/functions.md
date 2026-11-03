@@ -63,6 +63,27 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+## Conditional imports of `Type`
+
+Either binding of `Type` lets ty infer `T` from the class passed to `make`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+try:
+    from typing import Type
+except ImportError:
+    Type = type
+
+def make(cls: Type[T]) -> T:
+    reveal_type(cls)  # revealed: type[T@make]
+    return cls()
+
+reveal_type(make(int))  # revealed: int
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
