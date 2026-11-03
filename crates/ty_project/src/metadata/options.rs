@@ -859,9 +859,9 @@ pub struct EnvironmentOptions {
     /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
     /// * `./python`
     ///
-    /// Scripts with inline metadata default to `root = []`, even when the enclosing project
-    /// configures first-party roots. Set `root = ["."]` in the script's `[tool.ty.environment]`
-    /// table to import sibling modules.
+    /// Scripts with inline metadata have no first-party roots by default because they are
+    /// single-file programs. Set `root = ["."]` in the script's `[tool.ty.environment]` table
+    /// to import sibling modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -891,10 +891,8 @@ pub struct EnvironmentOptions {
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
     ///
-    /// A script with inline metadata uses its own `requires-python` in preference to the
-    /// enclosing project's Python version. An explicit `[tool.ty.environment]` Python version
-    /// in the script takes precedence over its `requires-python`. A script that specifies
-    /// neither `requires-python` nor a `[tool.ty]` table inherits the project's version setting.
+    /// A script uses its inline `environment.python-version` first, then `requires-python`.
+    /// It falls back to the project's version if it has no inline `[tool.ty]` table.
     ///
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,

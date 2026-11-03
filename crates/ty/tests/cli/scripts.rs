@@ -209,29 +209,58 @@ fn metadata_without_tool_ty_inherits_project_settings_and_overrides() -> anyhow:
             value: int = "not an int"  # type: ignore
             "#,
         ),
-        (
-            "scripts/empty.py",
-            r#"
-            # /// script
-            # [tool.ty]
-            # ///
-
-            print(missing)
-            value: int = "not an int"  # type: ignore
-            "#,
-        ),
     ])?;
 
     assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    scripts/empty.py:6:7: error[unresolved-reference] Name `missing` used when not defined
     scripts/inherit.py:8:14: warning[invalid-assignment] Object of type `Literal["not an int"]` is not assignable to `int`
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn empty_tool_ty_disables_project_settings_and_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-reference = "ignore"
+
+            [[tool.ty.overrides]]
+            include = ["script.py"]
+
+            [tool.ty.overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        (
+            "script.py",
+            "
+            # /// script
+            # [tool.ty]
+            # ///
+
+            print(missing)
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:7: error[unresolved-reference] Name `missing` used when not defined
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -800,7 +829,6 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
 #[test]
 fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyhow::Result<()> {
     let case = CliTest::with_files([
-        ("scripts/sibling.py", "value = 1\n"),
         ("scripts/source/first_party.py", "value = 1\n"),
         ("scripts/extra/dependency.py", "value = 1\n"),
         (
@@ -808,13 +836,12 @@ fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyho
             r#"
             # /// script
             # [tool.ty.environment]
-            # root = ["./source", "."]
+            # root = ["./source"]
             # extra-paths = ["./extra"]
             # ///
 
             from dependency import value as dependency
             from first_party import value as first_party
-            from sibling import value as sibling
             "#,
         ),
     ])?;
@@ -832,7 +859,7 @@ fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyho
 }
 
 #[test]
-fn scripts_have_separate_roots_and_inherit_project_extra_paths() -> anyhow::Result<()> {
+fn scripts_use_their_own_roots() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "ty.toml",

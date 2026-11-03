@@ -1,6 +1,5 @@
-Scripts with PEP 723 metadata inherit the enclosing project's ty configuration unless they have
-their own `[tool.ty]` table. Each script declares its own dependencies and has no first-party roots
-by default.
+Scripts with PEP 723 metadata are single-file projects with their own dependencies. They inherit the
+enclosing project's rules and analysis settings unless they define a `[tool.ty]` table.
 
 ```toml
 [environment]
@@ -15,8 +14,7 @@ respect-type-ignore-comments = false
 
 # Inline settings
 
-An inline `[tool.ty]` table replaces the enclosing project's ty configuration for that script. Like
-a `ty.toml`, it can configure rules, analysis settings, and the Python environment.
+A script can change its `rules`, `analysis`, and `environment` settings.
 
 ```py
 # /// script
