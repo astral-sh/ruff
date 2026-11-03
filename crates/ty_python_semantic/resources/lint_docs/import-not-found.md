@@ -21,3 +21,9 @@ import mathh  # error
 # ImportError: cannot import name 'sine' from 'math'
 from math import sine  # error
 ```
+
+## Rule history
+
+- v1.0.0: Renamed from `unresolved-import`.
+
+  `unresolved-import` remains as a compatibility alias for this rule.

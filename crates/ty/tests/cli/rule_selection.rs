@@ -222,6 +222,70 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A single rules table rejects conflicting levels for two names of the same rule.
+#[test]
+fn configuration_conflicting_rule_alias_levels() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "ignore"
+            import-not-found = "error"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: <temp_dir>/ty.toml is not a valid `ty.toml`
+      Cause: TOML parse error at line 2, column 1
+      |
+    2 | [rules]
+      | ^^^^^^^
+    Conflicting levels for the same rule: `import-not-found = "error"` and `unresolved-import = "ignore"`
+    note: `unresolved-import` is a legacy alias for `import-not-found`
+    "#);
+}
+
+/// A rule's name and its alias can select the same level, and a separate override can change it.
+#[test]
+fn configuration_rule_alias_levels_with_override() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "error"
+
+            [[overrides]]
+            include = ["test.py"]
+            [overrides.rules]
+            unresolved-import = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+}
+
 /// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {

@@ -1261,7 +1261,7 @@ def test() -> "Literal[5]":
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22import-not-found%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22import-not-found%22+OR+%22unresolved-import%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1204" target="_blank">View source</a>
 </small>
 
@@ -1292,6 +1292,13 @@ import mathh  # error
 # ImportError: cannot import name 'sine' from 'math'
 from math import sine  # error
 ```
+
+**Rule history**
+
+
+- v1.0.0: Renamed from [`unresolved-import`](#unresolved-import).
+
+  [`unresolved-import`](#unresolved-import) remains as a compatibility alias for this rule.
 
 ## `inconsistent-mro`
 

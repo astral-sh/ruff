@@ -25,11 +25,11 @@ use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
-use rustc_hash::FxHasher;
-use serde::{Deserialize, Serialize};
+use rustc_hash::{FxHashMap, FxHasher};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug, Display, Write as _};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -1158,9 +1158,7 @@ impl SrcOptions {
     }
 }
 
-#[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
-)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Hash, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
     /// The rules with their severity. Entries coming later in the map take precedence over
@@ -1168,6 +1166,40 @@ pub struct Rules {
     /// by a specific rule selector coming after it but if `all` is the last selector, then it
     /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
+}
+
+impl<'de> Deserialize<'de> for Rules {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let rules = Self {
+            inner: OrderMap::deserialize(deserializer)?,
+        };
+        // Check each table before merging so a separate config file or override can change the level.
+        let registry = ty_python_semantic::default_lint_registry();
+        let mut seen = FxHashMap::default();
+        for (name, level) in &rules.inner {
+            if let Ok(lint) = registry.get(name)
+                && let Some((other_name, other_level)) = seen.insert(lint, (name, level))
+                && level != other_level
+            {
+                let mut message = format!(
+                    "Conflicting levels for the same rule: `{other_name} = \"{other_level}\"` and \
+                     `{name} = \"{level}\"`"
+                );
+                let canonical = lint.name();
+                for spelling in [other_name, name] {
+                    if spelling.as_str() != canonical.as_str() {
+                        message.push('\n');
+                        let _ = write!(
+                            message,
+                            "note: `{spelling}` is a legacy alias for `{canonical}`"
+                        );
+                    }
+                }
+                return Err(serde::de::Error::custom(message));
+            }
+        }
+        Ok(rules)
+    }
 }
 
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {

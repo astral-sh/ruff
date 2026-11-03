@@ -82,8 +82,10 @@ fn generate_markdown() -> String {
 
     for lint in lints {
         // Keep links to the old rule heading working after a rename.
-        if let Some(names) = aliases.get(lint) {
-            for name in names.iter().sorted() {
+        let mut names = aliases.remove(lint).unwrap_or_default();
+        names.sort_unstable();
+        if !names.is_empty() {
+            for name in &names {
                 let _ = writeln!(output, r#"<a id="{name}"></a>"#);
             }
             output.push('\n');
@@ -144,12 +146,23 @@ fn generate_markdown() -> String {
             }
         };
 
+        let quoted_name = |name: LintName| format!("\"{name}\"");
+        let search_terms = if names.is_empty() {
+            quoted_name(lint.name())
+        } else {
+            let terms = std::iter::once(lint.name())
+                .chain(names)
+                .map(quoted_name)
+                .join(" OR ");
+            format!("({terms})")
+        };
+
         let _ = writeln!(
             &mut output,
             r#"<small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
 {status_text} ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22{encoded_name}%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_terms}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
@@ -157,8 +170,8 @@ Default level: <a href="../../rules#rule-levels" title="This lint has a default 
 {documentation}
 "#,
             level = lint.default_level(),
-            encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
-                .collect::<String>(),
+            encoded_terms =
+                url::form_urlencoded::byte_serialize(search_terms.as_bytes()).collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = lint.line(),

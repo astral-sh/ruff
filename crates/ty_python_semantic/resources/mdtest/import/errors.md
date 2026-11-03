@@ -31,9 +31,32 @@ reveal_type(thing)  # revealed: Unknown
 
 ## Suppressing `import-not-found` with the previous rule name
 
+`unresolved-import` is an alias for `import-not-found`. Existing ignore comments that use the old
+name still suppress errors for both a missing module and a missing member.
+
 ```py
 import missing_module  # ty: ignore[unresolved-import]
 from math import missing_member  # type: ignore[ty:unresolved-import]
+```
+
+## Reporting an unused `unresolved-import` suppression
+
+In the following example, only `ty: ignore[unresolved-reference]` is required to suppress the
+diagnostic for the unresolved name on `print(missing)`. The `unresolved-import` suppression is
+unused. But `unresolved-import` is actually a legacy alias for `import-not-found` -- a naive
+implementation of `unused-ignore-comment` could result in us, confusingly, complaining that an
+"`import-not-found`" suppression comment was unused, even though none exists!
+
+This test enforces that we use the name of the rule which was actually used in the source code
+when we complain about unused ignore comments, even if the name used in the source code is
+merely a legacy alias to the rule's canonical name.
+
+```py
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-import'"
+print(missing)  # ty: ignore[unresolved-reference, unresolved-import]
+
+# error: [unused-type-ignore-comment] "'ty:division-by-zero', 'ty:unresolved-import'"
+print(missing)  # type: ignore[ty:unresolved-reference, ty:division-by-zero, ty:unresolved-import]
 ```
 
 ## Resolved import of symbol from unresolved import
