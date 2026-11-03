@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
 
@@ -8,7 +9,7 @@ use crate::codes::Category;
 use crate::fix;
 use crate::preview::is_pyi048_fix_enabled;
 use crate::rules::flake8_pie::rules::Placeholder;
-use crate::{Applicability, Fix, FixAvailability, Violation};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for functions in stub (`.pyi`) files that contain multiple
@@ -36,23 +37,21 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// ## Fix availability
 ///
-/// The fix removes placeholder statements (`...` and `pass`), which do nothing at runtime, so it is
-/// only available when every statement but one is a placeholder. It also requires [preview] to be
-/// enabled.
-///
-/// ## Fix safety
-///
-/// As in [`unnecessary-placeholder` (`PIE790`)][PIE790], the fix is marked as unsafe when the
-/// surviving statement is a string literal that isn't already the docstring, since removing the
-/// placeholders that precede it turns it into one:
+/// The fix removes placeholder statements (`...` and `pass`), which do nothing at runtime. It is
+/// only available when exactly one statement in the body isn't a placeholder, so that the fix
+/// leaves that statement as the body's only one:
 ///
 /// ```pyi
 /// def function():
+///     """Docstring."""
 ///     ...
-///     "this string becomes the docstring"
 /// ```
 ///
-/// [PIE790]: https://docs.astral.sh/ruff/rules/unnecessary-placeholder/
+/// No fix is offered when that statement is a string literal preceded by placeholders, since
+/// removing them would turn the string into the function's docstring.
+///
+/// The fix also requires [preview] to be enabled.
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
@@ -87,41 +86,23 @@ pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: &Stmt, body
     }
 }
 
-/// Build a [`Fix`] that deletes every placeholder statement in `body` but one, if that leaves the
-/// body with a single statement.
+/// Build a [`Fix`] that deletes every placeholder in `body`, if that leaves the body with a single
+/// statement.
 fn remove_placeholders(checker: &Checker, body: &[Stmt]) -> Option<Fix> {
     let mut non_placeholders = body
         .iter()
         .enumerate()
         .filter(|(_, stmt)| Placeholder::from_stmt(stmt).is_none());
 
-    let mut applicability = Applicability::Safe;
-
-    let keep = match (non_placeholders.next(), non_placeholders.next()) {
-        (Some((index, stmt)), None) => {
-            // Deleting the placeholders that precede a string literal turns it into the function's
-            // docstring, so the fix is unsafe unless the literal already is the docstring. This
-            // matches how `PIE790` treats the same situation.
-            if index > 0
-                && stmt
-                    .as_expr_stmt()
-                    .is_some_and(|stmt| stmt.value.is_string_literal_expr())
-            {
-                applicability = Applicability::Unsafe;
-            }
-            index
-        }
-        // The body is nothing but placeholders, and one of them has to stay, since a body can't be
-        // empty. Keep an ellipsis if the body has one, so that the result is the `...` body a stub
-        // is supposed to have; otherwise keep the first `pass`, which `PYI009` then rewrites.
-        (None, _) => body
-            .iter()
-            .position(|stmt| matches!(Placeholder::from_stmt(stmt), Some(Placeholder::Ellipsis)))
-            .unwrap_or(0),
-        // More than one statement would be left behind, which wouldn't resolve the rule violation,
-        // so there's nothing to fix.
-        (Some(_), Some(_)) => return None,
+    let (Some((keep, kept)), None) = (non_placeholders.next(), non_placeholders.next()) else {
+        return None;
     };
+
+    // Deleting the placeholders that precede a string literal would turn it into the function's
+    // docstring, so no fix is offered.
+    if keep > 0 && is_docstring_stmt(kept) {
+        return None;
+    }
 
     let edits: Vec<_> = body
         .iter()
@@ -155,9 +136,7 @@ fn remove_placeholders(checker: &Checker, body: &[Stmt]) -> Option<Fix> {
     let mut edits = edits.into_iter();
     let first = edits.next()?;
 
-    Some(
-        Fix::applicable_edits(first, edits, applicability).isolate(Checker::isolation(
-            checker.semantic().current_statement_id(),
-        )),
-    )
+    Some(Fix::safe_edits(first, edits).isolate(Checker::isolation(
+        checker.semantic().current_statement_id(),
+    )))
 }

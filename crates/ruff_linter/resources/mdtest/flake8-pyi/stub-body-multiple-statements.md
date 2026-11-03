@@ -43,11 +43,11 @@ Placeholders (`...` and `pass`) that follow a docstring are removed, leaving the
 body's only statement.
 
 ```pyi
-def ellipsis():  # error: [stub-body-multiple-statements]
+def ellipsis():  # snapshot: stub-body-multiple-statements
     """docstring"""
     ...
 
-def pass_statement():  # error: [stub-body-multiple-statements]
+def pass_statement():  # snapshot: stub-body-multiple-statements
     """docstring"""
     pass
 
@@ -58,6 +58,32 @@ def both():  # snapshot: stub-body-multiple-statements
 ```
 
 ```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def ellipsis():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^
+help: Remove unnecessary statements
+  |
+2 |     """docstring"""
+  -     ...
+3 |
+  |
+
+
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:5:5
+  |
+5 | def pass_statement():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^^^
+help: Remove unnecessary statements
+  |
+6 |     """docstring"""
+  -     pass
+7 |
+  |
+
+
 error[PYI048]: Function body must contain exactly one statement
  --> src/mdtest_snippet.pyi:9:5
   |
@@ -73,11 +99,10 @@ help: Remove unnecessary statements
 
 ## Placeholders around a statement
 
-The surviving statement need not be a docstring; the rule only cares that a single statement is left
-behind.
+The surviving statement doesn't need to be a docstring. The fix only needs a single statement to be left behind.
 
 ```pyi
-def trailing_placeholder():  # error: [stub-body-multiple-statements]
+def trailing_placeholder():  # snapshot: stub-body-multiple-statements
     print("bar")
     pass
 
@@ -89,6 +114,19 @@ def leading_placeholders():  # snapshot: stub-body-multiple-statements
 
 ```snapshot
 error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def trailing_placeholder():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^^^^^^^^^
+help: Remove unnecessary statements
+  |
+2 |     print("bar")
+  -     pass
+3 |
+  |
+
+
+error[PYI048]: Function body must contain exactly one statement
  --> src/mdtest_snippet.pyi:5:5
   |
 5 | def leading_placeholders():  # snapshot: stub-body-multiple-statements
@@ -99,69 +137,6 @@ help: Remove unnecessary statements
   -     ...
   -     pass
 6 |     print("bar")
-  |
-```
-
-## Placeholder-only bodies
-
-When the body consists solely of placeholders, one is kept, since the body cannot be left empty. An
-ellipsis is preferred, so that a body of `...` is left behind even when it isn't the first statement.
-
-```pyi
-def only_ellipses():  # snapshot: stub-body-multiple-statements
-    ...
-    ...
-
-def pass_then_ellipsis():  # snapshot: stub-body-multiple-statements
-    pass
-    ...
-```
-
-```snapshot
-error[PYI048]: Function body must contain exactly one statement
- --> src/mdtest_snippet.pyi:1:5
-  |
-1 | def only_ellipses():  # snapshot: stub-body-multiple-statements
-  |     ^^^^^^^^^^^^^
-help: Remove unnecessary statements
-  |
-2 |     ...
-  -     ...
-3 |
-  |
-
-
-error[PYI048]: Function body must contain exactly one statement
- --> src/mdtest_snippet.pyi:5:5
-  |
-5 | def pass_then_ellipsis():  # snapshot: stub-body-multiple-statements
-  |     ^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary statements
-  |
-5 | def pass_then_ellipsis():  # snapshot: stub-body-multiple-statements
-  -     pass
-6 |     ...
-  |
-```
-
-A body with no ellipsis at all keeps its first `pass`, which `PYI009` then rewrites to `...`.
-
-```pyi
-def only_passes():  # snapshot: stub-body-multiple-statements
-    pass
-    pass
-```
-
-```snapshot
-error[PYI048]: Function body must contain exactly one statement
- --> src/mdtest_snippet.pyi:8:5
-  |
-8 | def only_passes():  # snapshot: stub-body-multiple-statements
-  |     ^^^^^^^^^^^
-help: Remove unnecessary statements
-  |
-9 |     pass
-  -     pass
   |
 ```
 
@@ -212,13 +187,12 @@ help: Remove unnecessary statements
 
 ## Placeholder before a string literal
 
-Removing the placeholder turns the string literal into the function's docstring, so the fix is
-unsafe, matching `PIE790`.
+Removing the placeholder would turn the string literal into the function's docstring, so no fix is offered.
 
 ```pyi
 def placeholder_before_string():  # snapshot: stub-body-multiple-statements
     ...
-    "not a docstring, until the fix is applied"
+    "not a docstring"
 ```
 
 ```snapshot
@@ -228,12 +202,6 @@ error[PYI048]: Function body must contain exactly one statement
 1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove unnecessary statements
-  |
-1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
-  -     ...
-2 |     "not a docstring, until the fix is applied"
-  |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Semicolon-separated statements
@@ -246,7 +214,7 @@ def semicolons():  # snapshot: stub-body-multiple-statements
     pass; print("bar")
 
 # snapshot: stub-body-multiple-statements
-def trailing_semicolon(): ...; ...
+def trailing_semicolon(): """docstring"""; ...
 ```
 
 ```snapshot
@@ -267,20 +235,19 @@ help: Remove unnecessary statements
 error[PYI048]: Function body must contain exactly one statement
  --> src/mdtest_snippet.pyi:5:5
   |
-5 | def trailing_semicolon(): ...; ...
+5 | def trailing_semicolon(): """docstring"""; ...
   |     ^^^^^^^^^^^^^^^^^^
 help: Remove unnecessary statements
   |
 4 | # snapshot: stub-body-multiple-statements
-  - def trailing_semicolon(): ...; ...
-5 + def trailing_semicolon(): ...; 
+  - def trailing_semicolon(): """docstring"""; ...
+5 + def trailing_semicolon(): """docstring"""; 
   |
 ```
 
 ## Line continuations
 
-When placeholders are joined by a semicolon and a line continuation, deleting each of them would
-remove overlapping ranges of the source, so no fix is offered.
+When placeholders are joined by a semicolon and a line continuation, deleting each of them would remove overlapping ranges of the source, so no fix is offered.
 
 ```pyi
 def continuation():  # snapshot: stub-body-multiple-statements
@@ -296,6 +263,29 @@ error[PYI048]: Function body must contain exactly one statement
 1 | def continuation():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^
 help: Remove unnecessary statements
+```
+
+When a line continuation joins the surviving statement to a placeholder, only the placeholder is deleted. The semicolon is left behind, as with other semicolon-separated statements.
+
+```pyi
+def continuation_after_statement():  # snapshot: stub-body-multiple-statements
+    print("bar"); \
+    pass
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:5:5
+  |
+5 | def continuation_after_statement():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove unnecessary statements
+  |
+5 | def continuation_after_statement():  # snapshot: stub-body-multiple-statements
+  -     print("bar"); \
+  -     pass
+6 +     print("bar"); 
+  |
 ```
 
 ## Protocol members and abstract methods
@@ -349,9 +339,22 @@ help: Remove unnecessary statements
 ## Async functions
 
 ```pyi
-async def coroutine():  # error: [stub-body-multiple-statements]
+async def coroutine():  # snapshot: stub-body-multiple-statements
     """docstring"""
     ...
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:11
+  |
+1 | async def coroutine():  # snapshot: stub-body-multiple-statements
+  |           ^^^^^^^^^
+help: Remove unnecessary statements
+  |
+2 |     """docstring"""
+  -     ...
+  |
 ```
 
 ## Compound statements
@@ -376,6 +379,25 @@ help: Remove unnecessary statements
 3 |         ...
   -     pass
   |
+```
+
+## Placeholder-only bodies
+
+When the body consists solely of placeholders, one of them has to stay, since a body can't be empty. The fix doesn't choose which placeholder to keep, so none is offered.
+
+```pyi
+def only_placeholders():  # snapshot: stub-body-multiple-statements
+    ...
+    pass
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def only_placeholders():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^^^^^^
+help: Remove unnecessary statements
 ```
 
 ## More than one statement would remain
