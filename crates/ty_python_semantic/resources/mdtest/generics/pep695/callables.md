@@ -1635,6 +1635,36 @@ def check[T](other: Box[T], arg: int) -> None:
     pair: tuple[T, int] = result  # no diagnostic
 ```
 
+## Inferred returns of specialized generic methods
+
+An inferred return can refer to both the owner's type argument and the called method's type
+argument. Only the latter is inferred from the call.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from typing import final
+
+@final
+class Box[C]:
+    value: C
+
+    def pair[T](self, arg: T):
+        def check(other: Box[T], n: int) -> tuple[T, T]:
+            result = other.pair(n)
+            # revealed: tuple[T@pair, int]
+            reveal_type(result)
+            return result  # error: [invalid-return-type]
+
+        return self.value, arg
+```
+
 ## Specializing generic constructors
 
 A constructor's method type parameter is independent of an explicitly supplied class argument, even

@@ -79,6 +79,7 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
+use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1756,7 +1757,29 @@ impl<'db> FunctionType<'db> {
             return Cow::Borrowed(signature);
         }
         let mut overload = overload.clone();
-        overload.return_ty = self.inferred_return_type(db);
+        // The body refers to the declaration's method typevars. Rename them to this
+        // signature's binders before substituting class arguments, which may themselves
+        // refer to the original occurrences.
+        let method_renaming = overload.generic_context.and_then(|context| {
+            let definition = self.definition(db);
+            let fresh = context.variables(db).filter(|var| {
+                var.freshness(db) != TypeVarNonce::NONE
+                    && var.binding_context(db).definition() == Some(definition)
+            });
+            let env = ProgramEnvironment::from_definition(definition);
+            let declared = GenericContext::try_from_typevar_instances(
+                db,
+                &env,
+                fresh
+                    .clone()
+                    .map(|var| var.typevar(db).with_binding_context(db, definition)),
+            )?;
+            Some(declared.specialize(db, fresh.map(Type::TypeVar).collect::<Vec<_>>()))
+        });
+        overload.return_ty = self
+            .inferred_return_type(db)
+            .apply_optional_specialization(db, method_renaming)
+            .apply_optional_specialization(db, self.class_specialization(db));
         Cow::Owned(CallableSignature::single(overload))
     }
 
@@ -1844,14 +1867,12 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
-        return_type
-            .apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::GeneralizeLocalTypes(scope),
-                TypeContext::default(),
-            )
-            .apply_optional_specialization(db, self.class_specialization(db))
+        return_type.apply_type_mapping(
+            db,
+            &env,
+            &TypeMapping::GeneralizeLocalTypes(scope),
+            TypeContext::default(),
+        )
     }
 
     #[salsa::tracked(
