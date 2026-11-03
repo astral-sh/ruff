@@ -140,6 +140,7 @@ ALL: Final = [
         revision="55996d1fb8342725c8a19b6023cd9439c3c1d6f7",
         python_version="3.11",
         include=["src"],
+        import_roots=["src"],
         install_arguments=[
             "-r",
             "pyproject.toml",
@@ -218,6 +219,7 @@ ALL: Final = [
         revision="5ef70112a1ff19c05324ff889dd30405b1002044",
         python_version="3.11",
         include=["src"],
+        import_roots=["src"],
         install_arguments=["-r", "pyproject.toml"],
         edit=IncrementalEdit(
             edited_file="src/jinja2/nodes.py",
@@ -275,6 +277,7 @@ ALL: Final = [
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
         revision="a9452ac21852755311913cb27887b083b5007c03",
+        import_roots=["src"],
         # See https://github.com/PrefectHQ/prefect/blob/a9452ac21852755311913cb27887b083b5007c03/.pre-commit-config.yaml#L25-L39
         include=[
             "src/prefect/server/models",
@@ -517,6 +520,7 @@ ALL: Final = [
         revision="f6e8480f9a5b2a4d02b17a1da54a1e57964bc312",
         python_version="3.11",
         include=["src/openai"],
+        import_roots=["src"],
         exclude=["src/openai/_vendor/**"],
         install_arguments=["-r", "pyproject.toml", "--all-extras"],
         edit=IncrementalEdit(
@@ -532,6 +536,7 @@ ALL: Final = [
         revision="8b005ed7f972987033ec34dc1e68b0635fb8142b",
         python_version="3.11",
         include=["src", "testing"],
+        import_roots=["src"],
         # These are input programs for nested test runs, rather than the tests themselves.
         exclude=["testing/example_scripts/**"],
         install_arguments=["-r", "pyproject.toml", "--all-extras"],

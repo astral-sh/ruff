@@ -15,7 +15,7 @@ from benchmark.venv import Venv
 
 
 @pytest.mark.parametrize("name", ["ty", "pyrefly", "mypy", "pyright", "zuban"])
-@pytest.mark.parametrize("layout", ["", "lib"])
+@pytest.mark.parametrize("layout", ["", "lib", "src"])
 def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str, layout: str):
     files = {
         "pkg/__init__.py": "",
