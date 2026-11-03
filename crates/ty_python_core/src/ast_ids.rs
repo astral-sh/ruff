@@ -148,8 +148,10 @@ impl AstIds {
         if let Some(index) = Self::regular_index(node) {
             let slot = self.slot(index, true);
             if slot.scope != Operand::EXTENDED {
-                if scope.as_u32() < u32::from(Operand::EXTENDED - 1) {
-                    slot.scope = (scope.as_u32() + 1) as u16;
+                if let Ok(compact) = u16::try_from(scope.as_u32())
+                    && compact < Operand::EXTENDED - 1
+                {
+                    slot.scope = compact + 1;
                     return;
                 }
                 let mut row = slot.occurrence();

@@ -3449,15 +3449,20 @@ impl<'db> UseDefMapBuilder<'db> {
             .ends
             .len()
             .saturating_add(bindings_by_use.len());
-        let compact =
-            place_count <= usize::from(u16::MAX) && max_lists <= usize::from(u16::MAX) + 1;
+        let compact = u16::try_from(place_count).is_ok() && max_lists <= usize::from(u16::MAX) + 1;
         let rows = bindings_by_use
             .into_iter()
             .map(|(bindings, place)| (interner.intern_bindings(&bindings), place));
         if compact {
             RetainedUses::Narrow(
-                rows.map(|(bindings, place)| (bindings.as_u32() as u16, place as u16))
-                    .collect(),
+                rows.map(|(bindings, place)| {
+                    (
+                        u16::try_from(bindings.as_u32())
+                            .expect("the binding ID fits in a narrow row"),
+                        u16::try_from(place).expect("the place ordinal fits in a narrow row"),
+                    )
+                })
+                .collect(),
             )
         } else {
             RetainedUses::Wide(rows.collect())
