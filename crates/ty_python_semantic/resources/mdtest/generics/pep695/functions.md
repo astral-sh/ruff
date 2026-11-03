@@ -3162,6 +3162,21 @@ def check(value: int | list[Any]):
     reveal_type(extract(value))  # revealed: int
 ```
 
+## An iterable matching a concrete union member
+
+Iterating over `([1],)` yields a list, so the tuple cannot match `Iterable[T]` for any `T` bounded
+by `str`. The call is valid because the tuple matches `tuple[list[Any], ...]`. This covers
+<https://github.com/astral-sh/ty/issues/4695>.
+
+```py
+from collections.abc import Iterable
+from typing import Any
+
+def accept[T: str](value: Iterable[T] | tuple[list[Any], ...]) -> None: ...
+
+accept(([1],))  # ok
+```
+
 ## Invalid members of a bounded union argument
 
 Every member of an argument union must satisfy the parameter type, including any bounds. The call is
