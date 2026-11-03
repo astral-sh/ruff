@@ -286,7 +286,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
+# error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -2571,7 +2571,7 @@ def _(
     # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Person`"
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # Direct calls to the synthesized method accept any string key, including keys not declared
@@ -2664,15 +2664,33 @@ def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any)
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
     person[str_key] = None
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
     person[literalstr_key] = None
 
 def _(person: Person, unknown_key: Any):
     # No error here:
     person[unknown_key] = "Eve"
+```
+
+### Suppressing non-literal key errors
+
+A read with a `str | int` key can report both rules. An ignore for either rule leaves the error for
+the other key type visible.
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(movie: Movie, key: str | int):
+    # error: [invalid-key] "got key of type `int`"
+    movie[key]  # ty: ignore[non-literal-typed-dict-key]
+    # error: [non-literal-typed-dict-key] "got key of type `str`"
+    movie[key]  # ty: ignore[invalid-key]
 ```
 
 ## `ReadOnly`
@@ -6257,7 +6275,7 @@ def access_invalid_key(person: Person):
     person[NAME_KEY]  # error: [invalid-key]
 
 def access_with_str_key(person: Person, str_key: str):
-    person[str_key]  # error: [invalid-key]
+    person[str_key]  # error: [non-literal-typed-dict-key]
 
 def write_to_key_with_wrong_type(person: Person):
     person["age"] = "42"  # error: [invalid-assignment]
@@ -6266,7 +6284,7 @@ def write_to_non_existing_key(person: Person):
     person["nane"] = "Alice"  # error: [invalid-key]
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
-    person[str_key] = "Alice"  # error: [invalid-key]
+    person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
 
 def create_with_invalid_string_key():
     # error: [invalid-key]
@@ -8097,7 +8115,7 @@ class Closed(TypedDict, closed=True):
     age: int
 
 def _(td: Closed, key: str) -> None:
-    # error: [invalid-key]
+    # error: [non-literal-typed-dict-key]
     reveal_type(td[key])  # revealed: int | str
 ```
 
@@ -9006,15 +9024,26 @@ def _(key: str) -> None:
     }
 ```
 
-### Non-literal keys in a closed TypedDict constructor are rejected
+### Non-literal strings and unions of literal keys in a closed TypedDict
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import Literal, TypedDict
 
-class Closed(TypedDict, closed=True): ...
+class Closed(TypedDict, closed=True, total=False):
+    name: int
 
 def _(key: str) -> None:
-    assigned: Closed = {key: 1}  # error: [invalid-key]
+    assigned: Closed = {key: 1}  # error: [non-literal-typed-dict-key]
+    Closed({key: 1})  # error: [non-literal-typed-dict-key]
+```
+
+A union of literal keys can include a known invalid key. Reading, writing, or constructing with such
+a key still reports `invalid-key`.
+
+```py
+def _(record: Closed, key: Literal["name", "typo"]) -> None:
+    record[key]  # error: [invalid-key]
+    record[key] = 1  # error: [invalid-key]
     Closed({key: 1})  # error: [invalid-key]
 ```
 

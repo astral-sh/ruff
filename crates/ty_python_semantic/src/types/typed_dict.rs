@@ -15,6 +15,7 @@ use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
+    typed_dict_key_lint,
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
@@ -2908,7 +2909,9 @@ fn validate_merged_dict_literal<'db, 'ast>(
                         }
                     } else if typed_dict.openness(db).is_closed() {
                         valid = false;
-                        if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                        if let Some(builder) =
+                            context.report_lint(typed_dict_key_lint(context, key_ty), key_expr)
+                        {
                             builder.into_diagnostic(format_args!(
                                 "Non-literal string key may be unknown for TypedDict `{}`",
                                 Type::TypedDict(typed_dict).display(db, env),

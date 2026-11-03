@@ -878,7 +878,7 @@
         },
         "invalid-key": {
           "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`\nit also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
+          "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\nBefore 0.0.97, this rule also reported string keys whose literal value ty could not determine. To\nretain a customized severity for both cases, set `non-literal-typed-dict-key` to the same level as\n`invalid-key`. For an inline ignore, replace `invalid-key` with `non-literal-typed-dict-key` if the\ndiagnostic moved. List both rules if the line reports both.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\nCreating a `TypedDict` with an unknown key is likely a mistake. A `TypedDict` declared with\n`closed=True` prohibits extra keys.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1319,6 +1319,16 @@
         "non-callable-init-subclass": {
           "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
           "description": "## What it does\n\nChecks for class definitions that will fail due to non-callable `__init_subclass__` methods.\n\n## Why is this bad?\n\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt to subclass that\nclass will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass Super:\n    __init_subclass__ = None\n\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-literal-typed-dict-key": {
+          "title": "detects non-literal string keys where a TypedDict requires a known key",
+          "description": "## What it does\n\nReports a string key when a `TypedDict` operation requires known keys and ty cannot narrow the key\nto a string literal or a union of string literals.\n\n## Why is this bad?\n\nEach declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check\nwhether the key exists or which value type applies.\n\n## Example\n\n```python\nfrom typing import Literal, TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n\n\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```",
           "default": "error",
           "oneOf": [
             {

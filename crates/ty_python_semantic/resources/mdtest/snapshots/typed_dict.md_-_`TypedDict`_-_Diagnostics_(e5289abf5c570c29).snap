@@ -28,7 +28,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 13 |     person[NAME_KEY]  # error: [invalid-key]
 14 | 
 15 | def access_with_str_key(person: Person, str_key: str):
-16 |     person[str_key]  # error: [invalid-key]
+16 |     person[str_key]  # error: [non-literal-typed-dict-key]
 17 | 
 18 | def write_to_key_with_wrong_type(person: Person):
 19 |     person["age"] = "42"  # error: [invalid-assignment]
@@ -37,7 +37,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 22 |     person["nane"] = "Alice"  # error: [invalid-key]
 23 | 
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
-25 |     person[str_key] = "Alice"  # error: [invalid-key]
+25 |     person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
 26 | 
 27 | def create_with_invalid_string_key():
 28 |     # error: [invalid-key]
@@ -105,10 +105,10 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 ```
 
 ```
-error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
+error[non-literal-typed-dict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
-16 |     person[str_key]  # error: [invalid-key]
+16 |     person[str_key]  # error: [non-literal-typed-dict-key]
    |            ^^^^^^^
 
 ```
@@ -150,10 +150,10 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[invalid-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
+error[non-literal-typed-dict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
   --> src/mdtest_snippet.py:25:12
    |
-25 |     person[str_key] = "Alice"  # error: [invalid-key]
+25 |     person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
    |            ^^^^^^^
 
 ```
