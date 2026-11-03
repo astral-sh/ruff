@@ -60,7 +60,10 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
     output = result.stdout + result.stderr
     assert result.returncode == 1, output
     # Losing the stub's return type makes this assignment Any -> str in mypy.
-    assert "consumer.py" in output, output
+    consumer_diagnostics = [
+        line for line in output.splitlines() if "consumer.py:" in line
+    ]
+    assert any("assign" in line.lower() for line in consumer_diagnostics), output
     assert "plain.py" in output, output
     assert "only.pyi" in output, output
 
