@@ -80,7 +80,7 @@ def write_cli_targets(project: Project, checkout: Path) -> Project:
                 relative = PurePosixPath(path.relative_to(checkout).as_posix())
                 if path.is_symlink() or (
                     path.is_file()
-                    and path.suffix in (".py", ".pyi")
+                    and path.suffix in (".py", ".pyi", ".ipynb")
                     and relative not in selected
                 ):
                     unwanted.add(relative)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -14,6 +15,16 @@ else:
 
 
 logger = logging.getLogger(__name__)
+
+
+def benchmark_environment(cwd: Path) -> dict[str, str]:
+    """Keep machine-specific user configuration out of benchmark settings."""
+    config_directory = cwd / ".benchmark-user-config"
+    config_directory.mkdir(exist_ok=True)
+    return os.environ | {
+        "XDG_CONFIG_HOME": str(config_directory),
+        "APPDATA": str(config_directory),
+    }
 
 
 class Command(NamedTuple):

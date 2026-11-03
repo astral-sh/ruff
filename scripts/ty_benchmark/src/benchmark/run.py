@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from benchmark import Hyperfine
+from benchmark import Hyperfine, benchmark_environment
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
 from benchmark.targets import write_cli_targets
@@ -134,12 +133,6 @@ def main() -> None:
         else ALL_PROJECTS
     )
 
-    benchmark_env = os.environ.copy()
-
-    if args.single_threaded:
-        benchmark_env["TY_MAX_PARALLELISM"] = "1"
-        benchmark_env["RAYON_NUM_THREADS"] = "1"
-
     first = True
 
     for project in projects:
@@ -158,6 +151,10 @@ def main() -> None:
                 include_mypy=any(isinstance(suite, Mypy) for suite in suites),
             )
             cli_project = write_cli_targets(project, cwd)
+            benchmark_env = benchmark_environment(cwd)
+            if args.single_threaded:
+                benchmark_env["TY_MAX_PARALLELISM"] = "1"
+                benchmark_env["RAYON_NUM_THREADS"] = "1"
 
             commands = []
 
