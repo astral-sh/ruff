@@ -17,13 +17,32 @@ else:
 logger = logging.getLogger(__name__)
 
 
-def benchmark_environment(cwd: Path) -> dict[str, str]:
+def benchmark_environment(
+    cwd: Path, *, single_threaded: bool = False
+) -> dict[str, str]:
     """Keep machine-specific user configuration out of benchmark settings."""
     config_directory = cwd / ".benchmark-user-config"
     config_directory.mkdir(exist_ok=True)
-    return os.environ | {
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("TY_", "PYREFLY_", "PYRIGHT_", "MYPY_", "ZUBAN_"))
+        and key
+        not in (
+            "PYTHONPATH",
+            "PYTHONHOME",
+            "MYPYPATH",
+            "RAYON_NUM_THREADS",
+            "RUST_LOG",
+            "NODE_OPTIONS",
+        )
+    }
+    workers = "1" if single_threaded else str(os.process_cpu_count() or 1)
+    return env | {
         "XDG_CONFIG_HOME": str(config_directory),
         "APPDATA": str(config_directory),
+        "TY_MAX_PARALLELISM": workers,
+        "RAYON_NUM_THREADS": workers,
     }
 
 

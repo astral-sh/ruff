@@ -37,6 +37,9 @@ class Project(NamedTuple):
 
     edit: IncrementalEdit | None = None
 
+    import_roots: Sequence[str] = ()
+    """Additional first-party import roots, relative to the checkout."""
+
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if (checkout_dir / ".git").exists():
@@ -438,6 +441,7 @@ ALL: Final = [
         revision="10f4d1e2d706a7722ca78e79ce05b00333a7aa5b",
         python_version="3.11",
         include=["lib/sqlalchemy"],
+        import_roots=["lib"],
         install_arguments=[
             "-r",
             "pyproject.toml",

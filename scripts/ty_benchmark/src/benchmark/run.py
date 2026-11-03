@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from benchmark import Hyperfine, benchmark_environment
+from benchmark.preflight import validate_cli_targets
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
-from benchmark.targets import write_cli_targets
+from benchmark.targets import neutralize_file_directives, write_cli_targets
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
@@ -146,21 +147,20 @@ def main() -> None:
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version
             )
-            venv.install(
-                project.install_arguments,
-                include_mypy=any(isinstance(suite, Mypy) for suite in suites),
-            )
+            venv.install(project.install_arguments)
+            neutralize_file_directives(cwd)
             cli_project = write_cli_targets(project, cwd)
-            benchmark_env = benchmark_environment(cwd)
-            if args.single_threaded:
-                benchmark_env["TY_MAX_PARALLELISM"] = "1"
-                benchmark_env["RAYON_NUM_THREADS"] = "1"
+            benchmark_env = benchmark_environment(
+                cwd, single_threaded=args.single_threaded
+            )
 
             commands = []
 
             for suite in suites:
                 suite.write_config(cli_project, venv)
-                commands.append(suite.command(cli_project, venv, args.single_threaded))
+                command = suite.command(cli_project, venv, args.single_threaded)
+                validate_cli_targets(suite, command, venv, benchmark_env)
+                commands.append(command)
 
             if not commands:
                 continue

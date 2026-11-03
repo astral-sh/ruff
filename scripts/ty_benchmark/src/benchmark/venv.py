@@ -60,9 +60,7 @@ class Venv:
 
         return Venv(project_name=project, project_path=parent)
 
-    def install(
-        self, pip_install_args: list[str], *, include_mypy: bool = False
-    ) -> None:
+    def install(self, pip_install_args: list[str]) -> None:
         """Installs the dependencies required to type check the project."""
 
         logger.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
@@ -85,7 +83,8 @@ class Venv:
             # Keep project dev dependencies from pinning a different mypy version.
             "--overrides",
             mypy_overrides.as_posix(),
-            *(["mypy"] if include_mypy else []),
+            # Project fixtures can import mypy even when only another tool is measured.
+            "mypy",
             *pip_install_args,
         ]
 
