@@ -385,16 +385,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
                 Err(()) => selection.disable(lint),
             };
 
-        // If "all" key is present, use it's value as the default for all rules.
-        if let Some(level) = rules.get("all") {
-            for lint in registry.lints() {
-                set_lint_level(&mut selection, *lint, *level);
-            }
-        }
-
-        // Apply overrides for specific (non-"all") rules.
+        let mut rules: Vec<_> = rules.iter().collect();
+        rules.sort_by_key(|(name, _)| registry.selector_sort_key(name));
         for (rule_name, level) in rules {
             if rule_name == "all" {
+                for lint in registry.lints() {
+                    set_lint_level(&mut selection, *lint, *level);
+                }
                 continue;
             }
 

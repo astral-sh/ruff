@@ -38,20 +38,7 @@ impl PyProject {
         source: ValueSource,
     ) -> Result<Self, PyProjectError> {
         let _guard = ValueSourceGuard::new(source, true);
-        Self::deserialize_toml(content)
-    }
-
-    fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
-        let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
-        // TOML tables are unordered and the `toml` crate sorts keys
-        // lexicographically. Normalize rule order so that the `all` selector
-        // is applied before per-rule selectors.
-        if let Some(tool) = &mut pyproject.tool {
-            if let Some(ty) = &mut tool.ty {
-                ty.prioritize_all_selectors();
-            }
-        }
-        Ok(pyproject)
+        toml::from_str(content).map_err(PyProjectError::TomlSyntax)
     }
 }
 

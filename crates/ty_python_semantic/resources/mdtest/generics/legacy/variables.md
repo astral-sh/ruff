@@ -74,7 +74,7 @@ reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 ```py
 from typing import Generic, TypeVar
 
-# error: [mismatched-type-name]
+# error: [mismatched-typevar-name]
 T = TypeVar("Q")
 
 class Box(Generic[T]): ...
@@ -93,7 +93,7 @@ S = TypeVar("S")
 T = TypeVar("T")
 
 # This recovers as the `Q` binding for source-level name resolution.
-# error: [mismatched-type-name]
+# error: [mismatched-typevar-name]
 Q = TypeVar("T")
 
 class Outer(Generic[Q]):
