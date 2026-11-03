@@ -5312,20 +5312,29 @@ impl<'db> Type<'db> {
         // A function substituted for a type variable keeps its full signature and identity.
         // Explicit descriptors still invoke `__get__`; a concrete subclass can store them on
         // the class even when the base declares the attribute as `value: T`.
-        if !bind_functions
-            && match self.resolve_type_alias(db) {
-                Type::Intersection(intersection) => intersection
-                    .iter_positive(db)
-                    .any(|ty| ty.resolve_type_alias(db).function_like_kind(db).is_some()),
+        let bind_callable = if bind_functions {
+            true
+        } else {
+            let is_plain_function = |ty: Type<'db>| {
+                ty.resolve_type_alias(db).function_like_kind(db)
+                    == Some(CallableTypeKind::FunctionLike)
+            };
+            match self.resolve_type_alias(db) {
+                Type::Intersection(intersection)
+                    if intersection.iter_positive(db).any(is_plain_function) =>
+                {
+                    return Ok(None);
+                }
+                ty if is_plain_function(ty) => return Ok(None),
+                // Bind explicit wrappers here. A union may mix them with ordinary functions,
+                // so let the general lookup handle each alternative separately.
                 ty => ty.function_like_kind(db).is_some(),
             }
-        {
-            return Ok(None);
-        }
+        };
         // Bind known callable descriptors outside the tracked lookup. Checking a protocol
         // receiver can recursively access this method; the lookup's `None` cycle value would
         // leave it unbound and falsely reject the protocol match.
-        if bind_functions
+        if bind_callable
             && let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner))
         {
             return Ok(Some(DescriptorGetResult {

@@ -2584,12 +2584,12 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
-    // Module-level functions and ordinary methods on class objects are matched through direct
-    // member access. Special instance methods still use special-method lookup on the meta-type.
+    // Match the signature seen by a caller. Ordinary methods use direct attribute access,
+    // while implicit calls to special methods look up the descriptor on the type.
     let place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
-        && (!is_class_object_type(ty) || member.uses_special_method_lookup())
+        && member.uses_special_method_lookup()
     {
         Type::invoke_descriptor_protocol(
             db,

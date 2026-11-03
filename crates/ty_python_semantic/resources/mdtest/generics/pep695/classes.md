@@ -2489,6 +2489,23 @@ def check_intersection(value: Base[Intersection[TypeOf[f], Any] | Descriptor]) -
     reveal_type(value.value)  # revealed: ((def f(value: str) -> str) & Any) | int | Descriptor
 ```
 
+Class access binds a `classmethod` stored on the subclass and unwraps a `staticmethod` to its
+original function.
+
+```py
+def with_value[T](descriptor: T) -> type[Base[T]]:
+    class Subclass(Base[Any]):
+        value = descriptor
+
+    return Subclass
+
+def method(cls: type, value: int) -> int:
+    return value
+
+reveal_type(with_value(classmethod(method)).value(1))  # revealed: int
+reveal_type(with_value(staticmethod(method)).value)  # revealed: def method(cls: type, value: int) -> int
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
