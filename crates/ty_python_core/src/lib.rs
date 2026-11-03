@@ -371,15 +371,7 @@ impl<'db> SemanticIndex<'db> {
         self.ast_ids.try_use_id(expression)
     }
 
-    /// Returns the lexical place and use IDs for an indexed read, along with their scope.
-    /// Reads of the same place have distinct use IDs so each can see its own reaching bindings.
-    ///
-    /// ```python
-    /// obj.child = 1
-    /// first = obj.child
-    /// obj.child = "new"
-    /// second = obj.child  # Same place as the first read, but a different binding.
-    /// ```
+    /// Returns the [`PlaceUse`](ast_ids::PlaceUse) for an expression that reads an indexed place.
     pub fn expression_place_use(&self, expr: ast::ExprRef<'_>) -> Option<ast_ids::PlaceUse> {
         let (scope, use_id) = self.ast_ids.scope_and_use(expr)?;
         let ordinal = self.use_def_map(scope).place_ordinal_at_use(use_id)?;

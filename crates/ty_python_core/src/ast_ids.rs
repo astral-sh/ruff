@@ -20,7 +20,18 @@ struct NodeIds {
     use_id: Option<ScopedUseId>,
 }
 
-/// The lexical place and its reaching-definition operand at an expression.
+/// A read of a lexical place in a particular scope.
+///
+/// ```python
+/// def f(x):
+///     before = x
+///     x = 1
+///     return x
+/// ```
+///
+/// Both reads of `x` share a `scope` (the body of `f`) and a `place` (the local variable `x`).
+/// Each read has its own `use_id`, which identifies the bindings that can reach it.
+/// The read in `before = x` sees the parameter binding, and the read in `return x` sees `x = 1`.
 #[derive(Clone, Copy, Debug)]
 pub struct PlaceUse {
     pub scope: FileScopeId,
