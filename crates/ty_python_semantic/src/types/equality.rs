@@ -4,7 +4,9 @@
 //! constraints and definite truthiness while remaining conservative around custom comparison
 //! methods.
 
-use rustc_hash::FxHashSet;
+use std::collections::hash_map::Entry;
+
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
@@ -298,8 +300,7 @@ pub(super) fn inequality_truthiness<'db>(
 
 /// Evaluates container elements using identity or equality.
 ///
-/// Reuses the active-comparison set across element comparisons. The set only detects recursive
-/// comparisons; results are not cached between elements.
+/// Reuses comparison results across elements, including repeated pairs in nested containers.
 pub(super) struct ContainerElementEqualityEvaluator<'db> {
     evaluator: ComparisonEvaluator<'db>,
 }
@@ -415,7 +416,7 @@ impl ComparisonSoundnessPolicy {
     }
 }
 
-/// Identifies an active comparison evaluation.
+/// Identifies a comparison evaluation.
 ///
 /// Operand order and branch are significant because the left operand is the narrowing target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -426,11 +427,13 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+/// Memoizes comparisons and detects recursive reentry.
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
-    active: FxHashSet<ComparisonKey<'db>>,
+    /// An entry with no result is still being evaluated.
+    comparisons: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    cycle_count: usize,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
@@ -444,7 +447,8 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            comparisons: FxHashMap::default(),
+            cycle_count: 0,
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -458,7 +462,8 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            comparisons: FxHashMap::default(),
+            cycle_count: 0,
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -516,14 +521,28 @@ impl<'db> ComparisonEvaluator<'db> {
             operator,
         };
 
-        // A repeated key means that the result depends on itself. Treating it as ambiguous is
-        // conservative: callers only narrow from definite truthiness or an explicit constraint.
-        if !self.active.insert(key) {
-            return ComparisonResult::Ambiguous;
+        match self.comparisons.entry(key) {
+            Entry::Occupied(entry) => {
+                if let Some(result) = *entry.get() {
+                    return result;
+                }
+                self.cycle_count += 1;
+                return ComparisonResult::Ambiguous;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(None);
+            }
         }
 
+        let cycle_count = self.cycle_count;
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        self.active.remove(&key);
+        // A cycle fallback can depend on which comparisons are already active. Reuse the
+        // result only if the evaluation finished without one.
+        if self.cycle_count == cycle_count {
+            self.comparisons.insert(key, Some(result));
+        } else {
+            self.comparisons.remove(&key);
+        }
         result
     }
 }

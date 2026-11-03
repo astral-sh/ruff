@@ -854,6 +854,34 @@ fn benchmark_very_large_tuple(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[very_large_tuple]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4883>.
+/// Each tuple contains two elements of the same type. Comparing both pairs independently doubles
+/// the work at each level.
+fn benchmark_nested_tuple_comparison(criterion: &mut Criterion) {
+    for depth in [8, 12] {
+        let mut aliases = String::from("type T0 = tuple[int]\n");
+        for level in 1..=depth {
+            let previous = level - 1;
+            writeln!(
+                &mut aliases,
+                "type T{level} = tuple[T{previous}, T{previous}]"
+            )
+            .ok();
+        }
+
+        for (name, operator) in [("lt", "<"), ("eq", "==")] {
+            let code = format!(
+                "{aliases}\ndef compare(a: T{depth}, b: T{depth}) -> bool:\n    return a {operator} b\n"
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[nested_tuple_comparison_{name}_{depth}]"),
+                &code,
+            );
+        }
+    }
+}
+
 fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 48;
 
@@ -2734,6 +2762,7 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_nested_tuple_comparison,
     benchmark_union_construction,
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
