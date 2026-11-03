@@ -700,7 +700,8 @@ impl Builder {
         } else {
             estimated.min(128)
         };
-        let mut rows = Vec::with_capacity(estimated_rows + 1);
+        // A small expression such as `x | y` needs three rows in addition to the sentinel.
+        let mut rows = Vec::with_capacity((estimated_rows + 1).max(4));
         // No view can refer to this row. Its presence makes every child slot a nonzero index.
         rows.push(Row::new(NodeKind::ModModule, TextRange::default()));
         Self {
