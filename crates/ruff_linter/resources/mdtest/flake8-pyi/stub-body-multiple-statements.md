@@ -63,7 +63,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 9 | def both():  # snapshot: stub-body-multiple-statements
   |     ^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
    |
 10 |     """docstring"""
    -     ...
@@ -93,7 +93,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 5 | def leading_placeholders():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 5 | def leading_placeholders():  # snapshot: stub-body-multiple-statements
   -     ...
@@ -123,7 +123,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def only_ellipses():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 2 |     ...
   -     ...
@@ -136,7 +136,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 5 | def pass_then_ellipsis():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 5 | def pass_then_ellipsis():  # snapshot: stub-body-multiple-statements
   -     pass
@@ -158,7 +158,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 8 | def only_passes():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 9 |     pass
   -     pass
@@ -187,7 +187,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def trailing_comments():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 2 |     """docstring"""
   -     ...  # keep me
@@ -203,7 +203,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 6 | def comment_on_kept_statement():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 7 |     """docstring"""  # kept
   -     ...
@@ -227,7 +227,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
   -     ...
@@ -255,7 +255,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def semicolons():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 1 | def semicolons():  # snapshot: stub-body-multiple-statements
   -     pass; print("bar")
@@ -269,7 +269,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 5 | def trailing_semicolon(): ...; ...
   |     ^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 4 | # snapshot: stub-body-multiple-statements
   - def trailing_semicolon(): ...; ...
@@ -305,7 +305,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 5 |     def member(self) -> None:  # snapshot: stub-body-multiple-statements
   |         ^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 6 |         """docstring"""
   -         ...
@@ -318,7 +318,7 @@ error[PYI048]: Function body must contain exactly one statement
    |
 11 |     def method(self) -> None:  # snapshot: stub-body-multiple-statements
    |         ^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
    |
 12 |         """docstring"""
    -         ...
@@ -350,7 +350,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def compound():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
   |
 3 |         ...
   -     pass
@@ -359,7 +359,7 @@ help: Remove unnecessary placeholder statements
 
 ## More than one statement would remain
 
-No fix is offered when removing the placeholders would still leave more than one statement. The extra statements are still unnecessary in a stub, so the help message asks for their removal without calling them placeholders.
+No fix is offered when removing the placeholders would still leave more than one statement.
 
 ```pyi
 def too_many_statements():  # snapshot: stub-body-multiple-statements
@@ -379,7 +379,7 @@ help: Remove unnecessary statements
 
 ## Fix requires preview mode
 
-Outside of preview, the rule reports the same diagnostics but offers no fix and no help message.
+Outside of preview, the rule reports the same diagnostics but offers no fix.
 
 ```toml
 [lint]
@@ -399,6 +399,7 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def placeholders():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^
+help: Remove unnecessary statements
 ```
 
 ## Non-stub files
