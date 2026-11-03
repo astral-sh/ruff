@@ -39,13 +39,14 @@ def write_cli_targets(project: Project, checkout: Path) -> None:
     }
     directories = {parent for path in files for parent in path.parents}
     # mypy accepts one definition per module. Prefer a populated directory to a
-    # same-named file and an implementation to its adjacent stub. Leave both on
-    # disk so each checker can resolve imports normally.
+    # same-named file and a stub to its adjacent implementation. Explicitly
+    # targeting an implementation overrides its stub for mypy's imports, losing
+    # types that the other checkers still resolve from the stub.
     targets = sorted(
         f"./{path}"
         for path in files
         if path.with_suffix("") not in directories
-        and (path.suffix == ".py" or path.with_suffix(".py") not in files)
+        and (path.suffix == ".pyi" or path.with_suffix(".pyi") not in files)
     )
     if not targets:
         raise ValueError(f"No Python source files selected for {project.name}")

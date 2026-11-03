@@ -26,11 +26,12 @@ without a pre-existing cache.
 
 All five CLIs receive the same list of tracked Python files. The runner applies
 each project's includes and excludes once and skips symlinks. When an
-implementation has an adjacent stub, the implementation is the check target.
-Standalone stubs stay in the list. If a file and a populated directory share a
-module name, the directory wins. Files omitted as targets remain available for
-import resolution. The runner prints the file count and SHA-256 of the list
-before timing each project.
+implementation has an adjacent stub, the stub is the check target. Implementations
+without stubs and standalone stubs stay in the list. This preserves the stub's
+types when mypy resolves imports; explicitly targeting the implementation would
+replace those types with the runtime module, unlike the other checkers. If a file
+and a populated directory share a module name, the directory wins. The runner
+prints the file count and SHA-256 of the list before timing each project.
 
 Each CLI checks unannotated function bodies. mypy uses its normal import
 following with project and user configuration disabled, so per-module overrides
@@ -84,6 +85,16 @@ may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
 ## Updating the benchmark
+
+Run the configuration and shared-target regression tests with all five CLI tools
+installed (including the compiled ty binary and npm's Pyright):
+
+```shell
+uv run --python 3.15 --group test pytest src/benchmark/test_tool.py src/benchmark/test_cli_targets.py
+```
+
+The `test` dependency group supplies mypy for the native import regression;
+measured mypy commands still use each project's virtual environment.
 
 Record the CLI file counts and manifest hashes with the results.
 

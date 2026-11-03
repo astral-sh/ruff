@@ -1,14 +1,68 @@
 import subprocess
 import sys
 import tomllib
+import venv as stdlib_venv
 from pathlib import Path
 
 import pytest
 
 from benchmark.projects import Project
 from benchmark.targets import write_cli_targets
-from benchmark.tool import Ty, Zuban
+from benchmark.tool import Mypy, Pyrefly, Pyright, Ty, Zuban, which_tool
 from benchmark.venv import Venv
+
+
+@pytest.mark.parametrize("name", ["ty", "pyrefly", "mypy", "pyright", "zuban"])
+def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
+    files = {
+        "pkg/__init__.py": "",
+        "pkg/api.py": "from ._native import typed_value\n",
+        "pkg/api.pyi": "def typed_value() -> int: ...\n",
+        "pkg/consumer.py": ("from .api import typed_value\nbad: str = typed_value()\n"),
+        "pkg/plain.py": 'def untyped():\n    number: int = "wrong"\n',
+        "pkg/only.pyi": "value: MissingType\n",
+    }
+    for filename, contents in files.items():
+        path = tmp_path / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "pkg"], cwd=tmp_path, check=True)
+    project = Project(
+        name="stub-imports",
+        repository="unused",
+        revision="unused",
+        install_arguments=[],
+        python_version=f"{sys.version_info.major}.{sys.version_info.minor}",
+        include=["pkg"],
+        exclude=[],
+    )
+    venv = Venv(project_name=project.name, project_path=tmp_path)
+    stdlib_venv.EnvBuilder().create(venv.path)
+    write_cli_targets(project, tmp_path)
+    tools = {
+        "ty": Ty,
+        "pyrefly": Pyrefly,
+        "mypy": lambda: Mypy(warm=False, path=which_tool("mypy")),
+        "pyright": Pyright,
+        "zuban": Zuban,
+    }
+    tool = tools[name]()
+    tool.write_config(project, venv)
+    result = subprocess.run(
+        tool.command(project, venv, single_threaded=False).command,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    output = result.stdout + result.stderr
+    assert result.returncode == 1, output
+    # Losing the stub's return type makes this assignment Any -> str in mypy.
+    assert "consumer.py" in output, output
+    assert "plain.py" in output, output
+    assert "only.pyi" in output, output
 
 
 @pytest.fixture
@@ -101,17 +155,17 @@ def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
     assert "outside.py" not in result.stdout
 
 
-def test_zuban_cli_checks_implementations_beside_stubs(zuban_project):
+def test_zuban_cli_prefers_stubs_beside_implementations(zuban_project):
     project, venv = zuban_project
     stub = venv.project_path / "src" / "example" / "main.pyi"
-    stub.write_text("def untyped() -> None: ...\n")
+    stub.write_text("def untyped() -> None: ...\nvalue: MissingType\n")
     subprocess.run(["git", "add", "src"], cwd=venv.project_path, check=True)
     write_cli_targets(project, venv.project_path)
     tool = Zuban()
     tool.write_config(project, venv)
     config = tomllib.loads((venv.project_path / "zuban-benchmark.toml").read_text())
-    assert "./src/example/main.py" in config["tool"]["zuban"]["files"]
-    assert "./src/example/main.pyi" not in config["tool"]["zuban"]["files"]
+    assert "./src/example/main.pyi" in config["tool"]["zuban"]["files"]
+    assert "./src/example/main.py" not in config["tool"]["zuban"]["files"]
     result = subprocess.run(
         tool.command(project, venv, single_threaded=False).command,
         cwd=venv.project_path,
@@ -121,5 +175,6 @@ def test_zuban_cli_checks_implementations_beside_stubs(zuban_project):
         timeout=20,
     )
     assert result.returncode == 1, result.stderr
-    assert 'expression has type "str", variable has type "int"' in result.stdout
+    assert "main.pyi" in result.stdout
+    assert 'Name "MissingType" is not defined' in result.stdout
     assert "Found 1 error in 1 file" in result.stdout
