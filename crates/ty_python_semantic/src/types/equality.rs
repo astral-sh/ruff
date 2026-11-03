@@ -447,7 +447,10 @@ impl<'db> ComparisonCache<'db> {
     /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
     const MAX_CACHED_COMPARISONS: usize = 1024;
 
-    /// Return an available result or register a new active comparison.
+    /// Return a cached result or register the comparison as active.
+    ///
+    /// If the comparison is already active, return `Ambiguous`. This fallback can depend on
+    /// which comparisons are active, so it makes every active comparison ineligible for caching.
     fn begin(
         &mut self,
         key: ComparisonKey<'db>,
@@ -470,10 +473,13 @@ impl<'db> ComparisonCache<'db> {
         }
     }
 
-    /// Mark a comparison as complete and cache its result when it can be reused safely.
+    /// Finish a comparison, caching its result if the generation is unchanged.
+    ///
+    /// When adding a result would exceed the cache limit, discard the completed entries and
+    /// keep the active ones for cycle detection. Comparisons in progress may have used the
+    /// discarded entries, so advance the generation to keep their results out of the cache.
     fn finish(&mut self, pending: PendingComparison<'db>, result: ComparisonResult<'db>) {
         let PendingComparison { key, generation } = pending;
-        // A cycle fallback can depend on which comparisons are already active.
         if self.generation == generation {
             if self.completed < Self::MAX_CACHED_COMPARISONS {
                 self.entries.insert(key, Some(result));
@@ -481,8 +487,6 @@ impl<'db> ComparisonCache<'db> {
                 return;
             }
 
-            // Start a fresh cache while preserving active comparisons for cycle detection.
-            // In-flight results may depend on entries from the old cache.
             self.entries.retain(|_, result| result.is_none());
             self.completed = 0;
             self.generation += 1;
