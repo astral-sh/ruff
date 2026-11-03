@@ -1595,14 +1595,11 @@ impl<'db> StaticClassLiteral<'db> {
                     .qualifiers
                     .insert(TypeQualifiers::NO_FUNCTION_BINDING);
             }
-            if policy.no_instance_fallback() || !place.origin.is_declared() {
-                place.ty =
-                    place
-                        .ty
-                        .into_function_like_callable(db, env, policy.no_instance_fallback());
+            let class_only = policy.no_instance_fallback();
+            if class_only || !place.origin.is_declared() {
+                place.ty = place.ty.into_function_like_callable(db, env, class_only);
             }
-        }
-        let member = member.map_type(|ty| {
+
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
@@ -1614,18 +1611,16 @@ impl<'db> StaticClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (inherited_generic_context, ty, specialization, name) {
-                (
-                    Some(generic_context),
-                    Type::FunctionLiteral(function),
-                    Some(_),
-                    "__new__" | "__init__",
-                ) => Type::FunctionLiteral(
+            if let Some(generic_context) = inherited_generic_context
+                && specialization.is_some()
+                && matches!(name, "__new__" | "__init__")
+                && let Type::FunctionLiteral(function) = place.ty
+            {
+                place.ty = Type::FunctionLiteral(
                     function.with_inherited_generic_context(db, generic_context),
-                ),
-                _ => ty,
+                );
             }
-        });
+        }
 
         if self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
@@ -1671,7 +1666,6 @@ impl<'db> StaticClassLiteral<'db> {
         if enum_metadata(db, ClassLiteral::Static(self))
             .is_some_and(|metadata| metadata.contains_member(name))
         {
-            let mut member = member;
             member.inner.qualifiers.insert(TypeQualifiers::READ_ONLY);
             return member;
         }

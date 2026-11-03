@@ -174,17 +174,6 @@ def check(impl: Callable[[object, str], int]) -> None:
     reveal_type(C()("value"))  # revealed: int
 ```
 
-A gradual callable is also accepted by implicit calls:
-
-```py
-def check_gradual(impl: Callable[..., int]) -> None:
-    class Method:
-        __call__: Callable[..., int] = impl
-
-    reveal_type(Method().__call__)  # revealed: (...) -> int
-    reveal_type(Method()("value"))  # revealed: int
-```
-
 The same binding behavior applies to inferred callable dunders, such as this comparison operator:
 
 ```py

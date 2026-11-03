@@ -25,6 +25,7 @@ use crate::{
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
+        member::uses_special_method_lookup,
     },
 };
 
@@ -586,7 +587,11 @@ pub(super) fn check_override<'db>(
     // `object.__hash__`, have method signatures but no general attribute contract.
     // Receiver annotations still describe instance storage even if a method with
     // the same name exists in the class body.
-    let policy = super::method_override_lookup_policy(name);
+    let policy = if uses_special_method_lookup(name) {
+        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+    } else {
+        MemberLookupPolicy::default()
+    };
     if definition.place(db).is_symbol()
         && [class, superclass].into_iter().all(|owner| {
             owner

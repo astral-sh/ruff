@@ -133,7 +133,7 @@ from typing import Callable
 class C:
     __call__: Callable[..., None]
 
-C()()
+reveal_type(C()())  # revealed: None
 
 _: Callable[..., None] = C()
 ```

@@ -5170,14 +5170,17 @@ impl<'db> Type<'db> {
             bind_functions: bool,
         ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
             let env = &ProgramEnvironment::from_program(program);
-            if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get_with_function_binding(
+            let call_get = |ty: Type<'db>| {
+                ty.try_call_dunder_get_with_function_binding(
                     db,
                     env,
                     instance,
                     owner,
                     bind_functions,
-                );
+                )
+            };
+            if let Some(fallback) = ty.materialized_divergent_fallback() {
+                return call_get(fallback);
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
@@ -5194,18 +5197,10 @@ impl<'db> Type<'db> {
                 let mut all_data_descriptors = true;
 
                 for alternative in union.elements(db) {
-                    let result = alternative
-                        .try_call_dunder_get_with_function_binding(
-                            db,
-                            env,
-                            instance,
-                            owner,
-                            bind_functions,
-                        )
-                        .unwrap_or_else(|failure| {
-                            error = error.or(Some(failure.context));
-                            Some(failure.fallback())
-                        });
+                    let result = call_get(*alternative).unwrap_or_else(|failure| {
+                        error.get_or_insert(failure.context);
+                        Some(failure.fallback())
+                    });
                     if let Some(DescriptorGetResult { return_type, kind }) = result {
                         any_descriptor = true;
                         all_data_descriptors &= kind.is_data();
@@ -5381,30 +5376,15 @@ impl<'db> Type<'db> {
             attribute
         };
 
-        if let PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                    provenance,
-                }),
-            qualifiers,
-        } = attribute
-            && let Some(fallback) = ty.materialized_divergent_fallback()
-        {
+        let Place::Defined(place) = attribute.place else {
+            return (attribute, AttributeKind::NormalOrNonDataDescriptor, None);
+        };
+        let with_type = |ty| Place::Defined(DefinedPlace { ty, ..place });
+        if let Some(fallback) = place.ty.materialized_divergent_fallback() {
             return Self::try_call_dunder_get_on_attribute(
                 db,
                 env,
-                Place::Defined(DefinedPlace {
-                    ty: fallback,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                    provenance,
-                })
-                .with_qualifiers(qualifiers),
+                with_type(fallback).with_qualifiers(attribute.qualifiers),
                 instance,
                 owner,
             );
@@ -5418,32 +5398,16 @@ impl<'db> Type<'db> {
                     Some(failure.fallback())
                 })
         };
-        let (member, kind) = match attribute {
+        let (member, kind) = match place.ty {
             // A directly dynamic attribute could be a data descriptor even though we cannot see
             // its methods. Preserve that uncertainty, along with the existing bottom and cycle
             // behavior, without performing member lookups that cannot add information.
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
-                        ..
-                    }),
-                qualifiers: _,
-            } => (attribute, AttributeKind::DataDescriptor),
-
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Union(union),
-                        origin,
-                        definedness: boundness,
-                        public_type_policy,
-                        provenance: attribute_provenance,
-                    }),
-                qualifiers,
-            } => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+                (attribute, AttributeKind::DataDescriptor)
+            }
+            Type::Union(union) => {
                 let mut all_data_descriptors = true;
-                let place = union
+                let member = union
                     .map_with_boundness(db, env, |elem| {
                         let ty = match call_get(*elem) {
                             Some(DescriptorGetResult { return_type, kind }) => {
@@ -5455,90 +5419,42 @@ impl<'db> Type<'db> {
                                 *elem
                             }
                         };
-
-                        Place::Defined(DefinedPlace {
-                            ty,
-                            origin,
-                            definedness: boundness,
-                            public_type_policy,
-                            provenance: attribute_provenance,
-                        })
+                        with_type(ty)
                     })
-                    .with_qualifiers(qualifiers);
+                    .with_qualifiers(attribute.qualifiers);
 
                 let kind = if all_data_descriptors {
                     AttributeKind::DataDescriptor
                 } else {
                     AttributeKind::NormalOrNonDataDescriptor
                 };
-
-                (place, kind)
+                (member, kind)
             }
-
-            attribute @ PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: Type::Intersection(intersection),
-                        origin,
-                        definedness,
-                        public_type_policy,
-                        provenance: attribute_provenance,
-                    }),
-                qualifiers,
-            } => {
-                let place = if intersection.positive(db).is_empty() {
+            Type::Intersection(intersection) => {
+                let member = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
                     intersection
                         .map_with_boundness(db, env, |elem| {
                             let ty = call_get(*elem).map_or(*elem, |result| result.return_type);
-                            Place::Defined(DefinedPlace {
-                                ty,
-                                origin,
-                                definedness,
-                                public_type_policy,
-                                provenance: attribute_provenance,
-                            })
+                            with_type(ty)
                         })
-                        .with_qualifiers(qualifiers)
+                        .with_qualifiers(attribute.qualifiers)
                 };
                 (
-                    place,
+                    member,
                     // TODO: Discover data descriptors in intersections without decomposing the
                     // descriptor return type into an unsound intersection.
                     AttributeKind::NormalOrNonDataDescriptor,
                 )
             }
-
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty: attribute_ty,
-                        origin,
-                        definedness: boundness,
-                        public_type_policy,
-                        provenance,
-                    }),
-                qualifiers: _,
-            } => {
-                if let Some(DescriptorGetResult { return_type, kind }) = call_get(attribute_ty) {
-                    (
-                        Place::Defined(DefinedPlace {
-                            ty: return_type,
-                            origin,
-                            definedness: boundness,
-                            public_type_policy,
-                            provenance,
-                        })
-                        .into(),
-                        kind,
-                    )
+            ty => {
+                if let Some(DescriptorGetResult { return_type, kind }) = call_get(ty) {
+                    (with_type(return_type).into(), kind)
                 } else {
                     (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
             }
-
-            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
         };
 
         (member, kind, error)

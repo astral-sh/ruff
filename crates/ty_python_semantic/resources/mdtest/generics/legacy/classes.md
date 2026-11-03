@@ -3504,7 +3504,6 @@ function attributes. The function is returned unchanged, just as it is at runtim
 instance.
 
 ```py
-from types import CodeType
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -3520,7 +3519,7 @@ def format_bytes(value: bytes) -> str:
 
 holder = Holder(format_bytes)
 reveal_type(holder.value(b""))  # revealed: str
-code: CodeType = holder.value.__code__  # ok
+reveal_type(holder.value.__code__)  # revealed: CodeType
 holder.value("wrong")  # error: [invalid-argument-type]
 ```
 
@@ -3540,7 +3539,7 @@ class OptionalHolder(Generic[F]):
 optional = OptionalHolder(format_bytes)
 if optional.value is not None:
     reveal_type(optional.value)  # revealed: (value: bytes) -> str
-    code: CodeType = optional.value.__code__  # ok
+    reveal_type(optional.value.__code__)  # revealed: CodeType
 ```
 
 ## Descriptors and generic attributes

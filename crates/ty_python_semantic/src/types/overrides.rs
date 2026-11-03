@@ -1356,18 +1356,9 @@ fn check_class_declaration<'db>(
     }
 }
 
-/// Compare special methods using the signature seen by an implicit call.
-fn method_override_lookup_policy(name: &str) -> MemberLookupPolicy {
-    if uses_special_method_lookup(name) {
-        MemberLookupPolicy::NO_INSTANCE_FALLBACK
-    } else {
-        MemberLookupPolicy::default()
-    }
-}
-
 /// Look up `__new__` on the class so generated and decorated callables retain `cls`
-/// until they are bound for the override comparison. Special methods use class-only
-/// lookup, while other attributes retain their instance-storage contracts.
+/// until they are bound for the override comparison. Compare special methods using the
+/// signature seen by implicit calls. Hashing uses class-only lookup even for `__hash__ = None`.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1375,23 +1366,20 @@ fn lookup_override_member<'db>(
     name: &Name,
 ) -> PlaceAndQualifiers<'db> {
     if name == "__new__" {
-        class.class_member(db, env, name, MemberLookupPolicy::default())
-    } else if name == "__hash__"
+        return class.class_member(db, env, name, MemberLookupPolicy::default());
+    }
+    let policy = if name == "__hash__"
         || uses_special_method_lookup(name)
             && class
                 .class_member(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| attributes::is_method_type(db, ty))
     {
-        Type::instance(db, env, class).member_lookup_with_policy(
-            db,
-            env,
-            name,
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
+        MemberLookupPolicy::NO_INSTANCE_FALLBACK
     } else {
-        Type::instance(db, env, class).member(db, env, name)
-    }
+        MemberLookupPolicy::default()
+    };
+    Type::instance(db, env, class).member_lookup_with_policy(db, env, name, policy)
 }
 
 /// Resolve `__new__` descriptors and normalize callable objects before binding the
