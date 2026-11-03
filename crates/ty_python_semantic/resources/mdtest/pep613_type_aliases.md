@@ -107,7 +107,7 @@ still understand it as a union type, just with an unknown element.
 
 ```py
 from typing import TypeAlias
-from nonexistent import unknown_type  # error: [unresolved-import]
+from nonexistent import unknown_type  # error: [import-not-found]
 
 MyAlias: TypeAlias = int | unknown_type | str
 

@@ -2542,7 +2542,7 @@ def f(components: Iterable[T | None]) -> T: ...
 
 ```py
 from overloaded import f
-from nonexistent_module import something_unknown  # error: [unresolved-import]
+from nonexistent_module import something_unknown  # error: [import-not-found]
 
 reveal_type(something_unknown)  # revealed: Unknown
 

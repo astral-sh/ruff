@@ -82,12 +82,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and an unresolved-import (error) diagnostic by default.
+    // and an import-not-found (error) diagnostic by default.
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    error[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -96,7 +96,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -119,13 +119,17 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
+            .arg("--ignore")
+            .arg("unresolved-import")
+            .arg("--error")
+            .arg("import-not-found")
             .arg("--warn")
             .arg("unresolved-import"),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    warning[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -134,7 +138,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` was selected on the command line
+    info: rule `import-not-found` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5

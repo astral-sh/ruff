@@ -64,12 +64,23 @@ fn generate_markdown() -> String {
 
     let mut lints: Vec<_> = registry.lints().iter().collect();
     lints.sort_by_key(|a| a.name());
+    let aliases = registry
+        .aliases()
+        .map(|(name, lint)| (lint, name))
+        .into_group_map();
 
     // Replace `rule-name` with [`rule-name`](url) for any known rule names,
     // turning them into inline links automatically.
     let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
     for lint in lints {
+        // Keep links to the old rule heading working after a rename.
+        if let Some(names) = aliases.get(lint) {
+            for name in names.iter().sorted() {
+                let _ = writeln!(output, r#"<a id="{name}"></a>"#);
+            }
+            output.push('\n');
+        }
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
         // Reformat headers as bold text

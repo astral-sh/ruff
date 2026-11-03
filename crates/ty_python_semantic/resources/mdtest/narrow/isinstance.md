@@ -727,7 +727,7 @@ type of the second argument is a dynamic type:
 
 ```py
 from typing import Any
-from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
+from something_unresolvable import SomethingUnknown  # error: [import-not-found]
 
 class Foo: ...
 

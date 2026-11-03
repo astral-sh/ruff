@@ -204,7 +204,7 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
         });
     }
 
-    let baseline: BaselineFile =
+    let mut baseline: BaselineFile =
         serde_json::from_str(source.as_str()).map_err(|error| Error::Parse {
             path: path.to_path_buf(),
             file,
@@ -216,6 +216,18 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
             file,
             version: baseline.version,
         });
+    }
+
+    // Resolve stored rule aliases to their current names so older baselines still match.
+    let aliases: FxHashMap<_, _> = db
+        .lint_registry()
+        .aliases()
+        .map(|(alias, lint)| (alias.as_str(), lint.name()))
+        .collect();
+    for entry in baseline.files.values_mut().flatten() {
+        if let Some(name) = aliases.get(entry.rule.as_str()) {
+            entry.rule = CompactString::const_new(name.as_str());
+        }
     }
 
     Ok(Some(baseline))

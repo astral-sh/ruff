@@ -16,7 +16,7 @@ except re.error as f:
 ## Unknown type in except handler does not cause spurious diagnostic
 
 ```py
-from nonexistent_module import foo  # error: [unresolved-import]
+from nonexistent_module import foo  # error: [import-not-found]
 
 try:
     help()
@@ -129,7 +129,7 @@ We do not emit an `invalid-exception-caught` if a class is caught that has `Any`
 MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
 
 ```py
-from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+from compat import BASE_EXCEPTION_CLASS  # error: [import-not-found] "Cannot resolve imported module `compat`"
 
 class Error(BASE_EXCEPTION_CLASS): ...
 

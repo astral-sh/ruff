@@ -558,7 +558,7 @@ parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` ca
 ```py
 from typing import TypeVar
 
-from missing import Base  # error: [unresolved-import]
+from missing import Base  # error: [import-not-found]
 
 reveal_type(Base)  # revealed: Unknown
 

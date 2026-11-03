@@ -17,7 +17,7 @@ def _(flag: bool):
 ## Calling with an unknown union
 
 ```py
-from nonexistent import f  # error: [unresolved-import] "Cannot resolve imported module `nonexistent`"
+from nonexistent import f  # error: [import-not-found] "Cannot resolve imported module `nonexistent`"
 
 def coinflip() -> bool:
     return True

@@ -1080,7 +1080,7 @@ mod tests {
             let _ = case.db.program_file(case.file);
             let diagnostics = crate::check_file(&case.db, case.file);
             assert_eq!(diagnostics.len(), 1);
-            assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+            assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
 
             let environment = script_environment(&case.db, case.file)
                 .context("expected a default script environment")?;
