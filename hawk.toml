@@ -1315,6 +1315,11 @@ reason = "the vendored filesystem intentionally mirrors the public filesystem in
 
 [[exclude]]
 crate = "ruff_index"
+file = "crates/ruff_index/src/salsa_id_set.rs"
+reason = "Salsa ID sets intentionally expose a complete mutable and immutable set API"
+
+[[exclude]]
+crate = "ruff_index"
 file = "crates/ruff_index/src/slice.rs"
 reason = "indexed slices intentionally mirror the supported slice API"
 

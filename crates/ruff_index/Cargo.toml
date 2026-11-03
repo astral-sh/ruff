@@ -10,15 +10,26 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `#[quickcheck]` macro expansion.
+ignored = ["quickcheck"]
+
 [lib]
 doctest = false
 
 [dependencies]
 get-size2 = { workspace = true }
+itertools = { workspace = true, optional = true }
 ruff_macros = { workspace = true }
 salsa = { workspace = true, optional = true }
+smallvec = { workspace = true, optional = true }
+
+[features]
+salsa = ["dep:itertools", "dep:salsa", "dep:smallvec"]
 
 [dev-dependencies]
+quickcheck = { workspace = true }
+quickcheck_macros = { workspace = true }
 static_assertions = { workspace = true }
 
 [lints]
