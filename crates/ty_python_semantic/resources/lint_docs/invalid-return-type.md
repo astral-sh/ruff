@@ -2,8 +2,9 @@
 
 Detects returned values that can't be assigned to the function's annotated return type.
 
-Note that the special case of a function with a non-`None` return type and an empty body is handled
-by the separate `empty-body` error code.
+A bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off
+the end of a function, Python also returns `None`. ty checks that case with `missing-return` for
+nonempty bodies and `empty-body` for empty bodies.
 
 ## Why is this bad?
 

@@ -19,9 +19,9 @@ expression: "[cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]"
           }
         },
         "severity": 1,
-        "code": "invalid-return-type",
+        "code": "missing-return",
         "codeDescription": {
-          "href": "https://ty.dev/rules#invalid-return-type"
+          "href": "https://ty.dev/rules#missing-return"
         },
         "source": "ty",
         "message": "Function can implicitly return `None`, which is not assignable to return type `str`",

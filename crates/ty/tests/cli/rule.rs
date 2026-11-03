@@ -21,8 +21,9 @@ fn rule_default_output() {
 
     Detects returned values that can't be assigned to the function's annotated return type.
 
-    Note that the special case of a function with a non-`None` return type and an empty body is handled
-    by the separate `empty-body` error code.
+    A bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off
+    the end of a function, Python also returns `None`. ty checks that case with `missing-return` for
+    nonempty bodies and `empty-body` for empty bodies.
 
     ## Why is this bad?
 
@@ -49,7 +50,7 @@ fn rule_json_output() {
     {
       "name": "invalid-return-type",
       "summary": "detects returned values that can't be assigned to the function's annotated return type",
-      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body is handled\nby the separate `empty-body` error code.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nA bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off\nthe end of a function, Python also returns `None`. ty checks that case with `missing-return` for\nnonempty bodies and `empty-body` for empty bodies.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
       "default_level": "error",
       "status": {
         "type": "stable",
