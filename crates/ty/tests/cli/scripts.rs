@@ -1221,6 +1221,67 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
 }
 
 #[test]
+fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [[tool.ty.overrides]]
+        # include = ["script.py"]
+        # [tool.ty.overrides.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:6:33: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_top_level_script_analysis_is_an_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:4:33: error[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn invalid_script_environment_reports_configuration_error() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (

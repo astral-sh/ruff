@@ -530,10 +530,10 @@ impl Options {
         let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
-        let analysis = self
-            .analysis
-            .or_default()
-            .to_settings(db, &mut analysis_diagnostics);
+        let analysis =
+            self.analysis
+                .or_default()
+                .to_settings(db, Severity::Error, &mut analysis_diagnostics);
 
         let analysis_result: Result<_, ToSettingsError> =
             if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
@@ -1807,6 +1807,7 @@ impl AnalysisOptions {
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
+        invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
@@ -1829,22 +1830,32 @@ impl AnalysisOptions {
 
         let allowed_unresolved_imports =
             if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
-                build_module_glob_set(db, allowed_unresolved_imports, "allowed_unresolved_imports")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    allowed_unresolved_imports,
+                    "allowed_unresolved_imports",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 allowed_unresolved_imports_default
             };
 
         let replace_imports_with_any =
             if let Some(replace_imports_with_any) = replace_imports_with_any {
-                build_module_glob_set(db, replace_imports_with_any, "replace_imports_with_any")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    replace_imports_with_any,
+                    "replace_imports_with_any",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 replace_imports_with_any_default
             };
@@ -1867,6 +1878,7 @@ fn build_module_glob_set(
     db: &dyn Db,
     patterns: &[RangedValue<String>],
     option_name: &str,
+    severity: Severity,
 ) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
@@ -1875,7 +1887,7 @@ fn build_module_glob_set(
             let diagnostic = OptionDiagnostic::new(
                 DiagnosticId::InvalidGlob,
                 format!("Invalid glob pattern `{error}`"),
-                Severity::Error,
+                severity,
             );
 
             return Err(diagnostic
@@ -1888,7 +1900,7 @@ fn build_module_glob_set(
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             "The `{option_name}` patterns resulted in a regex that is too large".to_string(),
-            Severity::Error,
+            severity,
         );
 
         Box::new(diagnostic.sub(SubDiagnostic::new(
@@ -2213,7 +2225,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.to_settings(db, diagnostics);
+        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
 
         let override_instance = Override {
             files,

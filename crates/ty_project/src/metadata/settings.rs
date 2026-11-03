@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
@@ -228,7 +229,7 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     // It's okay to ignore the errors here because the rules are eagerly validated
     // during `overrides.to_settings()`.
     let rules = rules.to_rule_selection(db, &mut Vec::new());
-    let analysis = analysis.to_settings(db, &mut Vec::new());
+    let analysis = analysis.to_settings(db, Severity::Warning, &mut Vec::new());
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
