@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, ArgOrKeyword};
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -55,15 +55,11 @@ impl Violation for TarfileIgnoreZerosTrue {
 }
 
 /// `tarfile-ignore-zeros-true`
-pub(crate) fn tarfile_ignore_zeros_true(checker: &Checker, call: &ast::ExprCall) {
-    if !checker.semantic().seen_module(Modules::TARFILE) {
-        return;
-    }
-
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
-        return;
-    };
-
+pub(crate) fn tarfile_ignore_zeros_true(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     // Keyword-only on the openers, but the `TarFile` constructor also takes it
     // positionally, after `name, mode, fileobj, format, tarinfo, dereference`.
     let argument = match qualified_name.segments() {

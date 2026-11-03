@@ -836,9 +836,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::TarfileUnsafeMembers) {
                 flake8_bandit::rules::tarfile_unsafe_members(checker, call);
             }
-            if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
-                ruff::rules::tarfile_ignore_zeros_true(checker, call);
-            }
             if checker.is_rule_enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
             }
@@ -1818,6 +1815,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::UnnecessaryRegularExpression,
         Rule::UnnecessaryEmptyIterableWithinDequeCall,
         Rule::StarmapZip,
+        Rule::TarfileIgnoreZerosTrue,
     ]) {
         return;
     }
@@ -2050,5 +2048,8 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     }
     if checker.is_rule_enabled(Rule::StarmapZip) {
         ruff::rules::starmap_zip(checker, call, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
+        ruff::rules::tarfile_ignore_zeros_true(checker, call, &qualified_name);
     }
 }
