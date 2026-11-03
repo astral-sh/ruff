@@ -1945,7 +1945,7 @@ def narrow_typed_dict_to_dict(value: int | Payload) -> None:
         value["optional"] = "present"
         reveal_type(value.pop("optional"))  # revealed: str
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
         # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
         value.pop("key")
@@ -1961,7 +1961,7 @@ Same for `MutableMapping`:
 def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
     if isinstance(value, MutableMapping):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 
@@ -1971,7 +1971,7 @@ And for `Mapping`:
 def narrow_typed_dict_to_mapping(value: Payload) -> None:
     if isinstance(value, Mapping):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 
@@ -1983,7 +1983,7 @@ PayloadAlias = Payload
 def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 

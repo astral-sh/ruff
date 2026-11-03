@@ -71,8 +71,8 @@ use crate::types::diagnostic::{
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
-    MISSING_UNION_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
     hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
@@ -11272,7 +11272,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if let Type::SpecialForm(special_form) = value_type {
                         if let Some(builder) =
-                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                            self.context.report_lint(&MISSING_ATTRIBUTE, attribute)
                         {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "Special form `{special_form}` has no attribute `{attr_name}`",
@@ -11309,7 +11309,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return fallback();
                     }
 
-                    let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                    let Some(builder) = self.context.report_lint(&MISSING_ATTRIBUTE, attribute)
                     else {
                         return fallback();
                     };

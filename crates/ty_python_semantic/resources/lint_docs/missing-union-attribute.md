@@ -1,11 +1,11 @@
 ## What it does
 
 Checks for reads or deletions of attributes that are present on some members of a union and missing
-from others. If every member lacks the attribute, ty reports `unresolved-attribute`.
+from others. If every member lacks the attribute, ty reports `missing-attribute`.
 
 ## Why is this bad?
 
-Reading the attribute raises an `AttributeError` when the value is a member that lacks it.
+Reading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.
 
 ## Examples
 

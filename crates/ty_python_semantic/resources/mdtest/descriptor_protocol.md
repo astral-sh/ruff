@@ -911,7 +911,7 @@ respect its `str | None` annotation, and arbitrary instance attributes remain un
 descriptor = property(lambda instance: 1)
 descriptor.__doc__ = None
 descriptor.__doc__ = 1  # error: [invalid-assignment]
-descriptor.extra = 1  # error: [unresolved-attribute]
+descriptor.extra = 1  # error: [missing-attribute]
 ```
 
 ### Overriding properties in subclasses

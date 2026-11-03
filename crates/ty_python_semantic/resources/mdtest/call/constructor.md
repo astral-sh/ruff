@@ -84,7 +84,7 @@ class LambdaNew:
     __new__ = lambda cls: object.__new__(cls)
 
 reveal_type(LambdaNew())  # revealed: LambdaNew
-LambdaNew().missing_attribute  # error: [unresolved-attribute]
+LambdaNew().missing_attribute  # error: [missing-attribute]
 ```
 
 ## `__new__` with an invalid decorator and unresolved return annotation

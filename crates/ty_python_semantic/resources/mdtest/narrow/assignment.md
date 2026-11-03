@@ -88,9 +88,9 @@ class _:
         reveal_type(a.z)  # revealed: None | Unknown
 
 a = A()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]
@@ -255,7 +255,7 @@ class GetterOnly:
         return "hello"
 
 def update(obj: GetterOnly) -> None:
-    obj.value = "goodbye"  # error: [unresolved-attribute]
+    obj.value = "goodbye"  # error: [missing-attribute]
     reveal_type(obj.value)  # revealed: str
 ```
 
@@ -323,10 +323,10 @@ still track the assigned type and report an incompatible use later:
 ```py
 import module
 
-module.value = 1  # error: [unresolved-attribute]
+module.value = 1  # error: [missing-attribute]
 
 # error: [invalid-assignment]
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 value: str = module.value
 ```
 

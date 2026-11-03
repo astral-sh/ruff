@@ -27,7 +27,7 @@ In particular, we should raise an error in the "possibly-undeclared-and-unbound"
 | ---------------- | -------- | ---------------------------- | ---------------------------- |
 | bound            |          |                              |                              |
 | possibly-unbound |          | `possibly-missing-attribute` | `possibly-missing-attribute` |
-| unbound          |          | ?                            | `unresolved-attribute`       |
+| unbound          |          | ?                            | `missing-attribute`          |
 
 When the declared and inferred types are mutually assignable, we use `T_declared` directly instead
 of unioning it with `T_inferred`.
@@ -244,11 +244,11 @@ class Public:
     if False:
         a: int = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Public.a)  # revealed: Unknown
 
 # Modification attempts yield an error:
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 Public.a = None
 ```
 

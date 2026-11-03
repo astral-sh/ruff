@@ -526,7 +526,7 @@ class B:
 
     @d()
     def m2(self, p):
-        self.__slots__  # error: [unresolved-attribute]
+        self.__slots__  # error: [missing-attribute]
 ```
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`

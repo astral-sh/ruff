@@ -1916,7 +1916,7 @@ fn change_python_version_and_platform() -> anyhow::Result<()> {
         case.render_diagnostics(&case.db().check()),
         @"
     bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`
-    bar.py:7:1: error[unresolved-attribute] Module `os` has no member `getegid`
+    bar.py:7:1: error[missing-attribute] Module `os` has no member `getegid`
     ");
 
     // Change the python version

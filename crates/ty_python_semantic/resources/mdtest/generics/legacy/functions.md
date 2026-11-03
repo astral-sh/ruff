@@ -2433,16 +2433,16 @@ from typing import Any, Callable, Generic, TypeVar
 F = TypeVar("F", bound=Callable[..., Any])
 
 def my_decorator(f: F) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever = 1
 
 class Box(Generic[F]):
     cls: type[F]
 
 def specialized(box: Box[Callable[..., Any]]) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     box.cls.whatever
 ```
 

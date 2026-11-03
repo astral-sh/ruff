@@ -30,7 +30,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `sys` has no member `last_exc`
+    error[missing-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
     5 | print(sys.last_exc)
@@ -1263,7 +1263,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `os` has no member `grantpt`
+    error[missing-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer

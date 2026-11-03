@@ -3230,7 +3230,7 @@ The returned instance supports known methods, and ty still rejects missing attri
 def _(series: Series[Any]):
     result = series + 1
     reveal_type(result.count())  # revealed: int
-    result.missing()  # error: [unresolved-attribute]
+    result.missing()  # error: [missing-attribute]
 ```
 
 ## Ambiguous overloads returning generic protocols

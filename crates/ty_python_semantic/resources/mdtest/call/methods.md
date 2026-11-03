@@ -786,7 +786,7 @@ reveal_type(C.f(1))  # revealed: str
 The method `f` cannot be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
+# error: [missing-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -1564,7 +1564,7 @@ class Item:
     def __new__(cls) -> Self:
         result = object.__new__(cls)
         reveal_type(result)  # revealed: Self@__new__
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         result.nonexistent()
         return result
 ```
@@ -1593,7 +1593,7 @@ class Baz(Bar):
     def __new__(cls) -> Self:
         result = Bar.__new__(cls)
         reveal_type(result)  # revealed: Self@__new__
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         result.nonexistent()
         return result
 ```

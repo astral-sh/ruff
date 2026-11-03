@@ -155,7 +155,7 @@ class Base:
         if not hasattr(self, "x"):
             self.x = self.__str__
         if not hasattr(self, "z"):
-            self.z = self.y  # error: [unresolved-attribute]
+            self.z = self.y  # error: [missing-attribute]
 
 reveal_type(Base().x())  # revealed: str
 
@@ -163,7 +163,7 @@ class Annotated:
     def __init__(self: "Annotated"):
         if not hasattr(self, "value"):
             self.value = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -209,7 +209,7 @@ class Base:
         if not hasattr(self, "x"):
             self.x = self.__str__
         if not hasattr(self, "z"):
-            self.z = self.y  # error: [unresolved-attribute]
+            self.z = self.y  # error: [missing-attribute]
 
 reveal_type(Base().x())  # revealed: str
 
@@ -217,7 +217,7 @@ class Annotated:
     def __init__(self: "Annotated"):
         if not hasattr(self, "value"):
             self.value = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 ## Named protocol guards when the base is checked first
@@ -240,7 +240,7 @@ class Base:
     def __init__(self):
         if not isinstance(self, HasX):
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 
 def accepts_x(value: HasX) -> None: ...
 
@@ -284,7 +284,7 @@ class Base:
     def __init__(self):
         if not isinstance(self, HasX):
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 
 def accepts_x(value: HasX) -> None: ...
 
@@ -318,15 +318,15 @@ class Base:
         if self is not None:
             if not hasattr(self, "nonnull"):
                 self.nonnull = self.__str__
-                self.nonnull_missing  # error: [unresolved-attribute]
+                self.nonnull_missing  # error: [missing-attribute]
         if not hasattr(self, "other"):
             if not hasattr(self, "unrelated"):
                 self.unrelated = self.__str__
-                self.unrelated_missing  # error: [unresolved-attribute]
+                self.unrelated_missing  # error: [missing-attribute]
         if isinstance(self, Marker):
             if not hasattr(self, "narrowed"):
                 self.narrowed = self.__str__
-                self.narrowed_missing  # error: [unresolved-attribute]
+                self.narrowed_missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -383,15 +383,15 @@ class Base:
         if self is not None:
             if not hasattr(self, "nonnull"):
                 self.nonnull = self.__str__
-                self.nonnull_missing  # error: [unresolved-attribute]
+                self.nonnull_missing  # error: [missing-attribute]
         if not hasattr(self, "other"):
             if not hasattr(self, "unrelated"):
                 self.unrelated = self.__str__
-                self.unrelated_missing  # error: [unresolved-attribute]
+                self.unrelated_missing  # error: [missing-attribute]
         if isinstance(self, Marker):
             if not hasattr(self, "narrowed"):
                 self.narrowed = self.__str__
-                self.narrowed_missing  # error: [unresolved-attribute]
+                self.narrowed_missing  # error: [missing-attribute]
 ```
 
 ## Class attributes independently establish presence
@@ -503,7 +503,7 @@ class Base:
         if not hasattr(self, "x"):
             prepare()
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -539,7 +539,7 @@ class Base:
         if not hasattr(self, "x"):
             prepare()
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 ## Non-returning initializers do not define instance attributes
@@ -557,7 +557,7 @@ class C:
         if not hasattr(self, "x"):
             self.x = fail()  # error: [invalid-assignment]
 
-C().x  # error: [unresolved-attribute]
+C().x  # error: [missing-attribute]
 ```
 
 ## Assignments in the opposite guard branch do not initialize an attribute
@@ -576,7 +576,7 @@ class C:
         else:
             self.y = self.missing
 
-C().y  # error: [unresolved-attribute]
+C().y  # error: [missing-attribute]
 ```
 
 ## Contradictory attribute guards do not initialize an attribute
@@ -590,7 +590,7 @@ class C:
             if not hasattr(self, "x"):
                 self.x = self.missing
 
-C().x  # error: [unresolved-attribute]
+C().x  # error: [missing-attribute]
 ```
 
 ## Lazy cached property behind `hasattr`

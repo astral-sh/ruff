@@ -145,7 +145,7 @@ c = C()
 del c.x
 reveal_type(c.x)  # revealed: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 del c.non_existent
 
 c.x = 1

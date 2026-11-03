@@ -44,7 +44,7 @@ use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, 
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
     parsed::parsed_module,
 };
@@ -1183,9 +1183,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-attribute.md")]
-    pub(crate) static UNRESOLVED_ATTRIBUTE = {
-        summary: "detects references to unresolved attributes",
+    #[doc = include_str!("../../resources/lint_docs/missing-attribute.md")]
+    pub(crate) static MISSING_ATTRIBUTE = {
+        summary: "detects references to missing attributes",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
@@ -1475,8 +1475,9 @@ declare_lint! {
 }
 
 fn register_missing_attribute_lints(registry: &mut LintRegistryBuilder) {
-    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&MISSING_ATTRIBUTE);
     registry.register_lint(&MISSING_UNION_ATTRIBUTE);
+    registry.register_alias(LintName::of("unresolved-attribute"), &MISSING_ATTRIBUTE);
 }
 
 /// A collection of type check diagnostics.

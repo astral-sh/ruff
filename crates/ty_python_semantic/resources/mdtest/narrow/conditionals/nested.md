@@ -147,7 +147,7 @@ class _:
 
     class _:
         a = 1
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         a.b.c1.d = D()
 
         class _3:

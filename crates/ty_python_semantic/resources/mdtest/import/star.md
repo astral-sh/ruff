@@ -163,7 +163,7 @@ D: (E := 4) = (F := 5)  # error: [invalid-type-form]  # fmt:skip
 for G in [1]:
     pass
 
-for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+for (H := 4).whatever in [2]:  # error: [missing-attribute]
     ...
 
 class I: ...

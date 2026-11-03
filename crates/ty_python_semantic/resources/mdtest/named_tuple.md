@@ -1320,7 +1320,7 @@ from typing import NamedTuple
 class Point(NamedTuple):
     x: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Point.__match_args__)  # revealed: Unknown
 ```
 
@@ -1529,7 +1529,7 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 

@@ -16,7 +16,7 @@ def _(obj: NonFinalClass):
     else:
         reveal_type(obj)  # revealed: NonFinalClass & ~<Protocol with members 'spam'>
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(obj.spam)  # revealed: Unknown
 
     if hasattr(obj, "not-an-identifier"):
@@ -39,7 +39,7 @@ def _(obj: FinalClass):
     else:
         reveal_type(obj)  # revealed: FinalClass
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(obj.spam)  # revealed: Unknown
 ```
 
@@ -80,7 +80,7 @@ def _(obj: MaybeWithSpam):
     else:
         reveal_type(obj)  # revealed: MaybeWithSpam & ~<Protocol with members 'spam'>
 
-        # TODO: Ideally, we would emit `[unresolved-attribute]` and reveal `Unknown` here:
+        # TODO: Ideally, we would emit `[missing-attribute]` and reveal `Unknown` here:
         # error: [possibly-missing-attribute]
         reveal_type(obj.spam)  # revealed: int
 ```
@@ -95,7 +95,7 @@ def f(x: object):
         reveal_type(x.__str__)  # revealed: bound method object.__str__() -> str
         reveal_type(x.__dict__)  # revealed: dict[str, Any]
 
-        # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
+        # error: [missing-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
 ```
 

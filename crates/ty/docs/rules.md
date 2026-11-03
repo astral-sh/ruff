@@ -4135,6 +4135,48 @@ def func(x: int): ...
 func()  # error
 ```
 
+## `missing-attribute`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-attribute%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1185" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for references to attributes that ty cannot find on the object's type. For a union, this rule
+applies when every member lacks the attribute. If only some members lack it, ty reports
+[`missing-union-attribute`](#missing-union-attribute).
+
+**Why is this bad?**
+
+
+Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is
+not guaranteed to exist from the type alone, so this could also indicate that the object is not of
+the type that the user expects.
+
+**Examples**
+
+
+```python
+class A: ...
+
+
+# AttributeError: 'A' object has no attribute 'foo'
+A().foo  # error
+```
+
+**Rule selection**
+
+
+This rule was renamed in ty 0.0.97. Settings such as `unresolved-attribute = "ignore"` and comments
+such as `# ty: ignore[unresolved-attribute]` still apply to this rule. To configure or suppress an
+access where only some union members lack the attribute, use [`missing-union-attribute`](#missing-union-attribute).
+
 ## `missing-direct-dependency`
 
 <small>
@@ -4460,12 +4502,12 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Checks for reads or deletions of attributes that are present on some members of a union and missing
-from others. If every member lacks the attribute, ty reports [`unresolved-attribute`](#unresolved-attribute).
+from others. If every member lacks the attribute, ty reports [`missing-attribute`](#missing-attribute).
 
 **Why is this bad?**
 
 
-Reading the attribute raises an `AttributeError` when the value is a member that lacks it.
+Reading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.
 
 **Examples**
 
@@ -6412,39 +6454,6 @@ def f(x: int) -> int:
 
 
 f(x=1, y=2)  # error
-```
-
-## `unresolved-attribute`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22unresolved-attribute%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1185" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for unresolved attributes.
-
-**Why is this bad?**
-
-
-Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is
-not guaranteed to exist from the type alone, so this could also indicate that the object is not of
-the type that the user expects.
-
-**Examples**
-
-
-```python
-class A: ...
-
-
-# AttributeError: 'A' object has no attribute 'foo'
-A().foo  # error
 ```
 
 ## `unresolved-global`

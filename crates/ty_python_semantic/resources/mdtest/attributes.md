@@ -42,10 +42,10 @@ c_instance.declared_and_bound = False
 c_instance.declared_and_bound = "incompatible"
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
-# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
+# error: [missing-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
@@ -188,7 +188,7 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
+# error: [missing-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `<class 'C'>`"
@@ -849,7 +849,7 @@ reveal_type(c_instance.e)  # revealed: int
 reveal_type(c_instance.f)  # revealed: int
 
 # This one is correctly not resolved as an attribute:
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(c_instance.g)  # revealed: Unknown
 ```
 
@@ -875,21 +875,21 @@ If the comprehension is inside another scope like function then that attribute i
 class C:
     def __init__(self):
         def f():
-            # error: [unresolved-attribute]
+            # error: [missing-attribute]
             [... for self.a in [1]]
 
         def g():
-            # error: [unresolved-attribute]
+            # error: [missing-attribute]
             [... for self.b in [1]]
         g()
 
 c_instance = C()
 
 # This attribute is in the function f and is not reachable
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(c_instance.a)  # revealed: Unknown
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(c_instance.b)  # revealed: Unknown
 ```
 
@@ -950,12 +950,12 @@ class C:
     def __init__(self) -> None:
         this = self
         # error: [invalid-type-form]
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         this.declared_and_bound: str | None = "a"
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
 # so `Unknown` + a diagnostic is also fine.
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().declared_and_bound)  # revealed: Unknown
 ```
 
@@ -970,10 +970,10 @@ class C:
     def f(other: Other) -> None:
         other.x = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().x)  # revealed: Unknown
 
 # This also works if `staticmethod` is aliased:
@@ -985,10 +985,10 @@ class D:
     def f(other: Other) -> None:
         other.x = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(D.x)  # revealed: Unknown
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(D().x)  # revealed: Unknown
 ```
 
@@ -1023,10 +1023,10 @@ class C:
     def f(other: Other) -> None:
         other.x = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().x)  # revealed: Unknown
 ```
 
@@ -1042,7 +1042,7 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: this would ideally raise an `unresolved-attribute` error
+# TODO: this would ideally raise an `missing-attribute` error
 reveal_type(C().x)  # revealed: str
 ```
 
@@ -1073,13 +1073,13 @@ class C:
 
 # TODO: this would ideally be `int`
 reveal_type(C(True).a)  # revealed: int | str
-# TODO: this would ideally raise an `unresolved-attribute` error
+# TODO: this would ideally raise an `missing-attribute` error
 reveal_type(C(True).b)  # revealed: int
 reveal_type(C(True).c)  # revealed: int | str
 # TODO: ideally this would be `str`, but we don't attempt to analyze control flow within methods
 # that closely; all reachable attribute assignments are included.
 reveal_type(C(True).d)  # revealed: int | str
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
 
@@ -2245,7 +2245,7 @@ class AugmentedDescriptorMeta(type):
 
 class UsesAugmentedDescriptor(metaclass=AugmentedDescriptorMeta): ...
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(UsesAugmentedDescriptor().descriptor_value)  # revealed: Unknown
 ```
 
@@ -2264,7 +2264,7 @@ class MaybeAugmentedDescriptorMeta(type):
 
 class UsesMaybeAugmentedDescriptor(metaclass=MaybeAugmentedDescriptorMeta): ...
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(UsesMaybeAugmentedDescriptor().descriptor_value)  # revealed: Unknown
 ```
 
@@ -2440,7 +2440,7 @@ class DoesNotInheritMetaclassAttribute(metaclass=MetaclassAttributeOnly): ...
 
 reveal_type(DoesNotInheritMetaclassAttribute.metaclass_only)  # revealed: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unknown
 ```
 
@@ -3022,10 +3022,10 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
+    # error: [missing-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 
-    # TODO: This should ideally be a `unresolved-attribute` error. We need better union
+    # TODO: This should ideally be a `missing-attribute` error. We need better union
     # handling in `validate_attribute_assignment` for this.
     # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'>`"
     C.x = 1
@@ -3040,7 +3040,7 @@ def f(x: list[int], y: list[int] | None, z: None):
     x.index
     # error: [missing-union-attribute] "Attribute `index` is not defined on `None` in union `list[int] | None`"
     y.index
-    # error: [unresolved-attribute] "Object of type `None` has no attribute `index`"
+    # error: [missing-attribute] "Object of type `None` has no attribute `index`"
     z.index
 ```
 
@@ -3075,16 +3075,24 @@ Each rule can be suppressed independently, even when both accesses occur on the 
 
 ```py
 def f(x: str | int):
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     x.strip(), x.typo  # ty: ignore[missing-union-attribute]
     # error: [missing-union-attribute]
-    x.strip(), x.typo  # ty: ignore[unresolved-attribute]
+    x.strip(), x.typo  # ty: ignore[missing-attribute]
+```
+
+The former name of `missing-attribute` also works in both forms of suppression comment.
+
+```py
+def g(x: str):
+    x.typo  # ty: ignore[unresolved-attribute]
+    x.typo  # type: ignore[ty:unresolved-attribute]
 ```
 
 ## Disabling definite missing attribute errors
 
-Disabling `unresolved-attribute` still allows ty to report attributes missing from some union
-members:
+Disabling `missing-attribute` using its former name still allows ty to report attributes missing
+from some union members.
 
 ```toml
 [rules]
@@ -3109,7 +3117,7 @@ missing-union-attribute = "ignore"
 ```py
 def f(x: str | int):
     x.strip()  # ok
-    x.typo  # error: [unresolved-attribute]
+    x.typo  # error: [missing-attribute]
 ```
 
 ## Inherited class attributes
@@ -3746,14 +3754,14 @@ def _(flag: bool):
     class B4: ...
 
     def inner4(a_and_b: Intersection[A4, B4]):
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(a_and_b.x)  # revealed: Unknown
 
         # error: [invalid-assignment]
         a_and_b.x = R()
     # Same for class objects
     def inner4_class(a_and_b: Intersection[type[A4], type[B4]]):
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(a_and_b.x)  # revealed: Unknown
 
         # error: [invalid-assignment]
@@ -3875,7 +3883,7 @@ Importantly, `__getattr__` is only called if attributes are accessed on instance
 accessed on the class itself:
 
 ```py
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 CustomGetAttr.whatever
 ```
 
@@ -4015,7 +4023,7 @@ class ThisFails:
         # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 ThisFails().x
 ```
 
@@ -4359,7 +4367,7 @@ class ContextSetAttr:
 
 instance = ContextSetAttr()
 instance.callback = lambda number: (
-    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    # error: [missing-attribute] "Object of type `int` has no attribute `missing`"
     number.missing
 )
 instance.payload = {"value": 1}
@@ -4523,7 +4531,7 @@ attribute is assigned on an `object` instance.
 
 ```py
 obj = object()
-obj.non_existing = 1  # error: [unresolved-attribute]
+obj.non_existing = 1  # error: [missing-attribute]
 ```
 
 ### Setting attributes on `Never` / `Any`
@@ -4693,7 +4701,7 @@ class ContextMeta(type):
 class ContextClass(metaclass=ContextMeta): ...
 
 ContextClass.callback = lambda number: (
-    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    # error: [missing-attribute] "Object of type `int` has no attribute `missing`"
     number.missing
 )
 ContextClass.payload = {"value": 1}
@@ -4716,7 +4724,7 @@ class OverloadedMeta(type):
 class OverloadedClass(metaclass=OverloadedMeta): ...
 
 OverloadedClass.callback = lambda number: (
-    # error: [unresolved-attribute] "Object of type `int` has no attribute `missing`"
+    # error: [missing-attribute] "Object of type `int` has no attribute `missing`"
     number.missing
 )
 OverloadedClass.payload = {"value": 1}
@@ -4746,7 +4754,7 @@ A class without a custom metaclass still produces an error for an unknown attrib
 ```py
 class Regular: ...
 
-Regular.whatever = 42  # error: [unresolved-attribute]
+Regular.whatever = 42  # error: [missing-attribute]
 ```
 
 ## Objects of all types have a `__class__` method
@@ -4999,7 +5007,7 @@ class C:
         other.x = 1
 
 def f(c: C):
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     reveal_type(c.x)  # revealed: Unknown
 ```
 
@@ -5019,7 +5027,7 @@ class Outer:
 
 reveal_type(Outer().x)  # revealed: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 Outer.Middle().x
 
 reveal_type(Outer.Middle.Inner().x)  # revealed: str
@@ -5051,7 +5059,7 @@ class C:
     def __init__(self, other: Other) -> None:
         (self := other).x = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C(Other()).x)  # revealed: Unknown
 ```
 
@@ -5080,7 +5088,7 @@ class C:
         set_attribute("a")
 
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().x)  # revealed: Unknown
 ```
 
@@ -5477,7 +5485,7 @@ class C:
     def f(self):
         self.x: int = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C.x)  # revealed: Unknown
 reveal_type(C().x)  # revealed: int
 
@@ -5633,12 +5641,12 @@ python-version = "3.10"
 ```py
 import datetime
 
-# snapshot: unresolved-attribute
+# snapshot: missing-attribute
 reveal_type(datetime.UTC)  # revealed: Unknown
 ```
 
 ```snapshot
-error[unresolved-attribute]: Module `datetime` has no member `UTC`
+error[missing-attribute]: Module `datetime` has no member `UTC`
  --> src/main.py:4:13
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
@@ -5654,12 +5662,12 @@ If an attribute doesn't exist at all, we still give the same error as before:
 ```py
 import datetime
 
-# snapshot: unresolved-attribute
+# snapshot: missing-attribute
 reveal_type(datetime.fakenotreal)  # revealed: Unknown
 ```
 
 ```snapshot
-error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
+error[missing-attribute]: Module `datetime` has no member `fakenotreal`
  --> src/wrong.py:4:13
   |
 4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
@@ -5734,14 +5742,14 @@ python-version = "3.14"
 from typing import Any, Callable
 
 def f(x: Callable[..., Any]):
-    x.__name__  # snapshot: unresolved-attribute
+    x.__name__  # snapshot: missing-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
+error[missing-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
  --> src/mdtest_snippet.py:4:5
   |
-4 |     x.__name__  # snapshot: unresolved-attribute
+4 |     x.__name__  # snapshot: missing-attribute
   |     ^^^^^^^^^^
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
@@ -5749,14 +5757,14 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 
 ```py
 def g(x: Callable[..., Any]):
-    x.__annotate__  # snapshot: unresolved-attribute
+    x.__annotate__  # snapshot: missing-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
+error[missing-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
  --> src/mdtest_snippet.py:6:5
   |
-6 |     x.__annotate__  # snapshot: unresolved-attribute
+6 |     x.__annotate__  # snapshot: missing-attribute
   |     ^^^^^^^^^^^^^^
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>

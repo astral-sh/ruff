@@ -44,15 +44,15 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'objec
 
 super(C, C()).a
 super(C, C()).b
-super(C, C()).c  # error: [unresolved-attribute]
+super(C, C()).c  # error: [missing-attribute]
 
 super(B, C()).a
-super(B, C()).b  # error: [unresolved-attribute]
-super(B, C()).c  # error: [unresolved-attribute]
+super(B, C()).b  # error: [missing-attribute]
+super(B, C()).c  # error: [missing-attribute]
 
-super(A, C()).a  # error: [unresolved-attribute]
-super(A, C()).b  # error: [unresolved-attribute]
-super(A, C()).c  # error: [unresolved-attribute]
+super(A, C()).a  # error: [missing-attribute]
+super(A, C()).b  # error: [missing-attribute]
+super(A, C()).c  # error: [missing-attribute]
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
 reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -373,7 +373,7 @@ class B(A): ...
 
 reveal_type(super(B))  # revealed: super
 
-# error: [unresolved-attribute] "Object of type `super` has no attribute `a`"
+# error: [missing-attribute] "Object of type `super` has no attribute `a`"
 super(B).a
 ```
 
@@ -745,10 +745,10 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
+        # error: [missing-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
 
-# error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
+# error: [missing-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 

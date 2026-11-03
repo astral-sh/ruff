@@ -562,7 +562,7 @@ class Animal: ...
 reveal_type(Animal)  # revealed: <class 'Animal'>
 reveal_type(Animal())  # revealed: Animal
 
-Animal().set_full_name("John")  # error: [unresolved-attribute]
+Animal().set_full_name("John")  # error: [missing-attribute]
 ```
 
 This also applies to unannotated callables that are not function definitions:
