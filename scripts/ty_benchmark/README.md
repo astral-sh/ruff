@@ -54,8 +54,9 @@ and source hashes. mypy uses its normal import
 following with project and user configuration disabled, so per-module overrides
 and plugins cannot change its workload. Checkers can still follow different
 imports or infer different types from the same source files.
-Additional first-party import roots, such as SQLAlchemy's `lib/`, apply to every
-checker. Every project environment includes the same pinned mypy dependency,
+Additional first-party import roots, including `src/` layouts and SQLAlchemy's
+`lib/`, apply to every checker. This keeps imports pointed at the checkout even
+when a dependency also installs a release of the project. Every project environment includes the same pinned mypy dependency,
 including runs that select only another tool.
 
 The suite includes Django's dynamic framework code, SymPy's symbolic computation,
