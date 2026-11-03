@@ -530,14 +530,9 @@ def collect_ty_diagnostics(
             "--error=ambiguous-protocol-member",
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
-            "--error=mismatched-enum-name",
-            "--error=mismatched-namedtuple-name",
-            "--error=mismatched-newtype-name",
-            "--error=mismatched-paramspec-name",
-            "--error=mismatched-type-alias-name",
-            "--error=mismatched-typeddict-name",
-            "--error=mismatched-typevar-name",
-            "--error=mismatched-typevartuple-name",
+            # Older ty versions only know the original name. It selects all eight
+            # replacement rules in newer versions, so both binaries use the same policy.
+            "--error=mismatched-type-name",
             "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
