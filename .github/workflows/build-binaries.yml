@@ -327,6 +327,7 @@ jobs:
           maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: 2_17
+          docker-options: ${{ matrix.target == 'i686-unknown-linux-gnu' && '--platform linux/386' || '' }}
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
