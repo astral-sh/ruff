@@ -524,6 +524,9 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        // For example, if `Base.f` accepts `bytes`, overloads of `Child.f` for `int` and `str`
+        // both fail the original check. The checker suppresses notes for individual alternatives,
+        // so trying those overloads again would leave the error context empty.
         if let (Type::Callable(source), Type::Callable(target)) = (self, target)
             && !source
                 .signatures(db)
