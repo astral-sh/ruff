@@ -2210,6 +2210,32 @@ def check_source(narrowed: Intersection[Any, Source[str]], inherited: DynamicSou
     reveal_type(from_source(inherited))  # revealed: str
 ```
 
+## Inferring union parameters in a loop
+
+When a call wraps its previous result, `Divergent` marks the cycle. Inference preserves that marker
+for both direct and nested union parameters.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T | None) -> tuple[T]:
+    raise NotImplementedError
+
+def wrap_nested(value: tuple[T | None] | None) -> tuple[T]:
+    raise NotImplementedError
+
+def check():
+    direct: object = 0
+    nested: object = 0
+    for _ in range(2):
+        direct = wrap(direct)
+        nested = wrap_nested((nested,))
+        reveal_type(direct)  # revealed: tuple[Divergent]
+        reveal_type(nested)  # revealed: tuple[Divergent]
+```
+
 ## Nested gradual evidence in unions
 
 A gradual type argument remains evidence for a type variable inside a nested union. Inference

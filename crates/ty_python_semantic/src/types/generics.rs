@@ -4035,7 +4035,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 continue;
             }
             match actual {
-                Type::Dynamic(_) => return true,
+                // `Divergent` also satisfies a union unconditionally. Preserve the marker so
+                // cycle recovery can recognize a call that wraps its own previous result.
+                ty if ty.is_dynamic() => return true,
                 Type::TypeAlias(alias) => {
                     // Recursive aliases can grow their specialization on every expansion.
                     // An incomplete walk cannot establish that gradual evidence is absent.
@@ -4075,7 +4077,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> bool {
         let db = self.db;
         any_over_type_expanding_aliases(db, self.env, actual, |nested| match nested {
-            Type::Dynamic(_) => true,
+            ty if ty.is_dynamic() => true,
             Type::NominalInstance(instance) => {
                 let class = instance.class(db, self.env);
                 // Exact recursion adds no evidence, as when `str` inherits `Sequence[str]`.
