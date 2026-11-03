@@ -115,65 +115,61 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn script_python_requirement_overrides_project_version() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "script.py",
-        r#"
-        # /// script
-        # requires-python = ">=3.12"
-        # ///
-
-        PythonFinalizationError
-        "#,
-    )?;
-    case.write_files([
+fn script_inherits_project_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "environment.python-version = '3.14'"),
         (
-            "ty.toml",
-            r#"
-            [environment]
-            python-version = "3.13"
-            "#,
-        ),
-        (
-            "inherited.py",
-            r#"
+            "script.py",
+            "
             # /// script
             # dependencies = []
             # ///
 
             import sys
-            from typing import Literal, assert_type
+            from typing import reveal_type
 
-            assert_type(sys.version_info[:2], tuple[Literal[3], Literal[13]])
+            reveal_type(sys.version_info[:2])
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:9:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn script_python_requirement_overrides_project_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "environment.python-version = '3.14'"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.13"
+            # ///
+
+            import sys
+            from typing import reveal_type
+
+            reveal_type(sys.version_info[:2])
             "#,
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 1
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: true
+    exit_code: 0
     ----- stdout -----
-    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
-     --> script.py:6:1
-      |
-    6 | PythonFinalizationError
-      | ^^^^^^^^^^^^^^^^^^^^^^^
-    info: `PythonFinalizationError` was added as a builtin in Python 3.13
-    info: Python 3.12 was assumed when resolving types because it was specified in script metadata
-     --> script.py:3:21
-      |
-    3 | # requires-python = ">=3.12"
-      |                     ^^^^^^^^ Python version configured here
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "#);
-    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    script.py:6:1: error[unresolved-reference] Name `PythonFinalizationError` used when not defined
+    script.py:9:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[13]]`
     Found 1 diagnostic
 
     ----- stderr -----
