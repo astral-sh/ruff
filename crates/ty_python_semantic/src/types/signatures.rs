@@ -1538,6 +1538,20 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
+        let self_mapping = |self_type| {
+            // In `P[Self].method`, the owner argument and the method's own `Self` can have
+            // the same declaration. Only the occurrence bound by this signature is the receiver.
+            if let Some(context) = self.generic_context
+                && let Some(typevar) = context.variables(db).find(|typevar| {
+                    Some(typevar.binding_context(db)) == binding_context
+                        && typevar.typevar(db).is_self(db)
+                })
+            {
+                TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, self_type))
+            } else {
+                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
+            }
+        };
         let receiver_constraint = if impossible_receiver {
             // Keep the signature for bound-method diagnostics, but make it incompatible with
             // callable contracts: no parameter can receive the implicit positional argument.
@@ -1553,12 +1567,7 @@ impl<'db> Signature<'db> {
                     ))
                 });
                 let annotation = if let Some(typing_self_type) = typing_self_type {
-                    let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                        db,
-                        env,
-                        typing_self_type,
-                        binding_context,
-                    ));
+                    let mapping = self_mapping(typing_self_type);
                     parameter.annotated_type().apply_type_mapping(
                         db,
                         env,
@@ -1597,8 +1606,7 @@ impl<'db> Signature<'db> {
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, env, parameters.as_slice())
         {
-            let self_mapping =
-                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
+            let self_mapping = self_mapping(self_type);
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,

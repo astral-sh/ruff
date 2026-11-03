@@ -1664,6 +1664,28 @@ class Box(Generic[C]):
         raise NotImplementedError
 ```
 
+## `Self` as a protocol's type argument
+
+When a method takes its owner's type argument and returns `Self`, binding the method fixes its
+return type to the receiver. The argument keeps the type supplied when specializing the protocol.
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import Self
+
+C = TypeVar("C")
+
+class P(Protocol[C]):
+    def method(self, value: C) -> tuple[C, Self]:
+        def check(other: "P[Self]", value: Self) -> None:
+            # revealed: tuple[Self@method, P[Self@method]]
+            reveal_type(other.method(value))
+            callback: Callable[[Self], tuple[Self, P[Self]]] = other.method  # ok
+            other.method(object())  # error: [invalid-argument-type]
+
+        raise NotImplementedError
+```
+
 ## Inferred returns of specialized generic methods
 
 An inferred return can refer to both the owner's type argument and the called method's type
