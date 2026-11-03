@@ -1593,7 +1593,7 @@ class IPolys(Protocol[T]):
 ## Specializing generic methods
 
 A method can use its own type parameter as the class argument of another instance. That class
-argument stays fixed while a call to the other instance's method infers its own type argument.
+argument stays fixed whether the method is called directly or saved as a bound method.
 
 ```py
 from typing import Generic, TypeVar
@@ -1602,12 +1602,17 @@ C = TypeVar("C")
 T = TypeVar("T")
 
 class Box(Generic[C]):
+    def __init__(self) -> None:
+        self.callback = self.method
+
     def method(self, value: T) -> tuple[C, T]:
         def check(other: Box[T], arg: int) -> None:
             result = other.method(arg)
             # revealed: tuple[T@method, int]
             reveal_type(result)
             pair: tuple[T, int] = result  # no diagnostic
+            # revealed: tuple[T@method, int]
+            reveal_type(other.callback(arg))
 
         raise NotImplementedError
 ```
