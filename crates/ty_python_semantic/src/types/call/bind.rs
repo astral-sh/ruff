@@ -650,6 +650,52 @@ pub(crate) fn requires_overload_evaluation(candidates: &OverloadSet) -> bool {
     candidates.iter().any(|indices| indices.len() > 1)
 }
 
+struct OverloadFilterSlot<'db> {
+    parameter: Type<'db>,
+    argument: Type<'db>,
+    variadic_argument: Option<Type<'db>>,
+}
+
+/// Build a candidate upper bound without repeatedly normalizing long literal unions.
+/// The caller verifies the bound against each original parameter before using it.
+fn collect_parameter_bounds<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    parameter: Type<'db>,
+    bounds: &mut SmallVec<[Type<'db>; 8]>,
+    depth: u8,
+) -> bool {
+    let Some(next_depth) = depth.checked_sub(1) else {
+        return false;
+    };
+    let bound = match parameter {
+        Type::Union(union) => {
+            return union
+                .elements(db)
+                .iter()
+                .all(|&element| collect_parameter_bounds(db, env, element, bounds, next_depth));
+        }
+        Type::TypeAlias(_) => {
+            return collect_parameter_bounds(
+                db,
+                env,
+                parameter.resolve_type_alias(db),
+                bounds,
+                next_depth,
+            );
+        }
+        Type::LiteralValue(literal) => literal.fallback_instance(db, env),
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            KnownClass::Type.to_instance(db, env)
+        }
+        _ => parameter,
+    };
+    if !bounds.contains(&bound) {
+        bounds.push(bound);
+    }
+    true
+}
+
 /// Controls the behavior of a given call to [`Bindings::check_types`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CheckTypesMode {
@@ -4330,12 +4376,6 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        struct OverloadFilterSlot<'db> {
-            parameter: Type<'db>,
-            argument: Type<'db>,
-            variadic_argument: Option<Type<'db>>,
-        }
-
         let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
@@ -4405,6 +4445,23 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
+        // Every prefix is contained in the union of all its parameter types. When one
+        // slot distinguishes a wide overload set, try rejecting every prefix at once.
+        let all_prefixes_miss = matching_overload_slots.len() >= 12
+            && participating_slot_indices
+                .iter()
+                .exactly_one()
+                .ok()
+                .is_some_and(|&column| {
+                    self.all_parameter_prefixes_miss(
+                        db,
+                        env,
+                        constraints,
+                        &matching_overload_slots,
+                        column,
+                    )
+                });
+
         // Each overload adds its parameter types to the same prefix. Keep the builders so
         // earlier parameters don't need to be compared for redundancy again at every step.
         let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
@@ -4413,7 +4470,7 @@ impl<'db> CallableBinding<'db> {
 
         for (upto, (current_index, current_slots)) in matching_overload_slots.iter().enumerate() {
             let remaining = &matching_overload_indexes[upto + 1..];
-            if remaining.is_empty() {
+            if all_prefixes_miss || remaining.is_empty() {
                 break;
             }
 
@@ -4505,6 +4562,76 @@ impl<'db> CallableBinding<'db> {
                 self.merge_ambiguous_return_types(db, env),
             ));
         }
+    }
+
+    /// A single participating slot gives each prefix a fixed one-element tuple shape. If
+    /// the argument cannot match an upper bound of every parameter in the slot, even the
+    /// widest such prefix cannot cover it. Missing or variadic slots use the regular check.
+    fn all_parameter_prefixes_miss(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        rows: &[(usize, Vec<OverloadFilterSlot<'db>>)],
+        column: usize,
+    ) -> bool {
+        let mut parameters = SmallVec::<[Type<'db>; 8]>::new();
+        let mut sources = SmallVec::<[(Type<'db>, TypeVarSet<'db>); 2]>::new();
+        for (position, (overload_index, slots)) in rows.iter().enumerate() {
+            let Some(slot) = slots.get(column) else {
+                return false;
+            };
+            if slot.variadic_argument.is_some() {
+                return false;
+            }
+            // The last overload is never tested as a prefix.
+            if position + 1 == rows.len() {
+                break;
+            }
+            if position == 0 && UnionBuilder::new(db, env).add(slot.parameter).is_empty() {
+                // An empty union is omitted from its tuple, changing its length.
+                return false;
+            }
+            if !parameters.contains(&slot.parameter) {
+                parameters.push(slot.parameter);
+            }
+            let source = (
+                slot.argument,
+                self.overloads[*overload_index].inferable_typevars,
+            );
+            if !sources.contains(&source) {
+                sources.push(source);
+            }
+        }
+        let mut bounds = SmallVec::new();
+        for &parameter in &parameters {
+            let materialized = parameter.top_materialization(db, env);
+            if !collect_parameter_bounds(db, env, materialized, &mut bounds, 16) {
+                return false;
+            }
+        }
+        let upper = UnionType::from_elements(db, env, bounds);
+        // This must hold for every materialization of every parameter. Mere
+        // assignability to the bound only proves it for some materialization.
+        if !parameters
+            .into_iter()
+            .all(|parameter| parameter.is_subtype_of(db, env, upper))
+        {
+            return false;
+        }
+        let target = Type::heterogeneous_tuple(db, env, [upper]);
+        sources.into_iter().all(|(argument, inferable)| {
+            let top = argument.top_materialization(db, env);
+            // For a single ordinary element the argument union is idempotent.
+            // Unpacking aliases or recursive unions can change its shape.
+            if !matches!(top, Type::NominalInstance(_) | Type::Intersection(_)) {
+                return false;
+            }
+            let source = Type::heterogeneous_tuple(db, env, [top]);
+            source
+                .when_assignable_to(db, env, target, constraints, inferable)
+                .is_never_satisfied(db, env, inferable)
+        })
     }
 
     fn merge_ambiguous_return_types(
