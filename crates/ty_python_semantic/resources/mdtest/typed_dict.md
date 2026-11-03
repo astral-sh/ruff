@@ -7140,7 +7140,7 @@ static_assert(is_assignable_to(FooBar, Bar))
 def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
     if "c" in u:
         # TODO: This should stop erroring if we prove that the `dict` arm cannot contain `"c"`.
-        # error: [invalid-argument-type]
+        # error: [invalid-index-type]
         reveal_type(u["c"])  # revealed: object
 
 def literal_union(u: Foo | Literal["abc"]):
@@ -7151,7 +7151,7 @@ def literal_union(u: Foo | Literal["abc"]):
 def literal_union_key_access(obj: Foo | Literal["a"]):
     if "a" in obj:
         # Membership in a string does not imply that the string supports subscripting with that key.
-        # error: [invalid-argument-type]
+        # error: [invalid-index-type]
         reveal_type(obj["a"])  # revealed: object
 ```
 

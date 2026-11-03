@@ -201,7 +201,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
     registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
     registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
-
+    registry.register_lint(&INVALID_INDEX_TYPE);
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
@@ -1462,6 +1462,15 @@ declare_lint! {
         summary: "detects truthiness tests of `Iterable`-typed objects",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-index-type.md")]
+    pub(crate) static INVALID_INDEX_TYPE = {
+        summary: "detects subscript operations with an index of an incompatible type",
+        status: LintStatus::stable("0.0.97"),
+        default_level: Level::Error,
     }
 }
 

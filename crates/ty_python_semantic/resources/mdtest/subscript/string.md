@@ -95,7 +95,7 @@ def f(x: LiteralString):
 
 ```py
 def invalid_slice_bounds(s: str, start: float, end: float) -> str:
-    return s[start:end]  # error: [invalid-argument-type]
+    return s[start:end]  # error: [invalid-index-type]
 
-"foo"["bar":"baz"]  # error: [invalid-argument-type]
+"foo"["bar":"baz"]  # error: [invalid-index-type]
 ```

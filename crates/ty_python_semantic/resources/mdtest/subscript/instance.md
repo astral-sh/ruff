@@ -58,7 +58,7 @@ def _(
     bound: object,
     invalid_bound: float,
 ) -> None:
-    integer_slices[invalid_bound:]  # error: [invalid-argument-type]
+    integer_slices[invalid_bound:]  # error: [invalid-index-type]
     arbitrary_slices[bound:bound:bound]
 ```
 
@@ -153,8 +153,9 @@ class Identity:
         return index
 
 a = Identity()
-# error: [invalid-argument-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with key of type `Literal["a"]` on object of type `Identity`"
+# error: [invalid-index-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with key of type `Literal["a"]` on object of type `Identity`"
 a["a"]
+a.__getitem__("a")  # error: [invalid-argument-type]
 ```
 
 ## `__setitem__` with no `__getitem__`
@@ -206,6 +207,44 @@ class Identity:
         pass
 
 a = Identity()
-# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"
+# error: [invalid-index-type] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"
 a["a"] = 0
+```
+
+## Subscript methods with the wrong arity
+
+Each subscript method below accepts the index, but requires an extra argument that subscript syntax
+cannot supply.
+
+```py
+class ExtraArgument:
+    def __getitem__(self, index: int, extra: int) -> int:
+        return index
+
+    def __setitem__(self, index: int, value: int, extra: int) -> None: ...
+    def __delitem__(self, index: int, extra: int) -> None: ...
+
+a = ExtraArgument()
+a[0]  # error: [invalid-argument-type]
+a[0] = 1  # error: [invalid-assignment]
+del a[0]  # error: [invalid-argument-type]
+```
+
+## Configuring invalid index types
+
+Index errors can be enabled or suppressed independently of other argument and assignment errors.
+
+```toml
+[rules]
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+invalid-index-type = "error"
+```
+
+```py
+def update(items: dict[str, int]):
+    items[0]  # error: [invalid-index-type]
+    items[0] = 1  # error: [invalid-index-type]
+    del items[0]  # error: [invalid-index-type]
+    items[0]  # ty: ignore[invalid-index-type]
 ```

@@ -14,16 +14,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 
 ```
 1 | config: dict[str, int] = {}
-2 | config[0] = 3  # error: [invalid-assignment]
+2 | config[0] = 3  # error: [invalid-index-type]
 ```
 
 # Diagnostics
 
 ```
-error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `Literal[3]` on object of type `dict[str, int]`
+error[invalid-index-type]: Invalid subscript assignment with key of type `Literal[0]` and value of type `Literal[3]` on object of type `dict[str, int]`
  --> src/mdtest_snippet.py:2:1
   |
-2 | config[0] = 3  # error: [invalid-assignment]
+2 | config[0] = 3  # error: [invalid-index-type]
   | ^^^^^^^-^^^^^
   |        |
   |        Expected key of type `str`, got `Literal[0]`

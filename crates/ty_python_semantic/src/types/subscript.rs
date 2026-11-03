@@ -10,14 +10,15 @@ use ruff_python_ast as ast;
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::special_form::TypeQualifier;
 
-use super::call::{CallArguments, CallDunderError, CallErrorKind};
+use super::call::bind::BindingError;
+use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
-    report_not_subscriptable, report_slice_step_size_zero,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, INVALID_INDEX_TYPE,
+    NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds,
+    report_invalid_key_on_typed_dict, report_not_subscriptable, report_slice_step_size_zero,
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
@@ -79,8 +80,8 @@ impl DunderMethod {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Option<Result<Type<'db>, SubscriptError<'db>>> {
-        // The same receiver and key types recur across subscript expressions. Only the return
-        // type and the callable's type are needed after overload resolution.
+        // The same receiver and key types recur across subscript expressions. Cache the outcome
+        // without retaining all the overload bindings.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
         enum Outcome<'db> {
             Returned(Type<'db>),
@@ -88,7 +89,7 @@ impl DunderMethod {
             Invalid {
                 return_ty: Type<'db>,
                 callable_ty: Type<'db>,
-                kind: CallErrorKind,
+                kind: SubscriptCallErrorKind,
             },
         }
 
@@ -126,7 +127,16 @@ impl DunderMethod {
                 Err(CallDunderError::CallError(kind, bindings, _)) => Some(Outcome::Invalid {
                     return_ty: bindings.return_type(db, &env),
                     callable_ty: bindings.callable_type(),
-                    kind,
+                    kind: match kind {
+                        CallErrorKind::NotCallable => SubscriptCallErrorKind::NotCallable,
+                        CallErrorKind::PossiblyNotCallable => {
+                            SubscriptCallErrorKind::PossiblyNotCallable
+                        }
+                        CallErrorKind::BindingError => SubscriptCallErrorKind::BindingError {
+                            invalid_index_type: method == DunderMethod::GetItem
+                                && has_invalid_index_type(db, value_ty, &bindings),
+                        },
+                    },
                 }),
                 Err(CallDunderError::MethodNotAvailable) => None,
             }
@@ -158,6 +168,54 @@ impl DunderMethod {
             )),
         })
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum SubscriptCallErrorKind {
+    NotCallable,
+    PossiblyNotCallable,
+    BindingError { invalid_index_type: bool },
+}
+
+/// Returns whether a failed subscript call should report `invalid-index-type`.
+pub(super) fn has_invalid_index_type<'db>(
+    db: &'db dyn Db,
+    object_ty: Type<'db>,
+    bindings: &Bindings<'db>,
+) -> bool {
+    // A TypedDict can reject a string key because its field is read-only. Preserve the existing
+    // diagnostic when the receiver is or could be a TypedDict.
+    if matches!(
+        object_ty.resolve_type_alias(db),
+        Type::TypedDict(_) | Type::TypeVar(_) | Type::Union(_) | Type::Intersection(_)
+    ) {
+        return false;
+    }
+
+    let rejects_index = |error: &BindingError<'_>| {
+        matches!(
+            error,
+            BindingError::InvalidArgumentType {
+                argument_index: Some(0),
+                last_argument_index: None | Some(0),
+                ..
+            }
+        )
+    };
+    bindings.iter_flat().all(|callable| {
+        // Every overload must reject the index, and at least one must accept everything else.
+        // For example, given `xs: list[int]`, `xs[0] = [1]` has a valid integer index, but the
+        // value fits only the slice overload. This is an invalid assignment.
+        let mut has_index_only_failure = false;
+        for overload in callable {
+            let errors = overload.errors();
+            if !errors.iter().any(rejects_index) {
+                return false;
+            }
+            has_index_only_failure |= errors.iter().all(rejects_index);
+        }
+        has_index_only_failure
+    })
 }
 
 /// The origin of a legacy generic subscription (`Generic` or `Protocol`).
@@ -207,7 +265,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
         method: DunderMethod,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
-        kind: CallErrorKind,
+        kind: SubscriptCallErrorKind,
         callable_ty: Type<'db>,
     },
     /// A `TypedDict` was subscripted with an invalid key.
@@ -361,7 +419,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 kind,
                 callable_ty,
             } => match kind {
-                CallErrorKind::NotCallable => {
+                SubscriptCallErrorKind::NotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
@@ -371,7 +429,12 @@ impl<'db> SubscriptErrorKind<'db> {
                         ));
                     }
                 }
-                CallErrorKind::BindingError => {
+                SubscriptCallErrorKind::BindingError { invalid_index_type } => {
+                    let rule = if *invalid_index_type {
+                        &INVALID_INDEX_TYPE
+                    } else {
+                        &INVALID_ARGUMENT_TYPE
+                    };
                     if let Some(typed_dict) = value_ty.as_typed_dict() {
                         report_invalid_key_on_typed_dict(
                             context,
@@ -382,9 +445,7 @@ impl<'db> SubscriptErrorKind<'db> {
                             *slice_ty,
                             typed_dict.items(db),
                         );
-                    } else if let Some(builder) =
-                        context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
-                    {
+                    } else if let Some(builder) = context.report_lint(rule, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
@@ -394,7 +455,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         ));
                     }
                 }
-                CallErrorKind::PossiblyNotCallable => {
+                SubscriptCallErrorKind::PossiblyNotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \

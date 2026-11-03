@@ -36,14 +36,14 @@ numbers[0]: str = "three"
 
 ```py
 numbers: list[int] = []
-numbers["zero"] = 3  # error: [invalid-assignment]
+numbers["zero"] = 3  # error: [invalid-index-type]
 ```
 
 ### For a `dict`
 
 ```py
 config: dict[str, int] = {}
-config[0] = 3  # error: [invalid-assignment]
+config[0] = 3  # error: [invalid-index-type]
 ```
 
 ## Invalid value type for `TypedDict`
