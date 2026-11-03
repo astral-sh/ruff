@@ -435,7 +435,7 @@ class Counter:
     count: int
 
 def update(counter: Counter | None) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     counter.count += 1
 ```
 

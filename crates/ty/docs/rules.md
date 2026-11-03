@@ -4446,6 +4446,52 @@ alice: Person = {"name": "Alice"}  # error
 alice["age"]  # KeyError
 ```
 
+## `missing-union-attribute`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-union-attribute%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1468" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for reads or deletions of attributes that are present on some members of a union and missing
+from others. If every member lacks the attribute, ty reports [`unresolved-attribute`](#unresolved-attribute).
+
+**Why is this bad?**
+
+
+Reading the attribute raises an `AttributeError` when the value is a member that lacks it.
+
+**Examples**
+
+
+```python
+def normalize(value: str | bytes) -> str:
+    return value.decode()  # error: [missing-union-attribute]
+```
+
+Narrow the type before accessing the attribute:
+
+```python
+def normalize(value: str | bytes) -> str:
+    if isinstance(value, bytes):
+        return value.decode()
+    return value
+```
+
+**Rule selection**
+
+
+Before ty 0.0.97, these accesses used the same rule as accesses to attributes missing from every
+member. If you configured a severity such as `unresolved-attribute = "warn"`, also set
+`missing-union-attribute = "warn"` to keep it for both cases. To suppress an access where only some
+members lack the attribute, use `# ty: ignore[missing-union-attribute]`.
+
 ## `no-matching-overload`
 
 <small>

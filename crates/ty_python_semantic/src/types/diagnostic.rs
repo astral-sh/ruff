@@ -166,7 +166,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
-    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    register_missing_attribute_lints(registry);
     registry.register_lint(&MISSING_SLOT);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
@@ -1463,6 +1463,20 @@ declare_lint! {
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
     }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-union-attribute.md")]
+    pub(crate) static MISSING_UNION_ATTRIBUTE = {
+        summary: "detects attribute accesses where some union members lack the attribute",
+        status: LintStatus::stable("0.0.97"),
+        default_level: Level::Error,
+    }
+}
+
+fn register_missing_attribute_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&MISSING_UNION_ATTRIBUTE);
 }
 
 /// A collection of type check diagnostics.

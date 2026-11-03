@@ -71,9 +71,9 @@ use crate::types::diagnostic::{
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD,
-    UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    MISSING_UNION_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
     hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
@@ -11396,13 +11396,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //     if flag:
                     //         x = 42
                     // ```
-                    // That is indeed a "possibly missing attribute", and it's a warning by default, because
-                    // there's a high false positive rate.
+                    // Report `possibly-missing-attribute` for such conditional definitions.
                     //
-                    // On the other hand, we could be looking at a union where some elements have
-                    // the attribute but others definitely don't. That's a very different case, and
-                    // we want it to be an error. Use `as_union_like` here to handle type aliases
-                    // of unions and `NewType`s of float/complex in addition to explicit unions.
+                    // If a union member definitely lacks the attribute, report
+                    // `missing-union-attribute`. Use `as_union_like` to handle type aliases of
+                    // unions and `NewType`s of float/complex in addition to explicit unions.
                     //
                     // Attribute lookup on a bounded type variable delegates to its upper bound, so
                     // use that bound here too when determining whether the lookup was on a union.
@@ -11427,8 +11425,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         if !elements_missing_the_attribute.is_empty() {
-                            if let Some(builder) =
-                                self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                            if let Some(builder) = self
+                                .context
+                                .report_lint(&MISSING_UNION_ATTRIBUTE, attribute)
                             {
                                 let types = std::iter::once(union_like_type)
                                     .chain(elements_missing_the_attribute.iter().copied());

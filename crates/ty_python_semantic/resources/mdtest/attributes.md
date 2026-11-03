@@ -2842,13 +2842,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [unresolved-attribute] "Attribute `x` is not defined on `<class 'C2'>` in union `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
+    # error: [missing-union-attribute] "Attribute `x` is not defined on `<class 'C2'>` in union `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: int | str
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [unresolved-attribute] "Attribute `x` is not defined on `C2` in union `C1 | C2 | C3`"
+    # error: [missing-union-attribute] "Attribute `x` is not defined on `C2` in union `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: int | str
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -2857,8 +2857,8 @@ def _(flag1: bool, flag2: bool):
 
 ### Possibly-unbound within a class
 
-We raise the same diagnostic if the attribute is possibly-unbound in at least one element of the
-union:
+If each union member defines the attribute, but one defines it conditionally, we report
+`possibly-missing-attribute`:
 
 ```py
 def _(flag: bool, flag1: bool, flag2: bool):
@@ -2889,6 +2889,11 @@ def _(flag: bool, flag1: bool, flag2: bool):
     # error: [possibly-missing-attribute]
     # error: [invalid-assignment]
     C().x = 100
+
+    # C2 defines x conditionally, but None always lacks it.
+    maybe_c2 = C2() if flag1 else None
+    # error: [missing-union-attribute] "Attribute `x` is not defined on `None` in union `C2 | None`"
+    reveal_type(maybe_c2.x)  # revealed: str
 ```
 
 ### Possibly-unbound within gradual types
@@ -3033,7 +3038,7 @@ If the symbol is unbound in some elements of the union, that's also an error:
 ```py
 def f(x: list[int], y: list[int] | None, z: None):
     x.index
-    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `list[int] | None`"
+    # error: [missing-union-attribute] "Attribute `index` is not defined on `None` in union `list[int] | None`"
     y.index
     # error: [unresolved-attribute] "Object of type `None` has no attribute `index`"
     z.index
@@ -3054,14 +3059,57 @@ type MaybeList = list[int] | None
 FloatNT = NewType("FloatNT", float)
 
 def g(x: MaybeList, y: FloatNT):
-    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `MaybeList`"
+    # error: [missing-union-attribute] "Attribute `index` is not defined on `None` in union `MaybeList`"
     x.index
-    # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
+    # error: [missing-union-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
     y.hex
 
 def h[T: list[int] | None](x: T):
-    # error: [unresolved-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
+    # error: [missing-union-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
     x.append
+```
+
+## Selecting missing attribute diagnostics
+
+Each rule can be suppressed independently, even when both accesses occur on the same line:
+
+```py
+def f(x: str | int):
+    # error: [unresolved-attribute]
+    x.strip(), x.typo  # ty: ignore[missing-union-attribute]
+    # error: [missing-union-attribute]
+    x.strip(), x.typo  # ty: ignore[unresolved-attribute]
+```
+
+## Disabling definite missing attribute errors
+
+Disabling `unresolved-attribute` still allows ty to report attributes missing from some union
+members:
+
+```toml
+[rules]
+unresolved-attribute = "ignore"
+```
+
+```py
+def f(x: str | int):
+    x.typo  # ok
+    x.strip()  # error: [missing-union-attribute]
+```
+
+## Disabling missing union attribute errors
+
+Disabling `missing-union-attribute` still catches a typo shared by all union members:
+
+```toml
+[rules]
+missing-union-attribute = "ignore"
+```
+
+```py
+def f(x: str | int):
+    x.strip()  # ok
+    x.typo  # error: [unresolved-attribute]
 ```
 
 ## Inherited class attributes

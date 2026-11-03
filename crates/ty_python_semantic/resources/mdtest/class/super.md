@@ -512,7 +512,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
+    # error: [missing-union-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
 def f(x: Literal["", "hello"]):
@@ -550,7 +550,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
+    # error: [missing-union-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
     reveal_type(s.a)  # revealed: str
 ```
 

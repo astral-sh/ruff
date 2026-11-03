@@ -198,6 +198,6 @@ We should only report the specific error for the incompatible variant (`invalid-
 ```py
 def _(x: bytes | str | int):
     # error: [invalid-argument-type]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     x.split(" ")
 ```

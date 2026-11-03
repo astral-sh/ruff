@@ -519,7 +519,7 @@ import first
 import second
 
 def missing_attribute(value: first.Model | second.Model) -> int:
-    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
+    # error: [missing-union-attribute] "Attribute `present` is not defined on `second.Model` in union `first.Model | second.Model`"
     return value.present
 ```
 
@@ -558,7 +558,7 @@ type Model = first.Present | second.Model
 from alias import Model
 
 def missing_attribute(value: Model) -> int:
-    # error: [unresolved-attribute] "Attribute `present` is not defined on `second.Model` in union `alias.Model`"
+    # error: [missing-union-attribute] "Attribute `present` is not defined on `second.Model` in union `alias.Model`"
     return value.present
 ```
 
@@ -580,7 +580,7 @@ if coinflip():
 else:
     class Model: ...
 
-# error: [unresolved-attribute] "Attribute `present` is not defined on `test.Model @ src/test.py:9:11` in union `test.Model @ src/test.py:5:11 | test.Model @ src/test.py:9:11`"
+# error: [missing-union-attribute] "Attribute `present` is not defined on `test.Model @ src/test.py:9:11` in union `test.Model @ src/test.py:5:11 | test.Model @ src/test.py:9:11`"
 Model().present
 ```
 

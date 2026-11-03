@@ -4129,8 +4129,8 @@ def _(unknown, any_: Any) -> None:
     reveal_type(unknown_result)  # revealed: Literal[1] | str
     # TODO: revealed: Literal[1] | (Any & str)
     reveal_type(any_result)  # revealed: Literal[1] | str
-    unknown_result.bit_length()  # error: [unresolved-attribute]
-    any_result.bit_length()  # error: [unresolved-attribute]
+    unknown_result.bit_length()  # error: [missing-union-attribute]
+    any_result.bit_length()  # error: [missing-union-attribute]
 ```
 
 Gradual specializations inherited through concrete subclasses can satisfy bounds and constraints
