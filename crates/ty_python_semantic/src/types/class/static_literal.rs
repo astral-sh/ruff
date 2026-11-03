@@ -3078,17 +3078,23 @@ impl<'db> StaticClassLiteral<'db> {
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
-                        let method_qualifiers = || {
-                            if declarations.any_reachable(db, |declaration| {
+                        if declared_ty.is_function_like(db)
+                            && !declarations.any_reachable(db, |declaration| {
                                 declaration.is_defined_and(|definition| {
                                     !definition.kind(db).is_function_def()
                                 })
-                            }) {
-                                qualifiers
-                            } else {
-                                qualifiers | TypeQualifiers::METHOD_INSTANCE_ATTRIBUTE
-                            }
-                        };
+                            })
+                        {
+                            // Use descriptor lookup to get the bound method type. If the class
+                            // method is only conditionally defined, retain the instance fallback
+                            // for paths on which the class has no method.
+                            return match declaredness {
+                                Definedness::AlwaysDefined => Member::unbound(),
+                                Definedness::PossiblyUndefined => {
+                                    sources.implicit_attribute(db, name, MethodDecorator::None)
+                                }
+                            };
+                        }
 
                         let implicit = match declaredness {
                             Definedness::AlwaysDefined
@@ -3097,7 +3103,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 // A method assigns to this attribute, but its declared type
                                 // already determines what an instance can read.
                                 return Member {
-                                    inner: declared.with_qualifiers(method_qualifiers()),
+                                    inner: declared.with_qualifiers(qualifiers),
                                 };
                             }
                             Definedness::AlwaysDefined => Member::unbound(),
@@ -3124,7 +3130,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     public_type_policy: PublicTypePolicy::Raw,
                                     provenance: implicit_provenance.or(declared_provenance),
                                 })
-                                .with_qualifiers(method_qualifiers()),
+                                .with_qualifiers(qualifiers),
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty

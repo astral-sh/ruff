@@ -36,6 +36,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(super) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_function_like(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).is_function_like(db),
+            _ => self.function_like_kind(db).is_some(),
+        }
+    }
+
     pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
         self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
     }
@@ -101,11 +109,26 @@ impl<'db> Type<'db> {
         ))
     }
 
-    /// The callable contract for a value that shadows a method on an instance.
+    /// The callable contract for assigning a value that shadows a method on an instance.
     ///
-    /// Instance lookup returns the shadowing value directly. Its contract uses the method's bound
-    /// signatures as regular callables, discarding function identity and bound-method attributes.
-    /// Static methods keep all parameters. Class methods bind the receiver's class.
+    /// ```python
+    /// class C:
+    ///     def method(self, x: int) -> str:
+    ///         return str(x)
+    ///
+    ///     def some_compatible_method(self, x: int) -> str:
+    ///         return str(x)
+    ///
+    ///     def swap(self) -> None:
+    ///         self.method = self.some_compatible_method
+    ///
+    /// c = C()
+    /// c.swap()
+    /// c.method(42)  # Returns "42".
+    /// ```
+    ///
+    /// Python retrieves the stored method with `self` already bound. The contract accepts any
+    /// callable compatible with the bound signature `(x: int) -> str`.
     pub(super) fn instance_method_contract(
         self,
         db: &'db dyn Db,
@@ -119,8 +142,10 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .instance_method_contract(db, env, receiver),
-            // Class objects, including instances of custom metaclasses, retain the
-            // class-attribute assignment rules.
+            // Assigning a function with `C.method = f` puts it in the class namespace,
+            // where it can bind to an instance on a later `C().method` lookup.
+            // Keep the class-attribute rules for such receivers. The subtype check
+            // also catches classes whose metaclass is a subclass of `type`.
             _ if self.function_like_kind(db).is_some()
                 && !receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) =>
             {

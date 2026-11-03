@@ -302,7 +302,16 @@ fn bind_attribute<'db>(
                     .unwrap_or(read),
             )
         } else {
-            descriptor_write_domain(db, env, ty, receiver, read)
+            // A value that shadows a method only needs to satisfy its bound signature.
+            // Use the same write contract as instance assignment checking.
+            descriptor_write_domain(
+                db,
+                env,
+                ty,
+                receiver,
+                ty.instance_method_contract(db, env, receiver)
+                    .unwrap_or(read),
+            )
         };
         (read, write)
     } else {
