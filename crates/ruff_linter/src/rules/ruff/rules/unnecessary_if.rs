@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtIfFields;
 use ruff_python_ast::helpers::{
     any_over_expr, comment_indentation_after, contains_effect, is_stub_body,
 };
@@ -75,10 +76,10 @@ impl AlwaysFixableViolation for UnnecessaryIf {
 }
 
 /// RUF050
-pub(crate) fn unnecessary_if(checker: &Checker, stmt: StmtIf<'_>) {
-    let test = stmt.test();
-    let body = stmt.body();
-    let elif_else_clauses = stmt.elif_else_clauses();
+pub(crate) fn unnecessary_if(checker: &Checker, stmt: &StmtIfFields<'_>) {
+    let test = stmt.test;
+    let body = stmt.body;
+    let elif_else_clauses = stmt.elif_else_clauses;
 
     // Only handle bare `if` blocks — `elif`/`else` branches are handled by
     // RUF047 (needless-else)
@@ -91,24 +92,24 @@ pub(crate) fn unnecessary_if(checker: &Checker, stmt: StmtIf<'_>) {
     }
 
     // Skip `if TYPE_CHECKING` blocks — handled by TC005
-    if typing::is_type_checking_block(stmt, checker.semantic()) {
+    if typing::is_type_checking_block(stmt.node, checker.semantic()) {
         return;
     }
 
     // Skip if the body contains a comment
-    if if_contains_comments(stmt, checker) {
+    if if_contains_comments(stmt.node, checker) {
         return;
     }
 
     let has_side_effects = contains_effect(test, |id| checker.semantic().has_builtin_binding(id))
         || any_over_expr(test, |expr| matches!(expr.classify(), ExprKind::Named(_)));
 
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryIf, stmt.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryIf, stmt.range);
 
     if has_side_effects {
         // Replace `if cond: pass` with `cond` as an expression statement.
-        let replacement = condition_as_expression_statement(test, stmt, checker);
-        let edit = Edit::range_replacement(replacement, stmt.range());
+        let replacement = condition_as_expression_statement(test, stmt.node, checker);
+        let edit = Edit::range_replacement(replacement, stmt.range);
         diagnostic.set_fix(Fix::safe_edit(edit));
     } else {
         let stmt_ref = checker.semantic().current_statement();

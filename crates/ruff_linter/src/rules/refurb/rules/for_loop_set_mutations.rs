@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprKind, StmtFor, StmtKind};
+use ruff_python_ast::StmtForFields;
+use ruff_python_ast::{ExprKind, StmtKind};
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -64,12 +64,13 @@ impl AlwaysFixableViolation for ForLoopSetMutations {
 }
 
 /// FURB142
-pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: StmtFor<'_>) {
-    if !for_stmt.orelse().is_empty() {
+pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt_fields: &StmtForFields<'_>) {
+    let for_stmt = for_stmt_fields.node;
+    if !for_stmt_fields.orelse.is_empty() {
         return;
     }
-    let Some([StmtKind::Expr(stmt_expr)]) = for_stmt
-        .body()
+    let Some([StmtKind::Expr(stmt_expr)]) = for_stmt_fields
+        .body
         .as_array()
         .map(|items| items.map(ruff_python_ast::Stmt::classify))
     else {
@@ -109,7 +110,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: StmtFor<'_>) {
     };
 
     let locator = checker.locator();
-    let content = match (for_stmt.target().classify(), arg.classify()) {
+    let content = match (for_stmt_fields.target.classify(), arg.classify()) {
         (ExprKind::Name(for_target), ExprKind::Name(arg)) if for_target.id() == arg.id() => {
             format!(
                 "{}.{batch_method_name}({})",
@@ -135,13 +136,13 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: StmtFor<'_>) {
         }
     };
 
-    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(for_stmt_fields.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
     let fix = Fix::applicable_edit(
-        Edit::range_replacement(content, for_stmt.range()),
+        Edit::range_replacement(content, for_stmt_fields.range),
         applicability,
     );
 
@@ -151,7 +152,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: StmtFor<'_>) {
                 method_name,
                 batch_method_name,
             },
-            for_stmt.range(),
+            for_stmt_fields.range,
         )
         .set_fix(fix);
 }

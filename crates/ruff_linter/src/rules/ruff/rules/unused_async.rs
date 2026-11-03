@@ -172,10 +172,14 @@ fn is_async_context_manager(
 }
 
 /// RUF029
-pub(crate) fn unused_async(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
-    let is_async = function_def.is_async();
-    let name = function_def.name();
-    let body = function_def.body();
+pub(crate) fn unused_async(
+    checker: &Checker,
+    function_def_fields: &ast::StmtFunctionDefFields<'_>,
+) {
+    let function_def = function_def_fields.node;
+    let is_async = function_def_fields.is_async;
+    let name = function_def_fields.name;
+    let body = function_def_fields.body;
     if !is_async {
         return;
     }

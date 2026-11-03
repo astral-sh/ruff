@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::{Decorator, Expr, ExprCall, ExprKind, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -82,14 +83,14 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
 /// FAST001
 pub(crate) fn fastapi_redundant_response_model(
     checker: &Checker,
-    function_def: StmtFunctionDef<'_>,
+    function_def: &StmtFunctionDefFields<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
-    for decorator in function_def.decorator_list() {
+    for decorator in function_def.decorator_list {
         let Some((call, response_model_arg)) =
-            check_decorator(function_def, decorator, checker.semantic())
+            check_decorator(function_def.node, decorator, checker.semantic())
         else {
             continue;
         };

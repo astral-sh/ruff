@@ -1,9 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -47,8 +47,8 @@ impl Violation for ExceptionWithoutExcInfo {
 }
 
 /// LOG007
-pub(crate) fn exception_without_exc_info(checker: &Checker, call: ExprCall<'_>) {
-    match call.func().classify() {
+pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCallFields<'_>) {
+    match call.func.classify() {
         ExprKind::Attribute(expr_attribute) => {
             let attr = expr_attribute.attr();
 
@@ -60,7 +60,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: ExprCall<'_>) 
             }
 
             if !logging::is_logger_candidate(
-                call.func(),
+                call.func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
@@ -70,7 +70,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: ExprCall<'_>) 
         ExprKind::Name(_) => {
             if !checker
                 .semantic()
-                .resolve_qualified_name(call.func())
+                .resolve_qualified_name(call.func)
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["logging", "exception"])
                 })
@@ -81,8 +81,8 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: ExprCall<'_>) 
         _ => return,
     }
 
-    if exc_info_arg_is_falsey(call, checker) {
-        checker.report_diagnostic(ExceptionWithoutExcInfo, call.range());
+    if exc_info_arg_is_falsey(call.node, checker) {
+        checker.report_diagnostic(ExceptionWithoutExcInfo, call.range);
     }
 }
 

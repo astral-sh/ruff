@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExprCall, ExprKind};
+use ruff_python_ast::{self as ast, ExprKind};
 
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -69,8 +69,11 @@ impl Violation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: ExprCall<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("tuple", call) else {
+pub(crate) fn unnecessary_literal_within_tuple_call(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
+    let Some(argument) = exactly_one_argument_with_matching_function("tuple", call.node) else {
         return;
     };
     let argument_kind = match argument.classify() {
@@ -86,7 +89,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: Exp
         UnnecessaryLiteralWithinTupleCall {
             literal_kind: argument_kind,
         },
-        call.range(),
+        call.range,
     );
 
     match argument.fields() {
@@ -107,7 +110,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: Exp
                 // Replace `[` with `(`.
                 let elt_start = Edit::replacement(
                     "(".into(),
-                    call.start(),
+                    call.range.start(),
                     argument.start() + TextSize::from(1),
                 );
                 // Replace `]` with `)` or `,)`.
@@ -118,7 +121,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: Exp
                         ")".into()
                     },
                     argument.end() - TextSize::from(1),
-                    call.end(),
+                    call.range.end(),
                 );
                 Fix::unsafe_edits(elt_start, [elt_end])
             });

@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtIfFields;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{Expr, ExprKind, Stmt, StmtIf, StmtKind, Suite};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind, Suite};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -159,12 +160,12 @@ fn is_builtin_exception(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
 /// TRY004
 pub(crate) fn type_check_without_type_error(
     checker: &Checker,
-    stmt_if: StmtIf<'_>,
+    stmt_if: &StmtIfFields<'_>,
     parent: Option<Stmt<'_>>,
 ) {
-    let body = stmt_if.body();
-    let test = stmt_if.test();
-    let elif_else_clauses = stmt_if.elif_else_clauses();
+    let body = stmt_if.body;
+    let test = stmt_if.test;
+    let elif_else_clauses = stmt_if.elif_else_clauses;
 
     if let Some(parent) = parent.and_then(ruff_python_ast::Stmt::as_if_stmt)
         && !check_type_check_test(checker.semantic(), parent.test())

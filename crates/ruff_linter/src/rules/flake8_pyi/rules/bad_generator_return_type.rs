@@ -90,12 +90,15 @@ impl Violation for GeneratorReturnFromIterMethod {
 }
 
 /// PYI058
-pub(crate) fn bad_generator_return_type(function_def: ast::StmtFunctionDef<'_>, checker: &Checker) {
-    if function_def.is_async() {
+pub(crate) fn bad_generator_return_type(
+    function_def: &ast::StmtFunctionDefFields<'_>,
+    checker: &Checker,
+) {
+    if function_def.is_async {
         return;
     }
 
-    let name = function_def.name().as_str();
+    let name = function_def.name.as_str();
 
     let semantic = checker.semantic();
 
@@ -103,7 +106,7 @@ pub(crate) fn bad_generator_return_type(function_def: ast::StmtFunctionDef<'_>, 
         return;
     }
 
-    let parameters = function_def.parameters();
+    let parameters = function_def.parameters;
 
     if !parameters.kwonlyargs().is_empty()
         || parameters.kwarg().is_some()
@@ -116,7 +119,7 @@ pub(crate) fn bad_generator_return_type(function_def: ast::StmtFunctionDef<'_>, 
         return;
     }
 
-    let Some(returns) = function_def.returns() else {
+    let Some(returns) = function_def.returns else {
         return;
     };
 
@@ -197,7 +200,7 @@ pub(crate) fn bad_generator_return_type(function_def: ast::StmtFunctionDef<'_>, 
     // it's more likely we'll be emitting a false positive here
     if !checker.source_type.is_stub() {
         let mut yield_encountered = false;
-        for stmt in function_def.body() {
+        for stmt in function_def.body {
             match stmt.classify() {
                 StmtKind::Pass(_) => continue,
                 StmtKind::Return(stmt_return) => {
@@ -232,12 +235,12 @@ pub(crate) fn bad_generator_return_type(function_def: ast::StmtFunctionDef<'_>, 
             return_type: member.to_iter(),
             method,
         },
-        function_def.identifier(),
+        function_def.node.identifier(),
     );
 
     diagnostic.try_set_fix(|| {
         generate_fix(
-            function_def,
+            function_def.node,
             returns,
             yield_type_info,
             module,

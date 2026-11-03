@@ -102,8 +102,8 @@ impl Violation for ReplaceStrEnum {
 }
 
 /// UP042
-pub(crate) fn replace_str_enum(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
-    let Some(arguments) = class_def.arguments() else {
+pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDefFields<'_>) {
+    let Some(arguments) = class_def.arguments else {
         // class does not inherit anything, exit early
         return;
     };
@@ -133,9 +133,9 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: ast::StmtClassDef<'
 
     let mut diagnostic = checker.report_diagnostic(
         ReplaceStrEnum {
-            name: class_def.name().to_string(),
+            name: class_def.name.to_string(),
         },
-        class_def.identifier(),
+        class_def.node.identifier(),
     );
 
     // If the base classes are _exactly_ `str` and `enum.Enum`, apply a fix.
@@ -146,7 +146,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: ast::StmtClassDef<'
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("enum", "StrEnum"),
-                class_def.start(),
+                class_def.range.start(),
                 checker.semantic(),
             )?;
             Ok(Fix::unsafe_edits(

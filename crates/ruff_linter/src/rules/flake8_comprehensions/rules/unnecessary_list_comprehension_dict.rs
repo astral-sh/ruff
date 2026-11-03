@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprCall, ExprKind};
-use ruff_text_size::Ranged;
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprKind;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -44,8 +44,8 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
 }
 
 /// C404 (`dict([...])`)
-pub(crate) fn unnecessary_list_comprehension_dict(checker: &Checker, call: ExprCall<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
+pub(crate) fn unnecessary_list_comprehension_dict(checker: &Checker, call: &ExprCallFields<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call.node) else {
         return;
     };
     let ExprKind::ListComp(list_comp) = argument.classify() else {
@@ -61,8 +61,9 @@ pub(crate) fn unnecessary_list_comprehension_dict(checker: &Checker, call: ExprC
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryListComprehensionDict, call.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryListComprehensionDict, call.range);
     diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_list_comprehension_dict(call.into(), checker).map(Fix::unsafe_edit)
+        fixes::fix_unnecessary_list_comprehension_dict(call.node.into(), checker)
+            .map(Fix::unsafe_edit)
     });
 }

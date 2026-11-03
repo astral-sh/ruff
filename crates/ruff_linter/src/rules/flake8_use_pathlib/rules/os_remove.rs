@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -64,14 +64,14 @@ impl Violation for OsRemove {
 }
 
 /// PTH107
-pub(crate) fn os_remove(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
+pub(crate) fn os_remove(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
     // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.remove)
     // ```text
     //            0         1
     // os.remove(path, *, dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments, "dir_fd") {
         return;
     }
 
@@ -81,7 +81,7 @@ pub(crate) fn os_remove(checker: &Checker, call: ExprCall<'_>, segments: &[&str]
 
     check_os_pathlib_single_arg_calls(
         checker,
-        call,
+        call.node,
         "unlink()",
         "path",
         is_fix_os_remove_enabled(checker.settings()),

@@ -77,26 +77,25 @@ impl Violation for PrintEmptyString {
 }
 
 /// FURB105
-pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
-    if !checker.semantic().match_builtin_expr(call.func(), "print") {
+pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func, "print") {
         return;
     }
 
-    match call.arguments().args().as_array() {
+    match call.arguments.args().as_array() {
         // Ex) `print("")` or `print("", sep="\t")`
         Some([arg]) if is_empty_string(arg) => {
-            let reason = if call.arguments().find_keyword("sep").is_some() {
+            let reason = if call.arguments.find_keyword("sep").is_some() {
                 Reason::Both
             } else {
                 Reason::EmptyArgument
             };
 
-            let mut diagnostic =
-                checker.report_diagnostic(PrintEmptyString { reason }, call.range());
+            let mut diagnostic = checker.report_diagnostic(PrintEmptyString { reason }, call.range);
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
-                    call,
+                    call.node,
                     Separator::Remove,
                     checker.generator(),
                     checker.comment_ranges(),
@@ -110,19 +109,19 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
         }
 
         // Ex) `print(sep="\t")` or `print(obj, sep="\t")`
-        _ if call.arguments().args().len() <= 1 => {
+        _ if call.arguments.args().len() <= 1 => {
             // If there's a `sep` argument, remove it, regardless of what it is.
-            if call.arguments().find_keyword("sep").is_some() {
+            if call.arguments.find_keyword("sep").is_some() {
                 let mut diagnostic = checker.report_diagnostic(
                     PrintEmptyString {
                         reason: Reason::UselessSeparator,
                     },
-                    call.range(),
+                    call.range,
                 );
 
                 diagnostic.set_fix(
                     EmptyStringFix::from_call(
-                        call,
+                        call.node,
                         Separator::Remove,
                         checker.generator(),
                         checker.comment_ranges(),
@@ -136,7 +135,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
         _ => {
             // Ignore `**kwargs`.
             let has_kwargs = call
-                .arguments()
+                .arguments
                 .keywords()
                 .iter()
                 .any(|keyword| keyword.arg().is_none());
@@ -146,7 +145,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
 
             // Require an empty `sep` argument.
             let empty_separator = call
-                .arguments()
+                .arguments
                 .find_keyword("sep")
                 .is_some_and(|keyword| is_empty_string(keyword.value()));
             if !empty_separator {
@@ -155,7 +154,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
 
             // Count the number of empty and non-empty arguments.
             let empty_arguments = call
-                .arguments()
+                .arguments
                 .args()
                 .iter()
                 .filter(|arg| is_empty_string(*arg))
@@ -166,12 +165,8 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
 
             // If removing the arguments would leave us with one or fewer, then we can remove the
             // separator too.
-            let separator = if call.arguments().args().len() - empty_arguments > 1
-                || call
-                    .arguments()
-                    .args()
-                    .iter()
-                    .any(ast::Expr::is_starred_expr)
+            let separator = if call.arguments.args().len() - empty_arguments > 1
+                || call.arguments.args().iter().any(ast::Expr::is_starred_expr)
             {
                 Separator::Retain
             } else {
@@ -186,12 +181,12 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
                         Reason::Both
                     },
                 },
-                call.range(),
+                call.range,
             );
 
             diagnostic.set_fix(
                 EmptyStringFix::from_call(
-                    call,
+                    call.node,
                     separator,
                     checker.generator(),
                     checker.comment_ranges(),

@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -104,7 +103,7 @@ impl Violation for TooManyPublicMethods {
 /// PLR0904
 pub(crate) fn too_many_public_methods(
     checker: &Checker,
-    class_def: ast::StmtClassDef<'_>,
+    class_def: &ast::StmtClassDefFields<'_>,
     max_methods: usize,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
@@ -112,7 +111,7 @@ pub(crate) fn too_many_public_methods(
         return;
     }
     let methods = class_def
-        .body()
+        .body
         .iter()
         .filter(|stmt| {
             stmt.as_function_def_stmt().is_some_and(|node| {
@@ -128,7 +127,7 @@ pub(crate) fn too_many_public_methods(
                 methods,
                 max_methods,
             },
-            class_def.range(),
+            class_def.range,
         );
     }
 }

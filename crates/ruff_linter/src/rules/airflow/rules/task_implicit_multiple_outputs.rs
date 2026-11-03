@@ -76,13 +76,16 @@ impl Violation for AirflowTaskImplicitMultipleOutputs {
 }
 
 /// AIR202
-pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+pub(crate) fn task_implicit_multiple_outputs(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Some(decorator) = matching_task_decorator(function_def, semantic) else {
+    let Some(decorator) = matching_task_decorator(function_def.node, semantic) else {
         return;
     };
 
@@ -92,10 +95,10 @@ pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: St
     }
 
     let annotation_is_mapping = function_def
-        .returns()
+        .returns
         .is_some_and(|annotation| annotation_resolves_to_mapping(annotation, semantic));
 
-    if !annotation_is_mapping && !body_has_dict_return(function_def, semantic) {
+    if !annotation_is_mapping && !body_has_dict_return(function_def.node, semantic) {
         return;
     }
 

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprKind};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
@@ -58,7 +59,8 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 }
 
 /// RUF046
-pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call_fields: &ExprCallFields<'_>) {
+    let call = call_fields.node;
     let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
@@ -114,10 +116,10 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: ExprCall<'_>) {
         }
     };
 
-    let edit = Edit::range_replacement(content, call.range());
+    let edit = Edit::range_replacement(content, call_fields.range);
     let fix = Fix::applicable_edit(edit, applicability);
     checker
-        .report_diagnostic(UnnecessaryCastToInt, call.range())
+        .report_diagnostic(UnnecessaryCastToInt, call_fields.range)
         .set_fix(fix);
 }
 

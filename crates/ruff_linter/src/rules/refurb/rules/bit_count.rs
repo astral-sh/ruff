@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprCall, ExprKind, PythonVersion};
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::{ExprKind, PythonVersion};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -64,13 +64,13 @@ impl AlwaysFixableViolation for BitCount {
 }
 
 /// FURB161
-pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn bit_count(checker: &Checker, call: &ExprCallFields<'_>) {
     // `int.bit_count()` was added in Python 3.10
     if checker.target_version() < PythonVersion::PY310 {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -81,10 +81,10 @@ pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
         return;
     }
 
-    if !call.arguments().keywords().is_empty() {
+    if !call.arguments.keywords().is_empty() {
         return;
     }
-    let Some([arg]) = call.arguments().args().as_array() else {
+    let Some([arg]) = call.arguments.args().as_array() else {
         return;
     };
 
@@ -189,10 +189,10 @@ pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
             existing: SourceCodeSnippet::from_str(literal_text),
             replacement: SourceCodeSnippet::new(replacement.clone()),
         },
-        call.range(),
+        call.range,
     );
     diagnostic.set_fix(Fix::applicable_edit(
-        Edit::range_replacement(replacement, call.range()),
+        Edit::range_replacement(replacement, call.range),
         applicability,
     ));
 }

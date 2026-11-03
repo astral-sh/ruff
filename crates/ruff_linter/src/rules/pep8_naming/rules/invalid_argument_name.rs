@@ -63,18 +63,18 @@ impl Violation for InvalidArgumentName {
 /// N803
 pub(crate) fn invalid_argument_name_function(
     checker: &Checker,
-    function_def: ast::StmtFunctionDef<'_>,
+    function_def: &ast::StmtFunctionDefFields<'_>,
 ) {
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
 
     if matches!(scope.kind, ScopeKind::Class(_))
-        && is_override(function_def.decorator_list(), semantic)
+        && is_override(function_def.decorator_list, semantic)
     {
         return;
     }
 
-    invalid_argument_name(checker, function_def.parameters());
+    invalid_argument_name(checker, function_def.parameters);
 }
 
 /// N803

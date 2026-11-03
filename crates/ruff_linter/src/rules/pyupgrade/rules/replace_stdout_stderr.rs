@@ -61,21 +61,21 @@ impl Violation for ReplaceStdoutStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(call.func())
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = call.arguments().find_keyword("stdout") else {
+        let Some(stdout) = call.arguments.find_keyword("stdout") else {
             return;
         };
-        let Some(stderr) = call.arguments().find_keyword("stderr") else {
+        let Some(stderr) = call.arguments.find_keyword("stderr") else {
             return;
         };
 
@@ -96,13 +96,13 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: ast::ExprCall<'_>) 
             return;
         }
 
-        let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
-        if call.arguments().find_keyword("capture_output").is_none() {
+        let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range);
+        if call.arguments.find_keyword("capture_output").is_none() {
             diagnostic.try_set_fix(|| {
                 generate_fix(
                     stdout,
                     stderr,
-                    call,
+                    call.node,
                     checker.locator().contents(),
                     checker.tokens(),
                 )

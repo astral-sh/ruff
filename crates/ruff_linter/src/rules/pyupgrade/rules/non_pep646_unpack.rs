@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprSubscriptFields;
 use ruff_python_ast::{ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -59,7 +59,7 @@ impl Violation for NonPEP646Unpack {
 }
 
 /// UP044
-pub(crate) fn use_pep646_unpack(checker: &Checker, expr: ExprSubscript<'_>) {
+pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscriptFields<'_>) {
     if checker.target_version() < PythonVersion::PY311 {
         return;
     }
@@ -68,9 +68,9 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: ExprSubscript<'_>) {
         return;
     }
 
-    let range = expr.range();
-    let value = expr.value();
-    let slice = expr.slice();
+    let range = expr.range;
+    let value = expr.value;
+    let slice = expr.slice;
 
     // Skip semantically invalid subscript calls (e.g. `Unpack[str | num]`).
     if !(slice.is_name_expr() || slice.is_subscript_expr() || slice.is_attribute_expr()) {
@@ -88,7 +88,9 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: ExprSubscript<'_>) {
     // - Variadic positional arguments (e.g., `def f(*args: *int)`).
     //
     // See: <https://peps.python.org/pep-0646/#grammar-changes>
-    if !in_subscript_index(expr, checker.semantic()) && !in_vararg(expr, checker.semantic()) {
+    if !in_subscript_index(expr.node, checker.semantic())
+        && !in_vararg(expr.node, checker.semantic())
+    {
         return;
     }
 
