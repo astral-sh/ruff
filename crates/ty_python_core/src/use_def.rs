@@ -701,7 +701,7 @@ struct CompactUseRecord {
 
 impl CompactUseRecord {
     /// A scope switches to full-width records if either field exceeds one byte.
-    fn try_pack(record: &UseRecord<InternedBindingsId>) -> Option<Self> {
+    fn try_pack(record: UseRecord<InternedBindingsId>) -> Option<Self> {
         Some(Self {
             bindings_id: u8::try_from(record.bindings.as_u32()).ok()?,
             place_plus_one: u8::try_from(record.place.map_or(0, |place| place.as_u32() + 1))
@@ -733,7 +733,12 @@ enum RetainedUses {
 impl FromIterator<UseRecord<InternedBindingsId>> for RetainedUses {
     fn from_iter<T: IntoIterator<Item = UseRecord<InternedBindingsId>>>(iter: T) -> Self {
         let rows: FrozenIndexVec<ScopedUseId, _> = iter.into_iter().collect();
-        match rows.iter().map(CompactUseRecord::try_pack).collect() {
+        let compact = rows
+            .iter()
+            .copied()
+            .map(CompactUseRecord::try_pack)
+            .collect();
+        match compact {
             Some(compact) => Self::Compact(compact),
             None => Self::Full(rows),
         }
