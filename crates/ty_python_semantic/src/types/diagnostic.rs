@@ -4447,14 +4447,15 @@ pub(super) fn typed_dict_subscript_key_lint<'db>(
 ) -> &'static LintMetadata {
     let db = context.db();
     let env = context.program_environment();
+
     let is_non_literal_string = |ty: Type<'db>| {
         if let Some(literal) = ty.as_literal_value() {
-            // `LiteralString` does not identify a particular string.
-            return literal.is_literal_string();
+            literal.is_literal_string()
+        } else {
+            ty.is_subtype_of(db, env, KnownClass::Str.to_instance(db, env))
         }
-        ty.is_subtype_of(db, env, KnownClass::Str.to_instance(db, env))
-            && !ty.is_subtype_of(db, env, Type::literal_string())
     };
+
     let non_literal = match key.expand_top_level_aliases(db, env) {
         Type::Union(union) => union
             .elements(db)
@@ -4463,6 +4464,7 @@ pub(super) fn typed_dict_subscript_key_lint<'db>(
             .all(is_non_literal_string),
         key => is_non_literal_string(key),
     };
+
     if non_literal {
         &NON_LITERAL_TYPED_DICT_KEY
     } else {

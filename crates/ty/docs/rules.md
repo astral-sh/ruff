@@ -3828,7 +3828,7 @@ def f(options: dict[str, object]):
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-typed-dict-key%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-typed-dict-key%22+OR+%22invalid-key%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L414" target="_blank">View source</a>
 </small>
 
@@ -3837,6 +3837,9 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Checks for invalid keys when accessing or assigning items on a `TypedDict`.
+
+This rule flags invalid keys such as a misspelled string literal or an integer. If the rejected key
+is a string whose value is unknown, ty reports [`non-literal-typed-dict-key`](#non-literal-typed-dict-key) instead.
 
 **Why is this bad?**
 
@@ -3849,24 +3852,18 @@ dictionary.
 
 ```python
 from typing import TypedDict
-from typing_extensions import NotRequired
 
 
 class Person(TypedDict):
-    name: NotRequired[str]
-    age: NotRequired[int]
+    name: str
+    age: int
 
 
 alice = Person(name="Alice", age=30)
+
 # KeyError: 'height'
-alice["height"]  # error
+print(f"The height of Alice is {alice['height']}")  # error
 ```
-
-**See also**
-
-
-- [`non-literal-typed-dict-key`](#non-literal-typed-dict-key) reports subscripts where ty cannot narrow the string key to a literal
-    or a union of literals.
 
 ## `invalid-typed-dict-statement`
 
@@ -4580,20 +4577,20 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 **What it does**
 
 
-Reports a string key when a `TypedDict` subscript requires a known key and ty cannot narrow the key
-to a string literal or a union of string literals.
+Reports attempts to subscript `TypedDict` instances with a key of type `str`.
 
 **Why is this bad?**
 
 
-Each declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check
-whether the key exists or which value type applies.
+A `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a
+distinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot
+infer a precise type for the subscript expression.
 
 **Example**
 
 
 ```python
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 
 class Movie(TypedDict):
@@ -4608,6 +4605,9 @@ def get_field(movie: Movie, key: str) -> str | int:
 Use instead:
 
 ```py
+from typing import Literal
+
+
 def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
     return movie[key]
 ```
@@ -4615,8 +4615,8 @@ def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
 **See also**
 
 
-- [`invalid-typed-dict-key`](#invalid-typed-dict-key) reports invalid keys such as a misspelled field name or an integer
-    subscript.
+- [`invalid-typed-dict-key`](#invalid-typed-dict-key) reports other invalid subscripts, such as a misspelled field name or an
+    integer key.
 
 ## `not-iterable`
 
@@ -6505,34 +6505,51 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 **What it does**
 
 
-Reports keys that a `TypedDict` constructor or a dictionary literal used to initialize a `TypedDict`
-cannot accept. This includes unpacked mappings that may supply unknown keys.
+Reports `TypedDict` constructions where an unknown key is or may be provided.
 
 **Why is this bad?**
 
 
 An unexpected key in a constructor often means a field name was misspelled. Even an implicitly open
-`TypedDict` rejects an explicitly supplied key it does not declare. A `TypedDict` declared with
-`closed=True` also rejects a string key that might introduce an extra item.
+`TypedDict` rejects an explicitly supplied key it does not declare.
 
 **Examples**
 
 
 ```python
-from typing import TypedDict
-from typing_extensions import NotRequired
+from typing_extensions import TypedDict, NotRequired
 
 
 class Person(TypedDict):
-    name: NotRequired[str]
+    name: str
     age: NotRequired[int]
 
 
-# error
-bob: Person = {"nickname": "Bob", "age": 30}
-
-# error
+# error: "Unknown key "aeg""
 carol = Person(name="Carol", aeg=25)  # typo!
+
+
+# error: "Unknown key "nickname""
+bob: Person = {"name": "Robert", "nickname": "Bob", "age": 30}  # unknown key!
+```
+
+If a `TypedDict` is declared with `closed=True`, this rule will also flag a string key being passed
+to the constructor, as this might introduce an illegal extra item:
+
+```py
+import json
+from typing_extensions import TypedDict
+
+
+class NotificationPatch(TypedDict, closed=True, total=False):
+    email: bool
+    sms: bool
+
+
+def encode_patch(channel: str, enabled: bool) -> str:
+    # error: "Non-literal string key may be unknown"
+    payload: NotificationPatch = {channel: enabled}
+    return json.dumps(payload)
 ```
 
 ## `unresolved-attribute`

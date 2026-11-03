@@ -2696,10 +2696,12 @@ def _(movie: Movie, key: str | int):
     movie[key]  # ty: ignore[invalid-typed-dict-key]
 ```
 
-The old `invalid-key` name still suppresses an invalid subscript key:
+The old `invalid-key` name still suppresses an invalid subscript key, and ty suggests using the new
+rule name.
 
 ```py
 def _(movie: Movie):
+    # error: [renamed-rule-in-ignore-comment] "Rule `invalid-key` has been renamed to `invalid-typed-dict-key`"
     movie["titel"]  # ty: ignore[invalid-key]
 ```
 

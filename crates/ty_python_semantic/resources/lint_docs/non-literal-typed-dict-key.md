@@ -1,17 +1,17 @@
 ## What it does
 
-Reports a string key when a `TypedDict` subscript requires a known key and ty cannot narrow the key
-to a string literal or a union of string literals.
+Reports attempts to subscript `TypedDict` instances with a key of type `str`.
 
 ## Why is this bad?
 
-Each declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check
-whether the key exists or which value type applies.
+A `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a
+distinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot
+infer a precise type for the subscript expression.
 
 ## Example
 
 ```python
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 
 class Movie(TypedDict):
@@ -26,11 +26,14 @@ def get_field(movie: Movie, key: str) -> str | int:
 Use instead:
 
 ```py
+from typing import Literal
+
+
 def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
     return movie[key]
 ```
 
 ## See also
 
-- `invalid-typed-dict-key` reports invalid keys such as a misspelled field name or an integer
-    subscript.
+- `invalid-typed-dict-key` reports other invalid subscripts, such as a misspelled field name or an
+    integer key.
