@@ -879,8 +879,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bytes(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let bytes = [lhs.value(db), rhs.value(db)].concat();
-                        Some(Type::bytes_literal(db, &bytes))
+                        let lhs = lhs.value(db);
+                        let rhs = rhs.value(db);
+                        let new_length = lhs.len().saturating_add(rhs.len());
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            Type::bytes_literal(db, &[lhs, rhs].concat())
+                        } else {
+                            KnownClass::Bytes.to_instance(db, env)
+                        };
+                        Some(ty)
                     }
 
                     (
