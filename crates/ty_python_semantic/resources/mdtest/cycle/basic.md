@@ -101,6 +101,25 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## A declaration resolves a recursive return
+
+A declaration can provide a concrete type when an inferred function return refers back to the result
+of calling that function.
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+def callback():
+    return value
+
+value = callback()
+value: int
+reveal_type(value)  # revealed: int
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.

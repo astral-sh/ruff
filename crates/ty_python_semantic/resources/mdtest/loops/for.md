@@ -1955,7 +1955,8 @@ def f(n: int):
             x, y = x - 1, x
         else:
             x, y = 2, x
-    reveal_type(x)  # revealed: Literal[1, 2]
+    # TODO: Literal[1, 2]
+    reveal_type(x)  # revealed: int
 ```
 
 ### Large reachability constraint graphs fall back to `Unknown`

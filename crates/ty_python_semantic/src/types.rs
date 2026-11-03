@@ -2688,13 +2688,36 @@ impl<'db> Type<'db> {
         // An inferred attribute updated with `self.items += (item,)` can settle on the
         // initializer plus a single update during the first few iterations. Widen new tuple
         // lengths during those iterations too, so repeated updates are represented.
-        let result = UnionType::widen_growing_tuples(db, env, previous, result)
-            .unwrap_or(result)
-            .recursive_type_normalized_impl_with_cycle(db, env, cycle);
-        if at_iteration_limit && result != previous {
+        let result = UnionType::widen_growing_tuples(db, env, previous, result).unwrap_or(result);
+        let normalized = result.recursive_type_normalized_impl_with_cycle(db, env, cycle);
+        let divergent = Type::divergent(cycle.id());
+        let normalized = if previous.same_divergent_marker(divergent)
+            && let Type::Union(union) = result
+        {
+            // When replacing this query's initial placeholder, retain dependencies on other
+            // active queries. An enclosing inference might embed `Literal[0] | Divergent(outer)`
+            // in a tuple or dictionary, where the marker lets normalization bound recursive
+            // nesting. On subsequent recoveries, prune these markers as usual so that resolved
+            // scalar types do not retain unrelated cycle dependencies.
+            let foreign_markers = union.elements(db).iter().copied().filter(|ty| {
+                ty.is_recursive_divergent()
+                    && !ty.same_divergent_marker(divergent)
+                    && cycle
+                        .head_ids()
+                        .any(|id| ty.same_divergent_marker(Type::divergent(id)))
+            });
+            UnionType::from_elements_cycle_recovery(
+                db,
+                env,
+                std::iter::once(normalized).chain(foreign_markers),
+            )
+        } else {
+            normalized
+        };
+        if at_iteration_limit && normalized != previous {
             Self::unknown()
         } else {
-            result
+            normalized
         }
     }
 

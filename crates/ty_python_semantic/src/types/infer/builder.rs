@@ -1926,7 +1926,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .ignore_possibly_undefined()
         .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(db, env, ty.inner_type()) {
-            ty
+            if inferred_ty.is_recursive_divergent() {
+                // Keep the binding's cycle dependency until its inferred type is available.
+                // Replacing the marker with the annotation can hide recursive nesting, but
+                // the annotation is also needed to resolve cycles through declared types.
+                ty.map_type(|declared| {
+                    UnionType::from_elements_cycle_recovery(db, env, [declared, inferred_ty])
+                })
+            } else {
+                ty
+            }
         } else {
             if let Some(builder) = self.context.report_lint(&INVALID_DECLARATION, node) {
                 builder.into_diagnostic(format_args!(

@@ -356,3 +356,45 @@ if target := callbacks:  # error: [invalid-assignment]
     def callbacks() -> callbacks:
         pass
 ```
+
+## Recursive lambda returns with an annotated binding
+
+A lambda decorator can return a tuple referring back to the decorated name. Inference converges even
+when a later annotation and assertion affect which value that name refers to.
+
+```py
+from typing import Any
+
+C = 0
+
+@lambda item=0: (item, C)
+class C:
+    pass
+
+try:
+    C: Any
+finally:
+    pass
+
+assert [lambda: C]  # ok
+C = 0
+```
+
+## Recursive lambda dictionaries in diagnostics
+
+Invalid annotations and iteration still produce diagnostics when the inferred value is a dictionary
+returned by a recursive lambda decorator.
+
+```py
+@lambda item=0, /: {item: C}
+class C:
+    pass
+
+try:
+    C: 0  # error: [invalid-type-form]
+except:
+    pass
+
+assert {0 for _ in (lambda: C)}  # error: [not-iterable]
+(C := 0)
+```
