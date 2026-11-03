@@ -211,6 +211,60 @@ def _(book: Book, ebook: Ebook):
     reveal_type(ebook.id)  # revealed: str
 ```
 
+### ForeignKey and OneToOneField as primary keys
+
+When a `OneToOneField` or `ForeignKey` is the primary key, `pk` has the value type of the related
+model's primary key. In the following example, `Book.id` is a UUID field, so `Ebook.pk` and
+`Review.pk` have type `UUID`, while their `book` attributes have type `Book`.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    id = models.UUIDField(primary_key=True)
+    isbn = models.CharField(max_length=13, unique=True)
+
+class Ebook(models.Model):
+    book = models.OneToOneField(Book, on_delete=models.CASCADE, primary_key=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, primary_key=True)
+
+def _(ebook: Ebook, review: Review):
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: UUID
+    reveal_type(ebook.pk)  # revealed: UUID
+    ebook.id  # error: [unresolved-attribute]
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: UUID
+    reveal_type(review.pk)  # revealed: UUID
+    review.id  # error: [unresolved-attribute]
+```
+
+With `to_field`, both `pk` and `<field>_id` have the referenced field's value type, even when it
+differs from the related model's primary key. Here, `to_field="isbn"` makes `pk` and `book_id` have
+type `str`, while `Book.pk` still has type `UUID`.
+
+```py
+class EbookByIsbn(models.Model):
+    book = models.OneToOneField(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+class ReviewByIsbn(models.Model):
+    book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+def _(book: Book, ebook: EbookByIsbn, review: ReviewByIsbn):
+    reveal_type(book.pk)  # revealed: UUID
+
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: str
+    reveal_type(ebook.pk)  # revealed: str
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: str
+    reveal_type(review.pk)  # revealed: str
+```
+
 ## Foreign key IDs
 
 ### Automatic primary key
