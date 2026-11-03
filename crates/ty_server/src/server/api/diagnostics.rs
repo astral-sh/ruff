@@ -230,7 +230,9 @@ pub(super) fn publish_diagnostics(
     session: &Session,
     client: &Client,
 ) {
-    if session.global_settings().diagnostic_mode().is_off() {
+    if session.global_settings().diagnostic_mode().is_off()
+        || session.has_project_diagnostics(document.uri())
+    {
         return;
     }
 

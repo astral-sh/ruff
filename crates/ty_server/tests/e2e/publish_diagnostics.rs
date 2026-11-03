@@ -39,6 +39,62 @@ def foo() -> str:
 }
 
 #[test]
+fn document_and_workspace_changes_preserve_shared_manifest_diagnostics() -> Result<()> {
+    let manifest = SystemPath::new("src/pyproject.toml");
+    let source = "[tool.ty.rules]\nunknown-rule = \"warn\"\n";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src/a"), None)?
+        .with_workspace(SystemPath::new("src/b"), None)?
+        .with_file(manifest, source)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let initial = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(initial.uri, server.file_uri(manifest));
+    assert!(!initial.diagnostics.is_empty());
+    assert_eq!(
+        server.await_notification::<PublishDiagnosticsNotification>(),
+        initial
+    );
+
+    // A manifest's diagnostics belong to the project, including while it is open as TOML.
+    server.send_notification::<DidOpenTextDocumentNotification>(DidOpenTextDocumentParams {
+        text_document: TextDocumentItem {
+            uri: server.file_uri(manifest),
+            language_id: LanguageKind::new("toml"),
+            version: 1,
+            text: source.to_string(),
+        },
+    });
+    // Closing the document preserves its project diagnostic until the configuration is fixed.
+    server.close_text_document(manifest);
+    assert!(
+        server
+            .try_await_notification::<PublishDiagnosticsNotification>(Some(Duration::from_millis(
+                100,
+            )))
+            .is_err()
+    );
+
+    server.change_workspace_folders([], [SystemPath::new("src/a")]);
+    let cleared = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(cleared.uri, initial.uri);
+    assert!(cleared.diagnostics.is_empty());
+    assert_eq!(
+        server.await_notification::<PublishDiagnosticsNotification>(),
+        initial
+    );
+
+    server.change_workspace_folders([], [SystemPath::new("src/b")]);
+    let cleared = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(cleared.uri, initial.uri);
+    assert!(cleared.diagnostics.is_empty());
+
+    Ok(())
+}
+
+#[test]
 fn full_diagnostic_output() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
@@ -179,6 +235,10 @@ def foo() -> str:
         .with_workspace(
             workspace_root,
             Some(ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Off)),
+        )?
+        .with_file(
+            SystemPath::new("src/pyproject.toml"),
+            "[tool.ty.rules]\nunknown-rule = \"warn\"\n",
         )?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(false)
