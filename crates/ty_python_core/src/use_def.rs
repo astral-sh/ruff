@@ -680,10 +680,30 @@ impl PredicateNarrowingTargets {
 
 /// The place and reaching bindings share one scope-local row. A zero place denotes
 /// a splatted keyword with multiple bindings. Other places use their ordinal plus one.
+/// A scope uses two bytes per row if both numbers fit in a byte for every use.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 enum RetainedUses {
-    Narrow(FrozenIndexVec<ScopedUseId, (u16, u16)>),
+    Narrow(FrozenIndexVec<ScopedUseId, (u8, u8)>),
     Wide(FrozenIndexVec<ScopedUseId, (InternedBindingsId, u32)>),
+}
+
+impl FromIterator<(InternedBindingsId, u32)> for RetainedUses {
+    fn from_iter<T: IntoIterator<Item = (InternedBindingsId, u32)>>(iter: T) -> Self {
+        let rows: FrozenIndexVec<ScopedUseId, _> = iter.into_iter().collect();
+        let narrow = rows
+            .iter()
+            .map(|&(bindings, place)| {
+                Some((
+                    u8::try_from(bindings.as_u32()).ok()?,
+                    u8::try_from(place).ok()?,
+                ))
+            })
+            .collect();
+        match narrow {
+            Some(narrow) => Self::Narrow(narrow),
+            None => Self::Wide(rows),
+        }
+    }
 }
 
 impl RetainedUses {
@@ -3221,11 +3241,11 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut place_state_interner,
         );
         let has_uses = !self.bindings_by_use.is_empty();
-        let bindings_by_use = Self::intern_bindings_by_use(
-            self.bindings_by_use,
-            self.symbol_states.len().max(self.member_states.len()),
-            &mut place_state_interner,
-        );
+        let bindings_by_use = self
+            .bindings_by_use
+            .into_iter()
+            .map(|(bindings, place)| (place_state_interner.intern_bindings(&bindings), place))
+            .collect();
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
@@ -3437,38 +3457,6 @@ impl<'db> UseDefMapBuilder<'db> {
         FrozenMap::from_entries(interned_ids_by_definition)
     }
 
-    fn intern_bindings_by_use(
-        bindings_by_use: IndexVec<ScopedUseId, (Bindings, u32)>,
-        place_count: usize,
-        interner: &mut PlaceStateInterner,
-    ) -> RetainedUses {
-        // Each remaining use interns at most one new list. Choose a width before consuming
-        // the rows, so construction never needs to revisit a scope's earlier uses.
-        let max_lists = interner
-            .interned_bindings
-            .ends
-            .len()
-            .saturating_add(bindings_by_use.len());
-        let compact = u16::try_from(place_count).is_ok() && max_lists <= usize::from(u16::MAX) + 1;
-        let rows = bindings_by_use
-            .into_iter()
-            .map(|(bindings, place)| (interner.intern_bindings(&bindings), place));
-        if compact {
-            RetainedUses::Narrow(
-                rows.map(|(bindings, place)| {
-                    (
-                        u16::try_from(bindings.as_u32())
-                            .expect("the binding ID fits in a narrow row"),
-                        u16::try_from(place).expect("the place ordinal fits in a narrow row"),
-                    )
-                })
-                .collect(),
-            )
-        } else {
-            RetainedUses::Wide(rows.collect())
-        }
-    }
-
     fn intern_place_states<I: Idx, T>(
         place_states: IndexVec<I, T>,
         get_parts: impl Fn(T) -> (Bindings, Declarations),
@@ -3546,30 +3534,17 @@ mod source_use_rows_tests {
     fn retains_the_scope_local_place_and_binding_widths() {
         let first = ScopedUseId::from_u32(0);
         let second = ScopedUseId::from_u32(1);
-        for (place, wide) in [
-            (u32::from(u16::MAX), false),
-            (65536, true),
-            (u32::MAX, true),
+        for (bindings, place, wide) in [
+            (255, 255, false),
+            (256, 1, true),
+            (1, 256, true),
+            (u32::MAX - 1, u32::MAX, true),
         ] {
-            let uses = [(Bindings::default(), place), (Bindings::default(), 0)]
-                .into_iter()
-                .collect();
-            let mut interner = PlaceStateInterner::with_capacity(2, 0, 0);
-            let rows = UseDefMapBuilder::intern_bindings_by_use(
-                uses,
-                usize::try_from(place).unwrap(),
-                &mut interner,
-            );
+            let bindings = InternedBindingsId::from_u32(bindings);
+            let rows: RetainedUses = [(bindings, place), (bindings, 0)].into_iter().collect();
             assert_eq!(matches!(rows, RetainedUses::Wide(_)), wide);
-            let (first_bindings, first_place) = rows.get(first);
-            let (second_bindings, second_place) = rows.get(second);
-            assert_eq!(first_bindings, second_bindings);
-            assert_eq!((first_place, second_place), (place, 0));
+            assert_eq!(rows.get(first), (bindings, place));
+            assert_eq!(rows.get(second), (bindings, 0));
         }
-
-        // A wide binding index is independent of the width of its place.
-        let last = InternedBindingsId::from_u32(u32::MAX - 1);
-        let rows = RetainedUses::Wide([(last, 1)].into_iter().collect());
-        assert_eq!(rows.get(first), (last, 1));
     }
 }
