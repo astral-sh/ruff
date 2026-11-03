@@ -8,6 +8,7 @@ mod version;
 
 use std::fmt::Display;
 use std::io::{self, BufWriter, Write};
+use std::path::Component;
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -115,13 +116,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     // The base path to which all CLI arguments are relative to.
     let cwd = current_directory()?;
+    let system = OsSystem::new(&cwd);
 
     let project_path = args
         .project
         .as_ref()
         .map(|project| {
             if project.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(project, &cwd))
+                resolve_cli_path(project, &system)
             } else {
                 Err(anyhow!(
                     "Provided project path `{project}` is not a directory"
@@ -134,8 +136,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let check_paths: Vec<_> = args
         .paths
         .iter()
-        .map(|path| SystemPath::absolute(path, &cwd))
-        .collect();
+        .map(|path| resolve_cli_path(path, &system))
+        .collect::<Result<_>>()?;
 
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
@@ -147,14 +149,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
-    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let config_file = args
         .config_file
         .as_ref()
-        .map(|path| SystemPath::absolute(path, &cwd));
+        .map(|path| resolve_cli_path(path, &system))
+        .transpose()?;
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
@@ -950,6 +952,22 @@ fn request_check(sender: &crossbeam_channel::Sender<()>) {
     // A full channel means that a check has already been requested. Keeping one pending request
     // coalesces bursts of file changes while the main loop drains higher-priority work.
     let _ = sender.try_send(());
+}
+
+fn resolve_cli_path(path: &SystemPath, system: &OsSystem) -> Result<SystemPathBuf> {
+    // Collapsing `..` lexically can select a different file when its preceding component is a
+    // symlink. Resolve these paths before they enter the database's normalized path keys.
+    if path
+        .as_std_path()
+        .components()
+        .any(|component| component == Component::ParentDir)
+    {
+        system
+            .canonicalize_path(&system.current_directory().join(path))
+            .with_context(|| format!("Failed to resolve path `{path}`"))
+    } else {
+        Ok(SystemPath::absolute(path, system.current_directory()))
+    }
 }
 
 fn current_directory() -> Result<SystemPathBuf> {

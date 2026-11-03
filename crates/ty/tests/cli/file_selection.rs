@@ -1276,6 +1276,62 @@ fn response_files_preserve_literal_at_paths() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn parent_component_after_symlink() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 1\n"),
+        ("other/main.py", "value: int = 'wrong'\n"),
+        ("other/nested/placeholder", ""),
+    ])?;
+    case.write_symlink("other/nested", "link")?;
+
+    let output = case.command().arg("link/../main.py").output()?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8(output.stdout)?.contains("invalid-assignment"));
+
+    let output = case
+        .command()
+        .args(["link/../main.py", "--add-ignore"])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read_to_string(case.root().join("main.py"))?,
+        "value: int = 1\n"
+    );
+    assert!(
+        std::fs::read_to_string(case.root().join("other/main.py"))?
+            .contains("# ty: ignore[invalid-assignment]")
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn project_and_config_after_symlink_parent() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "missing_name\n"),
+        ("other/main.py", "value: int = 1\n"),
+        ("ty.toml", "[rules]\nunresolved-reference = 'error'\n"),
+        (
+            "other/ty.toml",
+            "[rules]\nunresolved-reference = 'ignore'\n",
+        ),
+        ("other/nested/placeholder", ""),
+    ])?;
+    case.write_symlink("other/nested", "link")?;
+
+    let output = case.command().args(["--project", "link/.."]).output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    let output = case
+        .command()
+        .args(["main.py", "--config-file", "link/../ty.toml"])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    Ok(())
+}
+
 /// Test that ty works correctly with Bazel's symlinked file structure
 #[test]
 #[cfg(unix)]
