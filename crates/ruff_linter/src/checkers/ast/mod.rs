@@ -2433,14 +2433,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         self.semantic.flags = flags_snapshot;
-        let call = expr.as_call_expr();
-        if let Some(call) = call {
-            self.semantic.cache_callee(&call.func);
-        }
         analyze::expression(expr, self);
-        if call.is_some() {
-            self.semantic.clear_cached_callee();
-        }
         self.semantic.pop_node();
     }
 

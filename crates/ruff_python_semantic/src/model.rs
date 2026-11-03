@@ -55,14 +55,8 @@ impl Symbol {
     }
 }
 
-struct CachedCallee<'a> {
-    expression: &'a Expr,
-    qualified_name: Option<QualifiedName<'a>>,
-}
-
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
-    cached_callee: Option<CachedCallee<'a>>,
     typing_modules: &'a [String],
     custom_builtins: &'a [String],
     target_version: PythonVersion,
@@ -220,7 +214,6 @@ impl<'a> SemanticModel<'a> {
         module: Module<'a>,
     ) -> Self {
         let mut semantic = Self {
-            cached_callee: None,
             typing_modules,
             custom_builtins,
             target_version,
@@ -1192,34 +1185,6 @@ impl<'a> SemanticModel<'a> {
     ///
     /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
-        &self,
-        value: &'expr Expr,
-    ) -> Option<QualifiedName<'name>>
-    where
-        'a: 'name,
-    {
-        if let Some(cached) = &self.cached_callee
-            && std::ptr::eq(value, cached.expression)
-        {
-            return cached.qualified_name.clone();
-        }
-        self.resolve_qualified_name_uncached(value)
-    }
-
-    /// Reuses the callee's qualified name while lint rules check the same call.
-    /// Clear it before mutating scopes or bindings.
-    pub fn cache_callee(&mut self, callee: &'a Expr) {
-        self.cached_callee = Some(CachedCallee {
-            expression: callee,
-            qualified_name: self.resolve_qualified_name_uncached(callee),
-        });
-    }
-
-    pub fn clear_cached_callee(&mut self) {
-        self.cached_callee = None;
-    }
-
-    fn resolve_qualified_name_uncached<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
     ) -> Option<QualifiedName<'name>>
