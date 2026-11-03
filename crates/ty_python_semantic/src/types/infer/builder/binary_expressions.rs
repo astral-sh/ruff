@@ -343,9 +343,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
     ///
-    /// The normal path's bidirectional inference would emit spurious typed-dict diagnostics
-    /// (e.g., `missing-typed-dict-key`, `invalid-key`) when the RHS doesn't exactly match
-    /// the `TypedDict` schema. We probe here to decide the outcome without those side effects.
+    /// The normal path's bidirectional inference would report missing or unknown constructor keys
+    /// when the RHS doesn't exactly match the `TypedDict` schema. We probe here to decide the
+    /// outcome without those side effects.
     ///
     /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
