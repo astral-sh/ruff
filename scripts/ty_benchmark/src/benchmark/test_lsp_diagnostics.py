@@ -186,7 +186,8 @@ class LspTest(ABC):
 
     @property
     def cwd(self) -> Path:
-        return self.venv.project_path
+        # Use one physical path for process, workspace, and document identities.
+        return self.venv.project_path.resolve()
 
     @property
     def edited_file_path(self) -> Path:
@@ -289,7 +290,7 @@ class FetchDiagnostics(LspTest):
         if verbose:
             for file, diagnostics in self.diagnostics:
                 if diagnostics:
-                    print_diagnostics(file, diagnostics, self.venv.project_path)
+                    print_diagnostics(file, diagnostics, self.cwd)
 
 
 class IncrementalEditTest(LspTest):
@@ -420,7 +421,7 @@ class IncrementalEditTest(LspTest):
                 self.after_edit_diagnostics,
                 self.project.name,
                 self.tool.name(),
-                self.venv.project_path,
+                self.cwd,
             )
 
 
