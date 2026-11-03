@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for type checks that do not raise `TypeError`.
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `TypeError`](https://docs.python.org/3/library/exceptions.html#TypeError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.230")]
+#[violation_metadata(stable_since = "v0.0.230", category = Category::Style)]
 pub(crate) struct TypeCheckWithoutTypeError;
 
 impl Violation for TypeCheckWithoutTypeError {

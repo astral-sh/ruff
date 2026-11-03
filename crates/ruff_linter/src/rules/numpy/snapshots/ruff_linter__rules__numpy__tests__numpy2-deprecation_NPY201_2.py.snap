@@ -434,13 +434,10 @@ NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char
    |
 help: Replace with `numpy.char.compare_chararrays`
    |
-1  + from numpy.char import compare_chararrays
-2  | def func():
---------------------------------------------------------------------------------
-58 |
+57 |
    -     np.compare_chararrays
-59 +     compare_chararrays
-60 |
+58 +     np.char.compare_chararrays
+59 |
    |
 
 NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.

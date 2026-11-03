@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, Int};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
@@ -40,7 +41,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Complexity)]
 pub(crate) struct ZipInsteadOfPairwise;
 
 impl Violation for ZipInsteadOfPairwise {

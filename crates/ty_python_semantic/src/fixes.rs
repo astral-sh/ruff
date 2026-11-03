@@ -1,7 +1,8 @@
 use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::PythonFile;
 use ruff_db::cancellation::{Canceled, CancellationToken};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
+use ruff_db::diagnostic::DisplayDiagnosticConfig;
+use ruff_db::diagnostic::render::{FullRenderer, Renderer};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::SourceText;
 use ruff_db::system::{SystemPath, SystemPathBuf, WritableSystem};
@@ -315,11 +316,8 @@ fn create_fix_introduced_syntax_error_diagnostic(
 
     diag.info(format_args!(
         "Introduced syntax errors:\n\n{}",
-        DisplayDiagnostics::new(
-            &file_db,
-            &DisplayDiagnosticConfig::new("ty"),
-            &parse_diagnostics
-        )
+        FullRenderer::new(&file_db, &DisplayDiagnosticConfig::new("ty"))
+            .display(&parse_diagnostics)
     ));
 
     diag
@@ -365,12 +363,20 @@ enum FixMode {
 
 impl FixMode {
     fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        // The baseline demotes matching lint diagnostics to hints. Rechecking a file after an edit
+        // can return those hints again, so skip them here to keep `--fix` and `--add-ignore` from
+        // editing code for diagnostics the baseline already suppresses.
+        if diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint() {
+            return false;
+        }
+
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
 
         match self {
             FixMode::Suppress => {
+                // Don't suppress unused ignore comments.
                 primary_span.range().is_some()
                     && diagnostic
                         .id()
@@ -387,17 +393,15 @@ impl FixMode {
         file: PythonFile<'_>,
         file_diagnostics: &[Diagnostic],
     ) -> Vec<ApplicableFix> {
+        let fixable_diagnostics = file_diagnostics
+            .iter()
+            .filter(|diagnostic| self.is_fixable(diagnostic));
+
         match self {
             FixMode::Suppress => {
-                let suppressable_diagnostics: Vec<_> = file_diagnostics
-                    .iter()
+                let suppressable_diagnostics: Vec<_> = fixable_diagnostics
                     .filter_map(|diagnostic| {
                         let lint_id = diagnostic.id().as_lint()?;
-
-                        // Don't suppress unused ignore comments.
-                        if is_unused_ignore_comment_lint(lint_id) {
-                            return None;
-                        }
 
                         // We can't suppress diagnostics without a corresponding file or range.
                         let span = diagnostic.primary_span()?;
@@ -420,9 +424,7 @@ impl FixMode {
                     )
                     .collect()
             }
-            FixMode::ApplyFixes(applicability) => file_diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.has_applicable_fix(applicability))
+            FixMode::ApplyFixes(_) => fixable_diagnostics
                 .filter_map(|diagnostic| {
                     diagnostic.fix().cloned().map(|fix| ApplicableFix {
                         fix,
@@ -807,9 +809,9 @@ where
 mod tests {
     use insta::assert_snapshot;
     use ruff_db::cancellation::CancellationTokenSource;
+    use ruff_db::diagnostic::render::{FullRenderer, Renderer};
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics,
-        Severity, Span,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
     };
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::parsed::parsed_module;
@@ -991,7 +993,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1006,14 +1008,14 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 4 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
@@ -1024,7 +1026,7 @@ mod tests {
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            )
+            )  # ty: ignore[no-matching-overload]
         ```
         "#);
     }
@@ -1035,7 +1037,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1049,14 +1051,14 @@ mod tests {
                     ); missing  # ty: ignore[unresolved-reference]
                 "#),
             @r#"
-        Added 4 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
@@ -1067,7 +1069,7 @@ mod tests {
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            ); missing  # ty: ignore[unresolved-reference]
+            ); missing  # ty: ignore[unresolved-reference, no-matching-overload]
         ```
         "#
         );
@@ -2073,11 +2075,8 @@ class B(A):
             writeln!(
                 output,
                 "## Diagnostics after applying fixes\n\n{diagnostics}\n",
-                diagnostics = DisplayDiagnostics::new(
-                    &db,
-                    &DisplayDiagnosticConfig::new("ty"),
-                    &fixes.diagnostics
-                )
+                diagnostics = FullRenderer::new(&db, &DisplayDiagnosticConfig::new("ty"))
+                    .display(&fixes.diagnostics)
             )
             .unwrap();
         }
@@ -2094,11 +2093,8 @@ class B(A):
             writeln!(
                 &mut output,
                 "## New diagnostics after re-checking file\n\n{diagnostics}\n",
-                diagnostics = DisplayDiagnostics::new(
-                    &db,
-                    &DisplayDiagnosticConfig::new("ty"),
-                    &new_diagnostics
-                )
+                diagnostics = FullRenderer::new(&db, &DisplayDiagnosticConfig::new("ty"))
+                    .display(&new_diagnostics)
             )
             .unwrap();
         }

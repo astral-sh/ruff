@@ -1,10 +1,12 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `paramiko` calls.
@@ -26,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270")]
+#[violation_metadata(stable_since = "v0.0.270", category = Category::Security)]
 pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {
@@ -38,14 +40,8 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["paramiko", "exec_command"])
-        })
-    {
+pub(crate) fn paramiko_call(checker: &Checker, func: &Expr, qualified_name: &QualifiedName) {
+    if matches!(qualified_name.segments(), ["paramiko", "exec_command"]) {
         checker.report_diagnostic(ParamikoCall, func.range());
     }
 }

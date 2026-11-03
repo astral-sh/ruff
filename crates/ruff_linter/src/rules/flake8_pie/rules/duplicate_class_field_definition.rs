@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -35,7 +36,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is always marked as unsafe since we cannot know
 /// for certain which assignment was intended.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
 pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
 }

@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -28,7 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
@@ -65,7 +66,7 @@ impl AlwaysFixableViolation for NotInTest {
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {
@@ -85,18 +86,14 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
         return;
     }
 
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-        node_index: _,
-    }) = unary_op.operand.as_ref()
-    else {
+    let Expr::Compare(compare) = unary_op.operand.as_ref() else {
         return;
     };
 
-    match &**ops {
+    let left = compare.first_operand();
+    let comparators = compare.comparators();
+
+    match &*compare.ops {
         [CmpOp::In] if checker.is_rule_enabled(Rule::NotInTest) => {
             let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

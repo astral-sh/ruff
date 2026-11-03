@@ -1,10 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
@@ -48,7 +51,7 @@ use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeFromtimestamp {
@@ -71,21 +74,19 @@ impl Violation for CallDatetimeFromtimestamp {
 }
 
 /// DTZ006
-pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_fromtimestamp(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
 
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["datetime", "datetime", "fromtimestamp"]
-            )
-        })
-    {
+    if !matches!(
+        qualified_name.segments(),
+        ["datetime", "datetime", "fromtimestamp"]
+    ) {
         return;
     }
 
@@ -99,5 +100,5 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCal
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range);
+    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range());
 }

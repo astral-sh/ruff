@@ -99,9 +99,7 @@ pub(super) fn request(req: server::Request) -> Task {
 
 pub(super) fn notification(notif: server::Notification) -> Task {
     match LspNotificationMethod::from(notif.method.as_str()) {
-        notification::DidChange::METHOD => {
-            sync_notification_task::<notification::DidChange>(notif)
-        }
+        notification::DidChange::METHOD => sync_notification_task::<notification::DidChange>(notif),
         notification::DidChangeConfiguration::METHOD => {
             sync_notification_task::<notification::DidChangeConfiguration>(notif)
         }
@@ -138,7 +136,8 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         tracing::error!("Encountered error when routing notification: {err}");
         Task::sync(|_session, client| {
             client.show_error_message(
-                "Ruff failed to handle a notification from the editor. Check the logs for more details."
+                "Ruff failed to handle a notification from the editor. \
+                Check the logs for more details.",
             );
         })
     })
@@ -309,8 +308,11 @@ where
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
-                    than the one whose method name was matched against earlier.")
+                unreachable!(
+                    "A method mismatch should not be possible here \
+                    unless you've used a different handler (`Req`) than the one \
+                    whose method name was matched against earlier."
+                )
             }
         })
         .with_failure_code(server::ErrorCode::InternalError)
@@ -361,8 +363,11 @@ where
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
-                        than the one whose method name was matched against earlier.")
+                    unreachable!(
+                        "A method mismatch should not be possible here \
+                        unless you've used a different handler (`N`) than the one \
+                        whose method name was matched against earlier."
+                    )
                 }
             })
             .with_failure_code(server::ErrorCode::InternalError)?,

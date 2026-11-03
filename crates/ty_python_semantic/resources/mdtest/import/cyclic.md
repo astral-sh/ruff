@@ -125,3 +125,28 @@ from module import x
 
 reveal_type(x)  # revealed: int
 ```
+
+### Attribute assignment through a circular re-export
+
+A class imported through a circular re-export is the same class as the original definition. Its
+instances can be assigned to attributes annotated with that class, including optional attributes.
+
+`models.py`:
+
+```py
+class Item: ...
+
+from reexport import Item
+
+class Container:
+    item: Item | None
+
+def set_item(container: Container):
+    container.item = Item()
+```
+
+`reexport.py`:
+
+```py
+from models import Item
+```

@@ -60,7 +60,7 @@ impl<'db> ScopeId<'db> {
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
-    pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         semantic_index(db, self.program_file(db)).class_definition_of_method(self.file_scope_id(db))
     }
 

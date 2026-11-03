@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct InvalidSuppressionComment {
     pub(crate) kind: InvalidSuppressionCommentKind,
 }

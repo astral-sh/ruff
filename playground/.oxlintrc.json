@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "options": {
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "warn"
+  },
+  "rules": {
+    "eqeqeq": ["warn", "always", { "null": "never" }],
+    "no-array-constructor": "warn",
+    "no-console": "warn",
+    "no-shadow": "off",
+    "no-unused-vars": ["error", { "reportVarsOnlyUsedAsTypes": true }],
+    "no-var": "warn",
+    "prefer-const": "warn",
+    "prefer-rest-params": "warn",
+    "prefer-spread": "warn",
+    "react/react-in-jsx-scope": "off",
+    "react/rules-of-hooks": "warn",
+    "react/unsupported-syntax": "warn",
+    "typescript/ban-ts-comment": "warn",
+    "typescript/no-empty-object-type": "warn",
+    "typescript/no-namespace": "warn",
+    "typescript/no-require-imports": "warn",
+    "typescript/no-unsafe-function-type": "warn",
+    "unicorn/consistent-function-scoping": "off"
+  }
+}

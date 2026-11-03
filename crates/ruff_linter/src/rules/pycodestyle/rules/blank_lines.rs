@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::checkers::logical_lines::expand_indent;
+use crate::codes::Category;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::{AlwaysFixableViolation, Edit, Fix, Locator, Violation};
@@ -62,7 +63,7 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLineBetweenMethods;
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
@@ -116,7 +117,7 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLinesTopLevel {
     actual_blank_lines: u32,
     expected_blank_lines: u32,
@@ -184,7 +185,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct TooManyBlankLines {
     actual_blank_lines: u32,
 }
@@ -231,7 +232,7 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E304.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLineAfterDecorator {
     actual_blank_lines: u32,
 }
@@ -283,7 +284,7 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLinesAfterFunctionOrClass {
     actual_blank_lines: u32,
 }
@@ -338,7 +339,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLinesBeforeNestedDefinition;
 
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {

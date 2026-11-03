@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `__future__` imports that are not defined in the current Python
@@ -13,7 +14,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.34")]
+#[violation_metadata(stable_since = "v0.0.34", category = Category::Correctness)]
 pub(crate) struct FutureFeatureNotDefined {
     pub name: String,
 }

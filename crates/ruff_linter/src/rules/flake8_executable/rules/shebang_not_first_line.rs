@@ -5,6 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
@@ -33,7 +34,7 @@ use crate::checkers::ast::LintContext;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Suspicious)]
 pub(crate) struct ShebangNotFirstLine;
 
 impl Violation for ShebangNotFirstLine {

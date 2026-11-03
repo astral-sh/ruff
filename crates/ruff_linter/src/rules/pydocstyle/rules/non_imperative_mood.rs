@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
@@ -51,7 +52,7 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.228")]
+#[violation_metadata(stable_since = "v0.0.228", category = Category::Pedantic)]
 pub(crate) struct NonImperativeMood {
     first_line: String,
 }

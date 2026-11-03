@@ -3822,12 +3822,6 @@ impl ruff_text_size::Ranged for crate::ExprCompare {
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprCall {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
 impl ruff_text_size::Ranged for crate::ExprFString {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -9732,7 +9726,7 @@ pub struct ExprDictComp {
     pub range: ruff_text_size::TextRange,
     pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
-    pub generators: Vec<crate::Comprehension>,
+    pub generators: Box<[crate::Comprehension]>,
 }
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
@@ -9773,23 +9767,33 @@ pub struct ExprYieldFrom {
     pub value: Box<Expr>,
 }
 
-/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+/// A comparison or chain of comparisons.
+///
+/// `operands` contains all operands in source order, including the leftmost operand.
+/// For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
+/// There is at least one operator, and `operands.len() == ops.len() + 1`.
+///
+/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare).
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub left: Box<Expr>,
     pub ops: Box<[crate::CmpOp]>,
-    pub comparators: Box<[Expr]>,
+    pub operands: Box<[Expr]>,
 }
 
+/// A call expression whose end offset is derived from its arguments.
+///
+/// The parser and error-recovery code must ensure that the call and its arguments
+/// end at the same offset.
+///
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCall {
     pub node_index: crate::AtomicNodeIndex,
-    pub range: ruff_text_size::TextRange,
+    pub range_start: ruff_text_size::TextSize,
     pub func: Box<Expr>,
     pub arguments: crate::Arguments,
 }
@@ -10831,9 +10835,9 @@ impl ExprCall {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ExprCall {
+            range_start: _,
             func,
             arguments,
-            range: _,
             node_index: _,
         } = self;
         visitor.visit_expr(func);

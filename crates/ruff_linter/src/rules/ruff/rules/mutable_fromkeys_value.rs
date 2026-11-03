@@ -1,3 +1,4 @@
+use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct MutableFromkeysValue;
 
 impl Violation for MutableFromkeysValue {
@@ -123,7 +124,7 @@ fn generate_dict_comprehension(
     let dict_comp = ast::ExprDictComp {
         key: Some(Box::new(key.into())),
         value: Box::new(value.clone()),
-        generators: vec![comp],
+        generators: Box::new([comp]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };

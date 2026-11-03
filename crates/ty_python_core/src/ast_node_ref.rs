@@ -71,7 +71,7 @@ where
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
     /// different file, Python version, or Salsa revision than the module to which the node belongs.
-    pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+    pub fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
         let index = node.node_index().load();
         debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
 
@@ -124,16 +124,15 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         cfg_select! {
-            debug_assertions => {
-                f.debug_struct("AstNodeRef")
-                    .field("kind", &self.kind)
-                    .field("range", &self.range)
-                    .finish()
-            },
+            debug_assertions => f
+                .debug_struct("AstNodeRef")
+                .field("kind", &self.kind)
+                .field("range", &self.range)
+                .finish(),
             _ => {
                 // Unfortunately we have no access to the AST here.
                 f.debug_tuple("AstNodeRef").finish_non_exhaustive()
-            },
+            }
         }
     }
 }

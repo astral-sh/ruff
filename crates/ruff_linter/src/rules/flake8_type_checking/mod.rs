@@ -11,9 +11,11 @@ mod tests {
     use anyhow::Result;
     use itertools::Itertools;
     use ruff_python_ast::PythonVersion;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -79,7 +81,10 @@ mod tests {
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
     fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
-        let name = rules.iter().map(Rule::noqa_code).join("-");
+        let name = rules
+            .iter()
+            .map(|rule| rule.name().as_str().strip_prefix("typing-only-").unwrap())
+            .join("-");
         let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
@@ -102,7 +107,7 @@ mod tests {
     fn add_future_import_dataclass_kw_only_py313(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "add_future_import_kw_only__{}_{}",
-            rule.noqa_code(),
+            rule.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -273,6 +278,10 @@ mod tests {
         Path::new("runtime_evaluated_base_classes_4.py")
     )]
     #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_base_classes_4.py")
+    )]
+    #[test_case(
         Rule::TypingOnlyThirdPartyImport,
         Path::new("runtime_evaluated_base_classes_5.py")
     )]
@@ -282,10 +291,13 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Ambiguous,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
@@ -307,17 +319,36 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_decorators_3.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorators_5.py")
+    )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "attrs.define".to_string(),
-                        "attrs.frozen".to_string(),
-                        "pydantic.validate_call".to_string(),
-                    ],
+                    runtime_evaluated_decorators: FxHashMap::from_iter([
+                        ("attrs.define".to_string(), RuntimeSemantics::Required),
+                        ("attrs.frozen".to_string(), RuntimeSemantics::Required),
+                        (
+                            "pydantic.validate_call".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "sqlalchemy.orm.declared_attr".to_string(),
+                            RuntimeSemantics::Ambiguous,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
@@ -339,7 +370,10 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([(
+                        "module.direct.MyBaseClass".to_string(),
+                        RuntimeSemantics::Required,
+                    )]),
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
@@ -357,16 +391,34 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_required_decorators: vec![
-                        "fastapi.FastAPI.get".to_string(),
-                        "fastapi.FastAPI.put".to_string(),
-                        "module.app.AppContainer.app.get".to_string(),
-                        "module.app.AppContainer.app.put".to_string(),
-                        "module.app.app.get".to_string(),
-                        "module.app.app.put".to_string(),
-                        "module.app.app_container.app.get".to_string(),
-                        "module.app.app_container.app.put".to_string(),
-                    ],
+                    runtime_evaluated_decorators: FxHashMap::from_iter([
+                        (
+                            "fastapi.FastAPI.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "fastapi.FastAPI.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.AppContainer.app.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.AppContainer.app.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        ("module.app.app.get".to_string(), RuntimeSemantics::Required),
+                        ("module.app.app.put".to_string(), RuntimeSemantics::Required),
+                        (
+                            "module.app.app_container.app.get".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                        (
+                            "module.app.app_container.app.put".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

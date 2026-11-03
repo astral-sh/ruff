@@ -3,6 +3,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::renamer::ShadowedKind;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Suspicious)]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
 }

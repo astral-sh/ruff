@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `break`, `continue`, and `return` statements in `finally`
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Suspicious)]
 pub(crate) struct JumpStatementInFinally {
     name: String,
 }

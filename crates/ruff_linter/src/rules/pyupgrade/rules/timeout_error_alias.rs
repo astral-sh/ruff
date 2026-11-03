@@ -4,10 +4,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::name::{Name, QualifiedName, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -45,7 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `TimeoutError`](https://docs.python.org/3/library/exceptions.html#TimeoutError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct TimeoutErrorAlias {
     name: Option<String>,
 }
@@ -69,24 +70,26 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            if target_version >= PythonVersion::PY311 {
-                matches!(
-                    qualified_name.segments(),
-                    ["socket", "timeout"] | ["asyncio", "TimeoutError"]
-                )
-            } else {
-                // N.B. This lint is only invoked for Python 3.10+. We assume
-                // as much here since otherwise socket.timeout would be an unsafe
-                // fix in Python <3.10. We add an assert to make this assumption
-                // explicit.
-                assert!(
-                    target_version >= PythonVersion::PY310,
-                    "lint should only be used for Python 3.10+",
-                );
-                matches!(qualified_name.segments(), ["socket", "timeout"])
-            }
-        })
+        .is_some_and(|name| is_timeout_error_alias(&name, target_version))
+}
+
+fn is_timeout_error_alias(qualified_name: &QualifiedName, target_version: PythonVersion) -> bool {
+    if target_version >= PythonVersion::PY311 {
+        matches!(
+            qualified_name.segments(),
+            ["socket", "timeout"] | ["asyncio", "TimeoutError"]
+        )
+    } else {
+        // N.B. This lint is only invoked for Python 3.10+. We assume
+        // as much here since otherwise socket.timeout would be an unsafe
+        // fix in Python <3.10. We add an assert to make this assumption
+        // explicit.
+        assert!(
+            target_version >= PythonVersion::PY310,
+            "lint should only be used for Python 3.10+",
+        );
+        matches!(qualified_name.segments(), ["socket", "timeout"])
+    }
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
@@ -209,8 +212,12 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
 }
 
 /// UP041
-pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
-    if is_alias(func, checker.semantic(), checker.target_version()) {
+pub(crate) fn timeout_error_alias_call(
+    checker: &Checker,
+    func: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    if is_timeout_error_alias(qualified_name, checker.target_version()) {
         atom_diagnostic(checker, func);
     }
 }

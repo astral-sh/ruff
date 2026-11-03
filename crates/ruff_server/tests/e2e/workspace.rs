@@ -81,6 +81,7 @@ ignore = ["F401"]
                 }
               }
             ],
+            "is_preferred": true,
             "noqa_edit": {
               "newText": "  # noqa: F401\n",
               "range": {

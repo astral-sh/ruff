@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -28,7 +29,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct ByteStringUsage {
     origin: ByteStringOrigin,
 }

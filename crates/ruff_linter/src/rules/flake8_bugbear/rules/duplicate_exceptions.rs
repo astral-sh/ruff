@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
@@ -43,7 +44,7 @@ use crate::{Edit, Fix};
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", category = Category::Correctness)]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
     is_star: bool,
@@ -75,7 +76,7 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except (Exception, ValueError):  # `Exception` includes `ValueError`.
+/// except (ValueError, ValueError):
 ///     ...
 /// ```
 ///
@@ -83,7 +84,7 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except Exception:
+/// except ValueError:
 ///     ...
 /// ```
 ///
@@ -91,7 +92,7 @@ impl Violation for DuplicateTryBlockException {
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", category = Category::Correctness)]
 pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }

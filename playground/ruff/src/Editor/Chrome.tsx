@@ -71,7 +71,7 @@ export default function Chrome() {
         setRevision(1);
       })
       .catch((error) => {
-        // eslint-disable-next-line no-console
+        // oxlint-disable-next-line no-console
         console.error("Failed to initialize playground.", error);
       });
   }

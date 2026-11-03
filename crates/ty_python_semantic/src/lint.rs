@@ -1,7 +1,7 @@
 use crate::diagnostic::did_you_mean;
 use core::fmt;
 use itertools::Itertools;
-use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
+use ruff_db::diagnostic::{DiagnosticId, LintName, RuleMetadata, Severity};
 use rustc_hash::FxHashMap;
 use std::error::Error;
 use std::fmt::Formatter;
@@ -168,6 +168,12 @@ pub const fn lint_metadata_defaults(status: LintStatus) -> LintMetadata {
     serde(tag = "type", rename_all = "lowercase")
 )]
 pub enum LintStatus {
+    /// The lint is available, but its behavior is not yet stable.
+    Preview {
+        /// The version in which the lint was added.
+        since: &'static str,
+    },
+
     /// The lint is stable.
     Stable {
         /// The version in which the lint was added.
@@ -197,6 +203,10 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
+    pub(crate) const fn preview(since: &'static str) -> Self {
+        LintStatus::Preview { since }
+    }
+
     pub const fn stable(since: &'static str) -> Self {
         LintStatus::Stable { since }
     }
@@ -471,6 +481,28 @@ impl LintRegistry {
             }
         })
     }
+
+    /// Returns the metadata used to render all registered, non-removed lints.
+    pub fn rule_metadata(&self) -> FxHashMap<LintName, RuleMetadata> {
+        self.lints()
+            .iter()
+            .map(|lint| {
+                let name = lint.name();
+                (
+                    name,
+                    RuleMetadata {
+                        name,
+                        summary: lint.summary,
+                        description: lint.documentation().into(),
+                        help_url: lint.documentation_url(),
+                        linter: None,
+                        default_severity: Severity::try_from(lint.default_level()).ok(),
+                        enabled_by_default: !lint.default_level().is_ignore(),
+                    },
+                )
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -514,7 +546,7 @@ impl std::fmt::Display for GetLintError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
-    /// An existing lint rule. Can be stable or deprecated.
+    /// An existing lint rule. Can be in preview, stable or deprecated.
     Lint(LintId),
     /// A lint rule that has been removed.
     Removed(LintId),
@@ -660,9 +692,12 @@ pub enum LintSource {
     /// The rule was enabled in a configuration file.
     File,
 
+    /// The rule was enabled in a standalone script's inline metadata.
+    ScriptMetadata,
+
     /// The rule was enabled from the configuration in the editor.
     Editor,
 
-    /// The rule was enabled by uv workspace metadata.
-    UvWorkspace,
+    /// The rule was enabled by uv metadata.
+    UvMetadata,
 }

@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for enums that contain duplicate values.
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `enum.Enum`](https://docs.python.org/3/library/enum.html#enum.Enum)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.224")]
+#[violation_metadata(stable_since = "v0.0.224", category = Category::Suspicious)]
 pub(crate) struct NonUniqueEnums {
     value: String,
 }

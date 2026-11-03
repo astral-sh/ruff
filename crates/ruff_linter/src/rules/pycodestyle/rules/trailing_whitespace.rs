@@ -5,6 +5,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
@@ -32,7 +33,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Formatting)]
 pub(crate) struct TrailingWhitespace;
 
 impl AlwaysFixableViolation for TrailingWhitespace {
@@ -70,7 +71,7 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Formatting)]
 pub(crate) struct BlankLineWithWhitespace;
 
 impl AlwaysFixableViolation for BlankLineWithWhitespace {

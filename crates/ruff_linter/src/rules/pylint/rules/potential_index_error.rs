@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for hard-coded sequence accesses that are known to be out of bounds.
@@ -19,7 +20,7 @@ use crate::checkers::ast::Checker;
 /// print([0, 1, 2][3])
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct PotentialIndexError;
 
 impl Violation for PotentialIndexError {
@@ -34,6 +35,9 @@ pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Exp
     // Determine the length of the sequence.
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            if elts.iter().any(Expr::is_starred_expr) {
+                return;
+            }
             match i64::try_from(elts.len()) {
                 Ok(length) => length,
                 Err(_) => return,

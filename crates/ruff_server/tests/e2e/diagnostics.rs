@@ -57,6 +57,7 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
                 }
               }
             ],
+            "is_preferred": true,
             "noqa_edit": {
               "newText": "  # ruff: ignore[unused-import]\n",
               "range": {
@@ -138,6 +139,7 @@ extend-select = ["F401"]
                 }
               }
             ],
+            "is_preferred": true,
             "noqa_edit": null,
             "title": "Replace rule code with `unused-import`"
           }

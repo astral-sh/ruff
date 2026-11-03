@@ -1,3 +1,32 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
+# [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 """
 Compare memory usage reports between two ty versions and generate a PR comment.
 
@@ -123,7 +152,9 @@ def load_reports_from_directory(directory: Path) -> dict[str, MemoryReport]:
 
 def item_total_bytes(item: dict[str, Any]) -> int:
     """Get total bytes (metadata + fields) for a struct or query item."""
-    return item.get("metadata_bytes", 0) + item.get("fields_bytes", 0)
+    result = item.get("metadata_bytes", 0) + item.get("fields_bytes", 0)
+    assert isinstance(result, int)
+    return result
 
 
 def diff_items(
@@ -133,8 +164,8 @@ def diff_items(
 
     Returns a list of (name, old_bytes, new_bytes) sorted by absolute diff descending.
     """
-    old_by_name = {item["name"]: item for item in old_items}
-    new_by_name = {item["name"]: item for item in new_items}
+    old_by_name: dict[str, dict[str, Any]] = {item["name"]: item for item in old_items}
+    new_by_name: dict[str, dict[str, Any]] = {item["name"]: item for item in new_items}
 
     all_names = old_by_name.keys() | new_by_name.keys()
 

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
@@ -51,7 +52,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// - [Pandas Cookbook: "Constant Series"](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series)
 /// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Pedantic)]
 pub(crate) struct PandasNuniqueConstantSeriesCheck;
 
 impl Violation for PandasNuniqueConstantSeriesCheck {
@@ -62,18 +63,12 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
 }
 
 /// PD101
-pub(crate) fn nunique_constant_series_check(
-    checker: &Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
+pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: &ast::ExprCompare) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    let ([op], [right]) = (ops, comparators) else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -115,5 +110,5 @@ pub(crate) fn nunique_constant_series_check(
         return;
     }
 
-    checker.report_diagnostic(PandasNuniqueConstantSeriesCheck, expr.range());
+    checker.report_diagnostic(PandasNuniqueConstantSeriesCheck, compare.range());
 }

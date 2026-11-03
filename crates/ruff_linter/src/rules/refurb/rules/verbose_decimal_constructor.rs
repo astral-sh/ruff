@@ -3,11 +3,13 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
@@ -51,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct VerboseDecimalConstructor {
     replacement: String,
 }
@@ -71,12 +73,12 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
-    {
+pub(crate) fn verbose_decimal_constructor(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(qualified_name.segments(), ["decimal", "Decimal"]) {
         return;
     }
 

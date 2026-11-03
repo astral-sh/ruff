@@ -6,6 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_stmt;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -24,7 +25,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     def __repr__(self) -> str: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Style)]
 pub(crate) struct StrOrReprDefinedInStub {
     name: String,
 }

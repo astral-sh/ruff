@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{ExprCall, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.141")]
+#[violation_metadata(stable_since = "v0.0.141", category = Category::Correctness)]
 pub(crate) struct Debugger {
     using_type: DebuggerUsingType,
 }
@@ -49,20 +50,14 @@ impl Violation for Debugger {
 
 /// T100
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
-    if let Some(using_type) =
-        checker
-            .semantic()
-            .resolve_qualified_name(func)
-            .and_then(|qualified_name| {
-                if is_debugger_call(&qualified_name) {
-                    Some(DebuggerUsingType::Call(qualified_name.to_string()))
-                } else {
-                    None
-                }
-            })
-    {
-        checker.report_diagnostic(Debugger { using_type }, expr.range());
+pub(crate) fn debugger_call(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+    if is_debugger_call(qualified_name) {
+        checker.report_diagnostic(
+            Debugger {
+                using_type: DebuggerUsingType::Call(qualified_name.to_string()),
+            },
+            call.range(),
+        );
     }
 }
 

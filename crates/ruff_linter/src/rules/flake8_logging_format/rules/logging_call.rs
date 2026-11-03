@@ -46,14 +46,14 @@ fn logging_f_string(
 
     for part in &f_string.value {
         match part {
-            ast::FStringPart::Literal(literal) => {
+            ast::FStringPartRef::Literal(literal) => {
                 let literal_text = literal.as_str();
                 if literal_text.contains('%') {
                     return;
                 }
                 format_string.push_str(literal_text);
             }
-            ast::FStringPart::FString(f) => {
+            ast::FStringPartRef::FString(f) => {
                 for element in &f.elements {
                     match element {
                         InterpolatedStringElement::Literal(lit) => {

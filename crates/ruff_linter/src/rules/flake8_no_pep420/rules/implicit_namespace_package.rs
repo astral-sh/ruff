@@ -9,6 +9,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
@@ -29,10 +30,23 @@ use crate::package::PackageRoot;
 /// `__init__.py` file is typically meant to be a regular package, and
 /// the absence of the `__init__.py` file is probably an oversight.
 ///
+/// ## Preview
+///
+/// In preview, the rule also checks for packages without `__init__.py` files between two regular
+/// packages, such as `bar` in the project structure below.
+///
+/// ```text
+/// foo/
+/// ├── __init__.py
+/// └── bar/
+///     └── baz/
+///         └── __init__.py
+/// ```
+///
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.225")]
+#[violation_metadata(stable_since = "v0.0.225", category = Category::Pedantic)]
 pub(crate) struct ImplicitNamespacePackage {
     filename: String,
     parent: Option<String>,

@@ -6,6 +6,7 @@ use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestS
 use ruff_db::vendored::VendoredFileSystem;
 
 use ty_python_core::program::ProgramSettings;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
@@ -244,6 +245,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
+    }
+
+    fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+        None
     }
 
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {

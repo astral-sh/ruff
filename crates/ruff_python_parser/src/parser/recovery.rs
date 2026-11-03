@@ -93,30 +93,34 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             node_index,
             cls,
             arguments,
-        }) => Expr::Call(ast::ExprCall {
-            range,
-            node_index: node_index.clone(),
-            func: cls,
-            arguments: ast::Arguments {
-                range: arguments.range,
+        }) => {
+            debug_assert_eq!(range.end(), arguments.end());
+
+            Expr::Call(ast::ExprCall {
+                range_start: range.start(),
                 node_index: node_index.clone(),
-                args: arguments
-                    .patterns
-                    .into_iter()
-                    .map(pattern_to_expr)
-                    .collect(),
-                keywords: arguments
-                    .keywords
-                    .into_iter()
-                    .map(|keyword_pattern| ast::Keyword {
-                        range: keyword_pattern.range,
-                        node_index: node_index.clone(),
-                        arg: Some(keyword_pattern.attr),
-                        value: pattern_to_expr(keyword_pattern.pattern),
-                    })
-                    .collect(),
-            },
-        }),
+                func: cls,
+                arguments: ast::Arguments {
+                    range: arguments.range,
+                    node_index: node_index.clone(),
+                    args: arguments
+                        .patterns
+                        .into_iter()
+                        .map(pattern_to_expr)
+                        .collect(),
+                    keywords: arguments
+                        .keywords
+                        .into_iter()
+                        .map(|keyword_pattern| ast::Keyword {
+                            range: keyword_pattern.range,
+                            node_index: node_index.clone(),
+                            arg: Some(keyword_pattern.attr),
+                            value: pattern_to_expr(keyword_pattern.pattern),
+                        })
+                        .collect(),
+                },
+            })
+        }
         Pattern::MatchStar(ast::PatternMatchStar {
             range,
             node_index,

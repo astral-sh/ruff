@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that `append`, `extend` and `remove` methods are not called on
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///     __all__ += ["C"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Pedantic)]
 pub(crate) struct UnsupportedMethodCallOnAll {
     name: String,
 }

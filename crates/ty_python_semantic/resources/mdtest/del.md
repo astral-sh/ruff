@@ -373,7 +373,7 @@ item deletion. The `__delitem__` method is independent of `__getitem__`.
 ```py
 from typing import Protocol, TypeVar
 
-KT = TypeVar("KT")
+KT = TypeVar("KT", contravariant=True)
 
 class CanDelItem(Protocol[KT]):
     def __delitem__(self, k: KT, /) -> None: ...

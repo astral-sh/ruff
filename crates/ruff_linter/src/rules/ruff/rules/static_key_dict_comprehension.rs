@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## Removed
 /// This rule was implemented in `flake8-bugbear` and has been remapped to [B035]
@@ -28,7 +29,7 @@ use crate::Violation;
 ///
 /// [B035]: https://docs.astral.sh/ruff/rules/static-key-dict-comprehension/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.2.0")]
+#[violation_metadata(removed_since = "v0.2.0", category = Category::Correctness)]
 pub(crate) struct RuffStaticKeyDictComprehension;
 
 impl Violation for RuffStaticKeyDictComprehension {

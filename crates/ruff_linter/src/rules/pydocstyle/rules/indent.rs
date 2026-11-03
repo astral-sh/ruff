@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
@@ -56,7 +57,7 @@ use crate::{Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.75")]
+#[violation_metadata(stable_since = "v0.0.75", category = Category::Formatting)]
 pub(crate) struct DocstringTabIndentation;
 
 impl Violation for DocstringTabIndentation {
@@ -109,7 +110,7 @@ impl Violation for DocstringTabIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.75")]
+#[violation_metadata(stable_since = "v0.0.75", category = Category::Formatting)]
 pub(crate) struct UnderIndentation;
 
 impl AlwaysFixableViolation for UnderIndentation {
@@ -166,7 +167,7 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.75")]
+#[violation_metadata(stable_since = "v0.0.75", category = Category::Formatting)]
 pub(crate) struct OverIndentation;
 
 impl AlwaysFixableViolation for OverIndentation {

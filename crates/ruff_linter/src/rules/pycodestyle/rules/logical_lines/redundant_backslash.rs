@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::LogicalLine;
@@ -30,7 +31,7 @@ use super::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.3")]
+#[violation_metadata(preview_since = "v0.3.3", category = Category::Formatting)]
 pub(crate) struct RedundantBackslash;
 
 impl AlwaysFixableViolation for RedundantBackslash {

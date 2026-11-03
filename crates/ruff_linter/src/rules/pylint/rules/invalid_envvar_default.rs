@@ -1,11 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `os.getenv` calls with invalid default values.
@@ -33,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// int(os.getenv("FOO", "1"))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255")]
+#[violation_metadata(stable_since = "v0.0.255", category = Category::Suspicious)]
 pub(crate) struct InvalidEnvvarDefault;
 
 impl Violation for InvalidEnvvarDefault {
@@ -44,21 +46,19 @@ impl Violation for InvalidEnvvarDefault {
 }
 
 /// PLW1508
-pub(crate) fn invalid_envvar_default(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_envvar_default(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["os", "getenv"] | ["os", "environ", "get"]
-            )
-        })
-    {
+    if matches!(
+        qualified_name.segments(),
+        ["os", "getenv"] | ["os", "environ", "get"]
+    ) {
         // Find the `default` argument, if it exists.
         let Some(expr) = call.arguments.find_argument_value("default", 1) else {
             return;

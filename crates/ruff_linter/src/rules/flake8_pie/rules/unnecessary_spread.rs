@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -28,7 +29,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Complexity)]
 pub(crate) struct UnnecessarySpread;
 
 impl Violation for UnnecessarySpread {

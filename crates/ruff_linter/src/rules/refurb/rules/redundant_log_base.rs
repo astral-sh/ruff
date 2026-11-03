@@ -1,11 +1,13 @@
 use anyhow::Result;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -51,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
 /// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RedundantLogBase {
     base: Base,
     arg: String,
@@ -75,7 +77,11 @@ impl Violation for RedundantLogBase {
 }
 
 /// FURB163
-pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_log_base(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !call.arguments.keywords.is_empty() {
         return;
     }
@@ -84,11 +90,7 @@ pub(crate) fn redundant_log_base(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["math", "log"]))
-    {
+    if !matches!(qualified_name.segments(), ["math", "log"]) {
         return;
     }
 

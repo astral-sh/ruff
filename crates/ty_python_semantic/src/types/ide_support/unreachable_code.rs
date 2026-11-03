@@ -94,8 +94,9 @@ mod tests {
     use super::{UnreachableKind, unreachable_ranges};
     use crate::db::tests::{TestDb, TestDbBuilder};
     use insta::assert_snapshot;
+    use ruff_db::diagnostic::render::{FullRenderer, Renderer};
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity,
     };
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_python_ast::PythonVersion;
@@ -168,13 +169,10 @@ mod tests {
         })
         .collect::<Vec<_>>();
 
-        DisplayDiagnostics::new(
-            db,
-            &DisplayDiagnosticConfig::new("ty").context(0),
-            &diagnostics,
-        )
-        .to_string()
-        .replace('\\', "/")
+        FullRenderer::new(db, &DisplayDiagnosticConfig::new("ty").context(0))
+            .display(&diagnostics)
+            .to_string()
+            .replace('\\', "/")
     }
 
     #[test]
@@ -386,6 +384,28 @@ mod tests {
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
         "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_impossible_typed_dict_key_membership() -> anyhow::Result<()> {
+        let source = r#"
+            from typing_extensions import TypedDict
+
+            class Items(TypedDict, closed=True):
+                present: int
+
+            def f(items: Items) -> None:
+                if "missing" in items:
+                    print("missing")
+                if "present" not in items:
+                    print("present")
+            "#;
+
+        let diagnostics = UnreachableTest::new().render(source)?;
+        assert_eq!(diagnostics.matches("Code is unreachable").count(), 2);
+        assert!(diagnostics.contains("print(\"missing\")"));
+        assert!(diagnostics.contains("print(\"present\")"));
         Ok(())
     }
 

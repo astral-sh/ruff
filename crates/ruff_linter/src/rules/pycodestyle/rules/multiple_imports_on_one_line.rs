@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.191")]
+#[violation_metadata(stable_since = "v0.0.191", category = Category::Pedantic)]
 pub(crate) struct MultipleImportsOnOneLine;
 
 impl Violation for MultipleImportsOnOneLine {

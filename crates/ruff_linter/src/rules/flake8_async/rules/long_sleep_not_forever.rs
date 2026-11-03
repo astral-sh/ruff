@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_async::helpers::AsyncModule;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -39,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// This fix is marked as unsafe as it changes program behavior.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Style)]
 pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
 }

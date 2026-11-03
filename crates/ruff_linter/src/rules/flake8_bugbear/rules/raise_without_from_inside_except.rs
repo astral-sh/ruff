@@ -7,6 +7,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `raise` statements in exception handlers that lack a `from`
@@ -49,7 +50,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.138")]
+#[violation_metadata(stable_since = "v0.0.138", category = Category::Pedantic)]
 pub(crate) struct RaiseWithoutFromInsideExcept {
     is_star: bool,
 }

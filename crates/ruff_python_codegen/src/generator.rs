@@ -7,8 +7,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
-    Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Parameter, Parameters, Pattern, PatternOrKeyword, Singleton, Stmt, StringFlags, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -817,7 +817,28 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Pattern::MatchClass(_) => {}
+            Pattern::MatchClass(ast::PatternMatchClass {
+                cls,
+                arguments,
+                range: _,
+                node_index: _,
+            }) => {
+                self.unparse_expr(cls, precedence::MAX);
+                self.p("(");
+                let mut first = true;
+                for pattern_or_keyword in arguments.iter_source_order() {
+                    self.p_delim(&mut first, ", ");
+                    match pattern_or_keyword {
+                        PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
+                        PatternOrKeyword::Keyword(keyword) => {
+                            self.p_id(&keyword.attr);
+                            self.p("=");
+                            self.unparse_pattern(&keyword.pattern);
+                        }
+                    }
+                }
+                self.p(")");
+            }
             Pattern::MatchStar(ast::PatternMatchStar {
                 name,
                 range: _,
@@ -1166,17 +1187,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                range: _,
-                node_index: _,
-            }) => {
+            Expr::Compare(compare) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(comparators) {
+                    self.unparse_expr(compare.first_operand(), new_lvl);
+                    for (_, op, cmp) in compare.iter() {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1197,7 +1212,7 @@ impl<'a> Generator<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
@@ -1465,10 +1480,10 @@ impl<'a> Generator<'a> {
         for f_string_part in value {
             self.p_delim(&mut first, " ");
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     self.unparse_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }

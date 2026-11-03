@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, S
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_quotes;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -38,7 +39,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.88")]
+#[violation_metadata(stable_since = "v0.0.88", category = Category::Formatting)]
 pub(crate) struct AvoidableEscapedQuote;
 
 impl AlwaysFixableViolation for AvoidableEscapedQuote {
@@ -56,10 +57,14 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike) {
     if checker.semantic().in_pep_257_docstring()
         || checker.semantic().in_string_type_definition()
-        // This rule has support for strings nested inside another f-strings but they're checked
-        // via the outermost f-string. This means that we shouldn't be checking any nested string
-        // or f-string.
-        || checker.semantic().in_interpolated_string_replacement_field()
+        || (
+            // This rule has support for strings nested inside another f-strings but they're checked
+            // via the outermost f-string. This means that we shouldn't be checking any nested string
+            // or f-string.
+            checker
+                .semantic()
+                .in_interpolated_string_replacement_field()
+        )
     {
         return;
     }

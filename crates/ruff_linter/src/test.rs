@@ -9,9 +9,8 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
-};
+use ruff_db::diagnostic::render::{FullRenderer, Renderer};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Span};
 use ruff_notebook::Notebook;
 #[cfg(test)]
 use ruff_notebook::NotebookError;
@@ -25,7 +24,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::EmitterContext;
+use crate::message::RenderContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -36,7 +35,7 @@ use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
 /// Represents the difference between two diagnostic runs.
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct DiagnosticsDiff {
     /// Diagnostics that were removed (present in 'before' but not in 'after')
@@ -49,7 +48,7 @@ pub(crate) struct DiagnosticsDiff {
     settings_after: LinterSettings,
 }
 
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 impl std::fmt::Display for DiagnosticsDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "--- Linter settings ---")?;
@@ -91,7 +90,7 @@ impl std::fmt::Display for DiagnosticsDiff {
 }
 
 /// Compare two sets of diagnostics and return the differences
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 fn diff_diagnostics(
     before: Vec<Diagnostic>,
     after: Vec<Diagnostic>,
@@ -378,9 +377,12 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.secondary_code()?.to_string(), msg)))
-        .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code).unwrap();
+        .filter_map(|diagnostic| {
+            Rule::from_name(diagnostic.name())
+                .ok()
+                .map(|rule| (rule, diagnostic))
+        })
+        .map(|(rule, mut diagnostic)| {
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
@@ -483,35 +485,30 @@ pub(crate) fn print_jupyter_messages(
     notebook: &Notebook,
 ) -> String {
     let config = DisplayDiagnosticConfig::new("ruff")
-        .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
-    DisplayDiagnostics::new(
-        &EmitterContext::new(&FxHashMap::from_iter([(
+    FullRenderer::new(
+        &RenderContext::new(&FxHashMap::from_iter([(
             path.file_name().unwrap().to_string_lossy().to_string(),
             notebook.index().clone(),
         )])),
         &config,
-        diagnostics,
     )
+    .display(diagnostics)
     .to_string()
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
     let config = DisplayDiagnosticConfig::new("ruff")
-        .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
-    DisplayDiagnostics::new(
-        &EmitterContext::new(&FxHashMap::default()),
-        &config,
-        diagnostics,
-    )
-    .to_string()
+    FullRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
+        .display(diagnostics)
+        .to_string()
 }
 
 #[macro_export]

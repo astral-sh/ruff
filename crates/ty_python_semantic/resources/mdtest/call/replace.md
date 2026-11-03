@@ -65,7 +65,7 @@ Invalid calls to `__replace__` or `replace` will raise an error:
 ```py
 e = a.__replace__(x="wrong")  # error: [invalid-argument-type]
 
-# TODO: this should ideally also be emit an error
+# error: [invalid-argument-type] "Argument to function `replace` is incorrect: Expected `int`, found `Literal["wrong"]`"
 e = replace(a, x="wrong")
 ```
 

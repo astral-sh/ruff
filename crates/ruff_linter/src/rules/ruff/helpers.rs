@@ -30,10 +30,10 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
+            // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L33
             matches!(
                 qualified_name.segments(),
                 ["attrs", "field" | "Factory"]
-                // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L33
                     | ["attr", "ib" | "attr" | "attrib" | "field" | "Factory"]
             )
         })
@@ -121,8 +121,8 @@ pub(super) fn dataclass_kind<'a>(
         };
 
         match qualified_name.segments() {
-            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
             // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
+            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
             | ["attr", func @ ("s" | "attributes" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
@@ -227,7 +227,7 @@ pub(super) fn has_default_copy_semantics(
 /// Returns `true` if the given function is an instantiation of a class that implements the
 /// descriptor protocol.
 ///
-/// See: <https://docs.python.org/3.10/reference/datamodel.html#descriptors>
+/// See: <https://docs.python.org/3/reference/datamodel.html#descriptors>
 pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
@@ -252,7 +252,18 @@ pub(super) fn is_ctypes_structure_fields(
 ) -> bool {
     let is_ctypes_structure =
         analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
-            matches!(qualified_name.segments(), ["ctypes", "Structure"])
+            matches!(
+                qualified_name.segments(),
+                [
+                    "ctypes",
+                    "Structure"
+                        | "BigEndianStructure"
+                        | "LittleEndianStructure"
+                        | "Union"
+                        | "BigEndianUnion"
+                        | "LittleEndianUnion"
+                ]
+            )
         });
 
     let is_fields = matches!(

@@ -1,4 +1,5 @@
 use crate::checkers::ast::{Checker, TypingImporter};
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
@@ -114,7 +115,7 @@ use ruff_text_size::Ranged;
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Suspicious)]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,

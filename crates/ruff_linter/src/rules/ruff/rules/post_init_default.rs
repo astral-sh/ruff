@@ -9,6 +9,7 @@ use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
@@ -75,7 +76,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Suspicious)]
 pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {

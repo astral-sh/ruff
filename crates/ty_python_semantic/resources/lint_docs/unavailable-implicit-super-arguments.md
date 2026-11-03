@@ -1,12 +1,13 @@
 ## What it does
 
-Detects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.
+Detects invalid `super()` calls where implicit arguments like the enclosing class or first method
+argument are unavailable.
 
 ## Why is this bad?
 
-When `super()` is used without arguments, Python tries to find two things:
-the nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).
-If either of these is missing, the call will fail at runtime with a `RuntimeError`.
+When `super()` is used without arguments, Python tries to find two things: the nearest enclosing
+class and the first argument of the immediately enclosing function (typically self or cls). If
+either of these is missing, the call will fail at runtime with a `RuntimeError`.
 
 ## Examples
 

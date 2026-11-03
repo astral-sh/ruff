@@ -13,6 +13,15 @@ def _(user_id: UserId):
     reveal_type(user_id)  # revealed: UserId
 ```
 
+A `NewType` constructor preserves its argument's runtime identity but gives the result its own
+static tag. Applying an unrelated `NewType` constructor replaces the previous tag.
+
+```py
+MediaId = NewType("MediaId", int)
+
+reveal_type(MediaId(UserId(1)))  # revealed: MediaId
+```
+
 ## Subtyping
 
 The basic purpose of `NewType` is that it acts like a subtype of its base, but not the exact same
@@ -644,9 +653,11 @@ info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
 
-## Don't narrow `NewType`-wrapped `Enum`s inside of match arms
+## `NewType`-wrapped enums match their members
 
-`Literal[Foo.X]` is actually disjoint from `N` here:
+A `NewType` constructor returns its argument unchanged at runtime, and an ordinary literal does not
+restrict `NewType` tags. An enum member can therefore inhabit both its literal type and a `NewType`
+based on the enum. Each arm retains both types, and matching every enum member is exhaustive.
 
 ```py
 from enum import Enum
@@ -661,11 +672,11 @@ N = NewType("N", Foo)
 def f(x: N):
     match x:
         case Foo.X:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.X]
         case Foo.Y:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.Y]
         case _:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: Never
 ```
 
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`

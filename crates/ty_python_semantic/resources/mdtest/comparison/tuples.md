@@ -543,6 +543,69 @@ def _(
     reveal_type(prefix_int_var_int < prefix_int_var_bool)  # revealed: bool
 ```
 
+## Equality with sequences
+
+A `Sequence[object]` can be an empty or nonempty tuple. Both equality and inequality comparisons
+therefore have unknown results:
+
+```py
+from collections.abc import Sequence
+
+def _(value: Sequence[object]):
+    reveal_type(value == ())  # revealed: bool
+    reveal_type(() == value)  # revealed: bool
+    reveal_type(value != ())  # revealed: bool
+    reveal_type(() != value)  # revealed: bool
+
+    reveal_type(value == (1,))  # revealed: bool
+```
+
+The operand types can overlap without either being a subtype of the other. For example, `(1,)`
+inhabits both `Sequence[int]` and `tuple[int | str]`, so these comparisons also have unknown
+results:
+
+```py
+def _(value: Sequence[int], other: tuple[int | str]):
+    reveal_type(value == other)  # revealed: bool
+    reveal_type(other == value)  # revealed: bool
+```
+
+## Equality with tuple subclasses
+
+A `Base` value can be a `Child` instance, so comparing them has an unknown result despite their
+different inherited equality methods:
+
+```py
+class Base: ...
+class Child(tuple[int, ...], Base): ...
+
+def _(value: Base, child: Child):
+    reveal_type(value == child)  # revealed: bool
+    reveal_type(child == value)  # revealed: bool
+```
+
+For unrelated operand classes, the default equality semantics still ignore possible subclasses with
+different equality methods:
+
+```py
+def _(value: Base, other: tuple[int, ...]):
+    reveal_type(value == other)  # revealed: Literal[False]
+```
+
+## Comparisons with truthy strings
+
+A nonempty string cannot compare equal to an integer. Truthiness narrowing preserves this result
+when equality is used for tuple comparisons or membership tests:
+
+```py
+def _(text: str):
+    if text:
+        reveal_type((1,) == (text,))  # revealed: Literal[False]
+        reveal_type((text,) == (1,))  # revealed: Literal[False]
+        reveal_type(text in (1,))  # revealed: Literal[False]
+        reveal_type(1 in (text,))  # revealed: Literal[False]
+```
+
 ## Chained comparisons with elements that incorrectly implement `__bool__`
 
 <!-- snapshot-diagnostics -->
@@ -615,6 +678,35 @@ def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
     reveal_type(left is not right)  # revealed: bool
 ```
 
+## Recursive tuple aliases
+
+Ordering can be determined by the first unequal element, even when a later element is recursive.
+Membership can likewise be established by a known element of the tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+Implicit = tuple[Literal[1], "Implicit | None"]
+type Explicit = tuple[Literal[1], Explicit | None]
+
+def implicit(value: Implicit):
+    reveal_type(value < (2, None))  # revealed: Literal[True]
+    reveal_type(value > (2, None))  # revealed: Literal[False]
+    reveal_type((2, None) > value)  # revealed: Literal[True]
+    reveal_type(1 in value)  # revealed: Literal[True]
+
+def explicit(value: Explicit):
+    reveal_type(value < (2, None))  # revealed: Literal[True]
+    reveal_type(value > (2, None))  # revealed: Literal[False]
+    reveal_type((2, None) > value)  # revealed: Literal[True]
+    reveal_type(1 in value)  # revealed: Literal[True]
+```
+
 ## Recursive NamedTuple
 
 ```py
@@ -626,4 +718,28 @@ class Node(NamedTuple):
 
 def _(n: Node):
     reveal_type(n.parent is n)  # revealed: bool
+```
+
+While membership compares a `Needle` with `First`, it encounters a recursive comparison with
+`Second`. Comparing `Second` directly establishes that the children differ because `First` and
+`Needle` have different tags.
+
+```py
+from typing import Literal
+
+class Needle(NamedTuple):
+    child: Needle | Literal["needle"]
+    tag: Literal[1]
+
+class First(NamedTuple):
+    child: Second | Literal["candidate"]
+    tag: Literal[0]
+
+class Second(NamedTuple):
+    child: First | Literal["candidate"]
+    tag: Literal[1]
+
+def membership(needle: Needle, first: First, second: Second) -> None:
+    reveal_type(needle in (first, second))  # revealed: Literal[False]
+    reveal_type(needle in (second, first))  # revealed: Literal[False]
 ```

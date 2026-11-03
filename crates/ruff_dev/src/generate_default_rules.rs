@@ -35,7 +35,7 @@ pub(crate) fn generate() -> String {
         output.push_str("        select = [\n");
         for (_, rules) in &linters {
             for rule in rules {
-                let _ = writeln!(output, "            \"{}\",", rule.noqa_code());
+                let _ = writeln!(output, "            \"{}\",", rule.noqa_code().unwrap());
             }
         }
         output.push_str("        ]\n");
@@ -56,7 +56,7 @@ pub(crate) fn generate() -> String {
 
         for rule in rules {
             let name = rule.name();
-            let code = rule.noqa_code();
+            let code = rule.noqa_code().unwrap();
             let _ = writeln!(output, "- [`{name}`](rules/{name}.md) (`{code}`)");
         }
         output.push('\n');

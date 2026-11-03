@@ -1,13 +1,13 @@
 ## What it does
 
-Checks for [type variables] whose default type is not compatible with
-the type variable's bound or constraints.
+Checks for [type variables] whose default type is not compatible with the type variable's bound or
+constraints.
 
 ## Why is this bad?
 
-If a type variable has a bound, the default must be assignable to that
-bound (see: [bound rules]). If a type variable has constraints, the default
-must be one of the constraints (see: [constraint rules]).
+If a type variable has a bound, the default must be assignable to that bound (see: [bound rules]).
+If a type variable has constraints, the default must be one of the constraints (see:
+[constraint rules]).
 
 ## Examples
 

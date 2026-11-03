@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_s103_extended_dangerous_bits_enabled;
 
 /// ## What it does
@@ -42,7 +43,7 @@ use crate::preview::is_s103_extended_dangerous_bits_enabled;
 /// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Security)]
 pub(crate) struct BadFilePermissions {
     reason: Reason,
 }
@@ -69,15 +70,16 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_file_permissions(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
+    if matches!(qualified_name.segments(), ["os", "chmod"])
         && let Some(mode_arg) = call.arguments.find_argument_value("mode", 1)
     {
         let known = parse_mask(mode_arg, checker.semantic());

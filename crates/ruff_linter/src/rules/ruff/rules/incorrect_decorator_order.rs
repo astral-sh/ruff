@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for incorrect ordering of decorators on functions and methods.
@@ -44,7 +45,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `abc.abstractmethod`](https://docs.python.org/3/library/abc.html#abc.abstractmethod)
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.14")]
+#[violation_metadata(preview_since = "0.15.14", category = Category::Correctness)]
 pub(crate) struct IncorrectDecoratorOrder {
     outer_decorator: KnownDecorator,
     inner_decorator: KnownDecorator,

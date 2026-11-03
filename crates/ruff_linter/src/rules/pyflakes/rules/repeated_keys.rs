@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", category = Category::Correctness)]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -122,7 +123,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", category = Category::Correctness)]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }
@@ -154,89 +155,59 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
         return;
     }
 
-    // Generate a map from key to (index, value).
-    let mut seen: FxHashMap<HashableExpr, (&Expr, FxHashSet<ComparableExpr>)> =
-        FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
+    let mut seen_keys = FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
+    let mut seen_values = FxHashMap::default();
 
-    // Detect duplicate keys.
     for (i, ast::DictItem { key, value }) in dict.iter().enumerate() {
         let Some(key) = key else {
             continue;
         };
 
-        let comparable_key = HashableExpr::from(key);
-        let comparable_value = ComparableExpr::from(value);
-
-        match seen.entry(comparable_key) {
+        let (first_index, first_key) = match seen_keys.entry(HashableExpr::from(key)) {
             Entry::Vacant(entry) => {
-                entry.insert((key, FxHashSet::from_iter([comparable_value])));
+                entry.insert((i, key));
+                continue;
             }
-            Entry::Occupied(mut entry) => {
-                let (seen_key, seen_values) = entry.get_mut();
-                match key {
-                    key if is_literal_key(key)
-                        && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
-                    {
-                        let mut diagnostic = checker.report_diagnostic(
-                            MultiValueRepeatedKeyLiteral {
-                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                                existing: SourceCodeSnippet::from_str(
-                                    checker.locator().slice(*seen_key),
-                                ),
-                            },
-                            key.range(),
-                        );
-                        if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                parenthesized_range(
-                                    dict.value(i - 1).into(),
-                                    dict.into(),
-                                    checker.tokens(),
-                                )
-                                .unwrap_or_else(|| dict.value(i - 1).range())
-                                .end(),
-                                parenthesized_range(
-                                    dict.value(i).into(),
-                                    dict.into(),
-                                    checker.tokens(),
-                                )
-                                .unwrap_or_else(|| dict.value(i).range())
-                                .end(),
-                            )));
-                        }
-                    }
-                    Expr::Name(_)
-                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) =>
-                    {
-                        let mut diagnostic = checker.report_diagnostic(
-                            MultiValueRepeatedKeyVariable {
-                                name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
-                            },
-                            key.range(),
-                        );
-                        let comparable_value: ComparableExpr = dict.value(i).into();
-                        if !seen_values.insert(comparable_value) {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                                parenthesized_range(
-                                    dict.value(i - 1).into(),
-                                    dict.into(),
-                                    checker.tokens(),
-                                )
-                                .unwrap_or_else(|| dict.value(i - 1).range())
-                                .end(),
-                                parenthesized_range(
-                                    dict.value(i).into(),
-                                    dict.into(),
-                                    checker.tokens(),
-                                )
-                                .unwrap_or_else(|| dict.value(i).range())
-                                .end(),
-                            )));
-                        }
-                    }
-                    _ => {}
-                }
+            Entry::Occupied(entry) => *entry.get(),
+        };
+
+        let mut diagnostic = match key {
+            key if is_literal_key(key)
+                && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
+            {
+                checker.report_diagnostic(
+                    MultiValueRepeatedKeyLiteral {
+                        name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                        existing: SourceCodeSnippet::from_str(checker.locator().slice(first_key)),
+                    },
+                    key.range(),
+                )
             }
+            Expr::Name(_) if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) => {
+                checker.report_diagnostic(
+                    MultiValueRepeatedKeyVariable {
+                        name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                    },
+                    key.range(),
+                )
+            }
+            _ => continue,
+        };
+
+        // Comparing values is only necessary to decide whether a repeated key can be fixed.
+        let values = seen_values.entry(first_index).or_insert_with(|| {
+            FxHashSet::from_iter([ComparableExpr::from(dict.value(first_index))])
+        });
+        if !values.insert(ComparableExpr::from(value)) {
+            let previous = dict.value(i - 1);
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+                parenthesized_range(previous.into(), dict.into(), checker.tokens())
+                    .unwrap_or_else(|| previous.range())
+                    .end(),
+                parenthesized_range(value.into(), dict.into(), checker.tokens())
+                    .unwrap_or_else(|| value.range())
+                    .end(),
+            )));
         }
     }
 }

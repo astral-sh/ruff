@@ -5,6 +5,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -36,7 +37,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The property class](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.7")]
+#[violation_metadata(preview_since = "0.14.7", category = Category::Correctness)]
 pub(crate) struct PropertyWithoutReturn {
     name: String,
 }

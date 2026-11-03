@@ -14,6 +14,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
@@ -37,7 +38,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", category = Category::Suspicious)]
 pub(crate) struct LoopIteratorMutation {
     name: Option<SourceCodeSnippet>,
 }
@@ -70,28 +71,27 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
             // Ex) Given, `for item in items:`, `item` is the index and `items` is the iterable.
             (&**target, &**target, &**iter)
         }
+        // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
+        // iterable.
         Expr::Call(ExprCall {
             func, arguments, ..
-        })
-            // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
-            // iterable.
-            if checker.semantic().match_builtin_expr(func, "enumerate") => {
-                // Ex) `items`
-                let Some(iter) = arguments.args.first() else {
-                    return;
-                };
+        }) if checker.semantic().match_builtin_expr(func, "enumerate") => {
+            // Ex) `items`
+            let Some(iter) = arguments.args.first() else {
+                return;
+            };
 
-                let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
-                    return;
-                };
+            let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
+                return;
+            };
 
-                let [index, target] = elts.as_slice() else {
-                    return;
-                };
+            let [index, target] = elts.as_slice() else {
+                return;
+            };
 
-                // Ex) `i`
-                (index, target, iter)
-            }
+            // Ex) `i`
+            (index, target, iter)
+        }
         _ => {
             return;
         }

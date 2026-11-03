@@ -136,20 +136,6 @@ help: Remove quotes
    |
 
 UP037 [*] Remove quotes from type annotation
-  --> UP037_0.py:40:27
-   |
-39 | class D(TypedDict):
-40 |     E: TypedDict("E", foo="int", total=False)
-   |                           ^^^^^
-help: Remove quotes
-   |
-39 | class D(TypedDict):
-   -     E: TypedDict("E", foo="int", total=False)
-40 +     E: TypedDict("E", foo=int, total=False)
-41 |
-   |
-
-UP037 [*] Remove quotes from type annotation
   --> UP037_0.py:44:31
    |
 43 | class D(TypedDict):

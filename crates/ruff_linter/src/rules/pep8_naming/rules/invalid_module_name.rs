@@ -9,6 +9,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::package::PackageRoot;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -42,7 +43,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.248")]
+#[violation_metadata(stable_since = "v0.0.248", category = Category::Style)]
 pub(crate) struct InvalidModuleName {
     name: String,
 }

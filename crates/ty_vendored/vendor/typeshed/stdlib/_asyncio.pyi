@@ -133,7 +133,7 @@ else:
 # since the only reason why `asyncio.Future` is invariant is the `set_result()` method,
 # and `asyncio.Task.set_result()` always raises.
 @disjoint_base
-class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]  # ty:ignore[invalid-generic-class]
+class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]  # ty:ignore[invalid-generic-class]  # pyrefly: ignore [invalid-variance]
     """A coroutine wrapped in a Future."""
 
     if sys.version_info >= (3, 12):

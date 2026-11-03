@@ -1025,7 +1025,7 @@ In the future, this property will contain the last metadata change time.""")
 # At runtime it inherits from ABC and is not a Protocol, but it will be
 # on the allowlist for use as a Protocol starting in 3.14.
 @runtime_checkable
-class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]
+class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]  # pyrefly: ignore [invalid-inheritance]
     """Abstract base class for implementing the file system path protocol."""
 
     __slots__ = ()
@@ -2715,7 +2715,6 @@ else:
           Dictionary of strings mapping to strings.
         """
 
-@deprecated("Soft deprecated. Use the subprocess module instead.")
 def system(command: StrOrBytesPath) -> int:
     """Execute the command in a subshell."""
 
@@ -3581,20 +3580,20 @@ if sys.version_info >= (3, 13) and sys.platform == "linux":
         flags
           0 or a bit mask of TFD_TIMER_ABSTIME or TFD_TIMER_CANCEL_ON_SET.
         initial
-          initial expiration timing in seconds.
+          initial expiration timing in nanoseconds.
         interval
-          interval for the timer in seconds.
+          interval for the timer in nanoseconds.
         """
 
     def timerfd_gettime(fd: FileDescriptor, /) -> tuple[float, float]:
-        """Return a tuple of a timer file descriptor's (interval, next expiration) in float seconds.
+        """Return a tuple of a timer file descriptor's (next expiration, interval) in float seconds.
 
         fd
           A timer file descriptor.
         """
 
     def timerfd_gettime_ns(fd: FileDescriptor, /) -> tuple[int, int]:
-        """Return a tuple of a timer file descriptor's (interval, next expiration) in nanoseconds.
+        """Return a tuple of a timer file descriptor's (next expiration, interval) in nanoseconds.
 
         fd
           A timer file descriptor.

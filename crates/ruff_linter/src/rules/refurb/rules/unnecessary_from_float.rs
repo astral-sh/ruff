@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -61,7 +62,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,

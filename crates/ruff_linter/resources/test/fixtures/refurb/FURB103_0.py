@@ -162,3 +162,8 @@ with open("tmp_path/pyproject.toml", "w") as f:
         other = 1.234
         """,
     ))
+
+
+# `open` accepts a file descriptor, but `Path` does not
+with open(3, "w") as f:
+    f.write("test")

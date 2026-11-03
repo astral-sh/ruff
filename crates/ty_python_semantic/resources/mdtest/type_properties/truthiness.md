@@ -122,7 +122,21 @@ static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
 
-### `Callable` types always have ambiguous truthiness
+### Subclassable special-cased classes
+
+`Path` and `super` cannot be inferred as always truthy because subclasses can override `__bool__`.
+
+```py
+from pathlib import Path
+
+def _(path: Path, superclass: super):
+    reveal_type(bool(path))  # revealed: bool
+    reveal_type(bool(superclass))  # revealed: bool
+```
+
+### Callable objects
+
+Callable objects can define `__bool__`, so `Callable` parameters have ambiguous truthiness.
 
 ```py
 from typing import Any, Callable
@@ -132,13 +146,20 @@ def f(x: Callable[..., Any], y: Callable[[int], str]):
     reveal_type(bool(y))  # revealed: bool
 ```
 
-But certain callable objects are known to be always truthy:
+But instances of `types.FunctionType` (whether they're defined using a `def` statement or a `lambda`
+expression) are always truthy, and this is also true for bound methods:
 
 ```py
 from types import FunctionType
 
 class A:
     def method(self): ...
+
+reveal_type(bool(f))  # revealed: Literal[True]
+reveal_type(bool(lambda: False))  # revealed: Literal[True]
+
+lambda_function = lambda: False
+reveal_type(bool(lambda_function))  # revealed: Literal[True]
 
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]
@@ -181,7 +202,7 @@ class CustomLenEnum(Enum):
     NO = 0
     YES = 1
 
-    def __len__(self):
+    def __len__(self) -> int:
         return 0
 
 reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
@@ -258,4 +279,15 @@ class AllKeysNotRequired(TypedDict):
 def _(a: AllKeysNotRequired) -> None:
     # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
     reveal_type(bool(a))  # revealed: bool
+```
+
+## Uninhabited values
+
+Calling `bool` with an argument of type `Never` retains the constructor's return type.
+
+```py
+from typing_extensions import Never
+
+def uninhabited(value: Never):
+    reveal_type(bool(value))  # revealed: bool
 ```

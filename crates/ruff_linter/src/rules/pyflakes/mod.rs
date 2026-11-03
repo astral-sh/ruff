@@ -23,6 +23,7 @@ mod tests {
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -187,7 +188,7 @@ mod tests {
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -201,15 +202,18 @@ mod tests {
         rule_code: Rule,
         path: &Path,
     ) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -261,11 +265,7 @@ mod tests {
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_preview_mode(),
@@ -327,11 +327,7 @@ mod tests {
     // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let settings = LinterSettings {
             preview: PreviewMode::Enabled,
             isort: isort::settings::Settings {
@@ -360,11 +356,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "{}_stable_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_stable_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -383,7 +375,7 @@ mod tests {
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -4555,6 +4547,9 @@ lambda: fu
             List[TypedDict("x", x=int)]
             List[NamedTuple("a", a=int)]
             List[NamedTuple("a", [("a", int)])]
+
+            # Keyword arguments no longer define fields on Python 3.13+.
+            List[TypedDict("x", x="Y")]
         "#,
             &[],
         );
@@ -4563,7 +4558,6 @@ lambda: fu
             from typing import TypedDict, List, NamedTuple, TypeVar
 
             List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
             List[NamedTuple("a", [("a", "Y")])]
             List[NamedTuple("a", a="Y")]
             List[TypedDict("x", {"x": List["a"]})]
@@ -4571,7 +4565,6 @@ lambda: fu
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,

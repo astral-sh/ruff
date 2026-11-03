@@ -4,8 +4,8 @@ Checks for calls to an overloaded function that do not match any of the overload
 
 ## Why is this bad?
 
-Failing to provide the correct arguments to one of the overloads will raise a `TypeError`
-at runtime.
+Failing to provide the correct arguments to one of the overloads will raise a `TypeError` at
+runtime.
 
 ## Examples
 

@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
@@ -48,7 +49,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDoubleCastOrProcess {
     inner: String,
     outer: String,

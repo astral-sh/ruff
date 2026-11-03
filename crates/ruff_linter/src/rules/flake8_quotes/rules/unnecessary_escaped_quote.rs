@@ -5,6 +5,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use crate::rules::flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
@@ -33,7 +34,7 @@ use crate::rules::flake8_quotes::helpers::{contains_escaped_quote, raw_contents,
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Formatting)]
 pub(crate) struct UnnecessaryEscapedQuote;
 
 impl AlwaysFixableViolation for UnnecessaryEscapedQuote {

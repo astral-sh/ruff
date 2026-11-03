@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
@@ -671,27 +673,23 @@ fn has_trailing_comma(
     // The slash lacks its own node
     if ends_with_pos_only_argument_separator {
         let comma = tokens.next();
-        assert!(
-            matches!(
-                comma,
-                Some(SimpleToken {
-                    kind: SimpleTokenKind::Comma,
-                    ..
-                })
-            ),
-            "The last positional only argument must be separated by a `,` from the positional only parameters separator `/` but found '{comma:?}'."
+        assert_matches!(
+            comma,
+            Some(SimpleToken {
+                kind: SimpleTokenKind::Comma,
+                ..
+            }),
+            "The last positional only argument must be separated by a `,` from the positional only parameters separator `/`."
         );
 
         let slash = tokens.next();
-        assert!(
-            matches!(
-                slash,
-                Some(SimpleToken {
-                    kind: SimpleTokenKind::Slash,
-                    ..
-                })
-            ),
-            "The positional argument separator must be present for a function that has positional only parameters but found '{slash:?}'."
+        assert_matches!(
+            slash,
+            Some(SimpleToken {
+                kind: SimpleTokenKind::Slash,
+                ..
+            }),
+            "The positional argument separator must be present for a function that has positional only parameters."
         );
     }
 

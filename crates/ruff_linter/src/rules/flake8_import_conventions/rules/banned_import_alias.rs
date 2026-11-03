@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_import_conventions::settings::BannedAliases;
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::rules::flake8_import_conventions::settings::BannedAliases;
 /// ## Options
 /// - `lint.flake8-import-conventions.banned-aliases`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Pedantic)]
 pub(crate) struct BannedImportAlias {
     name: String,
     asname: String,

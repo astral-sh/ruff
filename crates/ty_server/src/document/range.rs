@@ -110,6 +110,16 @@ impl RangeExt for lsp_types::Range {
     }
 }
 
+/// Returns the range of the notebook cell identified by `cell_uri` in the notebook's
+/// concatenated Python source, including the newline that separates it from the next cell.
+///
+/// Returns `None` if `file` isn't an open notebook, if the cell can't be found, or if the cell
+/// isn't part of the notebook's Python source (for example, because it uses a cell magic).
+pub(crate) fn cell_range(db: &dyn Db, file: File, cell_uri: &lsp_types::Uri) -> Option<TextRange> {
+    let cell_index = db.notebook_document(file)?.cell_index_by_uri(cell_uri)?;
+    source_text(db, file).as_notebook()?.cell_range(cell_index)
+}
+
 pub(crate) trait PositionExt {
     /// Convert an LSP Position to internal `TextSize`.
     ///
@@ -144,11 +154,11 @@ impl PositionExt for lsp_types::Position {
             let notebook_document = db.notebook_document(file)?;
             let cell_index = notebook_document.cell_index_by_uri(uri)?;
 
-            let cell_start_offset = notebook.cell_offset(cell_index).unwrap_or_default();
+            let cell_range = notebook.cell_content_range(cell_index)?;
             let cell_relative_line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
 
             let cell_start_location =
-                index.source_location(cell_start_offset, source.as_str(), encoding.into());
+                index.source_location(cell_range.start(), source.as_str(), encoding.into());
             assert_eq!(cell_start_location.character_offset, OneIndexed::MIN);
 
             // Absolute position into the concatenated notebook source text.
@@ -158,7 +168,15 @@ impl PositionExt for lsp_types::Position {
                     .saturating_add(cell_relative_line.to_zero_indexed()),
                 character_offset: OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
             };
-            return Some(index.offset(absolute_position, &source, encoding.into()));
+            let offset = index.offset(absolute_position, &source, encoding.into());
+
+            // A position beyond the end of the cell (past the end of its last line, or on a line
+            // after it) would otherwise resolve to the cell separator or into the next cell.
+            // Clients can send such positions, e.g., a completion request using the position from
+            // before the user deleted the last character in the cell. Clamp it to the end of the
+            // cell, like an out-of-range position in a regular file is clamped to the end of the
+            // file.
+            return Some(offset.min(cell_range.end()));
         }
 
         Some(lsp_position_to_text_size(*self, &source, &index, encoding))

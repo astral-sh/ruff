@@ -1,11 +1,12 @@
-use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for usage of `datetime.date.today()`.
@@ -45,7 +46,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct CallDateToday;
 
 impl Violation for CallDateToday {
@@ -60,18 +61,16 @@ impl Violation for CallDateToday {
 }
 
 /// DTZ011
-pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_date_today(
+    checker: &Checker,
+    location: TextRange,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["datetime", "date", "today"])
-        })
-    {
+    if matches!(qualified_name.segments(), ["datetime", "date", "today"]) {
         checker.report_diagnostic(CallDateToday, location);
     }
 }

@@ -21,5 +21,9 @@ reveal_type(-True)  # revealed: Literal[-1]
 ```py
 reveal_type(~0)  # revealed: Literal[-1]
 reveal_type(~1)  # revealed: Literal[-2]
-reveal_type(~True)  # revealed: Literal[-2]
+
+# `~` on a `bool` is currently deprecated in typeshed.
+# error: [deprecated]
+# revealed: Literal[-2]
+reveal_type(~True)
 ```

@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::codes::Category;
 use crate::{
     FixAvailability, Locator, Violation, checkers::ast::LintContext, codes::Rule, noqa::Directive,
     suppression::Suppressions,
@@ -58,7 +59,7 @@ use crate::{
 /// `unused-noqa` for a rule that will remove these and allow the remaining codes to be moved into a
 /// `ruff: ignore` comment.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22")]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
 pub(crate) struct NoqaComments {
     file_level: bool,
 }
@@ -191,7 +192,9 @@ impl std::fmt::Display for Codes<'_> {
                 "{}",
                 rules
                     .iter()
-                    .map(Rule::noqa_code)
+                    .map(|rule| rule
+                        .noqa_code()
+                        .map_or_else(|| rule.name().to_string(), |code| code.to_string()))
                     .sorted()
                     .dedup()
                     .join(", ")

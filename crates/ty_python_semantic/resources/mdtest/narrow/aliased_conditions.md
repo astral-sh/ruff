@@ -266,6 +266,268 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
 ```
 
+## Alias defined in the `if` branch
+
+Only the `if` branch relates `condition` to `x`. After the branches merge, the independent
+assignment can produce either condition outcome for any value of `x`.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    if flag:
+        condition = x is not None
+    else:
+        condition = other
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias defined in the `else` branch
+
+The same applies when the `else` branch assigns the check. Its relationship to `x` does not hold for
+the independent assignment in the `if` branch.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    if flag:
+        condition = other
+    else:
+        condition = x is not None
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned conditionally
+
+If the branch is skipped, `condition` keeps the independent argument value. Neither outcome of the
+condition narrows `x`.
+
+```py
+def _(x: int | None, flag: bool, condition: bool):
+    if flag:
+        condition = x is not None
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Possibly unbound local alias
+
+A missing local binding raises `UnboundLocalError` instead of falling back to an outer scope. If
+evaluation succeeds, `condition` comes from the narrowing expression.
+
+```py
+def _(x: int | None, flag: bool):
+    if flag:
+        condition = x is not None
+
+    if condition:  # error: [possibly-unresolved-reference]
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+## Class-local alias with a global fallback
+
+An unbound class-local name falls back to the global binding. That independent boolean can produce
+either condition outcome without narrowing the class-local target.
+
+```py
+condition: bool = True
+
+def _(value: int | None, flag: bool):
+    class C:
+        x = value
+        if flag:
+            condition = x is not None
+
+        if condition:
+            reveal_type(x)  # revealed: int | None
+        else:
+            reveal_type(x)  # revealed: int | None
+```
+
+## Global alias assigned conditionally
+
+If the assignment is skipped, a `global` name keeps its independent module-level value. Neither
+outcome narrows the local target.
+
+```py
+condition: bool = True
+
+def _(x: int | None, flag: bool):
+    global condition
+    if flag:
+        condition = x is not None
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned on a terminal branch
+
+A check assigned on a branch that returns cannot describe the condition used afterward. The
+independent assignment is the only one that reaches this use, so neither outcome narrows `x`.
+
+```py
+def _(x: int | None, flag: bool, other: bool):
+    condition = other
+    if flag:
+        condition = x is not None
+        return
+
+    if condition:
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: int | None
+```
+
+## Alias assigned on the only continuing branch
+
+If the other branch returns, the check is the only assignment that reaches the condition. Its
+relationship to `x` still permits narrowing after the branches merge.
+
+```py
+def _(x: int | None, flag: bool):
+    if flag:
+        condition = x is not None
+    else:
+        return
+
+    if condition:
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+## Alias assigned on an always-taken branch
+
+An alias assigned under a condition that is always true is definitely initialized. Both outcomes of
+the alias narrow its target.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+x = get_value()
+if None is None:
+    is_int = isinstance(x, int)
+
+if is_int:
+    reveal_type(x)  # revealed: int
+else:
+    reveal_type(x)  # revealed: str
+```
+
+## Alias reassignment on the false branch
+
+If the final `check` is false, the `None` check ran and ruled out `None`. Otherwise, assigning
+`True` to `value` leaves a `bool` on that path too.
+
+```py
+def _(value: bool | None, check: bool):
+    if not check:
+        check = value is None
+    if check:
+        reveal_type(value)  # revealed: bool | None
+        value = True
+    reveal_type(value)  # revealed: bool
+```
+
+## Alias preserved across loop iterations
+
+The cached value and its alias are initialized together on the first iteration. Later iterations
+reuse both, so the alias still narrows the cached value.
+
+```py
+def _(value: int | str):
+    cached = None
+    for _ in range(2):
+        if cached is None:
+            cached = value
+            is_int = isinstance(cached, int)
+        # TODO: recognize that `is_int` is initialized on the first iteration.
+        if is_int:  # error: [possibly-unresolved-reference]
+            reveal_type(cached)  # revealed: int
+        else:
+            reveal_type(cached)  # revealed: str
+```
+
+## Cached alias updated when false
+
+A cached condition starts out false and is replaced by the `None` check whenever it is false. A
+later true condition therefore implies that `x` is not `None`, even across loop iterations.
+
+```py
+def _(x: int | None):
+    condition = False
+    for _ in range(2):
+        if not condition:
+            condition = x is not None
+        if condition:
+            reveal_type(x)  # revealed: int
+```
+
+## Cached alias updated when true
+
+The same reasoning applies with the outcomes reversed: a false condition can only come from the
+`None` check, so it rules out `None`.
+
+```py
+def _(x: int | None):
+    condition = True
+    for _ in range(2):
+        if condition:
+            condition = x is None
+        if not condition:
+            reveal_type(x)  # revealed: int
+```
+
+## Alias reassigned on a loop backedge
+
+A different assignment can reach the condition from an earlier iteration. That assignment does not
+describe `x`, so the condition cannot narrow it.
+
+```py
+def _(x: int | None, flags: list[bool], other: bool):
+    condition = False
+    for flag in flags:
+        if flag:
+            condition = x is not None
+        if condition:
+            reveal_type(x)  # revealed: int | None
+        else:
+            reveal_type(x)  # revealed: int | None
+        if other:
+            condition = True
+```
+
+## Alias replaced by an independent loop-carried value
+
+When `replace` is false, the value carried from the first iteration makes `condition` true on the
+second iteration even if `x` is `None`. The condition therefore cannot narrow `x`.
+
+```py
+def _(x: int | None, replace: bool):
+    carry = False
+    for _ in range(2):
+        condition = carry
+        if replace:
+            condition = x is not None
+        if condition:
+            reveal_type(x)  # revealed: int | None
+        carry = not condition
+```
+
 ## Nested scope can preserve alias
 
 > TODO: This feature is not supported yet.

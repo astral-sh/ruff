@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
@@ -35,7 +36,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 /// ## References
 /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.248")]
+#[violation_metadata(stable_since = "v0.0.248", category = Category::Correctness)]
 pub(crate) struct ReturnInInit;
 
 impl Violation for ReturnInInit {

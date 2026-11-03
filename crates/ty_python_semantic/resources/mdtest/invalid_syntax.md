@@ -106,6 +106,29 @@ out = (obj.attr := obj).attr
 out = (obj[0] := obj).attr
 ```
 
+## Multiple starred assignment targets
+
+Even when a recovered assignment has more than one starred target, unpacking records types for its
+bindings without panicking.
+
+```py
+first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
+first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+```
+
+## Chained assignment with a missing value
+
+When a chained assignment has no right-hand side, an annotation that uses one of its targets
+resolves to `Unknown`.
+
+```py
+# error: [invalid-syntax] "Expected an expression"
+X = Y =
+
+def f(x: X):
+    reveal_type(x)  # revealed: Unknown
+```
+
 ## Match-pattern alternatives binding different names
 
 A capture present in only one invalid `or` alternative is possibly undefined.
@@ -206,7 +229,7 @@ not panic.
 ```py
 match 0:
     # error: [invalid-syntax] "alternative patterns bind different names"
-    # error: [invalid-syntax] "Expected `:`, found name"
+    # error: [invalid-syntax] "Expected `:`, found identifier"
     # error: [invalid-syntax] "Expected an expression"
     case first | second first:
 ```
@@ -276,4 +299,44 @@ InvalidEmptyAnnotated = Annotated[]
 
 def _(a: InvalidEmptyAnnotated):
     reveal_type(a)  # revealed: Unknown
+```
+
+## Incomplete type parameter lists
+
+A generic protocol with an empty, unclosed type parameter list produces diagnostics without
+panicking while constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Type parameter list cannot be empty"
+# error: [invalid-generic-class]
+class P[(Protocol[T]): ...
+```
+
+## Incomplete type parameter lists with Unicode names
+
+An unclosed type parameter list can also contain a non-ASCII name. The missing closing bracket does
+not cause part of the name to be treated as a delimiter when constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Expected `]`, found `(`"
+# error: [invalid-generic-class]
+class P[Ä(Protocol[T]): ...
 ```

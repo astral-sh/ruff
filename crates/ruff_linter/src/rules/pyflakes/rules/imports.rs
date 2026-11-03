@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///     print(filename)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.44")]
+#[violation_metadata(stable_since = "v0.0.44", category = Category::Suspicious)]
 pub(crate) struct ImportShadowedByLoopVar {
     name: String,
     row: SourceRow,
@@ -118,7 +119,7 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Restriction)]
 pub(crate) struct UndefinedLocalWithImportStar {
     pub(crate) name: String,
 }
@@ -157,7 +158,7 @@ impl Violation for UndefinedLocalWithImportStar {
 /// ## References
 /// - [Python documentation: Future statements](https://docs.python.org/3/reference/simple_stmts.html#future)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.34")]
+#[violation_metadata(stable_since = "v0.0.34", category = Category::Correctness)]
 pub(crate) struct LateFutureImport;
 
 impl Violation for LateFutureImport {
@@ -202,7 +203,7 @@ impl Violation for LateFutureImport {
 ///     return pi * radius**2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.44")]
+#[violation_metadata(stable_since = "v0.0.44", category = Category::Restriction)]
 pub(crate) struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
 }
@@ -244,7 +245,7 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.37")]
+#[violation_metadata(stable_since = "v0.0.37", category = Category::Correctness)]
 pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,
 }

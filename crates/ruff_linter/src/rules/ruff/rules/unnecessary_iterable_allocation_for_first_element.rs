@@ -7,6 +7,7 @@ use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -54,7 +55,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278")]
+#[violation_metadata(stable_since = "v0.0.278", category = Category::Performance)]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }

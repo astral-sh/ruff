@@ -1,0 +1,333 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/duplicate_keyword_args.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..74,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..15,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..10,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..9,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 8..9,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 12..15,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 12..15,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 16..29,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 16..29,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 16..19,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 19..29,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 20..23,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 20..21,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 22..23,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 25..28,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 25..26,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 27..28,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 30..51,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("baz"),
+                        range: 34..37,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 37..46,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 38..39,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 38..39,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 38..39,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 41..42,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 41..42,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("y"),
+                                        range: 41..42,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 44..45,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 44..45,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("z"),
+                                        range: 44..45,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 48..51,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 48..51,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 52..73,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 52..73,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 52..55,
+                                    id: Name("baz"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 55..73,
+                                node_index: NodeIndex(None),
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 56..57,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 59..62,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("y"),
+                                                range: 59..60,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 61..62,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 64..67,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("z"),
+                                                range: 64..65,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 66..67,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 69..72,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("y"),
+                                                range: 69..70,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 71..72,
+                                                value: Int(
+                                                    4,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | def foo(x): ...
+2 | foo(x=1, x=2)
+  |          ^^^ Syntax Error: Duplicate keyword argument `x`
+3 | def baz(x, y, z): ...
+4 | baz(x, y=1, z=3, y=4)
+  |
+
+
+  |
+2 | foo(x=1, x=2)
+3 | def baz(x, y, z): ...
+4 | baz(x, y=1, z=3, y=4)
+  |                  ^^^ Syntax Error: Duplicate keyword argument `y`

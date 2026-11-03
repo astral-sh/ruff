@@ -3,6 +3,7 @@ use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -18,7 +19,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.32")]
+#[violation_metadata(stable_since = "v0.0.32", category = Category::Correctness)]
 pub(crate) struct ExpressionsInStarAssignment;
 
 impl Violation for ExpressionsInStarAssignment {
@@ -45,7 +46,7 @@ impl Violation for ExpressionsInStarAssignment {
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.32")]
+#[violation_metadata(stable_since = "v0.0.32", category = Category::Correctness)]
 pub(crate) struct MultipleStarredExpressions;
 
 impl Violation for MultipleStarredExpressions {

@@ -1,0 +1,460 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/mixed_tstring_and_bytes_literals.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..176,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..18,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 0..18,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 0..8,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 9..18,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 19..37,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 19..37,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 19..27,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 28..37,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 38..57,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 38..57,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 38..46,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 47..57,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 58..84,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 58..84,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 58..65,
+                                                node_index: NodeIndex(None),
+                                                value: "first",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 66..75,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 76..84,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 85..111,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 85..111,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 85..93,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 94..102,
+                                                node_index: NodeIndex(None),
+                                                value: "second",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 103..111,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 112..147,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 112..147,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 112..119,
+                                                node_index: NodeIndex(None),
+                                                value: "first",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 120..129,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 130..137,
+                                                node_index: NodeIndex(None),
+                                                value: "third",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 138..147,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 148..175,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 148..175,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 148..156,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 157..166,
+                                                node_index: NodeIndex(None),
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                        FString(
+                                            FString {
+                                                range: 167..175,
+                                                node_index: NodeIndex(None),
+                                                elements: [
+                                                    Literal(
+                                                        InterpolatedStringLiteralElement {
+                                                            range: 169..174,
+                                                            node_index: NodeIndex(None),
+                                                            value: "third",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Single,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | t'first' b'second'
+  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot mix t-string literals with string or bytes literals
+2 | b'first' t'second'
+3 | t'first' br'second'
+  |
+
+
+  |
+1 | t'first' b'second'
+2 | b'first' t'second'
+  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot mix t-string literals with string or bytes literals
+3 | t'first' br'second'
+4 | 'first' b'second' t'third'
+  |
+
+
+  |
+1 | t'first' b'second'
+2 | b'first' t'second'
+3 | t'first' br'second'
+  | ^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot mix t-string literals with string or bytes literals
+4 | 'first' b'second' t'third'
+5 | b'first' 'second' t'third'
+  |
+
+
+  |
+2 | b'first' t'second'
+3 | t'first' br'second'
+4 | 'first' b'second' t'third'
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+5 | b'first' 'second' t'third'
+6 | 'first' t'second' 'third' b'fourth'
+  |
+
+
+  |
+3 | t'first' br'second'
+4 | 'first' b'second' t'third'
+5 | b'first' 'second' t'third'
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+6 | 'first' t'second' 'third' b'fourth'
+7 | b'first' t'second' f'third'
+  |
+
+
+  |
+4 | 'first' b'second' t'third'
+5 | b'first' 'second' t'third'
+6 | 'first' t'second' 'third' b'fourth'
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot mix t-string literals with string or bytes literals
+7 | b'first' t'second' f'third'
+  |
+
+
+  |
+5 | b'first' 'second' t'third'
+6 | 'first' t'second' 'third' b'fourth'
+7 | b'first' t'second' f'third'
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Cannot mix t-string literals with string or bytes literals

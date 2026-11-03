@@ -172,9 +172,8 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
-        left: Box::new(left.clone()),
-        ops: Box::from([cmp_op]),
-        comparators: Box::from([right.clone()]),
+        ops: [cmp_op].into(),
+        operands: Box::from([left.clone(), right.clone()]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
@@ -392,12 +391,12 @@ impl UnittestAssert {
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: Box::from([(**obj).clone(), (**cls).clone()]),
+                        args: [(**obj).clone(), (**cls).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range: TextRange::default(),
+                    range_start: ruff_text_size::TextSize::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let isinstance = node1.into();
@@ -441,12 +440,12 @@ impl UnittestAssert {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: Box::from([(**regex).clone(), (**text).clone()]),
+                        args: [(**regex).clone(), (**text).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range: TextRange::default(),
+                    range_start: ruff_text_size::TextSize::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let re_search = node2.into();

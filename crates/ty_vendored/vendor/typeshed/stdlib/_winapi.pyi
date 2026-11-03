@@ -450,6 +450,7 @@ if sys.platform == "win32":
 
         def NeedCurrentDirectoryForExePath(exe_name: str, /) -> bool: ...
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 13):
+        # Added in Python 3.13.15, 3.14.7
         def GetTickCount64() -> int:
             """Number of milliseconds that have elapsed since the system was started."""

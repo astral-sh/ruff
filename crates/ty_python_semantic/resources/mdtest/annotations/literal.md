@@ -359,3 +359,69 @@ from typing import Literal
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```
+
+## Invalid expressions in string annotations
+
+Invalid `Literal` arguments in string annotations are checked without looking up assignment
+expressions that are absent from the semantic index. Missing names retain their diagnostics.
+
+`runtime.py`:
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "Literal[int[(name := missing)]]"
+b: "Literal[(name := int)[0]]"  # error: [invalid-type-form]
+c: "Literal[(name := 0).real]"  # error: [invalid-type-form]
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+value: "Literal[int[missing_nested]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+call: "Literal[int[missing_call()]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_left` used when not defined"
+# error: [unresolved-reference] "Name `missing_right` used when not defined"
+arguments: "Literal[int[(missing_left, missing_right)]]"
+
+def valid(value: "Literal[Literal[1], None]"):
+    reveal_type(value)  # revealed: Literal[1] | None
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "Literal[int[(name := missing)]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+b: "Literal[int[missing_nested]]"
+```
+
+## Invalid expressions in evaluated annotations
+
+When an annotation is evaluated, errors in its invalid arguments are still reported.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: Literal[int[(name := missing)]]
+```

@@ -4,8 +4,8 @@ Checks for the creation of invalid generic classes
 
 ## Why is this bad?
 
-There are several requirements that you must follow when defining a generic class.
-Many of these result in `TypeError` being raised at runtime if they are violated.
+There are several requirements that you must follow when defining a generic class. Many of these
+result in `TypeError` being raised at runtime if they are violated.
 
 ## Examples
 

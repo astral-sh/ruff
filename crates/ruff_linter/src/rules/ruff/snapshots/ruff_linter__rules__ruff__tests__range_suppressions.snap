@@ -300,7 +300,6 @@ RUF102 [*] Invalid rule code in suppression: YF829
 96 |     # ruff: enable[F841, RQW320]
 97 |     # ruff: enable[YF829]
    |                    -----
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
    |
 92 |     # Unknown rule codes
@@ -324,7 +323,6 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                          ------
 97 |     # ruff: enable[YF829]
    |
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `RQW320`
    |
 93 |     # ruff: disable[YF829]

@@ -91,7 +91,7 @@ pub fn rename(
 
 /// Helper function to check if a file is included in the project.
 fn is_file_in_project(db: &dyn Db, file: File) -> bool {
-    file.path(db).is_system_virtual_path() || db.project().files(db).contains(&file)
+    file.path(db).is_system_virtual_path() || db.project().files(db).contains(file)
 }
 
 #[cfg(test)]
@@ -2757,6 +2757,47 @@ DC(f=1)
         5 |
         6 | print(a)
           |       -
+        "#);
+    }
+
+    #[test]
+    fn multi_file_attribute_rename_updates_slots() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class Box:
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value = 42
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import Box
+
+print(Box().<CURSOR>value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("count"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:4:13
+          |
+        4 | print(Box().value)
+          |             ^^^^^
+          |
+         ::: lib.py:3:19
+          |
+        3 |     __slots__ = ("value",)
+          |                   -----
+        4 |
+        5 |     def __init__(self) -> None:
+        6 |         self.value = 42
+          |              -----
         "#);
     }
 

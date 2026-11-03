@@ -74,19 +74,10 @@ impl ast::ExprCompare {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-            node_index: _,
-        } = self;
-
-        visitor.visit_expr(left);
-
-        for (op, comparator) in ops.iter().zip(comparators) {
+        visitor.visit_expr(self.first_operand());
+        for (_, op, right) in self.iter() {
             visitor.visit_cmp_op(op);
-            visitor.visit_expr(comparator);
+            visitor.visit_expr(right);
         }
     }
 }
@@ -148,10 +139,10 @@ impl ast::ExprFString {
 
         for f_string_part in value {
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     visitor.visit_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     visitor.visit_f_string(f_string);
                 }
             }

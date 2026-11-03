@@ -3,12 +3,14 @@ use anyhow::Result;
 use ast::Keyword;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -51,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// defaultdict(list)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
@@ -75,15 +77,13 @@ impl Violation for DefaultFactoryKwarg {
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn default_factory_kwarg(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     // If the call isn't a `defaultdict` constructor, return.
-    if !checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["collections", "defaultdict"])
-        })
-    {
+    if !matches!(qualified_name.segments(), ["collections", "defaultdict"]) {
         return;
     }
 

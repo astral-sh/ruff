@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for three or more consecutive if-statements with direct returns
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 ///     return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250")]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Pedantic)]
 pub(crate) struct IfElseBlockInsteadOfDictLookup;
 
 impl Violation for IfElseBlockInsteadOfDictLookup {
@@ -58,23 +59,11 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
         ..
     } = stmt_if;
 
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-        node_index: _,
-    }) = test.as_ref()
+    let Expr::Compare(compare) = test.as_ref() else {
+        return;
+    };
+    let Some((Expr::Name(ast::ExprName { id: target, .. }), CmpOp::Eq, expr)) = compare.as_single()
     else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
-        return;
-    };
-    if **ops != [CmpOp::Eq] {
-        return;
-    }
-    let [expr] = &**comparators else {
         return;
     };
     let Some(literal_expr) = expr.as_literal_expr() else {
@@ -145,22 +134,15 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                 }
             }
             // `elif`
-            Some(Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                range: _,
-                node_index: _,
-            })) => {
-                let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+            Some(Expr::Compare(compare)) => {
+                let Some((Expr::Name(ast::ExprName { id, .. }), CmpOp::Eq, expr)) =
+                    compare.as_single()
+                else {
                     return;
                 };
-                if id != target || **ops != [CmpOp::Eq] {
+                if id != target {
                     return;
                 }
-                let [expr] = &**comparators else {
-                    return;
-                };
                 let Some(literal_expr) = expr.as_literal_expr() else {
                     return;
                 };

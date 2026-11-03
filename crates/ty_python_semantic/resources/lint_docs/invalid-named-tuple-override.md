@@ -4,14 +4,12 @@ Checks for subclass members that override inherited `NamedTuple` fields.
 
 ## Why is this bad?
 
-Reusing an inherited `NamedTuple` field name in a subclass creates a
-class where tuple indexing and `repr()` still reflect the original
-field, while attribute access follows the subclass member.
+Reusing an inherited `NamedTuple` field name in a subclass creates a class where tuple indexing and
+`repr()` still reflect the original field, while attribute access follows the subclass member.
 
 ## Default level
 
-This rule is a warning by default because these overrides do not make
-the class invalid at runtime.
+This rule is a warning by default because these overrides do not make the class invalid at runtime.
 
 ## Examples
 

@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -27,7 +28,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## References
 /// - [Python documentation: The `import` statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.237")]
+#[violation_metadata(stable_since = "v0.0.237", category = Category::Correctness)]
 pub(crate) struct InvalidAllObject;
 
 impl Violation for InvalidAllObject {

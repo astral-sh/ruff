@@ -76,7 +76,7 @@ mod tests {
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
     #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -96,12 +96,9 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code)
@@ -134,7 +131,7 @@ mod tests {
     ) -> Result<()> {
         let snapshot = format!(
             "{}_py{}{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             target_version.major,
             target_version.minor,
             path.to_string_lossy(),

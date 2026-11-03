@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checki
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -56,7 +57,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Complexity)]
 pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
     negate: bool,
@@ -233,29 +234,19 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     ..
                 }) => Some((**operand).clone()),
 
-                Expr::Compare(ast::ExprCompare {
-                    ops,
-                    left,
-                    comparators,
-                    ..
-                }) if matches!(
-                    ops.as_ref(),
-                    [ast::CmpOp::Eq
+                Expr::Compare(ast::ExprCompare { ops, operands, .. })
+                    if let [
+                        op @ (ast::CmpOp::Eq
                         | ast::CmpOp::NotEq
                         | ast::CmpOp::In
                         | ast::CmpOp::NotIn
                         | ast::CmpOp::Is
-                        | ast::CmpOp::IsNot]
-                ) =>
+                        | ast::CmpOp::IsNot),
+                    ] = ops.as_ref() =>
                 {
-                    let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
-                        unreachable!("Single comparison with multiple comparators");
-                    };
-
                     Some(Expr::Compare(ast::ExprCompare {
-                        ops: Box::new([op.negate()]),
-                        left: left.clone(),
-                        comparators: Box::new([right.clone()]),
+                        ops: [op.negate()].into(),
+                        operands: operands.clone(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     }))
@@ -283,12 +274,12 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: Box::from([if_test.clone()]),
+                    args: [if_test.clone()].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
-                range: TextRange::default(),
+                range_start: ruff_text_size::TextSize::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             Some(Expr::Call(call_node))

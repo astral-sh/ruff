@@ -1,9 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_stmt;
 use crate::{Fix, FixAvailability, Violation};
 
@@ -53,7 +55,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as it will remove `print` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
+#[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
 pub(crate) struct Print;
 
 impl Violation for Print {
@@ -103,7 +105,7 @@ impl Violation for Print {
 /// This rule's fix is marked as unsafe, as it will remove `pprint` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
+#[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
 pub(crate) struct PPrint;
 
 impl Violation for PPrint {
@@ -120,12 +122,8 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
 
     let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {

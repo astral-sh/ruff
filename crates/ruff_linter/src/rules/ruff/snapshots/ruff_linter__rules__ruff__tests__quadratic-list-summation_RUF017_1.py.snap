@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF017 [*] Avoid quadratic list summation
+ --> RUF017_1.py:1:1
+  |
+1 | sum((factor.dims for factor in bases), [])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with a starred list comprehension
+  |
+  - sum((factor.dims for factor in bases), [])
+1 + [*sublist for sublist in (factor.dims for factor in bases)]
+  |
+note: This is an unsafe fix and may change runtime behavior

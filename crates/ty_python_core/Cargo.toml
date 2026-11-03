@@ -1,6 +1,6 @@
 [package]
 name = "ty_python_core"
-version = "0.0.8"
+version = "0.0.20"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -44,6 +44,7 @@ ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_trivia = { workspace = true }
 
 anyhow = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 serde = ["dep:serde", "dep:ruff_macros"]

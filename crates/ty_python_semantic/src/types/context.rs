@@ -15,9 +15,10 @@ use salsa::plumbing::{AsId, FromId, Id};
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
+use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
+use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -47,7 +48,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `definition`.
-    pub fn from_definition(definition: Definition<'db>) -> Self {
+    pub(crate) fn from_definition(definition: Definition<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Definition(definition.as_id())),
             lifetime: PhantomData,
@@ -55,7 +56,7 @@ impl<'db> ProgramEnvironment<'db> {
     }
 
     /// Creates an environment that lazily obtains its program from `scope`.
-    pub fn from_scope(scope: ScopeId<'db>) -> Self {
+    pub(crate) fn from_scope(scope: ScopeId<'db>) -> Self {
         Self {
             environment: Cell::new(ProgramSource::Scope(scope.as_id())),
             lifetime: PhantomData,
@@ -102,13 +103,13 @@ impl<'db> ProgramEnvironment<'db> {
 
     /// Returns the Python version used by this operation.
     #[inline]
-    pub fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
+    pub(crate) fn python_version(&self, db: &'db dyn Db) -> PythonVersion {
         self.program(db).python_version(db)
     }
 
     /// Returns the resolver environment used by this operation.
     #[inline]
-    pub fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+    pub(crate) fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         self.program(db).resolver_environment(db)
     }
 }
@@ -125,17 +126,25 @@ enum ProgramSource {
     Scope(Id),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum DiagnosticMode {
+    Normal,
+    Suppressed,
+    /// Explain an invalid type expression without reporting errors in its defining file.
+    TypeExpressionExplanation,
+}
+
 /// Context for inferring the types of a single file.
 ///
 /// One context exists for at least for every inferred region but it's
 /// possible that inferring a sub-region, like an unpack assignment, creates
 /// a sub-context.
 ///
-/// Tracks the reported diagnostics of the inferred region.
+/// Tracks the reported diagnostics and semantic validity of the inferred region.
 ///
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
-/// [`InferContext::finish`] and the returned diagnostics must be stored
+/// [`InferContext::finish`] and the returned metadata must be stored
 /// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
@@ -145,7 +154,8 @@ pub(crate) struct InferContext<'db, 'ast> {
     program_file: ProgramFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
-    diagnostics_suppressed: bool,
+    has_invalid_type_form: Cell<bool>,
+    diagnostic_mode: DiagnosticMode,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -172,7 +182,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             file,
             program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
-            diagnostics_suppressed: false,
+            has_invalid_type_form: Cell::new(false),
+            diagnostic_mode: DiagnosticMode::Normal,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -185,7 +196,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.file
     }
 
-    pub(crate) fn python_file(&self) -> PythonFile<'db> {
+    fn python_file(&self) -> PythonFile<'db> {
         self.program_file.python_file(self.db())
     }
 
@@ -201,6 +212,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module
+    }
+
+    /// Constructs an importer using the file's cached imports and source style.
+    pub(crate) fn importer(&self) -> Importer<'_> {
+        Importer::new(self.db, self.program_file, self.module)
     }
 
     pub(crate) fn scope(&self) -> ScopeId<'db> {
@@ -230,18 +246,55 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.db
     }
 
-    pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.get_mut().extend(other);
+    pub(crate) fn extend(&mut self, other: &InferContextResult) {
+        *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
+        let diagnostics = self.diagnostics.get_mut();
+        if self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation {
+            let invalid_type_form = DiagnosticId::Lint(INVALID_TYPE_FORM.name());
+            diagnostics.extend_diagnostics(
+                (&other.diagnostics)
+                    .into_iter()
+                    .filter(|diagnostic| diagnostic.id() == invalid_type_form)
+                    .cloned(),
+            );
+        } else {
+            diagnostics.extend(&other.diagnostics);
+        }
+    }
+
+    /// Whether diagnostics inferred separately for a referenced alias should be collected.
+    pub(super) fn should_collect_diagnostics(&self) -> bool {
+        self.diagnostic_mode == DiagnosticMode::Normal
+            && self.db().should_check_file(self.file())
+            && !self.is_in_no_type_check()
     }
 
     pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
     }
 
+    /// Records an invalid type form even when its diagnostic is suppressed or inferred separately.
+    pub(super) fn mark_invalid_type_form(&self) {
+        self.has_invalid_type_form.set(true);
+    }
+
     /// Prevents diagnostic construction for this inference context.
     pub(super) fn suppress_diagnostics(&mut self) {
-        debug_assert!(!self.diagnostics_suppressed);
-        self.diagnostics_suppressed = true;
+        debug_assert_ne!(self.diagnostic_mode, DiagnosticMode::Suppressed);
+        self.diagnostic_mode = DiagnosticMode::Suppressed;
+    }
+
+    /// Collect type-expression errors for use as explanations at a reference site.
+    ///
+    /// These errors describe why a value cannot be used as a type, independently of whether
+    /// diagnostics are enabled or suppressed in the file defining that value.
+    pub(super) fn collect_type_expression_diagnostics(&mut self) {
+        debug_assert_eq!(self.diagnostic_mode, DiagnosticMode::Normal);
+        self.diagnostic_mode = DiagnosticMode::TypeExpressionExplanation;
+    }
+
+    pub(super) fn is_type_expression_explanation(&self) -> bool {
+        self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
@@ -281,6 +334,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
+        let lint = LintId::of(lint);
+        if lint == LintId::of(&INVALID_TYPE_FORM) {
+            self.mark_invalid_type_form();
+        }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
     }
 
@@ -342,7 +399,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     ///
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
-    fn is_range_reachable(&self, range: TextRange) -> bool {
+    pub(super) fn is_range_reachable(&self, range: TextRange) -> bool {
         let db = self.db;
         let index = semantic_index(self.db(), self.program_file);
         let scope_id = self.scope.file_scope_id(self.db());
@@ -359,18 +416,20 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[must_use]
-    pub(crate) fn finish(mut self) -> TypeCheckDiagnostics {
-        self.bomb.defuse();
-        let mut diagnostics = self.diagnostics.into_inner();
-        diagnostics.shrink_to_fit();
-        diagnostics
+    pub(crate) fn finish(self) -> InferContextResult {
+        let mut result = self.finish_uncompacted();
+        result.diagnostics.shrink_to_fit();
+        result
     }
 
     /// Consume this context without compacting its diagnostics.
     #[must_use]
-    pub(crate) fn finish_uncompacted(mut self) -> TypeCheckDiagnostics {
+    pub(crate) fn finish_uncompacted(mut self) -> InferContextResult {
         self.bomb.defuse();
-        self.diagnostics.into_inner()
+        InferContextResult {
+            diagnostics: self.diagnostics.into_inner(),
+            has_invalid_type_form: self.has_invalid_type_form.get(),
+        }
     }
 }
 
@@ -382,9 +441,27 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("file", &self.file)
             .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
-            .field("diagnostics_suppressed", &self.diagnostics_suppressed)
+            .field("has_invalid_type_form", &self.has_invalid_type_form)
+            .field("diagnostic_mode", &self.diagnostic_mode)
             .field("inference_flags", &self.inference_flags)
             .finish()
+    }
+}
+
+/// Diagnostics and semantic metadata that must survive inference-result caching and merging.
+///
+/// General inference results keep this in their optional extra storage. Invalid type forms
+/// must retain that storage even when diagnostic reporting is disabled or suppressed.
+#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct InferContextResult {
+    pub(super) diagnostics: TypeCheckDiagnostics,
+    /// Whether inference encountered an invalid type form, regardless of diagnostic emission.
+    pub(super) has_invalid_type_form: bool,
+}
+
+impl InferContextResult {
+    pub(super) fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && !self.has_invalid_type_form
     }
 }
 
@@ -514,7 +591,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
             diag.clear_concise_message();
         }
 
-        if self.ctx.db().verbose() {
+        if !self.ctx.is_type_expression_explanation() && self.ctx.db().verbose() {
             let rule = diag.id();
 
             diag.info(match self.source {
@@ -527,11 +604,14 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 LintSource::File => {
                     format!("rule `{rule}` was selected in the configuration file")
                 }
+                LintSource::ScriptMetadata => {
+                    format!("rule `{rule}` was selected in script metadata")
+                }
                 LintSource::Editor => {
                     format!("rule `{rule}` was selected in the editor settings")
                 }
-                LintSource::UvWorkspace => {
-                    format!("rule `{rule}` was selected by uv workspace metadata")
+                LintSource::UvMetadata => {
+                    format!("rule `{rule}` was selected by uv metadata")
                 }
             });
         }
@@ -580,8 +660,13 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: LintId,
     ) -> Option<(Severity, LintSource)> {
-        if ctx.diagnostics_suppressed {
-            return None;
+        match ctx.diagnostic_mode {
+            DiagnosticMode::Normal => {}
+            DiagnosticMode::Suppressed => return None,
+            DiagnosticMode::TypeExpressionExplanation => {
+                return (lint == LintId::of(&INVALID_TYPE_FORM))
+                    .then_some((Severity::Error, LintSource::Default));
+            }
         }
 
         // The comment below was copied from the original
@@ -612,36 +697,24 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
     fn new(
         ctx: &'ctx InferContext<'db, 'ctx>,
-        lint: &'static LintMetadata,
+        lint_id: LintId,
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
-        let lint_id = LintId::of(lint);
-
-        // Suppress all `invalid-type-form` errors during the first pass of
-        // inferring a PEP-613 type alias. These errors are emitted during the
-        // second pass, post-inference.
-        if (lint_id == LintId::of(&INVALID_TYPE_FORM)
-            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
-            && ctx
-                .inference_flags
-                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-        {
-            return None;
-        }
-
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
-        let suppressions = suppressions(ctx.db(), ctx.python_file());
-        if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
-            ctx.diagnostics.borrow_mut().mark_used(suppression.id());
-            return None;
-        }
+        if !ctx.is_type_expression_explanation() {
+            let suppressions = suppressions(ctx.db(), ctx.python_file());
+            if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
+                ctx.diagnostics.borrow_mut().mark_used(suppression.id());
+                return None;
+            }
 
-        // Suppress diagnostics in unreachable code. This checks both whether
-        // the scope itself is unreachable and whether the specific statement or
-        // expression containing this diagnostic is unreachable.
-        if !ctx.is_range_reachable(range) {
-            return None;
+            // Suppress diagnostics in unreachable code. This checks both whether
+            // the scope itself is unreachable and whether the specific statement or
+            // expression containing this diagnostic is unreachable.
+            if !ctx.is_range_reachable(range) {
+                return None;
+            }
         }
 
         Some(LintDiagnosticGuardBuilder {
@@ -720,7 +793,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
-        if ctx.diagnostics_suppressed {
+        if ctx.diagnostic_mode != DiagnosticMode::Normal {
             return None;
         }
 

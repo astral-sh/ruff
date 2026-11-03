@@ -100,7 +100,7 @@ impl<'src> Parser<'src> {
         let token = self.current_token_kind();
         matches!(
             token,
-            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
+            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Identifier
         ) || token.is_keyword()
     }
 
@@ -171,7 +171,9 @@ impl<'src> Parser<'src> {
                     ParseErrorType::SimpleStatementsOnSameLine,
                     self.current_token_range(),
                 );
-            } else if self.at_compound_stmt() {
+            } else if self.at_compound_stmt() && !self.at(TokenKind::Match) {
+                // `match` can also be an identifier. Report this error when parsing it as a keyword.
+
                 // test_err simple_and_compound_stmt_on_same_line
                 // a; if b: pass; b
                 self.add_error(
@@ -345,7 +347,7 @@ impl<'src> Parser<'src> {
                     // it's followed by an unexpected token.
                     let (first, second) = self.peek2();
 
-                    if (first == TokenKind::Name || first.is_soft_keyword())
+                    if (first == TokenKind::Identifier || first.is_soft_keyword())
                         && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
                     {
                         return Stmt::TypeAlias(self.parse_type_alias_statement());
@@ -532,7 +534,10 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Raise);
 
         let exc = match self.current_token_kind() {
-            TokenKind::Newline => None,
+            // test_ok bare_raise_before_semicolon
+            // try: work()
+            // except ValueError: raise; report()
+            TokenKind::Newline | TokenKind::Semi => None,
             TokenKind::From => {
                 // test_err raise_stmt_from_without_exc
                 // raise from exc
@@ -669,7 +674,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        let module = if self.at_name_or_soft_keyword() {
+        let module = if self.at_identifier_or_soft_keyword() {
             // test_ok from_import_soft_keyword_module_name
             // from match import pattern
             // from type import bar
@@ -794,7 +799,7 @@ impl<'src> Parser<'src> {
         };
 
         let asname = if self.eat(TokenKind::As) {
-            if self.at_name_or_soft_keyword() {
+            if self.at_identifier_or_soft_keyword() {
                 // test_ok import_as_name_soft_keyword
                 // import foo as match
                 // import bar as case
@@ -1150,8 +1155,9 @@ impl<'src> Parser<'src> {
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
-                                "Only integer literals are allowed in subscript expressions in help end escape command"
-                                    .to_string()
+                                "Only integer literals are allowed in subscript expressions \
+                                    in help end escape command"
+                                    .to_string(),
                             ),
                             slice.range(),
                         );
@@ -1168,8 +1174,9 @@ impl<'src> Parser<'src> {
                 _ => {
                     parser.add_error(
                         ParseErrorType::OtherError(
-                            "Expected name, subscript or attribute expression in help end escape command"
-                                .to_string()
+                            "Expected name, subscript or attribute expression \
+                                in help end escape command"
+                                .to_string(),
                         ),
                         expr,
                     );
@@ -1784,7 +1791,7 @@ impl<'src> Parser<'src> {
         };
 
         let name = if self.eat(TokenKind::As) {
-            if self.at_name_or_soft_keyword() {
+            if self.at_identifier_or_soft_keyword() {
                 // test_ok except_stmt_as_name_soft_keyword
                 // try: ...
                 // except Exception as match: ...
@@ -2396,11 +2403,13 @@ impl<'src> Parser<'src> {
                 self.add_error(error, &parsed_with_item.item.context_expr);
             }
         } else if self.at(TokenKind::Rpar)
-            // test_err with_items_parenthesized_missing_colon
-            // # `)` followed by a newline
-            // with (item1, item2)
-            //     pass
-            && matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            && (
+                // test_err with_items_parenthesized_missing_colon
+                // # `)` followed by a newline
+                // with (item1, item2)
+                //     pass
+                matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            )
         {
             if parsed_with_items.is_empty() {
                 // No with items, treat it as a parenthesized expression to create an empty
@@ -2524,6 +2533,31 @@ impl<'src> Parser<'src> {
         target
     }
 
+    /// Consume `match` as a keyword and report an error if the compound statement follows
+    /// a semicolon. If `match` turns out to be an identifier, rewinding discards the error.
+    fn bump_match_statement_keyword(&mut self) {
+        // test_ok semicolon_before_match_identifier
+        // first(); match = value
+        // first(); match(value)
+        // first(); match[0]: int
+        // first();
+        // match (value):
+        //     case _: pass
+
+        // test_err semicolon_before_match_statement
+        // first(); match value:
+        //     case _: pass
+        // first(); match (value):
+        //     case _: pass
+        if self.tokens.previous_kind() == Some(TokenKind::Semi) {
+            self.add_error(
+                ParseErrorType::SimpleAndCompoundStatementOnSameLine,
+                self.current_token_range(),
+            );
+        }
+        self.bump(TokenKind::Match);
+    }
+
     /// Try parsing a `match` statement.
     ///
     /// This uses speculative parsing to remove the ambiguity of whether the `match` token is used
@@ -2554,7 +2588,7 @@ impl<'src> Parser<'src> {
         let checkpoint = self.checkpoint();
 
         let start = self.node_start();
-        self.bump(TokenKind::Match);
+        self.bump_match_statement_keyword();
 
         let subject = self.parse_match_subject_expression();
 
@@ -2618,7 +2652,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
         let start = self.node_start();
-        self.bump(TokenKind::Match);
+        self.bump_match_statement_keyword();
 
         let match_range = self.node_range(start);
 
@@ -2879,22 +2913,7 @@ impl<'src> Parser<'src> {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it. Guard the recursive recovery path so
                 // `async async async ...` cannot overflow the parser stack.
-                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
-                    stmt
-                } else {
-                    let range = self.node_range(async_start);
-                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
-                    Stmt::Expr(ast::StmtExpr {
-                        range,
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            range,
-                            id: Name::new_static("async"),
-                            ctx: ExprContext::Invalid,
-                            node_index: AtomicNodeIndex::NONE,
-                        })),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
-                }
+                self.with_recursion(Self::parse_statement)
             }
         }
     }
@@ -3050,7 +3069,9 @@ impl<'src> Parser<'src> {
                 // x = 1
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "Expected class, function definition or async function definition after decorator".to_string(),
+                        "Expected class, function definition or async function definition \
+                            after decorator"
+                            .to_string(),
                     ),
                     self.current_token_range(),
                 );
@@ -3133,7 +3154,7 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self.with_recursion(|parser| {
+        let statements = self.with_recursion(|parser| {
             let snapshot = parser.stmt_scratch.snapshot();
             parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
                 let statement = parser.parse_statement();
@@ -3141,12 +3162,7 @@ impl<'src> Parser<'src> {
             });
 
             parser.stmt_scratch.take_thin_vec(snapshot)
-        }) {
-            statements
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            Suite::new()
-        };
+        });
 
         self.expect(TokenKind::Dedent);
 
@@ -3349,11 +3365,14 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    kwonlyargs_snapshot
-                        .get_or_insert_with(|| parser.parameter_scratch.snapshot());
+                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
-                    if parser.at_name_or_soft_keyword() {
-                        let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
+                    if parser.at_identifier_or_soft_keyword() {
+                        let param = parser.parse_parameter(
+                            param_start,
+                            function_kind,
+                            AllowStarAnnotation::Yes,
+                        );
                         let param_star_range = parser.node_range(star_range.start());
 
                         if parser.at(TokenKind::Equal) {
@@ -3405,7 +3424,8 @@ impl<'src> Parser<'src> {
                             // def foo(a, *args, b, c, *): ...
                             parser.add_error(
                                 ParseErrorType::OtherError(
-                                    "Keyword-only parameter separator not allowed after '*' parameter"
+                                    "Keyword-only parameter separator not allowed \
+                                        after '*' parameter"
                                         .to_string(),
                                 ),
                                 star_range,
@@ -3420,7 +3440,8 @@ impl<'src> Parser<'src> {
                     let double_star_range = parser.current_token_range();
                     parser.bump(TokenKind::DoubleStar);
 
-                    let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
+                    let param =
+                        parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
                     if parameters.kwarg.is_some() {
@@ -3531,7 +3552,7 @@ impl<'src> Parser<'src> {
 
                     last_keyword_only_separator_range = None;
                 }
-                _ if parser.at_name_or_soft_keyword() => {
+                _ if parser.at_identifier_or_soft_keyword() => {
                     let param = parser.parse_parameter_with_default(param_start, function_kind);
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
@@ -3547,8 +3568,7 @@ impl<'src> Parser<'src> {
 
                         // test_err params_non_default_after_default
                         // def foo(a=10, b, c: int): ...
-                        parser
-                            .add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
+                        parser.add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
                     }
 
                     seen_default_param |= param.default.is_some();
@@ -3562,7 +3582,7 @@ impl<'src> Parser<'src> {
                 }
                 _ => {
                     // This corresponds to the expected token kinds for `is_list_element`.
-                    unreachable!("Expected Name, '*', '**', or '/'");
+                    unreachable!("Expected identifier, '*', '**', or '/'");
                 }
             }
         });
@@ -3930,7 +3950,7 @@ impl<'src> Parser<'src> {
             // test_err match_classify_as_keyword
             // match yield foo:
             //     case _: ...
-            TokenKind::Name
+            TokenKind::Identifier
             | TokenKind::Int
             | TokenKind::Float
             | TokenKind::Complex

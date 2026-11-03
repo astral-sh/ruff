@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 /// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.237")]
+#[violation_metadata(stable_since = "v0.0.237", category = Category::Suspicious)]
 pub(crate) struct TryExceptPass;
 
 impl Violation for TryExceptPass {

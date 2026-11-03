@@ -5,6 +5,7 @@ use ruff_notebook::CellOffsets;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
 
 /// ## What it does
@@ -28,7 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
 /// spam(1)\n
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.3")]
+#[violation_metadata(preview_since = "v0.3.3", category = Category::Formatting)]
 pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
     in_notebook: bool,

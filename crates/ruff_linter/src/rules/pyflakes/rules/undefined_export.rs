@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for undefined names in `__all__`.
@@ -40,7 +41,7 @@ use crate::Violation;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.25")]
+#[violation_metadata(stable_since = "v0.0.25", category = Category::Suspicious)]
 pub(crate) struct UndefinedExport {
     pub name: String,
 }

@@ -413,16 +413,9 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryLiteralWithinDictCall), // C418
     RuleSelector::rule(Rule::UnnecessaryComprehensionInCall), // C419
     RuleSelector::rule(Rule::EmptyDocstring), // D419
-    RuleSelector::rule(Rule::CallDatetimeWithoutTzinfo), // DTZ001
     RuleSelector::rule(Rule::CallDatetimeToday), // DTZ002
     RuleSelector::rule(Rule::CallDatetimeUtcnow), // DTZ003
     RuleSelector::rule(Rule::CallDatetimeUtcfromtimestamp), // DTZ004
-    RuleSelector::rule(Rule::CallDatetimeNowWithoutTzinfo), // DTZ005
-    RuleSelector::rule(Rule::CallDatetimeFromtimestamp), // DTZ006
-    RuleSelector::rule(Rule::CallDatetimeStrptimeWithoutZone), // DTZ007
-    RuleSelector::rule(Rule::CallDateToday), // DTZ011
-    RuleSelector::rule(Rule::CallDateFromtimestamp), // DTZ012
-    RuleSelector::rule(Rule::DatetimeMinMax), // DTZ901
     RuleSelector::rule(Rule::BareExcept), // E722
     RuleSelector::rule(Rule::IOError), // E902
     RuleSelector::rule(Rule::ShebangNotExecutable), // EXE001
@@ -432,6 +425,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedImport), // F401
     RuleSelector::rule(Rule::ImportShadowedByLoopVar), // F402
     RuleSelector::rule(Rule::LateFutureImport), // F404
+    RuleSelector::rule(Rule::UndefinedLocalWithNestedImportStarUsage), // F406
     RuleSelector::rule(Rule::FutureFeatureNotDefined), // F407
     RuleSelector::rule(Rule::PercentFormatInvalidFormat), // F501
     RuleSelector::rule(Rule::PercentFormatExpectedMapping), // F502
@@ -773,7 +767,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+    LazyLock::new(|| Regex::new(r"^(_+|(_+[\p{XID_Continue}]*[\p{XID_Continue}--_]+?))$").unwrap());
 
 impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
@@ -937,5 +931,142 @@ impl Display for TargetVersion {
             Some(value) => write!(f, "{value}"),
             None => f.write_str("none"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::RuleSelector;
+    use crate::codes::Category;
+    use crate::registry::RuleSet;
+    use crate::rule_selector::PreviewOptions;
+    use crate::settings::types::PreviewMode;
+
+    use super::DEFAULT_SELECTORS;
+
+    #[test]
+    fn preview_default_rules() {
+        let stable_defaults = DEFAULT_SELECTORS
+            .iter()
+            .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+            .collect::<RuleSet>();
+
+        let preview_options = PreviewOptions {
+            mode: PreviewMode::Enabled,
+            require_explicit: false,
+        };
+        let preview_defaults = Category::default_categories()
+            .map(RuleSelector::Category)
+            .iter()
+            .flat_map(|selector| selector.rules(&preview_options))
+            .collect::<RuleSet>();
+
+        let added = preview_defaults.clone().subtract(&stable_defaults);
+        let removed = stable_defaults.subtract(&preview_defaults);
+
+        let snapshot = format!("Added in preview:\n{added}\n\nRemoved in preview:\n{removed}");
+
+        insta::assert_snapshot!(snapshot, @"
+        Added in preview:
+        [
+        	airflow-variable-name-task-id-mismatch (AIR001),
+        	airflow-dag-no-schedule-argument (AIR002),
+        	airflow-variable-get-outside-task (AIR003),
+        	airflow-task-branch-as-short-circuit (AIR004),
+        	airflow-xcom-pull-in-template-string (AIR201),
+        	airflow-task-implicit-multiple-outputs (AIR202),
+        	airflow3-dag-dynamic-value (AIR304),
+        	fast-api-redundant-response-model (FAST001),
+        	fast-api-non-annotated-dependency (FAST002),
+        	fast-api-unused-path-parameter (FAST003),
+        	blocking-http-call-httpx-in-async-function (ASYNC212),
+        	blocking-path-method-in-async-function (ASYNC240),
+        	blocking-input-in-async-function (ASYNC250),
+        	abstract-base-class-without-abstract-method (B024),
+        	empty-method-without-abstract-decorator (B027),
+        	del-attr-with-constant (B043),
+        	return-in-generator (B901),
+        	loop-iterator-mutation (B909),
+        	trailing-comma-on-bare-tuple (COM818),
+        	unnecessary-dict-comprehension-for-iterable (C420),
+        	django-model-without-dunder-str (DJ008),
+        	django-unordered-body-content-in-model (DJ012),
+        	django-non-leading-receiver-decorator (DJ013),
+        	pytest-patch-with-lambda (PT008),
+        	pytest-raises-with-multiple-statements (PT012),
+        	pytest-unnecessary-asyncio-mark-on-fixture (PT024),
+        	pytest-parameter-with-default-argument (PT028),
+        	reimplemented-builtin (SIM110),
+        	lazy-import-immediately-resolved (TID255),
+        	numpy-deprecated-type-alias (NPY001),
+        	numpy-legacy-random (NPY002),
+        	numpy-deprecated-function (NPY003),
+        	numpy2-deprecation (NPY201),
+        	pandas-use-of-dot-is-null (PD003),
+        	pandas-use-of-dot-not-null (PD004),
+        	pandas-use-of-dot-read-table (PD012),
+        	pandas-use-of-pd-merge (PD015),
+        	escape-sequence-in-docstring (D301),
+        	missing-maxsplit-arg (PLC0207),
+        	unnecessary-dunder-call (PLC2801),
+        	duplicate-bases (PLE0241),
+        	dict-iter-missing-items (PLE1141),
+        	modified-iterating-set (PLE4703),
+        	no-classmethod-decorator (PLR0202),
+        	no-staticmethod-decorator (PLR0203),
+        	swap-with-temporary-variable (PLR1712),
+        	unnecessary-lambda (PLW0108),
+        	redefined-slots-in-subclass (PLW0244),
+        	replace-str-enum (UP042),
+        	while-one (UP048),
+        	deprecated-abc-decorator (UP051),
+        	context-manager-iterator (UP052),
+        	if-exp-instead-of-or-operator (FURB110),
+        	repeated-append (FURB113),
+        	delete-full-slice (FURB131),
+        	for-loop-set-mutations (FURB142),
+        	slice-copy (FURB145),
+        	unnecessary-enumerate (FURB148),
+        	math-constant (FURB152),
+        	hardcoded-string-charset (FURB156),
+        	single-item-membership-test (FURB171),
+        	meta-class-abc-meta (FURB180),
+        	subclass-builtin (FURB189),
+        	missing-f-string-syntax (RUF027),
+        	none-not-at-end-of-union (RUF036),
+        	unnecessary-empty-iterable-within-deque-call (RUF037),
+        	redundant-bool-literal (RUF038),
+        	pytest-raises-ambiguous-pattern (RUF043),
+        	implicit-class-var-in-dataclass (RUF045),
+        	needless-else (RUF047),
+        	unnecessary-if (RUF050),
+        	indented-form-feed (RUF054),
+        	unnecessary-regular-expression (RUF055),
+        	falsy-dict-get-fallback (RUF056),
+        	in-empty-collection (RUF060),
+        	legacy-form-pytest-raises (RUF061),
+        	non-octal-permissions (RUF064),
+        	logging-eager-conversion (RUF065),
+        	property-without-return (RUF066),
+        	float-equality-comparison (RUF069),
+        	os-path-commonprefix (RUF071),
+        	useless-finally (RUF072),
+        	f-string-percent-format (RUF073),
+        	incorrect-decorator-order (RUF074),
+        	fallible-context-manager (RUF075),
+        	method-receiver-default (RUF077),
+        	invalid-rule-code (RUF102),
+        	invalid-suppression-comment (RUF103),
+        	unmatched-suppression-comment (RUF104),
+        	rule-codes-in-suppression-comments (RUF106),
+        	shared-clock-mock,
+        	unnecessary-regular-expression-compile,
+        ]
+
+        Removed in preview:
+        [
+        	exec-builtin (S102),
+        ]
+        ");
     }
 }

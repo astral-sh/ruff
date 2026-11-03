@@ -7,6 +7,7 @@ use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineI
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -61,7 +62,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
 pub(crate) struct MultiLineSummaryFirstLine;
 
 impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
@@ -125,7 +126,7 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 /// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
 pub(crate) struct MultiLineSummarySecondLine;
 
 impl AlwaysFixableViolation for MultiLineSummarySecondLine {

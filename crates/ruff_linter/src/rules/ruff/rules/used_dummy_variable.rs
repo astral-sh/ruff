@@ -4,6 +4,7 @@ use ruff_python_semantic::{Binding, BindingId, BindingKind, ScopeKind};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker,
@@ -68,7 +69,7 @@ use crate::{
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.2")]
+#[violation_metadata(preview_since = "0.8.2", category = Category::Pedantic)]
 pub(crate) struct UsedDummyVariable {
     name: String,
     shadowed_kind: Option<ShadowedKind>,

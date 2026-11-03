@@ -3,6 +3,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
@@ -26,7 +27,7 @@ use super::{LogicalLine, Whitespace};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct TabBeforeOperator;
 
 impl AlwaysFixableViolation for TabBeforeOperator {
@@ -59,7 +60,7 @@ impl AlwaysFixableViolation for TabBeforeOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MultipleSpacesBeforeOperator;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeOperator {
@@ -92,7 +93,7 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct TabAfterOperator;
 
 impl AlwaysFixableViolation for TabAfterOperator {
@@ -125,7 +126,7 @@ impl AlwaysFixableViolation for TabAfterOperator {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MultipleSpacesAfterOperator;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterOperator {
@@ -156,7 +157,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterOperator {
 /// ```
 ///
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.281")]
+#[violation_metadata(preview_since = "v0.0.281", category = Category::Formatting)]
 pub(crate) struct TabAfterComma;
 
 impl AlwaysFixableViolation for TabAfterComma {
@@ -187,7 +188,7 @@ impl AlwaysFixableViolation for TabAfterComma {
 /// a = 4, 5
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.281")]
+#[violation_metadata(preview_since = "v0.0.281", category = Category::Formatting)]
 pub(crate) struct MultipleSpacesAfterComma;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterComma {

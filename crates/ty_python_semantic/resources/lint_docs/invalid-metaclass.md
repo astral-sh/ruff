@@ -4,9 +4,8 @@ Checks for arguments to `metaclass=` that are invalid.
 
 ## Why is this bad?
 
-Python allows arbitrary expressions to be used as the argument to `metaclass=`.
-These expressions, however, need to be callable and accept the same arguments
-as `type.__new__`.
+Python allows arbitrary expressions to be used as the argument to `metaclass=`. These expressions,
+however, need to be callable and accept the same arguments as `type.__new__`.
 
 ## Example
 

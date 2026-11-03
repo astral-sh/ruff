@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::SequenceIndexVisitor;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -31,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(fruit_count)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
@@ -69,22 +70,20 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFo
 
 /// PLR1733
 pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
-    let (Expr::Generator(ast::ExprGenerator {
-        elt, generators, ..
-    })
-    | Expr::DictComp(ast::ExprDictComp {
-        value: elt,
-        generators,
-        ..
-    })
-    | Expr::SetComp(ast::ExprSetComp {
-        elt, generators, ..
-    })
-    | Expr::ListComp(ast::ExprListComp {
-        elt, generators, ..
-    })) = expr
-    else {
-        return;
+    let (elt, generators) = match expr {
+        Expr::Generator(ast::ExprGenerator {
+            elt, generators, ..
+        })
+        | Expr::SetComp(ast::ExprSetComp {
+            elt, generators, ..
+        })
+        | Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        }) => (elt.as_ref(), generators.as_slice()),
+        Expr::DictComp(ast::ExprDictComp {
+            value, generators, ..
+        }) => (value.as_ref(), generators.as_ref()),
+        _ => return,
     };
 
     for comp in generators {
@@ -95,7 +94,7 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, exp
         let ranges = {
             let mut visitor =
                 SequenceIndexVisitor::new(&dict_name.id, &index_name.id, &value_name.id);
-            visitor.visit_expr(elt.as_ref());
+            visitor.visit_expr(elt);
             for expr in &comp.ifs {
                 visitor.visit_expr(expr);
             }

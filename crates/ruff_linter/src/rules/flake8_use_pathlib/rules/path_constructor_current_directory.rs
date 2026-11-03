@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::flake8_use_pathlib::helpers::is_pure_path_subclass_with_preview;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Pedantic)]
 pub(crate) struct PathConstructorCurrentDirectory;
 
 impl AlwaysFixableViolation for PathConstructorCurrentDirectory {

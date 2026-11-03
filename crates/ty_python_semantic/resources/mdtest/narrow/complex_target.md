@@ -106,11 +106,11 @@ class C:
 def foo(c: C):
     # The truthiness check `c.value` narrows to `str & ~AlwaysFalsy`.
     # The subsequent `len(c.value)` doesn't narrow further since `str` is not narrowable by len().
-    if c.value and len(c.value):
+    if c.value and len(c.value):  # error: [truthiness-test-of-none-union]
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
     # error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `str | None`"
-    if len(c.value) and c.value:
+    if len(c.value) and c.value:  # error: [truthiness-test-of-none-union]
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
     if c.value is None or not len(c.value):
@@ -365,6 +365,22 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
         reveal_type(x)  # revealed: tuple[Literal["a"], A]
 ```
 
+A tuple can have several literal tags. Matching a different tag rules out that tuple, while
+excluding only one of its possible tags leaves it in the union:
+
+```py
+def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
+    if "a" == x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["a"], int]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+
+    if x[0] != "b":
+        reveal_type(x)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
+```
+
 Enum literals are supported as tuple tags, including `IntEnum` literals:
 
 ```py
@@ -392,17 +408,77 @@ def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
         reveal_type(x)  # revealed: tuple[Literal[IntTag.B], str]
 ```
 
-Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
-discriminating index, we can't safely narrow with equality:
+An `IntEnum` member compares equal to its integer value. A tuple whose tags are `IntTag.A` or `1`
+therefore always matches `1`, and is excluded from the other branch:
 
 ```py
-def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
-    # Can't narrow because second tuple has `str` (not literal) at index 0
+def enum_tag_equal_to_integer(
+    x: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str] | tuple[Literal[2], bytes],
+):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.A, 1], int] | tuple[Literal[1], str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], bytes]
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps tuples whose
+tag is that enum member in both branches, even when its literal type differs from the comparison
+value:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+def custom_inequality(
+    x: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str] | tuple[Literal["b"], bytes],
+):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["b"], bytes]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[NeverUnequal.A], int] | tuple[Literal["a"], str]
+```
+
+An ambiguous tag keeps its tuple in both branches. Other tuples can still be excluded when their
+literal tags make the comparison always true or always false:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
     if x[0] == "tag1":
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
     else:
-        # But we *can* narrow with inequality
-        reveal_type(x)  # revealed: tuple[str, B]
+        reveal_type(x)  # revealed: tuple[str, B] | tuple[Literal["tag2"], C]
+```
+
+This also applies when a tag is a union of literal and non-literal types. The non-literal
+alternative can compare equal to the tag being checked:
+
+```py
+class MatchesAnything:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def nonliteral_tag_union(
+    x: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str] | tuple[Literal["c"], bytes],
+):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"] | MatchesAnything, str]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"] | MatchesAnything, str] | tuple[Literal["c"], bytes]
+```
+
+An `int` tag can contain a subclass with custom equality, so it can match a string literal. This
+preserves the tuple with that tag without preventing narrowing of the literal tags:
+
+```py
+def integer_tag(x: tuple[int, A] | tuple[Literal["a"], B] | tuple[Literal["b"], C]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[int, A] | tuple[Literal["a"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[int, A] | tuple[Literal["b"], C]
 ```
 
 If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
@@ -428,6 +504,359 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
         # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
         # union.
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
+```
+
+### Tuple unions and truthiness
+
+A truthiness check on one tuple element can narrow the other elements.
+
+```py
+from typing import Literal
+
+def truthy(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+Negating the check selects the tuple with the falsy element. Negative indices work too:
+
+```py
+def negated(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
+    if not value[-2]:
+        reveal_type(value[1])  # revealed: str
+```
+
+Calling `bool` on the element has the same effect as checking its truthiness directly:
+
+```py
+def explicit_bool(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
+    if bool(value[0]):
+        reveal_type(value[1])  # revealed: int
+```
+
+The checked element can also be a union of literals that are all truthy or all falsy:
+
+```py
+def literal_tags(value: tuple[Literal[0, ""], str] | tuple[Literal[1, "x"], int]):
+    if value[0]:
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+A `bool` element can be either true or false, so its tuple remains possible in both branches:
+
+```py
+def ambiguous(value: tuple[bool, int] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value)  # revealed: tuple[bool, int]
+    else:
+        reveal_type(value)  # revealed: tuple[bool, int] | tuple[Literal[False], str]
+```
+
+### Tuple unions and instance checks
+
+An `isinstance` check on one element narrows the other elements in both branches.
+
+```py
+def instance(value: tuple[int, str] | tuple[str, int]):
+    if isinstance(value[0], str):
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+An `int | str` element can pass or fail the `str` check, so its tuple remains possible in both
+branches:
+
+```py
+def overlapping(value: tuple[int | str, bytes] | tuple[str, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[int | str, bytes] | tuple[str, int]
+    else:
+        reveal_type(value)  # revealed: tuple[int | str, bytes]
+```
+
+### Tuple unions and subclass checks
+
+Subclass checks also narrow the tuple containing the checked class.
+
+```py
+def subclass(value: tuple[type[int], str] | tuple[type[str], int]):
+    if issubclass(value[0], str):
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+### Tuple unions and `TypeIs`
+
+A user-defined `TypeIs` check narrows the tuple containing its argument.
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def check(value: tuple[int, str] | tuple[str, int]):
+    if is_string(value[0]):
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+The checked element can be passed by keyword:
+
+```py
+def keyword(value: tuple[int, str] | tuple[str, int]):
+    if is_string(value=value[0]):
+        reveal_type(value[1])  # revealed: int
+```
+
+### Tuple unions and `TypeGuard`
+
+`TypeGuard` can widen its argument's type, so it does not eliminate tuples from the union.
+
+```py
+from typing_extensions import TypeGuard
+
+def guard_string(value: object) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def check(value: tuple[int, str] | tuple[str, int]):
+    if guard_string(value[0]):
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str, int]
+```
+
+### Tuple unions with `Any` elements
+
+An `Any` element can pass or fail a truthiness or `isinstance` check, so its tuple remains possible
+in both branches.
+
+```py
+from typing import Any, Literal
+
+def check(value: tuple[Any, bytes] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value)  # revealed: tuple[Any, bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Any, bytes] | tuple[Literal[False], str]
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[Any, bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Any, bytes] | tuple[Literal[False], str]
+```
+
+### Tuple unions with other types
+
+The check can rule out a tuple while leaving other types in the union. It does not narrow those
+other types.
+
+```py
+def check(value: list[str] | tuple[int, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: list[str]
+    else:
+        reveal_type(value)  # revealed: list[str] | tuple[int, int]
+```
+
+### Tuple unions with variable-length tuples
+
+`tuple[str, ...]` supplies a string at every valid index, so the check can distinguish it from
+`tuple[int, int]`.
+
+```py
+def check(value: tuple[str, ...] | tuple[int, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[str, ...]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+```
+
+### Tuple unions with unknown indices
+
+When the index is not known, the check cannot identify which tuple is present.
+
+```py
+from typing import Literal
+
+def check(value: tuple[Literal[False], str] | tuple[str, Literal[False]], index: int):
+    if value[index]:
+        reveal_type(value)  # revealed: tuple[Literal[False], str] | tuple[str, Literal[False]]
+    if isinstance(value[index], str):
+        reveal_type(value)  # revealed: tuple[Literal[False], str] | tuple[str, Literal[False]]
+```
+
+### Tuple unions with out-of-bounds indices
+
+If the index is out of bounds for any tuple in the union, we report an error and leave the union
+unchanged.
+
+```py
+def check(value: tuple[int, str] | tuple[str]):
+    # error: [index-out-of-bounds]
+    if isinstance(value[1], str):
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str]
+    # error: [index-out-of-bounds]
+    if value[1]:
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str]
+```
+
+### Tuple checks that assign to another name
+
+Assigning the checked element to another name leaves the tuple unchanged, but currently prevents
+narrowing the tuple.
+
+```py
+def element(value: tuple[str, int] | tuple[int, str]):
+    if isinstance(item := value[0], str):
+        # TODO: Narrow to `int`.
+        reveal_type(value[1])  # revealed: int | str
+```
+
+### Tuple checks that reassign the tuple
+
+Assigning a checked element back to the tuple's name replaces the tuple. The check narrows the
+assigned element without restoring the old tuple type.
+
+```py
+def instance(flag: bool):
+    value = ("x",) if flag else (1,)
+    if isinstance(value := value[0], str):
+        reveal_type(value)  # revealed: Literal["x"]
+    else:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+The same applies to user-defined `TypeIs` checks:
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def check(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value := value[0]):
+        reveal_type(value)  # revealed: Literal["x"]
+    else:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+### Tuple reassignment in an index
+
+Python reads the tuple before evaluating its index. The index expression below then replaces `value`
+with `(False,)`. The truthiness check uses the original tuple and does not narrow the replacement.
+
+```py
+from typing import Literal
+
+def check(value: tuple[Literal[True]] | tuple[Literal[False]]):
+    if value[(value := (False,)) and 0]:
+        reveal_type(value)  # revealed: tuple[Literal[False]]
+```
+
+### Tuple checks with assignments in later arguments
+
+An assignment in a later argument can replace the tuple after its element has been read. The check
+does not narrow the replacement value.
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object, other: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def positional(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value[0], value := 0):
+        reveal_type(value)  # revealed: Literal[0]
+    else:
+        reveal_type(value)  # revealed: Literal[0]
+```
+
+This also applies when the later argument is passed by keyword:
+
+```py
+def keyword(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value=value[0], other=(value := 0)):
+        reveal_type(value)  # revealed: Literal[0]
+```
+
+An assignment expression in a comprehension also replaces the tuple, because it assigns to the name
+in the containing function:
+
+```py
+def comprehension(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value[0], [(value := 0) for _ in (0,)]):
+        reveal_type(value)  # revealed: int
+```
+
+Replacing an object prevents narrowing its tuple attribute based on a check of the old object:
+
+```py
+class Container:
+    value: tuple[str, int] | tuple[int, str] = (1, "new")
+
+def attribute(container: Container):
+    if is_string(container.value[0], container := Container()):
+        reveal_type(container.value)  # revealed: tuple[str, int] | tuple[int, str]
+```
+
+### Tuple tags with non-literal comparators
+
+A boolean comparison value can match either boolean tag value, but cannot match a string literal:
+
+```py
+from typing import Literal
+
+def boolean_comparator(value: tuple[bool, int] | tuple[Literal["other"], str], other: bool):
+    if value[0] == other:
+        reveal_type(value)  # revealed: tuple[bool, int]
+    else:
+        reveal_type(value)  # revealed: tuple[bool, int] | tuple[Literal["other"], str]
+```
+
+When the comparison value is a union of literals, a matching tuple can have any of those tags. An
+unequal comparison can retain every tuple because the comparison value is not fixed:
+
+```py
+def union_comparator(
+    value: tuple[Literal["a"], int] | tuple[Literal["b"], str] | tuple[Literal["c"], bytes],
+    other: Literal["a", "b"],
+):
+    if other != value[0]:
+        reveal_type(value)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"], str] | tuple[Literal["c"], bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Literal["a"], int] | tuple[Literal["b"], str]
+```
+
+An intersection can restrict an enum comparison value to some of its members. A tuple with the whole
+enum as its tag remains possible, while an excluded member cannot match:
+
+```py
+from enum import Enum
+from ty_extensions import Intersection, Not
+
+class Color(Enum):
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+
+def intersection_comparator(
+    value: tuple[Literal[Color.RED], int] | tuple[Color, str] | tuple[Literal[Color.GREEN], bytes],
+    other: Intersection[Color, Not[Literal[Color.RED]]],
+):
+    if value[0] == other:
+        reveal_type(value)  # revealed: tuple[Color, str] | tuple[Literal[Color.GREEN], bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Literal[Color.RED], int] | tuple[Color, str] | tuple[Literal[Color.GREEN], bytes]
 ```
 
 ### PEP 695 type aliases

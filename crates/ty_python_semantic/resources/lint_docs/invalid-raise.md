@@ -1,11 +1,11 @@
-Checks for `raise` statements that raise non-exceptions or use invalid
-causes for their raised exceptions.
+Checks for `raise` statements that raise non-exceptions or use invalid causes for their raised
+exceptions.
 
 ## Why is this bad?
 
-Only subclasses or instances of `BaseException` can be raised.
-For an exception's cause, the same rules apply, except that `None` is also
-permitted. Violating these rules results in a `TypeError` at runtime.
+Only subclasses or instances of `BaseException` can be raised. For an exception's cause, the same
+rules apply, except that `None` is also permitted. Violating these rules results in a `TypeError` at
+runtime.
 
 ## Examples
 

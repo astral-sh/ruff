@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the use of `global` statements to update identifiers.
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// print(var)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Restriction)]
 pub(crate) struct GlobalStatement {
     name: String,
 }

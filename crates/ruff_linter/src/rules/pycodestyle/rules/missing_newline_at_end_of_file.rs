@@ -4,6 +4,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -24,7 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// spam(1)\n
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.61")]
+#[violation_metadata(stable_since = "v0.0.61", category = Category::Formatting)]
 pub(crate) struct MissingNewlineAtEndOfFile;
 
 impl AlwaysFixableViolation for MissingNewlineAtEndOfFile {

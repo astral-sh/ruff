@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -29,7 +30,7 @@ use crate::rules::flake8_comprehensions::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.58")]
+#[violation_metadata(stable_since = "v0.0.58", category = Category::Complexity)]
 pub(crate) struct UnnecessaryListComprehensionDict;
 
 impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {

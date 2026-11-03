@@ -7,6 +7,7 @@ use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
@@ -42,7 +43,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// `**kwargs` arguments, as adding a `maxsplit` argument to such a call may lead to duplicate
 /// arguments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Performance)]
 pub(crate) struct MissingMaxsplitArg<'a> {
     actual_split_type: &'a str,
     suggested_split_type: &'a str,

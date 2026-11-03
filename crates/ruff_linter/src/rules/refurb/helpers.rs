@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::rules::flake8_use_pathlib::helpers::is_file_descriptor;
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
@@ -31,12 +32,12 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
+            args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
@@ -65,9 +66,8 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        left: left.clone().into(),
         ops: [op].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
@@ -281,6 +281,12 @@ fn find_file_open<'a>(
     // Match positional arguments, get filename and mode.
     let (filename, pos_mode) = match_open_args(args)?;
 
+    // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
+    // would fail at runtime. `PTH123` skips these for the same reason.
+    if is_file_descriptor(filename, semantic) {
+        return None;
+    }
+
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
@@ -414,6 +420,8 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// A helper function that extracts the `iter` from a [`ast::StmtFor`] node and
 /// adds parentheses if needed.
 ///
+/// Also returns the original source range, including any existing parentheses.
+///
 /// These cases are okay and will not be modified:
 ///
 /// - `for x in z: ...`       ->  `"z"`
@@ -425,11 +433,11 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// - `for x in y, z: ...`                   ->  `"(y, z)"`
 /// - `for x in lambda: 0: ...`              ->  `"(lambda: 0)"`
 /// - `for x in (1,) if True else (2,): ...` ->  `"((1,) if True else (2,))"`
-pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
+pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
     for_stmt: &'a ast::StmtFor,
     checker: &'a Checker,
     location: IterLocation,
-) -> Cow<'a, str> {
+) -> (Cow<'a, str>, TextRange) {
     let locator = checker.locator();
     let iter = for_stmt.iter.as_ref();
 
@@ -437,22 +445,24 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
         parenthesized_range(iter.into(), for_stmt.into(), checker.tokens());
 
     if let Some(range) = original_parenthesized_range {
-        return Cow::Borrowed(locator.slice(range));
+        return (Cow::Borrowed(locator.slice(range)), range);
     }
 
     let iter_in_source = locator.slice(iter);
 
-    match iter {
+    let contents = match iter {
         Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
         Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),
-    }
+    };
+
+    (contents, iter.range())
 }
 
 #[derive(Copy, Clone)]
-pub(super) enum IterLocation {
+pub(crate) enum IterLocation {
     Call,
     Comprehension,
 }

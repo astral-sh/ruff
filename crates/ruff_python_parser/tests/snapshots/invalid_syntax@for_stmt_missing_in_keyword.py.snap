@@ -94,7 +94,7 @@ Module(
 
   |
 1 | for a b: ...
-  |       ^ Syntax Error: Expected `in`, found name
+  |       ^ Syntax Error: Expected `in`, found identifier
 2 | for a: ...
   |
 

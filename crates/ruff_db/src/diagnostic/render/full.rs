@@ -11,25 +11,23 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::diagnostic::render::{FileResolver, Resolved};
+use crate::diagnostic::render::{FileResolver, Renderer, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
-pub(super) struct FullRenderer<'a> {
+pub struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> FullRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for FullRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let stylesheet = if self.config.color {
             DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
@@ -66,9 +64,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
-            if diag.has_applicable_fix(self.config.fix_applicability())
-                && let Some(diff) =
-                    Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
+            if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
                 if let Some(applicability) = to_applicability_annotate(diff.fix) {
@@ -369,17 +365,14 @@ fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
     let (level, message) = match fix.applicability() {
         Applicability::Safe => return None,
         Applicability::Unsafe => (
-            AnnotateLevel::WARNING,
+            AnnotateLevel::WARNING.with_name("note"),
             "This is an unsafe fix and may change runtime behavior",
         ),
         Applicability::DisplayOnly => (
-            // Note that this is still only used in tests. There's no `--display-only-fixes`
-            // analog to `--unsafe-fixes` for users to activate this or see the styling.
-            AnnotateLevel::ERROR,
-            "This is a display-only fix and is likely to be incorrect",
+            AnnotateLevel::WARNING.with_name("note"),
+            "This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
         ),
     };
-    let level = level.with_name("note");
 
     Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
@@ -390,23 +383,28 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
-        Annotation, DiagnosticFormat, Severity,
+        Annotation, Severity,
         render::tests::{
-            NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
+            DiagnosticFormat, NOTEBOOK, TestEnvironment, create_diagnostics,
+            create_notebook_diagnostics, create_syntax_error_diagnostics,
         },
     };
 
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
           |        ^^
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -419,6 +417,13 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F821]: Undefined name `a`
          --> undef.py:1:4
@@ -443,7 +448,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
@@ -760,6 +765,13 @@ print()
         4 |     x = 1
           |     ^
         help: Remove assignment to unused variable `x`
+         ::: cell 3
+          |
+        3 |     print()
+          -     x = 1
+        4 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 

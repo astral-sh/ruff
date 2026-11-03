@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
 
@@ -46,7 +48,7 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 ///
 ///[Python documentation]: https://docs.python.org/3/library/warnings.html#warnings.warn
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Pedantic)]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {
@@ -61,12 +63,12 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["warnings", "warn"]))
-    {
+pub(crate) fn no_explicit_stacklevel(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(qualified_name.segments(), ["warnings", "warn"]) {
         return;
     }
 
