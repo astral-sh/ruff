@@ -9,6 +9,7 @@ import tempfile
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Callable, Generator
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Final, override
 
@@ -184,7 +185,7 @@ class LspTest(ABC):
         self.client = LSPClient()
         self.edit = edit
 
-    @property
+    @cached_property
     def cwd(self) -> Path:
         # Use one physical path for process, workspace, and document identities.
         return self.venv.project_path.resolve()
