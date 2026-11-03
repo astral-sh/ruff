@@ -31,7 +31,7 @@ The manifest is an audit record; it is not passed as thousands of individual
 targets. Expanded include lists can add substantial checker-specific overhead.
 
 The runner applies each project's includes and excludes once, skips symlinks and
-untracked Python files, and prefers a stub to its adjacent implementation.
+untracked Python files, excludes notebooks, and prefers a stub to its adjacent implementation.
 Implementations without stubs and standalone stubs remain targets. This preserves
 imported stub types in mypy. If a file and a populated directory share a module
 name, the directory wins. Paired implementation bodies are omitted for every
@@ -42,6 +42,10 @@ Each CLI checks unannotated function bodies. mypy uses its normal import
 following with project and user configuration disabled, so per-module overrides
 and plugins cannot change its workload. Checkers can still follow different
 imports or infer different types from the same source files.
+
+CLI and LSP subprocesses receive an empty user-configuration directory through
+`XDG_CONFIG_HOME` and `APPDATA`, so machine-specific diagnostic rules cannot alter
+the measurements.
 
 You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
 

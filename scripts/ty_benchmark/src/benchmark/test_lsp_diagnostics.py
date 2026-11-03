@@ -15,6 +15,7 @@ from typing import Any, Final, override
 import pytest
 from lsprotocol import types as lsp
 
+from benchmark import benchmark_environment
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.projects import IncrementalEdit, Project
@@ -220,7 +221,9 @@ class LspTest(ABC):
             pytest.skip(f"{self.tool.name()} doesn't support LSP")
             return
 
-        await self.client.start_io(*lsp_cmd, cwd=self.cwd)
+        await self.client.start_io(
+            *lsp_cmd, cwd=self.cwd, env=benchmark_environment(self.cwd)
+        )
 
         await self.client.initialize_async(
             lsp.InitializeParams(

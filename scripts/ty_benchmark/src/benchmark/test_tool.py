@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from benchmark import benchmark_environment
 from benchmark.projects import Project
 from benchmark.targets import write_cli_targets
 from benchmark.tool import Mypy, Pyrefly, Pyright, Ty, Zuban, which_tool
@@ -24,6 +25,7 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
         "pkg/excluded.py": "this is not valid Python!\n",
         "pkg/sub.pyi": "this is not valid Python!\n",
         "pkg/sub/__init__.pyi": "",
+        "pkg/notebook.ipynb": "this is not a valid notebook!\n",
     }
     for filename, contents in files.items():
         path = tmp_path / filename
@@ -75,6 +77,7 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
     assert "untracked.py" not in output, output
     assert "sub.pyi" not in output, output
     assert "api.py:" not in output, output
+    assert "notebook.ipynb" not in output, output
 
 
 @pytest.fixture
@@ -165,6 +168,45 @@ def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
     assert "invalid-assignment" in result.stdout
     assert "excluded.py" not in result.stdout
     assert "outside.py" not in result.stdout
+
+
+def test_benchmark_environment_isolates_user_config(tmp_path, monkeypatch):
+    user_config = tmp_path / "user-config" / "ty"
+    user_config.mkdir(parents=True)
+    (user_config / "ty.toml").write_text('[rules]\nall = "ignore"\n')
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(user_config.parent))
+    monkeypatch.setenv("APPDATA", str(user_config.parent))
+    checkout = tmp_path / "project"
+    checkout.mkdir()
+    (checkout / "main.py").write_text('value: int = "wrong"\n')
+    tool = Ty()
+    project = Project(
+        name="user-config",
+        repository="",
+        revision="",
+        install_arguments=[],
+        python_version="3.15",
+        include=["main.py"],
+    )
+    venv = Venv(project_name=project.name, project_path=checkout)
+    stdlib_venv.EnvBuilder().create(venv.path)
+    tool.write_config(project, venv)
+    command = tool.command(project, venv, single_threaded=False).command
+    inherited = subprocess.run(
+        command, cwd=checkout, capture_output=True, text=True, check=False
+    )
+    isolated = subprocess.run(
+        command,
+        cwd=checkout,
+        env=benchmark_environment(checkout),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert inherited.returncode == 0, inherited.stderr
+    assert isolated.returncode == 1, isolated.stderr
+    assert "invalid-assignment" in isolated.stdout
+    assert (user_config / "ty.toml").read_text() == '[rules]\nall = "ignore"\n'
 
 
 def test_zuban_cli_prefers_stubs_beside_implementations(zuban_project):
