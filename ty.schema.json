@@ -1117,8 +1117,18 @@
           ]
         },
         "invalid-type-guard-definition": {
-          "title": "detects malformed type guard functions",
+          "title": "detects type guard functions without a positional parameter to narrow",
           "description": "## What it does\n\nChecks for type guard functions without a first non-self-like non-keyword-only non-variadic\nparameter.\n\n## Why is this bad?\n\nType narrowing functions must accept at least one positional argument (non-static methods must\naccept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeIs\n\n\n# no parameter\ndef f() -> TypeIs[int]:  # error\n    return True\n\n\n# no positional arguments allowed\ndef f(*, v: object) -> TypeIs[int]:  # error\n    return True\n\n\n# expected variadic arguments\ndef f(*args: object) -> TypeIs[int]:  # error\n    return True\n\n\nclass C:\n    # only positional argument is `self`\n    def f(self) -> TypeIs[int]:  # error\n        return True\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-is-narrowing": {
+          "title": "detects `TypeIs` narrowed types that are not assignable to the input type",
+          "description": "## What it does\n\nChecks that the narrowed type `T` in a `TypeIs[T]` return annotation is assignable to the declared\ntype of the parameter being narrowed.\n\n## Why is this bad?\n\nA `TypeIs` function refines the type of its argument in both branches of a conditional. Its narrowed\ntype must therefore be consistent with the input type. For example, `list[str]` cannot be assigned\nto `list[object]` because code that accepts a `list[object]` could append an integer to it. A\n`TypeGuard` can express this narrowing for the positive branch.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeGuard, TypeIs\n\n\ndef is_str_list(items: list[object]) -> TypeIs[list[str]]:  # error\n    return all(isinstance(item, str) for item in items)\n\n\ndef contains_only_strings(items: list[object]) -> TypeGuard[list[str]]:\n    return all(isinstance(item, str) for item in items)\n```\n\nBefore ty 0.0.97, `invalid-type-guard-definition` reported both missing parameters to narrow and\nincompatible `TypeIs` narrowings. To keep a custom severity for both checks, set it on both rules.\nFor a `ty: ignore[invalid-type-guard-definition]` that suppresses an incompatible `TypeIs`\nnarrowing, replace the rule name with `invalid-type-is-narrowing`.",
           "default": "error",
           "oneOf": [
             {

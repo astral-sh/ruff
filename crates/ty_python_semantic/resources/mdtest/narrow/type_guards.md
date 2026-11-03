@@ -101,10 +101,20 @@ def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
 
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+# snapshot: invalid-type-is-narrowing
 def _(a: int) -> TypeIs[str]: ...
+```
 
-# error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
+```snapshot
+error[invalid-type-is-narrowing]: Narrowed type `str` is not assignable to the declared parameter type `int`
+  --> src/mdtest_snippet.pyi:50:18
+   |
+50 | def _(a: int) -> TypeIs[str]: ...
+   |                  ^^^^^^^^^^^
+```
+
+```pyi
+# error: [invalid-type-is-narrowing] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
 
@@ -118,18 +128,57 @@ from typing import overload
 from typing_extensions import Never, TypeIs
 
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+# error: [invalid-type-is-narrowing] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
 def one_invalid(value: Never) -> TypeIs[bool]: ...
 @overload
 def one_invalid(value: object) -> TypeIs[str]: ...
 
 # Two distinct invalid overloads should each report their own diagnostic.
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+# error: [invalid-type-is-narrowing] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
 def two_invalid(value: Never) -> TypeIs[bool]: ...
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+# error: [invalid-type-is-narrowing] "Narrowed type `str` is not assignable to the declared parameter type `int`"
 def two_invalid(value: int) -> TypeIs[str]: ...
+```
+
+## Selecting type guard diagnostics
+
+Disabling either rule leaves the other enabled. A rule-specific `ty: ignore` comment can suppress
+the remaining diagnostic on an individual definition.
+
+### Ignoring missing parameters
+
+```toml
+[rules]
+invalid-type-guard-definition = "ignore"
+```
+
+```pyi
+from typing_extensions import TypeIs
+
+def missing_parameter() -> TypeIs[str]: ...  # ok
+
+# error: [invalid-type-is-narrowing]
+def incompatible(value: int) -> TypeIs[str]: ...
+def suppressed(value: int) -> TypeIs[str]: ...  # ty: ignore[invalid-type-is-narrowing]
+```
+
+### Ignoring incompatible narrowings
+
+```toml
+[rules]
+invalid-type-is-narrowing = "ignore"
+```
+
+```pyi
+from typing_extensions import TypeIs
+
+def incompatible(value: int) -> TypeIs[str]: ...  # ok
+
+# error: [invalid-type-guard-definition]
+def missing_parameter() -> TypeIs[str]: ...
+def suppressed() -> TypeIs[str]: ...  # ty: ignore[invalid-type-guard-definition]
 ```
 
 ## Methods
