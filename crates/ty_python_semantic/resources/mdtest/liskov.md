@@ -3298,8 +3298,7 @@ class IncompatibleAttribute(MethodBase):
 
 ## Callable dunder overrides
 
-Override checking classifies callable dunder annotations using class-only lookup, as for implicit
-operator calls:
+Override checking uses class-only lookup for methods invoked by operators.
 
 ```pyi
 from collections.abc import Callable
@@ -3319,6 +3318,17 @@ Methods overriding these callable annotations are compared with their bound sign
 class Methods(Callables):
     def __add__(self, other: object, /) -> bool: ...  # ok
     def __getitem__(self, key: int, extra: int, /) -> bool: ...  # error: [invalid-method-override]
+```
+
+Python uses ordinary attribute lookup for a custom dunder name. Here, the base attribute accepts two
+arguments, so the overriding method must accept both after binding its receiver.
+
+```pyi
+class CustomBase:
+    __custom__: Callable[[object, int], int]
+
+class CustomChild(CustomBase):
+    def __custom__(self, value: int, /) -> int: ...  # error: [invalid-attribute-override]
 ```
 
 Receiver annotations retain their instance-storage contracts:

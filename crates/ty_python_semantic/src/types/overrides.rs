@@ -42,6 +42,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        member::uses_special_method_lookup,
         tuple::Tuple,
     },
 };
@@ -1355,10 +1356,9 @@ fn check_class_declaration<'db>(
     }
 }
 
-/// Dunder method overrides preserve the signature used by implicit calls, which
-/// look up the method on the class. Ordinary methods use normal attribute access.
+/// Compare special methods using the signature seen by an implicit call.
 fn method_override_lookup_policy(name: &str) -> MemberLookupPolicy {
-    if is_dunder(name) {
+    if uses_special_method_lookup(name) {
         MemberLookupPolicy::NO_INSTANCE_FALLBACK
     } else {
         MemberLookupPolicy::default()
@@ -1366,7 +1366,7 @@ fn method_override_lookup_policy(name: &str) -> MemberLookupPolicy {
 }
 
 /// Look up `__new__` on the class so generated and decorated callables retain `cls`
-/// until they are bound for the override comparison. Callable dunders use class-only
+/// until they are bound for the override comparison. Special methods use class-only
 /// lookup, while other attributes retain their instance-storage contracts.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
@@ -1377,7 +1377,7 @@ fn lookup_override_member<'db>(
     if name == "__new__" {
         class.class_member(db, env, name, MemberLookupPolicy::default())
     } else if name == "__hash__"
-        || is_dunder(name)
+        || uses_special_method_lookup(name)
             && class
                 .class_member(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
                 .ignore_possibly_undefined()
