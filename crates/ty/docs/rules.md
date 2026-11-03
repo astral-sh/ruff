@@ -2151,30 +2151,46 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Checks whether a generator function's return annotation allows the generator object it produces.
-This applies to both synchronous and asynchronous generators.
 
 **Why is this bad?**
 
 
-Calling a generator function produces a generator object. A caller that relies on an incompatible
-annotation can fail at runtime.
+Calling a generator function produces a generator object. A synchronous generator function's
+return-type annotation must be a supertype of `types.GeneratorType[Never, object, Never]`, and an
+asynchronous generator function's return-type annotation must be a supertype of
+`types.AsyncGeneratorType[Never, object]`. Other return-type annotations contradict what the
+function does, so must be disallowed.
 
 **Examples**
 
 
 ```python
-def numbers() -> int:  # error: [invalid-generator-return-type]
+from collections.abc import Generator
+
+
+# error: [invalid-generator-return-type]
+def numbers() -> int:
+    yield 1
+
+
+# error: [invalid-generator-return-type]
+async def numbers() -> Generator[int]:
     yield 1
 ```
 
-Annotate `numbers` with `Iterator[int]` from `collections.abc` to describe the iterator it returns.
+Use instead:
 
-**Compatibility**
+```py
+from collections.abc import AsyncGenerator, Generator
 
 
-Before ty 0.0.97, [`invalid-return-type`](#invalid-return-type) also reported incompatible generator annotations. To keep a
-custom severity for these annotations, set [`invalid-generator-return-type`](#invalid-generator-return-type) to that level. To
-suppress the diagnostic on an annotation, use `# ty: ignore[invalid-generator-return-type]`.
+def numbers() -> Generator[int]:
+    yield 1
+
+
+async def numbers() -> AsyncGenerator[int]:
+    yield 1
+```
 
 ## `invalid-generic-class`
 
@@ -3219,7 +3235,7 @@ def g():
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-return-statement%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-return-statement%22+OR+%22invalid-return-type%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L465" target="_blank">View source</a>
 </small>
 
@@ -3228,12 +3244,15 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Checks whether the value in a `return` statement is assignable to the function's annotated return
-type. In a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the
-returned value must be assignable to `ReturnType`.
+type.
 
-A bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off
-the end of a function, Python also returns `None`. ty checks that case with
-[`missing-return-statement`](#missing-return-statement) for nonempty bodies and [`empty-body`](#empty-body) for empty bodies.
+A bare `return` statement is equivalent to `return None` and is checked by this rule. However, cases
+where a code path is missing a `return` statement entirely -- leading to execution "falling off" the
+end of a function and the function implicitly returning `None` in that code path -- are reported by
+either [`missing-return-statement`](#missing-return-statement) or [`empty-body`](#empty-body).
+
+In a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the value of a
+`return` statement must be assignable to `ReturnType`.
 
 **Why is this bad?**
 
@@ -3245,16 +3264,20 @@ to ty inferring incorrect types elsewhere.
 
 
 ```python
-def func() -> int:
-    return "a"  # error: [invalid-return-statement]
+from collections.abc import Generator, AsyncGenerator
+
+
+def func(coinflip: bool) -> int:
+    if coinflip:
+        return "a"  # error: [invalid-return-statement]
+    else:
+        return  # error: [invalid-return-statement]
+
+
+def gen_func() -> Generator[int, None, str]:
+    yield 42
+    return b"oops, a bytestring"  # error: [invalid-return-statement]
 ```
-
-**Compatibility**
-
-
-ty 0.0.97 renamed [`invalid-return-type`](#invalid-return-type) to [`invalid-return-statement`](#invalid-return-statement). The old name is an alias for
-this rule. Missing returns and incompatible generator annotations now have their own rules,
-[`missing-return-statement`](#missing-return-statement) and [`invalid-generator-return-type`](#invalid-generator-return-type).
 
 ## `invalid-super-argument`
 
@@ -4400,8 +4423,11 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Detects nonempty functions that can reach the end of their body when their return type does not
-allow `None`. If a generator annotated with `Generator[YieldType, SendType, ReturnType]` falls off
-the end, its final return value is `None`, so `ReturnType` must allow `None` on that path.
+allow `None`.
+
+If a generator annotated with `Generator[YieldType, SendType, ReturnType]` "falls off" the end of
+the function in certain code paths, the implicit return type in those code paths will be `None`, so
+`ReturnType` must allow `None` in these cases.
 
 **Why is this bad?**
 
@@ -4413,23 +4439,81 @@ the annotated return type can then fail at runtime.
 
 
 ```python
-def sign(x: int) -> int:  # error: [missing-return-statement]
+from collections.abc import Generator
+from hashlib import sha256
+from typing import BinaryIO
+
+
+# error: [missing-return-statement]
+def sign(x: int) -> int:
+    """Compute the sign of the integer passed in"""
     if x < 0:
         return -1
     if x > 0:
         return 1
+
+    # if `x == 0`, we get to here, and the function implicitly returns `None`.
+    # No valid sign exists for `0`, so adjusting the return annotation is appropriate here
+
+
+# error: [missing-return-statement]
+def sale_price(price_in_cents: int, *, on_sale: bool) -> int:
+    """If `on_sale` is `True`, return half the usual price; otherwise, return the usual price"""
+    if on_sale:
+        return price_in_cents // 2
+
+    # If `on_sale=False`, we get to here, and the function implicitly returns `None`.
+    # This function is missing a `return price_in_cents` statement at the end.
+
+
+# error: [missing-return-statement]
+def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
+    """Yield chunks of bytes and return the file's SHA-256 digest when the stream ends."""
+    checksum = sha256()
+
+    while chunk := source.read(8192):
+        checksum.update(chunk)
+        yield chunk
+
+    # The generator implicitly returns `None` after all chunks have been yielded,
+    # contradicting the third type argument of the return-type annotation.
+    # Per the docstring, the user meant to add `return checksum.hexdigest()` at the end.
 ```
 
-Calling `sign(0)` returns `None`. Add `return 0` at the end of the function to handle that case.
+Use instead:
 
-**Compatibility**
+```py
+from collections.abc import Generator
+from hashlib import sha256
+from typing import BinaryIO
 
 
-Before ty 0.0.97, [`invalid-return-type`](#invalid-return-type) also reported missing returns. If you configured a level for
-[`invalid-return-type`](#invalid-return-type) and want the same level for missing returns, set [`missing-return-statement`](#missing-return-statement) to
-that level too. Replace `# ty: ignore[invalid-return-type]` with
-`# ty: ignore[missing-return-statement]` on return annotations where you intended to suppress a
-missing return.
+def sign(x: int) -> int | None:
+    """Compute the sign of the integer passed in"""
+    if x < 0:
+        return -1
+    if x > 0:
+        return 1
+    return None
+
+
+def sale_price(price_in_cents: int, *, on_sale: bool) -> int:
+    """If `on_sale` is `True`, return half the usual price; otherwise, return the usual price"""
+    if on_sale:
+        return price_in_cents // 2
+    return price_in_cents
+
+
+def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
+    """Yield chunks of bytes and return the file's SHA-256 digest when the stream ends."""
+    checksum = sha256()
+
+    while chunk := source.read(8192):
+        checksum.update(chunk)
+        yield chunk
+
+    return checksum.hexdigest()
+```
 
 ## `missing-slot`
 
