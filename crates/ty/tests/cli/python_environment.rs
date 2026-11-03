@@ -1496,7 +1496,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
