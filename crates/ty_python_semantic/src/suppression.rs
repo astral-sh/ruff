@@ -142,8 +142,21 @@ pub(crate) fn check_suppressions(
     db: &dyn Db,
     file: PythonFile<'_>,
     diagnostics: TypeCheckDiagnostics,
+    additional_lints: Vec<Diagnostic>,
 ) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
+
+    for diagnostic in additional_lints {
+        if let Some(name) = diagnostic.id().as_lint()
+            && let Ok(lint) = db.lint_registry().get(name.as_str())
+            && let Some(range) = diagnostic.primary_span().and_then(|span| span.range())
+            && let Some(suppression) = context.suppressions.find_suppression(range, lint)
+        {
+            context.diagnostics.get_mut().mark_used(suppression.id());
+        } else {
+            context.diagnostics.get_mut().push(diagnostic);
+        }
+    }
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);

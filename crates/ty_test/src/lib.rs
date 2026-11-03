@@ -190,7 +190,7 @@ fn run_test(
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
             } else if let Some(site_packages_path) =
-                expand_site_packages_placeholder(&full_path, python_version)
+                mdtest::expand_site_packages_placeholder(&full_path, python_version)
             {
                 full_path = site_packages_path;
             }
@@ -277,7 +277,7 @@ fn run_test(
             } else {
                 src_path.join(path)
             };
-            expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
+            mdtest::expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
         })
         .collect();
 
@@ -339,28 +339,19 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(
+            let failure = match test_file.check_diagnostics(
                 db,
-                test_file.file,
+                "ty",
                 python_version,
                 &diagnostics,
                 options,
-            )
-            .and_then(|inline_diagnostics| {
-                mdtest::validate_inline_snapshot(
-                    db,
-                    "ty",
-                    test_file,
-                    &inline_diagnostics,
-                    &mut markdown_edits,
-                    |rendered| normalize_site_packages_paths(rendered, python_version),
-                )
-            }) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
-                    by_line: line_failures,
-                }),
+                |rendered| normalize_site_packages_paths(rendered, python_version),
+            ) {
+                Ok(edits) => {
+                    markdown_edits.extend(edits);
+                    None
+                }
+                Err(failure) => Some(failure),
             };
 
             all_diagnostics.extend(diagnostics);
@@ -588,28 +579,6 @@ fn normalize_site_packages_paths(rendered: &str, python_version: PythonVersion) 
     }
 
     normalized
-}
-
-fn expand_site_packages_placeholder(
-    path: &SystemPath,
-    python_version: PythonVersion,
-) -> Option<SystemPathBuf> {
-    let component_index = path
-        .components()
-        .position(|component| component.as_str() == "<path-to-site-packages>")?;
-
-    let mut components = path.components();
-    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
-    if cfg!(target_os = "windows") {
-        expanded.extend(["Lib", "site-packages"]);
-    } else {
-        expanded.push("lib");
-        expanded.push(format!("python{python_version}"));
-        expanded.push("site-packages");
-    }
-    expanded.extend(components.skip(1));
-
-    Some(expanded)
 }
 
 fn parse<'s>(

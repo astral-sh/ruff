@@ -38,6 +38,7 @@ pub use self::dedicated::pytest::{
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{MISSING_DIRECT_DEPENDENCY, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+pub(crate) use self::function::KnownFunction;
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
@@ -88,7 +89,7 @@ pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction, OverloadLiteral,
+    FunctionType, OverloadLiteral,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
@@ -196,6 +197,14 @@ mod property_tests;
 mod subscript;
 
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
+    check_types_with_diagnostics(db, file, Vec::new())
+}
+
+pub(crate) fn check_types_with_diagnostics(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    additional_lints: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
     tracing::debug!("Checking file '{path}'", path = source_file.path(db));
@@ -264,7 +273,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics, additional_lints);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {

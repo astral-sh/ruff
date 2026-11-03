@@ -8,7 +8,7 @@ use lsp_types::{
     TextDocumentContentChangePartial, TextDocumentContentChangeWholeDocument, TextDocumentItem,
     Uri,
 };
-use ruff_db::system::{SystemPath, SystemVirtualPath};
+use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPath};
 use ty_server::ClientOptions;
 
 use crate::notebook::NotebookBuilder;
@@ -34,6 +34,28 @@ def foo() -> str:
     let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn deferred_opens_complete_with_one_worker() -> Result<()> {
+    let mut builder = TestServerBuilder::new()?.with_workspace(SystemPath::new("src"), None)?;
+    let paths = (0..80)
+        .map(|index| SystemPathBuf::from(format!("src/file_{index}.py")))
+        .collect::<Vec<_>>();
+    for path in &paths {
+        builder = builder.with_file(path, "value = 1\n")?;
+    }
+    let mut server = builder.build();
+
+    // Editors can open many documents before workspace settings arrive. With a single worker,
+    // processing those deferred notifications must still leave later requests able to run.
+    for path in &paths {
+        server.open_text_document(path, "value = 1\n", 1);
+    }
+    let mut server = server.wait_until_workspaces_are_initialized();
+    server.document_diagnostic_request(&paths[0], None);
 
     Ok(())
 }
@@ -1024,9 +1046,9 @@ mod uv_metadata {
     use std::process::Command;
 
     use anyhow::Result;
-    #[cfg(feature = "test-uv")]
-    use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
+    #[cfg(feature = "test-uv")]
+    use lsp_types::{Message, TextDocumentContentChangeWholeDocument};
     use ruff_db::system::SystemPath;
     #[cfg(feature = "test-uv")]
     use ruff_python_trivia::textwrap::dedent;
@@ -1035,6 +1057,8 @@ mod uv_metadata {
     #[cfg(feature = "test-uv")]
     use ty_project::uv_test_env_vars;
 
+    #[cfg(feature = "test-uv")]
+    use crate::TestServer;
     use crate::TestServerBuilder;
 
     #[cfg(feature = "test-uv")]
@@ -1134,12 +1158,90 @@ package = "invalid"
 
         server.assert_work_done_progress("Refreshing example metadata")?;
 
-        // The existing warning is republished while the refresh is pending, then cleared.
-        assert_eq!(
-            server.collect_publish_diagnostic_notifications(1),
-            diagnostics
-        );
+        // The unchanged warning stays visible until the completed refresh clears it.
         assert!(server.collect_publish_diagnostic_notifications(1)[&event.uri].is_empty());
+        Ok(())
+    }
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn shared_manifest_tracks_unsaved_imports_in_both_workspace_folders() -> Result<()> {
+        let a = SystemPath::new("src/a/main.py");
+        let b = SystemPath::new("src/b/main.py");
+        let manifest = SystemPath::new("src/pyproject.toml");
+        let builder = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src/a"), None)?
+            .with_workspace(SystemPath::new("src/b"), None)?
+            .with_file(
+                manifest,
+                r#"
+[project]
+name = "example"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["attrs==25.4.0", "idna==3.10"]
+
+[tool.ty.rules]
+unused-dependency = "warn"
+"#,
+            )?
+            .with_files([(a, ""), (b, "")])?
+            .with_real_uv(UseUv::On)?;
+
+        let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
+            .current_dir(builder.file_path("src"))
+            .args(["sync"])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv sync failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let mut server = builder.build().wait_until_workspaces_are_initialized();
+        let uri = server.file_uri(manifest);
+        // Each workspace folder publishes a report for the same manifest. They must agree.
+        let next_report = |server: &mut TestServer| {
+            let report = server.await_notification::<PublishDiagnosticsNotification>();
+            assert_eq!(report.uri, uri);
+            assert_eq!(
+                server.await_notification::<PublishDiagnosticsNotification>(),
+                report
+            );
+            report.diagnostics
+        };
+        let initial = next_report(&mut server);
+        assert_eq!(initial.len(), 2);
+        assert!(initial.iter().all(|diagnostic| {
+            diagnostic.code == Some(Code::String("unused-dependency".into()))
+        }));
+
+        server.open_text_document(a, "import attrs\n", 1);
+        let unused_idna = next_report(&mut server);
+        assert_eq!(unused_idna.len(), 1);
+        assert_eq!(
+            unused_idna[0].message,
+            Message::String("Dependency `idna` is declared but never imported".into())
+        );
+        server.open_text_document(b, "import idna\n", 1);
+        assert!(next_report(&mut server).is_empty());
+
+        server.change_text_document(
+            b,
+            vec![
+                TextDocumentContentChangeWholeDocument {
+                    text: String::new(),
+                }
+                .into(),
+            ],
+            2,
+        );
+        assert_eq!(next_report(&mut server), unused_idna);
+        server.close_text_document(a);
+        assert_eq!(next_report(&mut server), initial);
+
         Ok(())
     }
 

@@ -35,6 +35,8 @@ pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
+#[cfg(feature = "testing")]
+pub use uv::testing as uv_test;
 pub use uv::{
     ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, UvWorkspace,
     uv_test_env_vars,
@@ -42,6 +44,7 @@ pub use uv::{
 
 pub mod baseline;
 mod db;
+mod dependency;
 mod files;
 pub mod glob;
 pub mod metadata;
@@ -149,7 +152,7 @@ pub trait ProgressReporter: Send + Sync {
     /// Report the completion of checking a given file along with its diagnostics.
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
-    /// Reports settings or IO related diagnostics. The diagnostics
+    /// Reports project and IO diagnostics. The diagnostics
     /// can belong to different files or no file at all.
     /// But it's never a file for which [`Self::report_checked_file`] gets called.
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
@@ -528,11 +531,10 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics = self.check_settings(db);
-
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
+        let mut diagnostics = self.manifest_diagnostics(db);
         diagnostics.extend_from_slice(files.diagnostics());
 
         reporter.report_diagnostics(db, diagnostics);
@@ -846,6 +848,13 @@ impl Project {
         }
     }
 
+    /// Diagnostics on the project's configuration and dependency declarations.
+    pub fn manifest_diagnostics(self, db: &dyn Db) -> Vec<Diagnostic> {
+        let mut diagnostics = self.check_settings(db);
+        diagnostics.extend_from_slice(dependency::project_dependency_diagnostics(db));
+        diagnostics
+    }
+
     /// Check if the project's settings have any issues
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
         let metadata = self.metadata(db);
@@ -1016,17 +1025,18 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
-            let script = Script::for_file(*db, source_file);
-            if let Some(script) = script
-                && !script.has_valid_settings(*db)
-            {
+            let Some(script) = Script::for_file(*db, source_file) else {
+                return ty_python_semantic::check_file(*db, file, Vec::new());
+            };
+            if !script.has_valid_settings(*db) {
                 return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
             }
 
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
-            let Some(script) = script else {
-                return Ok(diagnostics);
-            };
+            let diagnostics = ty_python_semantic::check_file(
+                *db,
+                file,
+                dependency::script_dependency_diagnostics(*db, script),
+            )?;
 
             let settings_diagnostics = script.settings_diagnostics(*db);
             let dependency_diagnostic =

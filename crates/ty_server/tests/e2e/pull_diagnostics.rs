@@ -648,6 +648,48 @@ def foo() -> str:
     Ok(())
 }
 
+#[test]
+fn shared_manifest_has_one_workspace_report() -> Result<()> {
+    let manifest = SystemPath::new("src/pyproject.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_workspace(SystemPath::new("src/a"), None)?
+        .with_workspace(SystemPath::new("src/b"), None)?
+        .with_file(manifest, "[tool.ty.rules]\nunknown-rule = 'warn'\n")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let first = server.workspace_diagnostic_request(None, None);
+    let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
+        first.items.as_slice()
+    else {
+        anyhow::bail!("expected one manifest report: {first:?}")
+    };
+    assert_eq!(report.uri, server.file_uri(manifest));
+    assert_eq!(report.full_document_diagnostic_report.items.len(), 1);
+
+    let request = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        previous_result_ids: extract_result_ids_from_response(&first),
+        ..WorkspaceDiagnosticParams::default()
+    });
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request);
+
+    server.write_file(manifest, "")?;
+    server.did_change_watched_file(manifest, FileChangeType::Changed);
+    let fixed = server.await_response::<WorkspaceDiagnosticRequest>(&request);
+    let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
+        fixed.items.as_slice()
+    else {
+        anyhow::bail!("expected one cleared report: {fixed:?}")
+    };
+    assert_eq!(report.uri, server.file_uri(manifest));
+    assert!(report.full_document_diagnostic_report.items.is_empty());
+    assert!(report.full_document_diagnostic_report.result_id.is_none());
+    Ok(())
+}
+
 /// Settings invalidate cached workspace results only when the reported diagnostics change.
 #[test]
 fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
