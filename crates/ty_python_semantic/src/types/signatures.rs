@@ -4960,11 +4960,12 @@ impl<'db> Parameters<'db> {
     /// [`Self::from_annotation`] when the kind should be inferred from annotations; preserve the
     /// existing kind when transforming a parameter list.
     fn new(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+        let value = value.into();
+        if value.is_empty() && kind == ParametersKind::Standard {
+            return Self::empty();
+        }
         Self {
-            data: Arc::new(ParametersData {
-                value: value.into(),
-                kind,
-            }),
+            data: Arc::new(ParametersData { value, kind }),
         }
     }
 
@@ -5112,7 +5113,17 @@ impl<'db> Parameters<'db> {
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::standard([])
+        // Binding a receiver often leaves no parameters. Give each worker its own empty list
+        // so that cloning these signatures does not contend on one shared reference count.
+        thread_local! {
+            static EMPTY: Parameters<'static> = Parameters {
+                data: Arc::new(ParametersData {
+                    value: Box::default(),
+                    kind: ParametersKind::Standard,
+                }),
+            };
+        }
+        EMPTY.with(Clone::clone)
     }
 
     /// Create a standard parameter list without inferring its kind or normalizing annotations.
