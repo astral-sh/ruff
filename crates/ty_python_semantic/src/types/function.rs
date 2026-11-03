@@ -1337,14 +1337,23 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         mut map: impl FnMut(&CallableSignature<'db>) -> CallableSignature<'db>,
     ) -> Self {
-        let updated_signature = map(self.signature(db));
+        let signature = self.signature(db);
+        let updated_signature = map(signature);
+        let mut changed = updated_signature != *signature;
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
             self.implementation_callables(db)
                 .iter()
-                .map(|callable| callable.with_signatures(db, map(callable.signatures(db))))
+                .map(|callable| {
+                    let mapped = callable.with_signatures(db, map(callable.signatures(db)));
+                    changed |= mapped != *callable;
+                    mapped
+                })
                 .collect()
         });
+        if !changed {
+            return self;
+        }
         Self::new_internal(
             db,
             literal,
