@@ -550,7 +550,7 @@ def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
 
 def reject_broad_runtime_type_narrowing(
     value: TypeForm[str],
-) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
+) -> TypeIs[type]:  # error: [invalid-type-is-narrowing]
     return isinstance(value, type)
 
 class A: ...
