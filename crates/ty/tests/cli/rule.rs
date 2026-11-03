@@ -9,21 +9,23 @@ fn ty_cmd() -> Command {
 
 #[test]
 fn rule_default_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type"]), @r#"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-statement"]), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-    # invalid-return-type
+    # invalid-return-statement
 
-    Default level: error | Stable (since 0.0.1-alpha.1)
+    Default level: error | Stable (since 0.0.97)
 
     ## What it does
 
-    Detects returned values that can't be assigned to the function's annotated return type.
+    Checks whether the value in a `return` statement is assignable to the function's annotated return
+    type. In a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the
+    returned value must be assignable to `ReturnType`.
 
     A bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off
-    the end of a function, Python also returns `None`. ty checks that case with `missing-return` for
-    nonempty bodies and `empty-body` for empty bodies.
+    the end of a function, Python also returns `None`. ty checks that case with
+    `missing-return-statement` for nonempty bodies and `empty-body` for empty bodies.
 
     ## Why is this bad?
 
@@ -34,8 +36,14 @@ fn rule_default_output() {
 
     ```python
     def func() -> int:
-        return "a"  # error: [invalid-return-type]
+        return "a"  # error: [invalid-return-statement]
     ```
+
+    ## Compatibility
+
+    ty 0.0.97 renamed `invalid-return-type` to `invalid-return-statement`. The old name is an alias for
+    this rule. Missing returns and incompatible generator annotations now have their own rules,
+    `missing-return-statement` and `invalid-generator-return-type`.
 
     ----- stderr -----
     "#);
@@ -43,18 +51,18 @@ fn rule_default_output() {
 
 #[test]
 fn rule_json_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type", "--output-format", "json"]), @r###"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-statement", "--output-format", "json"]), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "name": "invalid-return-type",
-      "summary": "detects returned values that can't be assigned to the function's annotated return type",
-      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nA bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off\nthe end of a function, Python also returns `None`. ty checks that case with `missing-return` for\nnonempty bodies and `empty-body` for empty bodies.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+      "name": "invalid-return-statement",
+      "summary": "detects return statements whose value is incompatible with the expected return type",
+      "documentation": "## What it does\n\nChecks whether the value in a `return` statement is assignable to the function's annotated return\ntype. In a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the\nreturned value must be assignable to `ReturnType`.\n\nA bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off\nthe end of a function, Python also returns `None`. ty checks that case with\n`missing-return-statement` for nonempty bodies and `empty-body` for empty bodies.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-statement]\n```\n\n## Compatibility\n\nty 0.0.97 renamed `invalid-return-type` to `invalid-return-statement`. The old name is an alias for\nthis rule. Missing returns and incompatible generator annotations now have their own rules,\n`missing-return-statement` and `invalid-generator-return-type`.",
       "default_level": "error",
       "status": {
         "type": "stable",
-        "since": "0.0.1-alpha.1"
+        "since": "0.0.97"
       }
     }
     ----- stderr -----

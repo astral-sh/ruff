@@ -3569,7 +3569,7 @@ def color_name(color: Color) -> str:
     else:
         assert_never(color)
 
-# No `missing-return` error here because the implicit `else` branch is detected as unreachable:
+# The implicit `else` branch is unreachable, so ty accepts this function's return type.
 def color_name_without_assertion(color: Color) -> str:
     if color is Color.RED:
         return "Red"

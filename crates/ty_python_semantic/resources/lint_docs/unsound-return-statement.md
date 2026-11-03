@@ -3,7 +3,7 @@
 Detects `return` statements that unsoundly return a type that is not a [subtype] of the function's
 annotated return type.
 
-This lint is a stricter version of `invalid-return-type`.
+This lint is a stricter version of `invalid-return-statement`.
 
 ## Why is this bad?
 

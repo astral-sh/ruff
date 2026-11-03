@@ -2,8 +2,8 @@
 
 Detects functions with empty bodies that have a non-`None` return type annotation.
 
-The errors reported by this rule have the same motivation as the `invalid-return-type` rule. The
-diagnostic exists as a separate error code to allow users to disable this rule while prototyping
+The errors reported by this rule have the same motivation as the `missing-return-statement` rule.
+The diagnostic exists as a separate error code to allow users to disable this rule while prototyping
 code. While we strongly recommend enabling this rule if possible, users migrating from other type
 checkers may also find it useful to temporarily disable this rule on some or all of their codebase
 if they find it results in a large number of diagnostics.

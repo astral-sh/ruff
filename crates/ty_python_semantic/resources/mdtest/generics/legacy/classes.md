@@ -1003,7 +1003,7 @@ T = TypeVar("T", bound=P[str])
 def create(cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-return-statement]
     return 0
 
 create(P[str])
@@ -1029,7 +1029,7 @@ T = TypeVar("T", bound=Impl)
 def create(cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-return-statement]
     return 0
 
 create(Impl)
@@ -1056,7 +1056,7 @@ class Impl:
 T = TypeVar("T", bound=Impl)
 
 def as_protocol_class(cls: type[T]) -> TypeOf[P[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-return-statement]
 ```
 
 ## Narrowing class objects against a final TypedDict
@@ -1079,7 +1079,7 @@ T = TypeVar("T", bound=Other)
 def create(cls: type[T]) -> int:
     if cls is not Shape:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
-        return "wrong"  # error: [invalid-return-type]
+        return "wrong"  # error: [invalid-return-statement]
     return 0
 
 create(Other)
@@ -1106,7 +1106,7 @@ class Other(TypedDict):
 T = TypeVar("T", bound=Other)
 
 def as_shape_class(cls: type[T]) -> TypeOf[Shape[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-return-statement]
 ```
 
 ## A subclass of a fully specialized generic is not generic
@@ -1502,7 +1502,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        return Box[T, Self](value, self)  # error: [invalid-return-type]
+        return Box[T, Self](value, self)  # error: [invalid-return-statement]
 ```
 
 ### Constructing through a classmethod receiver
@@ -1648,7 +1648,7 @@ class Pair(Generic[T, U]):
     def check(self, x: int, y: str) -> int:
         # revealed: Pair[str, int]
         reveal_type(Pair(x, y))
-        return Pair(x, y).first  # error: [invalid-return-type]
+        return Pair(x, y).first  # error: [invalid-return-statement]
 
 def check(x: int, y: str) -> None:
     # revealed: Pair[str, int]
@@ -3813,7 +3813,7 @@ def copy(value: Nested) -> Nested:
     return Box(value.value)
 
 def invalid() -> Nested:
-    return Box("wrong")  # error: [invalid-return-type]
+    return Box("wrong")  # error: [invalid-return-statement]
 ```
 
 ## Writable `__class__` protocol specializations
@@ -4124,7 +4124,7 @@ def inferred_result(a: Box[str], b: Box[T], cond: bool):
 
 def wrong_return(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
     box = a if cond else b
-    return box.pair()  # error: [invalid-return-type]
+    return box.pair()  # error: [invalid-return-statement]
 ```
 
 ## Calling a union of generic methods
@@ -4152,7 +4152,7 @@ def call(a: Box[str], b: Box[T], cond: bool, value: U):
 
 def wrong_return(a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
     pair = a.pair if cond else b.pair
-    return pair(value)  # error: [invalid-return-type]
+    return pair(value)  # error: [invalid-return-statement]
 ```
 
 ## Dictionary methods on unions

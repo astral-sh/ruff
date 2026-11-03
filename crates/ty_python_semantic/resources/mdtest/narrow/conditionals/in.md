@@ -550,7 +550,7 @@ class AlwaysEqual:
 def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
     if x in (y,):
         reveal_type(x)  # revealed: AlwaysEqual
-        # error: [invalid-return-type] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
+        # error: [invalid-return-statement] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
         return x
     return y
 ```

@@ -96,8 +96,13 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
-    registry.register_lint(&INVALID_RETURN_TYPE);
-    registry.register_lint(&MISSING_RETURN);
+    registry.register_lint(&INVALID_GENERATOR_RETURN_TYPE);
+    registry.register_lint(&INVALID_RETURN_STATEMENT);
+    registry.register_alias(
+        LintName::of("invalid-return-type"),
+        &INVALID_RETURN_STATEMENT,
+    );
+    registry.register_lint(&MISSING_RETURN_STATEMENT);
     registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&UNSOUND_YIELD);
@@ -479,17 +484,26 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-return-type.md")]
-    pub(crate) static INVALID_RETURN_TYPE = {
-        summary: "detects returned values that can't be assigned to the function's annotated return type",
-        status: LintStatus::stable("0.0.1-alpha.1"),
+    #[doc = include_str!("../../resources/lint_docs/invalid-generator-return-type.md")]
+    pub(crate) static INVALID_GENERATOR_RETURN_TYPE = {
+        summary: "detects generator functions whose return annotation is incompatible with the generator object",
+        status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
     }
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/missing-return.md")]
-    pub(crate) static MISSING_RETURN = {
+    #[doc = include_str!("../../resources/lint_docs/invalid-return-statement.md")]
+    pub(crate) static INVALID_RETURN_STATEMENT = {
+        summary: "detects return statements whose value is incompatible with the expected return type",
+        status: LintStatus::stable("0.0.97"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-return-statement.md")]
+    pub(crate) static MISSING_RETURN_STATEMENT = {
         summary: "detects missing returns in functions whose return type does not allow `None`",
         status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
@@ -2879,7 +2893,7 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
     }
 }
 
-pub(super) fn report_invalid_return_type(
+pub(super) fn report_invalid_return_statement(
     context: &InferContext,
     object_range: impl Ranged,
     return_type_range: impl Ranged,
@@ -2887,7 +2901,7 @@ pub(super) fn report_invalid_return_type(
     actual_ty: Type,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, object_range) else {
+    let Some(builder) = context.report_lint(&INVALID_RETURN_STATEMENT, object_range) else {
         return;
     };
 
@@ -2967,7 +2981,8 @@ pub(super) fn report_invalid_generator_function_return_type(
     expected_ty: Type,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, return_type_range) else {
+    let Some(builder) = context.report_lint(&INVALID_GENERATOR_RETURN_TYPE, return_type_range)
+    else {
         return;
     };
 
@@ -3148,7 +3163,7 @@ pub(super) fn report_implicit_return_type(
     let lint_to_use = if has_empty_body {
         &EMPTY_BODY
     } else {
-        &MISSING_RETURN
+        &MISSING_RETURN_STATEMENT
     };
 
     let Some(builder) = context.report_lint(lint_to_use, range) else {

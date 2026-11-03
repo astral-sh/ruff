@@ -12,7 +12,7 @@ the annotated return type can then fail at runtime.
 ## Examples
 
 ```python
-def sign(x: int) -> int:  # error: [missing-return]
+def sign(x: int) -> int:  # error: [missing-return-statement]
     if x < 0:
         return -1
     if x > 0:
@@ -24,6 +24,7 @@ Calling `sign(0)` returns `None`. Add `return 0` at the end of the function to h
 ## Compatibility
 
 Before ty 0.0.97, `invalid-return-type` also reported missing returns. If you configured a level for
-`invalid-return-type` and want the same level for missing returns, set `missing-return` to that
-level too. Replace `# ty: ignore[invalid-return-type]` with `# ty: ignore[missing-return]` on return
-annotations where you intended to suppress a missing return.
+`invalid-return-type` and want the same level for missing returns, set `missing-return-statement` to
+that level too. Replace `# ty: ignore[invalid-return-type]` with
+`# ty: ignore[missing-return-statement]` on return annotations where you intended to suppress a
+missing return.

@@ -358,7 +358,7 @@ class P[U = str]: ...
 def create[T: P[str]](cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-return-statement]
     return 0
 
 create(P[str])
@@ -382,7 +382,7 @@ class Impl:
 def create[T: Impl](cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-return-statement]
     return 0
 
 create(Impl)
@@ -405,7 +405,7 @@ class Impl:
     value: int
 
 def as_protocol_class[T: Impl](cls: type[T]) -> TypeOf[P[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-return-statement]
 ```
 
 ## Narrowing class objects against a final TypedDict
@@ -426,7 +426,7 @@ class Other(TypedDict):
 def create[T: Other](cls: type[T]) -> int:
     if cls is not Shape:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
-        return "wrong"  # error: [invalid-return-type]
+        return "wrong"  # error: [invalid-return-statement]
     return 0
 
 create(Other)
@@ -449,7 +449,7 @@ class Other(TypedDict):
     value: int
 
 def as_shape_class[T: Other](cls: type[T]) -> TypeOf[Shape[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-return-statement]
 ```
 
 ## Diagnostics for bad specializations
@@ -840,7 +840,7 @@ class Box[T, U]:
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        return Box[T, Self](value, self)  # error: [invalid-return-type]
+        return Box[T, Self](value, self)  # error: [invalid-return-statement]
 ```
 
 ### Identical `__new__` and `__init__` signatures
@@ -923,7 +923,7 @@ class Pair[T, U]:
     def check(self, x: int, y: str) -> int:
         # revealed: Pair[str, int]
         reveal_type(Pair(x, y))
-        return Pair(x, y).first  # error: [invalid-return-type]
+        return Pair(x, y).first  # error: [invalid-return-statement]
 
 def check(x: int, y: str) -> None:
     # revealed: Pair[str, int]
@@ -2916,7 +2916,7 @@ def copy(value: Nested) -> Nested:
     return Box(value.value)
 
 def invalid() -> Nested:
-    return Box("wrong")  # error: [invalid-return-type]
+    return Box("wrong")  # error: [invalid-return-statement]
 ```
 
 ## Multiple inherited recursive protocol methods
@@ -3158,7 +3158,7 @@ def inferred_result[T](a: Box[str], b: Box[T], cond: bool):
 
 def wrong_return[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
     box = a if cond else b
-    return box.pair()  # error: [invalid-return-type]
+    return box.pair()  # error: [invalid-return-statement]
 ```
 
 ## Calling a union of generic methods
@@ -3182,7 +3182,7 @@ def call[T, U](a: Box[str], b: Box[T], cond: bool, value: U):
 
 def wrong_return[T, U](a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
     pair = a.pair if cond else b.pair
-    return pair(value)  # error: [invalid-return-type]
+    return pair(value)  # error: [invalid-return-statement]
 ```
 
 ## Dictionary methods on unions

@@ -20,7 +20,7 @@ use crate::{
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
             report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_runtime_checkable,
+            report_invalid_return_statement, report_invalid_runtime_checkable,
             report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
@@ -271,7 +271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .ty
                             .is_assignable_to(db, env, expected_return_ty)
                         {
-                            report_invalid_return_type(
+                            report_invalid_return_statement(
                                 &self.context,
                                 return_statement.range,
                                 returns.range(),
@@ -332,7 +332,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
             {
                 if !accepts(return_statement.ty, TypeRelation::Assignability) {
-                    report_invalid_return_type(
+                    report_invalid_return_statement(
                         &self.context,
                         return_statement.range,
                         returns.range(),
