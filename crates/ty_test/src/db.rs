@@ -382,11 +382,7 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         "missing-override-decorator",
         // Many examples omit annotations to exercise inference or keep the setup short.
         "missing-parameter-annotation",
-        "missing-return-type-public-function",
-        "missing-return-type-private-function",
-        "missing-return-type-special-method",
-        "missing-return-type-static-method",
-        "missing-return-type-class-method",
+        "missing-return-annotation",
         // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
         // negation types in our tests for better readability.
         "experimental-syntax",
