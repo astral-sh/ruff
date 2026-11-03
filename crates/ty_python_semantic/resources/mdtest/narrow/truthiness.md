@@ -594,7 +594,7 @@ def test() -> None:
     if not p:
         raise ValueError("No person")
     reveal_type(p)  # revealed: Person & ~AlwaysFalsy
-    # error: [invalid-typeddict-key] "Unknown key "nonexistent" for TypedDict `Person`"
+    # error: [invalid-typed-dict-key] "Unknown key "nonexistent" for TypedDict `Person`"
     print(p["nonexistent"])
 ```
 

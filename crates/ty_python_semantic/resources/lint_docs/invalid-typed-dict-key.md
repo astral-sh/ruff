@@ -26,5 +26,5 @@ alice["height"]  # error
 
 ## See also
 
-- `non-literal-typeddict-key` reports subscripts where ty cannot narrow the string key to a literal
+- `non-literal-typed-dict-key` reports subscripts where ty cannot narrow the string key to a literal
     or a union of literals.

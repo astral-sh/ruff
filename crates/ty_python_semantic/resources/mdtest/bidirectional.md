@@ -178,7 +178,7 @@ for _ in range(2):
     record = {"value": 1}
     inspect(record)
     reveal_type(record)  # revealed: Record
-    record["missing"]  # error: [invalid-typeddict-key]
+    record["missing"]  # error: [invalid-typed-dict-key]
 
 class Record(TypedDict):
     value: int

@@ -20,7 +20,7 @@ class Movie(TypedDict):
 
 
 def get_field(movie: Movie, key: str) -> str | int:
-    return movie[key]  # error: [non-literal-typeddict-key]
+    return movie[key]  # error: [non-literal-typed-dict-key]
 ```
 
 Use instead:
@@ -32,5 +32,5 @@ def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
 
 ## See also
 
-- `invalid-typeddict-key` reports invalid keys such as a misspelled field name or an integer
+- `invalid-typed-dict-key` reports invalid keys such as a misspelled field name or an integer
     subscript.

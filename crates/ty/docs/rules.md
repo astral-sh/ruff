@@ -3821,48 +3821,14 @@ def f(options: dict[str, object]):
         ...
 ```
 
-## `invalid-typed-dict-statement`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.9">0.0.9</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-typed-dict-statement%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1335" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Detects statements other than annotated declarations in `TypedDict` class bodies.
-
-**Why is this bad?**
-
-
-`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,
-method definitions and field values aren't allowed. None of these will be available on "instances of
-the `TypedDict`" at runtime (as `dict` is the runtime class of all "`TypedDict` instances").
-
-**Example**
-
-
-```python
-from typing import TypedDict
-
-
-class Foo(TypedDict):
-    def bar(self):  # error: [invalid-typed-dict-statement]
-        pass
-```
-
 <a id="invalid-key"></a>
 
-## `invalid-typeddict-key`
+## `invalid-typed-dict-key`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-typeddict-key%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-typed-dict-key%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L414" target="_blank">View source</a>
 </small>
 
@@ -3899,8 +3865,42 @@ alice["height"]  # error
 **See also**
 
 
-- [`non-literal-typeddict-key`](#non-literal-typeddict-key) reports subscripts where ty cannot narrow the string key to a literal
+- [`non-literal-typed-dict-key`](#non-literal-typed-dict-key) reports subscripts where ty cannot narrow the string key to a literal
     or a union of literals.
+
+## `invalid-typed-dict-statement`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.9">0.0.9</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-typed-dict-statement%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1335" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Detects statements other than annotated declarations in `TypedDict` class bodies.
+
+**Why is this bad?**
+
+
+`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,
+method definitions and field values aren't allowed. None of these will be available on "instances of
+the `TypedDict`" at runtime (as `dict` is the runtime class of all "`TypedDict` instances").
+
+**Example**
+
+
+```python
+from typing import TypedDict
+
+
+class Foo(TypedDict):
+    def bar(self):  # error: [invalid-typed-dict-statement]
+        pass
+```
 
 ## `invalid-yield`
 
@@ -4567,12 +4567,12 @@ class Sub(Super): ...  # error: [non-callable-init-subclass]
 
 - [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)
 
-## `non-literal-typeddict-key`
+## `non-literal-typed-dict-key`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22non-literal-typeddict-key%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22non-literal-typed-dict-key%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1470" target="_blank">View source</a>
 </small>
 
@@ -4602,7 +4602,7 @@ class Movie(TypedDict):
 
 
 def get_field(movie: Movie, key: str) -> str | int:
-    return movie[key]  # error: [non-literal-typeddict-key]
+    return movie[key]  # error: [non-literal-typed-dict-key]
 ```
 
 Use instead:
@@ -4615,7 +4615,7 @@ def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
 **See also**
 
 
-- [`invalid-typeddict-key`](#invalid-typeddict-key) reports invalid keys such as a misspelled field name or an integer
+- [`invalid-typed-dict-key`](#invalid-typed-dict-key) reports invalid keys such as a misspelled field name or an integer
     subscript.
 
 ## `not-iterable`
@@ -6492,12 +6492,12 @@ def f(x: int) -> int:
 f(x=1, y=2)  # error
 ```
 
-## `unknown-typeddict-constructor-key`
+## `unknown-typed-dict-constructor-key`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22unknown-typeddict-constructor-key%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22unknown-typed-dict-constructor-key%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1479" target="_blank">View source</a>
 </small>
 

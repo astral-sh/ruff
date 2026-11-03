@@ -9866,7 +9866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         typed_dict_ty,
                         None,
                         key_ty,
-                        &diagnostic::INVALID_TYPEDDICT_KEY,
+                        &diagnostic::INVALID_TYPED_DICT_KEY,
                     );
                     // Return `Unknown` to prevent the overload system from generating its own error
                     return Type::unknown();
