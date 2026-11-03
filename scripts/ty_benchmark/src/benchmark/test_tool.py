@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 import tomllib
@@ -162,6 +163,58 @@ def zuban_project(tmp_path: Path) -> tuple[Project, Venv]:
     subprocess.run(["git", "add", "src"], cwd=tmp_path, check=True)
     project = write_cli_targets(project, tmp_path)
     return project, venv
+
+
+@pytest.mark.parametrize("layout", ["", "lib", "src"])
+def test_zuban_canonicalizes_symlinked_import_roots(zuban_project, layout):
+    project, venv = zuban_project
+    root = venv.project_path
+    source_root = root / layout
+    if layout != "src":
+        source_root.mkdir(exist_ok=True)
+        (root / "src/example").rename(source_root / "example")
+    (root / "source-alias").symlink_to(source_root, target_is_directory=True)
+    checkout_alias = root.with_name(root.name + "-alias")
+    checkout_alias.symlink_to(root, target_is_directory=True)
+    venv = Venv(project_name=project.name, project_path=checkout_alias)
+    package = source_root / "example"
+    (package / "settings.py").write_text("class Config: pass\n")
+    (package / "worker.py").write_text(
+        "from .settings import Config\ndef check(config: Config) -> None: pass\n"
+    )
+    (package / "main.py").write_text(
+        "from example.settings import Config\nfrom .worker import check\n"
+        'check(Config())\nnumber: int = "wrong"\n'
+    )
+    project = project._replace(
+        include=[(Path(layout) / "example").as_posix()],
+        exclude=[(Path(layout) / "example/tests/**").as_posix()],
+        import_roots=[layout or ".", "source-alias"],
+    )
+    tool = Zuban()
+    tool.write_config(project, venv)
+    config = tomllib.loads((root / "zuban-benchmark.toml").read_text())["tool"]["zuban"]
+    assert config["mypy_path"] == [source_root.resolve().as_posix()]
+    assert any(
+        re.search(pattern, "example/tests/excluded.py") for pattern in config["exclude"]
+    )
+    with tool.configure_lsp(project, venv):
+        assert (
+            tomllib.loads((root / "pyproject.toml").read_text())["tool"]["zuban"]
+            == config
+        )
+    result = subprocess.run(
+        tool.command(project, venv, single_threaded=False).command,
+        cwd=checkout_alias,
+        env=benchmark_environment(checkout_alias),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert 'expression has type "str", variable has type "int"' in result.stdout
+    assert "Found 1 error in 1 file" in result.stdout
 
 
 def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
