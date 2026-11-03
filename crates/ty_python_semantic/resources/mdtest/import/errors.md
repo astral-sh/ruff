@@ -47,9 +47,9 @@ unused. But `unresolved-import` is actually a legacy alias for `import-not-found
 implementation of `unused-ignore-comment` could result in us, confusingly, complaining that an
 "`import-not-found`" suppression comment was unused, even though none exists!
 
-This test enforces that we use the name of the rule which was actually used in the source code
-when we complain about unused ignore comments, even if the name used in the source code is
-merely a legacy alias to the rule's canonical name.
+This test enforces that we use the name of the rule which was actually used in the source code when
+we complain about unused ignore comments, even if the name used in the source code is merely a
+legacy alias to the rule's canonical name.
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-import'"
