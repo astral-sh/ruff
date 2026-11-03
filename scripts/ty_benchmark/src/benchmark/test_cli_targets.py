@@ -7,7 +7,12 @@ import unittest
 from pathlib import Path
 
 from benchmark.projects import Project
-from benchmark.targets import FILE_LIST, PYRIGHT_CONFIG, write_cli_targets
+from benchmark.targets import (
+    FILE_LIST,
+    PYRIGHT_CONFIG,
+    neutralize_file_directives,
+    write_cli_targets,
+)
 
 
 class CliTargetsTest(unittest.TestCase):
@@ -32,6 +37,8 @@ class CliTargetsTest(unittest.TestCase):
                 "pkg/stub only.pyi",
                 "pkg/sub.pyi",
                 "pkg/sub/__init__.pyi",
+                "pkg/native.pyi",
+                "pkg/native/build.py",
                 "pkg/skip/excluded.py",
                 "pkg/sub/tests/excluded.py",
                 "outside.py",
@@ -66,6 +73,7 @@ class CliTargetsTest(unittest.TestCase):
                 files,
                 [
                     "./pkg/api.pyi",
+                    "./pkg/native.pyi",
                     "./pkg/plain.py",
                     "./pkg/stub only.pyi",
                     "./pkg/sub/__init__.pyi",
@@ -78,6 +86,7 @@ class CliTargetsTest(unittest.TestCase):
                 [
                     "pkg/api.py",
                     "pkg/link.py",
+                    "pkg/native",
                     "pkg/skip",
                     "pkg/sub.pyi",
                     "pkg/sub/tests",
@@ -120,4 +129,40 @@ class CliTargetsTest(unittest.TestCase):
             self.assertEqual(native.exclude, ["pkg/untracked.py", "venv"])
             self.assertEqual(
                 (root / FILE_LIST).read_text(encoding="utf-8"), "./pkg/main.py\n"
+            )
+
+    def test_file_directives_preserve_line_suppressions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            original = (
+                "# mypy: ignore-errors\n"
+                "# pyrefly: ignore-errors\n"
+                "# pyright: reportAssignmentType=false\n"
+                '"""Example:\n# mypy: ignore-errors\n"""\n'
+                'text = "# mypy: ignore-errors"\n'
+                'number: int = "wrong"  # type: ignore[assignment]\n'
+                'other: int = "wrong"  # pyright: ignore[reportAssignmentType]\n'
+            )
+            (root / "main.py").write_text(original)
+            (root / "whole.py").write_text('# type: ignore\nvalue: int = "wrong"\n')
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            neutralize_file_directives(root)
+            normalized = (root / "main.py").read_text()
+            self.assertEqual(normalized.count("\n"), original.count("\n"))
+            self.assertIn(
+                '"""Example:\n# benchmark: mypy: ignore-errors\n"""', normalized
+            )
+            self.assertIn('text = "# mypy: ignore-errors"', normalized)
+            self.assertIn("# type: ignore[assignment]", normalized)
+            self.assertIn("# pyright: ignore[reportAssignmentType]", normalized)
+            self.assertTrue(normalized.startswith("# benchmark: mypy: ignore-errors"))
+            self.assertTrue(
+                (root / "whole.py").read_text().startswith("# benchmark: type: ignore")
+            )
+            report = (root / "benchmark-source-overrides.json").read_bytes()
+            neutralize_file_directives(root)
+            self.assertEqual((root / "main.py").read_text(), normalized)
+            self.assertEqual(
+                (root / "benchmark-source-overrides.json").read_bytes(), report
             )

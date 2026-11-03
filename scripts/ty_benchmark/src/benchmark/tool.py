@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import glob
 import json
+import os
 import re
 import shutil
 import sys
@@ -108,6 +109,7 @@ class Ty(Tool):
                     "environment": {
                         "python-version": project.python_version,
                         "python": venv.path.as_posix(),
+                        "extra-paths": list(project.import_roots),
                     },
                 }
             ),
@@ -120,6 +122,8 @@ class Ty(Tool):
             "check",
             "--output-format=concise",
             "--no-progress",
+            "--no-respect-ignore-files",
+            "--include-scripts",
         ]
 
         return Command(name=self._name, command=command)
@@ -142,6 +146,15 @@ class Mypy(Tool):
         return "mypy"
 
     @override
+    def config(self, project: Project, venv: Venv):
+        return (
+            Path("mypy-benchmark.toml"),
+            tomlkit.dumps(
+                {"tool": {"mypy": {"mypy_path": list(project.import_roots)}}}
+            ),
+        )
+
+    @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         path = self.path or which_tool("mypy", venv.bin)
         command = [
@@ -151,10 +164,12 @@ class Mypy(Tool):
             "--python-version",
             project.python_version,
             "--no-pretty",
-            # An empty config path disables mypy's project and user config discovery.
-            "--config-file=",
+            # A dedicated config disables project and user overrides.
+            "--config-file=mypy-benchmark.toml",
             "--follow-imports=normal",
             "--check-untyped-defs",
+            "--num-workers",
+            "0" if single_threaded else str(os.process_cpu_count() or 1),
             *project.include,
         ]
 
@@ -234,6 +249,7 @@ class Pyright(Tool):
                     # This is not the path to the venv folder, but the folder that contains the venv...
                     "venvPath": str(venv.path.parent.as_posix()),
                     "pythonVersion": project.python_version,
+                    "extraPaths": list(project.import_roots),
                 }
             ),
         )
@@ -242,7 +258,7 @@ class Pyright(Tool):
         command = [str(self.path)]
 
         if not single_threaded:
-            command.append("--threads")
+            command.extend(["--threads", str(os.process_cpu_count() or 1)])
 
         command.extend(
             [
@@ -275,18 +291,19 @@ class Pyrefly(Tool):
 
     @override
     def config(self, project: Project, venv: Venv):
+        settings = {
+            "project-includes": list(project.include),
+            "project-excludes": list(project.exclude),
+            "python-interpreter-path": venv.python.as_posix(),
+            "python-version": project.python_version,
+            "site-package-path": [venv.path.as_posix()],
+            "untyped-def-behavior": "check-and-infer-return-any",
+        }
+        if project.import_roots:
+            settings["search-path"] = [*project.import_roots, "."]
         return (
             Path("pyrefly.toml"),
-            tomlkit.dumps(
-                {
-                    "project-includes": list(project.include),
-                    "project-excludes": list(project.exclude),
-                    "python-interpreter-path": venv.python.as_posix(),
-                    "python-version": project.python_version,
-                    "site-package-path": [venv.path.as_posix()],
-                    "untyped-def-behavior": "check-and-infer-return-any",
-                }
-            ),
+            tomlkit.dumps(settings),
         )
 
     @override
@@ -297,10 +314,10 @@ class Pyrefly(Tool):
             "--output-format=min-text",
             "--config=pyrefly.toml",
             "--disable-project-excludes-heuristics=true",
+            "--use-ignore-files=false",
+            "--threads",
+            "1" if single_threaded else str(os.process_cpu_count() or 1),
         ]
-
-        if single_threaded:
-            command.extend(["--threads", "1"])
 
         return Command(
             name="Pyrefly",
@@ -324,7 +341,7 @@ class Zuban(Tool):
         return "zuban"
 
     def _settings(self, project: Project, venv: Venv) -> dict[str, object]:
-        search_paths = set()
+        search_paths = {venv.project_path / root for root in project.import_roots}
         for include in project.include:
             path = venv.project_path / include
             if path.is_file():
