@@ -1526,6 +1526,7 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> Member<'db> {
         let code_generator = CodeGeneratorKind::from_static_class(db, self);
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
@@ -1570,7 +1571,6 @@ impl<'db> StaticClassLiteral<'db> {
         let sources = self.member_sources(db);
         let symbol = sources.table.symbol_id(name);
         let mut member = class_member_with_symbol(db, sources.scope, symbol);
-        let is_dunder = name.starts_with("__") && name.ends_with("__");
         let is_class_var = member.inner.is_class_var();
         let is_inferred = matches!(
             member.inner.place,
@@ -1581,9 +1581,10 @@ impl<'db> StaticClassLiteral<'db> {
         );
 
         // Decide before applying this class's specialization: `Callable[P, R]` and a bare `F`
-        // describe the stored callable's full signature. A concrete receiver in a dunder or
-        // inferred class-body callable instead indicates a method. Ordinary `ClassVar` callables
-        // are promoted on instance access to preserve their declared types for assignment checks.
+        // describe the stored callable's full signature. Eligible inferred class-body callables
+        // and callables found during class-only lookup are assumed to be methods. Ordinary
+        // instance reads promote `ClassVar` callables separately to preserve their declared types
+        // for assignment checks.
         // TODO: An inherited annotation can already be specialized when a subclass supplies a
         // default. Preserve its original binding behavior in that case too.
         if !is_class_var
@@ -1604,8 +1605,8 @@ impl<'db> StaticClassLiteral<'db> {
                 .insert(TypeQualifiers::NO_FUNCTION_BINDING);
         }
         let member = member.map_type(|ty| {
-            let ty = if is_dunder || is_inferred {
-                ty.into_function_like_callable(db, env, is_dunder)
+            let ty = if policy.no_instance_fallback() || is_inferred {
+                ty.into_function_like_callable(db, env, policy.no_instance_fallback())
             } else {
                 ty
             };
@@ -2042,7 +2043,14 @@ impl<'db> StaticClassLiteral<'db> {
                     .to_class_literal(db, env)
                     .as_class_literal()?
                     .as_static()?
-                    .own_class_member(db, env, inherited_generic_context, None, name)
+                    .own_class_member(
+                        db,
+                        env,
+                        inherited_generic_context,
+                        None,
+                        name,
+                        MemberLookupPolicy::default(),
+                    )
                     .ignore_possibly_undefined()
                     .map(|ty| {
                         ty.apply_type_mapping(
@@ -2155,7 +2163,14 @@ impl<'db> StaticClassLiteral<'db> {
                     .to_class_literal(db, env)
                     .as_class_literal()?
                     .as_static()?
-                    .own_class_member(db, env, self.inherited_generic_context(db), None, name)
+                    .own_class_member(
+                        db,
+                        env,
+                        self.inherited_generic_context(db),
+                        None,
+                        name,
+                        MemberLookupPolicy::default(),
+                    )
                     .ignore_possibly_undefined()
                     .map(|ty| {
                         let self_class = determine_self_class(

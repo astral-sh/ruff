@@ -114,12 +114,12 @@ impl<'db> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
     }
 
-    /// Promote regular callable signatures with a receiver to function descriptors.
+    /// Promote regular callable signatures with a receiver to method descriptors.
     pub(super) fn into_function_like_callable(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        is_dunder: bool,
+        allow_gradual: bool,
     ) -> Type<'db> {
         struct IntoFunctionLikeCallable;
 
@@ -127,7 +127,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            is_dunder: bool,
+            allow_gradual: bool,
             visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
         ) -> Type<'db> {
             match ty {
@@ -138,7 +138,7 @@ impl<'db> Type<'db> {
                                 .parameters()
                                 .get(0)
                                 .is_some_and(Parameter::is_positional)
-                                || is_dunder && signature.parameters().is_gradual()
+                                || allow_gradual && signature.parameters().is_gradual()
                         }) =>
                 {
                     Type::Callable(callable.into_function_like(db))
@@ -146,7 +146,7 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
                     let value = alias.value_type(db);
                     let transformed =
-                        into_function_like_callable(db, env, value, is_dunder, visitor);
+                        into_function_like_callable(db, env, value, allow_gradual, visitor);
                     if transformed == value {
                         ty
                     } else {
@@ -154,16 +154,16 @@ impl<'db> Type<'db> {
                     }
                 }),
                 Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element, is_dunder, visitor)
+                    into_function_like_callable(db, env, *element, allow_gradual, visitor)
                 }),
                 Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element, is_dunder, visitor)
+                    into_function_like_callable(db, env, *element, allow_gradual, visitor)
                 }),
                 _ => ty,
             }
         }
 
-        into_function_like_callable(db, env, self, is_dunder, &TypeTransformer::default())
+        into_function_like_callable(db, env, self, allow_gradual, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`

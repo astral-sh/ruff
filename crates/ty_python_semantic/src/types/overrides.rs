@@ -1355,9 +1355,19 @@ fn check_class_declaration<'db>(
     }
 }
 
+/// Dunder method overrides preserve the signature used by implicit calls, which
+/// look up the method on the class. Ordinary methods use normal attribute access.
+fn method_override_lookup_policy(name: &str) -> MemberLookupPolicy {
+    if name.starts_with("__") && name.ends_with("__") {
+        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+    } else {
+        MemberLookupPolicy::default()
+    }
+}
+
 /// Look up `__new__` on the class so generated and decorated callables retain `cls`
-/// until they are bound for the override comparison. Hashing ignores instance storage
-/// and binds descriptors on the class, as for implicit calls to `__hash__`.
+/// until they are bound for the override comparison. Callable dunders use class-only
+/// lookup, while other attributes retain their instance-storage contracts.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1366,7 +1376,14 @@ fn lookup_override_member<'db>(
 ) -> PlaceAndQualifiers<'db> {
     if name == "__new__" {
         class.class_member(db, env, name, MemberLookupPolicy::default())
-    } else if name == "__hash__" {
+    } else if name == "__hash__"
+        || method_override_lookup_policy(name).no_instance_fallback()
+            && class
+                .class_member(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| attributes::is_method_type(db, ty))
+    {
         Type::instance(db, env, class).member_lookup_with_policy(
             db,
             env,

@@ -4650,8 +4650,11 @@ impl<'db> Type<'db> {
             },
             _ => self.to_class_type(db),
         };
-        let own_class_attr =
-            own_class.map(|class| class.own_class_member(db, env, None, name).inner);
+        let own_class_attr = own_class.map(|class| {
+            class
+                .own_class_member_with_policy(db, env, None, name, policy)
+                .inner
+        });
 
         // A definitely-declared attribute in this class's own namespace is the contract for
         // values populated by metaclass initialization, analogous to a declared instance
@@ -7025,10 +7028,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<(Type<'db>, Type<'db>)> {
-        let key_ty = match self
-            .member_lookup_with_policy(db, env, "keys", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-            .place
-        {
+        // Unpacking calls `keys()` through ordinary attribute access, unlike `__getitem__`.
+        let key_ty = match self.member(db, env, "keys").place {
             Place::Defined(DefinedPlace {
                 ty: keys_method,
                 definedness: Definedness::AlwaysDefined,

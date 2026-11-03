@@ -964,6 +964,8 @@ impl<'db> BoundSuperType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        // `super()` searches class namespaces without consulting instance storage.
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         let owner = self.owner(db);
         let class = match &owner {
             SuperOwnerKind::Dynamic(dynamic) => {

@@ -194,9 +194,7 @@ class Index(Operand):
     __getitem__: Callable[[Index, Any], str]
 
 index = Index()
-# TODO: Direct access also includes an unbound callable from instance-attribute lookup,
-# even though no instance assignment is present.
-reveal_type(index.__add__)  # revealed: ((Any, /) -> Index) | ((Index, Any, /) -> Index)
+reveal_type(index.__add__)  # revealed: (Index, Any, /) -> Index
 reveal_type(index + 1)  # revealed: Index
 reveal_type(index[1])  # revealed: str
 ```
@@ -223,7 +221,7 @@ _: Callable[..., None] = C()
 
 A dunder can also be a non-method callable. Using the callable object's concrete type preserves the
 runtime fact that it is not a descriptor. Erasing that fact with a `Callable` annotation is
-necessarily unsound: the dunder heuristic assumes it is a method.
+necessarily unsound: class-only lookup assumes it is a method.
 
 ```py
 from collections.abc import Callable

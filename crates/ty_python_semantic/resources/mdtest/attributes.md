@@ -5673,18 +5673,20 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
 help: Consider explicitly importing `baz.bar`
 ```
 
-## Function attributes on callable dunders
+## Function attributes on callables accessed through `super()`
 
-A callable dunder with a gradual signature is treated as function-like and exposes function
-attributes:
+Class-only lookup treats a gradual callable as a method descriptor. Its underlying function exposes
+function attributes:
 
 ```py
 from collections.abc import Callable
 
-class Method:
-    __call__: Callable[..., int]
+class Base:
+    method: Callable[..., int]
 
-reveal_type(Method.__call__.__code__)  # revealed: CodeType
+class Child(Base):
+    def check(self) -> None:
+        reveal_type(super().method.__func__.__code__)  # revealed: CodeType
 ```
 
 ## Diagnostic for function attribute accessed on `Callable` type

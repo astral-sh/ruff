@@ -104,18 +104,16 @@ also fail at runtime.
 There is no perfect solution here, but we can use some heuristics to improve the situation for
 certain use cases (at the cost of purity and simplicity).
 
-We treat inferred class-body callables (`method = impl`), `ClassVar` callables
-(`method: ClassVar[Callable[[object], int]]`), and callable dunders with a positional or gradual
-receiver (`__call__: Callable[[object], int]` or `__call__: Callable[..., int]`) as method
-descriptors. Other explicit callable annotations (`method: Callable[[object], int]`) do not act as
-method descriptors.
+We treat inferred class-body callables (`method = impl`) and `ClassVar` callables
+(`method: ClassVar[Callable[[object], int]]`) with a positional receiver as method descriptors.
+Other explicit callable annotations (`method: Callable[[object], int]`) do not act as method
+descriptors during ordinary attribute access. Class-only lookup, used by implicit calls and
+`super()`, treats callables with a positional or gradual receiver as method descriptors.
 
 For members declared in a generic class, `method: Callable[P, R]` never binds as a method
 descriptor, regardless of how it is specialized. A function substituted for `method: T` also retains
 its full signature. This exception only affects function binding: explicit descriptor types
 substituted for `T` still invoke their descriptor protocol.
-
-Descriptor classification is shared by direct attribute access, implicit calls, and `super()`.
 
 ## Inferred class-body callables
 
@@ -159,10 +157,10 @@ def check(impl: Method) -> None:
     C.method = impl  # ok
 ```
 
-## Callable dunders
+## Callable attributes in class-only lookup
 
-A callable dunder with a positional receiver acts as a method descriptor even with an explicit
-annotation. Both direct attribute access and implicit calls bind the receiver:
+Implicit calls look up their methods on the class, so a callable with a positional receiver acts as
+a method descriptor even with an explicit annotation. Direct attribute access does not bind it:
 
 ```py
 from collections.abc import Callable
@@ -172,18 +170,18 @@ def check(impl: Callable[[object, str], int]) -> None:
         __call__: Callable[[object, str], int] = impl
 
     reveal_type(C.__call__)  # revealed: (object, str, /) -> int
-    reveal_type(C().__call__)  # revealed: (str, /) -> int
+    reveal_type(C().__call__)  # revealed: (object, str, /) -> int
     reveal_type(C()("value"))  # revealed: int
 ```
 
-A gradual callable dunder also binds the instance as its receiver:
+A gradual callable is also accepted by implicit calls:
 
 ```py
 def check_gradual(impl: Callable[..., int]) -> None:
     class Method:
         __call__: Callable[..., int] = impl
 
-    reveal_type(Method().__call__.__self__)  # revealed: Method
+    reveal_type(Method().__call__)  # revealed: (...) -> int
     reveal_type(Method()("value"))  # revealed: int
 ```
 
@@ -199,30 +197,18 @@ class Matrix:
 Matrix() < Matrix()  # ok
 ```
 
-An explicitly annotated non-`ClassVar` callable dunder without a positional first parameter does not
-act as a method descriptor; it can't accept a receiver:
+A callable without parameters does not act as a method descriptor, even during class-only lookup; it
+can't accept a receiver:
 
 ```py
 class Thunk:
-    __value_thunk__: Callable[[], int]
+    __call__: Callable[[], int]
 
     def replace(self, other: "Thunk") -> None:
-        self.__value_thunk__ = other.__value_thunk__
+        self.__call__ = other.__call__
 
-reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
-```
-
-As with inferred callable attributes, the heuristic does not check whether the receiver's type is
-compatible with the first parameter:
-
-```py
-def descriptor_candidate(value: str) -> int:
-    return len(value)
-
-class DescriptorCandidate:
-    __value__: Callable[[str], int] = descriptor_candidate
-
-reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+reveal_type(Thunk().__call__)  # revealed: () -> int
+reveal_type(Thunk()())  # revealed: int
 ```
 
 ## Other explicitly annotated callable attributes
@@ -263,8 +249,8 @@ def check(impl: Method) -> None:
 
 ## Callable descriptors accessed through `super()`
 
-`super()` binds inferred and `ClassVar` callables just as ordinary instance access does, including
-when the attribute is a dunder:
+`super()` searches only class attributes. It binds inferred, `ClassVar`, and explicitly annotated
+callables, including attributes without dunder names:
 
 ```py
 from collections.abc import Callable
@@ -274,13 +260,42 @@ def check(impl: Callable[[object, int], int]) -> None:
     class Base:
         method = impl
         classvar: ClassVar[Callable[[object, int], int]] = impl
+        explicit: Callable[[object, int], int] = impl
         __call__ = impl
 
     class Child(Base):
         def check(self) -> None:
             reveal_type(super().method(1))  # revealed: int
             reveal_type(super().classvar(1))  # revealed: int
+            reveal_type(self.explicit)  # revealed: (object, int, /) -> int
+            reveal_type(super().explicit)  # revealed: (int, /) -> int
+            reveal_type(super().explicit(1))  # revealed: int
             reveal_type(super().__call__(1))  # revealed: int
+```
+
+Gradual callables also bind their receiver through `super()`:
+
+```py
+def check_gradual(impl: Callable[..., int]) -> None:
+    class Base:
+        method: Callable[..., int] = impl
+
+    class Child(Base):
+        def check(self) -> None:
+            reveal_type(super().method.__self__)  # revealed: Self@check
+            reveal_type(super().method("value"))  # revealed: int
+```
+
+As with inferred callable attributes, class-only lookup does not check whether the receiver's type
+is compatible with the first parameter:
+
+```py
+class Base:
+    method: Callable[[str], int]
+
+class Child(Base):
+    def check(self) -> None:
+        reveal_type(super().method)  # revealed: () -> int
 ```
 
 ## Use case: Decorating a method with a `Callable`-typed decorator

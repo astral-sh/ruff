@@ -3432,6 +3432,88 @@ reveal_type(operator.__add__(object(), 1))  # revealed: str
 operator + 1  # error: [unsupported-operator]
 ```
 
+## Methods overriding generic callable attributes
+
+Override checks preserve the full signature of a specialized `Callable[P, R]` or bare type variable.
+An overriding method must accept all of those arguments after its own receiver is bound.
+
+The optional mutable-override rule is disabled here to isolate signature compatibility.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+from typing import Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+F = TypeVar("F")
+
+class Base(Generic[P, F]):
+    __add__: Callable[P, str]
+    __getitem__: F
+
+class Compatible(Base[[object, int], Callable[[object, int], str]]):
+    def __add__(self, first: object, second: int, /) -> str: ...  # ok
+    def __getitem__(self, first: object, second: int, /) -> str: ...  # ok
+
+class Incompatible(Base[[object, int], Callable[[object, int], str]]):
+    def __add__(self, second: int, /) -> str: ...  # error: [invalid-attribute-override]
+    def __getitem__(self, second: int, /) -> str: ...  # error: [invalid-attribute-override]
+```
+
+## Generic callable attributes accessed through `super()`
+
+`super()` preserves the full signature of attributes declared as `Callable[P, R]` or a type
+variable, even when specialization gives them a positional first parameter:
+
+```py
+from collections.abc import Callable
+from typing import Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+F = TypeVar("F")
+
+class Base(Generic[P, F]):
+    callback: Callable[P, str]
+    value: F
+    optional: F | None
+
+class Child(Base[[object, int], Callable[[object, int], str]]):
+    def check(self) -> None:
+        reveal_type(super().callback)  # revealed: (object, int, /) -> str
+        reveal_type(super().value)  # revealed: (object, int, /) -> str
+        reveal_type(super().optional)  # revealed: ((object, int, /) -> str) | None
+```
+
+A function substituted for the type variable also remains unbound:
+
+```py
+from ty_extensions._internal import TypeOf
+
+def f(receiver: object, value: int) -> str:
+    return ""
+
+class FunctionChild(Base[[object, int], TypeOf[f]]):
+    def check(self) -> None:
+        reveal_type(super().value)  # revealed: def f(receiver: object, value: int) -> str
+        reveal_type(super().value(object(), 1))  # revealed: str
+        reveal_type(super().optional)  # revealed: (def f(receiver: object, value: int) -> str) | None
+```
+
+In a union, a concrete callable alternative still binds its receiver:
+
+```py
+class Mixed(Generic[P]):
+    callback: Callable[P, str] | Callable[[object, bytes], bytes]
+
+class MixedChild(Mixed[[object, int]]):
+    def check(self) -> None:
+        reveal_type(super().callback)  # revealed: ((object, int, /) -> str) | ((bytes, /) -> bytes)
+```
+
 ## Functions stored in generic instance attributes
 
 Reading a function stored in an attribute declared as `value: T` preserves its arguments and
