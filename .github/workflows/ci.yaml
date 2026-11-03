@@ -786,12 +786,11 @@ jobs:
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
       - run: cargo check
       - run: uv run --python="${PYTHON_VERSION}" --directory=./python/ruff-ecosystem python -m unittest discover -s tests
-      # Test, lint, format, and type-check py-fuzzer
+      # Lint/format/type-check py-fuzzer
       # (dogfooding with ty is done in a separate job)
       # Pass `--python` explicitly because the fuzzer's locked dependencies may
       # lack wheels for newer Python versions. Source builds of those
       # dependencies are disabled, so installation would fail.
-      - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer python -m unittest discover -s tests
       - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer mypy
       - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff format --check
       - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff check

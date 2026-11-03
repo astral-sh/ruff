@@ -765,7 +765,7 @@ class ResolvedCliArgs:
     minimize_failures: bool
 
 
-def parse_args(argv: Sequence[str] | None = None) -> ResolvedCliArgs:
+def parse_args() -> ResolvedCliArgs:
     """Parse command-line arguments"""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionRichHelpFormatter
@@ -871,7 +871,7 @@ def parse_args(argv: Sequence[str] | None = None) -> ResolvedCliArgs:
         choices=[member.value for member in Executable],
     )
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
 
     if args.minimize_failures is not None:
         if args.seeds or args.corpus_dir is not None:
