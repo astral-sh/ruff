@@ -233,14 +233,15 @@ impl ProjectDatabase {
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
+    /// Returns whether file discovery and checking completed for all selected files.
     ///
     /// Uses the same environment synchronization behavior as [`check`](Self::check).
     ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
-    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) {
-        self.project().check(self, reporter);
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> bool {
+        self.project().check(self, reporter)
     }
 
     /// Checks `file` using its current settings and available environment.

@@ -399,14 +399,16 @@ impl MainLoop {
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
                             let mut reporter = IndicatifReporter::new(printer.progress_target());
-                            db.check_with_reporter(&mut reporter);
-                            reporter.into_sorted_diagnostics(&db)
+                            let all_files_checked = db.check_with_reporter(&mut reporter);
+                            MainLoopMessage::CheckCompleted {
+                                result: reporter.into_sorted_diagnostics(&db),
+                                all_files_checked,
+                                revision,
+                            }
                         }) {
-                            Ok(result) => {
+                            Ok(message) => {
                                 // Send the result back to the main loop for printing.
-                                sender
-                                    .send(MainLoopMessage::CheckCompleted { result, revision })
-                                    .unwrap();
+                                sender.send(message).unwrap();
                             }
                             Err(cancelled) => {
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
@@ -417,7 +419,8 @@ impl MainLoop {
                     continue;
                 }
                 MainLoopMessage::CheckCompleted {
-                    result,
+                    mut result,
+                    all_files_checked,
                     revision: check_revision,
                 } => {
                     if check_revision != revision {
@@ -432,8 +435,7 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
-                    let mut result = result;
-                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
+                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) || !all_files_checked {
                         retain_visible_diagnostics(&mut result);
                     }
 
@@ -495,6 +497,11 @@ impl MainLoop {
                             } else {
                                 Err(Canceled)
                             }
+                        }
+                        // A file that could not be checked may still have baseline entries.
+                        MainLoopMode::UpdateBaseline if !all_files_checked => {
+                            self.write_diagnostics(db, &result, None)?;
+                            Ok(result)
                         }
                         MainLoopMode::UpdateBaseline => {
                             let settings = db.project().settings(db);
@@ -939,6 +946,7 @@ enum MainLoopMessage {
     CheckCompleted {
         /// The diagnostics that were found during the check.
         result: Vec<Diagnostic>,
+        all_files_checked: bool,
         revision: u64,
     },
     PollUvEnvironments,

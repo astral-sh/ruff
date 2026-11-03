@@ -401,6 +401,70 @@ fn update_baseline_does_not_suppress_syntax_errors() -> anyhow::Result<()> {
 }
 
 #[test]
+fn update_baseline_preserves_baseline_on_io_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "x: int = 'wrong'\n")?;
+    let update_args = ["--baseline", "baseline.json", "--update-baseline"];
+    let output = case.command().args(update_args).output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    let baseline_path = case.root().join("baseline.json");
+    let baseline = fs::read(&baseline_path)?;
+    case.write_file("test.py", "x: int = 1\n")?;
+
+    let output = case
+        .command()
+        .args(update_args)
+        .args(["test.py", "missing.py"])
+        .output()?;
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert_eq!(fs::read(&baseline_path)?, baseline);
+
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("error[io]:") && stdout.contains("missing.py"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("Updated baseline"), "{stdout}");
+
+    Ok(())
+}
+
+#[test]
+fn update_baseline_with_invalid_glob_when_script_is_checked() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [[tool.ty.overrides]]
+        # include = ["*.py"]
+        # [tool.ty.overrides.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+        x: int = 'wrong'
+        "#,
+    )?;
+
+    let output = case
+        .command()
+        .args(["--baseline", "baseline.json", "--update-baseline"])
+        .output()?;
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("error[invalid-glob]:"), "{stdout}");
+    assert!(stdout.contains("Updated baseline"), "{stdout}");
+
+    let baseline: serde_json::Value =
+        serde_json::from_slice(&fs::read(case.root().join("baseline.json"))?)?;
+    assert_eq!(
+        baseline["files"]["script.py"][0]["rule"],
+        "invalid-assignment"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn missing_baseline_is_reported() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "")?;
     assert_cmd_snapshot!(case.command().args(["--baseline", "missing.json", "--output-format=concise"]), @"

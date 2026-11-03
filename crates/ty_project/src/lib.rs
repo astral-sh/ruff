@@ -29,6 +29,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
 pub use ty_python_semantic::Db as SemanticDb;
@@ -518,7 +519,8 @@ impl Project {
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
-    fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
+    /// Returns whether file discovery and checking completed for all selected files.
+    fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) -> bool {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -533,7 +535,9 @@ impl Project {
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
 
-        diagnostics.extend_from_slice(files.diagnostics());
+        let discovery_diagnostics = files.diagnostics();
+        let all_files_checked = AtomicBool::new(discovery_diagnostics.is_empty());
+        diagnostics.extend_from_slice(discovery_diagnostics);
 
         reporter.report_diagnostics(db, diagnostics);
 
@@ -559,12 +563,7 @@ impl Project {
 
                         // This is outside `check_file_impl` to avoid that opening or closing
                         // a file invalidates the `check_file_impl` query of every file!
-                        // Scripts with invalid settings are never parsed by `check_file_impl`, so
-                        // they have no AST to clear.
-                        if !open_files.contains(&file)
-                            && Script::for_file(db, file)
-                                .is_none_or(|script| script.has_valid_settings(db))
-                        {
+                        if !open_files.contains(&file) {
                             let python_file = program_file.python_file(db);
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
@@ -576,8 +575,9 @@ impl Project {
                             parsed.clear();
                         }
                     }
-                    Err(io_error) => {
-                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    Err(diagnostics) => {
+                        all_files_checked.store(false, Ordering::Relaxed);
+                        reporter.report_checked_file(db, file, diagnostics);
                     }
                 }
             });
@@ -586,6 +586,7 @@ impl Project {
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
         );
+        all_files_checked.into_inner()
     }
 
     /// Opens a file in the project.
@@ -896,9 +897,9 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    check_file_impl(db, db.program_file(file))
-        .map(<[Diagnostic]>::to_vec)
-        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+    match check_file_impl(db, db.program_file(file)) {
+        Ok(diagnostics) | Err(diagnostics) => diagnostics.to_vec(),
+    }
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
@@ -1005,11 +1006,12 @@ pub enum ProjectReloadResult {
     },
 }
 
-#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+/// Returns the diagnostics in `Err` if the file could not be checked.
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(
     db: &dyn Db,
     file: ProgramFile<'_>,
-) -> Result<Box<[Diagnostic]>, Diagnostic> {
+) -> Result<Box<[Diagnostic]>, Box<[Diagnostic]>> {
     let source_file = file.file(db);
     {
         let db = AssertUnwindSafe(db);
@@ -1018,10 +1020,11 @@ pub(crate) fn check_file_impl(
             if let Some(script) = script
                 && !script.has_valid_settings(*db)
             {
-                return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
+                return Err(Box::from(script.settings_diagnostics(*db)));
             }
 
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let diagnostics = ty_python_semantic::check_file(*db, file)
+                .map_err(|diagnostic| Box::from([diagnostic]))?;
             let Some(script) = script else {
                 return Ok(diagnostics);
             };
@@ -1048,7 +1051,7 @@ pub(crate) fn check_file_impl(
                 baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
                 diagnostics
             }),
-            Err(diagnostic) => Ok(Box::new([diagnostic])),
+            Err(diagnostic) => Err(Box::from([diagnostic])),
         }
     }
 }
@@ -1210,13 +1213,11 @@ mod tests {
         file.sync(&mut db);
 
         assert_eq!(source_text(&db, file).as_str(), "");
+        let diagnostics = check_file_impl(&db, db.program_file(file)).unwrap_err();
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
         assert_eq!(
-            check_file_impl(&db, db.program_file(file))
-                .as_ref()
-                .unwrap_err()
-                .headline_message()
-                .to_string(),
-            "Failed to read file: No such file or directory".to_string()
+            diagnostics[0].headline_message(),
+            "Failed to read file: No such file or directory"
         );
 
         let events = db.take_salsa_events();
@@ -1227,15 +1228,8 @@ mod tests {
         db.write_file(path, "").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "");
-        assert_eq!(
-            check_file_impl(&db, db.program_file(file))
-                .as_ref()
-                .unwrap()
-                .iter()
-                .map(|diagnostic| diagnostic.headline_message().to_string())
-                .collect::<Vec<_>>(),
-            vec![] as Vec<String>
-        );
+        let diagnostics = check_file_impl(&db, db.program_file(file)).unwrap();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
         Ok(())
     }
