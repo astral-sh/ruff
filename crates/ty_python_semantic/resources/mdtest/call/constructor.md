@@ -1165,6 +1165,18 @@ def nested(errors: list[Any]):
     first.exceptions  # error: [unresolved-attribute]
 ```
 
+A dictionary whose key type is bounded by `Never` rejects every key assignment.
+
+```py
+from typing import Never
+
+class EmptyMap[K: Never, V](dict[K, V]): ...
+
+empty = EmptyMap()
+reveal_type(empty)  # revealed: EmptyMap[Never, Unknown]
+empty["key"] = 1  # error: [invalid-assignment]
+```
+
 When the constructor receives no arguments, either callback signature in the annotation is possible.
 
 ```py
@@ -1176,6 +1188,31 @@ class Handler[**P]:
 
 handler: Handler[[str]] | Handler[[int]] = Handler()
 reveal_type(handler)  # revealed: Handler[(str, /)] | Handler[(int, /)]
+```
+
+### An unpacked tuple before a keyword-only constructor parameter
+
+The keyword-only parameter keeps its declared type whether the tuple accepts zero or two arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+
+class Tagged:
+    def __new__(cls, *items: *tuple[()], label: str) -> Self:
+        return super().__new__(cls)
+
+class Pair:
+    def __new__(cls, *items: *tuple[int, int], label: str) -> Self:
+        return super().__new__(cls)
+
+Tagged(label="ok")
+Pair(1, 2, label="ok")
+Pair(1, 2, label=3)  # error: [invalid-argument-type]
 ```
 
 ### `__new__` with arbitrary generic return types
