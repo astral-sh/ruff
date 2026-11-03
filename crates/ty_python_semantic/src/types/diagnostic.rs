@@ -97,6 +97,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&MISSING_RETURN);
     registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&UNSOUND_YIELD);
@@ -482,6 +483,15 @@ declare_lint! {
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-return.md")]
+    pub(crate) static MISSING_RETURN = {
+        summary: "detects missing returns in functions whose return type does not allow `None`",
+        status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
     }
 }
@@ -3135,11 +3145,10 @@ pub(super) fn report_implicit_return_type(
 ) {
     let db = context.db();
 
-    // Use EMPTY_BODY lint for functions with empty bodies, INVALID_RETURN_TYPE for others
     let lint_to_use = if has_empty_body {
         &EMPTY_BODY
     } else {
-        &INVALID_RETURN_TYPE
+        &MISSING_RETURN
     };
 
     let Some(builder) = context.report_lint(lint_to_use, range) else {

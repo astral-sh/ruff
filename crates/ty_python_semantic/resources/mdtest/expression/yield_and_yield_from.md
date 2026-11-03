@@ -595,7 +595,7 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [inval
 ```py
 from typing import Generator
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
 

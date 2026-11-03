@@ -309,7 +309,7 @@ python-version = "3.12"
 ```
 
 ```py
-# error: [invalid-return-type]
+# error: [missing-return]
 def f() -> int:
     1
 
@@ -350,12 +350,12 @@ def f() -> int:
     # error: [invalid-return-type]
     return ...
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def foo() -> int:
     print("...")
     ...
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def foo() -> int:
     f"""{foo} is a function that ..."""
     ...
@@ -391,17 +391,17 @@ def f() -> None:
     if False:
         return 1
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def f(cond: bool) -> int:
     if cond:
         return 1
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def f(cond: bool) -> int:
     if cond:
         raise ValueError()
 
-# error: [invalid-return-type]
+# error: [missing-return]
 def f(cond: bool) -> int:
     if cond:
         cond = False
@@ -415,14 +415,29 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
-If the function has no `return` statement or if it has only bare `return` statement (no variable in
-the return statement), then we show a diagnostic hint that the return annotation should be `-> None`
-or a `return` statement should be added.
+When a function can fall through and contains no `return` statements, ty suggests changing the
+annotation to `-> None` or returning a value of the annotated type.
 
 ```py
-# error: [invalid-return-type]
+# error: [missing-return]
 def f() -> int:
     print("hello")
+```
+
+## Configuring missing returns
+
+With `invalid-return-type` disabled, ty accepts the bare `return` but still reports that execution
+can reach the end of the function when `flag` is false.
+
+```toml
+[rules]
+invalid-return-type = "ignore"
+```
+
+```py
+def f(flag: bool) -> int:  # error: [missing-return]
+    if flag:
+        return
 ```
 
 ## NotImplemented
@@ -553,7 +568,7 @@ If the function has no return and it's implicitly returning it is still type che
 def bare_return_ok() -> typing.Generator[int, int, None]:
     yield 1
 
-def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+def missing_return() -> typing.Generator[int, int, int]:  # error: [missing-return]
     yield 1
 ```
 
@@ -613,7 +628,7 @@ class Concrete(Abstract):
     def method(self) -> str: ...  # error: [empty-body]
 ```
 
-## Diagnostics for `invalid-return-type` on dynamic type
+## Diagnostics for `missing-return` on dynamic type
 
 ```toml
 environment.python-version = "3.12"
@@ -622,7 +637,7 @@ environment.python-version = "3.12"
 ```py
 from typing import Never, Any
 
-def f(func: Any) -> Never:  # error: [invalid-return-type]
+def f(func: Any) -> Never:  # error: [missing-return]
     func()
 ```
 

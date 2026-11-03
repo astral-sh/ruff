@@ -3569,7 +3569,7 @@ def color_name(color: Color) -> str:
     else:
         assert_never(color)
 
-# No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
+# No `missing-return` error here because the implicit `else` branch is detected as unreachable:
 def color_name_without_assertion(color: Color) -> str:
     if color is Color.RED:
         return "Red"

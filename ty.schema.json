@@ -1058,7 +1058,7 @@
         },
         "invalid-return-type": {
           "title": "detects returned values that can't be assigned to the function's annotated return type",
-          "description": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body is handled\nby the separate `empty-body` error code.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+          "description": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nA bare `return` is equivalent to `return None` and is checked by this rule. If execution falls off\nthe end of a function, Python also returns `None`. ty checks that case with `missing-return` for\nnonempty bodies and `empty-body` for empty bodies.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1330,6 +1330,16 @@
           "title": "detects methods that override a superclass member without an `@override` annotation",
           "description": "## What it does\n\nChecks for methods that override a method or attribute in a superclass but are not decorated with\n`@override`.\n\nThis rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a\nproject.\n\n## Exemptions\n\nOverriding `__init__`, `__new__`, `__init_subclass__`, or `__post_init__` does not require\n`@override`, even if the method is explicitly declared by a superclass.\n\n## Why is this bad?\n\nWithout an `@override` annotation, refactors can silently change whether a method is an override.\nRequiring `@override` on every override lets ty report when an intended override stops overriding\nanything, and when a method unexpectedly starts overriding a superclass member.\n\n## Example\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import override\n\n\nclass Parent:\n    def method(self) -> int:\n        return 1\n\n\nclass Child(Parent):\n    # when the rule is enabled\n    def method(self) -> int:  # error\n        return 2\n\n\nclass ExplicitChild(Parent):\n    @override\n    def method(self) -> int:  # fine\n        return 2\n```",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-return": {
+          "title": "detects missing returns in functions whose return type does not allow `None`",
+          "description": "## What it does\n\nDetects nonempty functions that can reach the end of their body when their return type does not\nallow `None`. If a generator annotated with `Generator[YieldType, SendType, ReturnType]` falls off\nthe end, its final return value is `None`, so `ReturnType` must allow `None` on that path.\n\n## Why is this bad?\n\nWhen execution reaches the end of a function, Python implicitly returns `None`. A caller relying on\nthe annotated return type can then fail at runtime.\n\n## Examples\n\n```python\ndef sign(x: int) -> int:  # error: [missing-return]\n    if x < 0:\n        return -1\n    if x > 0:\n        return 1\n```\n\nCalling `sign(0)` returns `None`. Add `return 0` at the end of the function to handle that case.\n\n## Compatibility\n\nBefore ty 0.0.97, `invalid-return-type` also reported missing returns. If you configured a level for\n`invalid-return-type` and want the same level for missing returns, set `missing-return` to that\nlevel too. Replace `# ty: ignore[invalid-return-type]` with `# ty: ignore[missing-return]` on return\nannotations where you intended to suppress a missing return.",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

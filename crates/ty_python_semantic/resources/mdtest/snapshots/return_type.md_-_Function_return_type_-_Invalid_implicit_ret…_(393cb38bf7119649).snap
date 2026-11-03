@@ -17,17 +17,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  2 |     if False:
  3 |         return 1
  4 | 
- 5 | # error: [invalid-return-type]
+ 5 | # error: [missing-return]
  6 | def f(cond: bool) -> int:
  7 |     if cond:
  8 |         return 1
  9 | 
-10 | # error: [invalid-return-type]
+10 | # error: [missing-return]
 11 | def f(cond: bool) -> int:
 12 |     if cond:
 13 |         raise ValueError()
 14 | 
-15 | # error: [invalid-return-type]
+15 | # error: [missing-return]
 16 | def f(cond: bool) -> int:
 17 |     if cond:
 18 |         cond = False
@@ -40,7 +40,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+error[missing-return]: Function can implicitly return `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.py:6:22
   |
 6 | def f(cond: bool) -> int:
@@ -49,7 +49,7 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
 ```
 
 ```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
+error[missing-return]: Function always implicitly returns `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.py:11:22
    |
 11 | def f(cond: bool) -> int:
@@ -59,7 +59,7 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 ```
 
 ```
-error[invalid-return-type]: Function can implicitly return `None`, which is not assignable to return type `int`
+error[missing-return]: Function can implicitly return `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.py:16:22
    |
 16 | def f(cond: bool) -> int:
