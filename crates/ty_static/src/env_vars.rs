@@ -66,7 +66,6 @@ impl EnvVars {
     /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
     /// root and initialize script environments. When set to `"scripts"`, only script environments
     /// are initialized.
-    #[attr_hidden]
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.

@@ -46,6 +46,14 @@ When set, ty will use this format for output instead of the default.
 
 Accepts the same values as the `--output-format` command-line argument.
 
+### `TY_UV`
+
+Enable uv integration.
+
+When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
+root and initialize script environments. When set to `"scripts"`, only script environments
+are initialized.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
