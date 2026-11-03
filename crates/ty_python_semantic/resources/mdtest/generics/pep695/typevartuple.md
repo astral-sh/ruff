@@ -294,15 +294,15 @@ suffix. This applies with or without a fixed suffix.
 
 ```py
 def empty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return reveal_type(Variadic())  # revealed: Variadic[()]
 
 def nonempty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return reveal_type(Variadic(1))  # revealed: Variadic[Literal[1]]
 
 def empty_without_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return reveal_type(Variadic())  # revealed: Variadic[()]
 ```
 
@@ -358,17 +358,17 @@ Fixed elements still constrain the pack's length and types, even when other elem
 ```py
 def fixed_any_with_context[*Us](shape: tuple[*Us], values: tuple[Any]) -> Variadic[*Us, int]:
     fixed_length: Variadic[int] = reveal_type(Variadic(*values))  # revealed: Variadic[int]
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return reveal_type(Variadic(*values))  # revealed: Variadic[Any]
 
 def incompatible_gradual_prefix[*Us](shape: tuple[*Us], values: tuple[int, *tuple[Any, ...]]) -> Variadic[*Us, int]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-return-statement]
 
 def incompatible_gradual_element(values: tuple[bytes, *tuple[Any, ...]]) -> Variadic[int, str]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-return-statement]
 
 def too_many_gradual_boundaries(values: tuple[int, *tuple[Any, ...], str]) -> Variadic[int]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-return-statement]
 ```
 
 ### Unspecified type arguments
@@ -423,10 +423,10 @@ class Array[*Ts]:
         return self
 
     def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-return-statement]
 
     def fixed_shape(self) -> "Top[Array[Any]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-return-statement]
 ```
 
 ### Constrained inference from synthetic `Self`
@@ -563,10 +563,10 @@ cannot be assigned to a fixed-length tuple, even when its fixed prefix and suffi
 
 ```py
 def arbitrary_pack[*Ts](value: tuple[*Ts]) -> tuple[int, str]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-return-statement]
 
 def middle_pack[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, str]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-return-statement]
 ```
 
 ### Assignability involving type variable tuples
@@ -586,14 +586,14 @@ def preserve_pack_with_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[ob
     return values
 
 def reject_object_pack[*Ts](values: tuple[object, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    return values  # error: [invalid-return-type]
+    return values  # error: [invalid-return-statement]
 
 def reject_int_pack[*Ts](values: tuple[int, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    return values  # error: [invalid-return-type]
+    return values  # error: [invalid-return-statement]
 
 class Outer[*Ts]:
     def reject_unrelated_pack[*Us](self, values: tuple[*Ts]) -> tuple[*Us]:
-        return values  # error: [invalid-return-type]
+        return values  # error: [invalid-return-statement]
 ```
 
 A fixed-length tuple cannot replace an arbitrary type variable tuple either. The caller determines
@@ -602,10 +602,10 @@ The same restriction applies to annotated assignments inside the function.
 
 ```py
 def reject_empty[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    return ()  # error: [invalid-return-type]
+    return ()  # error: [invalid-return-statement]
 
 def reject_fixed[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    return (1, "a")  # error: [invalid-return-type]
+    return (1, "a")  # error: [invalid-return-statement]
 
 def reject_fixed_assignment[*Ts]() -> None:
     fixed: tuple[*Ts] = (1,)  # error: [invalid-assignment]
@@ -616,10 +616,10 @@ remaining elements still cannot replace an arbitrary type variable tuple.
 
 ```py
 def reject_empty_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
-    return (1, "a")  # error: [invalid-return-type]
+    return (1, "a")  # error: [invalid-return-statement]
 
 def reject_fixed_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
-    return (1, True, "a")  # error: [invalid-return-type]
+    return (1, True, "a")  # error: [invalid-return-statement]
 ```
 
 Materializing a type variable tuple can change its default without changing the identity of the
@@ -1132,7 +1132,7 @@ Return statements and arguments to other functions also provide contextual retur
 
 ```py
 def invalid_return() -> tuple[str]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return collect(1)
 
 def accept_strings(values: tuple[str]) -> None: ...
@@ -2149,11 +2149,11 @@ def trim_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[*Ts]:
     return values[1:-1]
 
 def reverse[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@reverse]`, found `tuple[object, ...]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `tuple[*Ts@reverse]`, found `tuple[object, ...]`"
     return values[::-1]
 
 def stride[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@stride]`, found `tuple[object, ...]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `tuple[*Ts@stride]`, found `tuple[object, ...]`"
     return values[::2]
 ```
 

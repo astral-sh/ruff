@@ -14,15 +14,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 
 ```
  1 | def f() -> int:
- 2 |     # error: [invalid-return-type]
+ 2 |     # error: [invalid-return-statement]
  3 |     return ...
  4 | 
- 5 | # error: [missing-return]
+ 5 | # error: [missing-return-statement]
  6 | def foo() -> int:
  7 |     print("...")
  8 |     ...
  9 | 
-10 | # error: [missing-return]
+10 | # error: [missing-return-statement]
 11 | def foo() -> int:
 12 |     f"""{foo} is a function that ..."""
 13 |     ...
@@ -31,19 +31,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-return-statement]: Return type does not match returned value
  --> src/mdtest_snippet.pyi:3:12
   |
 1 | def f() -> int:
   |            --- Expected `int` because of return type
-2 |     # error: [invalid-return-type]
+2 |     # error: [invalid-return-statement]
 3 |     return ...
   |            ^^^ expected `int`, found `EllipsisType`
 
 ```
 
 ```
-error[missing-return]: Function always implicitly returns `None`, which is not assignable to return type `int`
+error[missing-return-statement]: Function always implicitly returns `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.pyi:6:14
   |
 6 | def foo() -> int:
@@ -53,7 +53,7 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 ```
 
 ```
-error[missing-return]: Function always implicitly returns `None`, which is not assignable to return type `int`
+error[missing-return-statement]: Function always implicitly returns `None`, which is not assignable to return type `int`
   --> src/mdtest_snippet.pyi:11:14
    |
 11 | def foo() -> int:

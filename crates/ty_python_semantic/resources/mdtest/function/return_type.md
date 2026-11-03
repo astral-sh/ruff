@@ -309,16 +309,16 @@ python-version = "3.12"
 ```
 
 ```py
-# error: [missing-return]
+# error: [missing-return-statement]
 def f() -> int:
     1
 
 def f() -> str:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return 1
 
 def f() -> int:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return
 
 from typing import TypeVar
@@ -332,13 +332,13 @@ class A[T]: ...
 
 def f() -> A[int]:
     class A[T]: ...
-    return A[int]()  # error: [invalid-return-type]
+    return A[int]()  # error: [invalid-return-statement]
 
 class B: ...
 
 def g() -> B:
     class B: ...
-    return B()  # error: [invalid-return-type]
+    return B()  # error: [invalid-return-statement]
 ```
 
 ## Invalid return type in stub file
@@ -347,15 +347,15 @@ def g() -> B:
 
 ```pyi
 def f() -> int:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return ...
 
-# error: [missing-return]
+# error: [missing-return-statement]
 def foo() -> int:
     print("...")
     ...
 
-# error: [missing-return]
+# error: [missing-return-statement]
 def foo() -> int:
     f"""{foo} is a function that ..."""
     ...
@@ -370,15 +370,15 @@ def f(cond: bool) -> str:
     if cond:
         return "a"
     else:
-        # error: [invalid-return-type]
+        # error: [invalid-return-statement]
         return 1
 
 def f(cond: bool) -> str:
     if cond:
-        # error: [invalid-return-type]
+        # error: [invalid-return-statement]
         return 1
     else:
-        # error: [invalid-return-type]
+        # error: [invalid-return-statement]
         return 2
 ```
 
@@ -391,17 +391,17 @@ def f() -> None:
     if False:
         return 1
 
-# error: [missing-return]
+# error: [missing-return-statement]
 def f(cond: bool) -> int:
     if cond:
         return 1
 
-# error: [missing-return]
+# error: [missing-return-statement]
 def f(cond: bool) -> int:
     if cond:
         raise ValueError()
 
-# error: [missing-return]
+# error: [missing-return-statement]
 def f(cond: bool) -> int:
     if cond:
         cond = False
@@ -419,15 +419,16 @@ When a function can fall through and contains no `return` statements, ty suggest
 annotation to `-> None` or returning a value of the annotated type.
 
 ```py
-# error: [missing-return]
+# error: [missing-return-statement]
 def f() -> int:
     print("hello")
 ```
 
-## Configuring missing returns
+## Configuring the old `invalid-return-type` name
 
-With `invalid-return-type` disabled, ty accepts the bare `return` but still reports that execution
-can reach the end of the function when `flag` is false.
+The old rule name `invalid-return-type` is an alias for `invalid-return-statement`. Disabling it
+suppresses the error on the bare `return`. ty still reports the missing return on the other path and
+the incompatible annotation on the generator function.
 
 ```toml
 [rules]
@@ -435,9 +436,12 @@ invalid-return-type = "ignore"
 ```
 
 ```py
-def f(flag: bool) -> int:  # error: [missing-return]
+def f(flag: bool) -> int:  # error: [missing-return-statement]
     if flag:
         return
+
+def numbers() -> int:  # error: [invalid-generator-return-type]
+    yield 1
 ```
 
 ## NotImplemented
@@ -480,7 +484,7 @@ def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 
 def f(cond: bool) -> int:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `int`, found `Literal["hello"]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `int`, found `Literal["hello"]`"
     return "hello" if cond else NotImplemented
 ```
 
@@ -545,12 +549,12 @@ def i() -> typing.Iterable[int]:
 def i2() -> typing.Generator[int]:
     yield from i()
 
-def j() -> str:  # error: [invalid-return-type]
+def j() -> str:  # error: [invalid-generator-return-type]
     yield 42
 
 def invalid_return_type() -> typing.Generator[None, None, None]:
     yield
-    return ""  # error: [invalid-return-type]
+    return ""  # error: [invalid-return-statement]
 ```
 
 The return value of the function must be assignable to the return type of the `Generator`. This is
@@ -559,7 +563,7 @@ specified in the third type parameter.
 ```py
 def wrong_return() -> typing.Generator[int, int, int]:
     yield 1
-    return ""  # error: [invalid-return-type]
+    return ""  # error: [invalid-return-statement]
 ```
 
 If the function has no return and it's implicitly returning it is still type checked.
@@ -568,7 +572,7 @@ If the function has no return and it's implicitly returning it is still type che
 def bare_return_ok() -> typing.Generator[int, int, None]:
     yield 1
 
-def missing_return() -> typing.Generator[int, int, int]:  # error: [missing-return]
+def missing_return() -> typing.Generator[int, int, int]:  # error: [missing-return-statement]
     yield 1
 ```
 
@@ -577,7 +581,7 @@ Iterators must not return anything.
 ```py
 def iterator_must_not_return() -> typing.Iterator[int]:
     yield 2
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return "foo"
 ```
 
@@ -604,7 +608,7 @@ async def h() -> typing.AsyncIterator[int]:
 async def i() -> typing.AsyncIterable[int]:
     yield 42
 
-async def j() -> str:  # error: [invalid-return-type]
+async def j() -> str:  # error: [invalid-generator-return-type]
     yield 42
 
 async def k() -> typing.AsyncGenerator[int]:
@@ -628,7 +632,7 @@ class Concrete(Abstract):
     def method(self) -> str: ...  # error: [empty-body]
 ```
 
-## Diagnostics for `missing-return` on dynamic type
+## Diagnostics for `missing-return-statement` on dynamic type
 
 ```toml
 environment.python-version = "3.12"
@@ -637,13 +641,13 @@ environment.python-version = "3.12"
 ```py
 from typing import Never, Any
 
-def f(func: Any) -> Never:  # error: [missing-return]
+def f(func: Any) -> Never:  # error: [missing-return-statement]
     func()
 ```
 
 ## `unsound-return-statement`
 
-In addition to `invalid-return-type`, we also offer a disabled-by-default stricter rule
+In addition to `invalid-return-statement`, we also offer a disabled-by-default stricter rule
 `unsound-return-statement`. This rule forbids `return` statements that return an instance of a type
 `A` unless `A` is a *subtype* of the annotated return type:
 

@@ -220,15 +220,15 @@ def reveal_unsupported_tuple_results(x: A | B, items: list[int]):
     reveal_type(isinstance(x, (A | B,)))  # revealed: bool
     reveal_type(isinstance(items, (List,)))  # revealed: bool
 
-def partial_tuple(x: A | B) -> bool:  # error: [missing-return]
+def partial_tuple(x: A | B) -> bool:  # error: [missing-return-statement]
     if isinstance(x, (A, bytes)):
         return True
 
-def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [missing-return]
+def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [missing-return-statement]
     if isinstance(x, targets):
         return True
 
-def subclass_target(x: A, target: type[A]) -> bool:  # error: [missing-return]
+def subclass_target(x: A, target: type[A]) -> bool:  # error: [missing-return-statement]
     if isinstance(x, (target,)):
         return True
 ```
@@ -392,7 +392,7 @@ def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [missing-return]
+def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [missing-return-statement]
     reveal_type(isinstance(x, (A, B)))  # revealed: bool
     if isinstance(x, (A, B)):
         return True

@@ -239,16 +239,16 @@ from typing_extensions import Literal, TypeGuard, TypeIs, assert_never
 
 def _(a: object, flag: bool) -> TypeGuard[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
+        # error: [invalid-return-statement] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
         return 0
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
     return "foo"
 
-# error: [missing-return] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
+# error: [missing-return-statement] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def f(a: object, flag: bool) -> TypeIs[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
+        # error: [invalid-return-statement] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
         return 1.2
 
 def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
@@ -260,7 +260,7 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
 ```
 
 A valid boolean return must also be accepted when the predicate's return annotation is an alias of
-`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-return-type` diagnostic.
+`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-return-statement` diagnostic.
 
 ```py
 from typing_extensions import TypeAliasType
