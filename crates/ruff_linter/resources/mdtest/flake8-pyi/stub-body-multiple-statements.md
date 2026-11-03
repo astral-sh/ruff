@@ -359,7 +359,7 @@ help: Remove unnecessary placeholder statements
 
 ## More than one statement would remain
 
-No fix is offered when removing the placeholders would still leave more than one statement.
+No fix is offered when removing the placeholders would still leave more than one statement. The extra statements are still unnecessary in a stub, so the help message asks for their removal without calling them placeholders.
 
 ```pyi
 def too_many_statements():  # snapshot: stub-body-multiple-statements
@@ -374,12 +374,12 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def too_many_statements():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
+help: Remove unnecessary statements
 ```
 
 ## Fix requires preview mode
 
-Outside of preview, the rule reports the same diagnostics but offers no fix.
+Outside of preview, the rule reports the same diagnostics but offers no fix and no help message.
 
 ```toml
 [lint]
@@ -399,7 +399,6 @@ error[PYI048]: Function body must contain exactly one statement
   |
 1 | def placeholders():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^
-help: Remove unnecessary placeholder statements
 ```
 
 ## Non-stub files

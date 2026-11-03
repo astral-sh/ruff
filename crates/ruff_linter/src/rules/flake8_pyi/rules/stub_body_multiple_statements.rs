@@ -55,7 +55,13 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
-pub(crate) struct StubBodyMultipleStatements;
+pub(crate) struct StubBodyMultipleStatements {
+    /// What the statements beyond the first one are, which decides the help message. `None`
+    /// outside of [preview], where the rule offers neither a fix nor a help message.
+    ///
+    /// [preview]: https://docs.astral.sh/ruff/preview/
+    extra_statements: Option<ExtraStatements>,
+}
 
 impl Violation for StubBodyMultipleStatements {
     // Sometimes fixable, and only under preview.
@@ -67,8 +73,29 @@ impl Violation for StubBodyMultipleStatements {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove unnecessary placeholder statements".to_string())
+        let title = match self.extra_statements? {
+            ExtraStatements::Placeholders => "Remove unnecessary placeholder statements",
+            ExtraStatements::Other => "Remove unnecessary statements",
+        };
+        Some(title.to_string())
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExtraStatements {
+    /// Removing placeholders (`...` and `pass`) leaves a single statement, so a fix is attached.
+    Placeholders,
+    /// More than one statement would remain after removing placeholders, as in:
+    ///
+    /// ```pyi
+    /// def function():
+    ///     x = 1
+    ///     return x
+    /// ```
+    ///
+    /// These statements are still unnecessary in a stub, but they aren't placeholders, and
+    /// removing them is left to the user.
+    Other,
 }
 
 /// PYI048
@@ -77,11 +104,27 @@ pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: &Stmt, body
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(StubBodyMultipleStatements, stmt.identifier());
+    let preview = is_pyi048_fix_enabled(checker.settings());
+    let fix = if preview {
+        remove_placeholders(checker, body)
+    } else {
+        None
+    };
 
-    if is_pyi048_fix_enabled(checker.settings())
-        && let Some(fix) = remove_placeholders(checker, body)
-    {
+    let extra_statements = preview.then(|| {
+        if fix.is_some() {
+            ExtraStatements::Placeholders
+        } else {
+            ExtraStatements::Other
+        }
+    });
+
+    let mut diagnostic = checker.report_diagnostic(
+        StubBodyMultipleStatements { extra_statements },
+        stmt.identifier(),
+    );
+
+    if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
 }
