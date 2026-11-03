@@ -40,7 +40,7 @@ untracked Python files, excludes notebooks, and prefers a stub to its adjacent i
 Implementations without stubs and standalone stubs remain targets. This preserves
 imported stub types in mypy. If a file and a populated directory share a module
 name, a package directory wins; a module wins over a directory without an
-`__init__.py` or `__init__.pyi`. Paired implementation bodies are omitted for every
+`__init__.py` or `__init__.pyi`. Paired implementations are omitted as roots for every
 checker, so this controlled workload differs from default project discovery.
 The runner prints its expected file count and SHA-256 before each project.
 `benchmark-workload.json` records root and stub counts and the fraction of
@@ -58,6 +58,10 @@ Additional first-party import roots, including `src/` layouts and SQLAlchemy's
 `lib/`, apply to every checker. This keeps imports pointed at the checkout even
 when a dependency also installs a release of the project. Every project environment includes the same pinned mypy dependency,
 including runs that select only another tool.
+
+The pandas workload excludes `pandas/tests` for every checker. Its timing therefore
+differs from suites that include those tests; clipboard and other selected modules
+still use the common unannotated-body policy.
 
 The suite includes Django's dynamic framework code, SymPy's symbolic computation,
 the OpenAI SDK's generated typed models and clients, and pytest's implementation
@@ -122,6 +126,10 @@ Measures how long it takes to recheck a project if there were no changes.
 
 Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
 
+The timer ends after the first diagnostic response for each open file. Push
+notifications can be empty or partial, so this does not establish completion of
+all background analysis.
+
 Run with:
 
 ```bash
@@ -150,8 +158,8 @@ We benchmark against the latest version of each type checker, but some projects
 may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
-With Zuban 0.10.2, a NumPy CLI check using an expanded stub-first file list did
-not finish within ten minutes. Its language server returned a server-panic error for the
+With Zuban 0.10.2, the NumPy CLI check using controlled native discovery did
+not finish its 600-second untimed preflight. Its language server returned a server-panic error for the
 incremental edits in discord.py, PyTorch, and NumPy. These cases retain the
 shared workload and assertions; a failed or interrupted run is not a benchmark
 result.
