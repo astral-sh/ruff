@@ -1052,6 +1052,20 @@ jobs:
             "$FUZZ_CORPUS_SEEDS"
           )
 
+  cargo-cooldowns:
+    name: "crates cooldowns"
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-2' || 'ubuntu-latest' }}
+    needs: determine_changes
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/github-actions/cargo-cooldowns@4d0d0b9f3efeb82c92183f4423e395b81c3fcf5e
+
   cargo-deny:
     name: "cargo deny"
     timeout-minutes: 10
@@ -1605,6 +1619,7 @@ jobs:
       - determine_changes
       - cargo-fmt
       - cargo-clippy
+      - cargo-cooldowns
       - cargo-deny
       - hawk
       - cargo-test-linux
@@ -1619,7 +1634,7 @@ jobs:
     steps:
       - name: "Check required jobs passed"
         run: |
-          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"')
+          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or .key == "cargo-cooldowns")) | "\(.key): \(.value.result)"')
           if [ -n "$failing" ]; then
             echo "$failing"
             exit 1
