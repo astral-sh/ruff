@@ -4451,8 +4451,7 @@ impl<'db> CallableBinding<'db> {
             && participating_slot_indices
                 .iter()
                 .exactly_one()
-                .ok()
-                .is_some_and(|&column| {
+                .is_ok_and(|&column| {
                     self.all_parameter_prefixes_miss(
                         db,
                         env,
