@@ -37,6 +37,11 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
         path.write_text(contents)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "add", "pkg"], cwd=tmp_path, check=True)
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nexclude = ["pkg"]\n'
+        '[[tool.mypy.overrides]]\nmodule = ["pkg.*"]\n'
+        "check_untyped_defs = false\n"
+    )
     (tmp_path / "pkg/generated").mkdir()
     (tmp_path / "pkg/generated/untracked.py").write_text("this is not valid Python!\n")
     project = Project(
@@ -125,9 +130,14 @@ def zuban_project(tmp_path: Path) -> tuple[Project, Venv]:
         "# Preserve project metadata and other checker settings.\n"
         '[project]\nname = "example"\n'
         '[tool.mypy]\nignore_errors = true\nexclude = ["src"]\n'
+        '[[tool.mypy.overrides]]\nmodule = ["example.*"]\n'
+        "check_untyped_defs = false\n"
         '[tool.zuban]\nignore_errors = true\npython_version = "3.14"\n'
     )
-    (tmp_path / "mypy.ini").write_text("[mypy]\nignore_errors = True\nexclude = src\n")
+    (tmp_path / "mypy.ini").write_text(
+        "[mypy]\nignore_errors = True\nexclude = src\n"
+        "[mypy-example.*]\ncheck_untyped_defs = False\n"
+    )
     project = Project(
         name="example",
         repository="unused",

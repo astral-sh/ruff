@@ -44,6 +44,12 @@ following with project and user configuration disabled, so per-module overrides
 and plugins cannot change its workload. Checkers can still follow different
 imports or infer different types from the same source files.
 
+The suite includes Django's dynamic framework code, SymPy's symbolic computation,
+the OpenAI SDK's generated typed models and clients, and pytest's implementation
+and tests. SymPy excludes test and benchmark inputs, the SDK excludes vendored
+code, and pytest excludes `testing/example_scripts`, whose files are inputs to
+nested test runs. Each exclusion applies to every checker.
+
 CLI and LSP subprocesses receive an empty user-configuration directory through
 `XDG_CONFIG_HOME` and `APPDATA`, so machine-specific diagnostic rules cannot alter
 the measurements.
@@ -67,6 +73,8 @@ roots, and project virtual environment. CLI runs use project roots and the commo
 exclusions in an isolated configuration file; LSP runs use the project's include/exclude lists in
 `pyproject.toml` and restore the original file afterwards. Upstream mypy or Zuban
 settings cannot silently narrow its workload or suppress diagnostics.
+In-file suppression comments and platform-dependent code still follow each
+checker's semantics.
 
 The language server checks the same open files and edits through the common LSP
 client, with the project interpreter supplied explicitly. `--single-threaded`
