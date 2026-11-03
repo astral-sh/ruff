@@ -43,7 +43,7 @@ reveal_type(c)  # revealed: Literal[2]
 d = [1, 2, 3]
 
 def delete():
-    del d  # error: [unresolved-reference] "Name `d` used when not defined"
+    del d  # error: [unbound-local] "Name `d` used when not defined"
 
 delete()
 reveal_type(d)  # revealed: list[int]
@@ -52,6 +52,10 @@ def delete_element():
     # When the `del` target isn't a name, it doesn't force local resolution.
     del d[0]
     print(d)
+
+def delete_parameter(value: int):
+    del value
+    print(value)  # error: [unbound-local]
 
 def delete_global():
     global d
@@ -68,7 +72,7 @@ def delete_nonlocal():
     e = 2
 
     def delete_nonlocal_bad():
-        del e  # error: [unresolved-reference] "Name `e` used when not defined"
+        del e  # error: [unbound-local] "Name `e` used when not defined"
 
     def delete_nonlocal_ok():
         nonlocal e
@@ -79,15 +83,15 @@ def delete_nonlocal():
 
 ## `del` forces local resolution even if it's unreachable
 
-Without a `global x` or `nonlocal x` declaration in `foo`, `del x` in `foo` causes `print(x)` in an
-inner function `bar` to resolve to `foo`'s binding, in this case an unresolved reference / unbound
-local error:
+The unreachable `del x` makes `x` local to `foo`. Reading it in `foo` raises `UnboundLocalError`.
+Reading `x` in the nested function `bar` would raise `NameError` because its enclosing function
+never assigns the captured variable a value.
 
 ```py
 x = 1
 
 def foo():
-    print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+    print(x)  # error: [unbound-local] "Name `x` used when not defined"
     if False:
         # Assigning to `x` would have the same effect here.
         del x

@@ -555,7 +555,7 @@ def foo():
         # error: [unresolved-reference] "Name `G` used when not defined"
         G
     ): ...
-    # error: [unresolved-reference] "Name `H` used when not defined"
+    # error: [unbound-local] "Name `H` used when not defined"
     if H:
         class H[_T](
             # error: [unresolved-reference] "Name `H` used when not defined"

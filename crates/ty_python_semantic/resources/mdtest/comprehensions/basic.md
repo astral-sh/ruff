@@ -250,7 +250,7 @@ local_target = "global"
 
 def read_local_target():
     [(local_target := 1) if False else 0 for _ in [0]]
-    local_target  # error: [unresolved-reference]
+    local_target  # error: [unbound-local]
 ```
 
 A walrus also makes its target local before the first iteration. Its first assignment must not read
@@ -302,7 +302,7 @@ Nor should it create a new value:
 ```py
 def unreachable_nested_assignment_without_previous_value():
     [[value := 1 for _ in [0]] if False else [] for _ in [0]]
-    value  # error: [unresolved-reference]
+    value  # error: [unbound-local]
 ```
 
 ## Comprehension referencing outer comprehension

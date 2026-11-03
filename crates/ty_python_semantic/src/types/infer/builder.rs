@@ -10,6 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -71,9 +72,9 @@ use crate::types::diagnostic::{
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD,
-    UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNBOUND_LOCAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
     hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
@@ -10722,7 +10723,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let place_expr = PlaceExpr::from_expr_name(name_node);
 
-        let (resolved, _) = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
+        let InferredPlaceLoad {
+            resolved, failure, ..
+        } = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,
@@ -10731,7 +10734,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ty = resolved.unwrap_with_diagnostic(db, env, |lookup_error| match lookup_error {
             LookupError::Undefined(qualifiers) => {
-                self.report_unresolved_reference(name_node);
+                self.report_unresolved_reference(name_node, failure);
                 TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
             }
             LookupError::PossiblyUndefined(type_when_bound) => {
@@ -10750,7 +10753,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         place_expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+    ) -> InferredPlaceLoad<'db> {
         let env = self.program_environment();
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
@@ -10821,9 +10824,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         };
 
-        let constraint_keys = procedure.into_constraints();
-
-        (place, constraint_keys)
+        InferredPlaceLoad {
+            resolved: place,
+            failure,
+            constraint_keys: procedure.into_constraints(),
+        }
     }
 
     fn infer_place_load_source(
@@ -10955,13 +10960,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+    /// Whether evaluating this expression would look up the name immediately at runtime.
+    fn is_runtime_name_load(&self, name: &ast::ExprName) -> bool {
+        if self.is_deferred() || self.in_stub() {
+            return false;
+        }
+        let Some(scope) = self.index.annotation_parent_scope_id(self.module(), name) else {
+            return true;
+        };
+        if self.defer_annotations() {
+            return false;
+        }
+        let Some(function) = self.index.scope(scope).node().as_function() else {
+            return true;
+        };
+
+        // Before Python 3.14, a nested function's signature can load a local eagerly, but
+        // the annotation on a variable in the same scope is never evaluated.
+        !covering_node(function.node(self.module()).into(), name.range())
+            .ancestors()
+            .any(|node| matches!(node, AnyNodeRef::StmtAnnAssign(_)))
+    }
+
+    fn report_unresolved_reference(
+        &self,
+        expr_name_node: &ast::ExprName,
+        failure: Option<PlaceLoadFailure>,
+    ) {
         let db = self.db();
         let env = self.program_environment();
-        let Some(builder) = self
-            .context
-            .report_lint(&UNRESOLVED_REFERENCE, expr_name_node)
-        else {
+        let lint = if failure == Some(PlaceLoadFailure::UnboundLocal)
+            && self.is_runtime_name_load(expr_name_node)
+        {
+            &UNBOUND_LOCAL
+        } else {
+            &UNRESOLVED_REFERENCE
+        };
+        let Some(builder) = self.context.report_lint(lint, expr_name_node) else {
             return;
         };
 
@@ -11166,18 +11201,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
-            let (resolved, keys) =
-                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
-            constraint_keys.extend(keys);
+            let load = self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
+            constraint_keys = load.constraint_keys;
             if let Place::Defined(
                 place @ DefinedPlace {
                     definedness: Definedness::AlwaysDefined,
                     ..
                 },
-            ) = resolved.place
+            ) = load.resolved.place
             {
                 assigned_type = Some(
-                    TypeAndQualifiers::new(place.ty, place.origin, resolved.qualifiers)
+                    TypeAndQualifiers::new(place.ty, place.origin, load.resolved.qualifiers)
                         .with_provenance(place.provenance),
                 );
             }
@@ -12794,6 +12828,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_insert(constraints.clone());
         }
     }
+}
+
+/// The result of looking up a place, including its narrowing constraints and why lookup stopped
+/// if it did not find a definite binding.
+#[derive(Debug)]
+struct InferredPlaceLoad<'db> {
+    resolved: PlaceAndQualifiers<'db>,
+    failure: Option<PlaceLoadFailure>,
+    constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
 }
 
 /// The inferred result of a boolean or comparison chain.

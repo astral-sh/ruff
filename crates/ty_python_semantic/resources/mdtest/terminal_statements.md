@@ -264,7 +264,7 @@ def resolved_reference(cond: bool) -> str:
         else:
             break
         return x
-    return x  # error: [unresolved-reference]
+    return x  # error: [unbound-local]
 
 def break_in_then_branch(cond: bool, i: int):
     x = "before"

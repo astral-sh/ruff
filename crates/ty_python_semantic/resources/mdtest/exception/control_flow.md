@@ -113,7 +113,7 @@ def no_previous_binding() -> None:
     try:
         value: int = could_raise_int()
     except Exception:
-        # error: [unresolved-reference]
+        # error: [unbound-local]
         reveal_type(value)  # revealed: Unknown
 ```
 
@@ -198,7 +198,7 @@ A later local assignment can shadow a builtin and make an earlier reference rais
 ```py
 def shadowed_builtin() -> None:
     try:
-        int  # ty: ignore[unresolved-reference]
+        int  # ty: ignore[unbound-local]
     except NameError:
         int = 1
 
@@ -609,7 +609,7 @@ def sequence_pattern(value: object) -> None:
                 state = 2
     except:
         reveal_type(state)  # revealed: Literal[1]
-        item  # error: [unresolved-reference]
+        item  # error: [unbound-local]
 ```
 
 Mapping, class, and literal patterns can call user-defined matching or equality operations:

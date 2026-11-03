@@ -195,7 +195,7 @@ binding, rather than to `x = 1` in `f`'s scope:
 def f():
     x = 1
     def g():
-        if x == 1:  # error: [unresolved-reference] "Name `x` used when not defined"
+        if x == 1:  # error: [unbound-local] "Name `x` used when not defined"
             x = 2
 ```
 
@@ -218,7 +218,7 @@ For the same reason, using the `+=` operator in an inner scope is an error witho
 def f():
     x = 1
     def g():
-        x += 1  # error: [unresolved-reference] "Name `x` used when not defined"
+        x += 1  # error: [unbound-local] "Name `x` used when not defined"
 
 def f():
     x = 1

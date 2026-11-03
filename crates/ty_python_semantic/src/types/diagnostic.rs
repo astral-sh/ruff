@@ -169,6 +169,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&MISSING_SLOT);
     registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&UNBOUND_LOCAL);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
@@ -1219,6 +1220,15 @@ declare_lint! {
         summary: "detects imports of dependencies that are not declared directly",
         status: LintStatus::preview("0.0.76"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unbound-local.md")]
+    pub(crate) static UNBOUND_LOCAL = {
+        summary: "detects uses of local variables that have no value",
+        status: LintStatus::stable("0.0.97"),
+        default_level: Level::Error,
     }
 }
 

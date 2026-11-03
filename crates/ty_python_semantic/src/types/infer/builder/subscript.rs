@@ -221,14 +221,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) =
-                    self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
-                constraint_keys.extend(keys);
+                let load = self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
+                constraint_keys = load.constraint_keys;
                 if let Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::AlwaysDefined,
                     ..
-                }) = place.place
+                }) = load.resolved.place
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).

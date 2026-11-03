@@ -225,7 +225,7 @@ def f():
 x = 42
 
 def f():
-    # error: [unresolved-reference] "Name `x` used when not defined"
+    # error: [unbound-local] "Name `x` used when not defined"
     reveal_type(x)  # revealed: Unknown
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
