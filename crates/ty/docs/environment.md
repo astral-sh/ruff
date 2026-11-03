@@ -48,6 +48,8 @@ Accepts the same values as the `--output-format` command-line argument.
 
 ### `TY_UV`
 
+Enable and configure uv integration.
+
 When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
 Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
 
