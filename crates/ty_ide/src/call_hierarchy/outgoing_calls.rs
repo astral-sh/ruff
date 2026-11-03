@@ -52,13 +52,15 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         let Some(def) = resolved.definition() else {
             continue;
         };
-        let parsed = parsed_module(db, def.python_file(db)).load(db);
+        // Call-site ranges are relative to the prepared item's file.
+        if def.program_file(db) != file {
+            continue;
+        }
 
-        let model = SemanticModel::new(db, def.program_file(db));
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
-            tokens: parsed.tokens(),
+            tokens: module.tokens(),
             by_callee: &mut groups,
             ancestors: Vec::new(),
         };
@@ -68,7 +70,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         // the visitor stops at nested callables — see `OutgoingCallsFinder`.
         match def.kind(db) {
             DefinitionKind::Function(fn_ref) => {
-                let func = fn_ref.node(&parsed);
+                let func = fn_ref.node(&module);
                 finder.walk_callable_signature(
                     &func.decorator_list,
                     func.type_params.as_deref(),
@@ -78,7 +80,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
                 walk_body(&mut finder, &func.body);
             }
             DefinitionKind::Class(class_ref) => {
-                let class = class_ref.node(&parsed);
+                let class = class_ref.node(&module);
                 finder.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
@@ -757,6 +759,44 @@ mod tests {
            |
         LL | class super:
            |       ^^^^^
+        ");
+    }
+
+    #[test]
+    fn inherited_property_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "base.py",
+                "
+class Record:
+    @property
+    def name(self):
+        return str(self)
+",
+            )
+            .source(
+                "main.py",
+                "
+from base import Record
+
+class Local(Record):
+    @Record.name.setter
+    def na<CURSOR>me(self, value):
+        self._name = value
+",
+            )
+            .build();
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls from `name`
+          --> main.py:LL:18
+           |
+        LL |     @Record.name.setter
+           |                  ^^^^^^ Call site
+        info: Method: `setter` (`builtins`)
+          --> stdlib/builtins.pyi:LL:9
+           |
+        LL |     def setter(self, fset: Callable[[Any, Any], None], /) -> property:
+           |         ^^^^^^
         ");
     }
 
