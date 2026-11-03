@@ -1345,6 +1345,11 @@ def f(x: int, y: str) -> int:
 
 c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
+
+def run_previous(previous: C[[]]) -> int:
+    return previous.f()
+
+reveal_type(C(run_previous).f)  # revealed: (previous: C[()]) -> int
 ```
 
 ### Generic constructors with bounded return types

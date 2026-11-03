@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -31,7 +31,7 @@ use crate::types::tuple::{
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
-    TypeVarNonce, TypeVarSet, max_typevar_freshness_matching_generic_context,
+    TypeVarNonce, TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -2581,16 +2581,31 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
-    /// Returns the highest freshness of a callee type variable in an inferred parameter list.
+    /// Returns the highest nonce in the captured signatures if any bind a callee type variable.
     pub(super) fn captured_paramspec_freshness(self, db: &'db dyn Db) -> Option<TypeVarNonce> {
-        let context = self.generic_context(db);
-        let mut captures = context
+        let callee = self.generic_context(db);
+        let captures = callee
             .variables(db)
             .zip(self.merged_types(db))
-            .filter_map(|(variable, inferred)| inferred.filter(|_| variable.is_paramspec(db)))
-            .peekable();
-        captures.peek()?;
-        max_typevar_freshness_matching_generic_context(db, captures, context)
+            .filter_map(|(variable, inferred)| inferred.filter(|_| variable.is_paramspec(db)));
+        // Only type variables bound by the captured signature belong to another callable
+        // occurrence. Its parameter annotations can refer to the callee's generic class.
+        let variables = captures
+            .flat_map(|capture| match capture {
+                Type::Intersection(intersection) => Either::Left(intersection.iter_positive(db)),
+                ty => Either::Right(std::iter::once(ty)),
+            })
+            .filter_map(Type::as_callable)
+            .flat_map(|callable| callable.signatures(db))
+            .filter_map(|signature| signature.generic_context)
+            .flat_map(|context| context.variables(db));
+        let mut collision = false;
+        let mut highest = TypeVarNonce::NONE;
+        for variable in variables {
+            collision |= callee.contains(db, variable.identity(db));
+            highest = highest.max(variable.freshness(db));
+        }
+        collision.then_some(highest)
     }
 
     /// Merge the alternatives into one closed specialization, discarding their correlations and
