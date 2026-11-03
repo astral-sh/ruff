@@ -441,9 +441,12 @@ impl<'a> crate::Arguments<'a> {
     }
 
     pub fn find_argument_value(self, name: &str, position: usize) -> Option<Expr<'a>> {
-        self.find_keyword(name)
-            .map(crate::Keyword::value)
-            .or_else(|| self.find_positional(position))
+        self.find_argument_as(
+            name,
+            position,
+            crate::Keyword::value,
+            std::convert::identity,
+        )
     }
 }
 
@@ -630,9 +633,27 @@ impl<'a> crate::Arguments<'a> {
         }
     }
     pub fn find_argument(self, name: &str, position: usize) -> Option<ArgOrKeyword<'a>> {
-        self.find_keyword(name)
-            .map(ArgOrKeyword::Keyword)
-            .or_else(|| self.find_positional(position).map(ArgOrKeyword::Arg))
+        self.find_argument_as(name, position, ArgOrKeyword::Keyword, ArgOrKeyword::Arg)
+    }
+
+    fn find_argument_as<T>(
+        self,
+        name: &str,
+        position: usize,
+        from_keyword: impl FnOnce(crate::Keyword<'a>) -> T,
+        from_positional: impl FnOnce(Expr<'a>) -> T,
+    ) -> Option<T> {
+        self.keywords()
+            .iter()
+            .find(|kw| kw.arg().is_some_and(|arg| arg == name))
+            .map(from_keyword)
+            .or_else(|| {
+                self.args()
+                    .iter()
+                    .take_while(|arg| !arg.is_starred_expr())
+                    .nth(position)
+                    .map(from_positional)
+            })
     }
 }
 
