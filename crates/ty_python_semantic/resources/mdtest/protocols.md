@@ -3030,7 +3030,7 @@ class MetaWithOverloadedSetAttr(type):
     def __setattr__(cls, attr: Literal["x"], value: Any) -> None: ...
     @overload
     def __setattr__(cls, attr: Literal["y"], value: int) -> None: ...
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(cls, attr: str, value: object) -> None: ...
 
 class ClassWithOverloadedSetAttr(metaclass=MetaWithOverloadedSetAttr): ...
@@ -3320,7 +3320,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 
 class ReturnsSelf(Protocol):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __eq__(self, other: object) -> Self: ...
 
 static_assert(not is_equivalent_to(ReturnsSelf, object))
@@ -4890,7 +4890,7 @@ class Compatible(SupportsMethod[T_co]):
         raise NotImplementedError
 
 class Incompatible(SupportsMethod[T_co]):
-    def method(self: "Incompatible[T]", value: int) -> Result[T]:  # error: [invalid-method-override]
+    def method(self: "Incompatible[T]", value: int) -> Result[T]:  # error: [incompatible-method-override]
         raise NotImplementedError
 ```
 
@@ -8172,15 +8172,15 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_equivalent_to, is_disjoint_from
 
 class HasRepr(Protocol):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __repr__(self) -> object: ...
 
 class HasReprRecursive(Protocol):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __repr__(self) -> "HasReprRecursive": ...
 
 class HasReprRecursiveAndFoo(Protocol):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __repr__(self) -> "HasReprRecursiveAndFoo": ...
     foo: int
 

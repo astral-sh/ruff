@@ -3981,7 +3981,7 @@ return type for error recovery.
 class InvalidGetAttribute:
     defined: bool = True
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 
@@ -4015,7 +4015,7 @@ An incompatible type for the attribute name also makes the implicit call invalid
 
 ```py
 class InvalidNameType:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self, name: int) -> bytes:
         return b"fallback"
 
@@ -4030,7 +4030,7 @@ the subclass.
 
 ```py
 class InvalidBase:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4067,7 +4067,7 @@ An invalid `__getattribute__` raises before Python can call an otherwise valid `
 
 ```py
 class CustomAccess:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4209,7 +4209,7 @@ attributes. Their original types remain available for error recovery.
 
 ```py
 class Meta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4233,7 +4233,7 @@ the class object.
 
 ```py
 class InvalidBaseMeta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4391,7 +4391,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -5153,7 +5153,7 @@ class Base:
         return Sub()
 
 class Sub(Base):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def flip(self) -> "Base":
         return Base()
 

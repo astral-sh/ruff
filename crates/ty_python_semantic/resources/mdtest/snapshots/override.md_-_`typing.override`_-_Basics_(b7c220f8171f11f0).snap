@@ -155,10 +155,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 140 |     # but here, we deliberately add a new parameter to introduce a Liskov violation
 141 |     @staticmethod
 142 |     @override
-143 |     def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
+143 |     def class_method1(x: int) -> int: ...  # error: [incompatible-method-override]
 144 |     @classmethod
 145 |     @override
-146 |     def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
+146 |     def static_method1(cls, x: int) -> int: ...  # error: [incompatible-method-override]
 147 | 
 148 | # Diagnostic edge case: `override` is very far away from the method definition in the source code:
 149 | 
@@ -344,10 +344,10 @@ error[invalid-property-type-override]: Invalid override of attribute `my_propert
 ```
 
 ```
-error[invalid-method-override]: Invalid override of method `class_method1`
+error[incompatible-method-override]: Invalid override of method `class_method1`
    --> src/mdtest_snippet.pyi:143:9
     |
-143 |     def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
+143 |     def class_method1(x: int) -> int: ...  # error: [incompatible-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method1`
     |
    ::: src/mdtest_snippet.pyi:20:9
@@ -362,10 +362,10 @@ info: This violates the Liskov Substitution Principle
 ```
 
 ```
-error[invalid-method-override]: Invalid override of method `static_method1`
+error[incompatible-method-override]: Invalid override of method `static_method1`
    --> src/mdtest_snippet.pyi:146:9
     |
-146 |     def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
+146 |     def static_method1(cls, x: int) -> int: ...  # error: [incompatible-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method1`
     |
    ::: src/mdtest_snippet.pyi:22:9

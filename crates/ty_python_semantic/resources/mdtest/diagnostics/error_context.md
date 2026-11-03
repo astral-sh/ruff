@@ -6,9 +6,9 @@ python-version = "3.13"
 ```
 
 A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
-(`invalid-assignment`, `invalid-argument-type` or `invalid-method-override`). Types can be complex,
-and so we can often help users understand the incompatibility by focusing on the relevant parts of
-the two types that are being compared.
+(`invalid-assignment`, `invalid-argument-type` or `incompatible-method-override`). Types can be
+complex, and so we can often help users understand the incompatibility by focusing on the relevant
+parts of the two types that are being compared.
 
 ## Basic
 
@@ -610,6 +610,11 @@ info: Function defined here
 
 ## Function assignability and overrides
 
+```toml
+[rules]
+incompatible-override-keyword = "error"
+```
+
 Liskov checks use function-to-function assignability.
 
 Wrong parameter type:
@@ -626,7 +631,7 @@ class Child1(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.py:7:9
   |
 7 |     def method(self, x: bytes) -> bool:
@@ -654,7 +659,7 @@ class ChildYX(ParentXY):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:15:9
    |
 15 |     def method(self, *, y: int, x: bytes) -> bool:
@@ -678,7 +683,7 @@ class Child2(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:19:9
    |
 19 |     def method(self, x: str) -> None:
@@ -702,7 +707,7 @@ class Child3(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-override-keyword]: Invalid override of method `method`
   --> src/mdtest_snippet.py:23:9
    |
 23 |     def method(self, y: str):

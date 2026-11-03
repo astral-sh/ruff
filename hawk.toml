@@ -689,14 +689,6 @@ reason = "lint status constructors intentionally cover every lifecycle state"
 [[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_semantic"
-item = "lint::LintRegistryBuilder::register_alias"
-kind = "inherent_method"
-level = "expect"
-reason = "the lint registry intentionally supports aliases before the first alias is added"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_python_semantic"
 item = "lint::LintRegistry::aliases"
 kind = "inherent_method"
 level = "expect"

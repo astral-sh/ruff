@@ -1666,7 +1666,7 @@ class Descriptor:
 class C:
     value = Descriptor()
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 

@@ -11,6 +11,9 @@ supertype. Applied to Python, this means:
 1. The return type of an overriding subclass method must be a subtype of the return type of the
     superclass method.
 
+When an override only loses a positional-or-keyword parameter's keyword name, ty checks it with the
+opt-in `incompatible-override-keyword` rule.
+
 ## Why is this bad?
 
 Violating the Liskov Substitution Principle will lead to many of ty's assumptions and inferences
@@ -27,7 +30,7 @@ class Super:
 class Sub(Super):
     # Liskov violation: `str` is not a subtype of `int`,
     # but the supertype method promises to return an `int`.
-    def method(self, x) -> str:  # error: [invalid-method-override]
+    def method(self, x) -> str:  # error: [incompatible-method-override]
         return "foo"
 
 
@@ -38,19 +41,14 @@ def accepts_super(s: Super) -> int:
 # The result of this call is a string, but ty will infer it to be an `int`
 # due to the violation of the Liskov Substitution Principle.
 accepts_super(Sub())
-
-
-class Sub2(Super):
-    # Liskov violation: the superclass method can be called with a `x=`
-    # keyword argument, but the subclass method does not accept it.
-    def method(self, y) -> int:  # error: [invalid-method-override]
-        return 42
-
-
-# TypeError at runtime: method() got an unexpected keyword argument 'x'
-# ty cannot catch this error due to the violation of the Liskov Substitution Principle.
-accepts_super(Sub2())
 ```
+
+## Migrating from the previous rule name
+
+Existing settings such as `invalid-method-override = "warn"` and comments such as
+`# ty: ignore[invalid-method-override]` still select this rule. To keep checking for overrides that
+only lose a positional parameter's keyword name, enable `incompatible-override-keyword` separately.
+Use its name in any suppressions for those diagnostics.
 
 ## Common issues
 
@@ -84,9 +82,8 @@ Ruff has several rules that will encourage you to rename a parameter, or change 
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
 parameter should either be removed or renamed to start with `_`. Applying either of these
-suggestions can cause ty to start reporting an `invalid-method-override` error if the function in
-question is a method on a subclass that overrides a method on a superclass, and the change would
-cause the subclass method to no longer accept all argument combinations that the superclass method
+suggestions can cause ty to report `incompatible-method-override` or `incompatible-override-keyword`
+if the overriding method no longer accepts all the argument combinations that the superclass method
 accepts.
 
 This can usually be resolved by adding [`@typing.override`][override] to your method definition.
