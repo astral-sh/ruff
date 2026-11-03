@@ -1079,13 +1079,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 module,
                 names,
                 is_lazy,
+                level,
                 ..
             }) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
+                let is_future = matches!(module.as_deref(), Some("__future__"))
+                    && (*level == 0 || self.target_version() < PythonVersion::PY313);
+
+                if !*is_lazy && is_future {
                     if names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
@@ -1222,8 +1226,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
+                let is_future = matches!(module, Some("__future__"))
+                    && (level == 0 || self.target_version() < PythonVersion::PY313);
+
                 for alias in names {
-                    if !is_lazy && matches!(module, Some("__future__")) {
+                    if !is_lazy && is_future {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,

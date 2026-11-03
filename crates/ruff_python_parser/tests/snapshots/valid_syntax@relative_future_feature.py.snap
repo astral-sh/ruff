@@ -1,0 +1,43 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/relative_future_feature.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..84,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 44..83,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 50..60,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 68..83,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 68..83,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: false,
+                },
+            ),
+        ],
+    },
+)
+```

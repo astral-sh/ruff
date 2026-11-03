@@ -16,7 +16,7 @@ mod tests {
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
@@ -984,13 +984,24 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     #[track_caller]
     fn flakes(contents: &str, expected: &[Rule]) {
+        let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
+        flakes_with_version(
+            contents,
+            expected,
+            settings.unresolved_target_version.parser_version(),
+        );
+    }
+
+    #[track_caller]
+    fn flakes_with_version(contents: &str, expected: &[Rule], version: PythonVersion) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python {
             code: contents.to_string(),
             is_stub: source_type.is_stub(),
         };
-        let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
+        let mut settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
+        settings.unresolved_target_version = version.into();
         let target_version = settings.unresolved_target_version;
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
@@ -3255,6 +3266,45 @@ lambda: fu
         from __future__ import *
         ",
             &[Rule::FutureFeatureNotDefined],
+        );
+    }
+
+    #[test]
+    fn relative_future_import_py313() {
+        // Relative imports from a module named `__future__` are ordinary imports on Python 3.13+.
+        flakes_with_version(
+            r"
+        from .__future__ import x
+        x
+        ",
+            &[],
+            PythonVersion::PY313,
+        );
+    }
+
+    #[test]
+    fn relative_future_import_py312() {
+        // On Python 3.12 and older, CPython treated relative imports from `__future__` as future imports.
+        flakes_with_version(
+            r"
+        from .__future__ import x
+        ",
+            &[Rule::FutureFeatureNotDefined],
+            PythonVersion::PY312,
+        );
+    }
+
+    #[test]
+    fn relative_future_import_closes_boundary() {
+        // Relative imports from `__future__` close the future import boundary on Python 3.13+.
+        flakes_with_version(
+            r"
+        from .__future__ import x
+        from __future__ import annotations
+        x
+        ",
+            &[Rule::LateFutureImport],
+            PythonVersion::PY313,
         );
     }
 

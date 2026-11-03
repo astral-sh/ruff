@@ -171,7 +171,7 @@ impl FutureImport for ModuleNameImport {
 
 impl FutureImport for MemberNameImport {
     fn is_future_import(&self) -> bool {
-        self.module.as_deref() == Some("__future__")
+        self.level == 0 && self.module.as_deref() == Some("__future__")
     }
 }
 

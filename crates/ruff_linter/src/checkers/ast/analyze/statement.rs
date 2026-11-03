@@ -822,8 +822,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_pyi::rules::from_future_import(checker, import_from);
                 }
             }
+            let is_future = module == Some("__future__")
+                && (level == 0 || checker.target_version() < PythonVersion::PY313);
+
             for alias in names {
-                if module != Some("__future__") && &alias.name == "*" {
+                if !is_future && &alias.name == "*" {
                     // F403
                     checker.report_diagnostic_if_enabled(
                         pyflakes::rules::UndefinedLocalWithImportStar {
