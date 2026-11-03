@@ -1,6 +1,9 @@
 ## What it does
 
-Checks for public functions and methods without a return type annotation.
+Checks for functions and methods without a return type annotation.
+
+The rule applies even when ty can infer the return type. For overloaded functions, it checks the
+overload signatures and skips the implementation.
 
 ## Why is this bad?
 
@@ -10,7 +13,7 @@ implementation returns a compatible value.
 ## Examples
 
 ```python
-def double(value: int):  # error: [missing-return-type-public-function]
+def double(value: int):  # error: [missing-return-annotation]
     return value * 2
 ```
 

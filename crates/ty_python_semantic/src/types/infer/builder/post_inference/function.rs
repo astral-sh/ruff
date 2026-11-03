@@ -1,4 +1,3 @@
-use super::return_annotation::check_missing_return_annotation;
 use crate::{
     Db,
     diagnostic::format_enumeration,
@@ -8,7 +7,7 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
-            INVALID_TYPE_VARIABLE_DEFAULT, UNBOUND_TYPE_VARIABLE,
+            INVALID_TYPE_VARIABLE_DEFAULT, MISSING_RETURN_ANNOTATION, UNBOUND_TYPE_VARIABLE,
         },
         function::{FunctionDecorators, FunctionType, OverloadLiteral},
         generics::GenericContext,
@@ -68,6 +67,26 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, signature, file_expression_type);
+}
+
+fn check_missing_return_annotation<'db>(
+    context: &InferContext<'db, '_>,
+    function_type: FunctionType<'db>,
+) {
+    let db = context.db();
+    let literal = function_type.literal(db);
+    let definition = literal.last_definition;
+    if definition.has_explicit_return_annotation(db) || literal.has_separate_implementation(db) {
+        return;
+    }
+
+    let function = definition.node(db, context.file(), context.module());
+    if let Some(builder) = context.report_lint(&MISSING_RETURN_ANNOTATION, &function.name) {
+        builder.into_diagnostic(format_args!(
+            "Missing return type annotation for function `{}`",
+            function.name
+        ));
+    }
 }
 
 /// Check that a nominal class's exposed methods respect its declared type-parameter variance.
