@@ -596,6 +596,11 @@ impl WritableSystem for MdtestSystem {
             .write_file_bytes(&self.normalize_path(path), content)
     }
 
+    fn write_file_atomic(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
+        self.as_system()
+            .write_file_atomic(&self.normalize_path(path), content)
+    }
+
     fn remove_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.as_system().remove_file(&self.normalize_path(path))
     }

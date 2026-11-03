@@ -14,10 +14,14 @@ use crate::system::{
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use std::any::Any;
+use std::io::{self, Write};
 use std::num::NonZeroUsize;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::process::Output;
 use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
 
 /// A system implementation that uses the OS file system.
 #[derive(Debug, Clone)]
@@ -57,8 +61,6 @@ impl OsSystem {
 
     #[cfg(unix)]
     fn permissions(metadata: &std::fs::Metadata) -> Option<u32> {
-        use std::os::unix::fs::PermissionsExt;
-
         Some(metadata.permissions().mode())
     }
 
@@ -264,6 +266,10 @@ impl WritableSystem for OsSystem {
 
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
+    }
+
+    fn write_file_atomic(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        write_atomic(path.as_std_path(), |file| file.write_all(content))
     }
 
     fn remove_file(&self, path: &SystemPath) -> Result<()> {
@@ -530,6 +536,76 @@ pub(super) mod testing {
     }
 }
 
+/// Publishes a complete file while retaining symlink targets and file permissions.
+fn write_atomic(path: &Path, write: impl FnOnce(&mut std::fs::File) -> Result<()>) -> Result<()> {
+    let mut target = path.to_path_buf();
+    let permissions = loop {
+        match std::fs::symlink_metadata(&target) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                target = match std::fs::canonicalize(&target) {
+                    Ok(path) => path,
+                    // A dangling link can still name a new file in an existing directory.
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => target
+                        .parent()
+                        .unwrap_or_else(|| Path::new("."))
+                        .join(std::fs::read_link(&target)?),
+                    Err(error) => return Err(error),
+                };
+            }
+            Ok(metadata) if metadata.is_file() => {
+                // Renaming alone can replace a read-only file on Unix. Check write access without
+                // truncating the destination before preparing its replacement.
+                std::fs::OpenOptions::new().write(true).open(&target)?;
+                break Some(metadata.permissions());
+            }
+            Ok(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "Cannot atomically replace `{}`: not a regular file",
+                        target.display()
+                    ),
+                ));
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => break None,
+            Err(error) => return Err(error),
+        }
+    };
+
+    let parent = target
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    // Canonical paths include the verbatim prefix needed by Windows rename operations on long paths.
+    let parent = std::fs::canonicalize(parent)?;
+    let name = target.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "Write path must name a file")
+    })?;
+    let destination = parent.join(name);
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    builder.permissions(
+        permissions
+            .clone()
+            .unwrap_or_else(|| std::fs::Permissions::from_mode(0o666)),
+    );
+    #[cfg(not(unix))]
+    if let Some(permissions) = &permissions {
+        builder.permissions(permissions.clone());
+    }
+    let mut temporary = builder.tempfile_in(parent)?;
+    // Write through the open handle because the umask may prevent reopening the temporary file.
+    write(temporary.as_file_mut())?;
+    temporary.as_file_mut().flush()?;
+    if let Some(permissions) = permissions {
+        temporary.as_file().set_permissions(permissions)?;
+    }
+    temporary
+        .persist(destination)
+        .map_err(|error| error.error)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
@@ -538,6 +614,116 @@ mod tests {
     use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
+
+    #[test]
+    fn atomic_write_failure_keeps_original() -> Result<()> {
+        let directory = TempDir::new()?;
+        let path = directory.path().join("source.py");
+        std::fs::write(&path, "original contents")?;
+
+        let error = write_atomic(&path, |file| {
+            file.write_all(b"partial replacement")?;
+            Err(io::Error::other("injected write failure"))
+        })
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "injected write failure");
+        assert_eq!(std::fs::read_to_string(&path)?, "original contents");
+        assert_eq!(std::fs::read_dir(directory.path())?.count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn atomic_write_failure_does_not_create_destination() -> Result<()> {
+        let directory = TempDir::new()?;
+        let path = directory.path().join("baseline.json");
+        let result = write_atomic(&path, |file| {
+            file.write_all(b"partial replacement")?;
+            Err(io::Error::other("injected write failure"))
+        });
+
+        assert!(result.is_err());
+        assert!(!path.exists());
+        assert_eq!(std::fs::read_dir(directory.path())?.count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn atomic_write_rejects_directory() -> Result<()> {
+        let directory = TempDir::new()?;
+        let result = write_atomic(directory.path(), |file| file.write_all(b"contents"));
+        assert!(result.is_err_and(|error| error.kind() == io::ErrorKind::InvalidInput));
+        assert!(directory.path().is_dir());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_preserves_symlink_and_permissions() -> Result<()> {
+        let directory = TempDir::new()?;
+        let target = directory.path().join("source.py");
+        let link = directory.path().join("link.py");
+        std::fs::write(&target, "original")?;
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o750))?;
+        std::os::unix::fs::symlink("source.py", &link)?;
+
+        write_atomic(&link, |file| file.write_all(b"replacement"))?;
+
+        assert_eq!(std::fs::read_link(&link)?, Path::new("source.py"));
+        assert_eq!(std::fs::read_to_string(&target)?, "replacement");
+        assert_eq!(
+            std::fs::metadata(target)?.permissions().mode() & 0o777,
+            0o750
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_creates_dangling_symlink_target() -> Result<()> {
+        let directory = TempDir::new()?;
+        std::fs::create_dir(directory.path().join("nested"))?;
+        let link = directory.path().join("baseline.json");
+        std::os::unix::fs::symlink("nested/new.json", &link)?;
+
+        write_atomic(&link, |file| file.write_all(b"{}"))?;
+
+        assert_eq!(std::fs::read_link(&link)?, Path::new("nested/new.json"));
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join("nested/new.json"))?,
+            "{}"
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_rejects_symlink_cycle() -> Result<()> {
+        let directory = TempDir::new()?;
+        let link = directory.path().join("source.py");
+        std::os::unix::fs::symlink("source.py", &link)?;
+
+        assert!(write_atomic(&link, |file| file.write_all(b"contents")).is_err());
+        assert_eq!(std::fs::read_link(link)?, Path::new("source.py"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_new_file_respects_umask() -> Result<()> {
+        let directory = TempDir::new()?;
+        let control = directory.path().join("control.json");
+        let path = directory.path().join("baseline.json");
+        std::fs::write(&control, "{}")?;
+
+        write_atomic(&path, |file| file.write_all(b"{}"))?;
+
+        assert_eq!(
+            std::fs::metadata(path)?.permissions().mode(),
+            std::fs::metadata(control)?.permissions().mode()
+        );
+        Ok(())
+    }
 
     #[test]
     fn read_directory() {
