@@ -984,9 +984,8 @@ mod tests {
         "#);
     }
 
-    // A same-code suppression inserted at the end of a narrower multiline range can land on the
-    // start line of a wider multiline range, which makes the wider range's own suppression
-    // redundant.
+    // Reading `diag[0]` and assigning to `diag[0]["entities"]` both report `invalid-index-type`.
+    // The ignore for the read on the first line also suppresses the multiline assignment error.
     #[test]
     fn same_code_multiline_suppressions_with_different_ranges_can_become_redundant() {
         assert_snapshot!(
@@ -1002,13 +1001,13 @@ mod tests {
 
                 def f() -> None:
                     diag = get_data()
-                    diag["home_assistant"]["entities"] = sorted(
+                    diag[0]["entities"] = sorted(
                         diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]
                     )
                 "#
         ),
          @r#"
-        Added 7 suppressions
+        Added 8 suppressions
 
         ## Fixed source
 
@@ -1024,13 +1023,15 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
+            diag[0]["entities"] = sorted(  # ty: ignore[invalid-assignment, invalid-index-type]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-index-type, not-subscriptable]
             )  # ty: ignore[no-matching-overload]
         ```
         "#);
     }
 
+    // Extend the existing ignore on the closing line with `no-matching-overload`. The new ignore
+    // on the assignment's first line already covers its `invalid-index-type` error.
     #[test]
     fn add_ignore_deduplicates_existing_edit_against_planned_start_line() {
         assert_snapshot!(
@@ -1046,12 +1047,12 @@ mod tests {
 
                 def f() -> None:
                     diag = get_data()
-                    diag["home_assistant"]["entities"] = sorted(
+                    diag[0]["entities"] = sorted(
                         diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]
                     ); missing  # ty: ignore[unresolved-reference]
                 "#),
             @r#"
-        Added 7 suppressions
+        Added 8 suppressions
 
         ## Fixed source
 
@@ -1067,8 +1068,8 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
+            diag[0]["entities"] = sorted(  # ty: ignore[invalid-assignment, invalid-index-type]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-index-type, not-subscriptable]
             ); missing  # ty: ignore[unresolved-reference, no-matching-overload]
         ```
         "#
