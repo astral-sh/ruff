@@ -185,7 +185,7 @@ def test_benchmark_environment_isolates_user_config(tmp_path, monkeypatch):
         repository="",
         revision="",
         install_arguments=[],
-        python_version="3.15",
+        python_version="3.14",
         include=["main.py"],
     )
     venv = Venv(project_name=project.name, project_path=checkout)
