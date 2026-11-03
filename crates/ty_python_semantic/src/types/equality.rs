@@ -428,6 +428,7 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
+#[derive(Clone, Copy)]
 struct PendingComparison<'db> {
     key: ComparisonKey<'db>,
     generation: usize,

@@ -858,28 +858,19 @@ fn benchmark_very_large_tuple(criterion: &mut Criterion) {
 /// Each tuple contains two elements of the same type. Comparing both pairs independently doubles
 /// the work at each level.
 fn benchmark_nested_tuple_comparison(criterion: &mut Criterion) {
-    for depth in [8, 12] {
-        let mut aliases = String::from("type T0 = tuple[int]\n");
-        for level in 1..=depth {
-            let previous = level - 1;
-            writeln!(
-                &mut aliases,
-                "type T{level} = tuple[T{previous}, T{previous}]"
-            )
-            .ok();
-        }
-
-        for (name, operator) in [("lt", "<"), ("eq", "==")] {
-            let code = format!(
-                "{aliases}\ndef compare(a: T{depth}, b: T{depth}) -> bool:\n    return a {operator} b\n"
-            );
-            benchmark_micro_case(
-                criterion,
-                &format!("ty_micro[nested_tuple_comparison_{name}_{depth}]"),
-                &code,
-            );
-        }
+    const DEPTH: usize = 12;
+    let mut code = String::from("type T0 = tuple[int]\n");
+    for level in 1..=DEPTH {
+        let previous = level - 1;
+        writeln!(&mut code, "type T{level} = tuple[T{previous}, T{previous}]").ok();
     }
+    writeln!(
+        &mut code,
+        "\ndef compare(a: T{DEPTH}, b: T{DEPTH}) -> bool:\n    return a == b"
+    )
+    .ok();
+
+    benchmark_micro_case(criterion, "ty_micro[nested_tuple_comparison_eq_12]", &code);
 }
 
 fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
