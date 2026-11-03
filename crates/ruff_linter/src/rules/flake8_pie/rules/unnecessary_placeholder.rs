@@ -2,11 +2,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
-use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Applicability};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `pass` statements and ellipsis (`...`) literals in
@@ -111,13 +110,15 @@ pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
     }
 }
 
-/// Add a diagnostic for the given statement.
-fn add_diagnostic(
+/// Return the [`Edit`] that deletes the placeholder `stmt`, along with its [`Applicability`].
+///
+/// Deleting is unsafe when `next_stmt` is a string literal, as it will become the
+/// module/class/function's docstring after the fix.
+pub(crate) fn placeholder_deletion(
     checker: &Checker,
     stmt: &Stmt,
     next_stmt: Option<&Stmt>,
-    placeholder_kind: Placeholder,
-) {
+) -> (Edit, Applicability) {
     let edit = fix::edits::delete_stmt_preserving_trailing_comment(
         stmt,
         None,
@@ -125,14 +126,23 @@ fn add_diagnostic(
         checker.indexer(),
     );
     let applicability = match next_stmt {
-        // Mark the fix as unsafe if the following statement is a string literal,
-        // as it will become the module/class/function's docstring after the fix.
         Some(Stmt::Expr(StmtExpr { value, .. })) => match value.as_ref() {
             Expr::StringLiteral(ExprStringLiteral { .. }) => Applicability::Unsafe,
             _ => Applicability::Safe,
         },
         _ => Applicability::Safe,
     };
+    (edit, applicability)
+}
+
+/// Add a diagnostic for the given statement.
+fn add_diagnostic(
+    checker: &Checker,
+    stmt: &Stmt,
+    next_stmt: Option<&Stmt>,
+    placeholder_kind: Placeholder,
+) {
+    let (edit, applicability) = placeholder_deletion(checker, stmt, next_stmt);
 
     let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::applicable_edit(edit, applicability).isolate(isolation_level);

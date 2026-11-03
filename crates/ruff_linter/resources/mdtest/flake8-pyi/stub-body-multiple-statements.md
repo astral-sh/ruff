@@ -194,7 +194,7 @@ help: Remove unnecessary statements
 
 ## Placeholder before a string literal
 
-Removing the placeholder would turn the string literal into the function's docstring, so no fix is offered.
+Removing the placeholder turns the string literal into the function's docstring, so the fix is unsafe, matching `PIE790`.
 
 ```pyi
 def placeholder_before_string():  # snapshot: stub-body-multiple-statements
@@ -209,6 +209,37 @@ error[PYI048]: Function body must contain exactly one statement
 1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove unnecessary statements
+  |
+1 | def placeholder_before_string():  # snapshot: stub-body-multiple-statements
+  -     ...
+2 |     "not a docstring"
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Only the placeholder directly before the string literal makes its deletion unsafe, but that is enough to make the whole fix unsafe.
+
+```pyi
+def placeholders_before_string():  # snapshot: stub-body-multiple-statements
+    ...
+    pass
+    "not a docstring"
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:4:5
+  |
+4 | def placeholders_before_string():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove unnecessary statements
+  |
+4 | def placeholders_before_string():  # snapshot: stub-body-multiple-statements
+  -     ...
+  -     pass
+5 |     "not a docstring"
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Semicolon-separated statements
