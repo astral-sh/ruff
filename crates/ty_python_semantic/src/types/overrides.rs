@@ -19,7 +19,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment,
-    lint::LintId,
+    lint::{LintId, LintMetadata},
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
@@ -30,18 +30,20 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_MUTABLE_OVERRIDE,
-            INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
-            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_incompatible_base_method, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            INCOMPATIBLE_METHOD_OVERRIDE, INCOMPATIBLE_OVERRIDE_KEYWORD, INVALID_ASSIGNMENT,
+            INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
+            INVALID_MUTABLE_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE,
+            INVALID_PROPERTY_TYPE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_incompatible_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -362,6 +364,7 @@ fn check_inherited_method_conflict<'db>(
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
     let selected = LazyCell::new(|| source_method_contract(db, env, owner, receiver, name));
+    let mut keyword_conflict = None;
     for contract_owner in contracts {
         let Some((contract_decorator, contract_ty)) =
             source_method_contract(db, env, contract_owner, receiver, name)
@@ -443,15 +446,35 @@ fn check_inherited_method_conflict<'db>(
         else {
             continue;
         };
-        report_incompatible_base_method(
-            context,
-            class,
-            name,
-            (owner, definition, selected_decorator),
-            (contract_owner, contract_definition, contract_decorator),
-            || selected_ty.assignability_error_context(db, env, contract_ty),
-        );
-        return;
+        let violation = if selected_decorator == contract_decorator {
+            MethodOverrideViolation::classify(db, env, selected_ty, contract_ty)
+        } else {
+            MethodOverrideViolation::Incompatible
+        };
+        let rule = violation.rule();
+        if !context.is_lint_enabled(rule) {
+            continue;
+        }
+        let report = move || {
+            report_incompatible_base_method(
+                context,
+                rule,
+                class,
+                name,
+                (owner, definition, selected_decorator),
+                (contract_owner, contract_definition, contract_decorator),
+                || selected_ty.assignability_error_context(db, env, contract_ty),
+            );
+        };
+        if violation == MethodOverrideViolation::Keyword {
+            keyword_conflict.get_or_insert(report);
+        } else {
+            report();
+            return;
+        }
+    }
+    if let Some(report) = keyword_conflict {
+        report();
     }
 }
 
@@ -741,7 +764,7 @@ fn check_class_declaration<'db>(
     // Hashability may change in either direction across subclasses. Only the hash protocol's
     // signature constrains each definition; finality and override decorators are checked below.
     if member.name == "__hash__"
-        && configuration.check_method_liskov_violations()
+        && context.is_lint_enabled(&INCOMPATIBLE_METHOD_OVERRIDE)
         && let Some(type_on_subclass_instance) =
             subclass_instance_member.place.ignore_possibly_undefined()
         && let Some(object_hash) = Type::object()
@@ -762,7 +785,7 @@ fn check_class_declaration<'db>(
         );
         if !type_on_subclass_instance.is_assignable_to(db, env, expected)
             && let Some(builder) = context.report_lint(
-                &INVALID_METHOD_OVERRIDE,
+                &INCOMPATIBLE_METHOD_OVERRIDE,
                 first_reachable_definition.focus_range(db, context.module()),
             )
         {
@@ -933,6 +956,7 @@ fn check_class_declaration<'db>(
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
     let mut liskov_check_complete = false;
+    let mut keyword_conflict = None;
     let mut missing_override_target: Option<MissingOverrideTarget<'db>> = None;
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
@@ -1124,7 +1148,8 @@ fn check_class_declaration<'db>(
             // **********************************************************
 
             // Stop after the first violation of an enabled rule, even if its diagnostic
-            // is suppressed or the override is incompatible with multiple superclasses.
+            // is suppressed. Defer a lost keyword because a later base may expose a type
+            // or arity error.
             if liskov_check_complete {
                 continue;
             }
@@ -1277,26 +1302,49 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            report_invalid_method_override(
-                context,
-                &member.name,
-                class,
-                *first_reachable_definition,
-                subclass_function,
-                superclass,
-                superclass_type,
-                method_kind,
-                || {
-                    subclass_override_type.assignability_error_context(
-                        db,
-                        env,
-                        superclass_override_type,
-                    )
-                },
+            let violation = MethodOverrideViolation::classify(
+                db,
+                env,
+                subclass_override_type,
+                superclass_override_type,
             );
+            let rule = violation.rule();
+            if !context.is_lint_enabled(rule) {
+                continue;
+            }
 
-            liskov_check_complete = true;
+            let report = move || {
+                report_incompatible_method_override(
+                    context,
+                    rule,
+                    &member.name,
+                    class,
+                    *first_reachable_definition,
+                    subclass_function,
+                    superclass,
+                    superclass_type,
+                    method_kind,
+                    || {
+                        subclass_override_type.assignability_error_context(
+                            db,
+                            env,
+                            superclass_override_type,
+                        )
+                    },
+                );
+            };
+
+            if violation == MethodOverrideViolation::Keyword {
+                keyword_conflict.get_or_insert(report);
+            } else {
+                report();
+                liskov_check_complete = true;
+            }
         }
+    }
+
+    if !liskov_check_complete && let Some(report) = keyword_conflict {
+        report();
     }
 
     if let Some(target) = missing_override_target
@@ -1496,6 +1544,52 @@ fn is_assignable_method_override<'db>(
     method_override_types(db, env, subclass_type, superclass_type).is_some_and(
         |(subclass_type, superclass_type)| subclass_type.is_assignable_to(db, env, superclass_type),
     )
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum MethodOverrideViolation {
+    Incompatible,
+    Keyword,
+}
+
+impl MethodOverrideViolation {
+    const fn rule(self) -> &'static LintMetadata {
+        match self {
+            Self::Incompatible => &INCOMPATIBLE_METHOD_OVERRIDE,
+            Self::Keyword => &INCOMPATIBLE_OVERRIDE_KEYWORD,
+        }
+    }
+
+    /// Classifies a failure as a lost keyword if relaxing the superclass's keyword requirements
+    /// makes the entire override assignable. The original types still explain the diagnostic.
+    fn classify<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Self {
+        if let Type::Callable(contract) = target
+            && let Some(overriding) = source.try_upcast_to_callable(db, env)
+            && let Some(overriding) = overriding.exactly_one()
+        {
+            let signatures = contract.signatures(db);
+            let adapted = CallableSignature::from_overloads(
+                signatures
+                    .iter()
+                    .map(|signature| signature.with_override_keywords(overriding.signatures(db))),
+            );
+            if &adapted != signatures
+                && source.is_assignable_to(
+                    db,
+                    env,
+                    Type::Callable(contract.with_signatures(db, adapted)),
+                )
+            {
+                return Self::Keyword;
+            }
+        }
+        Self::Incompatible
+    }
 }
 
 fn method_override_types<'db>(
@@ -1868,7 +1962,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
 
         let mut config = OverrideRulesConfig::empty();
 
-        if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
+        if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_METHOD_OVERRIDE))
+            || rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_OVERRIDE_KEYWORD))
+        {
             config |= OverrideRulesConfig::LISKOV_METHODS;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {

@@ -793,7 +793,7 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenIntermediateClass(MyFrozenClass):
-    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [incompatible-method-override]
 
 class MyFrozenChildClass(MyFrozenIntermediateClass):
     y: int
@@ -1220,7 +1220,7 @@ deletion on both that subclass and its subclasses:
 
 ```py
 class ChildWithDeletionOverride(Frozen):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __delattr__(self, name: str) -> None: ...
 
 class GrandchildWithDeletionOverride(ChildWithDeletionOverride): ...

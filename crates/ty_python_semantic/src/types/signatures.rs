@@ -1299,6 +1299,66 @@ impl<'db> Signature<'db> {
         &self.parameters
     }
 
+    /// Relaxes keyword requirements that the overriding overloads cannot meet. Leading parameters
+    /// can be checked positionally even if the overloads give them different names. After a
+    /// keyword-capable parameter, a positional-only parameter would make the signature invalid,
+    /// so use the override's keyword name when all its overloads agree on one.
+    pub(super) fn with_override_keywords(&self, overriding: &CallableSignature<'db>) -> Self {
+        let mut adapted = self.clone();
+        for (index, parameter) in self.parameters.positional().enumerate() {
+            let ParameterKind::PositionalOrKeyword { name, default_type } = parameter.kind() else {
+                continue;
+            };
+            // Changing a name must not also change which parameter receives another keyword.
+            // For example, swapping `x` and `y` can send an argument to a different type.
+            let mut positions = overriding.iter().map(|signature| {
+                let parameters = signature.parameters();
+                let positional = parameters.get_positional(index)?;
+                // If the positional parameter can be omitted, the original keyword may still
+                // bind to `**kwargs`, whose type must then accept the argument.
+                if parameters.keyword_by_name(name).is_some()
+                    || (positional.has_default() && parameters.keyword_variadic().is_some())
+                    || positional.keyword_name().is_some_and(|keyword| {
+                        self.parameters.keyword_by_name(keyword).is_some()
+                            || self.parameters.keyword_variadic().is_some()
+                    })
+                {
+                    return None;
+                }
+                Some(positional)
+            });
+            let Some(first) = positions.next().flatten() else {
+                continue;
+            };
+            let kind = if adapted
+                .parameters
+                .iter()
+                .take(index)
+                .all(Parameter::is_positional_only)
+                && positions.clone().all(|position| position.is_some())
+            {
+                ParameterKind::PositionalOnly {
+                    name: Some(name.clone()),
+                    default_type: *default_type,
+                }
+            } else if let Some(keyword) = first.keyword_name()
+                && positions.all(|other| other.and_then(Parameter::keyword_name) == Some(keyword))
+            {
+                ParameterKind::PositionalOrKeyword {
+                    name: keyword.clone(),
+                    default_type: *default_type,
+                }
+            } else {
+                continue;
+            };
+            Arc::make_mut(&mut adapted.parameters.data).value[index].kind = kind;
+            // A recursive comparison of the original declarations must still check their
+            // unmodified signatures. Only the outer contract is synthetic.
+            adapted.definition = None;
+        }
+        adapted
+    }
+
     pub(super) fn with_nominal_protocol_receiver(
         &self,
         db: &'db dyn Db,

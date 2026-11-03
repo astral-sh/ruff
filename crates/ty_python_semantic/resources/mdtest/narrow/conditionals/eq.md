@@ -998,7 +998,7 @@ from enum import IntEnum, auto
 from typing import Literal
 
 class Generated(IntEnum):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
         return "1"
 
