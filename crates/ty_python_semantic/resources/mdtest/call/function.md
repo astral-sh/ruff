@@ -1707,6 +1707,7 @@ exactly_zero(1)  # error: [too-many-positional-arguments]
 def register[**P](callback: Callable[P, None], *args: *tuple[()], enabled: bool) -> None: ...
 
 register(register, enabled=True)
+register(register, enabled="wrong")  # error: 20 [invalid-argument-type] "Expected `bool`"
 ```
 
 ### Unpacked variadic arity errors preserve element diagnostics
