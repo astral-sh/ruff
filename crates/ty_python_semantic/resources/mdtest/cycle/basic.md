@@ -347,6 +347,10 @@ class D:
 
 ### Lambdas
 
+When a lambda returns a parameter whose default refers back to the lambda, its inferred return type
+is recursive. We preserve a finite part of that callable structure and approximate the remaining
+recursion with `Divergent`.
+
 ```py
 class C:
     def f(self: "C"):
@@ -355,16 +359,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown | ((positional=...) -> Unknown | ((positional=...) -> Divergent))
+        # revealed: (positional=...) -> Unknown | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent))
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent))
+        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent))
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 

@@ -340,3 +340,19 @@ while Result:  # error: [redundant-condition]
 
 type build = int
 ```
+
+## Recursive lambda diagnostics in a condition
+
+Unused lambda bodies are checked even when they refer to conditionally defined names. Diagnostics in
+the condition can display another recursive lambda without preventing inference from converging.
+
+```py
+lambda: value  # ok
+callbacks: 0 = {lambda: callbacks}  # error: [invalid-type-form]
+target: int
+if target := callbacks:  # error: [invalid-assignment]
+    value = 0
+
+    def callbacks() -> callbacks:
+        pass
+```

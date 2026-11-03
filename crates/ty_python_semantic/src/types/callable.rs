@@ -735,7 +735,7 @@ pub enum SignatureSource<'db, S = CallableSignature<'db>> {
     ///
     /// "Explicit" describes how the signatures are provided; their types can still be inferred.
     Explicit(S),
-    /// Source inputs for a lambda signature, whose return type is inferred on demand.
+    /// Source inputs for a lambda signature, whose return type is inferred in a separate query.
     Lambda(LambdaSignature<'db>),
 }
 
@@ -785,7 +785,7 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
-/// The parameters and source inputs for a lazily inferred lambda signature.
+/// The parameters and source inputs used to infer a lambda signature.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct LambdaSignature<'db> {
     #[returns(ref)]
@@ -811,6 +811,14 @@ impl get_size2::GetSize for LambdaSignature<'_> {}
 impl<'db> LambdaSignature<'db> {
     /// Infer the body using the parameter types captured when this lambda was constructed.
     pub(super) fn infer_body(self, db: &'db dyn Db) -> &'db ScopeInference<'db> {
+        // Body inference can enter a reachability cycle that later requests this signature.
+        // Start with the signature query so its divergent return marker is available to stop
+        // recursive types from growing between cycle iterations, even when checking only diagnostics.
+        infer_lambda_signature(db, self);
+        self.infer_body_impl(db)
+    }
+
+    fn infer_body_impl(self, db: &'db dyn Db) -> &'db ScopeInference<'db> {
         InferenceEnvironment::from_lambda(self).infer_scope(
             db,
             self.scope(db),
@@ -856,7 +864,7 @@ fn infer_lambda_signature<'db>(
     let return_ty = match lambda.mapping(db) {
         Some(mapping) => mapping.return_type(db),
         None => lambda
-            .infer_body(db)
+            .infer_body_impl(db)
             .expression_type(lambda.body(db))
             .apply_type_mapping(
                 db,
