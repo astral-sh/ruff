@@ -14,13 +14,15 @@ when deciding which inputs are trusted. Browser integrations have a separate
 - **Trusted local input:** the editor, its extensions and their bundled files, the local machine and
     its file system, and the user's configuration and trust decisions.
 
+Ruff treats workspaces as trusted unless the server starts with `--untrusted-workspace`.
 ty treats workspaces as trusted unless `untrustedWorkspace` is true at initialization. Trust extends
 to everything in the workspace, including source code, configuration, notebooks, and the targets of
 symlinks that point outside it.
 
 ## Security invariants
 
-- **Code Execution:** In untrusted workspaces, the editor extension and server may launch executables
+- **Code Execution:** Unexpected code execution during analysis is a security issue even in trusted
+    workspaces. In untrusted workspaces, the editor extension and server may launch executables
     bundled with the extension or trusted programs already installed on the host. They must not
     execute workspace or dependency code, including code run during installation.
 - **Edits:** Only editing operations may change source files, and they must not change unrelated

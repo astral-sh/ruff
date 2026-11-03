@@ -862,7 +862,7 @@ pub struct UseDefMap<'db> {
     ///
     /// Function `f` may implicitly return `None`, but `g` cannot.
     ///
-    /// This is used by `can_implicitly_return_none` in the `ty_python_semantic` crate.
+    /// This is used by `is_end_of_scope_reachable` in the `ty_python_semantic` crate.
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
@@ -2193,7 +2193,8 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
-        self.checkpoint_state.record_binding_change();
+        // Earlier snapshots restore new places as undefined. The first definition
+        // changes the bindings visible to an exception handler.
         match place {
             ScopedPlaceId::Symbol(symbol) => {
                 let new_place = self.symbol_states.push(PendingPlaceState::new(
@@ -2252,10 +2253,21 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
-        let definitions_at_definition = DefinitionsAtDefinition {
-            bindings: place_state.bindings().clone(),
-            declarations: Some(place_state.declarations().clone()),
-        };
+        // The retained map uses implicit start-of-scope defaults for missing entries.
+        // Avoid cloning and storing those states for the common first binding.
+        if place_state.bindings().is_always_unbound()
+            && place_state.declarations().is_always_undeclared()
+        {
+            self.definitions_by_definition.remove(&binding);
+        } else {
+            self.definitions_by_definition.insert(
+                binding,
+                DefinitionsAtDefinition {
+                    bindings: place_state.bindings().clone(),
+                    declarations: Some(place_state.declarations().clone()),
+                },
+            );
+        }
 
         place_state.record_binding(
             def_id,
@@ -2272,9 +2284,6 @@ impl<'db> UseDefMapBuilder<'db> {
             ImportedQualifierAction::Clear => place_state.clear_imported_qualifiers(),
             ImportedQualifierAction::Preserve => {}
         }
-        self.definitions_by_definition
-            .insert(binding, definitions_at_definition);
-
         let definitions = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
             ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
@@ -2658,13 +2667,17 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.reachability_constraints,
         );
 
-        self.definitions_by_definition.insert(
-            declaration,
-            DefinitionsAtDefinition {
-                bindings: place_state.bindings().clone(),
-                declarations: None,
-            },
-        );
+        if place_state.bindings().is_always_unbound() {
+            self.definitions_by_definition.remove(&declaration);
+        } else {
+            self.definitions_by_definition.insert(
+                declaration,
+                DefinitionsAtDefinition {
+                    bindings: place_state.bindings().clone(),
+                    declarations: None,
+                },
+            );
+        }
         place_state.record_declaration(def_id, self.reachability);
 
         let definitions = match place {
@@ -2921,9 +2934,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
-        is_parent_of_annotation_scope: bool,
+        snapshot_symbol_bindings: bool,
     ) -> ScopedEnclosingSnapshotId {
         let pending = self.pending_reachability.current;
         let place_state = pending_place_state_mut(
@@ -2941,7 +2953,6 @@ impl<'db> UseDefMapBuilder<'db> {
             )
             .bindings();
 
-        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
@@ -2949,15 +2960,13 @@ impl<'db> UseDefMapBuilder<'db> {
             && bindings
                 .iter()
                 .any(|binding| !binding.binding().is_unbound());
-        // Names bound in class scopes are never visible to nested scopes (but
-        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
-        // class scope. There is one exception to this rule: annotation scopes can see names
-        // defined in an immediately-enclosing class scope. Likewise, unbound `global` and
+        // Member bindings can be visible even when the enclosing scope's names are hidden
+        // (e.g. a comprehension in a class body). Likewise, unbound `global` and
         // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
         // should continue walking outward instead of treating any bindings here as owned by this
         // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
         // state needs to be snapshotted so nested scopes can see the rebound type.
-        if (is_class_symbol && !is_parent_of_annotation_scope)
+        if (enclosing_place.is_symbol() && !snapshot_symbol_bindings)
             || !enclosing_place_expr.is_bound()
             || (is_forwarding_symbol && !stores_visible_bindings)
         {
@@ -3375,15 +3384,6 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
-            // Lookups use the shared start-of-scope defaults for these omitted entries.
-            if bindings.is_always_unbound()
-                && declarations
-                    .as_ref()
-                    .is_none_or(Declarations::is_always_undeclared)
-            {
-                continue;
-            }
-
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));

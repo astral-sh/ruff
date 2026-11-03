@@ -60,7 +60,7 @@ If a dict literal is inferred against a union containing both a `TypedDict` and 
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
 ```py
-from typing import Any, TypedDict
+from typing_extensions import Any, TypedDict
 
 class FormatterConfig(TypedDict, total=False):
     format: str
@@ -77,7 +77,7 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 bob.update({"age": 27})
 
-class NamePatch(TypedDict, total=False):
+class NamePatch(TypedDict, total=False, closed=True):
     name: str
 
 name_update: NamePatch = {"name": "Bobby"}
@@ -147,7 +147,7 @@ class Movie(TypedDict, total=False):
     year: int
     director: NotRequired[str]
 
-class MissingRequiredTitle(TypedDict, total=False):
+class MissingRequiredTitle(TypedDict, total=False, closed=True):
     year: int
 
 movie: Movie = {"title": "Alien"}
@@ -2657,6 +2657,77 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
+Read-only keys also can't be deleted, even if they are not required:
+
+```py
+from typing_extensions import NotRequired
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def _(cache: Cache) -> None:
+    # snapshot: invalid-argument-type
+    del cache["value"]
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete read-only key "value" from TypedDict `Cache`
+  --> src/mdtest_snippet.py:30:15
+   |
+30 |     del cache["value"]
+   |               ^^^^^^^
+```
+
+Read-only keys cannot be removed with `pop()` either. We also reject `setdefault()`, which can
+insert a value if the key is missing:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value")
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value", 0)
+    # error: [invalid-argument-type] "Cannot set default for read-only key "value" on TypedDict `Cache`"
+    cache.setdefault("value", 0)
+```
+
+## Diagnostics in read-only method arguments
+
+An invalid mutation of a non-required read-only key does not suppress errors in the key or default
+argument:
+
+```py
+from typing_extensions import Literal, NotRequired, ReadOnly, TypedDict
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def key(value: str) -> Literal["value"]:
+    return "value"
+
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.pop("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot set default for read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.setdefault("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    cache.pop(key(1))
+```
+
+Errors in the key are also reported when the mutation is an argument to an overloaded call:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    sorted((cache.pop(key(1)),))
+```
+
 ## `update()` with `ReadOnly` items
 
 `update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
@@ -2669,13 +2740,13 @@ class ReadOnlyPerson(TypedDict):
     id: ReadOnly[int]
     age: int
 
-class AgePatch(TypedDict, total=False):
+class AgePatch(TypedDict, total=False, closed=True):
     age: int
 
 class IdPatch(TypedDict, total=False):
     id: int
 
-class ImpossibleIdPatch(TypedDict, total=False):
+class ImpossibleIdPatch(TypedDict, total=False, closed=True):
     id: NotRequired[Never]
 
 person: ReadOnlyPerson = {"id": 1, "age": 30}
@@ -2696,6 +2767,134 @@ person.update({"id": 2})
 person.update(id=2)
 
 person.update(impossible_id_patch)
+```
+
+## Updates with undeclared source items
+
+An open `TypedDict` can contain items that are not declared in its type. A `NamePatch` may contain a
+`count` item with an incompatible type, so neither `update()` nor `|=` can safely apply it to a
+`Counter`. A source declaring every destination field is accepted when those declared types are
+compatible.
+
+```py
+from typing_extensions import TypedDict
+
+class NamePatch(TypedDict):
+    name: str
+
+class Counter(TypedDict):
+    name: str
+    count: int
+
+def _(counter: Counter, patch: NamePatch, other: Counter):
+    counter.update(patch)  # error: [invalid-argument-type]
+    counter |= patch  # error: [unsupported-operator]
+    counter.update(other)
+    counter |= other
+    counter |= {"name": "updated", "count": 1}
+```
+
+## Updates with undeclared read-only items
+
+An open source may contain a destination's read-only item even when it does not declare that item.
+Although `id` accepts any object, the update is rejected because it could overwrite a read-only
+item.
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class Person(TypedDict):
+    id: ReadOnly[object]
+    name: str
+
+class NamePatch(TypedDict):
+    name: str
+
+def _(person: Person, patch: NamePatch):
+    person.update(patch)  # error: [invalid-argument-type]
+    person |= patch  # error: [unsupported-operator]
+```
+
+A source with an `id: NotRequired[Never]` item cannot contain `id`, so it can update the mutable
+`name` item even when the source is open.
+
+```py
+class ImpossibleIdPatch(TypedDict):
+    id: NotRequired[Never]
+    name: str
+
+def _(person: Person, patch: ImpossibleIdPatch):
+    person.update(patch)
+    person |= patch
+```
+
+## Updates with undeclared destination items
+
+By default, an open `TypedDict`'s undeclared items behave as read-only items of type `object`. This
+allows subtypes to give those items narrower types: `destination` may contain a `count` item of type
+`str`. Even a closed source cannot update an undeclared destination key, because it could overwrite
+such an item with an incompatible value. A non-mutating merge can include these keys because it
+leaves the destination unchanged.
+
+```py
+from typing_extensions import TypedDict
+
+class Named(TypedDict):
+    name: str
+
+class CountPatch(TypedDict, closed=True):
+    count: int
+
+def _(destination: Named, patch: CountPatch):
+    destination.update(patch)  # error: [invalid-argument-type]
+    destination |= patch  # error: [unsupported-operator]
+    reveal_type(destination | patch)  # revealed: Named
+```
+
+Explicit mutable extra items permit these updates when the source's value types are compatible. An
+`object` extra-item type accepts both integer and string values, while `int` only accepts the
+integer patch. Explicit read-only extra items reject writes even when their value type is
+compatible.
+
+```py
+from typing_extensions import ReadOnly
+
+class ObjectExtras(Named, extra_items=object): ...
+class IntExtras(Named, extra_items=int): ...
+class ReadOnlyExtras(Named, extra_items=ReadOnly[object]): ...
+
+class StringPatch(TypedDict, closed=True):
+    count: str
+
+def _(
+    objects: ObjectExtras,
+    ints: IntExtras,
+    read_only: ReadOnlyExtras,
+    count: CountPatch,
+    text: StringPatch,
+):
+    objects.update(count)
+    objects |= count
+    objects.update(text)
+    objects |= text
+    ints.update(count)
+    ints |= count
+    ints.update(text)  # error: [invalid-argument-type]
+    ints |= text  # error: [unsupported-operator]
+    read_only.update(count)  # error: [invalid-argument-type]
+    read_only |= count  # error: [unsupported-operator]
+```
+
+An optional bottom-typed item cannot be present, so it does not write an undeclared destination key:
+
+```py
+from typing_extensions import Never, NotRequired
+
+class AbsentCountPatch(TypedDict, closed=True):
+    count: NotRequired[Never]
+
+def _(destination: Named, patch: AbsentCountPatch):
+    destination.update(patch)
 ```
 
 ## Methods on `TypedDict`
@@ -2899,7 +3098,7 @@ def invalid_default(mapping: OptionalValue) -> None:
 ```
 
 For a required field, the default cannot contribute to the result. This also holds when the field
-type is an explicit type alias:
+type is a PEP 695 alias:
 
 ```py
 type ValueAlias = Value
@@ -3310,8 +3509,8 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
-contain an `int`, so inference should select the `int` constraint. It currently selects the broader
-`object` constraint instead:
+contain an `int`, so inference selects the `int` constraint rather than the broader `object`
+constraint:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -3332,8 +3531,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    reveal_type(get_value(value))  # revealed: object
+    reveal_type(get_value(value))  # revealed: int
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 
@@ -3363,7 +3561,22 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
+    # TODO: This should not error.
+    # snapshot: invalid-argument-type
     takes_int(set_and_get(value, "a", 1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `takes_int` is incorrect
+   --> src/mdtest_snippet.py:346:15
+    |
+346 |     takes_int(set_and_get(value, "a", 1))
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+info: Function defined here
+   --> src/mdtest_snippet.py:342:5
+    |
+342 | def takes_int(value: int) -> None: ...
+    |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
@@ -5513,6 +5726,51 @@ tree: TreeNode = {
 bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
 ```
 
+## Recursive functional `TypedDict` in a shared expression
+
+The recursive field is approximated during cycle recovery, while the other fields keep their types.
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+Node = Alias = TypedDict("Node", {"child": "Node | None", "name": str, "id": NotRequired[int]})
+reveal_type(Node)  # revealed: <class 'Node'>
+reveal_type(Alias)  # revealed: <class 'Node'>
+
+node = Node(child=None, name="root")
+reveal_type(node["child"])  # revealed: Divergent
+reveal_type(node["name"])  # revealed: str
+Node(child=None, name=1)  # error: [invalid-argument-type]
+
+Other = OtherAlias = TypedDict("Other", {"child": "OtherAlias"})
+reveal_type(OtherAlias(child=None)["child"])  # revealed: Divergent
+```
+
+## Recursive functional `TypedDict` nested in an expression
+
+```py
+from typing import TypedDict
+
+Node = (TypedDict("Node", {"child": "Node | None", "name": str}),)[0]
+reveal_type(Node(child=None, name="root")["name"])  # revealed: str
+
+def conditional(flag: bool):
+    Conditional = TypedDict("Conditional", {"child": "Conditional | None"}) if flag else None
+    reveal_type(Conditional)  # revealed: <class 'Conditional'> | None
+```
+
+## Recursive `extra_items` in a shared expression
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+Extra = Alias = TypedDict("Extra", {"name": str}, extra_items="ReadOnly[Extra]")
+value = Extra(name="root")
+reveal_type(value["name"])  # revealed: str
+reveal_type(value["other"])  # revealed: Divergent
+value["other"] = value  # error: [invalid-assignment] "key is marked read-only"
+```
+
 ## Deprecated keyword-argument syntax
 
 The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is rejected.
@@ -5525,6 +5783,9 @@ from typing_extensions import TypedDict
 # error: [unknown-argument] "Argument `year` does not match any known parameter of function `TypedDict`"
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 Movie2 = TypedDict("Movie2", name=str, year=int)
+
+# The invalid declaration does not cause another diagnostic when used as an annotation.
+def use(value: Movie2): ...  # ok
 ```
 
 ## Function syntax with invalid arguments
@@ -7703,6 +7964,15 @@ static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
 ```
 
+This also applies to `get`: an undeclared key returns only `None` or the supplied default, whether
+`extra_items` is `Never` or an alias of `Never`:
+
+```py
+def _(extra: Extra, aliased: AliasedExtra) -> None:
+    reveal_type(extra.get("missing"))  # revealed: None
+    reveal_type(aliased.get("missing", False))  # revealed: Literal[False]
+```
+
 ### Empty closed TypedDict truthiness
 
 An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy.
@@ -8322,29 +8592,125 @@ def _(
     read_only.clear()  # error: [unresolved-attribute]
 ```
 
-### `get` accounts for closed TypedDicts
+### `get` on closed TypedDicts
 
-An arbitrary string key can only refer to a declared item on a closed TypedDict:
+A closed `TypedDict` cannot contain keys beyond those in its definition. Here, `Person` cannot
+contain an `"email"` key, so `get` returns only `None` or the supplied default:
+
+```py
+from typing_extensions import TypedDict
+
+class Person(TypedDict, closed=True):
+    name: str
+    age: int
+
+def _(person: Person) -> None:
+    reveal_type(person.get("email"))  # revealed: None
+    reveal_type(person.get("email", False))  # revealed: Literal[False]
+```
+
+A key of type `str` could be `"name"`, `"age"`, or an absent key, so the result includes both field
+types and the default:
+
+```py
+def _(person: Person, key: str) -> None:
+    reveal_type(person.get(key))  # revealed: int | str | None
+    reveal_type(person.get(key, b"missing"))  # revealed: int | str | Literal[b"missing"]
+```
+
+If every key in a union of string literals is absent, only the default can be returned:
+
+```py
+from typing import Literal
+
+def _(person: Person, key: Literal["email", "phone"]) -> None:
+    reveal_type(person.get(key, False))  # revealed: Literal[False]
+```
+
+### `get` on closed TypedDicts defined with functional syntax
+
+The functional syntax has the same behavior: an arbitrary string may name a declared field, but an
+undeclared literal key always returns the default.
+
+```py
+from typing_extensions import TypedDict
+
+Person = TypedDict("Person", {"name": str}, closed=True)
+
+def _(person: Person, key: str) -> None:
+    reveal_type(person.get(key))  # revealed: str | None
+    reveal_type(person.get("email", False))  # revealed: Literal[False]
+```
+
+### `get` on an empty closed TypedDict
+
+An empty closed `TypedDict` cannot contain any key, so even a lookup with an arbitrary string
+returns `None`:
+
+```py
+from typing_extensions import TypedDict
+
+class Empty(TypedDict, closed=True): ...
+
+def _(empty: Empty, key: str) -> None:
+    reveal_type(empty.get(key))  # revealed: None
+```
+
+### `get` through a saved method reference
+
+Saving `get` in a variable preserves its return types for absent keys:
+
+```py
+from typing_extensions import TypedDict
+
+class Person(TypedDict, closed=True):
+    name: str
+
+def _(person: Person) -> None:
+    get = person.get
+    reveal_type(get("email"))  # revealed: None
+    reveal_type(get("email", False))  # revealed: Literal[False]
+```
+
+### `get` default types for absent keys
+
+When a key is absent, the annotation on the result gives the element type for an empty list passed
+as the default. This also works through a saved method reference:
 
 ```py
 from typing_extensions import TypedDict
 
 class Closed(TypedDict, closed=True):
     name: str
-    year: int
 
-FunctionalClosed = TypedDict(
-    "FunctionalClosed",
-    {"name": str, "year": int},
-    closed=True,
-)
+def _(closed: Closed) -> None:
+    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[int]
+    get = closed.get
+    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[int]
+```
 
-class EmptyClosed(TypedDict, closed=True): ...
+An annotation does not make an incompatible default valid:
 
-def _(closed: Closed, functional: FunctionalClosed, empty: EmptyClosed, key: str) -> None:
-    reveal_type(closed.get(key))  # revealed: str | int | None
-    reveal_type(functional.get(key))  # revealed: str | int | None
-    reveal_type(empty.get(key))  # revealed: None
+```py
+def _(closed: Closed) -> None:
+    wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
+```
+
+### `get` default types for non-required items
+
+For a declared non-required item, we infer the type of an empty list from the item's type, even when
+the result has no annotation:
+
+```py
+from typing_extensions import TypedDict
+
+class ClosedPartial(TypedDict, total=False, closed=True):
+    values: list[int]
+
+def _(partial: ClosedPartial) -> None:
+    reveal_type(partial.get("values", []))  # revealed: list[int]
+    get = partial.get
+    reveal_type(get("values", []))  # revealed: list[int]
 ```
 
 ### `pop` and `setdefault` support literal extra-item keys

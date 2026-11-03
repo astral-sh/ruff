@@ -772,7 +772,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
-target_version             = 3.10
+target_version             = 3.11
 source_type                = Python
 nested-string-quote-style  = alternating
 ```
@@ -1592,7 +1592,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
-target_version             = 3.10
+target_version             = 3.11
 source_type                = Python
 nested-string-quote-style  = alternating
 ```
@@ -2402,7 +2402,7 @@ f"{f'''{'nested'} inner'''} outer"
 
 
 ### Unsupported Syntax Errors
-error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.10 (syntax was added in Python 3.12)
+error[invalid-syntax]: Cannot reuse outer quote character in f-strings on Python 3.11 (syntax was added in Python 3.12)
    --> fstring.py:178:8
     |
 176 | # Here, the formatter will remove the escapes which is correct because they aren't allowed

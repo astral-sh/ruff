@@ -312,7 +312,7 @@ a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
 ```
 
 ```snapshot
-warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-by-zero'
+warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'ty:division-by-zero'
  --> src/mdtest_snippet.py:2:39
   |
 2 | a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]

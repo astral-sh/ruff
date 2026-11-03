@@ -32,6 +32,48 @@ pub struct UnionType<'db> {
     pub(crate) recursively_defined: RecursivelyDefined,
 }
 
+// Whole-input memoization pays for its key on wider unions, where the individual
+// ordered redundancy comparisons would otherwise be repeated quadratically.
+const WIDE_UNION: usize = 8;
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct OrderedUnionInput<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(deref)]
+    elements: Box<[Type<'db>]>,
+    #[returns(copy)]
+    unpack_aliases: bool,
+    #[returns(copy)]
+    recursively_defined: RecursivelyDefined,
+}
+
+impl<'db> OrderedUnionInput<'db> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the normalization query is resolving a cycle"
+    )]
+    fn normalize(self, db: &'db dyn Db) -> Type<'db> {
+        fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(input.program(db));
+            let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
+            for &ty in input.elements(db) {
+                builder.add_in_place(ty);
+            }
+            builder
+                .or_recursively_defined(input.recursively_defined(db))
+                .build()
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
+            Some(build(db, input))
+        }
+
+        normalized(db, self).unwrap_or_else(|| build(db, self))
+    }
+}
+
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     union: UnionType<'db>,
@@ -62,6 +104,17 @@ impl<'db> UnionType<'db> {
         T: Into<Type<'db>>,
     {
         let mut iter_elements = elements.into_iter();
+        if iter_elements.size_hint().0 >= WIDE_UNION {
+            let elements = iter_elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
@@ -116,6 +169,18 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let elements = elements.into_iter();
+        if elements.size_hint().0 >= WIDE_UNION {
+            let elements = elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                false,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
             builder.add_in_place(element.into());
@@ -314,7 +379,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
-    fn map_leave_aliases(
+    pub(super) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -325,6 +390,22 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
+                if elements.len() >= WIDE_UNION {
+                    let mapped = elements[..i]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::once(new_ty))
+                        .chain(iter.map(|(_, element)| transform_fn(element)))
+                        .collect::<Box<[_]>>();
+                    return OrderedUnionInput::new(
+                        db,
+                        env.program(db),
+                        mapped,
+                        false,
+                        self.recursively_defined(db),
+                    )
+                    .normalize(db);
+                }
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
@@ -916,6 +997,31 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Returns whether a direct positive or negative element is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.positive(db)
+            .iter()
+            .chain(self.negative(db))
+            .copied()
+            .any(Type::is_alias_like)
+    }
+
+    /// Normalize direct aliases without expanding aliases nested inside containers.
+    pub(crate) fn expand_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db, env);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.resolve_type_alias(db));
+        }
+        for negative in self.negative(db) {
+            builder.add_negative_in_place(negative.resolve_type_alias(db));
+        }
+        builder.build()
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1036,6 +1142,33 @@ impl<'db> IntersectionType<'db> {
         intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
+    /// Create `positive & ~negative` directly so the positive operand can prune branches
+    /// while distributing the complement.
+    pub(crate) fn from_positive_and_negative(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        positive: Type<'db>,
+        negative: Type<'db>,
+    ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
+                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn difference<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            IntersectionBuilder::new(db, &env)
+                .add_positive(types.first(db))
+                .add_negative(types.second(db))
+                .build()
+        }
+
+        difference(db, TypePair::new(db, env.program(db), positive, negative))
+    }
+
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1110,7 +1243,8 @@ impl<'db> IntersectionType<'db> {
             }
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            let mut builder =
+                IntersectionBuilder::new(db, visitor.env).preserve_positive_aliases(true);
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,
@@ -1380,7 +1514,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
-        match element {
+        match element.resolve_type_alias(db) {
             Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
                 TypeVarBoundOrConstraints::UpperBound(bound) => {
                     builder.add_positive_in_place(bound);

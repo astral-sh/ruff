@@ -5,7 +5,7 @@ use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
 use ruff_db::system::{OsSystem, System, SystemPath, TestSystem};
 use ty_project::{
-    Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability, uv_test_env_vars,
+    Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability, UseUv, uv_test_env_vars,
 };
 use ty_static::EnvVars;
 
@@ -13,10 +13,11 @@ fn setup_iteration(root: &SystemPath, uv: &SystemPath) -> ProjectDatabase {
     let system = TestSystem::new(OsSystem::new(root));
     system.clear_env_vars();
     system.set_env_vars(uv_test_env_vars());
-    system.set_env_var(EnvVars::TY_UV, "scripts");
     system.set_env_var(EnvVars::UV, uv.as_str());
 
-    let metadata = ProjectMetadata::discover(root, &system).unwrap();
+    let metadata = ProjectMetadata::discover(root, &system)
+        .unwrap()
+        .with_use_uv(UseUv::Scripts);
     ProjectDatabase::fallible(metadata, system).unwrap()
 }
 

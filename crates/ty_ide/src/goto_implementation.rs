@@ -95,7 +95,14 @@ pub fn goto_implementation(
         .into_par_iter()
         .map_with_db(db, |db, file| {
             let file = ProgramFile::new(db, file, program);
-            let definitions = finder.implementations_for_file(db, file);
+            let Some(definitions) = finder.implementations_for_file(db, file) else {
+                return Vec::new();
+            };
+
+            // Go-to-implementation searches can scan the whole project, so release closed files'
+            // ASTs as we go. Keep the guard through target conversion, which can also load this
+            // file's AST.
+            let _ast_guard = parsed_module(db, file.python_file(db)).load_then_clear_on_drop(db);
             definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();

@@ -61,12 +61,13 @@ impl EnvVars {
     /// Accepts the same values as the `--output-format` command-line argument.
     pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
-    /// Enable uv integration.
+    /// Enable and configure uv integration.
     ///
-    /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
-    /// root and initialize script environments. When set to `"scripts"`, only script environments
-    /// are initialized.
-    #[attr_hidden]
+    /// When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+    /// Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
+    ///
+    /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+    /// environment.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
@@ -95,6 +96,41 @@ impl EnvVars {
     pub const CONDA_ROOT: &'static str = "_CONDA_ROOT";
 
     // Externally defined environment variables
+
+    /// Controls color in `ty check` diagnostics when stdout is a terminal.
+    ///
+    /// Setting this to `0` disables color. Any other non-empty value enables color, even if
+    /// `TERM=dumb`. An empty value has the same effect as leaving the variable unset.
+    ///
+    /// An explicit `--color=always` or `--color=never` takes precedence, as does a non-empty
+    /// `NO_COLOR`, `FORCE_COLOR`, or `CLICOLOR_FORCE` environment variable.
+    pub const CLICOLOR: &'static str = "CLICOLOR";
+
+    /// Alias for [`FORCE_COLOR`](#force_color).
+    pub const CLICOLOR_FORCE: &'static str = "CLICOLOR_FORCE";
+
+    /// Controls color in `ty check` diagnostics, including when piped.
+    ///
+    /// Setting this to any non-empty value (including `0`) forces color. An empty value has the
+    /// same effect as leaving the variable unset. All of the following have higher precedence:
+    /// setting the `NO_COLOR` environment variable to a non-empty value, passing `--color=always`,
+    /// or passing `--color=never`.
+    pub const FORCE_COLOR: &'static str = "FORCE_COLOR";
+
+    /// Controls color in `ty check` diagnostics, including when piped.
+    ///
+    /// Setting this to any non-empty value (including `0`) disables color in diagnostics.
+    /// Setting it to an empty value causes ty to defer to other environment variables and heuristics
+    /// such as whether stdout is a tty.
+    ///
+    /// Passing `--color always` or `--color never` takes precedence over this environment variable.
+    pub const NO_COLOR: &'static str = "NO_COLOR";
+
+    /// In automatic mode, `ty check` uses color when stdout is a terminal unless `TERM` is
+    /// exactly `dumb`. An empty or unset `TERM` allows color on a terminal. An explicit
+    /// `--color=always` or `--color=never` takes precedence, as does a non-empty `NO_COLOR`,
+    /// `FORCE_COLOR`, `CLICOLOR_FORCE`, or `CLICOLOR` environment variable.
+    pub const TERM: &'static str = "TERM";
 
     /// Specifies an upper limit for the number of threads ty uses when performing work in parallel.
     /// Equivalent to `TY_MAX_PARALLELISM`.

@@ -505,6 +505,21 @@ pub(crate) fn docstring_for_call_definition<'db>(
         .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
 }
 
+/// A parameter written in a `def` gets its documentation from the function docstring.
+/// A generated dataclass constructor has no `def __init__` to read. In `Foo(bar=True)`,
+/// `bar` points back to the field in the class body, where a string literal immediately
+/// following the field can document it.
+pub(crate) fn docstring_for_parameter_field<'db>(
+    db: &'db dyn Db,
+    definition: Option<Definition<'db>>,
+) -> Option<Docstring> {
+    let definition = definition?;
+    if definition.kind(db).is_parameter_def() {
+        return None;
+    }
+    Definitions::new(vec![ResolvedDefinition::Definition(definition)]).docstring(db)
+}
+
 impl GotoTarget<'_> {
     pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
@@ -1423,7 +1438,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-fn find_goto_target_impl<'a>(
+pub(crate) fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,

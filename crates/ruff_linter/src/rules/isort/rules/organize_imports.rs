@@ -23,6 +23,23 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
 ///
+/// By default, imports are categorized into the following sections in order:
+/// 1. `future` (`__future__`)
+/// 2. `standard-library` (e.g., `sys`, `os`, `json`)
+/// 3. `third-party` (e.g., `numpy`, `pandas`)
+/// 4. `first-party` (modules within the current project or package)
+/// 5. `local-folder` (relative imports starting with `.`, e.g., `from . import utils`)
+///
+/// With the default settings, each section is separated by a blank line. Within a section, Ruff
+/// generally places `import` statements before `from` imports and sorts each group by module name.
+///
+/// Ruff defaults to two blank lines between a top-level import block and a function or class
+/// definition, and one blank line before other top-level statements. In stub files (`.pyi`), the
+/// default is one blank line in either case.
+///
+/// See the FAQ for more information on how Ruff [determines which imports are first-party][1] and
+/// for how Ruff [compares to isort][2] more broadly.
+///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for imports to make your code
 /// more readable and idiomatic.
@@ -31,14 +48,33 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// import pandas
 /// import numpy as np
+/// import sys
+///
+///
+/// def main(): ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import sys
+///
 /// import numpy as np
 /// import pandas
+///
+///
+/// def main(): ...
 /// ```
 ///
+/// ## Options
+/// See the [`isort` settings](https://docs.astral.sh/ruff/settings/#lintisort) for all available
+/// configuration options.
+///
+/// ## References
+/// - [PEP 8: Imports](https://peps.python.org/pep-0008/#imports)
+/// - [isort documentation](https://isort.readthedocs.io/en/latest/)
+///
+/// [1]: https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc
+/// [2]: https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.110", category = Category::Style)]
 pub(crate) struct UnsortedImports;
@@ -170,7 +206,6 @@ pub(crate) fn organize_imports(
         source_type,
         target_version,
         &settings.isort,
-        settings.preview,
         tokens,
     );
 

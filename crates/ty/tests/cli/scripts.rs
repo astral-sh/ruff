@@ -727,7 +727,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
+    error[import-not-found]: Cannot resolve imported module `layout_dependency`
      --> scripts/script.py:6:6
       |
     6 | from layout_dependency import value as layout_value
@@ -736,7 +736,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `local_dependency`
+    error[import-not-found]: Cannot resolve imported module `local_dependency`
      --> scripts/script.py:7:6
       |
     7 | from local_dependency import value as local_value
@@ -745,7 +745,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> scripts/script.py:8:6
       |
     8 | from shared import value
@@ -828,7 +828,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `extra_only`
+    error[import-not-found]: Cannot resolve imported module `extra_only`
      --> scripts/script.py:6:6
       |
     6 | from extra_only import value as extra
@@ -837,7 +837,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `project_only`
+    error[import-not-found]: Cannot resolve imported module `project_only`
      --> scripts/script.py:7:6
       |
     7 | from project_only import value as project
@@ -989,7 +989,7 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `project_dependency`
+    error[import-not-found]: Cannot resolve imported module `project_dependency`
      --> scripts/script.py:6:6
       |
     6 | from project_dependency import value
@@ -1216,6 +1216,67 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [[tool.ty.overrides]]
+        # include = ["script.py"]
+        # [tool.ty.overrides.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:6:33: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_top_level_script_analysis_is_an_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:4:33: error[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1907,12 +1968,15 @@ mod uv_metadata {
 
         let case = CliTest::with_file(
             "script.py",
-            "# /// script\n# requires-python = '>=3.8'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
+            "
+            # /// script
+            # requires-python = '>=3.8'
+            # dependencies = ['missing-script-dependency==99.0.0']
+            # ///
+            print(missing)
+            ",
         )?
-        .with_filter(
-            r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 1 diagnostic)",
-            "`uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved\n$1",
-        );
+        .with_filter(r"exit code: (\d+)", "exit status: $1");
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
@@ -1921,7 +1985,13 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
+        error[uv-metadata]: `uv workspace metadata` failed with `exit status: 1`
+        --> script.py:2:1
+        info: No solution found when resolving dependencies
+          cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
+
+        hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+
         Found 1 diagnostic
 
         ----- stderr -----

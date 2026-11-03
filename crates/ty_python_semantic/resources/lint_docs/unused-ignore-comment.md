@@ -19,9 +19,3 @@ Use instead:
 ```py
 a = 20 / 2
 ```
-
-## Options
-
-Set
-[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false` to prevent this rule from reporting unused `type: ignore` comments.

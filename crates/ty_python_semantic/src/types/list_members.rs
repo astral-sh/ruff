@@ -6,7 +6,6 @@
 //! listing all members in the class's body scope.
 
 use std::cmp::Ordering;
-use std::convert::identity;
 
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
@@ -340,7 +339,7 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::Recursive(recursive) => {
-                let unfolded = recursive.map_or(db, env, Type::object(), identity);
+                let unfolded = recursive.unfold(db, env).unwrap_or_else(Type::object);
                 self.extend_with_type(db, env, unfolded);
             }
 

@@ -19,7 +19,7 @@ import tomllib  # no error
 Not valid in 3.11, only in 3.12 and later:
 
 ```py
-from collections.abc import Buffer  # error: [unresolved-import]
+from collections.abc import Buffer  # error: [import-not-found]
 ```
 
 ## Python version 3.12
@@ -38,7 +38,7 @@ from collections.abc import Buffer  # no error
 Not valid in 3.12, only in 3.13 and later:
 
 ```py
-from copy import replace  # error: [unresolved-import]
+from copy import replace  # error: [import-not-found]
 ```
 
 ## Python version 3.13
@@ -57,7 +57,7 @@ from copy import replace  # no error
 Not valid in 3.13, only in 3.14 and later:
 
 ```py
-from compression import zstd  # error: [unresolved-import]
+from compression import zstd  # error: [import-not-found]
 ```
 
 ## Python version 3.14

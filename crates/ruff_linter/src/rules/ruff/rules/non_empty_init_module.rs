@@ -43,24 +43,28 @@ use crate::{Violation, checkers::ast::Checker};
 /// [`lint.ruff.strictly-empty-init-modules`] setting. In this case:
 ///
 /// ```python
+/// """My module docstring."""
+///
 /// from submodule import MyClass
 ///
 /// __all__ = ["MyClass"]
 /// ```
 ///
-/// the only fix is entirely emptying the file:
+/// the only fix is removing everything but the docstring:
 ///
 /// ```python
+/// """My module docstring."""
 /// ```
 ///
 /// ## Details
 ///
-/// In non-strict mode, this rule allows several common patterns in `__init__.py` files:
+/// In both modes, this rule allows module-level and attribute docstrings in `__init__.py` files.
+///
+/// In non-strict mode, this rule additionally allows several common patterns:
 ///
 /// - Imports
 /// - Assignments to dunder names (identifiers starting and ending with `__`, such as `__all__` or
 ///   `__submodules__`)
-/// - Module-level and attribute docstrings
 /// - `if TYPE_CHECKING` blocks
 /// - [PEP-562] module-level `__getattr__` and `__dir__` functions
 ///
@@ -103,20 +107,21 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
+    // Docstrings are documentation rather than code, so they're allowed in both modes. Even though
+    // module-level attributes are disallowed, we still allow attribute docstrings to avoid needing
+    // two `noqa` comments in a case like:
+    //
+    // ```py
+    // MY_CONSTANT = 1  # noqa: RUF067
+    // "A very important constant"
+    // ```
+    if semantic.in_pep_257_docstring() || semantic.in_attribute_docstring() {
+        return;
+    }
+
     let strictly_empty_init_modules = checker.settings().ruff.strictly_empty_init_modules;
 
     if !strictly_empty_init_modules {
-        // Even though module-level attributes are disallowed, we still allow attribute docstrings
-        // to avoid needing two `noqa` comments in a case like:
-        //
-        // ```py
-        // MY_CONSTANT = 1  # noqa: RUF067
-        // "A very important constant"
-        // ```
-        if semantic.in_pep_257_docstring() || semantic.in_attribute_docstring() {
-            return;
-        }
-
         match stmt {
             // Allow imports
             Stmt::Import(_) | Stmt::ImportFrom(_) => return,

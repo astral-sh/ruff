@@ -24,11 +24,11 @@ use types::WorkspaceFoldersServerCapabilities;
 pub use self::connection::ConnectionInitializer;
 pub(crate) use self::connection::ConnectionSender;
 use self::schedule::spawn_main_loop;
-use crate::PositionEncoding;
 pub(crate) use crate::server::main_loop::MainLoopSender;
 pub(crate) use crate::server::main_loop::{Event, MainLoopReceiver};
 use crate::session::{AllOptions, Client, Session};
 use crate::workspace::Workspaces;
+use crate::{PositionEncoding, WorkspaceTrust};
 pub(crate) use api::Error;
 
 mod api;
@@ -52,6 +52,7 @@ impl Server {
         worker_threads: NonZeroUsize,
         connection: ConnectionInitializer,
         preview: Option<bool>,
+        workspace_trust: WorkspaceTrust,
         is_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
@@ -121,6 +122,7 @@ impl Server {
                 global,
                 &workspaces,
                 &client,
+                workspace_trust,
             )?,
             client_capabilities,
         })

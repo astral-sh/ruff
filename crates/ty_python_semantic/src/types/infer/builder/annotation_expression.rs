@@ -237,24 +237,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let annotation_ty = match value_ty {
                     Type::SpecialForm(special_form) => match special_form {
-                        SpecialFormType::Annotated => {
-                            let inferred = self.parse_subscription_of_annotated_special_form(
+                        SpecialFormType::Annotated => self
+                            .parse_subscription_of_annotated_special_form(
                                 subscript,
                                 AnnotatedExprContext::AnnotationExpression,
-                            );
-                            let in_type_expression = inferred
-                                .inner_type()
-                                .in_type_expression(db, self.scope(), None, self.inference_flags())
-                                .unwrap_or_else(|err| {
-                                    err.into_fallback_type(
-                                        &self.context,
-                                        subscript,
-                                        self.inference_flags(),
-                                    )
-                                });
-                            TypeAndQualifiers::declared(in_type_expression)
-                                .with_qualifier(inferred.qualifiers())
-                        }
+                            )
+                            .unwrap_or_else(|| TypeAndQualifiers::declared(Type::unknown())),
                         SpecialFormType::TypeQualifier(qualifier) => {
                             let arguments = if let ast::Expr::Tuple(tuple) = slice {
                                 &*tuple.elts

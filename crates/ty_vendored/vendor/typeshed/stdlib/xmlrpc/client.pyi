@@ -63,7 +63,6 @@ _Marshallable: TypeAlias = (
     | str
     | bytes
     | bytearray
-    | None
     | tuple[_Marshallable, ...]
     # Ideally we'd use _Marshallable for list and dict, but invariance makes that impractical
     | list[Any]
@@ -71,6 +70,7 @@ _Marshallable: TypeAlias = (
     | datetime
     | DateTime
     | Binary
+    | None
 )
 _XMLDate: TypeAlias = int | datetime | tuple[int, ...] | time.struct_time
 _HostType: TypeAlias = tuple[str, dict[str, str]] | str

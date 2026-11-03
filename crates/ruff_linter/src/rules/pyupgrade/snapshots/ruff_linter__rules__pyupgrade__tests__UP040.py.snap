@@ -497,5 +497,39 @@ help: Use the `type` keyword
     -     ),
     - )
 148 +     )
+149 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `StarredList` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:157:1
+    |
+155 | constraints = (int, str)
+156 | T_starred = TypeVar("T_starred", *constraints)
+157 | StarredList: TypeAlias = list[T_starred]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    |
+help: Use the `type` keyword
+    |
+156 | T_starred = TypeVar("T_starred", *constraints)
+    - StarredList: TypeAlias = list[T_starred]
+157 + type StarredList[T_starred: (*constraints,)] = list[T_starred]
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `StarredAlias` uses `TypeAliasType` assignment instead of the `type` keyword
+   --> UP040.py:158:1
+    |
+156 | T_starred = TypeVar("T_starred", *constraints)
+157 | StarredList: TypeAlias = list[T_starred]
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use the `type` keyword
+    |
+157 | StarredList: TypeAlias = list[T_starred]
+    - StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+158 + type StarredAlias[T_starred: (*constraints,)] = list[T_starred]
     |
 note: This is an unsafe fix and may change runtime behavior

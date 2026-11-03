@@ -70,7 +70,7 @@ if sys.version_info >= (3, 12):
     __all__ += ["getHandlerByName", "getHandlerNames"]
 
 _SysExcInfoType: TypeAlias = tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
-_ExcInfoType: TypeAlias = None | bool | _SysExcInfoType | BaseException
+_ExcInfoType: TypeAlias = bool | _SysExcInfoType | BaseException | None
 _ArgsType: TypeAlias = tuple[object, ...] | Mapping[str, object]
 _Level: TypeAlias = int | str
 _FormatStyle: TypeAlias = Literal["%", "{", "$"]
@@ -443,7 +443,7 @@ class Logger(Filterer):
         lno: int,
         msg: object,
         args: _ArgsType,
-        exc_info: _SysExcInfoType | None,
+        exc_info: _SysExcInfoType | Literal[False] | None,
         func: str | None = None,
         extra: Mapping[str, object] | None = None,
         sinfo: str | None = None,
@@ -819,12 +819,15 @@ class LogRecord:
     information to be logged.
     """
 
-    # args can be set to None by logging.handlers.QueueHandler
-    # (see https://bugs.python.org/issue44473)
+    # args can be set to None by logging.handlers.QueueHandler, which
+    # contradicts the LogRecord documentation, but seems to be intentional,
+    # see https://github.com/python/cpython/issues/88639
     args: _ArgsType | None
     asctime: str
     created: float
-    exc_info: _SysExcInfoType | None
+    # Prior to Python 3.16, Logger._log() only normalizes truthy exc_info
+    # values so exc_info=False ends up on the record unchanged.
+    exc_info: _SysExcInfoType | Literal[False] | None
     exc_text: str | None
     filename: str
     funcName: str
@@ -854,6 +857,9 @@ class LogRecord:
         pathname: str,
         lineno: int,
         msg: object,
+        # args can be set to None by logging.handlers.QueueHandler, which
+        # contradicts the LogRecord documentation, but seems to be intentional,
+        # see https://github.com/python/cpython/issues/88639
         args: _ArgsType | None,
         exc_info: _SysExcInfoType | None,
         func: str | None = None,

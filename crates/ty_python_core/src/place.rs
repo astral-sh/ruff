@@ -236,6 +236,28 @@ impl PlaceTable {
         self.members.iter()
     }
 
+    /// Receiver attributes that this scope can define. A read of `self.value` alone
+    /// does not establish `value` as an implicit attribute.
+    pub fn defined_instance_attribute_names(&self) -> impl Iterator<Item = &str> {
+        self.members
+            .iter()
+            .filter(|member| member.is_bound() || member.is_declared())
+            .filter_map(Member::as_instance_attribute)
+    }
+
+    /// Receiver attributes declared in this scope, such as `self.value: int`.
+    pub fn declared_instance_attributes(&self) -> impl Iterator<Item = (ScopedMemberId, &str)> {
+        self.members.iter().enumerate().filter_map(|(id, member)| {
+            if !member.is_declared() {
+                return None;
+            }
+            Some((
+                ScopedMemberId::from_usize(id),
+                member.as_instance_attribute()?,
+            ))
+        })
+    }
+
     /// Looks up a symbol by its ID and returns a reference to it.
     ///
     /// ## Panics
@@ -627,7 +649,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 places.extend(self.simple_expr(&attribute.value));
                 places
             }
-            // Subscript truthiness can also narrow its base (`TypedDict` tagged unions).
+            // Subscript truthiness can also narrow its base (`TypedDict` and tuple unions).
             ast::Expr::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
                 places.extend(self.simple_expr(&subscript.value));
@@ -720,10 +742,17 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 .filter(|keyword| keyword.arg.is_some())
                 .map(|keyword| &keyword.value),
         ) {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(argument) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
+            if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
+            // Checking a tuple element can also eliminate alternatives of its tuple union.
+            if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 

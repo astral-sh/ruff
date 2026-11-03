@@ -82,12 +82,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and an unresolved-import (error) diagnostic by default.
+    // and an import-not-found (error) diagnostic by default.
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    error[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -96,7 +96,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -119,13 +119,17 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
+            .arg("--ignore")
+            .arg("unresolved-import")
+            .arg("--error")
+            .arg("import-not-found")
             .arg("--warn")
             .arg("unresolved-import"),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    warning[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -134,7 +138,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` was selected on the command line
+    info: rule `import-not-found` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
@@ -216,6 +220,70 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+/// A single rules table rejects conflicting levels for two names of the same rule.
+#[test]
+fn configuration_conflicting_rule_alias_levels() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "ignore"
+            import-not-found = "error"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: <temp_dir>/ty.toml is not a valid `ty.toml`
+      Cause: TOML parse error at line 2, column 1
+      |
+    2 | [rules]
+      | ^^^^^^^
+    Conflicting levels for the same rule: `import-not-found = "error"` and `unresolved-import = "ignore"`
+    note: `unresolved-import` is a legacy alias for `import-not-found`
+    "#);
+}
+
+/// A rule's name and its alias can select the same level, and a separate override can change it.
+#[test]
+fn configuration_rule_alias_levels_with_override() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "error"
+
+            [[overrides]]
+            include = ["test.py"]
+            [overrides.rules]
+            unresolved-import = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 }
 
 /// ty warns about unknown rules specified in a configuration file

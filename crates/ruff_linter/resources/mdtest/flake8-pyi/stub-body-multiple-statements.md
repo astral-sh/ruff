@@ -8,21 +8,19 @@ select = ["PYI048"]
 
 ## Single-statement bodies
 
-A stub function body holding exactly one statement is what the rule asks for.
-
 ```pyi
-def ellipsis(): ...
-def pass_statement():
-    pass
+def bar(): ...  # ok
+def bar():
+    pass  # ok
 
-def docstring():
-    """oof"""
+def bar():
+    """oof"""  # ok
 ```
 
 ## Multiple statements
 
 ```pyi
-def oof():  # error: [stub-body-multiple-statements]
+def oof():  # snapshot: stub-body-multiple-statements
     """oof"""
     print("foo")
 
@@ -35,6 +33,15 @@ def buzz():  # error: [stub-body-multiple-statements]
     print("fizz")
     print("buzz")
     print("test")
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def oof():  # snapshot: stub-body-multiple-statements
+  |     ^^^
+help: Remove unnecessary statements
 ```
 
 ## Placeholders after a docstring
@@ -447,19 +454,37 @@ help: Remove unnecessary statements
 
 ## Non-stub files
 
-The rule only applies to stub files.
-
 ```py
-def oof():
+def bar():
+    ...  # ok
+
+
+def bar():
+    pass  # ok
+
+
+def bar():
+    """oof"""  # ok
+
+
+def oof():  # ok
     """oof"""
     print("foo")
 
-def foo():
+
+def foo():  # ok
     """foo"""
     print("foo")
     print("foo")
 
-def placeholders():
+
+def buzz():  # ok
+    print("fizz")
+    print("buzz")
+    print("test")
+
+
+def placeholders():  # ok
     """docstring"""
     ...
     pass

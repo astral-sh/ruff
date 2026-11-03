@@ -16,7 +16,7 @@ except re.error as f:
 ## Unknown type in except handler does not cause spurious diagnostic
 
 ```py
-from nonexistent_module import foo  # error: [unresolved-import]
+from nonexistent_module import foo  # error: [import-not-found]
 
 try:
     help()
@@ -65,6 +65,33 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
+## Negated dynamic type aliases
+
+A negated alias of `Any` behaves like `Any` in both single and tuple exception handlers.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Not
+
+type Dynamic = Any
+
+def catch_negated_alias(exc: Not[Dynamic]) -> None:
+    try:
+        raise ValueError
+    except exc as single:
+        reveal_type(single)  # revealed: Any
+
+    try:
+        raise ValueError
+    except (exc,) as tuple_element:
+        reveal_type(tuple_element)  # revealed: Any
+```
+
 ## Exception-class expressions
 
 Exception-class expressions can produce intersections, gradual refinements, or unions. Positive
@@ -102,7 +129,7 @@ We do not emit an `invalid-exception-caught` if a class is caught that has `Any`
 MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
 
 ```py
-from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+from compat import BASE_EXCEPTION_CLASS  # error: [import-not-found] "Cannot resolve imported module `compat`"
 
 class Error(BASE_EXCEPTION_CLASS): ...
 

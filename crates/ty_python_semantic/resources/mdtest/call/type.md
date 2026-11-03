@@ -818,7 +818,7 @@ Unknown bases (from unresolved imports) don't trigger duplicate-base diagnostics
 know if they represent the same type:
 
 ```py
-from unresolved_module import Bar, Baz  # error: [unresolved-import]
+from unresolved_module import Bar, Baz  # error: [import-not-found]
 
 # No duplicate-base error here - Bar and Baz are Unknown, and we can't
 # know if they're the same type.

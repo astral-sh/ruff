@@ -324,6 +324,87 @@ def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
         reveal_type(narrowed)  # revealed: int
 ```
 
+## Intersections
+
+Guards for overlapping types can share a common subtype. A function returning `TypeGuard[int]`
+satisfies both callable types below and can return `True` for an integer. Calling their intersection
+preserves both guard wrappers.
+
+```py
+from typing import Callable
+from typing_extensions import Never, TypeGuard, TypeIs
+from ty_extensions import Intersection, Not
+
+def is_int(value: object) -> TypeGuard[int]:
+    return isinstance(value, int)
+
+def check_overlapping_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int | str]], Callable[[object], TypeGuard[int | bytes]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int | str] & TypeGuard[int | bytes]
+
+check_overlapping_guards(is_int, 1)
+```
+
+Even guards for disjoint types share `TypeGuard[Never]` as a common subtype. An always-false
+function satisfies both callable types below, so their intersection also remains inhabited.
+
+```py
+def never_true(value: object) -> TypeGuard[Never]:
+    return False
+
+def check_disjoint_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int]], Callable[[object], TypeGuard[str]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int] & TypeGuard[str]
+
+check_disjoint_guards(never_true, object())
+```
+
+Distinct wrappers are also preserved in intersections of guard return types, including `TypeIs` and
+mixed guard kinds.
+
+```py
+def _(
+    guard: Intersection[TypeGuard[int], TypeGuard[str]],
+    type_is: Intersection[TypeIs[int], TypeIs[str]],
+    mixed: Intersection[TypeGuard[int], TypeIs[str]],
+):
+    reveal_type(guard)  # revealed: TypeGuard[int] & TypeGuard[str]
+    reveal_type(type_is)  # revealed: TypeIs[int] & TypeIs[str]
+    reveal_type(mixed)  # revealed: TypeGuard[int] & TypeIs[str]
+```
+
+Redundant components still simplify away. `TypeGuard` is covariant, whereas `TypeIs` is invariant.
+
+```py
+def _(
+    covariant: Intersection[TypeGuard[int], TypeGuard[bool]],
+    reversed: Intersection[TypeGuard[bool], TypeGuard[int]],
+    invariant: Intersection[TypeIs[int], TypeIs[bool]],
+    repeated: Intersection[TypeIs[int], TypeIs[int]],
+    boolean: Intersection[TypeGuard[int], bool],
+):
+    reveal_type(covariant)  # revealed: TypeGuard[bool]
+    reveal_type(reversed)  # revealed: TypeGuard[bool]
+    reveal_type(invariant)  # revealed: TypeIs[int] & TypeIs[bool]
+    reveal_type(repeated)  # revealed: TypeIs[int]
+    reveal_type(boolean)  # revealed: TypeGuard[int]
+```
+
+Excluding a different guard retains the exclusion. Excluding a supertype still yields `Never`.
+
+```py
+def _(
+    different: Intersection[TypeGuard[int], Not[TypeGuard[str]]],
+    supertype: Intersection[TypeGuard[bool], Not[TypeGuard[int]]],
+):
+    reveal_type(different)  # revealed: TypeGuard[int] & ~TypeGuard[str]
+    reveal_type(supertype)  # revealed: Never
+```
+
 ## Narrowing
 
 ```toml
@@ -490,6 +571,60 @@ def _(arg: Callable[[object], str] | Callable[[object], int]):
 def _(arg: Callable[[str], object] | Callable[[int], object]):
     if is_callable_that_takes_str(arg):
         reveal_type(arg)  # revealed: (str, /) -> object
+```
+
+## Generic union parameters
+
+Guards infer type arguments separately for each union member, so narrowing preserves the selected
+member's specialization. `TypeGuard` narrows only its positive branch; `TypeIs` also narrows its
+negative branch.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeGuard, TypeIs
+
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
+
+class Ok(Generic[T]): ...
+class Err(Generic[E]): ...
+
+def guard_error(value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error(value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check(value: Ok[int] | Err[str]):
+    if reveal_type(guard_error(value)):  # revealed: TypeGuard[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] | Err[str]
+
+def check_is(value: Ok[int] | Err[str]):
+    if reveal_type(is_error(value)):  # revealed: TypeIs[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] & ~Err[str]
+```
+
+PEP 695 functions preserve the specialization when the union members are reversed:
+
+```py
+def guard_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check_pep695(value: Err[str] | Ok[int]):
+    reveal_type(guard_error_pep695(value))  # revealed: TypeGuard[Err[str] @ value]
+    reveal_type(is_error_pep695(value))  # revealed: TypeIs[Err[str] @ value]
 ```
 
 ## `TypeIs` narrowing with generic classes and gradual types
@@ -931,6 +1066,45 @@ def _(obj: GradualReader):
         reveal_type(obj.read())  # revealed: Any & int
 ```
 
+## Materialized `TypeIs` narrowing
+
+A `TypeIs[Any]` guard may materialize to any type, and so it narrows its argument to `Never` in the
+negative branch:
+
+```py
+from typing import Any, Callable
+from typing_extensions import TypeIs
+from ty_extensions import Top
+
+def _(predicate: Callable[[object], TypeIs[Any]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int & Any
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+The top materialization of the guard, however, does not narrow its argument, as it describes the
+union of guards for all static types:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[Any]]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+The static component of a top-materialized gradual `TypeIs` guard constrains the possible
+materializations of its argument:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[int | Any]]], value: int | str) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int | str
+    else:
+        reveal_type(value)  # revealed: str
+```
+
 ## `TypeIs` narrowing of `NewType` instances
 
 `NewType` constructors return their arguments unchanged, so an integer-based `NewType` can contain a
@@ -1176,4 +1350,101 @@ def overwritten_target(value: object):
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
     else:
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
+```
+
+## Negative TypeIs narrowing with recursive unions
+
+Excluding a recursive union still exposes its literal exclusions. Removing `True` from `bool` leaves
+a value whose truthiness is known.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_type
+from typing_extensions import TypeIs
+
+type RecursiveBool = Literal[True] | list[RecursiveBool]
+
+def is_recursive_bool(value: object) -> TypeIs[RecursiveBool]:
+    raise NotImplementedError
+
+def f(value: bool):
+    if not is_recursive_bool(value):
+        assert_type(bool(value), Literal[False])
+```
+
+Excluding an enum member also narrows the remaining members' `name` and `value` attributes.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+type RecursiveColor = Literal[Color.RED] | list[RecursiveColor]
+
+def is_recursive_color(value: object) -> TypeIs[RecursiveColor]:
+    raise NotImplementedError
+
+def f(value: Color):
+    if not is_recursive_color(value):
+        assert_type(value.name, Literal["BLUE"])
+        assert_type(value.value, Literal[2])
+```
+
+## Recursive TypeIs targets
+
+An unresolved recursive `TypeIs` target does not make the negative branch unreachable. We retain the
+recursive input while inferring assignments in both branches.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+
+class Container(Generic[T]): ...
+
+def is_container(value: object, other: T) -> TypeIs[Container[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container(value, type(value)):
+        value = value.__str__  # error: [possibly-unresolved-reference]
+        bad: str = 42  # error: [invalid-assignment]
+    else:
+        value = {value}  # error: [possibly-unresolved-reference]
+        bad: str = 42  # error: [invalid-assignment]
+    reveal_type(value)  # revealed: Divergent | set[Divergent]
+```
+
+## Recursive TypeIs targets with PEP 695 generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeIs
+
+class Container[T]: ...
+
+def is_container[T](value: object, other: T) -> TypeIs[Container[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container(value, type(value)):
+        value = value.__str__  # error: [possibly-unresolved-reference]
+    else:
+        value = {value}  # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: Divergent | set[Divergent]
 ```
