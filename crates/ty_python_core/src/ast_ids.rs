@@ -101,13 +101,15 @@ impl AstIdsBuilder {
     /// Walking the root slots in source order also puts out-of-order visits in their final order.
     pub(super) fn finish(self) -> AstIds {
         let mut scopes = Vec::new();
-        let mut uses = Vec::new();
-        let pages = self
+        let mut narrow_uses = Vec::new();
+        let mut wide_uses = Vec::new();
+        let mut pages: Vec<_> = self
             .root
             .chunks(PAGE_SIZE)
             .enumerate()
             .map(|(page, rows)| {
-                let first_use = u32::try_from(uses.len()).expect("at most one use per root node");
+                let first_narrow = narrow_uses.len();
+                let mut wide = false;
                 // The last range from the previous page can extend into or across this one.
                 let first_scope = u32::try_from(scopes.len().saturating_sub(1))
                     .expect("at most one scope range per root node");
@@ -120,9 +122,24 @@ impl AstIdsBuilder {
                     }
                     if let Some(use_id) = row.use_id {
                         mask |= 1 << offset;
-                        uses.push(use_id);
+                        if let Ok(narrow) = u16::try_from(use_id.as_u32()) {
+                            narrow_uses.push(narrow);
+                        } else {
+                            wide = true;
+                        }
                     }
                 }
+                let first_use = if wide {
+                    // Revisit just this page to preserve full-width IDs.
+                    narrow_uses.truncate(first_narrow);
+                    let first = wide_uses.len();
+                    wide_uses.extend(rows.iter().filter_map(|row| row.use_id));
+                    PageUses::Wide(u32::try_from(first).expect("at most one use per root node"))
+                } else {
+                    PageUses::Narrow(
+                        u32::try_from(first_narrow).expect("at most one use per root node"),
+                    )
+                };
                 SourcePage {
                     first_use,
                     first_scope,
@@ -130,6 +147,11 @@ impl AstIdsBuilder {
                 }
             })
             .collect();
+
+        // Scope ranges also cover the tail of a file after its last use.
+        while pages.last().is_some_and(|page| page.mask == 0) {
+            pages.pop();
+        }
 
         let mut annotation_uses = Vec::new();
         for (node, row) in self.annotations {
@@ -141,8 +163,9 @@ impl AstIdsBuilder {
             }
         }
         AstIds {
-            pages,
-            uses: uses.into_boxed_slice(),
+            pages: pages.into_boxed_slice(),
+            narrow_uses: narrow_uses.into_boxed_slice(),
+            wide_uses: wide_uses.into_boxed_slice(),
             scopes: scopes.into_boxed_slice(),
             annotation_uses: FrozenMap::from_entries(annotation_uses),
         }
@@ -152,12 +175,19 @@ impl AstIdsBuilder {
 const PAGE_SIZE: usize = u64::BITS as usize;
 
 /// Locates uses and scope ranges for 64 consecutive root AST nodes.
-/// Each set bit corresponds to one consecutive entry in `AstIds::uses`.
+/// Each set bit corresponds to one consecutive use in the page's storage.
 #[derive(Debug, get_size2::GetSize)]
 struct SourcePage {
-    first_use: u32,
+    first_use: PageUses,
     first_scope: u32,
     mask: u64,
+}
+
+/// Small scope-local IDs fit in two bytes. A wide ID widens only its own page.
+#[derive(Debug, Clone, Copy, get_size2::GetSize)]
+enum PageUses {
+    Narrow(u32),
+    Wide(u32),
 }
 
 #[derive(Debug, get_size2::GetSize)]
@@ -187,7 +217,8 @@ impl ScopeRange {
 #[derive(Debug, get_size2::GetSize)]
 pub(crate) struct AstIds {
     pages: Box<[SourcePage]>,
-    uses: Box<[ScopedUseId]>,
+    narrow_uses: Box<[u16]>,
+    wide_uses: Box<[ScopedUseId]>,
     scopes: Box<[ScopeRange]>,
     annotation_uses: FrozenMap<ast::NodeIndex, ScopedUseId>,
 }
@@ -203,7 +234,12 @@ impl AstIds {
             return None;
         }
         let preceding = (page.mask & (bit - 1)).count_ones();
-        Some(self.uses[(page.first_use + preceding) as usize])
+        Some(match page.first_use {
+            PageUses::Narrow(first) => {
+                ScopedUseId::from_u32(u32::from(self.narrow_uses[(first + preceding) as usize]))
+            }
+            PageUses::Wide(first) => self.wide_uses[(first + preceding) as usize],
+        })
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
