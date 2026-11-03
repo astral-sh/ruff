@@ -1815,6 +1815,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::UnnecessaryRegularExpression,
         Rule::UnnecessaryEmptyIterableWithinDequeCall,
         Rule::StarmapZip,
+        Rule::TarfileIgnoreZerosTrue,
     ]) {
         return;
     }
@@ -2047,5 +2048,8 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     }
     if checker.is_rule_enabled(Rule::StarmapZip) {
         ruff::rules::starmap_zip(checker, call, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
+        ruff::rules::tarfile_ignore_zeros_true(checker, call, &qualified_name);
     }
 }
