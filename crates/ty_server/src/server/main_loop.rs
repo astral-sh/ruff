@@ -85,14 +85,13 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler.handle_response(&client, response);
+                                handler.handle_response(&client, &mut self.session, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
                                     response.id
                                 );
                             }
-
                             continue;
                         }
                     };
@@ -170,6 +169,12 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        // Drain worker actions before dispatching more deferred requests. Otherwise, workers
+        // can block on the full action channel while this thread blocks on the full job queue.
+        if let Ok(event) = self.main_loop_receiver.try_recv() {
+            return Ok(Some(event));
+        }
+
         // We can't queue those into the main loop because that could result in reordering if
         // the `select` below picks a client message first.
         if let Some(deferred) = self.session.take_deferred_messages() {
@@ -248,22 +253,28 @@ impl std::fmt::Debug for SendRequest {
 struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
-    /// Waits for a project wakeup, client message, or main-loop action.
+    /// Waits for a main-loop action, project wakeup, or client message, in that order.
+    /// Polling uv can wait for worker database snapshots, so drain the bounded action
+    /// channel before applying uv results. Handle both before accepting new requests.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,
         main_loop: &MainLoopReceiver,
     ) -> Result<Option<Event>, crossbeam::channel::RecvError> {
         let mut select = crossbeam::channel::Select::new_biased();
+        let main_loop_index = select.recv(main_loop);
         for (_, receiver) in &self.0 {
             select.recv(receiver);
         }
         let connection_index = select.recv(connection);
-        let main_loop_index = select.recv(main_loop);
         let operation = select.select();
         let index = operation.index();
 
-        if let Some((project_root, receiver)) = self.0.get(index) {
+        if index == main_loop_index {
+            return operation.recv(main_loop).map(Some);
+        }
+
+        if let Some((project_root, receiver)) = index.checked_sub(1).and_then(|i| self.0.get(i)) {
             return operation.recv(receiver).map(|()| {
                 Some(Event::PollUvEnvironments {
                     project_root: project_root.clone(),
@@ -271,12 +282,8 @@ impl UvSyncWakeups {
             });
         }
 
-        if index == connection_index {
-            // Ignore disconnect errors, they're handled by the main loop (it will exit).
-            return Ok(operation.recv(connection).ok().map(Event::Message));
-        }
-
-        debug_assert_eq!(index, main_loop_index);
-        operation.recv(main_loop).map(Some)
+        debug_assert_eq!(index, connection_index);
+        // Ignore disconnect errors, they're handled by the main loop (it will exit).
+        Ok(operation.recv(connection).ok().map(Event::Message))
     }
 }

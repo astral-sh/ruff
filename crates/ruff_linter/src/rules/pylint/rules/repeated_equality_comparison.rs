@@ -202,12 +202,11 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     op: bool_op.op,
                     values: before
                         .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            left: Box::new(expr.clone()),
                             ops: match bool_op.op {
-                                BoolOp::Or => Box::from([CmpOp::In]),
-                                BoolOp::And => Box::from([CmpOp::NotIn]),
+                                BoolOp::Or => [CmpOp::In].into(),
+                                BoolOp::And => [CmpOp::NotIn].into(),
                             },
-                            comparators: Box::from([comparator]),
+                            operands: Box::from([expr.clone(), comparator]),
                             range: bool_op.range(),
                             node_index: AtomicNodeIndex::NONE,
                         })))
@@ -230,20 +229,8 @@ fn to_allowed_value<'a>(
     value: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a Expr, &'a Expr)> {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = value
-    else {
-        return None;
-    };
-
     // Ignore, e.g., `foo == bar == baz`.
-    let [op] = &**ops else {
-        return None;
-    };
+    let (left, op, right) = value.as_compare_expr()?.as_single()?;
 
     if match bool_op {
         BoolOp::Or => !matches!(op, CmpOp::Eq),
@@ -253,9 +240,6 @@ fn to_allowed_value<'a>(
     }
 
     // Ignore self-comparisons, e.g., `foo == foo`.
-    let [right] = &**comparators else {
-        return None;
-    };
     if ComparableExpr::from(left) == ComparableExpr::from(right) {
         return None;
     }

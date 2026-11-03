@@ -8,8 +8,22 @@ use std::path::{Path, PathBuf, StripPrefixError};
 ///
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialOrd, Ord)]
 pub struct SystemPath(Utf8Path);
+
+impl PartialEq for SystemPath {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_std_path().cmp(other.0.as_std_path()).is_eq()
+    }
+}
+
+impl std::hash::Hash for SystemPath {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.0, state);
+    }
+}
 
 impl SystemPath {
     pub fn new(path: &(impl AsRef<Utf8Path> + ?Sized)) -> &Self {
@@ -988,5 +1002,45 @@ where
         }
 
         Some(current)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SystemPath, SystemPathBuf};
+
+    #[test]
+    fn component_equality_and_borrowed_lookup() {
+        let paths = dashmap::DashMap::new();
+        paths.insert(SystemPathBuf::from("a/b"), 1);
+
+        for alias in ["a/b", "a//b", "a/./b", "a/b/", "a/b/."] {
+            let path = SystemPath::new(alias);
+            assert_eq!(path, SystemPath::new("a/b"));
+            assert_eq!(paths.get(path).map(|value| *value), Some(1));
+        }
+        for distinct in ["./a/b", "a/x/../b", "a/c"] {
+            let path = SystemPath::new(distinct);
+            assert_ne!(path, SystemPath::new("a/b"));
+            assert!(paths.get(path).is_none());
+        }
+        assert_ne!(SystemPath::new(""), SystemPath::new("."));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_component_equality_and_borrowed_lookup() {
+        let paths = dashmap::DashMap::new();
+        paths.insert(SystemPathBuf::from(r"C:\a\b"), 1);
+
+        for alias in [r"C:\a\b", "C:/a/b", r"C:\a\.\b"] {
+            assert_eq!(
+                paths.get(SystemPath::new(alias)).map(|value| *value),
+                Some(1)
+            );
+        }
+        for distinct in [r"C:\a\x\..\b", r"\\?\C:\a\b"] {
+            assert!(paths.get(SystemPath::new(distinct)).is_none());
+        }
     }
 }

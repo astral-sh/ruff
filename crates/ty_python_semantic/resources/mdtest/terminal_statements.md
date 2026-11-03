@@ -1496,6 +1496,22 @@ async def main(flag: bool):
     reveal_type(x)  # revealed: Literal["test"]
 ```
 
+### Calls before loop-back imports
+
+Inference converges when a call's target is imported later in the same loop, even if the imported
+function never returns. The import does not guarantee that `sys` is defined at the call. The
+function definition before the call also requires looking for previous definitions of its name
+across loop iterations.
+
+```py
+for i in range(1):
+    def f():
+        pass
+
+    sys.exit()  # error: [possibly-unresolved-reference]
+    import sys
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.

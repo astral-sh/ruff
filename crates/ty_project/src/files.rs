@@ -267,6 +267,7 @@ impl IndexedMut<'_> {
 
     pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>) {
         self.inner_mut().diagnostics = diagnostics;
+        self.did_change = true;
     }
 
     fn inner_mut(&mut self) -> &mut IndexedInner {

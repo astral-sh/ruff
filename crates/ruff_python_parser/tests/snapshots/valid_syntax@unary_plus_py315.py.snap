@@ -1,0 +1,134 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/unary_plus_py315.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..156,
+        body: [
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 44..155,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 50..53,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 59..71,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 64..66,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 64..66,
+                                            op: UAdd,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 65..66,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 68..71,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 68..71,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 138..155,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 143..150,
+                                    keys: [
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                node_index: NodeIndex(None),
+                                                range: 144..146,
+                                                op: UAdd,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 145..146,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 148..149,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 148..149,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 152..155,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 152..155,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -293,7 +293,7 @@ class DocTestFinder:
         self,
         obj: object,
         name: str | None = None,
-        module: None | bool | types.ModuleType = None,
+        module: bool | types.ModuleType | None = None,
         globs: dict[str, Any] | None = None,
         extraglobs: dict[str, Any] | None = None,
     ) -> list[DocTest]:
@@ -720,7 +720,7 @@ def testfile(
     filename: str,
     module_relative: bool = True,
     name: str | None = None,
-    package: None | str | types.ModuleType = None,
+    package: str | types.ModuleType | None = None,
     globs: dict[str, Any] | None = None,
     verbose: bool | None = None,
     report: bool = True,
@@ -880,7 +880,7 @@ class SkipDocTestCase(DocTestCase):
 class _DocTestSuite(unittest.TestSuite): ...
 
 def DocTestSuite(
-    module: None | str | types.ModuleType = None,
+    module: str | types.ModuleType | None = None,
     globs: dict[str, Any] | None = None,
     extraglobs: dict[str, Any] | None = None,
     test_finder: DocTestFinder | None = None,
@@ -926,7 +926,7 @@ class DocFileCase(DocTestCase): ...
 def DocFileTest(
     path: str,
     module_relative: bool = True,
-    package: None | str | types.ModuleType = None,
+    package: str | types.ModuleType | None = None,
     globs: dict[str, Any] | None = None,
     parser: DocTestParser = ...,
     encoding: str | None = None,
@@ -1048,7 +1048,7 @@ def script_from_examples(s: str) -> str:
     <BLANKLINE>
     """
 
-def testsource(module: None | str | types.ModuleType, name: str) -> str:
+def testsource(module: str | types.ModuleType | None, name: str) -> str:
     """Extract the test sources from a doctest docstring as a script.
 
     Provide the module (or dotted name of the module) containing the
@@ -1062,7 +1062,7 @@ def debug_src(src: str, pm: bool = False, globs: dict[str, Any] | None = None) -
 def debug_script(src: str, pm: bool = False, globs: dict[str, Any] | None = None) -> None:
     """Debug a test script.  `src` is the script, as a string."""
 
-def debug(module: None | str | types.ModuleType, name: str, pm: bool = False) -> None:
+def debug(module: str | types.ModuleType | None, name: str, pm: bool = False) -> None:
     """Debug a single doctest docstring.
 
     Provide the module (or dotted name of the module) containing the

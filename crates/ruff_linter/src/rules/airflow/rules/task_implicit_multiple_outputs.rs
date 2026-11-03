@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{ReturnStatementVisitor, map_callable};
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Decorator, Expr, ExprAttribute, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::{BindingKind, Modules, SemanticModel};

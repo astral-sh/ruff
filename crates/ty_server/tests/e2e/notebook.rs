@@ -566,6 +566,158 @@ b: Litera
     Ok(())
 }
 
+/// Completions in an empty trailing cell must not panic when the requested position lies past
+/// the end of the cell (for example, when the client sends a position from before the user
+/// deleted the cell's only character).
+///
+/// Regression test for <https://github.com/astral-sh/ty/issues/4687>.
+#[test]
+fn completion_past_end_of_empty_last_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("x = 1\n");
+    let empty_cell = builder.add_python_cell("");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [
+        Position::new(0, 0),
+        Position::new(0, 1),
+        Position::new(1, 0),
+    ] {
+        let completions = server.completion_request(&empty_cell, position);
+        assert!(
+            completions.iter().any(|item| item.label == "x"),
+            "expected `x` in completions at {position:?}"
+        );
+    }
+
+    Ok(())
+}
+
+/// A position past the end of a cell resolves to the end of that cell, not to the start of the
+/// next cell.
+#[test]
+fn hover_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let empty_cell = builder.add_python_cell("");
+    builder.add_python_cell("x = 1\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [Position::new(0, 1), Position::new(1, 0)] {
+        let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: empty_cell.clone(),
+                },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        });
+        let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+        assert_eq!(hover, None, "expected no hover at {position:?}");
+    }
+
+    Ok(())
+}
+
+/// A range that ends past the end of a cell covers only that cell, so a request for the first
+/// cell's inlay hints doesn't return the hints from the second cell.
+#[test]
+fn inlay_hints_range_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .enable_inlay_hints(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let first_cell = builder.add_python_cell("x = 1\n");
+    let second_cell = builder.add_python_cell("def f(a: int) -> int:\n    return a\n\ny = f(1)\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    let range = Range::new(Position::new(0, 0), Position::new(10, 0));
+
+    // The second cell has hints of its own.
+    let second_cell_hints = inlay_hints_for_cell(&mut server, &second_cell, range);
+    assert!(!second_cell_hints.is_empty());
+
+    let first_cell_hints = inlay_hints_for_cell(&mut server, &first_cell, range);
+    assert_eq!(first_cell_hints, vec![]);
+
+    Ok(())
+}
+
+/// Cells that use a cell magic, such as `%%bash`, aren't Python code, so they aren't part of the
+/// notebook's Python source. Requests for the cells after them still resolve to the right cell,
+/// and requests for the magic cell itself return no Python results.
+#[test]
+fn cells_after_cell_magic() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("y = 'a'\n");
+    let magic_cell = builder.add_python_cell("%%bash\necho hi\n");
+    let x_cell = builder.add_python_cell("x = 1\n");
+    builder.add_python_cell("z = \"zz\"\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(4);
+
+    let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+        text_document_position_params: lsp_types::TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: x_cell.clone(),
+            },
+            position: Position::new(0, 0),
+        },
+        work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+    });
+    let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+    assert_json_snapshot!("cells_after_cell_magic_hover", hover);
+
+    let x_cell_tokens = semantic_tokens_full_for_cell(&mut server, &x_cell);
+    assert_json_snapshot!("cells_after_cell_magic_tokens", x_cell_tokens);
+
+    let magic_cell_tokens = semantic_tokens_full_for_cell(&mut server, &magic_cell)
+        .map(|tokens| tokens.data)
+        .unwrap_or_default();
+    assert_eq!(magic_cell_tokens, vec![]);
+
+    Ok(())
+}
+
+#[test]
+fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder
+        .add_python_cell("from __future__ import annotations\nfrom typing import TYPE_CHECKING\n");
+    builder.add_python_cell("\"\"\"A cell docstring.\"\"\"\nreveal_type(1)\n");
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
 #[test]
 fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
@@ -605,6 +757,22 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn inlay_hints_for_cell(
+    server: &mut TestServer,
+    cell_uri: &lsp_types::Uri,
+    range: Range,
+) -> Vec<lsp_types::InlayHint> {
+    server
+        .send_request_await::<lsp_types::InlayHintRequest>(lsp_types::InlayHintParams {
+            text_document: TextDocumentIdentifier {
+                uri: cell_uri.clone(),
+            },
+            range,
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        })
+        .unwrap_or_default()
 }
 
 fn semantic_tokens_full_for_cell(

@@ -46,7 +46,7 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 
 /// Tokens that represents either an expression or the start of one.
 pub(super) const EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Name,
+    TokenKind::Identifier,
     TokenKind::Minus,
     TokenKind::Plus,
     TokenKind::Tilde,
@@ -117,14 +117,14 @@ const END_EXPR_SET: TokenSet = TokenSet::new([
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
-    /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
-    pub(super) fn at_name_or_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
+    /// Returns `true` if the parser is at an identifier or keyword (including soft keyword) token.
+    pub(super) fn at_identifier_or_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.current_token_kind().is_keyword()
     }
 
-    /// Returns `true` if the parser is at a name or soft keyword token.
-    pub(super) fn at_name_or_soft_keyword(&self) -> bool {
-        self.at(TokenKind::Name) || self.at_soft_keyword()
+    /// Returns `true` if the parser is at an identifier or soft keyword token.
+    pub(super) fn at_identifier_or_soft_keyword(&self) -> bool {
+        self.at(TokenKind::Identifier) || self.at_soft_keyword()
     }
 
     /// Returns `true` if the parser is at a soft keyword token.
@@ -335,94 +335,93 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        let start = self.node_start();
 
-        if let Some(unary_op) = token.as_unary_operator() {
-            let expr = self.parse_unary_expression(unary_op, context);
+        if token != TokenKind::Identifier {
+            if let Some(unary_op) = token.as_unary_operator() {
+                let expr = self.parse_unary_expression(unary_op, context);
 
-            if matches!(unary_op, UnaryOp::Not) {
-                if left_precedence > OperatorPrecedence::Not {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Boolean 'not' expression cannot be used here".to_string(),
-                        ),
-                        &expr,
-                    );
+                if matches!(unary_op, UnaryOp::Not) {
+                    if left_precedence > OperatorPrecedence::Not {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "Boolean 'not' expression cannot be used here".to_string(),
+                            ),
+                            &expr,
+                        );
+                    }
+                } else {
+                    // > The power operator `**` binds less tightly than an arithmetic
+                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                    //
+                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
+                    if left_precedence > OperatorPrecedence::PosNegBitNot
+                        && left_precedence != OperatorPrecedence::Exponent
+                    {
+                        self.add_error(
+                            ParseErrorType::OtherError(format!(
+                                "Unary '{unary_op}' expression cannot be used here",
+                            )),
+                            &expr,
+                        );
+                    }
                 }
-            } else {
-                // > The power operator `**` binds less tightly than an arithmetic
-                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                //
-                // Reference: https://docs.python.org/3/reference/expressions.html#id21
-                if left_precedence > OperatorPrecedence::PosNegBitNot
-                    && left_precedence != OperatorPrecedence::Exponent
-                {
-                    self.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "Unary '{unary_op}' expression cannot be used here",
-                        )),
-                        &expr,
-                    );
-                }
+
+                return Expr::UnaryOp(expr).into();
             }
 
-            return Expr::UnaryOp(expr).into();
+            match token {
+                TokenKind::Star => {
+                    let starred_expr = self.parse_starred_expression(context);
+
+                    if left_precedence > OperatorPrecedence::None
+                        || !context.is_starred_expression_allowed()
+                    {
+                        self.add_error(
+                            ParseErrorType::InvalidStarredExpressionUsage,
+                            &starred_expr,
+                        );
+                    }
+
+                    return Expr::Starred(starred_expr).into();
+                }
+                TokenKind::Await => {
+                    let await_expr = self.parse_await_expression();
+
+                    // `await` expressions cannot be nested
+                    if left_precedence >= OperatorPrecedence::Await {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "Await expression cannot be used here".to_string(),
+                            ),
+                            &await_expr,
+                        );
+                    }
+
+                    return Expr::Await(await_expr).into();
+                }
+                TokenKind::Lambda => {
+                    // Lambda expression isn't allowed in this context but we'll still parse it and
+                    // report an error for better recovery.
+                    let lambda_expr = self.parse_lambda_expr();
+                    self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
+                    return Expr::Lambda(lambda_expr).into();
+                }
+                TokenKind::Yield => {
+                    let expr = self.parse_yield_expression();
+
+                    if left_precedence > OperatorPrecedence::None
+                        || !context.is_yield_expression_allowed()
+                    {
+                        self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
+                    }
+
+                    return expr.into();
+                }
+                _ => {}
+            }
         }
 
-        match token {
-            TokenKind::Star => {
-                let starred_expr = self.parse_starred_expression(context);
-
-                if left_precedence > OperatorPrecedence::None
-                    || !context.is_starred_expression_allowed()
-                {
-                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
-                }
-
-                return Expr::Starred(starred_expr).into();
-            }
-            TokenKind::Await => {
-                let await_expr = self.parse_await_expression();
-
-                // `await` expressions cannot be nested
-                if left_precedence >= OperatorPrecedence::Await {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Await expression cannot be used here".to_string(),
-                        ),
-                        &await_expr,
-                    );
-                }
-
-                return Expr::Await(await_expr).into();
-            }
-            TokenKind::Lambda => {
-                // Lambda expression isn't allowed in this context but we'll still parse it and
-                // report an error for better recovery.
-                let lambda_expr = self.parse_lambda_expr();
-                self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
-                return Expr::Lambda(lambda_expr).into();
-            }
-            TokenKind::Yield => {
-                let expr = self.parse_yield_expression();
-
-                if left_precedence > OperatorPrecedence::None
-                    || !context.is_yield_expression_allowed()
-                {
-                    self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
-                }
-
-                return expr.into();
-            }
-            _ => {}
-        }
-
-        let lhs = self.parse_atom(context);
-
-        ParsedExpr {
-            expr: self.parse_postfix_expression(lhs.expr, start, context),
-            is_parenthesized: lhs.is_parenthesized,
-        }
+        self.parse_primary_expression(context)
     }
 
     /// Parses an expression with a minimum precedence of bitwise `or`.
@@ -506,8 +505,8 @@ impl<'src> Parser<'src> {
     fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
         let range = self.current_token_range();
 
-        if self.at(TokenKind::Name) {
-            let name = self.bump_name();
+        if self.at(TokenKind::Identifier) {
+            let name = self.bump_identifier();
             return ast::Identifier {
                 id: name,
                 range,
@@ -518,7 +517,7 @@ impl<'src> Parser<'src> {
         if self.current_token_kind().is_soft_keyword() {
             let text = self.src_text(range);
             let id = self.intern_name(text);
-            self.bump_soft_keyword_as_name();
+            self.bump_soft_keyword_as_identifier();
             return ast::Identifier {
                 id,
                 range,
@@ -577,13 +576,14 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses an atom.
+    /// Parses an atom and any following calls, subscripts, or attributes.
     ///
-    /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self, context: ExpressionContext) -> ParsedExpr {
+    /// See: <https://docs.python.org/3/reference/expressions.html#primaries>
+    fn parse_primary_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
+        let mut is_parenthesized = false;
         let start = self.node_start();
 
-        let lhs = match self.current_token_kind() {
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Float => {
                 let value = self.bump_float();
 
@@ -639,7 +639,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Name => Expr::Name(self.parse_name(context)),
+            TokenKind::Identifier => Expr::Name(self.parse_name(context)),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
@@ -647,7 +647,9 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+                let parsed = self.parse_parenthesized_expression();
+                is_parenthesized = parsed.is_parenthesized;
+                parsed.expr
             }
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
@@ -670,21 +672,6 @@ impl<'src> Parser<'src> {
             }
         };
 
-        lhs.into()
-    }
-
-    /// Parses a postfix expression in a loop until there are no postfix expressions left to parse.
-    ///
-    /// For a given left-hand side, a postfix expression can begin with either `(` for a call
-    /// expression, `[` for a subscript expression, or `.` for an attribute expression.
-    ///
-    /// This method does nothing if the current token is not a candidate for a postfix expression.
-    fn parse_postfix_expression(
-        &mut self,
-        mut lhs: Expr,
-        start: TextSize,
-        context: ExpressionContext,
-    ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
@@ -692,8 +679,13 @@ impl<'src> Parser<'src> {
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
-                _ => break lhs,
+                _ => break,
             };
+        }
+
+        ParsedExpr {
+            expr: lhs,
+            is_parenthesized,
         }
     }
 
@@ -734,7 +726,7 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: Box::default(),
+                args: ThinVec::new(),
                 keywords: ThinVec::default(),
             };
         }
@@ -871,7 +863,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take(args_snapshot),
+            args: self.expr_scratch.take_thin_vec(args_snapshot),
             keywords,
         };
 
@@ -1240,7 +1232,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let comparators_snapshot = self.expr_scratch.snapshot();
+        let operands_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1272,9 +1265,8 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprCompare {
-            left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: self.expr_scratch.take(comparators_snapshot),
+            operands: self.expr_scratch.take(operands_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1770,12 +1762,12 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
-            // Ensure that the `r` is lexed as a `r` name token instead of a raw string
+            // Ensure that the `r` is lexed as an identifier token instead of a raw string
             // in `f{abc!r"` (note the missing `}`).
             self.tokens.re_lex_raw_string_in_format_spec();
 
             let conversion_flag_range = self.current_token_range();
-            if self.at(TokenKind::Name) {
+            if self.at(TokenKind::Identifier) {
                 // test_err f_string_conversion_follows_exclamation
                 // f"{x! s}"
                 // t"{x! s}"
@@ -1789,7 +1781,7 @@ impl<'src> Parser<'src> {
                         TextRange::new(self.prev_token_end, conversion_flag_range.start()),
                     );
                 }
-                let name = self.bump_name();
+                let name = self.bump_identifier();
                 match &*name {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
@@ -2666,7 +2658,7 @@ impl<'src> Parser<'src> {
         ast::ExprDictComp {
             key: key.map(Box::new),
             value: Box::new(value),
-            generators,
+            generators: generators.into_boxed_slice(),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

@@ -1,6 +1,6 @@
 import sys
 from _typeshed import SupportsItems
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Any, Generic, TypeVar, overload
 
 __all__ = ["TopologicalSorter", "CycleError"]
@@ -81,7 +81,7 @@ class TopologicalSorter(Generic[_T]):
         Raises ValueError if called without calling "prepare" previously.
         """
 
-    def static_order(self) -> Iterable[_T]:
+    def static_order(self) -> Iterator[_T]:
         """Returns an iterable of nodes in a topological order.
 
         The particular order that is returned may depend on the specific

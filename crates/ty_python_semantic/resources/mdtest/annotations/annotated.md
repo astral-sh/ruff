@@ -129,6 +129,19 @@ def _(x: Annotated[(int,)]):
     reveal_type(x)  # revealed: int
 ```
 
+Runtime inference preserves an `Annotated` object when a type argument is present, even if that type
+is `Unknown`. With no type argument, the entire expression recovers as `Unknown`:
+
+```py
+from ty_extensions._internal import Unknown
+
+Missing = Annotated[()]  # error: [invalid-type-form]
+Wrapped = Annotated[Unknown]  # error: [invalid-type-form]
+
+reveal_type(Missing)  # revealed: Unknown
+reveal_type(Wrapped)  # revealed: <special-form 'typing.Annotated[Unknown, <metadata>]'>
+```
+
 ## Inheritance
 
 ### Correctly parameterized
@@ -171,4 +184,69 @@ from ty_extensions._internal import reveal_mro
 class C(Annotated): ...
 
 reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
+```
+
+## Recursive runtime values
+
+`TypeOf` can make an `Annotated` value refer to the type of another runtime `Annotated` object.
+Inference preserves the outer object and collapses the recursive wrapped type. The resulting
+approximation can overlap with a concrete `Annotated` object, so identity comparisons remain
+ambiguous.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+value = int
+while True:
+    value = Annotated[TypeOf[value], "metadata"]
+    reveal_type(value)  # revealed: <special-form 'typing.Annotated[Divergent, <metadata>]'>
+    reveal_type(value is Annotated[TypeOf[int], "metadata"])  # revealed: bool
+    reveal_type(Annotated[TypeOf[int], "metadata"] is value)  # revealed: bool
+    reveal_type(value is not Annotated[TypeOf[int], "metadata"])  # revealed: bool
+```
+
+## Recursive inferred attributes
+
+An inferred attribute can store successive runtime `Annotated` objects. The recursive approximation
+accepts the next assignment, both with and without a separate initializer.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+class Initialized:
+    def __init__(self):
+        self.value = int
+
+    def update(self):
+        self.value = Annotated[TypeOf[self.value], "metadata"]
+
+class Uninitialized:
+    def update(self):
+        self.value = Annotated[TypeOf[self.value], "metadata"]
+```
+
+## Distinct runtime values
+
+An `Annotated` object wrapping `int` is distinct from one wrapping `object`, even though `int` is a
+subtype of `object`.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+integer = Annotated[int, "metadata"]
+object_ = Annotated[object, "metadata"]
+
+reveal_type(integer is object_)  # revealed: Literal[False]
+reveal_type(integer is not object_)  # revealed: Literal[True]
+
+def accepts_integer(value: TypeOf[integer]): ...
+def accepts_object(value: TypeOf[object_]): ...
+
+accepts_integer(integer)
+accepts_object(object_)
+accepts_integer(object_)  # error: [invalid-argument-type]
+accepts_object(integer)  # error: [invalid-argument-type]
 ```

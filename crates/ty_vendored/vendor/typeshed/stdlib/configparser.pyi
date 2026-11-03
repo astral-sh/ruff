@@ -585,6 +585,14 @@ class RawConfigParser(_Parser):
     def values(self) -> ValuesView[SectionProxy]:
         """D.values() -> an object providing a view on D's values"""
 
+    def popitem(self) -> tuple[str, SectionProxy]:
+        """Remove a section from the parser and return it as
+        a (section_name, section_proxy) tuple. If no section is present, raise
+        KeyError.
+
+        The section DEFAULT is never returned because it cannot be removed.
+        """
+
     def set(self, section: _SectionName, option: str, value: str | None = None) -> None:
         """Set an option."""
 

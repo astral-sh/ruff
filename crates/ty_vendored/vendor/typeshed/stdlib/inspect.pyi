@@ -345,10 +345,10 @@ def isgenerator(object: object) -> TypeIs[GeneratorType[object, Never, object]]:
         throw()         used to raise an exception inside the generator
     """
 
-def iscoroutine(object: object) -> TypeIs[CoroutineType[object, Never, object]]:
+def iscoroutine(object: object) -> TypeIs[CoroutineType[Any, Any, Any]]:
     """Return true if the object is a coroutine."""
 
-def isawaitable(object: object) -> TypeIs[Awaitable[object]]:
+def isawaitable(object: object) -> TypeIs[Awaitable[Any]]:
     """Return true if object can be passed to an ``await`` expression."""
 
 @overload
@@ -438,7 +438,8 @@ def isbuiltin(object: object) -> TypeIs[BuiltinFunctionType]:
     Built-in functions and methods provide these attributes:
         __doc__         documentation string
         __name__        original name of this function or method
-        __self__        instance to which a method is bound, or None
+        __self__        instance to which a method is bound, or module object
+                        a function was defined in, or None
     """
 
 if sys.version_info >= (3, 11):

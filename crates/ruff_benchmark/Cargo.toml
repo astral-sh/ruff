@@ -20,8 +20,9 @@ doctest = false
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
-ruff_python_parser = { workspace = true, optional = true }
+ruff_python_parser = { workspace = true, features = ["stacker"] }
 ruff_python_trivia = { workspace = true, optional = true }
+ty_ide = { workspace = true, optional = true }
 ty_module_resolver = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
 ty_python_semantic = { workspace = true, optional = true }
@@ -41,21 +42,22 @@ tikv-jemallocator = { workspace = true, optional = true }
 mimalloc = { workspace = true, optional = true }
 
 [dev-dependencies]
+itertools = { workspace = true }
 rayon = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
+ruff_text_size = { workspace = true }
 rustc-hash = { workspace = true }
 tempfile = { workspace = true }
 ty_static = { workspace = true }
 
 [features]
-default = ["module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
+default = ["module_resolution", "ruff_instrumented", "ty_ide", "ty_instrumented", "ty_walltime"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
     "ruff_linter",
     "ruff_python_formatter",
-    "ruff_python_parser",
     "ruff_python_trivia",
     "mimalloc",
     "tikv-jemallocator",
@@ -64,6 +66,8 @@ ruff_instrumented = [
 ty_instrumented = ["criterion", "ty_project", "ty_python_semantic", "ruff_python_trivia"]
 # Enables the module-resolution benchmark
 module_resolution = ["divan", "ty_module_resolver", "ty_project"]
+# Enables auto-import benchmarks.
+ty_ide = ["divan", "dep:ty_ide", "ty_module_resolver", "ty_project", "ruff_db/os"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
 ty_walltime = ["ruff_db/os", "ty_project", "divan"]
@@ -109,6 +113,11 @@ harness = false
 required-features = ["ty_walltime"]
 
 [[bench]]
+name = "ty_ide"
+harness = false
+required-features = ["ty_ide"]
+
+[[bench]]
 name = "ty_walltime"
 harness = false
 required-features = ["ty_walltime"]
@@ -123,8 +132,10 @@ ignored = [
     "divan",
     "ruff_linter",
     "ruff_python_formatter",
+    # Also enables stack growth when only ty benchmarks are selected.
     "ruff_python_parser",
     "ruff_python_trivia",
+    "ty_ide",
     "ty_module_resolver",
     "ty_python_semantic",
     "mimalloc",

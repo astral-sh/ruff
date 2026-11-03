@@ -5,7 +5,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
 ## Tokens
 ```
 [
-    Name 0..1,
+    Identifier 0..1,
     Equal 2..3,
     Lsqb 4..5,
     NonLogicalNewline 5..7,

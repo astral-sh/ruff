@@ -95,7 +95,14 @@ pub fn goto_implementation(
         .into_par_iter()
         .map_with_db(db, |db, file| {
             let file = ProgramFile::new(db, file, program);
-            let definitions = finder.implementations_for_file(db, file);
+            let Some(definitions) = finder.implementations_for_file(db, file) else {
+                return Vec::new();
+            };
+
+            // Go-to-implementation searches can scan the whole project, so release closed files'
+            // ASTs as we go. Keep the guard through target conversion, which can also load this
+            // file's AST.
+            let _ast_guard = parsed_module(db, file.python_file(db)).load_then_clear_on_drop(db);
             definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();
@@ -117,10 +124,10 @@ pub fn goto_implementation(
 }
 
 /// Select and prepare the appropriate `ImplementationsFinder` for `goto_target`.
-fn prepare_implementations_finder_for_goto_target<'db>(
-    model: &SemanticModel<'db>,
-    goto_target: &GotoTarget<'_>,
-) -> Option<ImplementationsFinder<'db>> {
+fn prepare_implementations_finder_for_goto_target<'a>(
+    model: &SemanticModel<'a>,
+    goto_target: &GotoTarget<'a>,
+) -> Option<ImplementationsFinder<'a>> {
     let db = model.db();
     let env = model.program_environment();
     match goto_target {

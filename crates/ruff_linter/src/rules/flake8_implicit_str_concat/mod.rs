@@ -32,6 +32,7 @@ mod tests {
         Path::new("ISC_syntax_error_2.py")
     )]
     #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC003_docstring.py"))]
     #[test_case(
         Rule::ImplicitStringConcatenationInCollectionLiteral,
         Path::new("ISC004.py")

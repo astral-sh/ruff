@@ -31,7 +31,8 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 
 ### Parameterized
 
-`LiteralString` cannot be parameterized.
+`LiteralString` cannot be parameterized. When its arguments are valid literal values, the diagnostic
+offers to replace it with `Literal`, importing that name if needed.
 
 ```py
 from typing_extensions import LiteralString
@@ -61,6 +62,86 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    -------------^^^^^^^
   |    |
   |    Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+  |
+1 + from typing import Literal
+2 | from typing_extensions import LiteralString
+--------------------------------------------------------------------------------
+6 | # snapshot: invalid-type-form
+  - b: LiteralString["foo"]
+7 + b: Literal["foo"]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Literal-valued variables are not valid literal arguments
+
+A variable can have a literal type without being a valid argument to `Literal`. We do not suggest
+`Literal` in this case.
+
+```py
+from typing_extensions import LiteralString
+
+name = "value"
+
+# snapshot: invalid-type-form
+value: LiteralString[name]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:8
+  |
+6 | value: LiteralString[name]
+  |        ^^^^^^^^^^^^^^^^^^^
+```
+
+### Fixing a parameterized module member
+
+The fix replaces the complete attribute access, preserving the surrounding parentheses, comments,
+and arguments.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import typing as t
+
+# snapshot: invalid-type-form
+value: (t.LiteralString)[
+    "first",  # A supported value.
+    b"second",
+    True,
+    None,
+    42,
+]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:4:8
+   |
+ 4 |   value: (t.LiteralString)[
+   |          ^--------------- Did you mean `Literal`?
+   |  ________|
+   | |
+ 5 | |     "first",  # A supported value.
+ 6 | |     b"second",
+ 7 | |     True,
+ 8 | |     None,
+ 9 | |     42,
+10 | | ]
+   | |_^
+help: Replace `LiteralString` with `Literal`
+  |
+3 | # snapshot: invalid-type-form
+  - value: (t.LiteralString)[
+4 + value: (t.Literal)[
+5 |     "first",  # A supported value.
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ### Parameterized string annotations
@@ -176,6 +257,17 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |         -------------^^^^^^^
   |         |
   |         Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+  |
+1 + import typing
+2 | from typing_extensions import Literal, LiteralString
+--------------------------------------------------------------------------------
+6 | # snapshot: invalid-type-form
+  - alias: "LiteralString[Alias]"
+7 + alias: "typing.Literal[Alias]"
+8 | MultipleValues = Literal["a", "b"]
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 Aliases containing multiple literal values are also valid `Literal` arguments.
@@ -195,6 +287,17 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
    |                   -------------^^^^^^^^^^^^^^^^
    |                   |
    |                   Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+   |
+1  + import typing
+2  | from typing_extensions import Literal, LiteralString
+--------------------------------------------------------------------------------
+10 | # snapshot: invalid-type-form
+   - multiple_values: "LiteralString[MultipleValues]"
+11 + multiple_values: "typing.Literal[MultipleValues]"
+12 | value = "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 Ordinary variables are not valid `Literal` arguments, even if their values are strings.

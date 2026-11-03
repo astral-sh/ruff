@@ -351,15 +351,15 @@ impl Rule {
         }
     }
 
-    /// Return the URL for the rule documentation, if it exists.
-    pub fn url(&self) -> Option<String> {
-        self.explanation().is_some().then(|| {
-            format!(
-                "{}/rules/{name}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                name = self.name()
-            )
-        })
+    /// Return the URL for the rule documentation.
+    pub fn url(&self) -> String {
+        // Every rule has documentation. Calling `explanation()` here would retain all
+        // documentation strings in binaries that only need the URLs.
+        format!(
+            "{}/rules/{name}",
+            env!("CARGO_PKG_HOMEPAGE"),
+            name = self.name()
+        )
     }
 
     pub fn name(&self) -> LintName {
@@ -398,7 +398,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
         Rule::BlankLineBeforeClass,
         Rule::IncorrectBlankLineBeforeClass,
-        "`incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
+        "`incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are \
          incompatible. Ignoring `incorrect-blank-line-before-class`.",
     ),
     (
@@ -485,7 +485,7 @@ mod tests {
     fn documentation() {
         for rule in Rule::iter() {
             assert!(
-                rule.explanation().is_some(),
+                !rule.explanation().trim().is_empty(),
                 "Rule {} is missing documentation",
                 rule.name()
             );

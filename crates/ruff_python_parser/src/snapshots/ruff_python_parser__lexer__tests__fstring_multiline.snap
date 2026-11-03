@@ -17,7 +17,7 @@ expression: lex_source(source)
     FStringStart 58..62 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
     FStringMiddle 62..80 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
     Lbrace 80..81,
-    Name 81..82,
+    Identifier 81..82,
     Rbrace 82..83,
     FStringEnd 83..86 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),
     Rbrace 86..87,

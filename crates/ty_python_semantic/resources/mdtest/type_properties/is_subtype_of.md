@@ -987,6 +987,126 @@ type RecursiveGradual = Covariant[RecursiveGradual] | Invariant[Any]
 static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
 ```
 
+## Generic protocol materializations
+
+Every gradual type is a supertype of its bottom materialization and a subtype of its top
+materialization. Here, we check this for generic protocols:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Unbounded[T](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Unbounded[Any], Top[Unbounded[Any]]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Unbounded[Any]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Top[Unbounded[Any]]))
+static_assert(not is_subtype_of(Unbounded[Any], Bottom[Unbounded[Any]]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Unbounded[Any]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Bottom[Unbounded[Any]]))
+```
+
+The same relations hold when the type parameter has a bound:
+
+```py
+class Bounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[Bounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[Bounded[Any]]))
+```
+
+These relations also hold between distinct protocols with the same members:
+
+```py
+class EquivalentBounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[EquivalentBounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
+```
+
+The same relations also hold when the type parameter has constraints:
+
+```py
+class Constrained[T: (str, bytes)](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Top[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[Any], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Constrained[Any]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+```
+
+A bound also limits the parameter type of a contravariant protocol. The same structural relations
+hold between distinct protocols with this method:
+
+```py
+class Writer[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+class EquivalentWriter[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(Writer[Any], Top[EquivalentWriter[Any]]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], EquivalentWriter[Any]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], Top[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Writer[Any], Bottom[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Top[Writer[Any]], EquivalentWriter[Any]))
+static_assert(not is_subtype_of(Top[Writer[Any]], Bottom[EquivalentWriter[Any]]))
+```
+
+Constraints also limit both the read and write types of a mutable attribute. These protocols are
+invariant, and their structural relations still respect the materialization directions:
+
+```py
+class Cell[T: (str, bytes)](Protocol):
+    value: T
+
+class EquivalentCell[T: (str, bytes)](Protocol):
+    value: T
+
+static_assert(is_subtype_of(Cell[Any], Top[EquivalentCell[Any]]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], EquivalentCell[Any]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], Top[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Cell[Any], Bottom[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
+static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
+```
+
+If a class inherits from the protocol explicitly, we treat it as a subtype, even if it has invalid
+overrides:
+
+```py
+class InvalidOverride(Bounded[str]):
+    # TODO: this should be an invalid-override error (https://github.com/astral-sh/ty/issues/2156)
+    read = None
+
+static_assert(is_subtype_of(InvalidOverride, Bounded[str]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[str]]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[str]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Top[EquivalentBounded[Any]]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what
@@ -2410,6 +2530,128 @@ static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
+```
+
+### Bound receivers and `Self`
+
+A bound method exposes its captured receiver through the read-only `__self__` attribute. A method
+bound to a subclass can therefore be a subtype of the same method bound to its base class, but not
+the reverse. A `Self` return type follows the same direction.
+
+```py
+from typing import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Base:
+    def plain(self) -> int:
+        return 0
+
+    def returns_self(self) -> Self:
+        return self
+
+    def accepts_self(self, other: Self) -> None: ...
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class Child(Base): ...
+
+def check(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.plain], TypeOf[base.plain]))
+    static_assert(not is_subtype_of(TypeOf[base.plain], TypeOf[child.plain]))
+    static_assert(is_subtype_of(TypeOf[child.returns_self], TypeOf[base.returns_self]))
+    static_assert(not is_subtype_of(TypeOf[base.returns_self], TypeOf[child.returns_self]))
+```
+
+`Self` in a remaining parameter is contravariant: a method that requires a `Child` cannot replace
+one that accepts any `Base`. The reverse substitution still fails the captured-receiver requirement.
+
+```py
+def check_parameters(base: Base, child: Child):
+    static_assert(not is_subtype_of(TypeOf[child.accepts_self], TypeOf[base.accepts_self]))
+    static_assert(not is_subtype_of(TypeOf[base.accepts_self], TypeOf[child.accepts_self]))
+```
+
+Classmethods capture the class object, while `Self` in their return type describes an instance.
+
+```py
+def check_classmethods(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.make], TypeOf[base.make]))
+    static_assert(not is_subtype_of(TypeOf[base.make], TypeOf[child.make]))
+```
+
+### Structurally related `TypedDict` receivers
+
+Bound methods retain structural relationships between their captured `TypedDict` receivers. Equal
+schemas remain compatible even when they have different class names, and an extra required field
+makes the receiver more specific:
+
+```py
+from typing import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class First(TypedDict):
+    value: int
+
+class Same(TypedDict):
+    value: int
+
+class Extended(TypedDict):
+    value: int
+    label: str
+
+def check(first: First, same: Same, extended: Extended):
+    static_assert(is_subtype_of(TypeOf[first.copy], TypeOf[same.copy]))
+    static_assert(is_subtype_of(TypeOf[extended.copy], TypeOf[first.copy]))
+    static_assert(not is_subtype_of(TypeOf[first.copy], TypeOf[extended.copy]))
+```
+
+### Recursive `TypedDict` receivers
+
+Recursive fields do not make methods with incompatible captured receivers interchangeable. The
+literal tags below still distinguish the two schemas:
+
+```py
+from __future__ import annotations
+
+from typing import Literal, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Left(TypedDict):
+    child: Left
+    kind: Literal["left"]
+
+class Right(TypedDict):
+    child: Right
+    kind: Literal["right"]
+
+def check(left: Left, right: Right):
+    static_assert(not is_subtype_of(TypeOf[left.copy], TypeOf[right.copy]))
+    static_assert(not is_subtype_of(TypeOf[right.copy], TypeOf[left.copy]))
+```
+
+### Distinct method implementations
+
+A compatible receiver and signature do not make methods with different `__func__` values
+interchangeable:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Original:
+    def method(self) -> int:
+        return 0
+
+class Changed(Original):
+    def method(self) -> int:
+        return 1
+
+def check(original: Original, changed: Changed):
+    static_assert(not is_subtype_of(TypeOf[changed.method], TypeOf[original.method]))
 ```
 
 ### Overloads

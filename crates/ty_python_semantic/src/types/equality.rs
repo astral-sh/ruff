@@ -4,7 +4,10 @@
 //! constraints and definite truthiness while remaining conservative around custom comparison
 //! methods.
 
-use rustc_hash::FxHashSet;
+use std::collections::hash_map::Entry;
+use std::ops::ControlFlow;
+
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
@@ -54,7 +57,7 @@ enum ComparisonResult<'db> {
     /// The comparison allows the operand being constrained to be narrowed to the wrapped type.
     ///
     /// For example, if an object of type `LiteralString` compares equal to an object of type
-    /// `Literal["foo"]`, the equality branch can safely narrow either operand to `Literal["foo"]`.
+    /// `Literal["foo"]`, the equality branch narrows the `LiteralString` operand to `Literal["foo"]`.
     CanNarrow(Type<'db>),
 
     /// The comparison may evaluate to true or false, depending on runtime values.
@@ -232,6 +235,13 @@ fn evaluate_type_comparison<'db>(
             .is_some_and(|narrowed| {
                 equality_truthiness(db, env, narrowed, *constraint, soundness_policy)
                     == Truthiness::AlwaysTrue
+                    // Equal values need not have the same type: `False == 0` does not make
+                    // `Literal[False]` a valid specialization of a `Literal[0]` constraint.
+                    && IntersectionBuilder::new(db, env)
+                        .add_positive(left)
+                        .add_positive(narrowed)
+                        .build()
+                        .is_subtype_of(db, env, *constraint)
             })
         })
     {
@@ -289,14 +299,14 @@ pub(super) fn inequality_truthiness<'db>(
     )
 }
 
-/// Evaluates tuple-element equality while reusing the active-comparison-set allocation across a
-/// tuple walk. The set only detects recursive comparisons; results are not cached between
-/// elements.
-pub(super) struct TupleEqualityEvaluator<'db> {
+/// Evaluates container elements using identity or equality.
+///
+/// Reuses comparison results across elements, including repeated pairs in nested containers.
+pub(super) struct ContainerElementEqualityEvaluator<'db> {
     evaluator: ComparisonEvaluator<'db>,
 }
 
-impl<'db> TupleEqualityEvaluator<'db> {
+impl<'db> ContainerElementEqualityEvaluator<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -313,7 +323,7 @@ impl<'db> TupleEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
-        let truthiness = evaluate_tuple_element_equality(&mut self.evaluator, left, right);
+        let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
         }
@@ -333,6 +343,8 @@ impl<'db> TupleEqualityEvaluator<'db> {
         // Identity can turn a false equality result true, but cannot turn a true result false.
         Ok(match result.try_bool(db, &self.evaluator.env)? {
             Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
+            // If equality cannot return, shared identity is the only completing path.
+            Truthiness::Uninhabited => Truthiness::AlwaysTrue,
             Truthiness::AlwaysFalse | Truthiness::Ambiguous => Truthiness::Ambiguous,
         })
     }
@@ -394,7 +406,7 @@ pub(crate) struct ComparisonSoundnessPolicy {
 }
 
 impl ComparisonSoundnessPolicy {
-    const CONSERVATIVE: Self = Self {
+    pub(super) const CONSERVATIVE: Self = Self {
         allow_unsafe_equality: false,
     };
 
@@ -405,7 +417,7 @@ impl ComparisonSoundnessPolicy {
     }
 }
 
-/// Identifies an active comparison evaluation.
+/// Identifies a comparison evaluation.
 ///
 /// Operand order and branch are significant because the left operand is the narrowing target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -416,11 +428,79 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+#[derive(Clone, Copy)]
+struct PendingComparison<'db> {
+    key: ComparisonKey<'db>,
+    generation: usize,
+}
+
+/// Memoizes completed comparisons and tracks active comparisons for cycle detection.
+#[derive(Default)]
+struct ComparisonCache<'db> {
+    /// An entry with no result is still being evaluated.
+    entries: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    /// Number of `Some` entries. The cache limit applies only to completed results.
+    completed: usize,
+    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
+    generation: usize,
+}
+
+impl<'db> ComparisonCache<'db> {
+    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
+    const MAX_CACHED_COMPARISONS: usize = 1024;
+
+    /// Return a cached result or register the comparison as active.
+    ///
+    /// If the comparison is already active, return `Ambiguous`. This fallback can depend on
+    /// which comparisons are active, so it makes every active comparison ineligible for caching.
+    fn begin(
+        &mut self,
+        key: ComparisonKey<'db>,
+    ) -> ControlFlow<ComparisonResult<'db>, PendingComparison<'db>> {
+        match self.entries.entry(key) {
+            Entry::Occupied(entry) => match *entry.get() {
+                Some(result) => ControlFlow::Break(result),
+                None => {
+                    self.generation += 1;
+                    ControlFlow::Break(ComparisonResult::Ambiguous)
+                }
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(None);
+                ControlFlow::Continue(PendingComparison {
+                    key,
+                    generation: self.generation,
+                })
+            }
+        }
+    }
+
+    /// Finish a comparison, caching its result if the generation is unchanged.
+    ///
+    /// When adding a result would exceed the cache limit, discard the completed entries and
+    /// keep the active ones for cycle detection. Comparisons in progress may have used the
+    /// discarded entries, so advance the generation to keep their results out of the cache.
+    fn finish(&mut self, pending: PendingComparison<'db>, result: ComparisonResult<'db>) {
+        let PendingComparison { key, generation } = pending;
+        if self.generation == generation {
+            if self.completed < Self::MAX_CACHED_COMPARISONS {
+                self.entries.insert(key, Some(result));
+                self.completed += 1;
+                return;
+            }
+
+            self.entries.retain(|_, result| result.is_none());
+            self.completed = 0;
+            self.generation += 1;
+        }
+        self.entries.remove(&key);
+    }
+}
+
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
-    active: FxHashSet<ComparisonKey<'db>>,
+    cache: ComparisonCache<'db>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
@@ -434,7 +514,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -448,7 +528,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -506,14 +586,12 @@ impl<'db> ComparisonEvaluator<'db> {
             operator,
         };
 
-        // A repeated key means that the result depends on itself. Treating it as ambiguous is
-        // conservative: callers only narrow from definite truthiness or an explicit constraint.
-        if !self.active.insert(key) {
-            return ComparisonResult::Ambiguous;
-        }
-
+        let pending = match self.cache.begin(key) {
+            ControlFlow::Break(result) => return result,
+            ControlFlow::Continue(pending) => pending,
+        };
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        self.active.remove(&key);
+        self.cache.finish(pending, result);
         result
     }
 }
@@ -733,10 +811,8 @@ fn evaluate_structural_comparison<'db>(
                 None => narrow_literal_comparison(
                     db,
                     env,
-                    left,
-                    right,
-                    left_literal.kind(),
-                    right_literal.kind(),
+                    left_literal,
+                    right_literal,
                     operator.condition_expects_equality(branch),
                 ),
             }
@@ -782,9 +858,11 @@ fn evaluate_structural_comparison<'db>(
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
         )
         | (
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
-        ) if left_function == right_function => operator.result_from_equality(true),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left_function)),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right_function)),
+        ) if left_function.inner(db).is_function_literal() && left_function == right_function => {
+            operator.result_from_equality(true)
+        }
         (left, right)
             if has_known_identity_comparison_semantics(db, env, left, operator)
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>
@@ -1175,8 +1253,8 @@ fn evaluate_target_union<'db>(
         {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
-                .add_negative(removed)
-                .build();
+                .bounded_add_negative(removed)
+                .map_or(narrowed, IntersectionBuilder::build);
         }
         builder = builder.add(narrowed);
     }
@@ -1422,28 +1500,20 @@ fn finite_alternatives<'db>(
 
 /// Return a constraint for literal pairs whose equality cannot be decided statically.
 ///
-/// This primarily handles `LiteralString`, which can be constrained by a concrete string literal
-/// or a string-valued enum member without having a single statically known runtime value.
+/// A concrete string or string-valued enum member can constrain a `LiteralString` operand.
+/// In the reverse direction, the unknown string value places no constraint on the concrete operand.
 fn narrow_literal_comparison<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    left: Type<'db>,
-    right: Type<'db>,
-    left_literal: LiteralValueTypeKind<'db>,
-    right_literal: LiteralValueTypeKind<'db>,
+    left: LiteralValueType<'db>,
+    right: LiteralValueType<'db>,
     equality_is_positive: bool,
 ) -> ComparisonResult<'db> {
-    match (left_literal, right_literal) {
+    match (left.kind(), right.kind()) {
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => {
-            ComparisonResult::CanNarrow(right.negate_if(db, env, !equality_is_positive))
-        }
-        (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString) => {
-            ComparisonResult::CanNarrow(left.negate_if(db, env, !equality_is_positive))
+            ComparisonResult::CanNarrow(Type::from(right).negate_if(db, env, !equality_is_positive))
         }
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::Enum(enum_literal)) => {
-            narrow_literal_string_against_enum(db, env, enum_literal, equality_is_positive)
-        }
-        (LiteralValueTypeKind::Enum(enum_literal), LiteralValueTypeKind::LiteralString) => {
             narrow_literal_string_against_enum(db, env, enum_literal, equality_is_positive)
         }
         _ => ComparisonResult::Ambiguous,
@@ -1528,7 +1598,20 @@ fn compare_literal_to_other<'db>(
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
 
-    // Treat broad builtin types as if only the literal itself can compare equal. This is
+    let literal_constraint = || {
+        if !condition_expects_equality {
+            ComparisonResult::CanNarrow(literal_type.negate(db, env))
+        } else if matches!(literal, LiteralValueTypeKind::Enum(_))
+            && literal_semantics != KnownComparisonSemantics::Object
+        {
+            // A plain string can compare equal to a `StrEnum` member.
+            ComparisonResult::Ambiguous
+        } else {
+            ComparisonResult::CanNarrow(literal_type)
+        }
+    };
+
+    // Treat broad builtin types as if only the builtin literal itself can compare equal. This is
     // intentionally unsafe: subclasses, including `bool` for `int`, can compare equal without
     // inhabiting the literal type. Explicitly typed subclasses do not take this path.
     if evaluator.soundness_policy.allow_unsafe_equality
@@ -1537,7 +1620,7 @@ fn compare_literal_to_other<'db>(
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
-            ComparisonResult::CanNarrow(literal_type)
+            literal_constraint()
         } else {
             operator.result_from_equality(false)
         };
@@ -1562,17 +1645,12 @@ fn compare_literal_to_other<'db>(
             if literal_operand == LiteralOperand::Other
                 && !other.is_disjoint_from(db, env, literal_type) =>
         {
-            ComparisonResult::CanNarrow(literal_type.negate_if(
-                db,
-                env,
-                !condition_expects_equality,
-            ))
+            literal_constraint()
         }
-        Some(_) => ComparisonResult::Ambiguous,
         None if literal_operand == LiteralOperand::Other && !condition_expects_equality => {
-            ComparisonResult::CanNarrow(literal_type.negate(db, env))
+            literal_constraint()
         }
-        None => ComparisonResult::Ambiguous,
+        _ => ComparisonResult::Ambiguous,
     }
 }
 
@@ -1664,10 +1742,10 @@ fn compare_nominal_instances<'db>(
 
         let mut all_equal = true;
         for (&left, &right) in left_elements.iter().zip(right_elements) {
-            match evaluate_tuple_element_equality(evaluator, left, right) {
+            match evaluate_container_element_equality(evaluator, left, right) {
                 Truthiness::AlwaysTrue => {}
                 Truthiness::AlwaysFalse => return operator.result_from_equality(false),
-                Truthiness::Ambiguous => all_equal = false,
+                Truthiness::Ambiguous | Truthiness::Uninhabited => all_equal = false,
             }
         }
 
@@ -1681,7 +1759,7 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-fn evaluate_tuple_element_equality<'db>(
+fn evaluate_container_element_equality<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     right: Type<'db>,
@@ -1921,6 +1999,16 @@ fn has_reflexive_equality_semantics<'db>(
     evaluator: &ComparisonEvaluator<'db>,
     ty: Type<'db>,
 ) -> bool {
+    // `comparison_semantics` identifies a single builtin comparison implementation. The evaluator
+    // normally distributes unions before that lookup, but this check receives the original operands.
+    // A union such as `Literal[1, "a"]` has reflexive equality in every alternative without sharing
+    // one comparison implementation, so check each alternative here.
+    if let Type::Union(union) = ty.resolve_type_alias(evaluator.db) {
+        return union
+            .elements(evaluator.db)
+            .iter()
+            .all(|element| has_reflexive_equality_semantics(evaluator, *element));
+    }
     evaluator
         .comparison_semantics(ty, ComparisonOperator::Equality)
         .is_some()

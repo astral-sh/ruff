@@ -93,3 +93,11 @@ D417 Missing argument description in the docstring for `function_with_unpack_and
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 239 |     """Function with Unpack kwargs but missing query arg documentation.
     |
+
+D417 Missing argument description in the docstring for `escaped_stars_google_missing`: `x`
+   --> D417.py:282:5
+    |
+282 | def escaped_stars_google_missing(x, *args, **kwargs):
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+283 |     r"""Do something.
+    |

@@ -173,12 +173,13 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 ///         def f(self, other: Annotated[C, ...]): ...
 ///     ```
 ///
-/// * `super().__new__`/`cls` call:
+/// * `super().__new__`/`object.__new__`/`cls` call:
 ///
 ///     ```python
 ///     class C:
 ///         def __new__(cls): ...
 ///             instance = super().__new__(cls)
+///             instance = object.__new__(cls)
 ///         @classmethod
 ///         def m(cls):
 ///             instance = cls()
@@ -294,7 +295,7 @@ impl TypeChecker for SameClassInstanceChecker {
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__()`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
         // `this = self` — a direct assignment from `self`, but only when
         // `self` is actually a function parameter (not a local rebinding).
@@ -319,15 +320,21 @@ impl TypeChecker for SameClassInstanceChecker {
             }
 
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+                if attr != "__new__" {
                     return false;
-                };
+                }
 
-                let Expr::Name(ast::ExprName { id: func, .. }) = &**func else {
-                    return false;
-                };
-
-                func == "super" && attr == "__new__"
+                match &**value {
+                    // `super().__new__()`, `object().__new__()`
+                    Expr::Call(ast::ExprCall {
+                        func, arguments, ..
+                    }) => {
+                        matches!(&**func, Expr::Name(ast::ExprName { id, .. }) if id == "super")
+                            || (arguments.is_empty() && semantic.match_builtin_expr(func, "object"))
+                    }
+                    // `object.__new__()`
+                    value => semantic.match_builtin_expr(value, "object"),
+                }
             }
 
             _ => false,

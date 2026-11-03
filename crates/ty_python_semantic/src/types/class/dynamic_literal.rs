@@ -275,7 +275,15 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `Err(DynamicMetaclassConflict)` if there's a metaclass conflict
     /// (i.e., two base classes have metaclasses that are not in a subclass relationship).
     ///
+    /// A base's type can depend on the reachability of this class's definition, which can in turn
+    /// depend on this class's metaclass. Fall back to an unknown metaclass during cycle recovery.
+    ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(in crate::types) fn try_metaclass(
         self,
         db: &'db dyn Db,
@@ -327,6 +335,9 @@ impl<'db> DynamicClassLiteral<'db> {
 
         // Reconcile with other bases' metaclasses.
         for (base, base_metaclass) in bases {
+            if base_metaclass == SubclassOfType::subclass_of_unknown() {
+                return Ok(ClassMetaclass::Selected(base_metaclass));
+            }
             // Get the ClassType for comparison.
             let Some(candidate_class) = candidate.to_class_type(db) else {
                 // If candidate isn't a class type, keep it as is.
@@ -336,15 +347,13 @@ impl<'db> DynamicClassLiteral<'db> {
                 continue;
             };
 
-            // Keep the incumbent when both metaclasses are equal.
-            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
-                continue;
-            }
-
-            // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, &env, candidate_class) {
-                candidate = base_metaclass;
-                candidate_base = base;
+            if let Some(selected) =
+                candidate_class.most_derived_metaclass(db, &env, base_metaclass_class)
+            {
+                if selected != candidate {
+                    candidate = selected;
+                    candidate_base = base;
+                }
                 continue;
             }
 
@@ -585,7 +594,7 @@ impl<'db> DynamicClassLiteral<'db> {
 /// Error for metaclass conflicts in dynamic classes.
 ///
 /// This mirrors `MetaclassErrorKind::Conflict` for regular classes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The first conflicting metaclass and its originating base class.
     pub(crate) metaclass1: ClassType<'db>,

@@ -4,6 +4,7 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
+use ruff_command_line::TerminalColor;
 use ruff_db::system::SystemPathBuf;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_combine::Combine;
@@ -76,6 +77,14 @@ pub(crate) struct CheckCommand {
     /// Adds `ty: ignore` comments to suppress all rule diagnostics.
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
+
+    /// Path to a JSON diagnostic baseline (preview).
+    #[arg(long, value_name = "PATH")]
+    baseline: Option<SystemPathBuf>,
+
+    /// Create or update the configured diagnostic baseline (preview).
+    #[arg(long, conflicts_with_all = ["watch", "fix", "add_ignore"])]
+    pub(crate) update_baseline: bool,
 
     /// Run the command within the given project directory.
     ///
@@ -273,6 +282,7 @@ impl CheckCommand {
             .then_some(false)
             .or(self.error_on_warning);
         let options = Options {
+            baseline: self.baseline.map(RelativePathBuf::cli),
             environment: Some(EnvironmentOptions {
                 python_version: self.python_version.map(Into::into).map(RangedValue::cli),
                 python_platform: self
@@ -449,6 +459,9 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[value(name = "junit")]
     Junit,
+    /// Print diagnostics as a SARIF report.
+    #[value(name = "sarif")]
+    Sarif,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -459,22 +472,9 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
             OutputFormat::Junit => Self::Junit,
+            OutputFormat::Sarif => Self::Sarif,
         }
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]

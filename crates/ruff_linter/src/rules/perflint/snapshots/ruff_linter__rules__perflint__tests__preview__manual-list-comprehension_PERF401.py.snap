@@ -592,6 +592,9 @@ PERF401 [*] Use a list comprehension to create a transformed list
 327 |         if i > 0:
 328 |             filtered.append(i)
     |             ^^^^^^^^^^^^^^^^^^
+329 |
+330 | def f(values, allowed):
+    |
 help: Replace for loop with list comprehension
     |
 322 |     original = list(range(10000))
@@ -603,5 +606,90 @@ help: Replace for loop with list comprehension
     -             filtered.append(i)
 323 +     # comment
 324 +     filtered = [i for i in original if i > 0]
+325 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:335:13
+    |
+333 |     for value in [values] if isinstance(values, str) else values:
+334 |         if value not in allowed:
+335 |             found.append(value)
+    |             ^^^^^^^^^^^^^^^^^^^
+336 |     return found
+    |
+help: Replace for loop with list comprehension
+    |
+331 |     # ternary iterable must be parenthesized (https://github.com/astral-sh/ruff/issues/29365)
+    -     found = []
+    -     for value in [values] if isinstance(values, str) else values:
+    -         if value not in allowed:
+    -             found.append(value)
+332 +     found = [value for value in ([values] if isinstance(values, str) else values) if value not in allowed]
+333 |     return found
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+   --> PERF401.py:343:13
+    |
+341 |     for value in ([values] if isinstance(values, str) else values):
+342 |         if value not in allowed:
+343 |             found.append(value)
+    |             ^^^^^^^^^^^^^^^^^^^
+344 |     return found
+    |
+help: Replace for loop with list.extend
+    |
+340 |     found = [0]
+    -     for value in ([values] if isinstance(values, str) else values):
+    -         if value not in allowed:
+    -             found.append(value)
+341 +     found.extend(value for value in ([values] if isinstance(values, str) else values) if value not in allowed)
+342 |     return found
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:350:9
+    |
+348 |     found = []
+349 |     for value in lambda: values:
+350 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+351 |     return found
+    |
+help: Replace for loop with list comprehension
+    |
+347 |     # lambda iterable
+    -     found = []
+    -     for value in lambda: values:
+    -         found.append(value * 2)
+348 +     found = [value * 2 for value in (lambda: values)]
+349 |     return found
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:375:9
+    |
+373 |         values if values else ()
+374 |     ):
+375 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+376 |     return found
+    |
+help: Replace for loop with list comprehension
+    |
+370 |     # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    -     found = []
+    -     for value in (  # comment
+371 +     found = [value * 2 for value in (  # comment
+372 |         values if values else ()
+    -     ):
+    -         found.append(value * 2)
+373 +     )]
+374 |     return found
     |
 note: This is an unsafe fix and may change runtime behavior

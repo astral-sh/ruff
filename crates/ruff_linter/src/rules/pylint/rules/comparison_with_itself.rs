@@ -1,7 +1,5 @@
-use itertools::Itertools;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{CmpOp, Expr};
+use ruff_python_ast::{Expr, ExprCompare};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -49,17 +47,8 @@ impl Violation for ComparisonWithItself {
 }
 
 /// PLR0124
-pub(crate) fn comparison_with_itself(
-    checker: &Checker,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    for ((left, right), op) in std::iter::once(left)
-        .chain(comparators)
-        .tuple_windows()
-        .zip(ops)
-    {
+pub(crate) fn comparison_with_itself(checker: &Checker, compare: &ExprCompare) {
+    for (left, op, right) in compare.iter() {
         match (left, right) {
             // Ex) `foo == foo`
             (Expr::Name(left_name), Expr::Name(right_name)) if left_name.id == right_name.id => {

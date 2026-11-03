@@ -87,6 +87,9 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
         let is_lazy = stmt
             .as_import_stmt()
             .is_some_and(|import_stmt| import_stmt.is_lazy);
+        if !is_lazy && !checker.import_rewrite_preserves_laziness(&alias.name, module) {
+            return;
+        }
         let node = ast::StmtImportFrom {
             module: Some(Identifier::new(module.to_string(), TextRange::default())),
             names: vec![Alias {

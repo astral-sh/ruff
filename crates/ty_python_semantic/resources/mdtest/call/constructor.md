@@ -76,6 +76,17 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+When `__new__` is a lambda with an unknown return type, constructor calls still infer the class
+instance type:
+
+```py
+class LambdaNew:
+    __new__ = lambda cls: object.__new__(cls)
+
+reveal_type(LambdaNew())  # revealed: LambdaNew
+LambdaNew().missing_attribute  # error: [unresolved-attribute]
+```
+
 ## `__new__` with an invalid decorator and unresolved return annotation
 
 Regression test for <https://github.com/astral-sh/ty/issues/3470>.
@@ -143,10 +154,12 @@ Foo(1, 2)
 def _(flag: bool) -> None:
     class Foo:
         if flag:
-            def __new__(cls, x: int): ...
+            def __new__(cls, x: int):
+                return super().__new__(cls)
 
         else:
-            def __new__(cls, x: int, y: int = 1): ...
+            def __new__(cls, x: int, y: int = 1):
+                return super().__new__(cls)
 
     reveal_type(Foo(1))  # revealed: Foo
     # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"
@@ -615,6 +628,30 @@ class Bar:
 
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `Bar.__new__`: expected 0, got 1"
 reveal_type(Bar())  # revealed: Bar
+```
+
+## `__new__` borrowed from another class
+
+A borrowed `__new__` method retains the upper bound on its `Self` receiver. The class being
+constructed must be a subclass of the class that defined the method.
+
+```py
+from typing_extensions import Self
+
+class A:
+    value: int = 1
+
+    def __new__(cls: type[Self]) -> int:
+        return cls.value
+
+class B:
+    __new__ = A.__new__
+
+class C(A):
+    __new__ = A.__new__
+
+B()  # error: [invalid-argument-type] "Argument type `B` does not satisfy upper bound `A` of type variable `Self`"
+reveal_type(C())  # revealed: int
 ```
 
 ## A callable instance in place of `__new__`
@@ -1643,6 +1680,30 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Reconstructing a generic receiver through a union parameter
+
+A mapping matches the constructor's mapping protocol; its keys do not also have to be key-value
+pairs. Reconstructing the receiver preserves `Self` and the enclosing key type.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import Self
+
+K = TypeVar("K")
+
+class Maplike(Protocol[K]):
+    def keys(self) -> Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> int: ...
+
+class Container(Generic[K]):
+    def __init__(self, value: Maplike[K] | Iterable[tuple[K, int]]) -> None: ...
+    def copy(self, other: Mapping[K, int]) -> Self:
+        result = self.__class__(other)
+        reveal_type(result)  # revealed: Self@copy
+        return result
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py
@@ -1686,6 +1747,104 @@ class RequiredClassSelector(Generic[T]):
     def __init__(self: RequiredClassSelector[CT | None], *, class_: type[CT]) -> None: ...
 
 reveal_type(RequiredClassSelector(class_=MyClass))  # revealed: RequiredClassSelector[MyClass | None]
+```
+
+## Inferring type arguments from a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Never
+
+class Covariant[T]:
+    def __init__(self: Covariant[int | str]) -> None: ...
+
+    # Make it covariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Covariant())  # revealed: Covariant[int | str]
+reveal_type(Covariant[int]())  # revealed: Covariant[int]
+reveal_type(Covariant[str]())  # revealed: Covariant[str]
+reveal_type(Covariant[Never]())  # revealed: Covariant[Never]
+
+Covariant[object]()  # error: [invalid-argument-type]
+
+class Contravariant[T]:
+    def __init__(self: Contravariant[int | str]) -> None: ...
+
+    # Make it contravariant in `T`:
+    def push(self, value: T) -> None: ...
+
+reveal_type(Contravariant())  # revealed: Contravariant[int | str]
+reveal_type(Contravariant[object]())  # revealed: Contravariant[object]
+
+Contravariant[int]()  # error: [invalid-argument-type]
+Contravariant[str]()  # error: [invalid-argument-type]
+
+class Invariant[T]:
+    def __init__(self: Invariant[int | str]) -> None: ...
+
+    # Make it invariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+reveal_type(Invariant())  # revealed: Invariant[int | str]
+reveal_type(Invariant[int | str]())  # revealed: Invariant[int | str]
+
+Invariant[int]()  # error: [invalid-argument-type]
+Invariant[Never]()  # error: [invalid-argument-type]
+Invariant[object]()  # error: [invalid-argument-type]
+```
+
+## Constrained type variables in a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C[T: (str | None, int | None)]:
+    def __init__[U: (str, int)](self: C[U | None], value: U) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(C("a"))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
+```
+
+## Union `self` annotations with variadic constructor parameters
+
+The `object` argument selects the `Any` constraint, even when the constructor also infers a
+`ParamSpec` or `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class WithParamSpec[T: (str | None, Any)]:
+    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[P, None]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+def callback() -> None: ...
+
+reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+
+class WithTypeVarTuple[T: (str | None, Any)]:
+    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+reveal_type(WithTypeVarTuple(object(), (1,)))  # revealed: WithTypeVarTuple[Any]
 ```
 
 ## `__init__` can remap constructor generic arguments via `self` annotation
@@ -2014,6 +2173,34 @@ reveal_type(Foo(1))  # revealed: Foo
 reveal_type(Foo())  # revealed: Foo
 ```
 
+An explicit `Self` annotation on the callable's receiver refers to the callable instance, not the
+class being constructed:
+
+```py
+from typing_extensions import Self
+
+class SelfCallable:
+    def __call__(self: Self, x: int) -> None: ...
+
+class WithSelfCallable:
+    __init__ = SelfCallable()
+
+reveal_type(WithSelfCallable(1))  # revealed: WithSelfCallable
+```
+
+For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class:
+
+```py
+class ClassmethodCallable:
+    @classmethod
+    def __call__(cls: type[Self], x: int) -> None: ...
+
+class WithClassmethodCallable:
+    __init__ = ClassmethodCallable()
+
+reveal_type(WithClassmethodCallable(1))  # revealed: WithClassmethodCallable
+```
+
 ### Possibly Unbound
 
 ```py
@@ -2155,4 +2342,32 @@ reveal_type(C())  # revealed: C
 
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
+```
+
+## Covariant constructors retain outer type variables from arguments
+
+A holder argument supplies its outer type variable to a covariant constructor, even without an
+expected return type. The constructor's bound and default must not replace that outer variable. Both
+the standalone expression and the return expression infer `RelatedBox[T]`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import TypeVar
+
+class Client: ...
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # revealed: RelatedBox[T@Holder]
+        reveal_type(RelatedBox(self))
+        # revealed: RelatedBox[T@Holder]
+        return reveal_type(RelatedBox(self))
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
 ```

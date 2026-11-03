@@ -40,7 +40,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -110,7 +110,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -180,7 +180,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {

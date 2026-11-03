@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
-pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
+pub use directory::{
+    DirectoryListing, DirectoryListingError, directory_listing, system_path_to_directory,
+};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -680,6 +682,14 @@ impl FileRange {
 
     pub const fn file(&self) -> File {
         self.file
+    }
+
+    /// Return a new [`FileRange`] instance where `self.range`
+    /// has been extended to cover `range` as well.
+    #[must_use]
+    pub fn cover_range(mut self, range: TextRange) -> Self {
+        self.range = self.range.cover(range);
+        self
     }
 }
 

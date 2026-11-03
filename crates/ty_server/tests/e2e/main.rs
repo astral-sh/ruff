@@ -28,10 +28,13 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod diagnostic_snapshots;
+mod file_watching;
 mod folding_range;
 mod goto_definition;
 mod hover;
@@ -65,19 +68,21 @@ use lsp_types::{
     DefinitionRequest, DefinitionResponse, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
-    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
-    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
-    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
-    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions,
+    DidChangeWorkspaceFoldersNotification, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
+    ExitNotification, FileChangeType, FileEvent, FileSystemWatcher, FoldingRange,
+    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
+    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
+    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, RegistrationRequest, Request, SemanticTokens,
+    ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
     SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest,
+    Uri, VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
@@ -88,6 +93,8 @@ use rustc_hash::FxHashMap;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use ty_project::UseUv;
+#[cfg(feature = "test-uv")]
+use ty_project::uv_test_env_vars;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -232,6 +239,7 @@ impl TestServer {
 
         // Create test system and set environment variable overrides
         let test_system = Arc::new(TestSystem::new(os_system));
+        test_system.clear_env_vars();
         for (name, value) in env_vars {
             match value {
                 Some(value) => {
@@ -604,6 +612,42 @@ impl TestServer {
         self.send(Message::Response(Response::new_ok(id, ())));
     }
 
+    /// Acknowledge a successful server-to-client request.
+    pub(crate) fn acknowledge_request(&mut self, id: RequestId) {
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    pub(crate) fn watcher_registration_request(
+        &mut self,
+    ) -> Result<(RequestId, String, Vec<FileSystemWatcher>)> {
+        let (request_id, params) = self.await_request::<RegistrationRequest>();
+        let [registration] = params.registrations.as_slice() else {
+            anyhow::bail!("expected exactly one file watcher registration");
+        };
+        anyhow::ensure!(
+            registration.method == "workspace/didChangeWatchedFiles",
+            "unexpected registration method: {}",
+            registration.method
+        );
+        let options: DidChangeWatchedFilesRegistrationOptions = serde_json::from_value(
+            registration
+                .register_options
+                .clone()
+                .context("expected file watcher options")?,
+        )?;
+        Ok((request_id, registration.id.clone(), options.watchers))
+    }
+
+    pub(crate) fn acknowledge_unregistration(&mut self) -> Result<String> {
+        let (request_id, params) = self.await_request::<UnregistrationRequest>();
+        let [unregistration] = params.unregisterations.as_slice() else {
+            anyhow::bail!("expected exactly one unregistration");
+        };
+        let registration_id = unregistration.id.clone();
+        self.acknowledge_request(request_id);
+        Ok(registration_id)
+    }
+
     /// Checks server-created progress with matching begin, report, and end notifications.
     #[cfg(feature = "test-uv")]
     #[track_caller]
@@ -903,6 +947,18 @@ impl TestServer {
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFilesNotification>(params);
+    }
+
+    /// Sends a `workspace/didChangeWatchedFiles` notification for one path.
+    pub(crate) fn did_change_watched_file(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        kind: FileChangeType,
+    ) {
+        self.did_change_watched_files(vec![FileEvent {
+            uri: self.file_uri(path),
+            kind,
+        }]);
     }
 
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
@@ -1279,11 +1335,7 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![
-                ("HOME".into(), None),
-                ("PATH".into(), None),
-                ("VIRTUAL_ENV".into(), None),
-            ],
+            env_vars: Vec::new(),
         })
     }
 
@@ -1300,8 +1352,10 @@ impl TestServerBuilder {
 
     /// Enable uv integration using the uv executable on the test process's PATH.
     #[cfg(feature = "test-uv")]
-    pub(crate) fn with_real_uv(self, use_uv: UseUv) -> Result<Self> {
+    pub(crate) fn with_real_uv(mut self, use_uv: UseUv) -> Result<Self> {
         let uv = OsSystem::default().which("uv")?;
+        self.env_vars
+            .extend(uv_test_env_vars().map(|(name, value)| (name.to_owned(), Some(value))));
         Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
     }
 
@@ -1420,6 +1474,17 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable server-requested refreshes for inlay hints.
+    pub(crate) fn enable_inlay_hint_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .inlay_hint
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
     /// Enable or disable the completion snippet capability.
     pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -1433,17 +1498,15 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable or disable file watching capability
-    #[expect(dead_code)]
-    pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
+    /// Enable dynamic file watching, optionally with relative patterns.
+    pub(crate) fn with_watched_file_support(mut self, relative_pattern_support: bool) -> Self {
         self.client_capabilities
             .workspace
             .get_or_insert_default()
-            .did_change_watched_files = if enabled {
-            Some(DidChangeWatchedFilesClientCapabilities::default())
-        } else {
-            None
-        };
+            .did_change_watched_files = Some(DidChangeWatchedFilesClientCapabilities {
+            dynamic_registration: Some(true),
+            relative_pattern_support: Some(relative_pattern_support),
+        });
         self
     }
 
@@ -1566,7 +1629,6 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
@@ -1632,6 +1694,11 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        // Absolute globs use forward slashes on every platform.
+        settings.add_filter(
+            &tempdir_filter(project_dir.as_str().replace('\\', "/")),
+            "<temp_dir>/",
+        );
         settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
