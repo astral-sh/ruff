@@ -68,11 +68,9 @@ impl Violation for DuplicateTryBlockException {
 /// ## Why is this bad?
 /// Including the same exception multiple times in the same handler is redundant,
 /// as the first exception will catch the exception, making the second exception
-/// unreachable.
-///
-/// ## Known problems
-/// This rule does not yet detect a parent exception listed together with one of
-/// its children, such as `except (Exception, ValueError)`.
+/// unreachable. The same applies to exception hierarchies, as a handler for a
+/// parent exception (like `Exception`) will also catch child exceptions (like
+/// `ValueError`).
 ///
 /// ## Example
 /// ```python
