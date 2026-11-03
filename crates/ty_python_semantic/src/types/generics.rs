@@ -36,7 +36,7 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_type_with_recursion_guard,
+    may_contain_typevar_from, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -4178,6 +4178,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .iter(db)
             .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
 
+        // All members of a union argument must agree on a specialization of a nominal parameter.
+        // For example, no static choice of `T` accepts both `list[int]` and `list[str]` as `list[T]`.
+        let resolved_formal = formal.resolve_type_alias(db);
+        let nominal_union = if !has_variadic && resolved_formal.is_nominal_instance() {
+            actual.resolve_type_alias(db).as_union().filter(|_| {
+                may_contain_typevar_from(db, self.env, resolved_formal, self.generic_context)
+            })
+        } else {
+            None
+        };
+
         // Keep alternative matches in one constraint set until all arguments have contributed
         // their evidence. Filtering either union first can discard an obligation or apply a
         // variable's bound to an argument member that matches a different formal member.
@@ -4185,13 +4196,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
         // Recursive aliases retain their unfolding path, which collects leaf evidence for
         // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
-        if formal.resolve_type_alias(db).is_union()
-            && !has_variadic
+        if !has_variadic
+            && (resolved_formal.is_union() || nominal_union.is_some())
             && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
                 matches!(nested, Type::Recursive(_))
             })
             && !self.has_gradual_union_evidence(formal, actual)
         {
+            let actual = nominal_union.map_or(actual, |union| {
+                // A bare cycle marker satisfies any nominal parameter without constraining its
+                // type variables. Carry it into their specialization so loop inference can widen
+                // the result of a call such as `items = wrap(items)`.
+                union.map_leave_aliases(db, self.env, |&member| {
+                    if member.is_divergent() {
+                        formal.apply_specialization(
+                            db,
+                            self.generic_context.repeat_specialization(db, member),
+                        )
+                    } else {
+                        member
+                    }
+                })
+            });
             let when = self.constraint_for_relation(formal, actual, polarity);
             return self.infer_from_constraint_set(when);
         }

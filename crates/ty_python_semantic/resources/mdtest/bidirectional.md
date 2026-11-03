@@ -2174,7 +2174,7 @@ def preserve_partially_specialized[T](value: list[T | int]) -> list[T | int]:
 
 def generic_type_context(values: list[int | str] | None) -> None:
     reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
-    reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
+    reveal_type(preserve_partially_specialized(values or []))  # revealed: list[str | int]
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]

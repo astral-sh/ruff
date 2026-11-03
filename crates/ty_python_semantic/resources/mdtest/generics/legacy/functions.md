@@ -2280,6 +2280,20 @@ def check_source(value: Source[int] | Source[str], reverse: Source[str] | Source
     assert_type(from_source(reverse), int | str)
 ```
 
+A plain `Source[T]` parameter also infers the union. An `Any` member leaves the element type
+unknown.
+
+```py
+from typing import Any
+
+def read(value: Source[T]) -> T:
+    return value.get()
+
+def check(value: Source[int] | Source[str], gradual: Source[int] | Any):
+    assert_type(read(value), int | str)
+    reveal_type(read(gradual))  # revealed: Unknown
+```
+
 For a contravariant parameter, the inferred type must be accepted by every argument union member.
 Only `Never` satisfies both `int` and `str` consumers.
 
@@ -2294,6 +2308,62 @@ def from_sink(value: Sink[T] | None) -> T:
 
 def check_sink(value: Sink[int] | Sink[str]):
     reveal_type(from_sink(value))  # revealed: Never
+```
+
+Both `list[T]` and `list[T] | None` require one `T` shared by all list members of the argument
+union.
+
+```py
+def take_list(value: list[T]) -> None: ...
+def take_optional_list(value: list[T] | None) -> None: ...
+def check_lists(value: list[int] | list[str]):
+    take_list(value)  # error: [invalid-argument-type]
+    take_optional_list(value)  # error: [invalid-argument-type]
+```
+
+The key type is invariant even when the dictionary's value type is `Any`.
+
+```py
+def take_dict(value: dict[T, Any]) -> None: ...
+def check_keys(value: dict[int, Any] | dict[str, Any]):
+    take_dict(value)  # error: [invalid-argument-type]
+```
+
+## Inferring element types across loop iterations
+
+Each iteration wraps the previous element in another tuple. Inference represents this recursion even
+when the type variable has a concrete default.
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T", default=int)
+
+def wrap(items: list[T]) -> list[tuple[T]]:
+    return [(item,) for item in items]
+
+def defaulted():
+    items = [1]
+    for _ in range(2):
+        items = wrap(items)
+    reveal_type(items)  # revealed: list[Divergent]
+```
+
+A second argument can also supply a concrete type on every iteration.
+
+```py
+from collections.abc import Sequence
+
+U = TypeVar("U")
+
+def wrap_with_seed(items: Sequence[U], seed: U) -> Sequence[tuple[U]]:
+    raise NotImplementedError
+
+def seeded(start: Sequence[int]):
+    items = start
+    for _ in range(2):
+        items = wrap_with_seed(items, 1)
+    reveal_type(items)  # revealed: Sequence[Divergent]
 ```
 
 ## Union inference preserves outer type variables
