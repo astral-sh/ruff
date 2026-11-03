@@ -8,6 +8,7 @@ mod attributes;
 use std::cell::LazyCell;
 
 use bitflags::bitflags;
+use rayon::prelude::*;
 use ruff_db::{
     diagnostic::{Annotation, Span},
     files::FileRange,
@@ -79,6 +80,7 @@ pub(super) fn check_class<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     inconsistent_generic_bases: bool,
+    parallel: bool,
 ) {
     let db = context.db();
     let configuration = OverrideRulesConfig::from(context);
@@ -87,7 +89,7 @@ pub(super) fn check_class<'db>(
     }
 
     let scope = class.body_scope(db);
-    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+    let own_class_members = super::list_members::class_member_checks(db, scope);
     let class_specialized = class.identity_specialization(db);
     if configuration.check_liskov_violations() && !inconsistent_generic_bases {
         check_inherited_conflicts(
@@ -152,12 +154,48 @@ pub(super) fn check_class<'db>(
         named_tuple_bases,
     };
 
-    #[expect(
-        clippy::iter_over_hash_type,
-        reason = "each class member is checked independently"
-    )]
-    for member in own_class_members {
-        check_class_declaration(context, configuration, &override_class, &member);
+    if parallel && own_class_members.len() >= 32 && rayon::current_num_threads() > 1 {
+        tracing::trace!(
+            member_count = own_class_members.len(),
+            "checking independent class members"
+        );
+        let file = context.file();
+        let program_file = context.program_file();
+        let declaring_scope = context.scope();
+        // Give idle workers a few chunks to steal without cloning the database for every member.
+        let chunk_len = own_class_members
+            .len()
+            .div_ceil(rayon::current_num_threads() * 3)
+            .max(4);
+        let jobs: Vec<_> = own_class_members
+            .chunks(chunk_len)
+            .map(|chunk| (db.dyn_clone(), chunk))
+            .collect();
+        let results: Vec<_> = jobs
+            .into_par_iter()
+            .map(|(worker, members)| {
+                let db = &*worker;
+                salsa::attach_allow_change(db, || {
+                    let env = crate::types::ProgramEnvironment::from_scope(declaring_scope);
+                    let module =
+                        ruff_db::parsed::parsed_module(db, program_file.python_file(db)).load(db);
+                    let local =
+                        InferContext::new(db, &env, declaring_scope, file, program_file, &module);
+                    for member in members {
+                        check_class_declaration(&local, configuration, &override_class, member);
+                    }
+                    local.finish_uncompacted().diagnostics
+                })
+            })
+            .collect();
+        // Indexed collection retains declaration order, including when two notes share a span.
+        for result in &results {
+            context.extend_member_diagnostics(result);
+        }
+        return;
+    }
+    for member in &own_class_members {
+        check_class_declaration(context, configuration, &override_class, member);
     }
 }
 
@@ -171,7 +209,7 @@ fn check_inherited_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     class_type: ClassType<'db>,
-    own_members: &FxHashSet<MemberWithDefinition<'db>>,
+    own_members: &[MemberWithDefinition<'db>],
     configuration: OverrideRulesConfig,
 ) {
     let Some((mro, first_dynamic_base)) = inherited_conflict_mro(context, class, class_type) else {

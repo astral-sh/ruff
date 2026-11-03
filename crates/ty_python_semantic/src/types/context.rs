@@ -246,6 +246,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.db
     }
 
+    pub(super) fn extend_member_diagnostics(&self, diagnostics: &TypeCheckDiagnostics) {
+        self.diagnostics.borrow_mut().extend(diagnostics);
+    }
+
     pub(crate) fn extend(&mut self, other: &InferContextResult) {
         *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
         let diagnostics = self.diagnostics.get_mut();

@@ -1123,6 +1123,8 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
+    deferred_classes: Box<[(StaticClassLiteral<'db>, bool)]>,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     legacy_aliases: Box<[Definition<'db>]>,
 
@@ -1214,6 +1216,12 @@ impl<'db> ScopeInference<'db> {
         self.extra
             .as_deref()
             .map(|extra| &extra.context.diagnostics)
+    }
+
+    pub(super) fn deferred_classes(&self) -> &[(StaticClassLiteral<'db>, bool)] {
+        self.extra
+            .as_deref()
+            .map_or(&[], |extra| extra.deferred_classes.as_ref())
     }
 
     pub(crate) fn legacy_aliases(&self) -> &[Definition<'db>] {

@@ -196,6 +196,14 @@ mod property_tests;
 mod subscript;
 
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
+    check_types_with(db, file, false)
+}
+
+pub(crate) fn check_types_with(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    parallel_class_members: bool,
+) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
     tracing::debug!("Checking file '{path}'", path = source_file.path(db));
@@ -217,6 +225,15 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
+        }
+        if !result.deferred_classes().is_empty() {
+            let env = ProgramEnvironment::from_scope(scope_id);
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let context = InferContext::new(db, &env, scope_id, source_file, file, &module);
+            for &(class, inconsistent_bases) in result.deferred_classes() {
+                overrides::check_class(&context, class, inconsistent_bases, parallel_class_members);
+            }
+            diagnostics.extend(&context.finish().diagnostics);
         }
         legacy_aliases.extend_from_slice(result.legacy_aliases());
     }

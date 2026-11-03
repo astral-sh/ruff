@@ -70,6 +70,11 @@ pub struct Project {
     #[default]
     open_fileset: FxHashSet<File>,
 
+    /// An immutable one-shot check can run class member diagnostics outside of inference.
+    #[default]
+    #[returns(copy)]
+    batch_class_members: bool,
+
     /// The first-party files of this project.
     #[default]
     #[returns(ref)]
@@ -271,6 +276,9 @@ impl Project {
             .with_durability(durability)
             .to(force_exclude);
 
+        self.set_batch_class_members(db)
+            .with_durability(durability)
+            .to(true);
         IndexedFiles::freeze(db, self);
     }
 
@@ -539,6 +547,7 @@ impl Project {
 
         let reporter: &dyn ProgressReporter = reporter;
         let open_files = self.open_files(db);
+        let batch_class_members = self.batch_class_members(db);
         let check_start = ruff_db::Instant::now();
 
         let files: Vec<_> = (&files).into_iter().collect();
@@ -553,7 +562,16 @@ impl Project {
                 let _entered = check_file_span.entered();
                 let program_file = db.program_file(file);
 
-                match check_file_impl(db, program_file) {
+                // Member jobs may attach a different database to the worker thread, so a
+                // one-shot check must start outside the file's tracked query.
+                let one_shot;
+                let result = if batch_class_members {
+                    one_shot = check_file_with(db, program_file, true);
+                    one_shot.as_deref()
+                } else {
+                    check_file_impl(db, program_file)
+                };
+                match result {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
@@ -1010,6 +1028,14 @@ pub(crate) fn check_file_impl(
     db: &dyn Db,
     file: ProgramFile<'_>,
 ) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    check_file_with(db, file, false)
+}
+
+fn check_file_with(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    parallel_class_members: bool,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let source_file = file.file(db);
     {
         let db = AssertUnwindSafe(db);
@@ -1021,7 +1047,11 @@ pub(crate) fn check_file_impl(
                 return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
             }
 
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let diagnostics = if parallel_class_members {
+                ty_python_semantic::check_file_one_shot(*db, file)?
+            } else {
+                ty_python_semantic::check_file(*db, file)?
+            };
             let Some(script) = script else {
                 return Ok(diagnostics);
             };

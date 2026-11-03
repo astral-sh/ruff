@@ -8,6 +8,7 @@
 use std::cmp::Ordering;
 
 use itertools::Itertools;
+use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -26,7 +27,7 @@ use crate::{
 };
 use ty_python_core::{
     ProgramFile, attribute_scopes, definition::Definition, global_scope, place_table,
-    scope::ScopeId, semantic_index, use_def_map,
+    scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -35,6 +36,31 @@ pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    end_of_scope_members_with_symbol(db, scope_id).map(|(_, member)| member)
+}
+
+/// Collect one override check per distinct symbol and first reachable definition.
+/// Declarations arrive before bindings, so an annotated assignment keeps its declared type.
+pub(super) fn class_member_checks<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Vec<MemberWithDefinition<'db>> {
+    // Each symbol contributes at most one declaration row and one binding row. Its dense
+    // scope-local ID lets us recognize their common definition without hashing names or types.
+    let mut definitions =
+        IndexVec::<ScopedSymbolId, _>::from_raw(vec![None; place_table(db, scope).symbols().len()]);
+    end_of_scope_members_with_symbol(db, scope)
+        .filter_map(|(symbol, member)| {
+            let first = member.first_reachable_definition;
+            (definitions[symbol].replace(first) != Some(first)).then_some(member)
+        })
+        .collect()
+}
+
+fn end_of_scope_members_with_symbol<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = (ScopedSymbolId, MemberWithDefinition<'db>)> + 'db {
     let env = ProgramEnvironment::from_scope(scope_id);
 
     let use_def_map = use_def_map(db, scope_id);
@@ -56,10 +82,13 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 ty,
                 is_type_check_only: false,
             };
-            Some(MemberWithDefinition {
-                member,
-                first_reachable_definition,
-            })
+            Some((
+                symbol_id,
+                MemberWithDefinition {
+                    member,
+                    first_reachable_definition,
+                },
+            ))
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
@@ -77,10 +106,13 @@ pub(crate) fn all_end_of_scope_members<'db>(
                     ty,
                     is_type_check_only: false,
                 };
-                Some(MemberWithDefinition {
-                    member,
-                    first_reachable_definition,
-                })
+                Some((
+                    symbol_id,
+                    MemberWithDefinition {
+                        member,
+                        first_reachable_definition,
+                    },
+                ))
             },
         ))
 }

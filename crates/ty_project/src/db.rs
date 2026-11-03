@@ -598,6 +598,10 @@ impl ty_module_resolver::Db for ProjectDatabase {}
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
+    fn defers_class_members(&self) -> bool {
+        self.project().batch_class_members(self)
+    }
+
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         ProjectDatabase::check_file(self, file)
     }
@@ -952,6 +956,8 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
@@ -1094,6 +1100,39 @@ mod tests {
 
         assert_eq!(db.check().len(), 1);
 
+        Ok(())
+    }
+
+    #[test]
+    fn frozen_class_members_preserve_diagnostics_and_suppressions() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        let mut base = String::from("class Base:\n");
+        let mut child = String::from("from base import Base\nclass Child(Base):\n");
+        for index in 0..40 {
+            writeln!(base, "    def method_{index}(self, x: int) -> int: ...")?;
+            let (ty, suppression) = match index {
+                0 => ("str", "  # ty: ignore[invalid-method-override]"),
+                1 => ("str", ""),
+                _ => ("int", ""),
+            };
+            writeln!(
+                child,
+                "    def method_{index}(self, x: {ty}) -> int: ...{suppression}"
+            )?;
+        }
+        let files = system.memory_file_system();
+        files.write_file_all(project.join("base.pyi"), base)?;
+        files.write_file_all(project.join("child.pyi"), child)?;
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let expected = db.check();
+        assert_eq!(expected.len(), 1);
+        assert_eq!(expected[0].id().as_str(), "invalid-method-override");
+
+        db.freeze();
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build()?;
+        assert_eq!(pool.install(move || db.check()), expected);
         Ok(())
     }
 

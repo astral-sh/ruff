@@ -1119,11 +1119,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infers types in the given [`InferenceRegion`].
-    fn infer_region(&mut self) {
+    /// Infers types in this region. Only scopes can leave class checks for the file driver.
+    fn infer_region(&mut self) -> Vec<(crate::types::StaticClassLiteral<'db>, bool)> {
         match self.region {
             InferenceRegion::Statement(statement) => self.infer_region_statement(statement),
-            InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
+            InferenceRegion::Scope(scope, tcx) => return self.infer_region_scope(scope, tcx),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
             InferenceRegion::FunctionDecorators(definition) => {
                 self.infer_region_function_decorators(definition);
@@ -1138,9 +1138,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_region_expression(expression, tcx);
             }
         }
+        Vec::new()
     }
 
-    fn infer_region_scope(&mut self, scope: ScopeId<'db>, tcx: TypeContext<'db>) {
+    fn infer_region_scope(
+        &mut self,
+        scope: ScopeId<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Vec<(crate::types::StaticClassLiteral<'db>, bool)> {
+        let mut deferred_classes = Vec::new();
         let node = scope.node(self.db());
         match node {
             NodeWithScopeKind::Module => {
@@ -1255,6 +1261,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             class_node.node(self.module()),
                             self.index,
                             &|expr| self.file_expression_type(expr),
+                            &mut deferred_classes,
                         );
                     }
                     DefinitionKind::AnnotatedAssignment(assignment)
@@ -1290,6 +1297,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             post_inference::final_variable::check_final_without_value(&self.context, self.index);
         }
+        deferred_classes
     }
 
     fn infer_region_statement(&mut self, statement: StatementInner<'db>) {
@@ -12561,7 +12569,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
-        self.infer_region();
+        let deferred_classes = self.infer_region();
         let return_type = self.inferred_return_type();
 
         let Self {
@@ -12602,7 +12610,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let context = context.finish();
 
-        let extra = (!legacy_aliases.is_empty()
+        let extra = (!deferred_classes.is_empty()
+            || !legacy_aliases.is_empty()
             || !string_annotations.is_empty()
             || !expected_types.is_empty()
             || !context.is_empty()
@@ -12614,6 +12623,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
+                deferred_classes: deferred_classes.into_boxed_slice(),
                 legacy_aliases: legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(string_annotations),
                 qualifiers: FrozenMap::from(qualifiers),

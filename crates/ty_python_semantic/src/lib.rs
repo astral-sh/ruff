@@ -7,7 +7,6 @@ use crate::suppression::{
     BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
     UNUSED_TYPE_IGNORE_COMMENT,
 };
-use crate::types::check_types;
 pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
@@ -230,6 +229,22 @@ pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> 
 }
 
 pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    check_file_with(db, file, false)
+}
+
+/// Checks an immutable file from a top-level command outside the Salsa query stack.
+pub fn check_file_one_shot(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    check_file_with(db, file, true)
+}
+
+fn check_file_with(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    parallel_class_members: bool,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let source_file = file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -265,7 +280,7 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
         error
     }));
 
-    diagnostics.extend(check_types(db, file));
+    diagnostics.extend(types::check_types_with(db, file, parallel_class_members));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

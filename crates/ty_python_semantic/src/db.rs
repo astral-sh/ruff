@@ -8,6 +8,10 @@ use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
+    fn defers_class_members(&self) -> bool {
+        false
+    }
+
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
 
     /// Returns the program file for `file`.

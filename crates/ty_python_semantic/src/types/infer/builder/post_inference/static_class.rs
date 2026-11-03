@@ -145,6 +145,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    deferred_classes: &mut Vec<(StaticClassLiteral<'db>, bool)>,
 ) {
     let db = context.db();
 
@@ -1127,7 +1128,17 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // (13) Check for violations of the Liskov Substitution Principle,
     // and for violations of other rules relating to invalid overrides of some sort.
-    overrides::check_class(context, class, inconsistent_generic_bases);
+    // Only a scope checked independently by the file driver can hand off this work.
+    // Contextual and speculative inference must retain its own diagnostics.
+    if db.defers_class_members()
+        && context.should_collect_diagnostics()
+        && context.inference_flags.is_empty()
+        && !context.scope().accepts_type_context(db)
+    {
+        deferred_classes.push((class, inconsistent_generic_bases));
+    } else {
+        overrides::check_class(context, class, inconsistent_generic_bases, false);
+    }
 
     // (14) Check compatibility between class namespace values and metaclass-populated attributes.
     check_class_namespace_against_metaclass_members(context, class, index);
