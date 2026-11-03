@@ -558,6 +558,23 @@ impl<'db> CallableSignature<'db> {
             .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
+    /// Whether checking these two signatures at the root of an eager relation can add context.
+    pub(super) fn may_explain_relation_to(&self, target: &Self) -> bool {
+        // Overload alternatives are checked with context collection disabled. Only a unary
+        // aggregate probe can contribute an explanation for a source with multiple overloads.
+        self.overloads.len() <= 1
+            || (target.overloads.iter().any(|signature| {
+                signature.supports_overload_aggregation()
+                    && matches!(
+                        signature.single_required_positional_parameter_type(),
+                        Some(Type::Union(_))
+                    )
+            }) && self
+                .overloads
+                .iter()
+                .all(Signature::supports_overload_aggregation))
+    }
+
     pub(crate) fn has_parameters(&self) -> bool {
         self.overloads
             .iter()
@@ -2483,6 +2500,29 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
+impl<'db> Signature<'db> {
+    fn supports_overload_aggregation(&self) -> bool {
+        self.receiver_constraints().is_none() && !self.is_paramspec_value()
+    }
+
+    fn single_required_positional_parameter_type(&self) -> Option<Type<'db>> {
+        if self.parameters().len() != 1 {
+            return None;
+        }
+        let parameter = self.parameters().get(0)?;
+
+        match parameter.kind() {
+            ParameterKind::PositionalOnly {
+                default_type: None, ..
+            }
+            | ParameterKind::PositionalOrKeyword {
+                default_type: None, ..
+            } => Some(parameter.annotated_type()),
+            _ => None,
+        }
+    }
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
@@ -2498,33 +2538,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Aggregation summarizes visible parameters and return types, but receiver bindings are
         // additional per-signature obligations and `ParamSpec` values have no meaningful return
         // type. Leave those signatures to the ordinary relation.
-        if target_signature.receiver_constraints().is_some()
-            || target_signature.is_paramspec_value()
-            || source_signatures.iter().any(|signature| {
-                signature.receiver_constraints().is_some() || signature.is_paramspec_value()
-            })
+        if !target_signature.supports_overload_aggregation()
+            || source_signatures
+                .iter()
+                .any(|signature| !signature.supports_overload_aggregation())
         {
             return None;
         }
 
-        let single_required_positional_parameter_type = |signature: &Signature<'db>| {
-            if signature.parameters().len() != 1 {
-                return None;
-            }
-            let parameter = signature.parameters().get(0)?;
-
-            match parameter.kind() {
-                ParameterKind::PositionalOnly {
-                    default_type: None, ..
-                }
-                | ParameterKind::PositionalOrKeyword {
-                    default_type: None, ..
-                } => Some(parameter.annotated_type()),
-                _ => None,
-            }
-        };
-
-        let other_parameter_type = single_required_positional_parameter_type(target_signature)?;
+        let other_parameter_type = target_signature.single_required_positional_parameter_type()?;
         // Keep this aggregate path narrowly scoped to unary target callables whose parameter
         // domain is an explicit union.
         //
@@ -2552,7 +2574,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut has_overlapping_domain = false;
 
         for self_signature in source_signatures {
-            let self_parameter_type = single_required_positional_parameter_type(self_signature)?;
+            let self_parameter_type = self_signature.single_required_positional_parameter_type()?;
             if !is_unary_overload_aggregate_candidate_type(self_parameter_type)
                 || !is_unary_overload_aggregate_candidate_type(self_signature.return_ty)
             {

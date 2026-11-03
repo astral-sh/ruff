@@ -524,6 +524,13 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        if let (Type::Callable(source), Type::Callable(target)) = (self, target)
+            && !source
+                .signatures(db)
+                .may_explain_relation_to(target.signatures(db))
+        {
+            return ErrorContextTree::new(relation);
+        }
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             env,
