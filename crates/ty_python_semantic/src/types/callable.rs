@@ -130,14 +130,12 @@ impl<'db> Type<'db> {
             allow_gradual: bool,
             visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
         ) -> Type<'db> {
+            let promote = |ty| into_function_like_callable(db, env, ty, allow_gradual, visitor);
             match ty {
                 Type::Callable(callable)
                     if callable.is_regular(db)
                         && callable.signatures(db).iter().any(|signature| {
-                            signature
-                                .parameters()
-                                .get(0)
-                                .is_some_and(Parameter::is_positional)
+                            signature.parameters().get_positional(0).is_some()
                                 || allow_gradual && signature.parameters().is_gradual()
                         }) =>
                 {
@@ -145,20 +143,17 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
                     let value = alias.value_type(db);
-                    let transformed =
-                        into_function_like_callable(db, env, value, allow_gradual, visitor);
+                    let transformed = promote(value);
                     if transformed == value {
                         ty
                     } else {
                         transformed
                     }
                 }),
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element, allow_gradual, visitor)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element, allow_gradual, visitor)
-                }),
+                Type::Union(union) => union.map(db, env, |element| promote(*element)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, env, |element| promote(*element))
+                }
                 _ => ty,
             }
         }
@@ -569,13 +564,12 @@ pub enum CallableTypeKind {
     /// Calculator().add(1, 2)  # Returns 3; both arguments are still required.
     /// ```
     ///
-    /// Class-member lookup can treat inferred class-body callables, `ClassVar` callables,
-    /// and explicitly annotated callable dunders as function-like descriptors. Generic callable
-    /// declarations retain their complete signatures after specialization.
+    /// Inferred class-body callables and `ClassVar` callables with a positional receiver act as
+    /// method descriptors. Class-only lookup, including implicit calls and `super()`, also binds
+    /// explicitly annotated callables with a positional or gradual receiver.
     ///
-    /// For example, `len(Sized())` implicitly calls `__len__` on the `Sized` instance. We
-    /// treat the `Callable`-typed `__len__` as a function, so accessing `Sized().__len__`
-    /// binds the `instance` parameter and gives it the signature `() -> int`:
+    /// For example, `len(Sized())` looks up `__len__` on the class and binds the instance.
+    /// Direct access through `Sized().__len__` keeps the declared signature.
     ///
     /// ```python
     /// from collections.abc import Callable

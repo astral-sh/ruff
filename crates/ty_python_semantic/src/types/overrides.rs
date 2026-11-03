@@ -1358,7 +1358,7 @@ fn check_class_declaration<'db>(
 /// Dunder method overrides preserve the signature used by implicit calls, which
 /// look up the method on the class. Ordinary methods use normal attribute access.
 fn method_override_lookup_policy(name: &str) -> MemberLookupPolicy {
-    if name.starts_with("__") && name.ends_with("__") {
+    if is_dunder(name) {
         MemberLookupPolicy::NO_INSTANCE_FALLBACK
     } else {
         MemberLookupPolicy::default()
@@ -1377,10 +1377,9 @@ fn lookup_override_member<'db>(
     if name == "__new__" {
         class.class_member(db, env, name, MemberLookupPolicy::default())
     } else if name == "__hash__"
-        || method_override_lookup_policy(name).no_instance_fallback()
+        || is_dunder(name)
             && class
                 .class_member(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-                .place
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| attributes::is_method_type(db, ty))
     {

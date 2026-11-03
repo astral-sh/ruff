@@ -1571,15 +1571,6 @@ impl<'db> StaticClassLiteral<'db> {
         let sources = self.member_sources(db);
         let symbol = sources.table.symbol_id(name);
         let mut member = class_member_with_symbol(db, sources.scope, symbol);
-        let is_class_var = member.inner.is_class_var();
-        let is_inferred = matches!(
-            member.inner.place,
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Inferred,
-                ..
-            })
-        );
-
         // Decide before applying this class's specialization: `Callable[P, R]` and a bare `F`
         // describe the stored callable's full signature. Eligible inferred class-body callables
         // and callables found during class-only lookup are assumed to be methods. Ordinary
@@ -1587,29 +1578,31 @@ impl<'db> StaticClassLiteral<'db> {
         // for assignment checks.
         // TODO: An inherited annotation can already be specialized when a subclass supplies a
         // default. Preserve its original binding behavior in that case too.
-        if !is_class_var
-            && !is_inferred
-            && let Some(ty) = member.ignore_possibly_undefined()
-            && match ty.resolve_type_alias(db) {
-                Type::TypeVar(_) => true,
-                Type::Union(union) => union.elements(db).iter().all(|element| {
-                    let element = element.resolve_type_alias(db);
-                    element.is_type_var() || element.is_none(db)
-                }),
-                _ => false,
+        if let Place::Defined(place) = &mut member.inner.place {
+            if place.origin.is_declared()
+                && !member.inner.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                && match place.ty.resolve_type_alias(db) {
+                    Type::TypeVar(_) => true,
+                    Type::Union(union) => union.elements(db).iter().all(|element| {
+                        let element = element.resolve_type_alias(db);
+                        element.is_type_var() || element.is_none(db)
+                    }),
+                    _ => false,
+                }
+            {
+                member
+                    .inner
+                    .qualifiers
+                    .insert(TypeQualifiers::NO_FUNCTION_BINDING);
             }
-        {
-            member
-                .inner
-                .qualifiers
-                .insert(TypeQualifiers::NO_FUNCTION_BINDING);
+            if policy.no_instance_fallback() || !place.origin.is_declared() {
+                place.ty =
+                    place
+                        .ty
+                        .into_function_like_callable(db, env, policy.no_instance_fallback());
+            }
         }
         let member = member.map_type(|ty| {
-            let ty = if policy.no_instance_fallback() || is_inferred {
-                ty.into_function_like_callable(db, env, policy.no_instance_fallback())
-            } else {
-                ty
-            };
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of

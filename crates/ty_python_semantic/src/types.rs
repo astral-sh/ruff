@@ -1335,9 +1335,7 @@ bitflags! {
         /// instance, dunder methods are not looked up as instance attributes. And when invoked
         /// on a class, dunder methods are only looked up on the metaclass, not the class itself.
         ///
-        /// All other attributes use the `WithInstanceFallback` policy.
-        ///
-        /// If this flag is set - look up the attribute on the meta-type only.
+        /// `super()` also skips instance storage when it searches the base classes.
         const NO_INSTANCE_FALLBACK = 1 << 0;
 
         /// When looking up an attribute on a class, we sometimes need to avoid
@@ -5403,7 +5401,15 @@ impl<'db> Type<'db> {
             );
         }
 
-        let (member, kind, error) = match attribute {
+        let mut error = None;
+        let mut call_get = |ty: Type<'db>| {
+            ty.try_call_dunder_get_with_function_binding(db, env, instance, owner, bind_functions)
+                .unwrap_or_else(|failure| {
+                    error.get_or_insert(failure.context);
+                    Some(failure.fallback())
+                })
+        };
+        let (member, kind) = match attribute {
             // A directly dynamic attribute could be a data descriptor even though we cannot see
             // its methods. Preserve that uncertainty, along with the existing bottom and cycle
             // behavior, without performing member lookups that cannot add information.
@@ -5414,7 +5420,7 @@ impl<'db> Type<'db> {
                         ..
                     }),
                 qualifiers: _,
-            } => (attribute, AttributeKind::DataDescriptor, None),
+            } => (attribute, AttributeKind::DataDescriptor),
 
             PlaceAndQualifiers {
                 place:
@@ -5428,22 +5434,9 @@ impl<'db> Type<'db> {
                 qualifiers,
             } => {
                 let mut all_data_descriptors = true;
-                let mut error = None;
                 let place = union
                     .map_with_boundness(db, env, |elem| {
-                        let result = elem
-                            .try_call_dunder_get_with_function_binding(
-                                db,
-                                env,
-                                instance,
-                                owner,
-                                bind_functions,
-                            )
-                            .unwrap_or_else(|failure| {
-                                error = error.or(Some(failure.context));
-                                Some(failure.fallback())
-                            });
-                        let ty = match result {
+                        let ty = match call_get(*elem) {
                             Some(DescriptorGetResult { return_type, kind }) => {
                                 all_data_descriptors &= kind.is_data();
                                 return_type
@@ -5470,7 +5463,7 @@ impl<'db> Type<'db> {
                     AttributeKind::NormalOrNonDataDescriptor
                 };
 
-                (place, kind, error)
+                (place, kind)
             }
 
             attribute @ PlaceAndQualifiers {
@@ -5484,25 +5477,12 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers,
             } => {
-                let mut error = None;
                 let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
                     intersection
                         .map_with_boundness(db, env, |elem| {
-                            let ty = elem
-                                .try_call_dunder_get_with_function_binding(
-                                    db,
-                                    env,
-                                    instance,
-                                    owner,
-                                    bind_functions,
-                                )
-                                .unwrap_or_else(|failure| {
-                                    error = error.or(Some(failure.context));
-                                    Some(failure.fallback())
-                                })
-                                .map_or(*elem, |result| result.return_type);
+                            let ty = call_get(*elem).map_or(*elem, |result| result.return_type);
                             Place::Defined(DefinedPlace {
                                 ty,
                                 origin,
@@ -5518,7 +5498,6 @@ impl<'db> Type<'db> {
                     // TODO: Discover data descriptors in intersections without decomposing the
                     // descriptor return type into an unsound intersection.
                     AttributeKind::NormalOrNonDataDescriptor,
-                    error,
                 )
             }
 
@@ -5533,20 +5512,7 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers: _,
             } => {
-                let mut error = None;
-                let result = attribute_ty
-                    .try_call_dunder_get_with_function_binding(
-                        db,
-                        env,
-                        instance,
-                        owner,
-                        bind_functions,
-                    )
-                    .unwrap_or_else(|failure| {
-                        error = Some(failure.context);
-                        Some(failure.fallback())
-                    });
-                if let Some(DescriptorGetResult { return_type, kind }) = result {
+                if let Some(DescriptorGetResult { return_type, kind }) = call_get(attribute_ty) {
                     (
                         Place::Defined(DefinedPlace {
                             ty: return_type,
@@ -5557,14 +5523,13 @@ impl<'db> Type<'db> {
                         })
                         .into(),
                         kind,
-                        error,
                     )
                 } else {
-                    (attribute, AttributeKind::NormalOrNonDataDescriptor, None)
+                    (attribute, AttributeKind::NormalOrNonDataDescriptor)
                 }
             }
 
-            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor, None),
+            _ => (attribute, AttributeKind::NormalOrNonDataDescriptor),
         };
 
         (member, kind, error)

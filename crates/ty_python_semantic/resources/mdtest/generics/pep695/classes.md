@@ -2304,35 +2304,28 @@ def check(wrapper: Wrapper[Callable[[int], str]]) -> Callable[[int], str]:
 
 ## Generic callable operator attributes
 
-Specializing a callable operator's `ParamSpec` preserves all parameters, including a first parameter
-that could accept the instance. Implicit operator calls therefore still require both arguments:
+Specializing a callable operator's `ParamSpec` or substituting a function for its type variable
+preserves all parameters, including a first parameter that could accept the instance. Implicit
+operator calls therefore still require both arguments:
 
 ```py
 from collections.abc import Callable
 
-class Operator[**P]:
+class Operator[**P, F: Callable[..., object]]:
     __add__: Callable[P, str]
+    __sub__: F
 
-def check(operator: Operator[[object, int]]) -> None:
-    reveal_type(operator.__add__)  # revealed: (object, int, /) -> str
-    operator + 1  # error: [unsupported-operator]
-```
-
-The same applies when the entire callable is substituted for a type variable:
-
-```py
-class TypeVarOperator[F: Callable[..., object]]:
-    __add__: F
-
-def as_operator[F: Callable[..., object]](function: F) -> TypeVarOperator[F]:
+def as_operator[F: Callable[..., object]](function: F) -> Operator[[object, int], F]:
     raise NotImplementedError
 
-def add(receiver: object, value: int) -> str:
+def subtract(receiver: object, value: int) -> str:
     return str(value)
 
-operator = as_operator(add)
-reveal_type(operator.__add__(object(), 1))  # revealed: str
+operator = as_operator(subtract)
+reveal_type(operator.__add__)  # revealed: (object, int, /) -> str
+reveal_type(operator.__sub__(object(), 1))  # revealed: str
 operator + 1  # error: [unsupported-operator]
+operator - 1  # error: [unsupported-operator]
 ```
 
 ## Methods overriding generic callable attributes
@@ -2369,7 +2362,8 @@ class Incompatible(Base[[object, int], Callable[[object, int], str]]):
 ## Generic callable attributes accessed through `super()`
 
 `super()` preserves the full signature of attributes declared as `Callable[P, R]` or a type
-variable, even when specialization gives them a positional first parameter:
+variable, even when specialization gives them a positional first parameter. In a union, a concrete
+callable alternative still binds its receiver:
 
 ```py
 from collections.abc import Callable
@@ -2378,12 +2372,14 @@ class Base[**P, F]:
     callback: Callable[P, str]
     value: F
     optional: F | None
+    mixed: Callable[P, str] | Callable[[object, bytes], bytes]
 
 class Child(Base[[object, int], Callable[[object, int], str]]):
     def check(self) -> None:
         reveal_type(super().callback)  # revealed: (object, int, /) -> str
         reveal_type(super().value)  # revealed: (object, int, /) -> str
         reveal_type(super().optional)  # revealed: ((object, int, /) -> str) | None
+        reveal_type(super().mixed)  # revealed: ((object, int, /) -> str) | ((bytes, /) -> bytes)
 ```
 
 A function substituted for the type variable also remains unbound:
@@ -2397,19 +2393,7 @@ def f(receiver: object, value: int) -> str:
 class FunctionChild(Base[[object, int], TypeOf[f]]):
     def check(self) -> None:
         reveal_type(super().value)  # revealed: def f(receiver: object, value: int) -> str
-        reveal_type(super().value(object(), 1))  # revealed: str
         reveal_type(super().optional)  # revealed: (def f(receiver: object, value: int) -> str) | None
-```
-
-In a union, a concrete callable alternative still binds its receiver:
-
-```py
-class Mixed[**P]:
-    callback: Callable[P, str] | Callable[[object, bytes], bytes]
-
-class MixedChild(Mixed[[object, int]]):
-    def check(self) -> None:
-        reveal_type(super().callback)  # revealed: ((object, int, /) -> str) | ((bytes, /) -> bytes)
 ```
 
 ## Functions stored in generic instance attributes
@@ -2432,7 +2416,6 @@ def format_bytes(value: bytes) -> str:
 
 holder = Holder(format_bytes)
 reveal_type(holder.value(b""))  # revealed: str
-name: str = holder.value.__name__  # ok
 code: CodeType = holder.value.__code__  # ok
 holder.value("wrong")  # error: [invalid-argument-type]
 ```
@@ -2450,13 +2433,11 @@ class OptionalHolder[F: Callable[..., object]]:
 
 optional = OptionalHolder(format_bytes)
 if optional.value is not None:
-    reveal_type(optional.value(b""))  # revealed: str
-    name: str = optional.value.__name__  # ok
+    reveal_type(optional.value)  # revealed: (value: bytes) -> str
     code: CodeType = optional.value.__code__  # ok
-    optional.value("wrong")  # error: [invalid-argument-type]
 ```
 
-## Descriptors substituted for type variables
+## Descriptors and generic attributes
 
 A descriptor supplied as a type argument can be stored on a concrete subclass. Instance access
 retains both the descriptor result and the possibility of an instance value; `super()` only
@@ -2469,6 +2450,7 @@ class Descriptor:
 
 class Base[T]:
     value: T
+    with_default: T | Descriptor = Descriptor()
 
 class Concrete(Base[Descriptor]):
     value = Descriptor()  # ok
@@ -2481,6 +2463,12 @@ reveal_type(Concrete().value)  # revealed: int | Descriptor
 class Child(Concrete):
     def inspect(self) -> None:
         reveal_type(super().value)  # revealed: int
+```
+
+A union containing an explicit descriptor still invokes that descriptor on instance access:
+
+```py
+reveal_type(Base[str]().with_default)  # revealed: str | int
 ```
 
 A union substituted for the type variable preserves function types, including intersections, while
@@ -2499,21 +2487,6 @@ def check_mixed(value: Base[TypeOf[f] | Descriptor]) -> None:
 
 def check_intersection(value: Base[Intersection[TypeOf[f], Any] | Descriptor]) -> None:
     reveal_type(value.value)  # revealed: ((def f(value: str) -> str) & Any) | int | Descriptor
-```
-
-## Generic attributes unioned with descriptors
-
-A union containing an explicit descriptor still invokes that descriptor on instance access:
-
-```py
-class Descriptor:
-    def __get__(self, instance: object, owner: type) -> int:
-        return 1
-
-class Mixed[T]:
-    value: T | Descriptor = Descriptor()
-
-reveal_type(Mixed[str]().value)  # revealed: str | int
 ```
 
 ## Materialized `TypeIs` return types

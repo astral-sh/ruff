@@ -1608,7 +1608,8 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let annotation = match self.access.declaration.kind {
+        let declaration = self.access.declaration;
+        let annotation = match declaration.kind {
             ProtocolMemberKind::Method(ty, kind) => {
                 // TODO: Passing `None` binds the method without a concrete receiver type.
                 // Supply the actual receiver type instead. For `Example.create()`, a classmethod
@@ -1626,11 +1627,7 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
                 };
                 ProtocolAnnotation {
                     ty,
-                    self_binding_context: self
-                        .access
-                        .declaration
-                        .definition
-                        .map(BindingContext::Definition),
+                    self_binding_context: declaration.definition.map(BindingContext::Definition),
                 }
             }
             ProtocolMemberKind::Property { read, .. } => read?.annotation(db, env)?,
@@ -1644,23 +1641,16 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
             annotation.bind_self(db, env, self_type)
         });
         if self.access.mode == ProtocolMemberAccessMode::Instance
-            && self
-                .access
-                .declaration
-                .qualifiers
-                .contains(TypeQualifiers::CLASS_VAR)
-            && matches!(
-                self.access.declaration.kind,
-                ProtocolMemberKind::Attribute(_)
-            )
+            && declaration.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+            && matches!(declaration.kind, ProtocolMemberKind::Attribute(_))
         {
-            // Class-variable callable annotations describe the unbound signature. Resolve their
-            // instance reads with the same descriptor heuristic as the implementation's reads.
+            // A ClassVar is read through the class's descriptor on both the protocol and
+            // its implementation. In particular, a callable can bind the receiver here.
             let receiver = self_type.unwrap_or(Type::unknown());
             Type::try_call_dunder_get_on_attribute(
                 db,
                 env,
-                Place::declared(ty).with_qualifiers(self.access.declaration.qualifiers),
+                Place::declared(ty).with_qualifiers(declaration.qualifiers),
                 Some(receiver),
                 receiver.to_meta_type(db, env),
             )
@@ -3680,8 +3670,7 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, &env, *previous, cycle)
 }
 
-/// Bind `self` and *also* discard the functionlike-ness
-/// of the callable.
+/// Bind `self` and upcast the method to a regular callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
