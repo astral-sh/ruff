@@ -1595,6 +1595,8 @@ impl<'db> NominalInstanceClass<'db> {
         matches!(self, Self::InheritsFromExplicitAny(_))
     }
 
+    // Most protocol member annotations take the plain-class path when checking for `Self`.
+    #[inline]
     fn class(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Plain(class) => class,

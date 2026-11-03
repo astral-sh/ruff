@@ -1,6 +1,5 @@
 use crate::ProgramEnvironment;
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
@@ -22,6 +21,7 @@ use crate::{
         any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
+        generics::enclosing_binding_contexts,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -30,6 +30,7 @@ use crate::{
 use ty_python_core::{
     Program,
     definition::{Definition, DefinitionKind},
+    scope::ScopeId,
     semantic_index,
 };
 
@@ -902,42 +903,27 @@ impl TypeVarNonce {
     }
 }
 
+/// Generates fresh identities when a call repeats a generic context or calls it recursively.
 #[derive(Debug)]
-struct TypeVarNonceGeneratorInner<'db> {
-    next: TypeVarNonce,
-    seen: FxHashSet<GenericContext<'db>>,
-    enclosing: FxHashSet<BindingContext<'db>>,
-}
-
-/// A clone-safe generator of fresh bound-typevar occurrence nonces.
-///
-/// The generator only allocates a nonce for the second and later occurrence of a generic context.
-/// The first occurrence can use its source-level identity directly because there is no previous
-/// occurrence for it to collide with.
-#[derive(Clone, Debug)]
 pub(crate) struct TypeVarNonceGenerator<'db> {
-    inner: Rc<RefCell<TypeVarNonceGeneratorInner<'db>>>,
+    next: Cell<TypeVarNonce>,
+    seen: RefCell<FxHashSet<GenericContext<'db>>>,
+    call_site_scope: Option<ScopeId<'db>>,
 }
 
 impl Default for TypeVarNonceGenerator<'_> {
     fn default() -> Self {
-        Self {
-            inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
-                next: TypeVarNonce::FIRST,
-                seen: FxHashSet::default(),
-                enclosing: FxHashSet::default(),
-            })),
-        }
+        Self::new(None)
     }
 }
 
 impl<'db> TypeVarNonceGenerator<'db> {
-    pub(crate) fn record_enclosing_binding_contexts(
-        &self,
-        binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
-    ) {
-        let mut inner = self.inner.borrow_mut();
-        inner.enclosing.extend(binding_contexts);
+    pub(crate) fn new(call_site_scope: Option<ScopeId<'db>>) -> Self {
+        Self {
+            next: Cell::new(TypeVarNonce::FIRST),
+            seen: RefCell::default(),
+            call_site_scope,
+        }
     }
 
     pub(crate) fn should_freshen(
@@ -945,23 +931,26 @@ impl<'db> TypeVarNonceGenerator<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> bool {
-        let mut inner = self.inner.borrow_mut();
-        let mut binding_contexts = generic_context
-            .variables(db)
-            .map(|typevar| typevar.binding_context(db));
-        // A context inherited from an enclosing definition can be merged with another context.
-        // Only the unmerged context represents a recursive occurrence that needs freshening.
-        let matches_enclosing = binding_contexts.next().is_some_and(|binding_context| {
-            inner.enclosing.contains(&binding_context)
-                && binding_contexts.all(|other| other == binding_context)
+        // Only an unmerged context from an enclosing definition represents a recursive call.
+        let matches_enclosing = self.call_site_scope.is_some_and(|scope| {
+            let mut contexts = generic_context
+                .variables(db)
+                .map(|typevar| typevar.binding_context(db));
+            let Some(first @ BindingContext::Definition(definition)) = contexts.next() else {
+                return false;
+            };
+            let file = scope.program_file(db);
+            definition.program_file(db) == file
+                && contexts.all(|other| other == first)
+                && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
+                    .any(|enclosing| enclosing == first)
         });
-        matches_enclosing || !inner.seen.insert(generic_context)
+        matches_enclosing || !self.seen.borrow_mut().insert(generic_context)
     }
 
     pub(crate) fn next(&self) -> TypeVarNonce {
-        let mut inner = self.inner.borrow_mut();
-        let nonce = inner.next;
-        inner.next = nonce.increment();
+        let nonce = self.next.get();
+        self.next.set(nonce.increment());
         nonce
     }
 }

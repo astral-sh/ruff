@@ -6998,7 +6998,55 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
+        if let Type::ClassLiteral(ClassLiteral::Static(class)) = self {
+            return Self::static_class_bindings(db, env, class);
+        }
         self.bindings_impl(db, env, &ActiveRecursionDetector::default())
+    }
+
+    /// Caches constructors for static classes in their own program.
+    /// Keeping this out of line leaves other call frames small.
+    #[inline(never)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa uses None if constructor preparation participates in a cycle"
+    )]
+    fn static_class_bindings(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> Bindings<'db> {
+        #[salsa::tracked(returns(ref), no_eq, cycle_result=|_,_,_| None, heap_size=ruff_memory_usage::heap_size)]
+        fn prepared_class_bindings<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> Option<Box<Bindings<'db>>> {
+            let env = ProgramEnvironment::from_file(class.program_file(db));
+            let class = ClassLiteral::Static(class);
+            // Returning a pointer keeps query frames small when a field default
+            // constructs another class.
+            let mut bindings = Box::new(Type::class_literal_bindings(
+                db,
+                &env,
+                class,
+                &ActiveRecursionDetector::default(),
+            ));
+            bindings.shrink_to_fit();
+            Some(bindings)
+        }
+        // The class alone identifies the template only when the caller uses the class's program.
+        if class.program_file(db).program(db) == env.program(db)
+            && let Some(bindings) = prepared_class_bindings(db, class)
+        {
+            // Argument matching and generic freshening mutate the bindings for each call.
+            return bindings.as_ref().clone();
+        }
+        Self::class_literal_bindings(
+            db,
+            env,
+            ClassLiteral::Static(class),
+            &ActiveRecursionDetector::default(),
+        )
     }
 
     fn bindings_impl(
@@ -7309,17 +7357,9 @@ impl<'db> Type<'db> {
                 .into(),
             },
 
-            Type::ClassLiteral(class) => self
-                // TODO this should be called from `constructor_bindings` for better consistency
-                .known_class_literal_bindings(db, env, class)
-                .unwrap_or_else(|| {
-                    self.constructor_bindings(
-                        db,
-                        env,
-                        ClassType::NonGeneric(class),
-                        recursion_guard,
-                    )
-                }),
+            Type::ClassLiteral(class) => {
+                Self::class_literal_bindings(db, env, class, recursion_guard)
+            }
 
             Type::GenericAlias(alias) => {
                 self.constructor_bindings(db, env, ClassType::Generic(alias), recursion_guard)
@@ -7569,6 +7609,21 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
+    }
+
+    /// Prepares the built-in or inferred constructor signature for a class literal.
+    fn class_literal_bindings(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassLiteral<'db>,
+        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+    ) -> Bindings<'db> {
+        let ty = Type::ClassLiteral(class);
+        // TODO this should be called from `constructor_bindings` for better consistency
+        ty.known_class_literal_bindings(db, env, class)
+            .unwrap_or_else(|| {
+                ty.constructor_bindings(db, env, ClassType::NonGeneric(class), recursion_guard)
+            })
     }
 
     fn known_class_literal_bindings(

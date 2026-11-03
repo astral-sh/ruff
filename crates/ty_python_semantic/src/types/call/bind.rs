@@ -23,6 +23,8 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
+use ty_python_core::scope::ScopeId;
+
 use self::constructor::{ConstructorBinding, ConstructorContext};
 use super::ambiguous::merge_ambiguous_returns;
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -76,7 +78,7 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
+    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, TypeContext,
@@ -294,7 +296,7 @@ fn generic_context_has_paramspec<'db>(
 
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
@@ -475,7 +477,7 @@ impl<'db> CallableItem<'db> {
 /// A single element in a union of callables.
 /// This could be a single callable or an intersection of callables.
 /// If there are multiple items, they form an intersection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct BindingsElement<'db> {
     /// The callable type associated with this union element. For an intersection, retain the
     /// complete source type because its bindings can omit negative contributions or represent
@@ -613,7 +615,7 @@ impl<'db> BindingsElement<'db> {
 /// For the intersection level within each element: We try each binding and discard bindings
 /// where the call fails. If at least one binding succeeds, the element succeeds. Return types
 /// are combined using intersection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Bindings<'db> {
     /// The type that is (hopefully) callable.
     callable_type: Type<'db>,
@@ -628,12 +630,8 @@ pub(crate) struct Bindings<'db> {
     /// Each element may contain multiple `CallableBinding`s if it came from an intersection.
     elements: SmallVec<[BindingsElement<'db>; 1]>,
 
-    /// Binding contexts that enclose this call site, if known.
-    ///
-    /// This is an optimization hint for deciding when direct-call generic freshening is needed.
-    /// `None` means the caller did not provide lexical collision information. `Some([])` means the
-    /// caller knows there are no enclosing binding contexts.
-    enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+    /// The lexical scope used to detect recursive generic calls.
+    call_site_scope: Option<ScopeId<'db>>,
 }
 
 /// The set of overload candidates at a given call-site, before argument type inference.
@@ -782,7 +780,7 @@ impl<'db> Bindings<'db> {
             mut implicit_dunder_new_is_possibly_unbound,
             mut implicit_dunder_init_is_possibly_unbound,
             mut elements,
-            enclosing_binding_contexts: _,
+            call_site_scope: _,
         } = bindings_iter.next().expect("bindings must not be empty");
 
         for bindings in bindings_iter {
@@ -799,7 +797,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
             elements,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 
@@ -833,7 +831,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
             elements,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 
@@ -896,11 +894,24 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    pub(crate) fn with_enclosing_binding_contexts(
-        mut self,
-        enclosing_binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
-    ) -> Self {
-        self.enclosing_binding_contexts = Some(enclosing_binding_contexts.into_iter().collect());
+    /// Releases excess capacity in a constructor template before Salsa retains it.
+    pub(crate) fn shrink_to_fit(&mut self) {
+        self.elements.shrink_to_fit();
+        for element in &mut self.elements {
+            element.items.shrink_to_fit();
+            for item in &mut element.items {
+                item.callable_mut().overloads.shrink_to_fit();
+                if let Some(constructor) = item.as_constructor_mut()
+                    && let Some(downstream) = &mut constructor.downstream_constructor
+                {
+                    downstream.shrink_to_fit();
+                }
+            }
+        }
+    }
+
+    pub(crate) fn with_call_site_scope(mut self, scope: ScopeId<'db>) -> Self {
+        self.call_site_scope = Some(scope);
         self
     }
 
@@ -1277,7 +1288,7 @@ impl<'db> Bindings<'db> {
             callable_type: self.callable_type,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
-            enclosing_binding_contexts: self.enclosing_binding_contexts,
+            call_site_scope: self.call_site_scope,
             elements: self
                 .elements
                 .into_iter()
@@ -1299,15 +1310,9 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
-        let enclosing_binding_contexts = self.enclosing_binding_contexts.take();
-        if let Some(enclosing_binding_contexts) = enclosing_binding_contexts.as_deref() {
-            nonce_generator
-                .record_enclosing_binding_contexts(enclosing_binding_contexts.iter().copied());
-        }
         for item in self.iter_callable_items_mut() {
             item.freshen_generic_contexts_in_place(db, env, nonce_generator);
         }
-        self.enclosing_binding_contexts = enclosing_binding_contexts;
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -1325,7 +1330,7 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        let nonce_generator = TypeVarNonceGenerator::default();
+        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope);
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
         self.match_parameters_in_place(db, env, arguments);
         self
@@ -3438,7 +3443,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             }],
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 }
@@ -3471,7 +3476,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
 /// If the arguments cannot be matched to formal parameters, we store information about the
 /// specific errors that occurred when trying to match them up. If the callable has multiple
 /// overloads, we store this error information for each overload.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CallableBinding<'db> {
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
@@ -4973,7 +4978,7 @@ impl<'db> IntoIterator for CallableBinding<'db> {
 }
 
 /// An overload call whose result requires more than the first matching signature.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 enum OverloadCallResult<'db> {
     /// Successful argument expansion, boxed to keep other call bindings small.
     ArgumentTypeExpansion(Box<ExpandedOverloadCall<'db>>),
@@ -4986,7 +4991,7 @@ enum OverloadCallResult<'db> {
 }
 
 /// The combined return type and selected overloads from successful argument expansion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpandedOverloadCall<'db> {
     return_type: Type<'db>,
     cases: Box<[ExpandedCallEvaluation<'db>]>,
@@ -4995,7 +5000,7 @@ struct ExpandedOverloadCall<'db> {
 /// One successful expanded argument list, before its bindings are merged with other cases.
 /// The snapshot retains matching candidates; selection records the overloads that determine
 /// this case's result after resolving equivalent return types or ambiguity.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpandedCallEvaluation<'db> {
     return_type: Type<'db>,
     selected_overloads: SmallVec<[usize; 2]>,
@@ -7957,7 +7962,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
 /// Information about which parameter(s) an argument was matched against. This is tracked
 /// separately for each overload.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MatchedArgument<'db> {
     /// The parameters that an argument was matched against. A splatted argument might be matched
     /// against multiple parameters.
@@ -7970,7 +7975,7 @@ pub struct MatchedArgument<'db> {
 }
 
 /// One parameter matched to an argument.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MatchedParameter<'db> {
     /// The index of the matched parameter.
     pub index: usize,
@@ -8171,7 +8176,7 @@ fn inferable_typevar_occurrences<'db>(
 }
 
 /// Binding information for one of the overloads of a callable.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct Binding<'db> {
     pub(crate) signature: Signature<'db>,
 
@@ -9271,7 +9276,7 @@ impl<'db> Binding<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     inferable_typevars: TypeVarSet<'db>,
@@ -9281,7 +9286,7 @@ struct BindingSnapshot<'db> {
     errors: Vec<BindingError<'db>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 struct CallableBindingSnapshot<'db> {
     overload_result: Option<OverloadCallResult<'db>>,
 
@@ -9554,7 +9559,7 @@ impl std::fmt::Display for CallableDescription<'_> {
 }
 
 /// Information needed to emit a diagnostic regarding a parameter.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ParameterContext {
     name: Option<ParameterDisplayName<Name>>,
 
@@ -9597,7 +9602,7 @@ impl std::fmt::Display for ParameterContext {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ParameterContexts(Vec<ParameterContext>);
 
 impl std::fmt::Display for ParameterContexts {
@@ -9615,7 +9620,7 @@ impl std::fmt::Display for ParameterContexts {
 }
 
 /// The function and source offsets used to locate a forwarded `ParamSpec` parameter.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ForwardedParameterSource<'db> {
     function: FunctionType<'db>,
     is_bound_method: bool,
@@ -9672,7 +9677,7 @@ impl<'db> ForwardedParameterSource<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum InvalidArgumentTypeProvenance {
     Argument,
     OpenTypedDictExtraItems,
@@ -9682,7 +9687,7 @@ pub(crate) enum InvalidArgumentTypeProvenance {
 ///
 /// Each variant represents a combination that causes the returned decorator to raise when applied
 /// to a class.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum InvalidDataclassArgument {
     /// `order=True` combined with `eq=False`.
     OrderRequiresEq,
@@ -9694,7 +9699,7 @@ pub(crate) enum InvalidDataclassArgument {
 ///
 /// This preserves the expected type, the provided type when available, and the parameter
 /// definition so diagnostics can explain the failed inference in terms of the original call.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct SpecializationErrorContext<'db> {
     parameter_definition: Option<Definition<'db>>,
     expected_ty: Type<'db>,
@@ -9702,7 +9707,7 @@ pub(crate) struct SpecializationErrorContext<'db> {
     provided_ty: Option<Type<'db>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum BindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
     /// parameter.
@@ -9783,7 +9788,7 @@ pub(crate) enum BindingError<'db> {
     InvalidDataclassArgument(InvalidDataclassArgument),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PropertyAccessorCallError<'db> {
     bindings: Box<Bindings<'db>>,
     argument_index_offset: usize,
@@ -9920,7 +9925,7 @@ impl BindingError<'_> {
 }
 
 /// The target of an invalid `@dataclass` application.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum InvalidDataclassTarget {
     NamedTuple,
     TypedDict,

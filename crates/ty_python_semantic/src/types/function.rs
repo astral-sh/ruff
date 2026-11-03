@@ -1734,15 +1734,10 @@ impl<'db> FunctionType<'db> {
             return Cow::Borrowed(signature);
         };
 
-        if !db
-            .analysis_settings(self.file(db))
-            .return_type_inference
-            .is_active()
-            // Always preserve explicit annotations
+        // Decorators and signature transformations can supply a return type without an annotation.
+        if !overload.return_ty.is_unknown()
+            || !db.analysis_settings(self.file(db)).return_type_inference.is_active()
             || self.has_explicit_return_annotation(db)
-            // Preserve return types already supplied by decorators or signature transformations,
-            // unless they are unknown.
-            || !overload.return_ty.is_unknown()
             // We never infer return types in stubs
             || self.file(db).is_stub(db)
             // An (invalid) function with a single `@overload` could still fall through the filter above.
