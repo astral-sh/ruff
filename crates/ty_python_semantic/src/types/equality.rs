@@ -5,6 +5,7 @@
 //! methods.
 
 use std::collections::hash_map::Entry;
+use std::ops::ControlFlow;
 
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
@@ -427,23 +428,78 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Memoizes comparisons and detects recursive reentry.
+struct PendingComparison<'db> {
+    key: ComparisonKey<'db>,
+    generation: usize,
+}
+
+/// Memoizes completed comparisons and tracks active comparisons for cycle detection.
+#[derive(Default)]
+struct ComparisonCache<'db> {
+    /// An entry with no result is still being evaluated.
+    entries: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    completed: usize,
+    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
+    generation: usize,
+}
+
+impl<'db> ComparisonCache<'db> {
+    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
+    const MAX_CACHED_COMPARISONS: usize = 1024;
+
+    /// Return an available result or register a new active comparison.
+    fn begin(
+        &mut self,
+        key: ComparisonKey<'db>,
+    ) -> ControlFlow<ComparisonResult<'db>, PendingComparison<'db>> {
+        match self.entries.entry(key) {
+            Entry::Occupied(entry) => match *entry.get() {
+                Some(result) => ControlFlow::Break(result),
+                None => {
+                    self.generation += 1;
+                    ControlFlow::Break(ComparisonResult::Ambiguous)
+                }
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(None);
+                ControlFlow::Continue(PendingComparison {
+                    key,
+                    generation: self.generation,
+                })
+            }
+        }
+    }
+
+    /// Mark a comparison as complete and cache its result when it can be reused safely.
+    fn finish(&mut self, pending: PendingComparison<'db>, result: ComparisonResult<'db>) {
+        let PendingComparison { key, generation } = pending;
+        // A cycle fallback can depend on which comparisons are already active.
+        if self.generation == generation {
+            if self.completed < Self::MAX_CACHED_COMPARISONS {
+                self.entries.insert(key, Some(result));
+                self.completed += 1;
+                return;
+            }
+
+            // Start a fresh cache while preserving active comparisons for cycle detection.
+            // In-flight results may depend on entries from the old cache.
+            self.entries.retain(|_, result| result.is_none());
+            self.completed = 0;
+            self.generation += 1;
+        }
+        self.entries.remove(&key);
+    }
+}
+
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
-    /// An entry with no result is still being evaluated.
-    comparisons: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
-    cached_comparisons: usize,
-    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
-    cache_generation: usize,
+    cache: ComparisonCache<'db>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
-    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
-    const MAX_CACHED_COMPARISONS: usize = 1024;
-
     fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -452,9 +508,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            comparisons: FxHashMap::default(),
-            cached_comparisons: 0,
-            cache_generation: 0,
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -468,9 +522,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            comparisons: FxHashMap::default(),
-            cached_comparisons: 0,
-            cache_generation: 0,
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -528,36 +580,12 @@ impl<'db> ComparisonEvaluator<'db> {
             operator,
         };
 
-        match self.comparisons.entry(key) {
-            Entry::Occupied(entry) => {
-                if let Some(result) = *entry.get() {
-                    return result;
-                }
-                self.cache_generation += 1;
-                return ComparisonResult::Ambiguous;
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(None);
-            }
-        }
-
-        let cache_generation = self.cache_generation;
+        let pending = match self.cache.begin(key) {
+            ControlFlow::Break(result) => return result,
+            ControlFlow::Continue(pending) => pending,
+        };
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        // A cycle fallback can depend on which comparisons are already active.
-        if self.cache_generation == cache_generation {
-            if self.cached_comparisons < Self::MAX_CACHED_COMPARISONS {
-                self.comparisons.insert(key, Some(result));
-                self.cached_comparisons += 1;
-                return result;
-            }
-
-            // Start a fresh cache while preserving active comparisons for cycle detection.
-            // In-flight results may depend on entries from the old cache.
-            self.comparisons.retain(|_, result| result.is_none());
-            self.cached_comparisons = 0;
-            self.cache_generation += 1;
-        }
-        self.comparisons.remove(&key);
+        self.cache.finish(pending, result);
         result
     }
 }
