@@ -24,14 +24,19 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
-All five CLIs receive the same list of tracked Python files. The runner applies
-each project's includes and excludes once and skips symlinks. When an
-implementation has an adjacent stub, the stub is the check target. Implementations
-without stubs and standalone stubs stay in the list. This preserves the stub's
-types when mypy resolves imports; explicitly targeting the implementation would
-replace those types with the runtime module, unlike the other checkers. If a file
-and a populated directory share a module name, the directory wins. The runner
-prints the file count and SHA-256 of the list before timing each project.
+All five CLIs use their native directory discovery inside the timed command.
+Before timing, the runner records the expected tracked Python files in
+`benchmark-files.txt` and derives exclusions that align the discovered scope.
+The manifest is an audit record; it is not passed as thousands of individual
+targets. Expanded include lists can add substantial checker-specific overhead.
+
+The runner applies each project's includes and excludes once, skips symlinks and
+untracked Python files, and prefers a stub to its adjacent implementation.
+Implementations without stubs and standalone stubs remain targets. This preserves
+imported stub types in mypy. If a file and a populated directory share a module
+name, the directory wins. Paired implementation bodies are omitted for every
+checker, so this controlled workload differs from default project discovery.
+The runner prints its expected file count and SHA-256 before each project.
 
 Each CLI checks unannotated function bodies. mypy uses its normal import
 following with project and user configuration disabled, so per-module overrides

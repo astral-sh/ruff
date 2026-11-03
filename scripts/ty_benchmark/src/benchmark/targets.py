@@ -1,4 +1,4 @@
-"""The source files passed to every CLI benchmark."""
+"""The expected source files and exclusions for native CLI discovery."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ FILE_LIST = "benchmark-files.txt"
 PYRIGHT_CONFIG = "pyrightconfig.benchmark.json"
 
 
-def write_cli_targets(project: Project, checkout: Path) -> None:
-    """Write one set of explicitly selected files in the formats the checkers accept."""
+def write_cli_targets(project: Project, checkout: Path) -> Project:
+    """Record the expected files and configure native discovery of that scope."""
     entries = subprocess.check_output(
         [
             "git",
@@ -60,13 +60,47 @@ def write_cli_targets(project: Project, checkout: Path) -> None:
 
     manifest = "".join(f"{target}\n" for target in targets).encode("utf-8")
     (checkout / FILE_LIST).write_bytes(manifest)
-    # Pyright's stdin file list splits on spaces. JSON preserves each pathname.
+    selected = {PurePosixPath(path) for path in targets}
+    selected_parents = {parent for path in selected for parent in path.parents}
+    unwanted = {
+        PurePosixPath(os.fsdecode(entry.split(b"\t", 1)[1]))
+        for entry in entries.split(b"\0")
+        if entry.startswith(b"120000 ")
+    }
+    for include in project.include or ["."]:
+        start = checkout / include
+        if start.is_file():
+            if PurePosixPath(include) not in selected:
+                unwanted.add(PurePosixPath(include))
+            continue
+        for directory, directories, filenames in os.walk(start, followlinks=False):
+            base = Path(directory)
+            for name in directories + filenames:
+                path = base / name
+                relative = PurePosixPath(path.relative_to(checkout).as_posix())
+                if path.is_symlink() or (
+                    path.is_file()
+                    and path.suffix in (".py", ".pyi")
+                    and relative not in selected
+                ):
+                    unwanted.add(relative)
+
+    # Collapse excluded Python subtrees, without pre-pruning asset-only directories
+    # that the checkers would normally visit during their timed discovery.
+    exclusions = set()
+    for path in unwanted:
+        while path.parent not in selected_parents and path.parent != PurePosixPath("."):
+            path = path.parent
+        exclusions.add(path.as_posix())
+    native_project = project._replace(
+        include=list(project.include) or ["."], exclude=sorted(exclusions)
+    )
     (checkout / PYRIGHT_CONFIG).write_text(
         json.dumps(
             {
                 "extends": "./pyrightconfig.json",
-                "include": targets,
-                "exclude": [],
+                "include": list(native_project.include),
+                "exclude": list(native_project.exclude),
                 "analyzeUnannotatedFunctions": True,
             }
         ),
@@ -76,3 +110,4 @@ def write_cli_targets(project: Project, checkout: Path) -> None:
     print(
         f"{project.name}: {len(targets)} CLI source files (sha256 {digest})", flush=True
     )
+    return native_project

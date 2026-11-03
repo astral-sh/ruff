@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import glob
 import json
+import re
 import shutil
 import sys
 from collections.abc import Generator
@@ -15,7 +16,7 @@ import tomlkit
 
 from benchmark import Command
 from benchmark.projects import Project
-from benchmark.targets import FILE_LIST, PYRIGHT_CONFIG
+from benchmark.targets import PYRIGHT_CONFIG
 
 if TYPE_CHECKING:
     from benchmark.venv import Venv
@@ -119,7 +120,6 @@ class Ty(Tool):
             "check",
             "--output-format=concise",
             "--no-progress",
-            f"@{FILE_LIST}",
         ]
 
         return Command(name=self._name, command=command)
@@ -155,8 +155,18 @@ class Mypy(Tool):
             "--config-file=",
             "--follow-imports=normal",
             "--check-untyped-defs",
-            f"@{FILE_LIST}",
+            *project.include,
         ]
+
+        if project.exclude:
+            command.extend(
+                [
+                    "--exclude",
+                    r"\A(?:"
+                    + "|".join(re.escape(path) for path in project.exclude)
+                    + r")(?:[/\\]|\Z)",
+                ]
+            )
 
         prepare = None
 
@@ -267,14 +277,16 @@ class Pyrefly(Tool):
     def config(self, project: Project, venv: Venv):
         return (
             Path("pyrefly.toml"),
-            f"""
-            project-includes = [{", ".join([f'"{include}"' for include in project.include])}]
-            project-excludes = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
-            python-interpreter-path = "{venv.python.as_posix()}"
-            python-version = "{project.python_version}"
-            site-package-path = ["{venv.path.as_posix()}"]
-            untyped-def-behavior="check-and-infer-return-any"
-            """,
+            tomlkit.dumps(
+                {
+                    "project-includes": list(project.include),
+                    "project-excludes": list(project.exclude),
+                    "python-interpreter-path": venv.python.as_posix(),
+                    "python-version": project.python_version,
+                    "site-package-path": [venv.path.as_posix()],
+                    "untyped-def-behavior": "check-and-infer-return-any",
+                }
+            ),
         )
 
     @override
@@ -285,7 +297,6 @@ class Pyrefly(Tool):
             "--output-format=min-text",
             "--config=pyrefly.toml",
             "--disable-project-excludes-heuristics=true",
-            f"@{FILE_LIST}",
         ]
 
         if single_threaded:
@@ -357,16 +368,9 @@ class Zuban(Tool):
 
     @override
     def config(self, project: Project, venv: Venv) -> tuple[Path, str]:
-        settings = self._settings(project, venv)
-        # Zuban has no response-file support. Use the shared manifest as its
-        # explicit config targets, with exclusions already applied by the runner.
-        settings["files"] = (
-            (venv.project_path / FILE_LIST).read_text(encoding="utf-8").splitlines()
-        )
-        settings["exclude"] = []
         return (
             Path("zuban-benchmark.toml"),
-            tomlkit.dumps({"tool": {"zuban": settings}}),
+            tomlkit.dumps({"tool": {"zuban": self._settings(project, venv)}}),
         )
 
     @override

@@ -21,6 +21,9 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
         "pkg/consumer.py": ("from .api import typed_value\nbad: str = typed_value()\n"),
         "pkg/plain.py": 'def untyped():\n    number: int = "wrong"\n',
         "pkg/only.pyi": "value: MissingType\n",
+        "pkg/excluded.py": "this is not valid Python!\n",
+        "pkg/sub.pyi": "this is not valid Python!\n",
+        "pkg/sub/__init__.pyi": "",
     }
     for filename, contents in files.items():
         path = tmp_path / filename
@@ -28,6 +31,8 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
         path.write_text(contents)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "add", "pkg"], cwd=tmp_path, check=True)
+    (tmp_path / "pkg/generated").mkdir()
+    (tmp_path / "pkg/generated/untracked.py").write_text("this is not valid Python!\n")
     project = Project(
         name="stub-imports",
         repository="unused",
@@ -35,11 +40,11 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
         install_arguments=[],
         python_version=f"{sys.version_info.major}.{sys.version_info.minor}",
         include=["pkg"],
-        exclude=[],
+        exclude=["pkg/excluded.py"],
     )
     venv = Venv(project_name=project.name, project_path=tmp_path)
     stdlib_venv.EnvBuilder().create(venv.path)
-    write_cli_targets(project, tmp_path)
+    project = write_cli_targets(project, tmp_path)
     tools = {
         "ty": Ty,
         "pyrefly": Pyrefly,
@@ -66,6 +71,10 @@ def test_cli_preserves_imported_stub_types(tmp_path: Path, name: str):
     assert any("assign" in line.lower() for line in consumer_diagnostics), output
     assert "plain.py" in output, output
     assert "only.pyi" in output, output
+    assert "excluded.py" not in output, output
+    assert "untracked.py" not in output, output
+    assert "sub.pyi" not in output, output
+    assert "api.py:" not in output, output
 
 
 @pytest.fixture
@@ -123,7 +132,7 @@ def zuban_project(tmp_path: Path) -> tuple[Project, Venv]:
     )
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "add", "src"], cwd=tmp_path, check=True)
-    write_cli_targets(project, tmp_path)
+    project = write_cli_targets(project, tmp_path)
     return project, venv
 
 
@@ -140,7 +149,7 @@ def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
         include=["source root/example"], exclude=["source root/**/tests/**"]
     )
     subprocess.run(["git", "add", "--all"], cwd=root, check=True)
-    write_cli_targets(project, root)
+    project = write_cli_targets(project, root)
     tool = Ty()
     tool.write_config(project, venv)
     result = subprocess.run(
@@ -163,12 +172,12 @@ def test_zuban_cli_prefers_stubs_beside_implementations(zuban_project):
     stub = venv.project_path / "src" / "example" / "main.pyi"
     stub.write_text("def untyped() -> None: ...\nvalue: MissingType\n")
     subprocess.run(["git", "add", "src"], cwd=venv.project_path, check=True)
-    write_cli_targets(project, venv.project_path)
+    project = write_cli_targets(project, venv.project_path)
     tool = Zuban()
     tool.write_config(project, venv)
     config = tomllib.loads((venv.project_path / "zuban-benchmark.toml").read_text())
-    assert "./src/example/main.pyi" in config["tool"]["zuban"]["files"]
-    assert "./src/example/main.py" not in config["tool"]["zuban"]["files"]
+    assert config["tool"]["zuban"]["files"] == list(project.include)
+    assert "src/example/main.py" in project.exclude
     result = subprocess.run(
         tool.command(project, venv, single_threaded=False).command,
         cwd=venv.project_path,
