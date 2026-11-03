@@ -83,7 +83,7 @@
 
 use ruff_python_ast::{self as ast, name::Name};
 use smallvec::SmallVec;
-use ty_python_core::ast_ids::{HasScopedUseId, ScopedUseId};
+use ty_python_core::ast_ids::{HasScopedUseId, PlaceUse, ScopedUseId};
 use ty_python_core::definition::Definition;
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
@@ -131,7 +131,7 @@ pub(crate) enum PlaceLoadMode<'ast> {
 /// Exposes an iterator over the steps that resolve the value for a place load.
 pub(crate) struct PlaceLoadResolutionProcedure<'db, 'ast> {
     /// The place expression whose loaded value is being resolved.
-    place_expr: &'ast PlaceExpr,
+    place_expr: PlaceExprRef<'ast>,
     /// Read-only context shared by every source-selection phase.
     context: PlaceLoadResolutionContext<'db, 'ast>,
     /// The next node to visit in the resolution graph, or `None` after reaching a leaf.
@@ -313,15 +313,26 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         place_expr: &'ast PlaceExpr,
         mode: PlaceLoadMode<'ast>,
     ) -> Self {
+        Self::from_source(db, index, scope, place_expr.into(), mode, None)
+    }
+
+    pub(crate) fn from_source(
+        db: &'db dyn Db,
+        index: &'db SemanticIndex<'db>,
+        scope: ScopeId<'db>,
+        place_expr: PlaceExprRef<'ast>,
+        mode: PlaceLoadMode<'ast>,
+        local_operand: Option<PlaceUse>,
+    ) -> Self {
         let context = PlaceLoadResolutionContext {
             db,
             index,
             scope,
             file: scope.program_file(db),
             mode,
+            local_operand,
         };
-        let crosses_scope_declaration =
-            context.symbol_has_scope_declaration(PlaceExprRef::from(place_expr));
+        let crosses_scope_declaration = context.symbol_has_scope_declaration(place_expr);
         Self {
             context,
             place_expr,
@@ -338,9 +349,9 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         let place_table = self.context.index.place_table(file_scope);
 
         let mut symbol_is_local = false;
-        let place_expr = PlaceExprRef::from(self.place_expr);
+        let place_expr = self.place_expr;
         if let Some(symbol) = place_expr.as_symbol()
-            && let Some(symbol_id) = place_table.symbol_id(symbol.name())
+            && let Some(symbol_id) = self.context.local_symbol(symbol.name())
         {
             let indexed_symbol = place_table.symbol(symbol_id);
             symbol_is_local = indexed_symbol.is_local();
@@ -398,7 +409,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             }
 
             let enclosing_place_table = self.context.index.place_table(enclosing_file_scope);
-            let place_expr = PlaceExprRef::from(self.place_expr);
+            let place_expr = self.place_expr;
             let enclosing_place_id = enclosing_place_table.place_id(place_expr);
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
             // A `global` declaration forwards the place to the module instead of making this
@@ -530,7 +541,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         if self.context.uses_enclosing_snapshots() {
             match self.context.index.enclosing_snapshot(
                 FileScopeId::global(),
-                PlaceExprRef::from(self.place_expr),
+                self.place_expr,
                 current_scope,
             ) {
                 EnclosingSnapshotResult::FoundConstraint(constraint) => {
@@ -586,7 +597,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
     }
 
     pub(crate) fn place_expr(&self) -> PlaceExprRef<'_> {
-        PlaceExprRef::from(self.place_expr)
+        self.place_expr
     }
 
     /// Returns the loaded symbol's name, or `None` when the loaded place is a member.
@@ -865,16 +876,30 @@ struct PlaceLoadResolutionContext<'db, 'ast> {
     scope: ScopeId<'db>,
     file: ProgramFile<'db>,
     mode: PlaceLoadMode<'ast>,
+    local_operand: Option<PlaceUse>,
 }
 
 impl<'db> PlaceLoadResolutionContext<'db, '_> {
+    fn local_symbol(self, name: &str) -> Option<ScopedSymbolId> {
+        if let Some(PlaceUse {
+            place: ScopedPlaceId::Symbol(id),
+            ..
+        }) = self.local_operand
+        {
+            return Some(id);
+        }
+        self.index
+            .place_table(self.scope.file_scope_id(self.db))
+            .symbol_id(name)
+    }
+
     fn symbol_has_scope_declaration(self, place_expr: PlaceExprRef) -> bool {
         let Some(symbol) = place_expr.as_symbol() else {
             return false;
         };
         let scope = self.scope.file_scope_id(self.db);
         let table = self.index.place_table(scope);
-        let Some(symbol_id) = table.symbol_id(symbol.name()) else {
+        let Some(symbol_id) = self.local_symbol(symbol.name()) else {
             return false;
         };
         let symbol = table.symbol(symbol_id);
@@ -912,7 +937,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     return None;
                 }
 
-                let use_id = expr_ref.scoped_use_id(self.db, self.file);
+                let use_id = self.local_operand.map_or_else(
+                    || expr_ref.scoped_use_id(self.db, self.file),
+                    |operand| operand.use_id,
+                );
                 Some((
                     PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),
@@ -923,8 +951,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 Some((scope, ConstraintKey::Snapshot(snapshot))),
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
-                let source = table
-                    .place_id(place_expr)
+                let source = self
+                    .local_operand
+                    .map(|op| op.place)
+                    .or_else(|| table.place_id(place_expr))
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
