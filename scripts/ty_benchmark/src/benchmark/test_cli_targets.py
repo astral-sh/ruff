@@ -27,6 +27,7 @@ class CliTargetsTest(unittest.TestCase):
             for name in (
                 "pkg/api.py",
                 "pkg/api.pyi",
+                "pkg/plain.py",
                 "pkg/stub only.pyi",
                 "pkg/sub.pyi",
                 "pkg/sub/__init__.pyi",
@@ -61,7 +62,13 @@ class CliTargetsTest(unittest.TestCase):
             write_cli_targets(project, root)
             files = (root / FILE_LIST).read_text(encoding="utf-8").splitlines()
             self.assertEqual(
-                files, ["./pkg/api.py", "./pkg/stub only.pyi", "./pkg/sub/__init__.pyi"]
+                files,
+                [
+                    "./pkg/api.pyi",
+                    "./pkg/plain.py",
+                    "./pkg/stub only.pyi",
+                    "./pkg/sub/__init__.pyi",
+                ],
             )
             config = json.loads((root / PYRIGHT_CONFIG).read_text(encoding="utf-8"))
             self.assertEqual(config["include"], files)
