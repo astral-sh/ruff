@@ -4,7 +4,10 @@
 //! constraints and definite truthiness while remaining conservative around custom comparison
 //! methods.
 
-use rustc_hash::FxHashSet;
+use std::collections::hash_map::Entry;
+use std::ops::ControlFlow;
+
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
@@ -298,8 +301,7 @@ pub(super) fn inequality_truthiness<'db>(
 
 /// Evaluates container elements using identity or equality.
 ///
-/// Reuses the active-comparison set across element comparisons. The set only detects recursive
-/// comparisons; results are not cached between elements.
+/// Reuses comparison results across elements, including repeated pairs in nested containers.
 pub(super) struct ContainerElementEqualityEvaluator<'db> {
     evaluator: ComparisonEvaluator<'db>,
 }
@@ -415,7 +417,7 @@ impl ComparisonSoundnessPolicy {
     }
 }
 
-/// Identifies an active comparison evaluation.
+/// Identifies a comparison evaluation.
 ///
 /// Operand order and branch are significant because the left operand is the narrowing target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -426,11 +428,79 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+#[derive(Clone, Copy)]
+struct PendingComparison<'db> {
+    key: ComparisonKey<'db>,
+    generation: usize,
+}
+
+/// Memoizes completed comparisons and tracks active comparisons for cycle detection.
+#[derive(Default)]
+struct ComparisonCache<'db> {
+    /// An entry with no result is still being evaluated.
+    entries: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    /// Number of `Some` entries. The cache limit applies only to completed results.
+    completed: usize,
+    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
+    generation: usize,
+}
+
+impl<'db> ComparisonCache<'db> {
+    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
+    const MAX_CACHED_COMPARISONS: usize = 1024;
+
+    /// Return a cached result or register the comparison as active.
+    ///
+    /// If the comparison is already active, return `Ambiguous`. This fallback can depend on
+    /// which comparisons are active, so it makes every active comparison ineligible for caching.
+    fn begin(
+        &mut self,
+        key: ComparisonKey<'db>,
+    ) -> ControlFlow<ComparisonResult<'db>, PendingComparison<'db>> {
+        match self.entries.entry(key) {
+            Entry::Occupied(entry) => match *entry.get() {
+                Some(result) => ControlFlow::Break(result),
+                None => {
+                    self.generation += 1;
+                    ControlFlow::Break(ComparisonResult::Ambiguous)
+                }
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(None);
+                ControlFlow::Continue(PendingComparison {
+                    key,
+                    generation: self.generation,
+                })
+            }
+        }
+    }
+
+    /// Finish a comparison, caching its result if the generation is unchanged.
+    ///
+    /// When adding a result would exceed the cache limit, discard the completed entries and
+    /// keep the active ones for cycle detection. Comparisons in progress may have used the
+    /// discarded entries, so advance the generation to keep their results out of the cache.
+    fn finish(&mut self, pending: PendingComparison<'db>, result: ComparisonResult<'db>) {
+        let PendingComparison { key, generation } = pending;
+        if self.generation == generation {
+            if self.completed < Self::MAX_CACHED_COMPARISONS {
+                self.entries.insert(key, Some(result));
+                self.completed += 1;
+                return;
+            }
+
+            self.entries.retain(|_, result| result.is_none());
+            self.completed = 0;
+            self.generation += 1;
+        }
+        self.entries.remove(&key);
+    }
+}
+
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
-    active: FxHashSet<ComparisonKey<'db>>,
+    cache: ComparisonCache<'db>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
@@ -444,7 +514,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -458,7 +528,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -516,14 +586,12 @@ impl<'db> ComparisonEvaluator<'db> {
             operator,
         };
 
-        // A repeated key means that the result depends on itself. Treating it as ambiguous is
-        // conservative: callers only narrow from definite truthiness or an explicit constraint.
-        if !self.active.insert(key) {
-            return ComparisonResult::Ambiguous;
-        }
-
+        let pending = match self.cache.begin(key) {
+            ControlFlow::Break(result) => return result,
+            ControlFlow::Continue(pending) => pending,
+        };
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        self.active.remove(&key);
+        self.cache.finish(pending, result);
         result
     }
 }
