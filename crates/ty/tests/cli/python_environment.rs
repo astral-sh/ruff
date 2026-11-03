@@ -1489,6 +1489,24 @@ home = ./
     ----- stderr -----
     ");
 
+    // An empty VIRTUAL_ENV does not hide the working venv.
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", ""), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
+      |
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
     // Run with VIRTUAL_ENV set, should find the active venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
