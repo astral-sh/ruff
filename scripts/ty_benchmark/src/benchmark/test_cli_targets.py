@@ -28,6 +28,7 @@ class CliTargetsTest(unittest.TestCase):
                 "pkg/api.py",
                 "pkg/api.pyi",
                 "pkg/plain.py",
+                "pkg/assets/data.json",
                 "pkg/stub only.pyi",
                 "pkg/sub.pyi",
                 "pkg/sub/__init__.pyi",
@@ -59,7 +60,7 @@ class CliTargetsTest(unittest.TestCase):
                 check=True,
             )
 
-            write_cli_targets(project, root)
+            native_project = write_cli_targets(project, root)
             files = (root / FILE_LIST).read_text(encoding="utf-8").splitlines()
             self.assertEqual(
                 files,
@@ -71,7 +72,19 @@ class CliTargetsTest(unittest.TestCase):
                 ],
             )
             config = json.loads((root / PYRIGHT_CONFIG).read_text(encoding="utf-8"))
-            self.assertEqual(config["include"], files)
+            self.assertEqual(config["include"], ["pkg"])
+            self.assertEqual(
+                native_project.exclude,
+                [
+                    "pkg/api.py",
+                    "pkg/link.py",
+                    "pkg/skip",
+                    "pkg/sub.pyi",
+                    "pkg/sub/tests",
+                    "pkg/untracked.py",
+                ],
+            )
+            self.assertEqual(config["exclude"], native_project.exclude)
             self.assertTrue(config["analyzeUnannotatedFunctions"])
 
             with self.assertRaisesRegex(ValueError, "No Python source files"):

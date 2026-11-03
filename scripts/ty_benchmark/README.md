@@ -25,14 +25,19 @@ Measures how long it takes to type check a project without a pre-existing cache.
 Hyperfine 2.0 also reports peak resident set size (RSS) for each measured command
 in the `Memory` row. Both metrics use the same warmups and measured runs.
 
-All five CLIs receive the same list of tracked Python files. The runner applies
-each project's includes and excludes once and skips symlinks. When an
-implementation has an adjacent stub, the stub is the check target. Implementations
-without stubs and standalone stubs stay in the list. This preserves the stub's
-types when mypy resolves imports; explicitly targeting the implementation would
-replace those types with the runtime module, unlike the other checkers. If a file
-and a populated directory share a module name, the directory wins. The runner
-prints the file count and SHA-256 of the list before timing each project.
+All five CLIs use their native directory discovery inside the timed command.
+Before timing, the runner records the expected tracked Python files in
+`benchmark-files.txt` and derives exclusions that align the discovered scope.
+The manifest is an audit record; it is not passed as thousands of individual
+targets. Expanded include lists can add substantial checker-specific overhead.
+
+The runner applies each project's includes and excludes once, skips symlinks and
+untracked Python files, and prefers a stub to its adjacent implementation.
+Implementations without stubs and standalone stubs remain targets. This preserves
+imported stub types in mypy. If a file and a populated directory share a module
+name, the directory wins. Paired implementation bodies are omitted for every
+checker, so this controlled workload differs from default project discovery.
+The runner prints its expected file count and SHA-256 before each project.
 
 Each CLI checks unannotated function bodies. mypy uses its normal import
 following with project and user configuration disabled, so per-module overrides
@@ -54,8 +59,8 @@ uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py -k zuban
 Zuban uses mypy-compatible mode with untyped-function checking enabled and untyped
 returns treated as `Any`, matching the mypy and Pyrefly benchmark policy. Its
 generated configuration uses the shared target Python version, source import
-roots, and project virtual environment. CLI runs use the shared file manifest in
-an isolated configuration file; LSP runs use the project's include/exclude lists in
+roots, and project virtual environment. CLI runs use project roots and the common
+exclusions in an isolated configuration file; LSP runs use the project's include/exclude lists in
 `pyproject.toml` and restore the original file afterwards. Upstream mypy or Zuban
 settings cannot silently narrow its workload or suppress diagnostics.
 
@@ -109,7 +114,7 @@ We benchmark against the latest version of each type checker, but some projects
 may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
-With Zuban 0.10.2, a NumPy CLI check using the shared stub-first file manifest did
+With Zuban 0.10.2, a NumPy CLI check using an expanded stub-first file list did
 not finish within ten minutes. Its language server returned a server-panic error for the
 incremental edits in discord.py, PyTorch, and NumPy. These cases retain the
 shared workload and assertions; a failed or interrupted run is not a benchmark

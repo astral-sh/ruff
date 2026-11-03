@@ -150,7 +150,7 @@ def main() -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
-            write_cli_targets(project, cwd)
+            cli_project = write_cli_targets(project, cwd)
 
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version
@@ -163,8 +163,8 @@ def main() -> None:
             commands = []
 
             for suite in suites:
-                suite.write_config(project, venv)
-                commands.append(suite.command(project, venv, args.single_threaded))
+                suite.write_config(cli_project, venv)
+                commands.append(suite.command(cli_project, venv, args.single_threaded))
 
             if not commands:
                 continue
