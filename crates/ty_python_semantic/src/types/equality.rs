@@ -433,12 +433,17 @@ struct ComparisonEvaluator<'db> {
     env: ProgramEnvironment<'db>,
     /// An entry with no result is still being evaluated.
     comparisons: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
-    cycle_count: usize,
+    cached_comparisons: usize,
+    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
+    cache_generation: usize,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
+    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
+    const MAX_CACHED_COMPARISONS: usize = 1024;
+
     fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -448,7 +453,8 @@ impl<'db> ComparisonEvaluator<'db> {
             db,
             env: env.clone(),
             comparisons: FxHashMap::default(),
-            cycle_count: 0,
+            cached_comparisons: 0,
+            cache_generation: 0,
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -463,7 +469,8 @@ impl<'db> ComparisonEvaluator<'db> {
             db,
             env: env.clone(),
             comparisons: FxHashMap::default(),
-            cycle_count: 0,
+            cached_comparisons: 0,
+            cache_generation: 0,
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -526,7 +533,7 @@ impl<'db> ComparisonEvaluator<'db> {
                 if let Some(result) = *entry.get() {
                     return result;
                 }
-                self.cycle_count += 1;
+                self.cache_generation += 1;
                 return ComparisonResult::Ambiguous;
             }
             Entry::Vacant(entry) => {
@@ -534,15 +541,23 @@ impl<'db> ComparisonEvaluator<'db> {
             }
         }
 
-        let cycle_count = self.cycle_count;
+        let cache_generation = self.cache_generation;
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        // A cycle fallback can depend on which comparisons are already active. Reuse the
-        // result only if the evaluation finished without one.
-        if self.cycle_count == cycle_count {
-            self.comparisons.insert(key, Some(result));
-        } else {
-            self.comparisons.remove(&key);
+        // A cycle fallback can depend on which comparisons are already active.
+        if self.cache_generation == cache_generation {
+            if self.cached_comparisons < Self::MAX_CACHED_COMPARISONS {
+                self.comparisons.insert(key, Some(result));
+                self.cached_comparisons += 1;
+                return result;
+            }
+
+            // Start a fresh cache while preserving active comparisons for cycle detection.
+            // In-flight results may depend on entries from the old cache.
+            self.comparisons.retain(|_, result| result.is_none());
+            self.cached_comparisons = 0;
+            self.cache_generation += 1;
         }
+        self.comparisons.remove(&key);
         result
     }
 }
