@@ -225,7 +225,7 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
 
 /// Shared recursive references should reuse constructor bodies when aliases are unfolded.
 fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
-    for (aliases, references) in [(4, 3), (8, 3), (32, 3), (6, 6)] {
+    for (aliases, references) in [(4, 3), (8, 3), (32, 3), (8, 8)] {
         let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
         for alias in 0..aliases {
             write!(code, "A{alias} = tuple[T").unwrap();
