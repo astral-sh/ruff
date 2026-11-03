@@ -975,6 +975,11 @@ impl CondaEnvironmentKind {
     /// `/usr/local/conda/envs/<name>`. Note that the name `CONDA_DEFAULT_ENV` is misleading, it's
     /// the active environment name, not a constant base environment name.
     fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
+        // Pixi has no base environment, and its environment names need not match the prefix.
+        if system.is_file(&path.join("conda-meta/pixi")) {
+            return Self::Child;
+        }
+
         // If `_CONDA_ROOT` is set and matches `CONDA_PREFIX`, it's the base environment.
         if let Ok(conda_root) = system.env_var(EnvVars::CONDA_ROOT)
             && path.as_str() == conda_root
@@ -986,6 +991,11 @@ impl CondaEnvironmentKind {
         let Ok(current_env) = system.env_var(EnvVars::CONDA_DEFAULT_ENV) else {
             return Self::Child;
         };
+
+        // Environments created with `conda create -p` use their full prefix as the name.
+        if path == SystemPath::new(&current_env) {
+            return Self::Child;
+        }
 
         // If the environment name is "base" or "root", treat it as a base environment
         //
@@ -2318,6 +2328,45 @@ mod tests {
                 Self::System(_) => panic!("Expected a virtual environment"),
             }
         }
+    }
+
+    #[test]
+    fn unnamed_conda_environment_precedes_project_venv() -> Result<(), Box<dyn std::error::Error>> {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/conda/envs/custom");
+        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, prefix.as_str());
+        let fs = system.memory_file_system();
+        fs.create_directory_all(prefix)?;
+        fs.create_directory_all("/python")?;
+        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python\n")?;
+
+        let environment = PythonEnvironment::discover(Some(SystemPath::new("/project")), &system)?;
+        assert_eq!(
+            environment.map(|environment| environment.sys_prefix().to_path_buf()),
+            Some(system.canonicalize_path(prefix)?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pixi_environment_precedes_project_venv() -> Result<(), Box<dyn std::error::Error>> {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/pixi/envs/default");
+        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, "project:default");
+        system.set_env_var(EnvVars::CONDA_ROOT, prefix.as_str());
+        let fs = system.memory_file_system();
+        fs.write_file_all(prefix.join("conda-meta/pixi"), "")?;
+        fs.create_directory_all("/python")?;
+        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python\n")?;
+
+        let environment = PythonEnvironment::discover(Some(SystemPath::new("/project")), &system)?;
+        assert_eq!(
+            environment.map(|environment| environment.sys_prefix().to_path_buf()),
+            Some(system.canonicalize_path(prefix)?)
+        );
+        Ok(())
     }
 
     #[derive(Default)]
