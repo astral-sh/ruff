@@ -267,3 +267,375 @@ async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, o
     y = await x
     reveal_type(y)  # revealed: A & B
 ```
+
+## Async generator stubs
+
+An `async def` function without a `yield` expression returns a coroutine, even if its return
+annotation is `AsyncIterator` or `AsyncGenerator`. To describe an async generator in a stub, use
+`def` with the async iterator return annotation, or include a `yield` expression in the body.
+
+### Iterating over a stubbed async generator
+
+When a stub omits `yield`, iterating over the resulting coroutine reports an error that points to
+the declaration and explains how to declare an async generator. This also applies to callable
+objects and async comprehensions.
+
+`stubs.pyi`:
+
+```pyi
+from collections.abc import AsyncGenerator, AsyncIterator
+
+async def values() -> AsyncIterator[int]: ...
+
+class Values:
+    async def __call__(self) -> AsyncGenerator[int, None]: ...
+```
+
+`main.py`:
+
+```py
+from stubs import values
+
+async def consume() -> None:
+    # snapshot
+    async for value in values():
+        pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]` is not async-iterable
+ --> src/main.py:5:24
+  |
+5 |     async for value in values():
+  |                        ^^^^^^^^
+  |
+ ::: src/stubs.pyi:3:1
+  |
+3 | async def values() -> AsyncIterator[int]: ...
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
+info: It has no `__aiter__` method
+help: `await` the coroutine before iterating over its result
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
+```
+
+`callable.py`:
+
+```py
+from stubs import Values
+
+async def consume() -> None:
+    # snapshot
+    [value async for value in Values()()]
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncGenerator[int, None]]` is not async-iterable
+ --> src/callable.py:5:31
+  |
+5 |     [value async for value in Values()()]
+  |                               ^^^^^^^^^^
+  |
+ ::: src/stubs.pyi:6:5
+  |
+6 |     async def __call__(self) -> AsyncGenerator[int, None]: ...
+  |     ----------------------------------------------------- Without `yield` in the function body this function returns a coroutine
+info: It has no `__aiter__` method
+help: `await` the coroutine before iterating over its result
+help: To declare `__call__` as an async generator, use `def` rather than `async def` or add `yield` to the body
+```
+
+### Overriding a stubbed async generator
+
+An abstract method with an empty `async def` body describes a coroutine function. An async generator
+cannot override it, and the diagnostic explains how to correct the abstract declaration.
+
+```py
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+
+class Base(ABC):
+    @abstractmethod
+    async def values(self) -> AsyncIterator[int]: ...
+
+class Derived(Base):
+    # snapshot
+    async def values(self) -> AsyncIterator[int]:
+        yield 1
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `values`
+  --> src/mdtest_snippet.py:10:15
+   |
+ 6 |     async def values(self) -> AsyncIterator[int]: ...
+   |     --------------------------------------------
+   |     |         |
+   |     |         `Base.values` defined here
+   |     Without `yield` in the function body this function returns a coroutine
+ 7 |
+ 8 | class Derived(Base):
+ 9 |     # snapshot
+10 |     async def values(self) -> AsyncIterator[int]:
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.values`
+info: incompatible return types: `AsyncIterator[int]` is not assignable to `CoroutineType[Any, Any, AsyncIterator[int]]`
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
+info: This violates the Liskov Substitution Principle
+```
+
+### Assigning a stubbed async generator
+
+The same guidance applies when assigning a stubbed function to an async-generator callable type.
+
+`declarations-script.pyi`:
+
+```pyi
+from collections.abc import AsyncIterator, Callable
+
+async def values() -> AsyncIterator[int]: ...
+
+# snapshot
+factory: Callable[[], AsyncIterator[int]] = values
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `def values() -> CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `() -> AsyncIterator[int]`
+ --> src/declarations-script.pyi:6:45
+  |
+3 | async def values() -> AsyncIterator[int]: ...
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
+4 |
+5 | # snapshot
+6 | factory: Callable[[], AsyncIterator[int]] = values
+  |          --------------------------------   ^^^^^^ Incompatible value of type `def values() -> CoroutineType[Any, Any, AsyncIterator[int]]`
+  |          |
+  |          Declared type
+info: incompatible return types: `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `AsyncIterator[int]`
+info: └── type `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to protocol `AsyncIterator[int]`
+info:     └── protocol member `__aiter__` is not defined on type `CoroutineType[Any, Any, AsyncIterator[int]]`
+help: To declare `values` as an async generator, use `def` rather than `async def` or add `yield` to the body
+```
+
+### Correct async generator declarations
+
+Both forms of declaration can be overridden by an async generator and called without `await`.
+
+```py
+from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+
+class Base(ABC):
+    @abstractmethod
+    def values(self) -> AsyncIterator[int]: ...
+    @abstractmethod
+    async def more_values(self) -> AsyncIterator[int]:
+        yield 1
+
+class Derived(Base):
+    async def values(self) -> AsyncIterator[int]:
+        yield 1
+
+    async def more_values(self) -> AsyncIterator[int]:
+        yield 2
+
+async def consume(base: Base) -> None:
+    async for value in base.values():
+        reveal_type(value)  # revealed: int
+    async for value in base.more_values():
+        reveal_type(value)  # revealed: int
+```
+
+### Coroutines returning async iterators
+
+A coroutine can intentionally return an async iterator. Its caller must await it before iterating
+over its result; an async iterator return annotation does not make the function an async generator.
+
+```py
+from collections.abc import AsyncIterator
+
+async def values() -> AsyncIterator[int]:
+    yield 1
+
+async def factory() -> AsyncIterator[int]:
+    return values()
+
+async def consume() -> None:
+    # snapshot
+    async for value in factory():
+        pass
+
+    async for value in await factory():
+        reveal_type(value)  # revealed: int
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]` is not async-iterable
+  --> src/mdtest_snippet.py:11:24
+   |
+11 |     async for value in factory():
+   |                        ^^^^^^^^^
+info: It has no `__aiter__` method
+help: `await` the coroutine before iterating over its result
+```
+
+### Unrelated coroutine errors
+
+Coroutines returning other types do not receive advice about async generator stubs.
+
+```py
+async def value() -> int:
+    return 1
+
+async def consume() -> None:
+    # snapshot
+    async for item in value():
+        pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, int]` is not async-iterable
+ --> src/mdtest_snippet.py:6:23
+  |
+6 |     async for item in value():
+  |                       ^^^^^^^
+info: It has no `__aiter__` method
+```
+
+### Third-party async generator stubs
+
+When the declaration comes from a dependency, the diagnostic shows its location and suggests
+reporting an incorrect stub to the library maintainers. This applies to iteration, callable
+assignments, and method overrides.
+
+```toml
+[environment]
+python = "/.venv"
+```
+
+`/.venv/<path-to-site-packages>/dependency.pyi`:
+
+```pyi
+from collections.abc import AsyncIterator
+
+async def values() -> AsyncIterator[int]: ...
+
+class Base:
+    async def values(self) -> AsyncIterator[int]: ...
+```
+
+`main.py`:
+
+```py
+from dependency import values
+
+async def consume() -> None:
+    # snapshot
+    async for value in values():
+        pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]` is not async-iterable
+ --> src/main.py:5:24
+  |
+5 |     async for value in values():
+  |                        ^^^^^^^^
+  |
+ ::: .venv/<path-to-site-packages>/dependency.pyi:3:1
+  |
+3 | async def values() -> AsyncIterator[int]: ...
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
+info: It has no `__aiter__` method
+help: `await` the coroutine before iterating over its result
+help: If an async generator was intended, report this stub to the library maintainers
+```
+
+`assignment.py`:
+
+```py
+from collections.abc import AsyncIterator, Callable
+from dependency import values
+
+# snapshot
+factory: Callable[[], AsyncIterator[int]] = values
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `def values() -> CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `() -> AsyncIterator[int]`
+ --> src/assignment.py:5:45
+  |
+5 | factory: Callable[[], AsyncIterator[int]] = values
+  |          --------------------------------   ^^^^^^ Incompatible value of type `def values() -> CoroutineType[Any, Any, AsyncIterator[int]]`
+  |          |
+  |          Declared type
+  |
+ ::: .venv/<path-to-site-packages>/dependency.pyi:3:1
+  |
+3 | async def values() -> AsyncIterator[int]: ...
+  | ---------------------------------------- Without `yield` in the function body this function returns a coroutine
+info: incompatible return types: `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to `AsyncIterator[int]`
+info: └── type `CoroutineType[Any, Any, AsyncIterator[int]]` is not assignable to protocol `AsyncIterator[int]`
+info:     └── protocol member `__aiter__` is not defined on type `CoroutineType[Any, Any, AsyncIterator[int]]`
+help: If an async generator was intended, report this stub to the library maintainers
+```
+
+`override.py`:
+
+```py
+from collections.abc import AsyncIterator
+from dependency import Base
+
+class Derived(Base):
+    # snapshot
+    async def values(self) -> AsyncIterator[int]:
+        yield 1
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `values`
+ --> src/override.py:6:15
+  |
+6 |     async def values(self) -> AsyncIterator[int]:
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.values`
+  |
+ ::: .venv/<path-to-site-packages>/dependency.pyi:6:5
+  |
+6 |     async def values(self) -> AsyncIterator[int]: ...
+  |     --------------------------------------------
+  |     |         |
+  |     |         `Base.values` defined here
+  |     Without `yield` in the function body this function returns a coroutine
+info: incompatible return types: `AsyncIterator[int]` is not assignable to `CoroutineType[Any, Any, AsyncIterator[int]]`
+help: If an async generator was intended, report this stub to the library maintainers
+info: This violates the Liskov Substitution Principle
+```
+
+### Coroutines without a known declaration
+
+When a coroutine that returns an async iterator is stored in a variable, the diagnostic suggests
+awaiting it. It does not suggest editing a stub without knowing which declaration to point to.
+
+```py
+from collections.abc import AsyncIterator
+
+async def values() -> AsyncIterator[int]:
+    yield 1
+
+async def factory() -> AsyncIterator[int]:
+    return values()
+
+async def consume() -> None:
+    coroutine = factory()
+    # snapshot
+    async for value in coroutine:
+        pass
+```
+
+```snapshot
+error[not-iterable]: Object of type `CoroutineType[Any, Any, AsyncIterator[int]]` is not async-iterable
+  --> src/mdtest_snippet.py:12:24
+   |
+12 |     async for value in coroutine:
+   |                        ^^^^^^^^^
+info: It has no `__aiter__` method
+help: `await` the coroutine before iterating over its result
+```

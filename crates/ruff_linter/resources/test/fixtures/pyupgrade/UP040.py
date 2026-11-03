@@ -149,3 +149,10 @@ ParenAlias = TypeAliasType(
         | str
     ),
 )
+
+
+# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+StarredList: TypeAlias = list[T_starred]
+StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))

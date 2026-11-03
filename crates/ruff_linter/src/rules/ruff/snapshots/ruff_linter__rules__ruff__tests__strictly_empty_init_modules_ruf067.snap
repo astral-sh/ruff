@@ -6,8 +6,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.ruff.strictly_empty_init_modules = true
 
 --- Summary ---
-Removed: 6
-Added: 30
+Removed: 7
+Added: 29
 
 --- Removed ---
 RUF067 `__init__` module should only contain docstrings and re-exports
@@ -17,14 +17,14 @@ RUF067 `__init__` module should only contain docstrings and re-exports
 11 |
 12 | MY_CONSTANT = 5
    | ^^^^^^^^^^^^^^^
-13 | """This is an important constant."""
+13 | """This is an important constant."""  # ok in both modes
    |
 
 
 RUF067 `__init__` module should only contain docstrings and re-exports
   --> __init__.py:15:1
    |
-13 | """This is an important constant."""
+13 | """This is an important constant."""  # ok in both modes
 14 |
 15 | os.environ["FOO"] = 1
    | ^^^^^^^^^^^^^^^^^^^^^
@@ -55,39 +55,40 @@ RUF067 `__init__` module should only contain docstrings and re-exports
 
 
 RUF067 `__init__` module should only contain docstrings and re-exports
-  --> __init__.py:54:1
+  --> __init__.py:43:1
    |
-52 | __submodules__ += ["extra"]  # ok
-53 |
-54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+42 | import pkgutil
+43 | """Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |
+45 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
    |
 
 
 RUF067 `__init__` module should only contain docstrings and re-exports
   --> __init__.py:55:1
    |
-54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
-55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+53 | __submodules__ += ["extra"]  # ok
+54 |
+55 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+56 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:56:1
+   |
+55 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+56 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-56 |
-57 | # also allow `__author__`
+57 |
+58 | # also allow `__author__`
    |
 
 
 
 --- Added ---
-RUF067 `__init__` module should not contain any code
- --> __init__.py:1:1
-  |
-1 | """This is the module docstring."""
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2 |
-3 | # convenience imports:
-  |
-
-
 RUF067 `__init__` module should not contain any code
  --> __init__.py:4:1
   |
@@ -163,25 +164,14 @@ RUF067 `__init__` module should not contain any code
 11 |
 12 | MY_CONSTANT = 5
    | ^^^^^^^^^^^^^^^
-13 | """This is an important constant."""
-   |
-
-
-RUF067 `__init__` module should not contain any code
-  --> __init__.py:13:1
-   |
-12 | MY_CONSTANT = 5
-13 | """This is an important constant."""
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-14 |
-15 | os.environ["FOO"] = 1
+13 | """This is an important constant."""  # ok in both modes
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:15:1
    |
-13 | """This is an important constant."""
+13 | """This is an important constant."""  # ok in both modes
 14 |
 15 | os.environ["FOO"] = 1
    | ^^^^^^^^^^^^^^^^^^^^^
@@ -306,116 +296,126 @@ RUF067 `__init__` module should not contain any code
 41 |
 42 | import pkgutil
    | ^^^^^^^^^^^^^^
-43 |
-44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
+43 | """Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
    |
 
 
 RUF067 `__init__` module should not contain any code
-  --> __init__.py:44:1
+  --> __init__.py:43:1
    |
 42 | import pkgutil
-43 |
-44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
+43 | """Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |
+45 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:45:1
    |
-44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
-45 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
+43 | """Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
+44 |
+45 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-46 |
-47 | # any dunder-named assignment is allowed in non-strict mode
+46 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
    |
 
 
 RUF067 `__init__` module should not contain any code
-  --> __init__.py:48:1
+  --> __init__.py:46:1
    |
-47 | # any dunder-named assignment is allowed in non-strict mode
-48 | __path__ = 5  # ok
-   | ^^^^^^^^^^^^
-49 | __submodules__ = []  # ok (e.g. mkinit)
-50 | __protected__ = []  # ok
+45 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
+46 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |
+48 | # any dunder-named assignment is allowed in non-strict mode
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:49:1
    |
-47 | # any dunder-named assignment is allowed in non-strict mode
-48 | __path__ = 5  # ok
-49 | __submodules__ = []  # ok (e.g. mkinit)
-   | ^^^^^^^^^^^^^^^^^^^
-50 | __protected__ = []  # ok
-51 | __custom__: list[str] = []  # ok
+48 | # any dunder-named assignment is allowed in non-strict mode
+49 | __path__ = 5  # ok
+   | ^^^^^^^^^^^^
+50 | __submodules__ = []  # ok (e.g. mkinit)
+51 | __protected__ = []  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:50:1
    |
-48 | __path__ = 5  # ok
-49 | __submodules__ = []  # ok (e.g. mkinit)
-50 | __protected__ = []  # ok
-   | ^^^^^^^^^^^^^^^^^^
-51 | __custom__: list[str] = []  # ok
-52 | __submodules__ += ["extra"]  # ok
+48 | # any dunder-named assignment is allowed in non-strict mode
+49 | __path__ = 5  # ok
+50 | __submodules__ = []  # ok (e.g. mkinit)
+   | ^^^^^^^^^^^^^^^^^^^
+51 | __protected__ = []  # ok
+52 | __custom__: list[str] = []  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:51:1
    |
-49 | __submodules__ = []  # ok (e.g. mkinit)
-50 | __protected__ = []  # ok
-51 | __custom__: list[str] = []  # ok
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-52 | __submodules__ += ["extra"]  # ok
+49 | __path__ = 5  # ok
+50 | __submodules__ = []  # ok (e.g. mkinit)
+51 | __protected__ = []  # ok
+   | ^^^^^^^^^^^^^^^^^^
+52 | __custom__: list[str] = []  # ok
+53 | __submodules__ += ["extra"]  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:52:1
    |
-50 | __protected__ = []  # ok
-51 | __custom__: list[str] = []  # ok
-52 | __submodules__ += ["extra"]  # ok
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-53 |
-54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+50 | __submodules__ = []  # ok (e.g. mkinit)
+51 | __protected__ = []  # ok
+52 | __custom__: list[str] = []  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | __submodules__ += ["extra"]  # ok
    |
 
 
 RUF067 `__init__` module should not contain any code
-  --> __init__.py:54:1
+  --> __init__.py:53:1
    |
-52 | __submodules__ += ["extra"]  # ok
-53 |
-54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+51 | __protected__ = []  # ok
+52 | __custom__: list[str] = []  # ok
+53 | __submodules__ += ["extra"]  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 |
+55 | foo = __submodules__ = []  # RUF067: not every target is a dunder
    |
 
 
 RUF067 `__init__` module should not contain any code
   --> __init__.py:55:1
    |
-54 | foo = __submodules__ = []  # RUF067: not every target is a dunder
-55 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-56 |
-57 | # also allow `__author__`
+53 | __submodules__ += ["extra"]  # ok
+54 |
+55 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+56 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
    |
 
 
 RUF067 `__init__` module should not contain any code
-  --> __init__.py:58:1
+  --> __init__.py:56:1
    |
-57 | # also allow `__author__`
-58 | __author__ = "The Author"  # ok
+55 | foo = __submodules__ = []  # RUF067: not every target is a dunder
+56 | __all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+57 |
+58 | # also allow `__author__`
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:59:1
+   |
+58 | # also allow `__author__`
+59 | __author__ = "The Author"  # ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^

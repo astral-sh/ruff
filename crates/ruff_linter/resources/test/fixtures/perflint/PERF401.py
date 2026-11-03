@@ -326,3 +326,51 @@ def f():
     ) in original:
         if i > 0:
             filtered.append(i)
+
+def f(values, allowed):
+    # ternary iterable must be parenthesized (https://github.com/astral-sh/ruff/issues/29365)
+    found = []
+    for value in [values] if isinstance(values, str) else values:
+        if value not in allowed:
+            found.append(value)
+    return found
+
+def f(values, allowed):
+    # parenthesized ternary iterable
+    found = [0]
+    for value in ([values] if isinstance(values, str) else values):
+        if value not in allowed:
+            found.append(value)
+    return found
+
+def f(values):
+    # lambda iterable
+    found = []
+    for value in lambda: values:
+        found.append(value * 2)
+    return found
+
+def f(values, allowed):
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
+    found = []
+    for value in (items := values):
+        if value not in allowed:
+            found.append(value)
+    return found
+
+def f(values, allowed):
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
+    found = []
+    for value in list(items := values):
+        if value not in allowed:
+            found.append(value)
+    return found
+
+def f(values):
+    # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    found = []
+    for value in (  # comment
+        values if values else ()
+    ):
+        found.append(value * 2)
+    return found

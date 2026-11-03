@@ -457,7 +457,7 @@ reason = "the public semantic model retains node navigation for downstream analy
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
-item = "model::SemanticModel::<'a>::in_runtime_required_annotation"
+item = "model::SemanticModel::<'a>::in_runtime_ambiguous_annotation"
 kind = "inherent_method"
 level = "expect"
 reason = "semantic model predicates intentionally expose each annotation context"
@@ -513,7 +513,7 @@ reason = "the public semantic model exposes its file identity and source locatio
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'_, Context>::state_snapshot"
+item = "formatter::Formatter::<'_, '_, Context>::state_snapshot"
 kind = "inherent_method"
 level = "expect"
 reason = "formatter clients use snapshots to restore state after speculative formatting"
@@ -521,7 +521,7 @@ reason = "formatter clients use snapshots to restore state after speculative for
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'_, Context>::restore_state_snapshot"
+item = "formatter::Formatter::<'_, '_, Context>::restore_state_snapshot"
 kind = "inherent_method"
 level = "expect"
 reason = "formatter clients use snapshots to restore state after speculative formatting"
@@ -581,14 +581,6 @@ item = "size::TextSize::saturating_sub"
 kind = "inherent_method"
 level = "expect"
 reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_project"
-item = "db::changes::ChangeResult::custom_stdlib_changed"
-kind = "inherent_method"
-level = "expect"
-reason = "change results expose both project and custom-stdlib invalidation state"
 
 [[override]]
 lint = "hawk::dead_public"
@@ -679,7 +671,7 @@ level = "expect"
 reason = "lint level predicates intentionally cover every severity"
 
 [[override]]
-lint = "hawk::dead_public"
+lint = "hawk::unnecessary_public"
 crate = "ty_python_semantic"
 item = "lint::Level::is_ignore"
 kind = "inherent_method"
@@ -1028,7 +1020,7 @@ reason = "group mode predicates intentionally expose a consistent public interfa
 [[override]]
 lint = "hawk::unnecessary_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'buf, Context>::intern_vec"
+item = "formatter::Formatter::<'buf, 'state, Context>::intern_vec"
 kind = "inherent_method"
 level = "expect"
 reason = "the public formatter API supports interning prebuilt format elements"
@@ -1399,3 +1391,13 @@ reason = "kept compatible with the upstream annotate-snippets crate"
 crate = "annotate_snippets"
 file = "crates/ruff_annotate_snippets/src/snippet.rs"
 reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "unicode_names2"
+file = "crates/ruff_unicode_names2/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2 crate"
+
+[[exclude]]
+crate = "unicode_names2_generator"
+file = "crates/ruff_unicode_names2_generator/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2_generator crate"

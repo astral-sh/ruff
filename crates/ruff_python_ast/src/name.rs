@@ -173,11 +173,6 @@ impl salsa::Lookup<Name> for &str {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&str> for Name {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-
-    #[inline]
     fn eq(&self, data: &&str) -> bool {
         self == *data
     }
@@ -216,11 +211,6 @@ impl salsa::Lookup<compact_str::CompactString> for &Name {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<Name> for compact_str::CompactString {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
-    #[inline]
     fn eq(&self, data: &Name) -> bool {
         self.as_str() == data.as_str()
     }
@@ -228,11 +218,6 @@ impl salsa::HashEqLike<Name> for compact_str::CompactString {
 
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&Name> for compact_str::CompactString {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
     #[inline]
     fn eq(&self, data: &&Name) -> bool {
         self.as_str() == data.as_str()
@@ -338,7 +323,18 @@ impl<'a> QualifiedName<'a> {
         }
     }
 
-    /// Creates a name that's guaranteed not be a built in
+    /// Creates a non-builtin qualified name from a single identifier.
+    ///
+    /// `name` must be nonempty and must not contain `.`. Use [`Self::user_defined`]
+    /// for dotted names.
+    #[inline]
+    pub fn user_defined_identifier(name: &'a str) -> Self {
+        debug_assert!(!name.is_empty());
+        debug_assert!(!name.contains('.'));
+        Self(SegmentsVec::from_slice(&[name]))
+    }
+
+    /// Creates a non-builtin qualified name, splitting `name` on `.`.
     #[inline]
     pub fn user_defined(name: &'a str) -> Self {
         name.split('.').collect()
@@ -384,6 +380,35 @@ impl<'a> QualifiedName<'a> {
         let mut inner = self.0;
         inner.push(member);
         Self(inner)
+    }
+
+    /// Qualifies `expr`, using `self` as the qualified name of its root.
+    ///
+    /// For example, qualifying `la.norm` with `numpy.linalg` produces
+    /// `numpy.linalg.norm`. Qualifying a name expression such as `la` returns
+    /// `numpy.linalg`, a copy of `self`, without adding any segments.
+    ///
+    /// Returns `None` if this name is empty or `expr` is not a name or an
+    /// attribute chain rooted at a name.
+    #[inline]
+    pub fn qualify(&self, mut expr: &'a Expr) -> Option<Self> {
+        let prefix = self.segments();
+        if prefix.is_empty() {
+            return None;
+        }
+
+        let mut segments = SegmentsVec::from_slice(prefix);
+        while let Expr::Attribute(attribute) = expr {
+            segments.push(attribute.attr.as_str());
+            expr = &attribute.value;
+        }
+        if !expr.is_name_expr() {
+            return None;
+        }
+
+        // Attribute traversal visits the outermost member first; keep the prefix in order.
+        segments.as_mut_slice()[prefix.len()..].reverse();
+        Some(Self(segments))
     }
 
     /// Extends the qualified name using the given members.
@@ -722,6 +747,14 @@ impl<'a> SegmentsVec<'a> {
         }
     }
 
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [&'a str] {
+        match self {
+            Self::Stack(stack) => stack.as_mut_slice(),
+            Self::Heap(heap) => heap.as_mut_slice(),
+        }
+    }
+
     /// Pushes `name` to the end of the segments.
     ///
     /// Spills to the heap if the segments are stored on the stack and the 9th segment is pushed.
@@ -867,9 +900,53 @@ mod tests {
     #[cfg(feature = "salsa")]
     use std::hash::{DefaultHasher, Hash, Hasher};
 
+    use ruff_text_size::TextRange;
+
     #[cfg(feature = "salsa")]
     use crate::name::Name;
-    use crate::name::SegmentsVec;
+    use crate::name::{QualifiedName, SegmentsVec};
+    use crate::{
+        AtomicNodeIndex, Expr, ExprAttribute, ExprContext, ExprName, ExprNoneLiteral, Identifier,
+    };
+
+    #[test]
+    fn qualify() {
+        let name = QualifiedName::user_defined("numpy.linalg");
+        let expr = Expr::Name(ExprName {
+            id: "la".into(),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+        });
+        assert_eq!(name.qualify(&expr), Some(name.clone()));
+
+        let expr = attribute_expr(attribute_expr(expr, "norm"), "__name__");
+        assert_eq!(
+            name.qualify(&expr),
+            Some(QualifiedName::user_defined("numpy.linalg.norm.__name__"))
+        );
+    }
+
+    #[test]
+    fn qualify_invalid_root() {
+        let name = QualifiedName::user_defined_identifier("numpy");
+        let expr = Expr::NoneLiteral(ExprNoneLiteral {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let expr = attribute_expr(expr, "member");
+        assert_eq!(name.qualify(&expr), None);
+    }
+
+    fn attribute_expr(value: Expr, attribute: &str) -> Expr {
+        Expr::Attribute(ExprAttribute {
+            value: Box::new(value),
+            attr: Identifier::new(attribute, TextRange::default()),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+        })
+    }
 
     #[cfg(feature = "salsa")]
     #[test]
@@ -878,7 +955,7 @@ mod tests {
         let lookup = "member";
 
         let mut name_hasher = DefaultHasher::new();
-        salsa::HashEqLike::<&str>::hash(&name, &mut name_hasher);
+        name.hash(&mut name_hasher);
         let mut lookup_hasher = DefaultHasher::new();
         lookup.hash(&mut lookup_hasher);
 

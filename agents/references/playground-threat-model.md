@@ -3,7 +3,8 @@
 ## Overview
 
 This model covers browser analysis, Python execution, file exports, and the public sharing API. The
-[CLI threat model](cli-threat-model.md) defines the general criteria for security findings.
+[CLI threat model](cli-threat-model.md) defines the general criteria for security findings. The trust
+rules below take precedence when deciding which inputs are trusted.
 
 Builds and publication have a separate
 [repository threat model](repository-threat-model.md).

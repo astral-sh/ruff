@@ -9,7 +9,7 @@ from aaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaa import (  # explain
 # non-pragma prefix is 86 columns.
 from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # explain  # noqa: TID251
 
-# Separate comments with the pragma first: when isort collapses this import in preview,
+# Separate comments with the pragma first: when isort collapses this import,
 # the merged comment token is pragma-prefixed, so E501 strips it entirely and the
 # collapsed 104-column line is fine.
 from ccccccccccccccccccccccccccccccc.ccccccccccccccccccccccccccccccc import (  # noqa: TID251

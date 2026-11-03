@@ -24,7 +24,7 @@ fn default_inlay_hints() -> Result<()> {
     let foo_content = "\
 class Thing: ...
 
-def foo(a: Thing) -> Thing:
+def foo(a: Thing):
     return a
 
 y = foo(Thing())
@@ -33,6 +33,10 @@ y = foo(Thing())
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/ty.toml",
+            "[analysis]\nreturn-type-inference = 'always'\n",
+        )?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
         .build()
@@ -46,6 +50,49 @@ y = foo(Thing())
 
     insta::assert_json_snapshot!(hints, @r#"
     [
+      {
+        "position": {
+          "line": 2,
+          "character": 17
+        },
+        "label": [
+          {
+            "value": " -> "
+          },
+          {
+            "value": "Thing",
+            "location": {
+              "uri": "file://<temp_dir>/src/foo.py",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 6
+                },
+                "end": {
+                  "line": 0,
+                  "character": 11
+                }
+              }
+            }
+          }
+        ],
+        "kind": 1,
+        "textEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 2,
+                "character": 17
+              },
+              "end": {
+                "line": 2,
+                "character": 17
+              }
+            },
+            "newText": " -> Thing"
+          }
+        ]
+      },
       {
         "position": {
           "line": 5,

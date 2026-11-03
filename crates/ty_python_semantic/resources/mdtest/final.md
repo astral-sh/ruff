@@ -102,16 +102,13 @@ class Child(Parent):
 class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
-    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
-    # type or on an instance, it will behave the same from the caller's perspective. The only
-    # difference is whether the method body gets access to `self`, which is not a
-    # concern of Liskov.
+    # The static method accepts the same instance calls as the inherited method, but
+    # overriding a final method is still prohibited.
     @staticmethod
     # error: [override-of-final-method]
-    # error: [invalid-method-override]
     def foo(): ...
     @property
-    # TODO: we should emit a Liskov violation here too
+    # error: [invalid-property-type-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
@@ -323,7 +320,7 @@ class B:
     method = A.method
 
 class C(B):
-    def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+    def method(self) -> None: ...  # ok here (see prose discussion above)
 ```
 
 ## Overriding a `@final` method by assigning a function to a class variable
@@ -346,7 +343,7 @@ class Base:
 `other.py`:
 
 ```py
-def replacement_method() -> None: ...
+def replacement_method(self) -> None: ...
 ```
 
 `derived.py`:
@@ -357,6 +354,59 @@ from other import replacement_method
 
 class Derived(Base):
     method = replacement_method  # error: [override-of-final-method]
+```
+
+## A decorator can replace an overriding method with another function
+
+`handlers.py`:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+F = TypeVar("F")
+
+def use_handler(handler: F) -> Callable[[object], F]:
+    return lambda original: handler
+
+def shared_handler(self: object) -> None: ...
+```
+
+`main.py`:
+
+```py
+from typing import final
+from handlers import shared_handler, use_handler
+
+class Base:
+    @final
+    def run(self) -> None: ...
+
+class Plugin(Base):
+    @use_handler(shared_handler)
+    def run(self) -> None: ...  # error: [override-of-final-method]
+
+class LocalPlugin(Base):
+    def local_handler(self) -> None: ...
+    @use_handler(local_handler)
+    # snapshot: override-of-final-method
+    def run(self) -> None: ...
+```
+
+```snapshot
+error[override-of-final-method]: Cannot override `Base.run`
+  --> src/main.py:16:9
+   |
+16 |     def run(self) -> None: ...
+   |         ^^^ Overrides a definition from superclass `Base`
+info: `Base.run` is decorated with `@final`, forbidding overrides
+ --> src/main.py:5:5
+  |
+5 |     @final
+  |     ------
+6 |     def run(self) -> None: ...
+  |         --- `Base.run` defined here
+help: Remove the override of `run`
 ```
 
 ## Constructor methods are also checked
@@ -1296,7 +1346,7 @@ class Base(ABC):
 @final
 # snapshot: abstract-method-in-final-class
 class Bad(Base):
-    method: int
+    method: int  # error: [invalid-attribute-override]
 ```
 
 ```snapshot
@@ -1316,7 +1366,7 @@ info: The instance-attribute annotation for `method` does not override the abstr
 help: Either assign a value or add `ClassVar` to this declaration
   --> src/mdtest_snippet.py:11:5
    |
-11 |     method: int
+11 |     method: int  # error: [invalid-attribute-override]
    |     ------ Instance-attribute declaration
 ```
 

@@ -9,11 +9,15 @@ positional-only by type checkers. [PEP 570][pep-570], introduced in Python 3.8, 
 syntax for specifying positional-only parameters, rendering the legacy convention obsolete. However,
 some codebases may still use the legacy convention for compatibility with older Python versions.
 
+This rule is disabled by default because modern code may use `__`-prefixed parameter names for other
+purposes. Enable it if your codebase uses the legacy convention and you want to check that it is
+applied consistently.
+
 ## Why is this bad?
 
 In most cases, a type checker will not consider a parameter to be positional-only if it comes after
-a positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected to the
-author of the code.
+a positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected if the
+author intended to use the legacy convention.
 
 ## Example
 

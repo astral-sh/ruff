@@ -132,7 +132,7 @@ class _SSLContext:
     security_level: int
     """The current security level."""
 
-    sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
+    sni_callback: Callable[[SSLObject, str, SSLContext], int | None] | None
     """Set a callback that will be called when a server name is provided by the SSL/TLS client in the SNI extension.
 
     If the argument is None then the callback is disabled.  The method

@@ -20,6 +20,11 @@ pub trait OptionsMetadata {
         None
     }
 
+    /// The TOML representation of this option group.
+    fn kind() -> OptionSetKind {
+        OptionSetKind::Table
+    }
+
     /// Returns the extracted metadata.
     fn metadata() -> OptionSet
     where
@@ -35,6 +40,10 @@ where
 {
     fn record(visit: &mut dyn Visit) {
         T::record(visit);
+    }
+
+    fn kind() -> OptionSetKind {
+        T::kind()
     }
 }
 
@@ -67,6 +76,18 @@ impl Display for OptionEntry {
     }
 }
 
+/// The TOML representation of an option group.
+#[derive(Debug, Copy, Clone)]
+pub enum OptionSetKind {
+    /// A TOML table, declared with `[name]`.
+    Table,
+    /// A TOML array of tables, declared with `[[name]]`.
+    Array {
+        /// Example fields to include when declaring an array entry for a nested option group.
+        example: &'static str,
+    },
+}
+
 /// A set of options.
 ///
 /// It extracts the options by calling the [`OptionsMetadata::record`] of a type implementing
@@ -75,6 +96,7 @@ impl Display for OptionEntry {
 pub struct OptionSet {
     record: fn(&mut dyn Visit),
     doc: fn() -> Option<&'static str>,
+    kind: OptionSetKind,
 }
 
 impl OptionSet {
@@ -85,6 +107,7 @@ impl OptionSet {
         Self {
             record: T::record,
             doc: T::documentation,
+            kind: T::kind(),
         }
     }
 
@@ -97,6 +120,10 @@ impl OptionSet {
     pub fn documentation(&self) -> Option<&'static str> {
         let documentation = self.doc;
         documentation()
+    }
+
+    pub fn kind(&self) -> OptionSetKind {
+        self.kind
     }
 
     /// Returns `true` if this set has an option that resolves to `name`.

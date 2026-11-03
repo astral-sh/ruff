@@ -1227,6 +1227,51 @@ class C:
 C().value
 ```
 
+### A descriptor requires a protocol containing its own attribute
+
+The descriptor's instance parameter can require the same attribute that the descriptor implements.
+Checking the enclosing class terminates, and an instance of that class satisfies the protocol.
+
+```py
+from typing import Protocol
+
+class HasItem(Protocol):
+    item: int
+
+class ItemDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: int) -> None: ...
+
+class Holder:
+    item = ItemDescriptor()
+
+compatible: HasItem = Holder()  # ok
+```
+
+Checking a class that only annotates its attribute with the descriptor type also terminates:
+
+```py
+class AnnotationOnlyHolder:
+    item: ItemDescriptor  # ok
+```
+
+The recursive check does not make an incompatible setter acceptable:
+
+```py
+class WrongValueDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: str) -> None: ...
+
+class WrongValueHolder:
+    item = WrongValueDescriptor()
+
+incompatible: HasItem = WrongValueHolder()  # error: [invalid-assignment]
+```
+
 ### Recursive metaclass declarations containing dynamic types
 
 A recursive declaration containing `Any` can describe a data descriptor. Assignments to a class

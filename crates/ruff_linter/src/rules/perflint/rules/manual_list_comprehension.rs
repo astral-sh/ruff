@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
+use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{Binding, analyze::typing::is_list};
@@ -187,6 +188,12 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 return;
             }
         }
+    }
+
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
+    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
+        return;
     }
 
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
@@ -389,23 +396,8 @@ fn convert_to_list_extend(
         None => String::new(),
     };
 
-    // if the loop target was an implicit tuple, add parentheses around it
-    // ```python
-    //  for i in a, b:
-    //      ...
-    // ```
-    // becomes
-    // [... for i in (a, b)]
-    let for_iter_str = if for_stmt
-        .iter
-        .as_ref()
-        .as_tuple_expr()
-        .is_some_and(|expr| !expr.parenthesized)
-    {
-        format!("({})", locator.slice(for_stmt.iter.range()))
-    } else {
-        locator.slice(for_stmt.iter.range()).to_string()
-    };
+    let (for_iter_str, for_iter_range) =
+        parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let for_type = if for_stmt.is_async {
         "async for"
@@ -424,11 +416,7 @@ fn convert_to_list_extend(
     };
 
     let variable_name = locator.slice(binding);
-    let mut ranges_to_ignore = vec![
-        to_append.range(),
-        for_stmt.iter.range(),
-        for_stmt.target.range(),
-    ];
+    let mut ranges_to_ignore = vec![to_append.range(), for_iter_range, for_stmt.target.range()];
     if let Some(test) = if_test {
         ranges_to_ignore.push(test.range());
     }

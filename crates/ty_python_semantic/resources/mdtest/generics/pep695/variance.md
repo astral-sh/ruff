@@ -691,6 +691,30 @@ static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
 static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
 ```
 
+### Mutable attributes on classmethod wrappers
+
+A classmethod exposes its wrapped callable through `__func__`, including any mutable attributes. In
+the below example, `Wrapper[T].value` therefore makes `C[T]` invariant even though `T` does not
+appear in the bound call signature. Accepting `C[int]` as `C[object]` would let `set_value` replace
+an `int` with a `str`.
+
+```py
+class Wrapper[T]:
+    value: T
+
+    def __call__(self, cls: object) -> None: ...
+
+class C[T]:
+    method = classmethod(Wrapper[T]())
+
+def set_value(c: C[object]) -> None:
+    c.method.__func__.value = "not an int"
+
+def corrupt(c: C[int]) -> int:
+    set_value(c)  # error: [invalid-argument-type]
+    return c.method.__func__.value
+```
+
 ### Mutable protocol attributes
 
 Underscore-prefixed protocol attributes remain writable through their structural interface, so their

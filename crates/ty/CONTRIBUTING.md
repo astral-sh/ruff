@@ -58,7 +58,7 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features  # Rust linting
 cargo test  # Rust testing
 uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```

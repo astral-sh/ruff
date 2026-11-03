@@ -1,6 +1,7 @@
-use std::fs;
+use std::{borrow::Cow, fs};
 
 pub use project_watcher::{ProjectWatcher, WatchPaths, watch_paths};
+use ruff_db::Db;
 use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{EventHandler, Watcher, directory_watcher};
 
@@ -20,7 +21,7 @@ mod watcher;
 /// ## Renaming a directory
 /// It's up to the file watcher implementation to aggregate the rename event for a directory to a single rename
 /// event instead of emitting an event for each file or subdirectory in that path.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
     /// A new or existing file was opened in an editor.
     ///
@@ -70,6 +71,31 @@ impl ChangeEvent {
         ChangeEvent::Changed {
             path,
             kind: ChangedKind::FileContent,
+        }
+    }
+
+    /// Refines ambiguous deletions using the project's cached file state.
+    ///
+    /// Created and modified paths can be classified from the filesystem, but deleted paths
+    /// no longer exist. If the cache records an existing file, classify its deletion as `File`.
+    /// Otherwise, keep `Any`: the path could have been an uncached file or a directory.
+    /// Resolve every event in a batch before updating any cached file state.
+    pub(crate) fn resolve(&self, db: &dyn Db) -> Cow<'_, Self> {
+        if let Self::Deleted {
+            path,
+            kind: DeletedKind::Any,
+        } = self
+            && db
+                .files()
+                .try_system(db, path)
+                .is_some_and(|file| file.exists(db))
+        {
+            Cow::Owned(Self::Deleted {
+                path: path.clone(),
+                kind: DeletedKind::File,
+            })
+        } else {
+            Cow::Borrowed(self)
         }
     }
 

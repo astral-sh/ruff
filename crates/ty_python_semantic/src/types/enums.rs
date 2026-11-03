@@ -710,7 +710,7 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            let Type::NominalInstance(instance) = positive else {
+            let Type::NominalInstance(instance) = positive.resolve_type_alias(db) else {
                 rest.push(*positive);
                 continue;
             };
@@ -732,7 +732,7 @@ impl<'db> EnumComplementType<'db> {
         }
         let mut excluded_names = FxHashSet::default();
         for negative in negative {
-            let enum_literal = negative.as_enum_literal()?;
+            let enum_literal = negative.resolve_type_alias(db).as_enum_literal()?;
             if enum_literal.enum_class_literal(db) != enum_class_literal {
                 return None;
             }
@@ -1070,14 +1070,17 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
+    let scope_id = class.body_scope(db);
+    let use_def_map = use_def_map(db, scope_id);
+    // As a fast path, avoid looking up base classes if the class body is empty
+    use_def_map.all_end_of_scope_symbol_bindings().next()?;
+
     let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;
     }
 
-    let scope_id = class.body_scope(db);
-    let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();

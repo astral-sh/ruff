@@ -651,18 +651,13 @@ impl<'db> BoundSuperType<'db> {
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::Recursive(recursive) => {
-                return recursive.map_or_else(
-                    db,
-                    env,
-                    || {
-                        Err(BoundSuperError::AbstractOwnerType {
-                            owner_type,
-                            pivot_class: pivot_class_type,
-                            typevar_context: None,
-                        })
+                return recursive.unfold(db, env).map(delegate_to).unwrap_or(Err(
+                    BoundSuperError::AbstractOwnerType {
+                        owner_type,
+                        pivot_class: pivot_class_type,
+                        typevar_context: None,
                     },
-                    delegate_to,
-                );
+                ));
             }
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
@@ -886,8 +881,8 @@ impl<'db> BoundSuperType<'db> {
             Type::NewTypeInstance(newtype) => {
                 return delegate_to(newtype.concrete_base_type(db));
             }
-            Type::Callable(callable) if callable.is_function_like(db) => {
-                return delegate_to(KnownClass::FunctionType.to_instance(db, env));
+            Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => {
+                return delegate_to(class.to_instance(db, env));
             }
             Type::AlwaysFalsy
             | Type::AlwaysTruthy

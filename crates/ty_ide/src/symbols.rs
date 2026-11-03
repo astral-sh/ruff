@@ -394,7 +394,8 @@ impl SymbolKind {
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Workspace symbol searches scan every project file, so release closed files' ASTs as we go.
+    let module = parsed.load_then_clear_on_drop(db);
 
     let mut visitor = SymbolVisitor::tree(db, file);
     visitor.visit_body(&module.syntax().body);
@@ -412,21 +413,13 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbol
     heap_size=ruff_memory_usage::heap_size,
 )]
 pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
-    let source_file = file.file(db);
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Auto-imports scan every module, so release closed files' ASTs as we go.
+    let module = parsed.load_then_clear_on_drop(db);
 
     let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
-    if source_file
-        .path(db)
-        .as_system_path()
-        .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
-    {
-        // Eagerly clear ASTs of third party files.
-        parsed.clear();
-    }
     visitor.into_flat_symbols()
 }
 

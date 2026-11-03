@@ -169,6 +169,12 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        // Drain worker actions before dispatching more deferred requests. Otherwise, workers
+        // can block on the full action channel while this thread blocks on the full job queue.
+        if let Ok(event) = self.main_loop_receiver.try_recv() {
+            return Ok(Some(event));
+        }
+
         // We can't queue those into the main loop because that could result in reordering if
         // the `select` below picks a client message first.
         if let Some(deferred) = self.session.take_deferred_messages() {

@@ -79,6 +79,22 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
         reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
+## `is` with runtime unions
+
+`typing` can reuse the same union object when a nested union repeats its members in a different
+order. The identity branch is reachable in that case.
+
+```py
+from typing import Union
+from typing_extensions import assert_never
+
+Base = Union[int, str, bytes]
+Forward = Base | Union[str, bytes]
+Reverse = Base | Union[bytes, str]
+if Forward is Reverse:
+    assert_never(Forward)  # error: [type-assertion-failure]
+```
+
 ## `is` with `functools.partial`
 
 In the following example, the class body creates `callback` only once, so `C[int].callback` and

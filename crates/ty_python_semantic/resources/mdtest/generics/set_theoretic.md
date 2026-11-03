@@ -13,8 +13,8 @@ This section concentrates on deriving the main results while the next section co
 cases.
 
 ```pyi
-from typing import Any, Coroutine, Sequence
-from types import CoroutineType
+from email.message import EmailMessage, Message
+from typing import Any, Sequence
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
@@ -422,10 +422,10 @@ ContraBase[P] & Top[ContraSub[Any]] = ContraSub[P | Never] = ContraSub[P]    (8b
 An example of this relation would be:
 
 ```ignore
-Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]] = CoroutineType[str, int, bytes]    
+Message[str, str] & Top[EmailMessage[str, Any]] = EmailMessage[str, str]
 ```
 
-where both `Coroutine` and `CoroutineType` are contravariant in their "Send" type parameter.
+where both `Message` and `EmailMessage` are contravariant in their second type parameter.
 
 Again, we can encode the results in ty assertions:
 
@@ -439,7 +439,7 @@ static_assert(is_equivalent_to(Top[ContraSub[Any]] & ContraBase[P], ContraSub[P]
 static_assert(is_equivalent_to(ContraBase[P] & Top[InvariantSubOfContraBase[Any]], Top[InvariantSubOfContraBase[P | Any]]))
 static_assert(is_equivalent_to(Top[InvariantSubOfContraBase[Any]] & ContraBase[P], Top[InvariantSubOfContraBase[P | Any]]))
 
-static_assert(is_equivalent_to(Coroutine[str, int, bytes] & Top[CoroutineType[str, Any, bytes]], CoroutineType[str, int, bytes]))
+static_assert(is_equivalent_to(Message[str, str] & Top[EmailMessage[str, Any]], EmailMessage[str, str]))
 ```
 
 Finally, we look at the invariant `Base` case (item 5). Here, we need `P'` to be equal to `P`, and

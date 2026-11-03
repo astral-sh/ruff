@@ -428,6 +428,36 @@ class C(metaclass=Meta): ...
 reveal_type(C())  # revealed: int
 ```
 
+### Metaclass classmethods wrapping callable objects
+
+A metaclass can wrap a callable instance in `classmethod`. Passing the class as a callback binds the
+metaclass argument and preserves the wrapped callable's remaining parameters and return type.
+
+```py
+from typing import Callable
+
+class MetaCall:
+    def __call__(self, cls: type, value: int) -> str:
+        return str(value)
+
+class Meta(type):
+    __call__ = classmethod(MetaCall())
+
+class C(metaclass=Meta): ...
+
+def call_factory(factory: Callable[[int], str]) -> str:
+    return factory(1)
+
+reveal_type(C(1))  # revealed: str
+reveal_type(call_factory(C))  # revealed: str
+```
+
+A callback expecting a no-argument constructor returning `C` is incompatible with this metaclass.
+
+```py
+wrong_factory: Callable[[], C] = C  # error: [invalid-assignment]
+```
+
 ### Invalid overloaded downstream `__new__`
 
 If metaclass `__call__` forwards to normal construction by returning the constructed instance type,
