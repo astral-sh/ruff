@@ -10,7 +10,7 @@
 `package/bar.py`:
 
 ```py
-from .foo import X  # error: [unresolved-import]
+from .foo import X  # error: [import-not-found]
 
 reveal_type(X)  # revealed: Unknown
 ```
@@ -110,7 +110,7 @@ reveal_type(X)  # revealed: int
 `package/bar.py`:
 
 ```py
-from . import X  # error: [unresolved-import]
+from . import X  # error: [import-not-found]
 
 reveal_type(X)  # revealed: Unknown
 ```
@@ -136,7 +136,7 @@ X: int = 42
 `package/__init__.py`:
 
 ```py
-from .foo import X  # error: [unresolved-import]
+from .foo import X  # error: [import-not-found]
 
 reveal_type(X)  # revealed: Unknown
 ```
@@ -178,7 +178,7 @@ x  # error: [unresolved-reference]
 `package/bar.py`:
 
 ```py
-from .foo import x  # error: [unresolved-import]
+from .foo import x  # error: [import-not-found]
 
 reveal_type(x)  # revealed: Unknown
 ```
@@ -217,7 +217,7 @@ nor an attribute of `package`.
 `package/bar.py`:
 
 ```py
-from . import foo  # error: [unresolved-import]
+from . import foo  # error: [import-not-found]
 
 reveal_type(foo)  # revealed: Unknown
 ```
@@ -266,7 +266,7 @@ X: int = 42
 `__main__.py`:
 
 ```py
-from .parser import X  # error: [unresolved-import]
+from .parser import X  # error: [import-not-found]
 ```
 
 ## Relative imports in `site-packages`

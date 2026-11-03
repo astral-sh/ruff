@@ -79,6 +79,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use similar::{Algorithm, DiffTag, capture_diff_slices};
+use ty_python_semantic::lint::LintId;
 
 use crate::Db;
 
@@ -204,7 +205,7 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
         });
     }
 
-    let baseline: BaselineFile =
+    let mut baseline: BaselineFile =
         serde_json::from_str(source.as_str()).map_err(|error| Error::Parse {
             path: path.to_path_buf(),
             file,
@@ -216,6 +217,19 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
             file,
             version: baseline.version,
         });
+    }
+
+    // Resolve stored rule aliases to their current names so older baselines still match.
+    let aliases: FxHashMap<&'static str, LintId> = db
+        .lint_registry()
+        .aliases()
+        .map(|(name, lint)| (name.as_str(), lint))
+        .collect();
+
+    for entry in baseline.files.values_mut().flatten() {
+        if let Some(lint) = aliases.get(entry.rule.as_str()) {
+            entry.rule = CompactString::const_new(lint.name().as_str());
+        }
     }
 
     Ok(Some(baseline))
