@@ -15,6 +15,7 @@ use crate::system::{
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
+use std::panic::{self, AssertUnwindSafe};
 use std::process::Output;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
@@ -321,10 +322,11 @@ impl DirectoryWalker for OsDirectoryWalker {
 
         builder.threads(max_parallelism().min(NonZeroUsize::new(12).unwrap()).get());
 
+        let panic_payload = std::sync::Mutex::new(None);
         builder.build_parallel().run(|| {
             let mut visitor = visitor_builder.build();
 
-            Box::new(move |entry| {
+            let mut visit = move |entry: std::result::Result<::ignore::DirEntry, _>| {
                 match entry {
                     Ok(entry) => {
                         // SAFETY: The walkdir crate supports `stdin` files and `file_type` can be `None` for these files.
@@ -371,8 +373,21 @@ impl DirectoryWalker for OsDirectoryWalker {
                         }
                     },
                 }
+            };
+
+            // The parallel walker unwraps its worker joins, discarding panic payloads such as
+            // Salsa cancellations. Resume the original panic on the calling thread instead.
+            let panic_payload = &panic_payload;
+            Box::new(move |entry| {
+                panic::catch_unwind(AssertUnwindSafe(|| visit(entry))).unwrap_or_else(|payload| {
+                    panic_payload.lock().unwrap().get_or_insert(payload);
+                    ::ignore::WalkState::Quit
+                })
             })
         });
+        if let Some(payload) = panic_payload.into_inner().unwrap() {
+            panic::resume_unwind(payload);
+        }
     }
 
     fn incremental_matcher(
@@ -598,6 +613,27 @@ mod tests {
         if cfg!(unix) {
             assert!(error.to_string().contains("Not a directory"));
         }
+    }
+
+    #[test]
+    fn walk_directory_preserves_cancellation() -> std::io::Result<()> {
+        use salsa::Database as _;
+
+        let tempdir = TempDir::new()?;
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+
+        let result = salsa::Cancelled::catch(|| {
+            OsSystem::new(root).walk_directory(root).run(|| {
+                Box::new(|_| {
+                    let db = salsa::DatabaseImpl::default();
+                    db.cancellation_token().cancel();
+                    db.unwind_if_revision_cancelled();
+                    WalkState::Continue
+                })
+            });
+        });
+        std::assert_matches!(result, Err(salsa::Cancelled::Local));
+        Ok(())
     }
 
     #[test]
