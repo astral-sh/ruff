@@ -2811,12 +2811,12 @@ GoodMatch2 = Enum(name, "A B")  # also fine
 If there is a mismatch, we emit the following diagnostic:
 
 ```py
-# snapshot: mismatched-type-name
+# snapshot: mismatched-enum-name
 Mismatch = Enum("WrongName", "A B")
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+warning[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
  --> src/mdtest_snippet.py:8:17
   |
 8 | Mismatch = Enum("WrongName", "A B")
@@ -2827,12 +2827,12 @@ If the name is not a string literal, we also emit a diagnostic:
 
 ```py
 def f(name: str) -> None:
-    # snapshot: mismatched-type-name
+    # snapshot: mismatched-enum-name
     DynamicMismatch = Enum(name, "A B")
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+warning[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
   --> src/mdtest_snippet.py:11:28
    |
 11 |     DynamicMismatch = Enum(name, "A B")
@@ -3107,7 +3107,7 @@ Non-literal names should still be recognized as creating an enum class.
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
-    # error: [mismatched-type-name]
+    # error: [mismatched-enum-name]
     result = Enum(name.title(), "RED BLUE", module=__name__)
     reveal_type(result)  # revealed: type[Enum]
     return result

@@ -16,9 +16,6 @@ characters.
 
 Enable this rule to enforce consistent sentinel naming.
 
-This rule is similar to `mismatched-type-name`, but is a distinct rule because the default severity
-differs.
-
 ## Examples
 
 ```python

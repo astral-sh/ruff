@@ -36,7 +36,7 @@ impl std::fmt::Display for Explanation<'_> {
         let status = match self.status {
             LintStatus::Preview { since } => format!("Preview (since {since})"),
             LintStatus::Stable { since } => format!("Stable (since {since})"),
-            LintStatus::Deprecated { since, reason } => {
+            LintStatus::Deprecated { since, reason, .. } => {
                 format!("Deprecated (since {since}): {reason}")
             }
             LintStatus::Removed { since, reason } => format!("Removed (since {since}): {reason}"),

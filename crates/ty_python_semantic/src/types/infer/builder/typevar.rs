@@ -7,6 +7,7 @@ use crate::{
         diagnostic::{
             INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_BOUND,
             INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+            MISMATCHED_PARAMSPEC_NAME, MISMATCHED_TYPEVAR_NAME, MISMATCHED_TYPEVARTUPLE_NAME,
             report_mismatched_type_name,
         },
         infer::{
@@ -999,6 +1000,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name_param != target_name {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEVARTUPLE_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),
@@ -1252,6 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name_param != target_name {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_PARAMSPEC_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),
@@ -1495,6 +1498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name_param != target_name {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEVAR_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),

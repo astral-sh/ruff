@@ -8,8 +8,8 @@ use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT, report_mismatched_type_name,
+    INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISMATCHED_TYPEDDICT_NAME, MISSING_ARGUMENT,
+    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
@@ -285,6 +285,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEDDICT_NAME,
                 name_arg,
                 "TypedDict",
                 &assigned_name,

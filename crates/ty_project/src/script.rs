@@ -188,7 +188,7 @@ fn parse_script_metadata(
         toml::from_str::<ScriptMetadata>(tag.metadata())
     };
 
-    let mut metadata = match result {
+    match result {
         Ok(metadata) => metadata,
         Err(error) => {
             let range = error.span().and_then(|span| {
@@ -202,15 +202,9 @@ fn parse_script_metadata(
                 error.message(),
                 range,
             ));
-            return ScriptMetadata::default();
+            ScriptMetadata::default()
         }
-    };
-
-    if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.prioritize_all_selectors();
     }
-
-    metadata
 }
 
 fn resolve_script_options(
