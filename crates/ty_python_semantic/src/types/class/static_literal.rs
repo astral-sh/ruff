@@ -3023,7 +3023,7 @@ impl<'db> StaticClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+            let declared_and_qualifiers = place_from_declarations(db, env, declarations.clone())
                 .with_imported_final(
                     db,
                     env,
@@ -3078,6 +3078,17 @@ impl<'db> StaticClassLiteral<'db> {
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
+                        let method_qualifiers = || {
+                            if declarations.any_reachable(db, |declaration| {
+                                declaration.is_defined_and(|definition| {
+                                    !definition.kind(db).is_function_def()
+                                })
+                            }) {
+                                qualifiers
+                            } else {
+                                qualifiers | TypeQualifiers::METHOD_INSTANCE_ATTRIBUTE
+                            }
+                        };
 
                         let implicit = match declaredness {
                             Definedness::AlwaysDefined
@@ -3086,7 +3097,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 // A method assigns to this attribute, but its declared type
                                 // already determines what an instance can read.
                                 return Member {
-                                    inner: declared.with_qualifiers(qualifiers),
+                                    inner: declared.with_qualifiers(method_qualifiers()),
                                 };
                             }
                             Definedness::AlwaysDefined => Member::unbound(),
@@ -3113,7 +3124,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     public_type_policy: PublicTypePolicy::Raw,
                                     provenance: implicit_provenance.or(declared_provenance),
                                 })
-                                .with_qualifiers(qualifiers),
+                                .with_qualifiers(method_qualifiers()),
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty

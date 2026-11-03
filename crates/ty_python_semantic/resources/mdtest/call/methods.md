@@ -726,8 +726,6 @@ class C:
         return str(x)
 
     def swap(self) -> None:
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = self.some_compatible_method
 
 c = C()
@@ -746,9 +744,6 @@ bound to the instance "again".
 In summary, calling `c.method(42)` works, returns a string, and prints "replaced":
 
 ```py
-# TODO: This works at runtime, so we shouldn't emit an error here
-# error: [invalid-argument-type] "Argument to function `C.method` is incorrect: Expected `C`, found `Literal[42]`"
-# error: [missing-argument] "No argument provided for required parameter `x` of function `C.method`"
 reveal_type(c.method(42))  # revealed: str
 ```
 
@@ -773,24 +768,16 @@ class Correct:
         return str(x)
 
     def swap(self, replacement: Callable[[int], str]) -> None:
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = self.compatible_method
 
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = replacement
 
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = lambda x: str(x)
 
         class CompatibleCallable:
             def __call__(self, x: int) -> str:
                 return str(x)
 
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = CompatibleCallable()
 ```
 
@@ -814,8 +801,7 @@ class Wrong:
         self.method = lambda: ""  # error: [invalid-assignment]
         self.method = lambda self, x: ""  # error: [invalid-assignment]
         self.method = lambda x: x  # error: [invalid-assignment]
-        # TODO: This should be an error
-        self.method = Wrong.method
+        self.method = Wrong.method  # error: [invalid-assignment]
 ```
 
 ### Keyword arguments
@@ -829,15 +815,13 @@ class C:
         return str(x)
 
     def swap(self) -> None:
-        # TODO: the first one here should not be an error
-        # error: [invalid-assignment]
         self.method = lambda x: str(x)
+
+    def swap_with_different_keyword(self) -> None:
         self.method = lambda y: str(y)  # error: [invalid-assignment]
 
 c = C()
 c.swap()
-# TODO: this should not be an error
-# error: [missing-argument]
 c.method(x=42)
 ```
 
@@ -856,13 +840,9 @@ class C:
         return str(x)
 
     def swap(self) -> None:
-        # TODO: these should not be errors
-        self.class_method = lambda x: str(x)  # error: [invalid-assignment]
-        self.static_method = lambda x: str(x)  # error: [invalid-assignment]
+        self.class_method = lambda x: str(x)
+        self.static_method = lambda x: str(x)
 
-        # TODO: those two errors should not be emitted
-        # error: [invalid-argument-type]
-        # error: [missing-argument]
         reveal_type(self.class_method(42))  # revealed: str
         reveal_type(self.static_method(42))  # revealed: str
 ```
@@ -892,8 +872,6 @@ class Problematic:
             def __call__(self, x: int) -> str:
                 return str(x)
 
-        # TODO: this should not be an error
-        # error: [invalid-assignment]
         self.method = CompatibleCallable()
 
 p = Problematic()
@@ -911,8 +889,7 @@ does not emit an error for the missing `__self__` attribute:
 
 ```py
 p.swap()
-# TODO: we currently emit `unresolved-attribute` here, but this will likely go away once we implement shadowing
-p.method.__self__  # error: [unresolved-attribute]
+p.method.__self__
 ```
 
 Maybe more importantly, consider what happens if the class is subclassed. Since we only checked the
@@ -928,8 +905,7 @@ class C:
         return x
 
     def swap(self) -> None:
-        # TODO: with a proposed strict rule, this should be an error, but not `invalid-assignment`
-        # error: [invalid-assignment]
+        # TODO: with a proposed strict rule, this should be an error
         self.method = self.seemingly_compatible
 
 class D(C):
@@ -944,12 +920,7 @@ instead:
 d = D()
 d.swap()
 
-# TODO: these errors should not occur
-# TODO: the type is currently `object` (which is fine), since we union the return types of `D.method` and `C.method`.
-# This will likely turn into `str` when we allow shadowing, but `d.method(42)` actually returns an `int` after swapping.
-# error: [invalid-argument-type]
-# error: [missing-argument]
-reveal_type(d.method(42))  # revealed: object
+reveal_type(d.method(42))  # revealed: str
 ```
 
 We might therefore consider implementing a stricter check that emits a diagnostic on the problematic
