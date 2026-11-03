@@ -1,5 +1,4 @@
 use crate::StringFlags;
-use itertools::Either;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::ops::Deref;
@@ -243,6 +242,15 @@ pub enum AnyParameter<'a> {
 }
 
 impl<'a> AnyParameter<'a> {
+    #[inline]
+    fn from_syntax_node(node: super::SyntaxNode<'a>) -> Self {
+        if let Some(parameter) = node.cast::<Parameter>() {
+            Self::Variadic(parameter)
+        } else {
+            Self::NonVariadic(node.retype())
+        }
+    }
+
     pub fn as_parameter(self) -> Parameter<'a> {
         match self {
             Self::Variadic(node) => node,
@@ -278,13 +286,9 @@ impl Ranged for AnyParameter<'_> {
 
 impl<'a> crate::Parameters<'a> {
     pub fn iter_source_order(self) -> impl Iterator<Item = AnyParameter<'a>> {
-        self.ordered_items().iter().map(|node| {
-            if let Some(parameter) = node.cast::<crate::Parameter>() {
-                AnyParameter::Variadic(parameter)
-            } else {
-                AnyParameter::NonVariadic(node.retype())
-            }
-        })
+        self.ordered_items()
+            .iter()
+            .map(AnyParameter::from_syntax_node)
     }
 
     pub fn index(self, name: &str) -> Option<usize> {
@@ -300,18 +304,9 @@ impl<'a> crate::Parameters<'a> {
     }
     #[inline]
     pub fn iter(self) -> impl DoubleEndedIterator<Item = AnyParameter<'a>> {
-        if self.has_only_regular_args() {
-            return Either::Left(self.args().iter().map(AnyParameter::NonVariadic));
-        }
-        Either::Right(
-            self.posonlyargs()
-                .iter()
-                .chain(self.args())
-                .map(AnyParameter::NonVariadic)
-                .chain(self.vararg().map(AnyParameter::Variadic))
-                .chain(self.kwonlyargs().iter().map(AnyParameter::NonVariadic))
-                .chain(self.kwarg().map(AnyParameter::Variadic)),
-        )
+        self.grouped_items()
+            .iter()
+            .map(AnyParameter::from_syntax_node)
     }
 
     pub fn len(self) -> usize {

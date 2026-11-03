@@ -821,6 +821,21 @@ mod tests {
     }
 
     #[test]
+    fn recovered_parameters_iterate_in_argument_order() {
+        let parsed = parse_unchecked_source("def f(**kw, x): pass", PySourceType::Python);
+        let parameters = parsed
+            .root()
+            .descendants()
+            .find_map(AstNode::cast::<ruff_python_ast::Parameters>)
+            .expect("function has parameters");
+
+        let mut iter = parameters.iter().map(|parameter| parameter.name().as_str());
+        assert_eq!(iter.next_back(), Some("kw"));
+        assert_eq!(iter.next(), Some("x"));
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
     fn rewrite_expressions_and_strings_in_copied_syntax() -> Result<(), ParseError> {
         struct ReplaceTokens;
 

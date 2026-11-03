@@ -294,6 +294,17 @@ impl<'a> Parameters<'a> {
             .first_chunk()
     }
 
+    pub(super) fn grouped_items(self) -> NodeList<'a, crate::kind::Any> {
+        let ordered = self.ordered_items();
+        let Some(layout) = self.parameter_layout() else {
+            return ordered;
+        };
+        // The original interval keeps parameter groups together even when error recovery
+        // stores a second copy in source order. The two intervals have the same length.
+        let interval = Interval::new(layout[0] as usize, ordered.len());
+        NodeList::new(self.syntax.ast, interval.encode())
+    }
+
     pub(super) fn parameter_group<const GROUP: usize>(self) -> u64 {
         let Some(&[start, posonly, regular, kwonly, vararg, _]) = self.parameter_layout() else {
             return if GROUP == 1 {
