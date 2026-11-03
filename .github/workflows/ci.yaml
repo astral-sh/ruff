@@ -1106,7 +1106,7 @@ jobs:
             --bin=ty --test-executable=ty-new --baseline-executable=ty-old --only-new-bugs \
             --minimize-failures=ty-fuzz-failures \
             --budget-minutes="$FUZZ_JOB_TIMEOUT_MINUTES" --job-started-at="$FUZZ_JOB_STARTED_AT" \
-            --write-github-issue="$RUNNER_TEMP/ty-fuzz-report.md"
+            --write-github-comment="$RUNNER_TEMP/ty-fuzz-report.md"
       - name: Upload the fuzz report
         id: upload-report
         if: ${{ !cancelled() }}

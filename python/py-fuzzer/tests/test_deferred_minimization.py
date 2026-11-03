@@ -46,13 +46,7 @@ class TestDeferredMinimization(unittest.TestCase):
                 patch("concurrent.futures.ProcessPoolExecutor", ThreadPoolExecutor),
                 patch.object(fuzz, "contains_reportable_bug", side_effect=detects_bug),
                 patch.object(fuzz, "generate_random_code", side_effect=AssertionError),
-                patch.dict(
-                    os.environ,
-                    GITHUB_ACTIONS="true",
-                    GITHUB_SERVER_URL="https://github.com",
-                    GITHUB_REPOSITORY="astral-sh/ruff",
-                    GITHUB_RUN_ID="123",
-                ),
+                patch.dict(os.environ, GITHUB_ACTIONS="true"),
                 redirect_stdout(io.StringIO()) as output,
             ):
                 with patch.object(fuzz, "minimize_repro", side_effect=AssertionError):
@@ -70,21 +64,15 @@ class TestDeferredMinimization(unittest.TestCase):
                 self.assertEqual((failures / "1.py").read_text(), original)
                 self.assertIn("::error::ty fuzzing failed on seed 1", output.getvalue())
 
-                with patch(
-                    "fuzz.subprocess.check_output",
-                    side_effect=[
-                        '{"commit_info":{"commit_hash":"abc123"}}',
-                        "def456\n",
-                    ],
-                ):
-                    status = run(
-                        f"--minimize-failures={failures}",
-                        f"--write-github-issue={report}",
-                    )
+                status = run(
+                    f"--minimize-failures={failures}",
+                    f"--write-github-comment={report}",
+                )
                 self.assertEqual(status, 0)
                 body = report.read_text()
-                self.assertIn("### Seed: 1", body)
+                self.assertTrue(body.startswith("### Seed: 1\n"))
                 self.assertIn("panic()", body)
                 self.assertNotIn("unused = 42", body)
                 self.assertIn("Seed: 2 (original source", body)
                 self.assertIn("flaky()", body)
+                self.assertTrue(body.endswith("</details>"))

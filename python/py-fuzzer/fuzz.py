@@ -485,11 +485,7 @@ def render_issue_body(
     run_url: str,
     fuzzer_revision: str,
 ) -> str:
-    """Render a GitHub issue body containing reproducers and unchecked seeds.
-
-    Omit reproducers or unchecked seeds when including them alongside omission
-    notices would exceed the issue body size limit.
-    """
+    """Render the daily fuzz issue with instructions for reproducing its failures."""
     match executable:
         case Executable.RUFF:
             failure_description = (
@@ -513,6 +509,27 @@ def render_issue_body(
         case _ as unreachable:
             assert_never(unreachable)
 
+    return render_github_report(
+        "daily_fuzz_issue.md.jinja",
+        bugs,
+        unchecked_seeds,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision,
+        executable=executable,
+        executable_revision=executable_revision,
+        failure_description=failure_description,
+        reproduction_command=reproduction_command,
+        seed_rerun_command=rerun_command,
+    )
+
+
+def render_github_report(
+    template_name: str,
+    bugs: list[FuzzResult],
+    unchecked_seeds: list[Seed],
+    **context: str,
+) -> str:
+    """Render reproducers and unchecked seeds within GitHub's size limit."""
     environment = Environment(
         loader=FileSystemLoader(Path(__file__).parent),
         undefined=StrictUndefined,
@@ -521,26 +538,20 @@ def render_issue_body(
         lstrip_blocks=True,
     )
 
-    template = environment.get_template("daily_fuzz_issue.md.jinja")
+    template = environment.get_template(template_name)
     unchecked_seeds = sorted(unchecked_seeds)
     selected_seeds: list[Seed] = []
 
     def render(reproducers: list[RenderableReproducer], *, omitted: bool) -> str:
         """Render selected reproducers and unchecked seeds with any omission notices."""
         return template.render(
-            run_url=run_url,
-            fuzzer_revision=fuzzer_revision,
-            executable=executable,
-            executable_revision=executable_revision,
-            failure_description=failure_description,
-            reproduction_command=reproduction_command,
             reproducers=reproducers,
             omitted=omitted,
             unchecked_count=len(unchecked_seeds),
             unchecked_seeds=selected_seeds,
             seeds_omitted=len(selected_seeds) < len(unchecked_seeds),
-            seed_rerun_command=rerun_command,
-        ).removesuffix("\n")
+            **context,
+        ).strip()
 
     reproducers: list[RenderableReproducer] = []
     omitted = False
@@ -680,6 +691,9 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
             write_github_issue_body(
                 run_result, args, args.github_issue_path, rerun_command=rerun_command
             )
+        elif args.github_comment_path is not None:
+            body = render_github_report("fuzz_reproducers.md.jinja", bugs, unchecked)
+            args.github_comment_path.write_text(body, encoding="utf-8")
 
     if unchecked:
         return ExitCode(2)
@@ -743,6 +757,7 @@ class ResolvedCliArgs:
     baseline_executable_path: Path | None
     quiet: bool
     github_issue_path: Path | None
+    github_comment_path: Path | None
     budget_minutes: float | None
     job_started_at: float | None
     corpus_dir: Path | None
@@ -819,11 +834,18 @@ def parse_args(argv: Sequence[str] | None = None) -> ResolvedCliArgs:
             "before fuzzing begins."
         ),
     )
-    parser.add_argument(
+    reports = parser.add_mutually_exclusive_group()
+    reports.add_argument(
         "--write-github-issue",
         type=Path,
         metavar="PATH",
         help="Write a GitHub issue body to PATH if bugs are found or seeds are unchecked (intended for CI workflows)",
+    )
+    reports.add_argument(
+        "--write-github-comment",
+        type=Path,
+        metavar="PATH",
+        help="Write reproducers and unchecked seeds to PATH for a pull request comment.",
     )
     parser.add_argument(
         "--test-executable",
@@ -950,6 +972,7 @@ def parse_args(argv: Sequence[str] | None = None) -> ResolvedCliArgs:
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
         github_issue_path=args.write_github_issue,
+        github_comment_path=args.write_github_comment,
         budget_minutes=args.budget_minutes,
         job_started_at=args.job_started_at,
         corpus_dir=args.corpus_dir,
