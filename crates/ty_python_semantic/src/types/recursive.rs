@@ -32,7 +32,7 @@
 //!
 //! The result is closed, so ordinary type operations can inspect it. Binding works in
 //! the other direction: it replaces applications of a recursive type with variables.
-//! Mutually recursive bodies share a `RecursiveGraph`; a `RecursiveType` selects one
+//! Mutually recursive bodies share a `RecursiveTypeGraph`; a `RecursiveType` selects one
 //! body by index, and each `RecursiveVar` refers to another index in that same graph.
 //! Unfolding replaces these variables with applications sharing the original graph,
 //! without copying the other bodies. Importing a body into a graph remaps its indices
