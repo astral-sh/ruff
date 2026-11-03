@@ -585,9 +585,10 @@ where
     ))
 }
 
-// `TypedDict` subscripts need custom handling because invalid keys should emit `invalid-key` while
-// recovering with the union of value types for non-literal string keys on closed `TypedDict`s and
-// `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
+// On a closed `TypedDict`, a successful lookup with an arbitrary string must return one of the
+// declared value types. Recover with their union after reporting the invalid subscript. Other
+// invalid keys recover with `Unknown`. Synthesized `__getitem__` overloads cannot express both
+// the error and its recovery type.
 fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,

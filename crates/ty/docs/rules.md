@@ -2367,13 +2367,19 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.17">0
 
 Checks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.
 
+Before 0.0.97, this rule also reported string keys whose literal value ty could not determine. To
+retain a customized severity for both cases, set [`non-literal-typed-dict-key`](#non-literal-typed-dict-key) to the same level as
+[`invalid-key`](#invalid-key). For an inline ignore, replace [`invalid-key`](#invalid-key) with [`non-literal-typed-dict-key`](#non-literal-typed-dict-key) if the
+diagnostic moved. List both rules if the line reports both.
+
 **Why is this bad?**
 
 
-Subscripting with an invalid key will raise a `KeyError` at runtime.
+Reading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the
+dictionary.
 
-Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`
-it also violates the expectations of the type.
+Creating a `TypedDict` with an unknown key is likely a mistake. A `TypedDict` declared with
+`closed=True` prohibits extra keys.
 
 **Examples**
 
@@ -4566,6 +4572,48 @@ class Sub(Super): ...  # error: [non-callable-init-subclass]
 
 
 - [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)
+
+## `non-literal-typed-dict-key`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22non-literal-typed-dict-key%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1468" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Reports a string key when a `TypedDict` operation requires known keys and ty cannot narrow the key
+to a string literal or a union of string literals.
+
+**Why is this bad?**
+
+
+Each declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check
+whether the key exists or which value type applies.
+
+**Example**
+
+
+```python
+from typing import Literal, TypedDict
+
+
+class Movie(TypedDict):
+    title: str
+    year: int
+
+
+def get_field(movie: Movie, key: str) -> str | int:
+    return movie[key]  # error: [non-literal-typed-dict-key]
+
+
+def get_known_field(movie: Movie, key: Literal["title", "year"]) -> str | int:
+    return movie[key]
+```
 
 ## `not-iterable`
 
