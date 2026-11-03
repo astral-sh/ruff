@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::Violation;
 use crate::codes::Category;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of `glob.glob()` and `glob.iglob()`.
@@ -58,9 +58,15 @@ pub(crate) struct Glob {
 }
 
 impl Violation for Glob {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Glob { function } = self;
         format!("Replace `{function}` with `Path.glob` or `Path.rglob`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path().glob`".to_string())
     }
 }

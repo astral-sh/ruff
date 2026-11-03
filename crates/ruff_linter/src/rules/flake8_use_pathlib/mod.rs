@@ -150,6 +150,7 @@ mod tests {
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
+    #[test_case(Rule::Glob, Path::new("PTH207.py"))]
     fn preview_flake8_use_pathlib(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

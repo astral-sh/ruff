@@ -200,6 +200,16 @@ pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/2331
+pub(crate) const fn is_fix_os_path_join_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/2331
+pub(crate) const fn is_fix_glob_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/11436
 // https://github.com/astral-sh/ruff/pull/11168
 pub(crate) const fn is_dunder_init_fix_unused_import_enabled(settings: &LinterSettings) -> bool {

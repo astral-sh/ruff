@@ -10,6 +10,7 @@ PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
 10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
 11 | search("*.png")
    |
+help: Replace with `Path().glob`
 
 PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
   --> PTH207.py:10:6
@@ -20,6 +21,7 @@ PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
    |      ^^^^^^^^^^
 11 | search("*.png")
    |
+help: Replace with `Path().glob`
 
 PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
   --> PTH207.py:11:1
@@ -31,3 +33,4 @@ PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
 12 |
 13 | # if `dir_fd` is set, suppress the diagnostic
    |
+help: Replace with `Path().glob`

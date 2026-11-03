@@ -46,6 +46,8 @@ pub(crate) struct OsPathJoin {
 }
 
 impl Violation for OsPathJoin {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let OsPathJoin { module, joiner } = self;
@@ -58,9 +60,17 @@ impl Violation for OsPathJoin {
             }
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let OsPathJoin { joiner, .. } = self;
+        match joiner {
+            Joiner::Slash => Some("Replace with `Path` with `/` operator".to_string()),
+            Joiner::Joinpath => Some("Replace with `Path.joinpath()`".to_string()),
+        }
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Joiner {
     Slash,
     Joinpath,

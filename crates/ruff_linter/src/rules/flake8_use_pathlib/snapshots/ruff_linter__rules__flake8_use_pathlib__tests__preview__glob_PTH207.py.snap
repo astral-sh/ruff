@@ -1,0 +1,69 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:9:1
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+   | ^^^^^^^^^
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   |
+help: Replace with `Path().glob`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+9  | # PTH207
+   - glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 + pathlib.Path().glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+11 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:10:6
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   |      ^^^^^^^^^^
+11 | search("*.png")
+   |
+help: Replace with `Path().glob`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+10 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+   - list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 + list(pathlib.Path().glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+12 | search("*.png")
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:11:1
+   |
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   | ^^^^^^
+12 |
+13 | # if `dir_fd` is set, suppress the diagnostic
+   |
+help: Replace with `Path().glob`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+11 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   - search("*.png")
+12 + pathlib.Path().glob("*.png")
+13 |
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
