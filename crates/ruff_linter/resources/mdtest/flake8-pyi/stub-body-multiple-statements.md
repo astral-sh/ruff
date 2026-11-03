@@ -277,6 +277,27 @@ help: Remove unnecessary statements
   |
 ```
 
+## Line continuations
+
+When placeholders are joined by a semicolon and a line continuation, deleting each of them would
+remove overlapping ranges of the source, so no fix is offered.
+
+```pyi
+def continuation():  # snapshot: stub-body-multiple-statements
+    """docstring"""
+    pass; \
+    pass
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def continuation():  # snapshot: stub-body-multiple-statements
+  |     ^^^^^^^^^^^^
+help: Remove unnecessary statements
+```
+
 ## Protocol members and abstract methods
 
 `PIE790` leaves the ellipsis alone in protocol members and abstract methods, because in a runtime

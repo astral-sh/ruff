@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier::Identifier;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -122,7 +123,7 @@ fn remove_placeholders(checker: &Checker, body: &[Stmt]) -> Option<Fix> {
         (Some(_), Some(_)) => return None,
     };
 
-    let mut edits = body
+    let edits: Vec<_> = body
         .iter()
         .enumerate()
         .filter(|(index, _)| *index != keep)
@@ -133,8 +134,25 @@ fn remove_placeholders(checker: &Checker, body: &[Stmt]) -> Option<Fix> {
                 checker.locator(),
                 checker.indexer(),
             )
-        });
+        })
+        .collect();
 
+    // The deletions of neighboring statements can overlap when they share a line continuation:
+    //
+    // ```pyi
+    // def f():
+    //     "doc"
+    //     pass; \
+    //     pass
+    // ```
+    //
+    // Deleting the first `pass` extends to the start of the second, while deleting the second
+    // starts back at the continuation. A fix can't hold overlapping edits, so offer none.
+    if edits.windows(2).any(|pair| pair[0].end() > pair[1].start()) {
+        return None;
+    }
+
+    let mut edits = edits.into_iter();
     let first = edits.next()?;
 
     Some(
