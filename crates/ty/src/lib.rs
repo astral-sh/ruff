@@ -345,7 +345,8 @@ impl MainLoop {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
-            sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
+            // A final batch of file changes can arrive after Ctrl+C has closed the receiver.
+            let _ = sender.send(MainLoopMessage::ApplyChanges(event));
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
