@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 /// C405 (`set([1, 2])`)
 pub(crate) fn unnecessary_literal_set(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
     let call = call_fields.node;
-    let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call_fields) else {
         return;
     };
     let Some(kind) = UnnecessaryLiteral::try_from_expr(argument) else {

@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 
 /// C400 (`list(generator)`)
 pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("list", call.node) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("list", call) else {
         return;
     };
     let ExprKind::Generator(generator_node) = argument.classify() else {
