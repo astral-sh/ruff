@@ -13,10 +13,10 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPEDDICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_key_lint,
+    report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
@@ -2004,11 +2004,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     } else {
                         // With explicit extra items, a string key reaches this branch if it might
-                        // overwrite a read-only item. Keep that error under `invalid-key`.
+                        // overwrite a read-only item. Keep that error under `invalid-typeddict-key`.
                         let lint = if typed_dict.explicit_extra_items(db).is_some() {
-                            &INVALID_KEY
+                            &INVALID_TYPEDDICT_KEY
                         } else {
-                            typed_dict_key_lint(&self.context, slice_ty)
+                            typed_dict_subscript_key_lint(&self.context, slice_ty)
                         };
                         if let Some(builder) = self.context.report_lint(lint, &*target.slice) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(

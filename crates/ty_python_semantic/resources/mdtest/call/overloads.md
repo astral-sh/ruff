@@ -2667,7 +2667,7 @@ select_payload({"name": "missing count"}, 1)
 # error: [no-matching-overload]
 select_payload({"name": "bad count", "count": "not an int"}, 1)
 
-# error: [invalid-key]
+# error: [unknown-typeddict-constructor-key]
 # error: [no-matching-overload]
 select_payload({"name": "extra key", "count": 1, "extra": None}, 1)
 

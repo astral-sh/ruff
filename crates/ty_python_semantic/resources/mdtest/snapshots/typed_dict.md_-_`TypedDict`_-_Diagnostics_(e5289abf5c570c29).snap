@@ -20,30 +20,30 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
  5 |     age: int | None
  6 | 
  7 | def access_invalid_literal_string_key(person: Person):
- 8 |     person["nane"]  # error: [invalid-key]
+ 8 |     person["nane"]  # error: [invalid-typeddict-key]
  9 | 
 10 | NAME_KEY: Final = "nane"
 11 | 
 12 | def access_invalid_key(person: Person):
-13 |     person[NAME_KEY]  # error: [invalid-key]
+13 |     person[NAME_KEY]  # error: [invalid-typeddict-key]
 14 | 
 15 | def access_with_str_key(person: Person, str_key: str):
-16 |     person[str_key]  # error: [non-literal-typed-dict-key]
+16 |     person[str_key]  # error: [non-literal-typeddict-key]
 17 | 
 18 | def write_to_key_with_wrong_type(person: Person):
 19 |     person["age"] = "42"  # error: [invalid-assignment]
 20 | 
 21 | def write_to_non_existing_key(person: Person):
-22 |     person["nane"] = "Alice"  # error: [invalid-key]
+22 |     person["nane"] = "Alice"  # error: [invalid-typeddict-key]
 23 | 
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
-25 |     person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
+25 |     person[str_key] = "Alice"  # error: [non-literal-typeddict-key]
 26 | 
 27 | def create_with_invalid_string_key():
-28 |     # error: [invalid-key]
+28 |     # error: [unknown-typeddict-constructor-key]
 29 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
 30 | 
-31 |     # error: [invalid-key]
+31 |     # error: [unknown-typeddict-constructor-key]
 32 |     bob = Person(name="Bob", age=25, unknown="Bar")
 33 | from typing_extensions import ReadOnly
 34 | 
@@ -54,7 +54,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 39 | def write_to_readonly_key(employee: Employee):
 40 |     employee["id"] = 42  # error: [invalid-assignment]
 41 | def write_to_non_existing_key_single_quotes(person: Person):
-42 |     # error: [invalid-key]
+42 |     # error: [invalid-typeddict-key]
 43 |     person['nane'] = "Alice"  # fmt: skip
 44 | class MovieBase(TypedDict):
 45 |     name: str
@@ -75,18 +75,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 # Diagnostics
 
 ```
-error[invalid-key]: Unknown key "nane" for TypedDict `Person`
+error[invalid-typeddict-key]: Unknown key "nane" for TypedDict `Person`
  --> src/mdtest_snippet.py:8:12
   |
-8 |     person["nane"]  # error: [invalid-key]
+8 |     person["nane"]  # error: [invalid-typeddict-key]
   |     ------ ^^^^^^ Did you mean "name"?
   |     |
   |     TypedDict `Person`
 help: Replace with "name"
   |
 7 | def access_invalid_literal_string_key(person: Person):
-  -     person["nane"]  # error: [invalid-key]
-8 +     person["name"]  # error: [invalid-key]
+  -     person["nane"]  # error: [invalid-typeddict-key]
+8 +     person["name"]  # error: [invalid-typeddict-key]
 9 |
   |
 note: This is an unsafe fix and may change runtime behavior
@@ -94,10 +94,10 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[invalid-key]: Unknown key "nane" for TypedDict `Person`
+error[invalid-typeddict-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:13:12
    |
-13 |     person[NAME_KEY]  # error: [invalid-key]
+13 |     person[NAME_KEY]  # error: [invalid-typeddict-key]
    |     ------ ^^^^^^^^ Unknown key "nane" - did you mean "name"?
    |     |
    |     TypedDict `Person`
@@ -105,10 +105,10 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
 ```
 
 ```
-error[non-literal-typed-dict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
+error[non-literal-typeddict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
-16 |     person[str_key]  # error: [non-literal-typed-dict-key]
+16 |     person[str_key]  # error: [non-literal-typeddict-key]
    |            ^^^^^^^
 
 ```
@@ -131,18 +131,18 @@ info: Item declaration
 ```
 
 ```
-error[invalid-key]: Unknown key "nane" for TypedDict `Person`
+error[invalid-typeddict-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:22:12
    |
-22 |     person["nane"] = "Alice"  # error: [invalid-key]
+22 |     person["nane"] = "Alice"  # error: [invalid-typeddict-key]
    |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
 help: Replace with "name"
    |
 21 | def write_to_non_existing_key(person: Person):
-   -     person["nane"] = "Alice"  # error: [invalid-key]
-22 +     person["name"] = "Alice"  # error: [invalid-key]
+   -     person["nane"] = "Alice"  # error: [invalid-typeddict-key]
+22 +     person["name"] = "Alice"  # error: [invalid-typeddict-key]
 23 |
    |
 note: This is an unsafe fix and may change runtime behavior
@@ -150,16 +150,16 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[non-literal-typed-dict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
+error[non-literal-typeddict-key]: TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`.
   --> src/mdtest_snippet.py:25:12
    |
-25 |     person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
+25 |     person[str_key] = "Alice"  # error: [non-literal-typeddict-key]
    |            ^^^^^^^
 
 ```
 
 ```
-error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
+error[unknown-typeddict-constructor-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:29:50
    |
 29 |     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
@@ -171,7 +171,7 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
 ```
 
 ```
-error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
+error[unknown-typeddict-constructor-key]: Unknown key "unknown" for TypedDict `Person`
   --> src/mdtest_snippet.py:32:38
    |
 32 |     bob = Person(name="Bob", age=25, unknown="Bar")
@@ -196,7 +196,7 @@ info: Item declaration
 ```
 
 ```
-error[invalid-key]: Unknown key "nane" for TypedDict `Person`
+error[invalid-typeddict-key]: Unknown key "nane" for TypedDict `Person`
   --> src/mdtest_snippet.py:43:12
    |
 43 |     person['nane'] = "Alice"  # fmt: skip
@@ -205,7 +205,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     TypedDict `Person`
 help: Replace with 'name'
    |
-42 |     # error: [invalid-key]
+42 |     # error: [invalid-typeddict-key]
    -     person['nane'] = "Alice"  # fmt: skip
 43 +     person['name'] = "Alice"  # fmt: skip
 44 | class MovieBase(TypedDict):
