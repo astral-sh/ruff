@@ -17,7 +17,8 @@ run ID from the workflow URL; GitHub Actions sets them automatically.
 
 On normal completion, the fuzzer exits with status 0 when it checks every seed
 and finds no bugs, 1 when it checks every seed and finds bugs, and 2 when it
-leaves seeds unchecked.
+leaves seeds unchecked. When minimizing previously reported failures, it exits
+with status 0 after processing all of them.
 
 Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
@@ -294,7 +295,7 @@ def fuzz_code(
     deadline: float | None,
     cancelled: threading.Event,
 ) -> FuzzResult | None:
-    """Check one seed and minimize any failure, or return None if it was not checked."""
+    """Process one seed, or return None if it was not checked."""
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
 
@@ -306,15 +307,35 @@ def fuzz_code(
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
 
-    if not contains_reportable_bug(code, args):
-        return FuzzResult(
-            seed,
-            None,
-            args.executable,
-            only_new_bugs=args.baseline_executable_path is not None,
-            minimization_timed_out=False,
-        )
+    bug = None
+    # Saved inputs already failed during detection. Keep the original source in
+    # the report if an intermittent failure stops reproducing during minimization.
+    if args.minimize_failures or contains_reportable_bug(code, args):
+        if args.save_failures is None:
+            return minimize_failure(seed, code, args, deadline, cancelled)
+        (args.save_failures / f"{seed}.py").write_text(code, encoding="utf-8")
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            print(
+                f"::error::{args.executable} fuzzing failed on seed {seed}", flush=True
+            )
+        bug = Bug(source=code, minimization_succeeded=False)
 
+    return FuzzResult(
+        seed,
+        bug,
+        args.executable,
+        only_new_bugs=args.baseline_executable_path is not None,
+        minimization_timed_out=False,
+    )
+
+
+def minimize_failure(
+    seed: Seed,
+    code: str,
+    args: ResolvedCliArgs,
+    deadline: float | None,
+    cancelled: threading.Event,
+) -> FuzzResult:
     maybe_bug = Bug(source=code, minimization_succeeded=False)
     minimization_timed_out = False
 
@@ -384,7 +405,7 @@ class FuzzRunResult(NamedTuple):
 def run_fuzzer_concurrently(
     args: ResolvedCliArgs, deadline: float | None
 ) -> FuzzRunResult:
-    """Check seeds concurrently and minimize failures, returning failures and unchecked seeds."""
+    """Process seeds concurrently, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
@@ -423,7 +444,7 @@ def run_fuzzer_concurrently(
 def run_fuzzer_sequentially(
     args: ResolvedCliArgs, *, deadline: float | None
 ) -> FuzzRunResult:
-    """Check seeds sequentially and minimize failures, returning failures and unchecked seeds."""
+    """Process seeds sequentially, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
@@ -602,6 +623,9 @@ def write_github_issue_body(
 
 
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
+    if args.save_failures is not None:
+        # An earlier run's failures must not be passed to the minimizer.
+        args.save_failures.mkdir()
     deadline = None
     if args.budget_minutes is not None and args.job_started_at is not None:
         remaining = (
@@ -611,7 +635,10 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         )
         deadline = time.monotonic() + remaining
 
-    if len(args.seeds) <= 5:
+    # Starting a process pool costs more than checking a few seeds, but each
+    # known failure can take minutes to minimize.
+    sequential_limit = 1 if args.minimize_failures else 5
+    if len(args.seeds) <= sequential_limit:
         run_result = run_fuzzer_sequentially(args, deadline=deadline)
     else:
         run_result = run_fuzzer_concurrently(args, deadline=deadline)
@@ -657,7 +684,7 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
     if unchecked:
         return ExitCode(2)
 
-    return ExitCode(1 if bugs else 0)
+    return ExitCode(1 if bugs and not args.minimize_failures else 0)
 
 
 def absolute_path(p: str) -> Path:
@@ -719,9 +746,11 @@ class ResolvedCliArgs:
     budget_minutes: float | None
     job_started_at: float | None
     corpus_dir: Path | None
+    save_failures: Path | None
+    minimize_failures: bool
 
 
-def parse_args() -> ResolvedCliArgs:
+def parse_args(argv: Sequence[str] | None = None) -> ResolvedCliArgs:
     """Parse command-line arguments"""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionRichHelpFormatter
@@ -729,13 +758,26 @@ def parse_args() -> ResolvedCliArgs:
     parser.add_argument(
         "seeds",
         type=parse_seed_argument,
-        nargs="+",
+        nargs="*",
         help="Either a single seed, or an inclusive range of seeds in the format `0-5`",
     )
     parser.add_argument(
         "--corpus-dir",
         type=Path,
         help="Read the generated source for each seed from <seed>.py in this directory.",
+    )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--save-failures",
+        type=Path,
+        metavar="DIR",
+        help="Save each failing input to <seed>.py in a new directory and skip minimization.",
+    )
+    modes.add_argument(
+        "--minimize-failures",
+        type=Path,
+        metavar="DIR",
+        help="Minimize the inputs saved by --save-failures.",
     )
     parser.add_argument(
         "--only-new-bugs",
@@ -807,7 +849,20 @@ def parse_args() -> ResolvedCliArgs:
         choices=[member.value for member in Executable],
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    if args.minimize_failures is not None:
+        if args.seeds or args.corpus_dir is not None:
+            parser.error(
+                "--minimize-failures supplies both the seeds and their sources"
+            )
+        args.corpus_dir = args.minimize_failures
+        try:
+            args.seeds = [int(path.stem) for path in args.corpus_dir.glob("*.py")]
+        except ValueError:
+            parser.error("--minimize-failures expects files named <seed>.py")
+    if not args.seeds:
+        parser.error("no seeds to check")
 
     if (args.budget_minutes is None) != (args.job_started_at is None):
         parser.error(
@@ -898,6 +953,8 @@ def parse_args() -> ResolvedCliArgs:
         budget_minutes=args.budget_minutes,
         job_started_at=args.job_started_at,
         corpus_dir=args.corpus_dir,
+        save_failures=args.save_failures,
+        minimize_failures=args.minimize_failures is not None,
     )
 
 
