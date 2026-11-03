@@ -101,7 +101,7 @@ if True and (x := 1):
 def _(flag: bool):
     flag or (x := 1) or reveal_type(x)  # revealed: Never
 
-    # error: [unresolved-reference]
+    # error: [unbound-local]
     flag or reveal_type(y) or (y := 1)  # revealed: Unknown
 ```
 

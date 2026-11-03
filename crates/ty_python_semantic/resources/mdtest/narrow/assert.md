@@ -71,7 +71,7 @@ def _(x: int | None, y: int | None):
 def one(x: int | None):
     assert x is None, (y := x * 42) * reveal_type(y)  # revealed: int
 
-    # error: [unresolved-reference]
+    # error: [unbound-local]
     reveal_type(y)  # revealed: Unknown
 
 def two(x: int | None, y: int | None):

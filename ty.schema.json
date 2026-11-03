@@ -1596,6 +1596,16 @@
             }
           ]
         },
+        "unbound-local": {
+          "title": "detects uses of local variables that have no value",
+          "description": "## What it does\n\nChecks for a function using one of its own local variables before it has a value or after its value\nhas been deleted.\n\n## Why is this bad?\n\nReading or deleting an unbound local variable raises `UnboundLocalError` at runtime, even if a\nglobal or builtin has the same name.\n\n## Example\n\nThe assignment makes `count` local to `increment`, so `+=` tries to read its value before the\nfunction has assigned one.\n\n```python\ncount = 0\n\n\ndef increment():\n    count += 1  # error\n```\n\n## Migration\n\nBefore ty 0.0.97, `unresolved-reference` also covered unbound locals. To keep a custom rule level\nfor both diagnostics, set `unbound-local` to the same level as `unresolved-reference`. On lines that\nsuppress an unbound local, change `ty: ignore[unresolved-reference]` to `ty: ignore[unbound-local]`.\nList both codes if the line has both diagnostics.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unbound-type-variable": {
           "title": "detects type variables used outside of their bound scope",
           "description": "## What it does\n\nChecks for type variables that are used in a scope where they are not bound to any enclosing generic\ncontext.\n\n## Why is this bad?\n\nUsing a type variable outside of a scope that binds it has no well-defined meaning.\n\n## Examples\n\n```python\nfrom typing import TypeVar, Generic\n\nT = TypeVar(\"T\")\nS = TypeVar(\"S\")\n\n# unbound type variable in module scope\nx: T  # error\n\n\nclass C(Generic[T]):\n    # S is not in this class's generic context\n    x: list[S] = []  # error\n```\n\n## References\n\n- [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)",
@@ -1658,7 +1668,7 @@
         },
         "unresolved-reference": {
           "title": "detects references to names that are not defined",
-          "description": "## What it does\n\nChecks for references to names that are not defined.\n\n## Why is this bad?\n\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\n# NameError: name 'x' is not defined\nprint(x)  # error\n```",
+          "description": "## What it does\n\nChecks for references to names that are not defined.\n\nWhen a function uses one of its own local variables before it has a value or after its value has\nbeen deleted, see `unbound-local`.\n\n## Why is this bad?\n\nEvaluating an undefined name raises `NameError` at runtime.\n\n## Example\n\n```python\n# NameError: name 'x' is not defined\nprint(x)  # error\n```",
           "default": "error",
           "oneOf": [
             {

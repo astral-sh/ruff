@@ -466,7 +466,7 @@ def f(x: str | Literal[1] | None):
 
     def _():
         # No narrowing is performed on unresolved references.
-        # error: [unresolved-reference]
+        # error: [unbound-local]
         if x is not None:
             def _():
                 if x != 1:

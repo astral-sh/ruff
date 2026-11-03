@@ -64,7 +64,7 @@ An unbound function local that has definitions in the scope does not fall back t
 x = 1
 
 def f():
-    # error: [unresolved-reference]
+    # error: [unbound-local]
     # revealed: Unknown
     reveal_type(x)
     x = 2
@@ -79,6 +79,65 @@ find the name. It does not replace an unbound local.
 
 ```py
 def f():
-    reveal_type(1)  # error: [unresolved-reference]
+    reveal_type(1)  # error: [unbound-local]
     reveal_type = lambda value: value
+```
+
+## Local declarations and annotations
+
+A variable annotation makes a name local, even when the declaration does not assign a value. Python
+never evaluates the annotation on a function-local variable. ty still checks it and reports that
+`Later` has no definition at that point.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def f():
+    value: Later  # error: [unresolved-reference]
+    print(value)  # error: [unbound-local]
+    class Later: ...
+```
+
+On Python 3.13, an unquoted annotation on a nested function is evaluated when the function is
+defined. A quoted annotation can refer to a class defined later.
+
+```py
+def outer():
+    def eager(value: Later): ...  # error: [unbound-local]
+    def forward(value: "Later"): ...
+    class Later: ...
+```
+
+A quoted annotation still needs a definition for the type it names.
+
+```py
+def declared_only():
+    Declared: type[int]
+    def forward(value: "Declared"): ...  # error: [unresolved-reference]
+```
+
+## Configuring unbound locals independently
+
+```toml
+[rules]
+unresolved-reference = "ignore"
+```
+
+```py
+def f():
+    print(missing)
+    print(local)  # snapshot: unbound-local
+    print(local)  # ty: ignore[unbound-local]
+    local = 1
+```
+
+```snapshot
+error[unbound-local]: Name `local` used when not defined
+ --> src/mdtest_snippet.py:3:11
+  |
+3 |     print(local)  # snapshot: unbound-local
+  |           ^^^^^
 ```
