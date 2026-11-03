@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -87,21 +88,19 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
 }
 
 /// DTZ007
-pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_strptime_without_zone(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
 
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["datetime", "datetime", "strptime"]
-            )
-        })
-    {
+    if !matches!(
+        qualified_name.segments(),
+        ["datetime", "datetime", "strptime"]
+    ) {
         return;
     }
 
