@@ -13,8 +13,9 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
-            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
+            INVALID_ARGUMENT_TYPE, INVALID_BASE, MISMATCHED_ENUM_NAME, MISSING_ARGUMENT,
+            PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            report_mismatched_type_name,
         },
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
@@ -430,6 +431,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_ENUM_NAME,
                 name_arg,
                 base_class.name(self.program_environment().python_version(db)),
                 &assigned_name,

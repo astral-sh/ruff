@@ -414,10 +414,10 @@ impl Suppressions {
     ) -> impl Iterator<Item = &Suppression> + '_ {
         self.file
             .iter()
-            .chain(self.inline.intersecting_rev(
-                range,
-                SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask(),
-            ))
+            .chain(
+                self.inline
+                    .intersecting_rev(range, SuppressionTarget::All.target_mask() | lint_mask(id)),
+            )
             .filter(move |suppression| suppression.matches(id) && suppression.applies_to(range))
     }
 
@@ -530,7 +530,9 @@ impl Suppression {
     fn matches(&self, tested_id: LintId) -> bool {
         match self.target {
             SuppressionTarget::All => true,
-            SuppressionTarget::Lint(suppressed_id) => tested_id == suppressed_id,
+            SuppressionTarget::Lint(suppressed_id) => {
+                suppressed_id.selected_lints().contains(&tested_id)
+            }
             SuppressionTarget::Empty => false,
         }
     }
@@ -602,24 +604,29 @@ impl SuppressionTarget {
         matches!(self, SuppressionTarget::Lint(_))
     }
 
-    /// Returns the conservative bit used to skip subtrees without this target.
+    /// Returns the bits used to skip subtrees without this target.
     ///
-    /// Lints are hashed into 62 buckets, with one bucket reserved for blanket suppressions and
-    /// one for editable suppressions. The interval index only traverses subtrees whose buckets
-    /// overlap the queried lint.
+    /// The interval index reserves 62 bits for lint buckets and two for blanket and editable
+    /// suppressions. A deprecated name sets the bit for each replacement so a lookup by the
+    /// diagnostic's current lint ID still finds the original ignore.
     fn target_mask(self) -> u64 {
         match self {
             // Keep blanket suppressions separate so they are always considered.
             SuppressionTarget::All => 1,
             SuppressionTarget::Empty => 0,
-            SuppressionTarget::Lint(id) => {
-                let mut hasher = FxHasher::default();
-                id.hash(&mut hasher);
-                // The top bit is reserved for editable suppressions.
-                1 << (1 + hasher.finish() % 62)
-            }
+            SuppressionTarget::Lint(id) => id
+                .selected_lints()
+                .iter()
+                .fold(0, |mask, &lint| mask | lint_mask(lint)),
         }
     }
+}
+
+fn lint_mask(id: LintId) -> u64 {
+    let mut hasher = FxHasher::default();
+    id.hash(&mut hasher);
+    // The bottom and top bits are reserved for blanket and editable suppressions, respectively.
+    1 << (1 + hasher.finish() % 62)
 }
 
 struct SuppressionsBuilder<'a> {

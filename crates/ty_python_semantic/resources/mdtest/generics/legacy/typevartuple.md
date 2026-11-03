@@ -64,10 +64,18 @@ from typing import Generic, TypeVarTuple
 
 Ts1 = TypeVarTuple("Ts1")
 
-# error: [mismatched-type-name]
+# snapshot: mismatched-typevartuple-name
 Ts2 = TypeVarTuple("Ts3")
 
 class Array(Generic[*Ts2]): ...
+```
+
+```snapshot
+warning[mismatched-typevartuple-name]: The name passed to `TypeVarTuple` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:20
+  |
+6 | Ts2 = TypeVarTuple("Ts3")
+  |                    ^^^^^ Expected "Ts2", got "Ts3"
 ```
 
 ### Bounds and constraints

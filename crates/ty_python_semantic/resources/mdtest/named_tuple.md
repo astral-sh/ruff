@@ -257,7 +257,7 @@ The assigned variable name should match the `typename` argument:
 from typing import NamedTuple
 from ty_extensions._internal import is_subtype_of
 
-# error: [mismatched-type-name]
+# error: [mismatched-namedtuple-name]
 Mismatch = NamedTuple("WrongName", [("x", int)])
 reveal_type(Mismatch)  # revealed: <class 'WrongName'>
 reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]

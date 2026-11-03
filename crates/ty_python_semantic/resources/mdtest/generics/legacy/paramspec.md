@@ -64,13 +64,21 @@ from typing import Callable, Generic, ParamSpec
 
 P1 = ParamSpec("P1")
 
-# error: [mismatched-type-name]
+# snapshot: mismatched-paramspec-name
 P2 = ParamSpec("P3")
 
 class Wrapper(Generic[P2]): ...
 
 def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
     return f
+```
+
+```snapshot
+warning[mismatched-paramspec-name]: The name passed to `ParamSpec` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:16
+  |
+6 | P2 = ParamSpec("P3")
+  |                ^^^^ Expected "P2", got "P3"
 ```
 
 ### Bounds and constraints

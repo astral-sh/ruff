@@ -1264,6 +1264,42 @@ fn cli_specific_then_all() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A specific rule takes precedence even when its name sorts alphabetically before the old name.
+#[test]
+fn configuration_split_rule_precedence() {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            mismatched-namedtuple-name = "error"
+            mismatched-type-name = "ignore"
+            "#,
+        ),
+        (
+            "example.py",
+            r#"
+            from collections import namedtuple
+            from typing import TypeVar
+
+            Point = namedtuple("Vector", "x y")
+            T = TypeVar("U")
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    example.py:5:20: error[mismatched-namedtuple-name] The name passed to `namedtuple` must match the variable it is assigned to: Expected "Point", got "Vector"
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+}
+
 /// The "all" keyword works in configuration files
 #[test]
 fn configuration_all_rules() -> anyhow::Result<()> {
