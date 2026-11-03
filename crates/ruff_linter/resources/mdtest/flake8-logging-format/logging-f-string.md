@@ -5,14 +5,9 @@ lint.preview = true
 lint.select = ["G004"]
 ```
 
-The fix rewrites the message into `%`-style formatting so that it is only interpolated when the
-record is actually emitted. That must not change what the program logs, so each section below
-either checks that the rewrite is equivalent at runtime, or that no fix is offered because no
-faithful `%`-style equivalent exists.
-
 ## Basic example
 
-Nothing unusual here, so the fix applies.
+The fix passes the interpolated value as an argument to the logger.
 
 ```py
 import logging
@@ -207,8 +202,7 @@ help: Convert to lazy `%` formatting
 
 ## Self-documenting interpolations
 
-`f"{value=}"` renders `value=` followed by `repr(value)`, whereas `%s` renders `str(value)`. Those
-differ for most types -- on a string, `repr` shows the surrounding quotes -- so no fix is offered.
+The fix skips debug fields, which include the expression text in the message.
 
 ```py
 import logging

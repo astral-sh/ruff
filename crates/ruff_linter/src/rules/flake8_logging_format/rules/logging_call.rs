@@ -36,13 +36,7 @@ fn logging_f_string(
         return;
     }
 
-    // The interpolated values become positional arguments
-    // that follow the message, so the message itself has to be positional too.
-    // Rewriting `logging.warning(msg=f"{x}")` in place would produce
-    // `logging.warning(msg="%s", x)`, which is a syntax error,
-    // and passing a tuple instead (`msg=("%s", x)`) would log the tuple
-    // rather than the formatted message, since `%`-formatting only runs when
-    // `args` is non-empty.
+    // The new positional arguments cannot follow a keyword argument.
     if arguments.find_keyword("msg").is_some() {
         return;
     }
@@ -72,10 +66,6 @@ fn logging_f_string(
                             format_string.push_str(lit.value.as_ref());
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
-                            // A self-documenting interpolation such as `f"{x=}"` renders `x=`
-                            // followed by `repr(x)`, whereas `%s` renders `str(x)`. Those differ
-                            // for most types -- `f"{s=}"` on a string shows the surrounding
-                            // quotes -- so there is no faithful `%`-style equivalent.
                             if interpolated.debug_text.is_some()
                                 || interpolated.format_spec.is_some()
                                 || !matches!(
@@ -103,11 +93,6 @@ fn logging_f_string(
         return;
     }
 
-    // Emit the format string through the code generator rather than pasting the collected text
-    // between quotes. The literal parts gathered above are *decoded*, so a source `f"\n{x}"`
-    // leaves a real newline in `format_string`, and re-emitting that verbatim produced an
-    // unterminated literal. The generator escapes the contents for a plain (non-raw) literal,
-    // which also stops raw-prefixed sources such as `fr"\'{x}"` from losing their backslash.
     let format_string = checker
         .generator()
         .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
@@ -121,17 +106,12 @@ fn logging_f_string(
             node_index: AtomicNodeIndex::NONE,
         }));
 
-    // Replace any enclosing parentheses along with the f-string.
-    // Rewriting only the f-string in `logging.warning((f"{x}"))`
-    // would leave the parentheses wrapped around the new argument
-    // list, silently turning the message into a tuple.
+    // Leaving the parentheses around the replacement would turn the message into a tuple.
     let target =
         parenthesized_range(msg.into(), arguments.into(), checker.tokens()).unwrap_or(msg.range());
 
     let replacement = format!("{format_string}, {}", args.join(", "));
 
-    // Everything in the replaced range is discarded, so a comment
-    // written between the parentheses and the message would be lost.
     let applicability = if checker.comment_ranges().intersects(target) {
         Applicability::Unsafe
     } else {
