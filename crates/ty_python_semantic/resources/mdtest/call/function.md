@@ -1536,6 +1536,25 @@ def f(*, x: int) -> int:
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
+### Keyword-only parameter after an empty unpacked tuple
+
+`register` accepts no positional arguments after the callback. Passing `register` itself as the
+callback is valid, and the keyword-only argument `enabled` still requires a `bool`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+
+def register[**P](callback: Callable[P, None], *args: *tuple[()], enabled: bool) -> None: ...
+
+register(register, enabled=True)  # ok
+register(register, enabled="wrong")  # error: 20 [invalid-argument-type] "Expected `bool`"
+```
+
 ### Keyword argument, keywords parameter
 
 ```py
@@ -1682,8 +1701,6 @@ python-version = "3.13"
 ```
 
 ```py
-from collections.abc import Callable
-
 def at_least_one(*args: *tuple[*tuple[int, ...], int]) -> None: ...
 def exactly_two(*args: *tuple[int, str]) -> None: ...
 def exactly_zero(*args: *tuple[()]) -> None: ...
@@ -1703,11 +1720,6 @@ exactly_two(1, "two", 3)  # error: [too-many-positional-arguments]
 
 exactly_zero()
 exactly_zero(1)  # error: [too-many-positional-arguments]
-
-def register[**P](callback: Callable[P, None], *args: *tuple[()], enabled: bool) -> None: ...
-
-register(register, enabled=True)
-register(register, enabled="wrong")  # error: 20 [invalid-argument-type] "Expected `bool`"
 ```
 
 ### Unpacked variadic arity errors preserve element diagnostics

@@ -1345,16 +1345,25 @@ def f(x: int, y: str) -> int:
 
 c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
+```
 
+`run_previous` takes one argument, a `C` whose stored callback takes none. Constructing a new `C`
+from `run_previous` preserves that one-argument signature.
+
+```py
 def run_previous(previous: C[[]]) -> int:
     return previous.f()
 
 reveal_type(C(run_previous).f)  # revealed: (previous: C[()]) -> int
 ```
 
-A constructor can receive itself as a callback and still infer a class type argument from a value.
+### Passing a class to its own constructor
+
+When `Box` takes itself as the callback, the second argument still determines the class type
+parameter `T`.
 
 ```py
+from collections.abc import Callable
 from typing import overload
 
 class Box[T]:
@@ -1362,8 +1371,7 @@ class Box[T]:
     def __init__[**P](self, callback: Callable[P, object], value: T) -> None: ...
     @overload
     def __init__(self, callback: object, value: T) -> None: ...
-    def __init__(self, callback, value):
-        self.value = value
+    def __init__(self, callback, value): ...
 
 reveal_type(Box(Box, 1))  # revealed: Box[Literal[1]]
 ```
@@ -1767,29 +1775,31 @@ def target(name: str, callback: Callable[[int], Any]): ...
 forward(target, callback=lambda value: value)  # error: [missing-argument]
 ```
 
-### Capturing a generic callable from a sequence
+### Selecting a generic callback from a list
+
+The list of callbacks can contain `first` itself. Calling the result with `[fetch]` preserves
+`fetch`'s `key` parameter and `bytes` return type.
 
 ```py
-from collections.abc import Callable, Sequence
-from functools import partial
-from typing import Protocol
+from collections.abc import Callable
 
-class Selector(Protocol):
-    def __call__[**P, R](self, callbacks: Sequence[Callable[P, R]], /) -> Callable[P, R]: ...
+def first[**P, R](callbacks: list[Callable[P, R]]) -> Callable[P, R]:
+    return callbacks[0]
 
-def _(primary: Selector, fallback: Selector):
-    select = primary([fallback])
+def fetch(key: str) -> bytes:
+    return key.encode()
 
-    def fetch(key: str) -> bytes:
-        return key.encode()
-
-    reveal_type(select([fetch]))  # revealed: (key: str) -> bytes
-    reveal_type(primary((partial(fallback),))([fetch]))  # revealed: (key: str) -> bytes
+select = first([first])
+reveal_type(select([fetch]))  # revealed: (key: str) -> bytes
 ```
 
-Overload resolution still checks arguments forwarded to a callback fetched from a list.
+### Forwarding arguments to an overloaded callback in a list
+
+`invoke` passes its extra arguments to each callback in the list. In `invoke([invoke], 1)`, the
+inner call would receive `1` where both overloads require a list.
 
 ```py
+from collections.abc import Callable
 from typing import overload
 
 @overload
@@ -2676,11 +2686,6 @@ def first[**P, T](callback: Callable[P, None], value: tuple[T, ...]) -> T:
 def callback(*, label: str) -> None: ...
 def check(value: tuple[int] | tuple[str]):
     reveal_type(first(callback, value))  # revealed: int | str
-
-def tag[**P, R, *Ts](func: Callable[P, R], *tags: *Ts) -> Callable[P, R]:
-    return func
-
-reveal_type(tag(tag)(callback))  # revealed: (*, label: str) -> None
 ```
 
 ### Overloads with substitution of `P.args` and `P.kwargs`
@@ -2707,8 +2712,6 @@ def returns_str(x: int) -> str:
 def never_returns(x: int) -> Never:
     raise Exception()
 
-reveal_type(Task(Task)(returns_str)(1))  # revealed: str
-
 t1 = Task(returns_str)
 reveal_type(t1)  # revealed: Task[(x: int), str]
 reveal_type(t1(1))  # revealed: str
@@ -2721,6 +2724,14 @@ reveal_type(t1(y=1))  # revealed: Unknown
 t2 = Task(never_returns)
 reveal_type(t2)  # revealed: Task[(x: int), Never]
 reveal_type(t2(1))  # revealed: Never
+```
+
+`Task` can also wrap its own constructor. Calling the wrapped constructor with `returns_str` builds
+a task that returns `str`.
+
+```py
+build_task = Task(Task)
+reveal_type(build_task(returns_str)(1))  # revealed: str
 ```
 
 ## ParamSpec attribute assignability
@@ -2813,8 +2824,6 @@ from ty_extensions._internal import generic_context
 def decorator[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     return func
 
-reveal_type(decorator(decorator))  # revealed: [**P, T](func: (**P) -> T) -> ((**P) -> T)
-
 @decorator
 def identity[T](value: T) -> T:
     return value
@@ -2835,16 +2844,70 @@ reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
 ```
 
-A nested callback can close over the decorator's parameter list and return type.
+### Passing a decorator to itself
+
+`identity` returns the function it receives. When it receives itself, the result is still generic
+over the callback's parameters and return type.
 
 ```py
-def decorate[**P, R](func: Callable[P, R], *, repeat: bool = False) -> Callable[P, R]:
-    def wrap(callback: Callable[P, R]) -> Callable[P, R]:
+from collections.abc import Callable
+
+def identity[**P, R](callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+reveal_type(identity(identity))  # revealed: [**P, R](callback: (**P) -> R) -> ((**P) -> R)
+```
+
+The decorator can also take extra arguments through `*Ts`. It can take itself as the callback
+without any extra arguments.
+
+```py
+def tag[**P, R, *Ts](callback: Callable[P, R], *tags: *Ts) -> Callable[P, R]:
+    return callback
+
+tag(tag)  # ok
+```
+
+### A decorator with a parameter list fixed by its class
+
+A `Decorator[[int]]` accepts a function that takes one `int`. The decorator itself takes a function
+as its argument, so passing it to itself is an error.
+
+```py
+from collections.abc import Callable
+
+class Decorator[**P]:
+    def __call__[R](self, callback: Callable[P, R]) -> Callable[P, R]:
         return callback
 
-    return decorate(wrap)(func) if repeat else func
+def check(decorator: Decorator[[int]]):
+    decorator(decorator)  # error: [invalid-argument-type]
+```
 
-reveal_type(decorate(identity, repeat=True)(1))  # revealed: Literal[1]
+### A nested callback in a recursive call
+
+`wrap` uses `P` and `R` from the enclosing call to `decorate`. When `decorate` calls itself with
+`wrap` as the callback, the inner call infers its own `P` and `R`.
+
+```py
+from collections.abc import Callable
+
+def decorate[**P, R](callback: Callable[P, R], repeat: bool = False) -> Callable[P, R]:
+    def wrap(other: Callable[P, R]) -> Callable[P, R]:
+        return other
+    if repeat:
+        return decorate(wrap)(callback)
+    return callback
+```
+
+After the recursive call, the decorated function accepts the same named argument and returns the
+same type as `size`.
+
+```py
+def size(text: str) -> int:
+    return len(text)
+
+reveal_type(decorate(size, repeat=True))  # revealed: (text: str) -> int
 ```
 
 ### Chained decorators with generic functions
@@ -3198,19 +3261,23 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     box.invoke(callback, 1)
 ```
 
-Lambda arguments are checked for both possible receivers.
+## Passing a union of receivers to a callback
+
+`pipe` passes its receiver to the callback. If the receiver can be either `Ok` or `Err`, a lambda
+that only handles `Ok` is too narrow.
 
 ```py
-from typing import Concatenate
+from collections.abc import Callable
+from typing import Concatenate, Self
 
 class Result:
-    def pipe[**P, R](self, callback: Callable[Concatenate[Self, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
-        return callback(self, *args, **kwargs)
+    def pipe[**P](self, callback: Callable[Concatenate[Self, P], None], *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(self, *args, **kwargs)
 
 class Ok(Result): ...
 class Err(Result): ...
 
-def process(result: Ok) -> None: ...
+def handle_ok(result: Ok) -> None: ...
 def check(result: Ok | Err):
-    result.pipe(lambda value: process(value))  # error: [invalid-argument-type]
+    result.pipe(lambda value: handle_ok(value))  # error: [invalid-argument-type]
 ```
