@@ -524,6 +524,15 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
+        // A pattern can guard bindings used to infer its own subject. Keep both outcomes
+        // when iterations disagree, after allowing the initial ambiguous result to resolve.
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            previous.union(current)
+        } else {
+            current
+        }
+    },
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {

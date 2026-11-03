@@ -934,3 +934,41 @@ def _(val, IntOrStr: type[int | str]):
         case IntOrStr():
             print(f"Matched as {IntOrStr}: {val!r}")
 ```
+
+## Cyclic pattern reachability
+
+Pattern analysis can depend on the reachability of bindings used to infer its own subject. These
+cycles converge even when the inferred subject type changes whether the pattern can match.
+
+### A single mapping case
+
+```py
+lambda: callback
+for item in [1]:
+    match subject:  # error: [possibly-unresolved-reference]
+        case {}:
+            callback = 0
+            subject = 0
+```
+
+### Reachability through a later import
+
+A recursive subject can also depend on an import after the match. Checking the earlier lambda must
+finish so that invalid annotations and unresolved imports can be reported.
+
+```py
+lambda: later
+value: 0 = (lambda: value)()  # error: [invalid-type-form]
+match value:
+    case {}:
+        pass
+    case _ if True:
+        raise
+while []:
+    pass
+else:
+    from . import value  # error: [import-not-found]
+
+def later():
+    pass
+```
