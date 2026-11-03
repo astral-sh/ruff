@@ -19,7 +19,7 @@ def bar():
 ## Multiple statements
 
 ```pyi
-def oof():  # error: [stub-body-multiple-statements]
+def oof():  # snapshot: stub-body-multiple-statements
     """oof"""
     print("foo")
 
@@ -32,6 +32,14 @@ def buzz():  # error: [stub-body-multiple-statements]
     print("fizz")
     print("buzz")
     print("test")
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:1:5
+  |
+1 | def oof():  # snapshot: stub-body-multiple-statements
+  |     ^^^
 ```
 
 ## Non-stub files
