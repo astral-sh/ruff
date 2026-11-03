@@ -1446,6 +1446,16 @@
             }
           ]
         },
+        "read-only-typed-dict-mutation": {
+          "title": "detects attempts to modify or delete read-only `TypedDict` items",
+          "description": "## What it does\n\nChecks for subscript assignments and deletions of read-only `TypedDict` items, including read-only\nextra items. It also checks direct calls to `pop()` and `setdefault()` that could remove or insert a\nread-only item.\n\n## Why is this bad?\n\nA `ReadOnly` annotation allows callers to pass a dictionary with a narrower item type. For example,\na caller could pass a movie whose title is always a string. Replacing the title with `None` would\nviolate that guarantee. Similarly, deleting an item could remove a key the caller requires.\n\n## Example\n\n```python\nfrom typing_extensions import ReadOnly, TypedDict\n\n\nclass Movie(TypedDict):\n    title: ReadOnly[str | None]\n\n\ndef clear_title(movie: Movie) -> None:\n    movie[\"title\"] = None  # error: [read-only-typed-dict-mutation]\n```\n\n## Migration\n\nBefore ty 0.0.97, subscript assignments to read-only items used `invalid-assignment`. Read-only\nerrors for `del`, `pop()`, and `setdefault()` used `invalid-argument-type`. To keep a custom rule\nlevel for these errors, set `read-only-typed-dict-mutation` to that level as well. To suppress a\nread-only mutation on a single line, use `# ty: ignore[read-only-typed-dict-mutation]`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "redundant-cast": {
           "title": "detects redundant `cast` calls",
           "description": "## What it does\n\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\n\nThese casts have no effect and can be removed.\n\n## Example\n\n```python\nfrom typing import cast\n\n\ndef f() -> int:\n    return 10\n\n\n# Redundant\ncast(int, f())  # error\n```",

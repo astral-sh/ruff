@@ -201,7 +201,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
     registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
     registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
-
+    registry.register_lint(&READ_ONLY_TYPED_DICT_MUTATION);
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
@@ -1462,6 +1462,15 @@ declare_lint! {
         summary: "detects truthiness tests of `Iterable`-typed objects",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/read-only-typed-dict-mutation.md")]
+    pub(crate) static READ_ONLY_TYPED_DICT_MUTATION = {
+        summary: "detects attempts to modify or delete read-only `TypedDict` items",
+        status: LintStatus::stable("0.0.97"),
+        default_level: Level::Error,
     }
 }
 
@@ -4680,28 +4689,24 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     error_kind: TypedDictDeleteErrorKind,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
+    let (lint, key_description) = match error_kind {
+        TypedDictDeleteErrorKind::RequiredKey => (&INVALID_ARGUMENT_TYPE, "required key"),
+        TypedDictDeleteErrorKind::ReadOnlyKey => (&READ_ONLY_TYPED_DICT_MUTATION, "read-only key"),
+        TypedDictDeleteErrorKind::ReadOnlyExtraItem => {
+            (&READ_ONLY_TYPED_DICT_MUTATION, "read-only extra item")
+        }
+        TypedDictDeleteErrorKind::UnknownKey => (&INVALID_ARGUMENT_TYPE, "unknown key"),
+    };
+    let Some(builder) = context.report_lint(lint, key_node) else {
         return;
     };
     let env = &context.program_environment();
 
     let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db, env);
 
-    let mut diagnostic = match error_kind {
-        TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
-            "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
-        )),
-        TypedDictDeleteErrorKind::ReadOnlyKey => builder.into_diagnostic(format_args!(
-            "Cannot delete read-only key \"{field_name}\" from TypedDict `{typed_dict_name}`"
-        )),
-        TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
-            "Cannot delete read-only extra item \"{field_name}\" \
-            from TypedDict `{typed_dict_name}`"
-        )),
-        TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
-            "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
-        )),
-    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot delete {key_description} \"{field_name}\" from TypedDict `{typed_dict_name}`"
+    ));
 
     // Only suggest making the field `NotRequired` when that would allow deletion.
     if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey)

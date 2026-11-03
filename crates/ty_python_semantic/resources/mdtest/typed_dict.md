@@ -2624,7 +2624,17 @@ def _(person: Person, unknown_key: Any):
 
 ## `ReadOnly`
 
-Assignments to keys that are marked `ReadOnly` will produce an error:
+Mutating a read-only item is an error even when ordinary assignment and argument type errors are
+disabled:
+
+```toml
+[rules]
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+```
+
+A read-only item can be initialized, but assigning to it afterward is an error even if the value has
+the declared type:
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, Required
@@ -2637,7 +2647,7 @@ class Person(TypedDict, total=False):
 alice: Person = {"id": 1, "name": "Alice", "age": 30}
 alice["age"] = 31  # okay
 
-# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
+# error: [read-only-typed-dict-mutation] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
 alice["id"] = 2
 ```
 
@@ -2651,9 +2661,9 @@ class Config(TypedDict):
 
 config: Config = {"host": "localhost", "port": 8080}
 
-# error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
+# error: [read-only-typed-dict-mutation] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
 config["host"] = "127.0.0.1"
-# error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
+# error: [read-only-typed-dict-mutation] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
 config["port"] = 80
 ```
 
@@ -2666,12 +2676,12 @@ class Cache(TypedDict):
     value: NotRequired[ReadOnly[int]]
 
 def _(cache: Cache) -> None:
-    # snapshot: invalid-argument-type
+    # snapshot: read-only-typed-dict-mutation
     del cache["value"]
 ```
 
 ```snapshot
-error[invalid-argument-type]: Cannot delete read-only key "value" from TypedDict `Cache`
+error[read-only-typed-dict-mutation]: Cannot delete read-only key "value" from TypedDict `Cache`
   --> src/mdtest_snippet.py:30:15
    |
 30 |     del cache["value"]
@@ -2683,11 +2693,11 @@ insert a value if the key is missing:
 
 ```py
 def _(cache: Cache) -> None:
-    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only key "value" from TypedDict `Cache`"
     cache.pop("value")
-    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only key "value" from TypedDict `Cache`"
     cache.pop("value", 0)
-    # error: [invalid-argument-type] "Cannot set default for read-only key "value" on TypedDict `Cache`"
+    # error: [read-only-typed-dict-mutation] "Cannot set default for read-only key "value" on TypedDict `Cache`"
     cache.setdefault("value", 0)
 ```
 
@@ -2706,24 +2716,32 @@ def key(value: str) -> Literal["value"]:
     return "value"
 
 def _(cache: Cache) -> None:
-    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only key"
     # error: [unresolved-reference] "Name `missing_default` used when not defined"
     cache.pop("value", missing_default)
 
-    # error: [invalid-argument-type] "Cannot set default for read-only key"
+    # error: [read-only-typed-dict-mutation] "Cannot set default for read-only key"
     # error: [unresolved-reference] "Name `missing_default` used when not defined"
     cache.setdefault("value", missing_default)
 
-    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only key"
     # error: [invalid-argument-type] "Argument to function `key` is incorrect"
     cache.pop(key(1))
+```
+
+Suppressing the mutation diagnostic still leaves the argument type error visible:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    cache.pop(key(1))  # ty: ignore[read-only-typed-dict-mutation]
 ```
 
 Errors in the key are also reported when the mutation is an argument to an overloaded call:
 
 ```py
 def _(cache: Cache) -> None:
-    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only key"
     # error: [invalid-argument-type] "Argument to function `key` is incorrect"
     sorted((cache.pop(key(1)),))
 ```
@@ -3953,7 +3971,7 @@ Read-only fields can be made mutable in a subtype, but not the other way around:
 
 ```py
 named_dict: ReadOnlyBase = {"value": 1}
-named_dict["value"] = 2  # error: [invalid-assignment]
+named_dict["value"] = 2  # error: [read-only-typed-dict-mutation]
 
 class MutableSubtype(ReadOnlyBase):
     value: int
@@ -5071,7 +5089,7 @@ from typing_extensions import TypedDict, ReadOnly
 
 inline_readonly = TypedDict("InlineReadOnly", {"id": ReadOnly[int]})(id=1)
 
-# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `InlineReadOnly`: key is marked read-only"
+# error: [read-only-typed-dict-mutation] "Cannot assign to key "id" on TypedDict `InlineReadOnly`: key is marked read-only"
 inline_readonly["id"] = 2
 ```
 
@@ -5768,7 +5786,7 @@ Extra = Alias = TypedDict("Extra", {"name": str}, extra_items="ReadOnly[Extra]")
 value = Extra(name="root")
 reveal_type(value["name"])  # revealed: str
 reveal_type(value["other"])  # revealed: Divergent
-value["other"] = value  # error: [invalid-assignment] "key is marked read-only"
+value["other"] = value  # error: [read-only-typed-dict-mutation] "key is marked read-only"
 ```
 
 ## Deprecated keyword-argument syntax
@@ -6246,7 +6264,7 @@ class Employee(TypedDict):
     name: str
 
 def write_to_readonly_key(employee: Employee):
-    employee["id"] = 42  # error: [invalid-assignment]
+    employee["id"] = 42  # error: [read-only-typed-dict-mutation]
 ```
 
 If the key uses single quotes, the autofix preserves that quoting style:
@@ -8116,7 +8134,7 @@ class NativeReadOnlyExtra[T](TypedDict, extra_items=ReadOnly[T]): ...
 
 def _(extra: NativeGenericExtra[int], read_only: NativeReadOnlyExtra[int]) -> None:
     reveal_type(extra["other"])  # revealed: int
-    read_only["other"] = 1  # error: [invalid-assignment]
+    read_only["other"] = 1  # error: [read-only-typed-dict-mutation]
 
 static_assert(not is_subtype_of(NativeGenericExtra[int], NativeGenericExtra[object]))
 static_assert(not is_subtype_of(NativeGenericExtra[object], NativeGenericExtra[int]))
@@ -8390,7 +8408,7 @@ class ReadOnlyExtra(TypedDict, extra_items=ReadOnly[int]):
 def _(read_only_extra: ReadOnlyExtra) -> None:
     read_only_extra["name"] = "Alien"  # OK: name is a declared mutable field
 
-    # error: [invalid-assignment] "Cannot assign to key "year" on TypedDict `ReadOnlyExtra`: key is marked read-only"
+    # error: [read-only-typed-dict-mutation] "Cannot assign to key "year" on TypedDict `ReadOnlyExtra`: key is marked read-only"
     read_only_extra["year"] = 1982
 ```
 
@@ -8760,13 +8778,13 @@ def _(
     reveal_type(read_only.get("other"))  # revealed: int | None
     reveal_type(read_only.get("other", "missing"))  # revealed: int | Literal["missing"]
 
-    # error: [invalid-argument-type] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
     read_only.pop("other")
-    # error: [invalid-argument-type] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    # error: [read-only-typed-dict-mutation] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
     read_only.pop("other", 0)
-    # error: [invalid-argument-type] "Cannot set default for read-only extra item "other" on TypedDict `ReadOnlyExtra`"
+    # error: [read-only-typed-dict-mutation] "Cannot set default for read-only extra item "other" on TypedDict `ReadOnlyExtra`"
     read_only.setdefault("other", 0)
-    # error: [invalid-argument-type] "Cannot delete read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    # error: [read-only-typed-dict-mutation] "Cannot delete read-only extra item "other" from TypedDict `ReadOnlyExtra`"
     del read_only["other"]
 
     # error: [invalid-argument-type]

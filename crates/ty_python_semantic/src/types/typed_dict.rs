@@ -14,7 +14,8 @@ use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
-    TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
+    READ_ONLY_TYPED_DICT_MUTATION, TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict,
+    report_missing_typed_dict_key,
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
@@ -1646,7 +1647,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             if self.emit_diagnostic
                 && let Some(builder) = self
                     .context
-                    .report_lint(self.assignment_kind.diagnostic_type(), self.key_node)
+                    .report_lint(&READ_ONLY_TYPED_DICT_MUTATION, self.key_node)
             {
                 let typed_dict_ty = Type::TypedDict(self.typed_dict);
                 let typed_dict_d = typed_dict_ty.display(db, env);

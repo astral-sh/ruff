@@ -52,7 +52,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 37 |     name: str
 38 | 
 39 | def write_to_readonly_key(employee: Employee):
-40 |     employee["id"] = 42  # error: [invalid-assignment]
+40 |     employee["id"] = 42  # error: [read-only-typed-dict-mutation]
 41 | def write_to_non_existing_key_single_quotes(person: Person):
 42 |     # error: [invalid-key]
 43 |     person['nane'] = "Alice"  # fmt: skip
@@ -180,10 +180,10 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
 ```
 
 ```
-error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
+error[read-only-typed-dict-mutation]: Cannot assign to key "id" on TypedDict `Employee`
   --> src/mdtest_snippet.py:40:14
    |
-40 |     employee["id"] = 42  # error: [invalid-assignment]
+40 |     employee["id"] = 42  # error: [read-only-typed-dict-mutation]
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
