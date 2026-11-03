@@ -117,9 +117,9 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     }
 
     let project_metadata = db.project().metadata(db);
-    let has_inline_settings =
+    let use_inline_settings =
         project_metadata.config_file_override().is_none() && metadata.ty().is_some();
-    let configuration_root = if has_inline_settings {
+    let configuration_root = if use_inline_settings {
         file.path(db)
             .as_system_path()
             .and_then(|path| path.parent())
@@ -136,7 +136,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         file,
         &mut diagnostics,
     );
-    let settings = has_inline_settings
+    let settings = use_inline_settings
         .then(|| resolve_script_settings(db, &options, context, &mut diagnostics))
         .map(Box::new);
     let program_settings = resolve_script_program_settings(
@@ -233,16 +233,11 @@ fn resolve_script_options(
     } else {
         let mut config = metadata.to_options(file, diagnostics);
         if metadata.ty().is_none()
-            && let Some(environment) = &project_metadata.options().environment
+            && let Some(mut environment) = project_metadata.options().environment.clone()
         {
             // Each script is a standalone program with its own first-party roots.
-            config
-                .environment
-                .get_or_insert_default()
-                .combine_with(EnvironmentOptions {
-                    root: None,
-                    ..environment.clone()
-                });
+            environment.root = None;
+            config.environment.combine_with(Some(environment));
         }
         config
     };
@@ -268,6 +263,13 @@ fn resolve_script_options(
         options.environment.get_or_insert_default().python =
             Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
     }
+
+    // Unlike projects, standalone scripts default to `root = []`.
+    options
+        .environment
+        .get_or_insert_default()
+        .root
+        .get_or_insert_default();
 
     options
 }

@@ -87,7 +87,7 @@ impl MarkdownTestConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct ScriptOptions {
     pub(crate) rules: Option<Rules>,

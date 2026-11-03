@@ -749,17 +749,6 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
         ("src/layout_dependency.py", "value = 1\n"),
         ("scripts/local_dependency.py", "value = 1\n"),
         (
-            "scripts/with_root.py",
-            r#"
-            # /// script
-            # [tool.ty.environment]
-            # root = ["."]
-            # ///
-
-            import local_dependency
-            "#,
-        ),
-        (
             "scripts/script.py",
             r#"
             # /// script
@@ -773,13 +762,37 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    scripts/script.py:6:6: error[unresolved-import] Cannot resolve imported module `layout_dependency`
-    scripts/script.py:7:6: error[unresolved-import] Cannot resolve imported module `local_dependency`
-    scripts/script.py:8:6: error[unresolved-import] Cannot resolve imported module `shared`
+    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
+     --> scripts/script.py:6:6
+      |
+    6 | from layout_dependency import value as layout_value
+      |      ^^^^^^^^^^^^^^^^^
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+    error[unresolved-import]: Cannot resolve imported module `local_dependency`
+     --> scripts/script.py:7:6
+      |
+    7 | from local_dependency import value as local_value
+      |      ^^^^^^^^^^^^^^^^
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+    error[unresolved-import]: Cannot resolve imported module `shared`
+     --> scripts/script.py:8:6
+      |
+    8 | from shared import value
+      |      ^^^^^^
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
     Found 3 diagnostics
 
     ----- stderr -----
@@ -791,6 +804,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
 #[test]
 fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyhow::Result<()> {
     let case = CliTest::with_files([
+        ("scripts/sibling.py", "value = 1\n"),
         ("scripts/source/first_party.py", "value = 1\n"),
         ("scripts/extra/dependency.py", "value = 1\n"),
         (
@@ -798,12 +812,13 @@ fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyho
             r#"
             # /// script
             # [tool.ty.environment]
-            # root = ["./source"]
+            # root = ["./source", "."]
             # extra-paths = ["./extra"]
             # ///
 
             from dependency import value as dependency
             from first_party import value as first_party
+            from sibling import value as sibling
             "#,
         ),
     ])?;

@@ -388,7 +388,8 @@ impl Options {
                 .iter()
                 .map(|root| root.absolute(context.configuration_root(), system))
                 .collect()
-        } else if let Some(project_root) = context.project_root() {
+        } else {
+            let project_root = context.configuration_root();
             let mut roots = vec![];
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
@@ -436,9 +437,6 @@ impl Options {
             roots.push(project_root.to_path_buf());
 
             roots
-        } else {
-            // A standalone script has no implicit first-party roots.
-            Vec::new()
         };
 
         // collect the existing site packages
