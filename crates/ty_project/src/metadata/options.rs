@@ -537,8 +537,12 @@ impl Options {
 
         let analysis_result: Result<_, ToSettingsError> =
             if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
+                // Treat invalid top-level analysis settings as configuration errors.
                 Err(ToSettingsError {
-                    diagnostic: Box::new(diagnostic),
+                    diagnostic: Box::new(OptionDiagnostic {
+                        severity: Severity::Error,
+                        ..diagnostic
+                    }),
                     output_format: terminal.output_format,
                     color: colored::control::SHOULD_COLORIZE.should_colorize(),
                 })
@@ -1875,7 +1879,7 @@ fn build_module_glob_set(
             let diagnostic = OptionDiagnostic::new(
                 DiagnosticId::InvalidGlob,
                 format!("Invalid glob pattern `{error}`"),
-                Severity::Error,
+                Severity::Warning,
             );
 
             return Err(diagnostic
@@ -1888,7 +1892,7 @@ fn build_module_glob_set(
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             "The `{option_name}` patterns resulted in a regex that is too large".to_string(),
-            Severity::Error,
+            Severity::Warning,
         );
 
         Box::new(diagnostic.sub(SubDiagnostic::new(
