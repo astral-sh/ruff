@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
 
 /// C404 (`dict([...])`)
 pub(crate) fn unnecessary_list_comprehension_dict(checker: &Checker, call: &ExprCallFields<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("dict", call.node) else {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
     let ExprKind::ListComp(list_comp) = argument.classify() else {
