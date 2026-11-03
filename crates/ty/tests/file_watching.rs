@@ -4100,10 +4100,9 @@ mod uv_metadata {
         Ok(())
     }
 
-    /// Installing the dependency with `uv pip install` clears the unresolved-import diagnostic
-    /// and uv metadata warning without changing the project's manifest or lockfile.
+    /// Installing the dependency clears the unresolved import without changing the manifest or lockfile.
     #[test]
-    fn uv_pip_install_clears_import_and_metadata_errors() -> anyhow::Result<()> {
+    fn uv_pip_install_clears_unresolved_import() -> anyhow::Result<()> {
         let mut case = setup_uv(
             UseUv::On,
             &[
@@ -4139,10 +4138,7 @@ mod uv_metadata {
             ],
         )?;
         // The optional dependency is resolved but not installed by setup's `uv sync`.
-        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
-        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
-        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
-        ");
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`");
 
         // Installing a local package changes the environment without editing the project's
         // manifest or lockfile. uv's bundled build backend keeps the test offline.
@@ -4153,10 +4149,9 @@ mod uv_metadata {
         Ok(())
     }
 
-    /// Uninstalling the dependency with `uv pip uninstall` reports an unresolved-import
-    /// diagnostic and uv metadata warning without changing the project's manifest or lockfile.
+    /// Uninstalling the dependency makes the import unresolved without changing the manifest or lockfile.
     #[test]
-    fn uv_pip_uninstall_reports_import_and_metadata_errors() -> anyhow::Result<()> {
+    fn uv_pip_uninstall_reports_unresolved_import() -> anyhow::Result<()> {
         let mut case = setup_uv(
             UseUv::On,
             &[
@@ -4196,10 +4191,7 @@ mod uv_metadata {
         run_uv(&case, &["pip", "uninstall", "--offline", "dependency"])?;
         let deleted = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
         apply_changes_and_synchronize_project(&mut case, &deleted)?;
-        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
-        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
-        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
-        ");
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`");
         Ok(())
     }
 

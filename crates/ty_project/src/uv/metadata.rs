@@ -20,6 +20,7 @@ pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
+    installed_packages: Option<BTreeMap<CharStr, InstalledPackage>>,
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
@@ -53,13 +54,17 @@ impl UvMetadata {
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
-        let environment = match metadata.environment {
-            Some(environment) => Some(existing_directory(
-                environment.root,
-                "environment root",
-                system,
-            )?),
-            None => None,
+        let (environment, installed_packages) = match metadata.environment {
+            Some(environment) => (
+                Some(existing_directory(
+                    environment.root,
+                    "environment root",
+                    system,
+                )?),
+                environment.packages.map(|packages| packages.0),
+            ),
+            // With no environment there are no installed packages to attribute.
+            None => (None, Some(BTreeMap::new())),
         };
 
         let mut module_owners = metadata.module_owners;
@@ -76,6 +81,7 @@ impl UvMetadata {
             workspace_root,
             members: metadata.members,
             environment,
+            installed_packages,
             schema: metadata.schema,
             workspace: metadata.workspace,
             script: metadata.script,
@@ -175,7 +181,7 @@ fn existing_directory(
 /// See uv's [schema documentation] and [serialization types] for the upstream format.
 ///
 /// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
-/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
+/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-lock/src/lock/export/metadata.rs
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
@@ -201,6 +207,26 @@ struct ModuleMetadata {
 #[derive(Deserialize)]
 struct WorkspaceEnvironment {
     root: PathBuf,
+    // uv versions before 0.13.2 supply an environment root without a package inventory.
+    packages: Option<InstalledPackages>,
+}
+
+#[derive(Deserialize)]
+#[serde(transparent)]
+struct InstalledPackages(
+    #[serde(deserialize_with = "string_interner::deserialize_map")]
+    BTreeMap<CharStr, InstalledPackage>,
+);
+
+/// The installed package's name and editability, used for import ownership.
+///
+/// For editable installs, source roots come from the resolution: the installed package's `path`
+/// points to distribution metadata instead of source code.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct InstalledPackage {
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    name: CharStr,
+    editable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
@@ -270,10 +296,10 @@ mod tests {
 
     use anyhow::Context;
     use char_str::CharStr;
-    use ruff_db::system::TestSystem;
+    use ruff_db::system::{SystemPath, TestSystem};
     use serde_json::json;
 
-    use super::{UvMetadata, UvMetadataError};
+    use super::{DependencyMetadataError, UvMetadata, UvMetadataError};
 
     #[test]
     fn rejects_invalid_metadata() {
@@ -305,6 +331,31 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn only_dependency_checks_require_the_package_inventory() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        system.memory_file_system().create_directory_all("/app")?;
+
+        for environment in [
+            json!({"root": "/app"}),
+            json!({"root": "/app", "packages": null}),
+        ] {
+            let metadata = json!({
+                "schema": {"version": "preview"},
+                "workspace_root": "/app",
+                "environment": environment,
+            });
+            let metadata = UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system)?;
+            assert_eq!(metadata.environment(), Some(SystemPath::new("/app")));
+            assert_matches!(
+                metadata.dependency_metadata(),
+                Err(DependencyMetadataError::MissingPackageInventory)
+            );
+        }
+
+        Ok(())
+    }
+
     fn assert_shared(expected: &CharStr, actual: &CharStr) {
         assert_eq!(actual, expected);
         assert!(expected.is_heap_allocated());
@@ -323,6 +374,10 @@ mod tests {
         let input = serde_json::to_vec(&json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
+            "environment": {
+                "root": root,
+                "packages": {(dependency_id): {"name": name, "editable": false}}
+            },
             "members": [{"id": member_id, "name": "app", "path": root}],
             "resolution": {
                 (member_id): {
@@ -345,12 +400,20 @@ mod tests {
             .module_owners
             .get_key_value(name)
             .context("expected module ownership")?;
+        let (installed_id, package) = metadata
+            .installed_packages
+            .as_ref()
+            .context("expected an installed package inventory")?
+            .get_key_value(dependency_id)
+            .context("expected an installed dependency")?;
 
         assert_shared(
             dependency_key,
             &metadata.resolution[member_id].dependencies[0].id,
         );
         assert_shared(dependency_key, &owners[0].package_id);
+        assert_shared(dependency_key, installed_id);
+        assert_shared(module_name, &package.name);
 
         let dependencies = metadata.dependency_metadata()?;
         assert_shared(
@@ -380,6 +443,7 @@ mod tests {
                 "workspace_root": "/app",
                 "environment": {
                     "root": "/env",
+                    "packages": {},
                     "python": { "version": "3.13.5" }
                 },
                 "schema": { "version": schema },

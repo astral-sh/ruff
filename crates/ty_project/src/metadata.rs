@@ -1261,7 +1261,7 @@ unclosed table, expected `]`
         let input = serde_json::json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
-            "environment": {"root": link},
+            "environment": {"root": link, "packages": {}},
             "members": [{"id": "app", "name": "app", "path": root}],
             "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
         });
@@ -1327,7 +1327,7 @@ unclosed table, expected `]`
         let input = serde_json::json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
-            "environment": {"root": uv_link},
+            "environment": {"root": uv_link, "packages": {}},
             "members": [{"id": "app", "name": "app", "path": root}],
             "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
         });
@@ -1433,7 +1433,7 @@ unclosed table, expected `]`
         let input = serde_json::json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
-            "environment": {"root": uv_link},
+            "environment": {"root": uv_link, "packages": {}},
             "members": [{"id": "app", "name": "app", "path": root}],
             "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
         });

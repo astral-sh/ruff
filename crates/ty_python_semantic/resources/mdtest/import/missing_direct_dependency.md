@@ -547,6 +547,35 @@ from shared_namespace import external  # error: [missing-direct-dependency] "dir
 import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
+#### Namespaces shared with editable installations
+
+An installed distribution can own part of a namespace while a separate editable installation
+provides another child through a `.pth` file. If uv doesn't identify the editable child's owner,
+importing it does not require the distribution that owns its sibling.
+
+`/.venv/<path-to-site-packages>/shared_namespace/external.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/editable.pth`:
+
+```pth
+/editable/src
+```
+
+`/editable/src/shared_namespace/plugin.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import shared_namespace.plugin  # no diagnostic
+import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
+```
+
 #### Shared namespaces with inline stubs
 
 An installed `__init__.pyi` does not change which modules share the namespace at runtime. Imports of
