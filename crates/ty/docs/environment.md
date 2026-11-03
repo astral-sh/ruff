@@ -46,6 +46,16 @@ When set, ty will use this format for output instead of the default.
 
 Accepts the same values as the `--output-format` command-line argument.
 
+### `TY_UV`
+
+Enable and configure uv integration.
+
+When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
+
+When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+environment.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
