@@ -680,7 +680,10 @@ impl<'r> RenderableAnnotation<'r> {
         // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
         // `TextRange::default()` for a diagnostic range instead of a range relative to file
         // contents.
-        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
+        let range = TextRange::new(
+            ann.range.start().saturating_sub(snippet_start),
+            ann.range.end().saturating_sub(snippet_start),
+        );
         RenderableAnnotation {
             range,
             message: ann.message,

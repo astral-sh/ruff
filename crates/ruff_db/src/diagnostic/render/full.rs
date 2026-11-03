@@ -951,6 +951,46 @@ print()
         ");
     }
 
+    #[test]
+    fn bom_only_file() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "\u{feff}");
+        env.format(DiagnosticFormat::Full);
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::new(TextSize::new(0), TextSize::new(3)));
+        let annotation = Annotation::primary(span);
+        diagnostic.annotate(annotation);
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 |
+          | ^
+        ");
+    }
+
+    #[test]
+    fn bom_with_full_file_range() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "\u{feff}import foo");
+        env.format(DiagnosticFormat::Full);
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::new(TextSize::new(0), TextSize::new(13)));
+        let annotation = Annotation::primary(span);
+        diagnostic.annotate(annotation);
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | import foo
+          | ^^^^^^^^^^
+        ");
+    }
+
     /// We previously rendered this correctly, but the header was falling back to 1:1 for ranges
     /// pointing to the final newline in a file. Like Ruff, we now use the offset of the first
     /// character in the nonexistent final line in the header.
