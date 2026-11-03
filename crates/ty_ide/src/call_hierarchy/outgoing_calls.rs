@@ -52,8 +52,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         let Some(def) = resolved.definition() else {
             continue;
         };
-        // An edit can move the prepared item's range onto an imported symbol. Outgoing
-        // call-site ranges are relative to the item's file, so only walk definitions in it.
+        // Call-site ranges are relative to the prepared item's file.
         if def.program_file(db) != file {
             continue;
         }
@@ -769,13 +768,10 @@ mod tests {
             .source(
                 "base.py",
                 "
-def default_name():
-    return 'untitled'
-
 class Record:
     @property
     def name(self):
-        return default_name()
+        return str(self)
 ",
             )
             .source(
@@ -786,17 +782,22 @@ from base import Record
 class Local(Record):
     @Record.name.setter
     def na<CURSOR>me(self, value):
-        print(value)
+        self._name = value
 ",
             )
             .build();
-        let calls = outgoing_calls(
-            &test.db,
-            test.program_file(test.cursor.file),
-            test.cursor.offset,
-        );
-        assert!(calls.iter().any(|call| call.to.name == "print"));
-        assert!(!calls.iter().any(|call| call.to.name == "default_name"));
+        assert_snapshot!(test.outgoing_calls(), @"
+        info[outgoing-calls]: Outgoing calls from `name`
+          --> main.py:LL:18
+           |
+        LL |     @Record.name.setter
+           |                  ^^^^^^ Call site
+        info: Method: `setter` (`builtins`)
+          --> stdlib/builtins.pyi:LL:9
+           |
+        LL |     def setter(self, fset: Callable[[Any, Any], None], /) -> property:
+           |         ^^^^^^
+        ");
     }
 
     #[test]

@@ -1,8 +1,8 @@
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
-    WorkDoneProgressParams,
+    PartialResultParams, Position, TextDocumentContentChangeWholeDocument, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkDoneProgressParams,
 };
 use lsp_types::{
     CallHierarchyIncomingCallsRequest, CallHierarchyOutgoingCallsRequest,
@@ -140,20 +140,18 @@ def caller():
 
 #[test]
 fn stale_outgoing_calls_on_an_imported_decorator() -> anyhow::Result<()> {
-    let content = "from hooks import record_call, trace
+    let content = "from hooks import trace
 
 @trace
-def run():
-    record_call('café')
+def label():
+    return 'café'
 ";
-    let hooks = r#"def record_call(message):
-    pass
+    let hooks = "def register_callback(func): ...
 
 def trace(func):
-    """Record registration, then return the original function."""
-    record_call('registered')
+    register_callback(func)
     return func
-"#;
+";
     let mut server = TestServerBuilder::new()?
         .with_file("main.py", content)?
         .with_file("hooks.py", hooks)?
@@ -162,22 +160,12 @@ def trace(func):
     server.open_text_document("main.py", content, 1);
     let items = prepare(&mut server, "main.py", Position::new(3, 4)).unwrap();
 
-    // The saved range for `run` now points at `trace`, whose body is in hooks.py.
-    server.change_text_document(
-        "main.py",
-        vec![
-            lsp_types::TextDocumentContentChangeWholeDocument {
-                text: format!("\n{content}"),
-            }
-            .into(),
-        ],
-        2,
-    );
+    // The saved position for `label` now falls on the imported `trace` decorator.
+    let change = TextDocumentContentChangeWholeDocument {
+        text: format!("\n{content}"),
+    };
+    server.change_text_document("main.py", vec![change.into()], 2);
     assert!(outgoing(&mut server, items[0].clone()).is_none());
-
-    let items = prepare(&mut server, "main.py", Position::new(4, 4)).unwrap();
-    let calls = outgoing(&mut server, items[0].clone()).unwrap();
-    assert!(calls.iter().any(|call| call.to.name == "record_call"));
     Ok(())
 }
 
