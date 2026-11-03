@@ -1693,6 +1693,23 @@ IgnoreSettings(debug=True)  # error: [pydantic-discarded-extra-argument]
 IgnoreSettings(_secrets_dir="./secrets")  # ok
 ```
 
+## SettingsConfigDict subclasses
+
+Subclasses of `SettingsConfigDict` can add application-specific configuration keys while retaining
+Pydantic's model options:
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class AppConfig(SettingsConfigDict, total=False):
+    deployment: str
+
+class Settings(BaseSettings):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+Settings(debug=True)  # error: [unknown-argument]
+```
+
 ## Root models
 
 Unlike fields on ordinary Pydantic models, a root model's `root` field can be passed either
@@ -1859,6 +1876,18 @@ class AliasedConfigDict(BaseModel):
     name: str
 
 AliasedConfigDict(name="Alice", something_else=7)  # error: [unknown-argument]
+```
+
+Subclasses of `ConfigDict` are also recognized:
+
+```py
+class AppConfig(ConfigDict, total=False):
+    deployment: str
+
+class CustomConfigModel(BaseModel):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+CustomConfigModel(something_else=7)  # error: [unknown-argument]
 ```
 
 Pydantic also accepts a plain dictionary as `model_config`:
