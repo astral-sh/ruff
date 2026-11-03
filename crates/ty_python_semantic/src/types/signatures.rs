@@ -1290,7 +1290,7 @@ impl<'db> Signature<'db> {
                 any_over_type(db, env, *ty, false, |ty| {
                     matches!(ty, Type::TypeVar(typevar)
                         if generic_context.contains(db, typevar.identity(db))
-                            && specialization.get(db, typevar).is_none())
+                            && !specialization.generic_context(db).contains(db, typevar.identity(db)))
                 })
             })
             && let Some(freshness) = max_typevar_freshness_matching_generic_context(

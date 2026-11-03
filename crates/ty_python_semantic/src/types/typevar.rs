@@ -975,11 +975,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
         ) -> Self {
             let base_identities = generic_context
                 .variables(db)
-                .map(|typevar| {
-                    let mut identity = typevar.identity(db);
-                    identity.freshness = TypeVarNonce::NONE;
-                    identity
-                })
+                .map(|typevar| typevar.identity(db).unfreshened_binder())
                 .collect();
             Self {
                 env,
@@ -1004,8 +1000,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
             db: &'db dyn Db,
             bound_typevar: BoundTypeVarInstance<'db>,
         ) {
-            let mut identity = bound_typevar.identity(db);
-            identity.freshness = TypeVarNonce::NONE;
+            let identity = bound_typevar.identity(db).unfreshened_binder();
             if self.base_identities.contains(&identity) {
                 self.max_freshness.set(
                     self.max_freshness
@@ -1906,6 +1901,16 @@ pub struct BoundTypeVarIdentity<'db> {
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
+    /// All fresh occurrences of a binder, including both components of a `ParamSpec`, share
+    /// the same source declaration.
+    fn unfreshened_binder(self) -> Self {
+        Self {
+            paramspec_attr: None,
+            freshness: TypeVarNonce::NONE,
+            ..self
+        }
+    }
+
     fn kind(self, db: &'db dyn Db) -> TypeVarKind<'db> {
         self.identity.kind(db)
     }

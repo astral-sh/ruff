@@ -2227,3 +2227,28 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     # error: [missing-argument]
     box.invoke(callback, 1)
 ```
+
+## Method specialization preserves a callable's parameter list
+
+The callback stored in the owner's type argument can accept different parameters from the callback
+passed to its method.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+C = TypeVar("C")
+P = ParamSpec("P")
+
+class Box(Generic[C]):
+    @staticmethod
+    def get(f: Callable[P, int]) -> C:
+        def check(other: Box[Callable[P, int]], f: Callable[[int], int]) -> None:
+            callback = other.get(f)
+            # revealed: (**P@get) -> int
+            reveal_type(callback)
+            # error: [missing-argument]
+            # error: [invalid-argument-type]
+            callback(1)
+
+        raise NotImplementedError
+```
