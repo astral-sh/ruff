@@ -5,15 +5,17 @@ import sys
 import tomllib
 import venv as stdlib_venv
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from lsprotocol import types as lsp
 
 from benchmark import Command, benchmark_environment
-from benchmark.lsp_client import LSPClient
+from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.preflight import validate_cli_targets
-from benchmark.projects import Project
+from benchmark.projects import IncrementalEdit, Project
 from benchmark.targets import neutralize_file_directives, write_cli_targets
+from benchmark.test_lsp_diagnostics import FetchDiagnostics
 from benchmark.tool import Mypy, Pyrefly, Pyright, Ty, Zuban, which_tool
 from benchmark.venv import Venv
 
@@ -240,6 +242,59 @@ def test_zuban_canonicalizes_symlinked_import_roots(zuban_project, layout):
     assert result.returncode == 1, result.stdout + result.stderr
     assert 'expression has type "str", variable has type "int"' in result.stdout
     assert "Found 1 error in 1 file" in result.stdout
+
+
+def test_lsp_uses_physical_checkout_paths(zuban_project, monkeypatch, capsys):
+    project, venv = zuban_project
+    root = venv.project_path.resolve()
+    alias = root.with_name(root.name + "-alias")
+    alias.symlink_to(root, target_is_directory=True)
+    venv = Venv(project_name=project.name, project_path=alias)
+    project = project._replace(
+        edit=IncrementalEdit(
+            edited_file="src/example/main.py",
+            affected_files=["src/example/__init__.py"],
+            replace_text="text",
+            replacement="replacement",
+        )
+    )
+    test = FetchDiagnostics(project, Zuban(), venv)
+    start_io = AsyncMock()
+    initialize = AsyncMock()
+    opened = Mock()
+    monkeypatch.setattr(test.client, "start_io", start_io)
+    monkeypatch.setattr(test.client, "initialize_async", initialize)
+    monkeypatch.setattr(test.client, "initialized", Mock())
+    monkeypatch.setattr(test.client, "text_document_did_open", opened)
+    asyncio.run(test.setup())
+    assert test.cwd == root
+    assert test.edited_file_path == root / "src/example/main.py"
+    assert start_io.await_args is not None
+    assert start_io.await_args.kwargs["cwd"] == root
+    assert initialize.await_args is not None
+    params = initialize.await_args.args[0]
+    assert params.root_uri == root.as_uri()
+    assert [folder.uri for folder in params.workspace_folders] == [root.as_uri()]
+    assert [call.args[0].text_document.uri for call in opened.call_args_list] == [
+        (root / "src/example/main.py").as_uri(),
+        (root / "src/example/__init__.py").as_uri(),
+    ]
+    test.diagnostics = [
+        FileDiagnostics(
+            test.edited_file_path,
+            [
+                lsp.Diagnostic(
+                    range=lsp.Range(
+                        start=lsp.Position(line=0, character=0),
+                        end=lsp.Position(line=0, character=1),
+                    ),
+                    message="test diagnostic",
+                )
+            ],
+        )
+    ]
+    test.assert_output(verbose=True)
+    assert "src/example/main.py:1:1" in capsys.readouterr().out
 
 
 def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
