@@ -383,7 +383,7 @@ impl LintRegistryBuilder {
     }
 
     #[track_caller]
-    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
+    pub(crate) fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
         let target = match self.by_name.get(to.name.as_str()) {
             Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
             Some(LintEntry::Alias(target)) => {
