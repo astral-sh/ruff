@@ -499,6 +499,11 @@ impl<'db> SemanticIndex<'db> {
         &self.scopes[id]
     }
 
+    /// Returns the tracked scope for an ID assigned by this index.
+    pub fn scope_id(&self, id: FileScopeId) -> ScopeId<'db> {
+        self.scope_ids_by_scope[id]
+    }
+
     pub fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
         self.scope_ids_by_scope.iter().copied()
     }

@@ -417,11 +417,13 @@ mod source_occurrence_tests {
 
     #[test]
     fn large_operands_preserve_each_index() {
-        let mut builder = AstIdsBuilder::with_node_count(65);
+        let mut builder = AstIdsBuilder::with_node_count(129);
         let cases = [
             (0, 0, 0),
             (63, 65_534, 65_535),
-            (64, u32::MAX - 1, u32::MAX - 1),
+            (64, 7, 42),
+            (66, u32::MAX - 1, u32::MAX - 1),
+            (128, 1, 8),
             (ast::MAX_REAL_INDEX + 1, u32::MAX - 1, u32::MAX - 1),
         ];
         for (node, scope, use_id) in cases {

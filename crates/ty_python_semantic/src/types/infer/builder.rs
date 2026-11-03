@@ -10739,7 +10739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
         if !self.in_string_annotation()
             && let Some(operand) = self.index.expression_place_use(expr)
-            && operand.scope == self.scope().file_scope_id(self.db())
+            && self.index.scope_id(operand.scope) == self.scope()
         {
             let place = self.index.place_table(operand.scope).place(operand.place);
             return Some(SourcePlace::Indexed(place, operand));
@@ -10798,13 +10798,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
+        let operand = source_place.operand();
+        let file_scope =
+            operand.map_or_else(|| self.scope().file_scope_id(self.db()), |op| op.scope);
         let mut procedure = PlaceLoadResolutionProcedure::from_source(
             self.db(),
             self.index,
-            self.scope(),
+            self.program_file(),
+            file_scope,
             source_place.place(),
             mode,
-            source_place.operand(),
+            operand,
         );
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
