@@ -343,14 +343,12 @@ fn has_metaclass_new_signature(class_def: StmtClassDef<'_>, semantic: &SemanticM
         let Some(function_def_node) = stmt.as_function_def_stmt() else {
             continue;
         };
-        let name = function_def_node.name();
-        let parameters = function_def_node.parameters();
-
-        if name != "__new__" {
+        if function_def_node.name() != "__new__" {
             continue;
         }
 
         // Check if we have exactly 5 parameters (cls + 4 others)
+        let parameters = function_def_node.parameters();
         if parameters.len() != 5 {
             continue;
         }
