@@ -673,14 +673,6 @@ reason = "lint level predicates intentionally cover every severity"
 [[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_semantic"
-item = "lint::LintStatus::deprecated"
-kind = "inherent_method"
-level = "expect"
-reason = "lint status constructors intentionally cover every lifecycle state"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_python_semantic"
 item = "lint::RuleSelection::enabled"
 kind = "inherent_method"
 level = "expect"

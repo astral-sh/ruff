@@ -198,14 +198,14 @@ reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 from typing_extensions import NewType
 from ty_extensions._internal import is_subtype_of
 
-# snapshot: mismatched-type-name
+# snapshot: mismatched-newtype-name
 UserId = NewType("Id", int)
 reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
 reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
  --> src/mdtest_snippet.py:5:18
   |
 5 | UserId = NewType("Id", int)
@@ -214,13 +214,13 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
 
 ```py
 Id = int
-# snapshot: mismatched-type-name
+# snapshot: mismatched-newtype-name
 UsesExistingId = NewType("Id", "Id")
 UsesExistingId(1)
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
   --> src/mdtest_snippet.py:10:26
    |
 10 | UsesExistingId = NewType("Id", "Id")

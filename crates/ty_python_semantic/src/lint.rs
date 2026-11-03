@@ -190,6 +190,11 @@ pub enum LintStatus {
         /// This should explain why the lint has been deprecated and if there's a replacement lint that users
         /// can use instead.
         reason: &'static str,
+
+        /// Rules selected by the deprecated name in configuration and ignore comments.
+        /// Empty if the deprecated rule still emits its own diagnostics.
+        #[cfg_attr(feature = "serde", serde(skip))]
+        replacements: &'static [LintId],
     },
 
     /// The lint has been removed and can no longer be used.
@@ -211,8 +216,16 @@ impl LintStatus {
         LintStatus::Stable { since }
     }
 
-    pub const fn deprecated(since: &'static str, reason: &'static str) -> Self {
-        LintStatus::Deprecated { since, reason }
+    pub(crate) const fn deprecated(
+        since: &'static str,
+        reason: &'static str,
+        replacements: &'static [LintId],
+    ) -> Self {
+        LintStatus::Deprecated {
+            since,
+            reason,
+            replacements,
+        }
     }
 
     pub(crate) const fn removed(since: &'static str, reason: &'static str) -> Self {
@@ -225,6 +238,13 @@ impl LintStatus {
 
     pub const fn is_deprecated(&self) -> bool {
         matches!(self, LintStatus::Deprecated { .. })
+    }
+
+    const fn replacements(&self) -> Option<&'static [LintId]> {
+        match self {
+            Self::Deprecated { replacements, .. } if !replacements.is_empty() => Some(replacements),
+            _ => None,
+        }
     }
 }
 
@@ -334,6 +354,14 @@ impl LintId {
     pub const fn of(definition: &'static LintMetadata) -> Self {
         LintId { definition }
     }
+
+    /// The rules to which a setting or suppression for this name applies.
+    pub(crate) const fn selected_lints(&self) -> &[Self] {
+        match self.definition.status.replacements() {
+            Some(replacements) => replacements,
+            None => std::slice::from_ref(self),
+        }
+    }
 }
 
 impl PartialEq for LintId {
@@ -421,6 +449,18 @@ pub struct LintRegistry {
 }
 
 impl LintRegistry {
+    /// Returns a sort key for applying lower-precedence selectors first within a rule table.
+    pub fn selector_sort_key(&self, name: &str) -> impl Ord + use<> {
+        if name == "all" {
+            return 0;
+        }
+        match self.by_name.get(name) {
+            Some(entry) if entry.id().status.replacements().is_some() => 1,
+            Some(LintEntry::Alias(_)) => 2,
+            _ => 3,
+        }
+    }
+
     /// Looks up a lint by its name.
     pub fn get(&self, code: &str) -> Result<LintId, GetLintError> {
         match self.by_name.get(code) {
@@ -457,11 +497,6 @@ impl LintRegistry {
     /// Returns all registered, non-removed lints.
     pub fn lints(&self) -> &[LintId] {
         &self.lints
-    }
-
-    /// Returns whether `name` is a registered alias for a lint.
-    pub fn is_alias(&self, name: &str) -> bool {
-        self.alias_target(name).is_some()
     }
 
     /// Returns the target of a registered alias.
@@ -627,6 +662,7 @@ impl RuleSelection {
         let lints = registry
             .lints()
             .iter()
+            .filter(|lint| lint.status.replacements().is_none())
             .filter_map(|lint| {
                 Severity::try_from(lint.default_level())
                     .ok()
@@ -668,12 +704,16 @@ impl RuleSelection {
     ///
     /// Overrides any previous configuration for the lint.
     pub fn enable(&mut self, lint: LintId, severity: Severity, source: LintSource) {
-        self.lints.insert(lint, (severity, source));
+        for selected in lint.selected_lints() {
+            self.lints.insert(*selected, (severity, source));
+        }
     }
 
     /// Disables `lint` if it was previously enabled.
     pub fn disable(&mut self, lint: LintId) {
-        self.lints.remove(&lint);
+        for selected in lint.selected_lints() {
+            self.lints.remove(selected);
+        }
     }
 }
 
