@@ -109,8 +109,8 @@ We benchmark against the latest version of each type checker, but some projects
 may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
-With Zuban 0.10.2, allow roughly two minutes per NumPy CLI check with the shared
-file manifest. Its language server returned a server-panic error for the
+With Zuban 0.10.2, a NumPy CLI check using the shared stub-first file manifest did
+not finish within ten minutes. Its language server returned a server-panic error for the
 incremental edits in discord.py, PyTorch, and NumPy. These cases retain the
 shared workload and assertions; a failed or interrupted run is not a benchmark
 result.
