@@ -663,17 +663,34 @@ fn collect_parameter_bounds<'db>(
     env: &ProgramEnvironment<'db>,
     parameter: Type<'db>,
     bounds: &mut SmallVec<[Type<'db>; 8]>,
+    first_argument: Type<'db>,
+    budget: &mut usize,
     depth: u8,
 ) -> bool {
     let Some(next_depth) = depth.checked_sub(1) else {
         return false;
     };
+    // A union can contain a long flat list of literals but only one widened
+    // type. Charge recursive expansions rather than each literal in that list.
+    if matches!(parameter, Type::Union(_) | Type::TypeAlias(_)) {
+        let Some(remaining) = budget.checked_sub(1) else {
+            return false;
+        };
+        *budget = remaining;
+    }
     let bound = match parameter {
         Type::Union(union) => {
-            return union
-                .elements(db)
-                .iter()
-                .all(|&element| collect_parameter_bounds(db, env, element, bounds, next_depth));
+            return union.elements(db).iter().all(|&element| {
+                collect_parameter_bounds(
+                    db,
+                    env,
+                    element,
+                    bounds,
+                    first_argument,
+                    budget,
+                    next_depth,
+                )
+            });
         }
         Type::TypeAlias(_) => {
             return collect_parameter_bounds(
@@ -681,6 +698,8 @@ fn collect_parameter_bounds<'db>(
                 env,
                 parameter.resolve_type_alias(db),
                 bounds,
+                first_argument,
+                budget,
                 next_depth,
             );
         }
@@ -690,7 +709,20 @@ fn collect_parameter_bounds<'db>(
         }
         _ => parameter,
     };
+    if bound.is_object() || bound == first_argument {
+        return false;
+    }
     if !bounds.contains(&bound) {
+        // A protocol implemented by object admits every source.
+        if matches!(bound, Type::ProtocolInstance(protocol) if protocol.is_equivalent_to_object(db))
+        {
+            return false;
+        }
+        // The bound is speculative. Many unrelated leaves make it expensive
+        // to normalize and unlikely to disprove coverage.
+        if bounds.len() >= 2 * bounds.inline_size() {
+            return false;
+        }
         bounds.push(bound);
     }
     true
@@ -4445,22 +4477,6 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        // Every prefix is contained in the union of all its parameter types. When one
-        // slot distinguishes a wide overload set, try rejecting every prefix at once.
-        let all_prefixes_miss = matching_overload_slots.len() >= 12
-            && participating_slot_indices
-                .iter()
-                .exactly_one()
-                .is_ok_and(|&column| {
-                    self.all_parameter_prefixes_miss(
-                        db,
-                        env,
-                        constraints,
-                        &matching_overload_slots,
-                        column,
-                    )
-                });
-
         // Each overload adds its parameter types to the same prefix. Keep the builders so
         // earlier parameters don't need to be compared for redundancy again at every step.
         let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
@@ -4469,7 +4485,26 @@ impl<'db> CallableBinding<'db> {
 
         for (upto, (current_index, current_slots)) in matching_overload_slots.iter().enumerate() {
             let remaining = &matching_overload_indexes[upto + 1..];
-            if all_prefixes_miss || remaining.is_empty() {
+            if remaining.is_empty() {
+                break;
+            }
+            // Check the first prefix normally. If it covers the argument, we never need
+            // to inspect the remaining parameter types to build an upper bound.
+            if upto == 1
+                && matching_overload_slots.len() >= 12
+                && participating_slot_indices
+                    .iter()
+                    .exactly_one()
+                    .is_ok_and(|&column| {
+                        self.all_parameter_prefixes_miss(
+                            db,
+                            env,
+                            constraints,
+                            &matching_overload_slots,
+                            column,
+                        )
+                    })
+            {
                 break;
             }
 
@@ -4574,63 +4609,73 @@ impl<'db> CallableBinding<'db> {
         rows: &[(usize, Vec<OverloadFilterSlot<'db>>)],
         column: usize,
     ) -> bool {
-        let mut parameters = SmallVec::<[Type<'db>; 8]>::new();
-        let mut sources = SmallVec::<[(Type<'db>, TypeVarSet<'db>); 2]>::new();
-        for (position, (overload_index, slots)) in rows.iter().enumerate() {
-            let Some(slot) = slots.get(column) else {
-                return false;
-            };
-            if slot.variadic_argument.is_some() {
-                return false;
-            }
-            // The last overload is never tested as a prefix.
-            if position + 1 == rows.len() {
-                break;
-            }
-            if position == 0 && UnionBuilder::new(db, env).add(slot.parameter).is_empty() {
-                // An empty union is omitted from its tuple, changing its length.
-                return false;
-            }
-            if !parameters.contains(&slot.parameter) {
-                parameters.push(slot.parameter);
-            }
-            let source = (
-                slot.argument,
-                self.overloads[*overload_index].inferable_typevars,
-            );
-            if !sources.contains(&source) {
-                sources.push(source);
-            }
+        if rows.iter().any(|(_, slots)| {
+            slots
+                .get(column)
+                .is_none_or(|slot| slot.variadic_argument.is_some())
+        }) {
+            return false;
         }
+        let first = &rows[0].1[column];
+        let first_argument = first.argument.top_materialization(db, env);
+        if !matches!(
+            first_argument,
+            Type::NominalInstance(_) | Type::Intersection(_)
+        ) || UnionBuilder::new(db, env).add(first.parameter).is_empty()
+        {
+            return false;
+        }
+
+        // The last overload is never tested as a prefix. Only adjacent duplicate
+        // parameters need to be coalesced to walk the remaining rows in linear time.
+        let candidates = &rows[..rows.len() - 1];
+        let parameters = candidates
+            .iter()
+            .map(|(_, slots)| slots[column].parameter)
+            .dedup();
         let mut bounds = SmallVec::new();
-        for &parameter in &parameters {
-            let materialized = parameter.top_materialization(db, env);
-            if !collect_parameter_bounds(db, env, materialized, &mut bounds, 16) {
+        let mut budget = candidates.len().saturating_mul(bounds.inline_size());
+        for parameter in parameters.clone() {
+            if !collect_parameter_bounds(
+                db,
+                env,
+                parameter.top_materialization(db, env),
+                &mut bounds,
+                first_argument,
+                &mut budget,
+                16,
+            ) {
                 return false;
             }
         }
         let upper = UnionType::from_elements(db, env, bounds);
-        // This must hold for every materialization of every parameter. Mere
-        // assignability to the bound only proves it for some materialization.
-        if !parameters
-            .into_iter()
-            .all(|parameter| parameter.is_subtype_of(db, env, upper))
-        {
-            return false;
-        }
         let target = Type::heterogeneous_tuple(db, env, [upper]);
-        sources.into_iter().all(|(argument, inferable)| {
+        let mut sources = candidates
+            .iter()
+            .map(|(index, slots)| {
+                (
+                    slots[column].argument,
+                    self.overloads[*index].inferable_typevars,
+                )
+            })
+            .dedup();
+        if !sources.all(|(argument, inferable)| {
             let top = argument.top_materialization(db, env);
-            // For a single ordinary element the argument union is idempotent.
-            // Unpacking aliases or recursive unions can change its shape.
+            // Repeated insertion of a single ordinary element is idempotent.
             if !matches!(top, Type::NominalInstance(_) | Type::Intersection(_)) {
                 return false;
             }
-            let source = Type::heterogeneous_tuple(db, env, [top]);
-            source
+            Type::heterogeneous_tuple(db, env, [top])
                 .when_assignable_to(db, env, target, constraints, inferable)
                 .is_never_satisfied(db, env, inferable)
-        })
+        }) {
+            return false;
+        }
+        // Verify the bound only after finding that it can rule out every source.
+        // Assignability alone would prove it for just some materializations.
+        parameters
+            .into_iter()
+            .all(|parameter| parameter.is_subtype_of(db, env, upper))
     }
 
     fn merge_ambiguous_return_types(
