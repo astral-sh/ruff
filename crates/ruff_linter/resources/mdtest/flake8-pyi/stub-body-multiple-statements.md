@@ -288,15 +288,41 @@ from abc import ABC, abstractmethod
 from typing import Protocol
 
 class P(Protocol):
-    def member(self) -> None:  # error: [stub-body-multiple-statements]
+    def member(self) -> None:  # snapshot: stub-body-multiple-statements
         """docstring"""
         ...
 
 class A(ABC):
     @abstractmethod
-    def method(self) -> None:  # error: [stub-body-multiple-statements]
+    def method(self) -> None:  # snapshot: stub-body-multiple-statements
         """docstring"""
         ...
+```
+
+```snapshot
+error[PYI048]: Function body must contain exactly one statement
+ --> src/mdtest_snippet.pyi:5:9
+  |
+5 |     def member(self) -> None:  # snapshot: stub-body-multiple-statements
+  |         ^^^^^^
+help: Remove unnecessary placeholder statements
+  |
+6 |         """docstring"""
+  -         ...
+7 |
+  |
+
+
+error[PYI048]: Function body must contain exactly one statement
+  --> src/mdtest_snippet.pyi:11:9
+   |
+11 |     def method(self) -> None:  # snapshot: stub-body-multiple-statements
+   |         ^^^^^^
+help: Remove unnecessary placeholder statements
+   |
+12 |         """docstring"""
+   -         ...
+   |
 ```
 
 ## Async functions
