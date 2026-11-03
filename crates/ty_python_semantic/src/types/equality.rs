@@ -439,6 +439,7 @@ struct PendingComparison<'db> {
 struct ComparisonCache<'db> {
     /// An entry with no result is still being evaluated.
     entries: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    /// Number of `Some` entries. The cache limit applies only to completed results.
     completed: usize,
     /// Changes when an active evaluation encounters a cycle or the cache is cleared.
     generation: usize,
