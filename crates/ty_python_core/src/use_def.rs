@@ -678,45 +678,73 @@ impl PredicateNarrowingTargets {
     }
 }
 
-/// The place and reaching bindings share one scope-local row. A zero place denotes
-/// a splatted keyword with multiple bindings. Other places use their ordinal plus one.
-/// A scope uses two bytes per row if both numbers fit in a byte for every use.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-enum RetainedUses {
-    Narrow(FrozenIndexVec<ScopedUseId, (u8, u8)>),
-    Wide(FrozenIndexVec<ScopedUseId, (InternedBindingsId, u32)>),
+/// A symbol or member index within a scope. The expression determines which table to use.
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+struct PlaceOrdinal;
+
+/// The bindings reaching one use and the lexical place they belong to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct UseRecord<B> {
+    bindings: B,
+    /// `None` for a splatted keyword whose bindings come from several places.
+    place: Option<PlaceOrdinal>,
 }
 
-impl FromIterator<(InternedBindingsId, u32)> for RetainedUses {
-    fn from_iter<T: IntoIterator<Item = (InternedBindingsId, u32)>>(iter: T) -> Self {
+/// The two-byte representation of an interned use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
+struct CompactUseRecord {
+    bindings_id: u8,
+    /// Zero for a multi-place use. A single place stores its ordinal plus one.
+    place_plus_one: u8,
+}
+
+impl CompactUseRecord {
+    /// A scope switches to full-width records if either field exceeds one byte.
+    fn try_pack(record: &UseRecord<InternedBindingsId>) -> Option<Self> {
+        Some(Self {
+            bindings_id: u8::try_from(record.bindings.as_u32()).ok()?,
+            place_plus_one: u8::try_from(record.place.map_or(0, |place| place.as_u32() + 1))
+                .ok()?,
+        })
+    }
+
+    fn unpack(self) -> UseRecord<InternedBindingsId> {
+        UseRecord {
+            bindings: InternedBindingsId::from_u32(u32::from(self.bindings_id)),
+            place: self
+                .place_plus_one
+                .checked_sub(1)
+                .map(|ordinal| PlaceOrdinal::from_u32(u32::from(ordinal))),
+        }
+    }
+}
+
+static_assertions::assert_eq_size!(CompactUseRecord, [u8; 2]);
+static_assertions::assert_eq_size!(UseRecord<InternedBindingsId>, [u32; 2]);
+
+/// Each scope uses compact records when all of its uses fit.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+enum RetainedUses {
+    Compact(FrozenIndexVec<ScopedUseId, CompactUseRecord>),
+    Full(FrozenIndexVec<ScopedUseId, UseRecord<InternedBindingsId>>),
+}
+
+impl FromIterator<UseRecord<InternedBindingsId>> for RetainedUses {
+    fn from_iter<T: IntoIterator<Item = UseRecord<InternedBindingsId>>>(iter: T) -> Self {
         let rows: FrozenIndexVec<ScopedUseId, _> = iter.into_iter().collect();
-        let narrow = rows
-            .iter()
-            .map(|&(bindings, place)| {
-                Some((
-                    u8::try_from(bindings.as_u32()).ok()?,
-                    u8::try_from(place).ok()?,
-                ))
-            })
-            .collect();
-        match narrow {
-            Some(narrow) => Self::Narrow(narrow),
-            None => Self::Wide(rows),
+        match rows.iter().map(CompactUseRecord::try_pack).collect() {
+            Some(compact) => Self::Compact(compact),
+            None => Self::Full(rows),
         }
     }
 }
 
 impl RetainedUses {
-    fn get(&self, use_id: ScopedUseId) -> (InternedBindingsId, u32) {
+    fn get(&self, use_id: ScopedUseId) -> UseRecord<InternedBindingsId> {
         match self {
-            Self::Narrow(uses) => {
-                let (bindings, place) = uses[use_id];
-                (
-                    InternedBindingsId::from_u32(u32::from(bindings)),
-                    u32::from(place),
-                )
-            }
-            Self::Wide(uses) => uses[use_id],
+            Self::Compact(uses) => uses[use_id].unpack(),
+            Self::Full(uses) => uses[use_id],
         }
     }
 }
@@ -1039,7 +1067,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let (bindings_id, _) = self.extra().bindings_by_use.get(use_id);
+        let bindings_id = self.extra().bindings_by_use.get(use_id).bindings;
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1048,8 +1076,11 @@ impl<'db> UseDefMap<'db> {
 
     /// The source expression determines whether this ordinal refers to a symbol or a member.
     pub(super) fn place_ordinal_at_use(&self, use_id: ScopedUseId) -> Option<u32> {
-        let (_, place) = self.extra().bindings_by_use.get(use_id);
-        place.checked_sub(1)
+        self.extra()
+            .bindings_by_use
+            .get(use_id)
+            .place
+            .map(PlaceOrdinal::as_u32)
     }
 
     /// Return the state before the enclosing `if` chain for a use in its final `elif` condition.
@@ -2118,8 +2149,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
-    /// Live bindings and the one-based place ordinal at each use.
-    bindings_by_use: IndexVec<ScopedUseId, (Bindings, u32)>,
+    /// Live bindings and the lexical place at each use.
+    bindings_by_use: IndexVec<ScopedUseId, UseRecord<Bindings>>,
 
     /// Live bindings associated with each so-far-recorded use.
     ///
@@ -2360,7 +2391,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = &LiveBinding> {
-        self.bindings_by_use[use_id].0.iter()
+        self.bindings_by_use[use_id].bindings.iter()
     }
 
     pub(super) fn add_predicate(
@@ -2423,7 +2454,7 @@ impl<'db> UseDefMapBuilder<'db> {
         state.record_narrowing_constraint_for_bindings_at_use(
             &mut self.narrowing_constraints,
             constraint,
-            &self.bindings_by_use[use_id].0,
+            &self.bindings_by_use[use_id].bindings,
         );
     }
 
@@ -2861,7 +2892,7 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Symbol(id) => id.as_u32(),
             ScopedPlaceId::Member(id) => id.as_u32(),
         };
-        self.record_use_bindings(bindings, ordinal + 1)
+        self.record_use_bindings(bindings, Some(PlaceOrdinal::from_u32(ordinal)))
     }
 
     pub(super) fn set_if_chain_start(&mut self, snapshot: Option<FlowSnapshot>) {
@@ -2894,16 +2925,20 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
-        self.record_use_bindings(Bindings::default(), 0)
+        self.record_use_bindings(Bindings::default(), None)
     }
 
-    fn record_use_bindings(&mut self, bindings: Bindings, place: u32) -> ScopedUseId {
+    fn record_use_bindings(
+        &mut self,
+        bindings: Bindings,
+        place: Option<PlaceOrdinal>,
+    ) -> ScopedUseId {
         let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
         self.mark_definition_ids_used(binding_definition_ids);
 
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        self.bindings_by_use.push((bindings, place))
+        self.bindings_by_use.push(UseRecord { bindings, place })
     }
 
     pub(super) fn symbol_binding_definition_ids(
@@ -3244,7 +3279,10 @@ impl<'db> UseDefMapBuilder<'db> {
         let bindings_by_use = self
             .bindings_by_use
             .into_iter()
-            .map(|(bindings, place)| (place_state_interner.intern_bindings(&bindings), place))
+            .map(|use_record| UseRecord {
+                bindings: place_state_interner.intern_bindings(&use_record.bindings),
+                place: use_record.place,
+            })
             .collect();
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
@@ -3534,17 +3572,25 @@ mod source_use_rows_tests {
     fn retains_the_scope_local_place_and_binding_widths() {
         let first = ScopedUseId::from_u32(0);
         let second = ScopedUseId::from_u32(1);
-        for (bindings, place, wide) in [
-            (255, 255, false),
-            (256, 1, true),
-            (1, 256, true),
-            (u32::MAX - 1, u32::MAX, true),
+        for (bindings, ordinal, full) in [
+            (0, 0, false),
+            (255, 254, false),
+            (256, 0, true),
+            (1, 255, true),
+            (u32::MAX - 1, u32::MAX - 1, true),
         ] {
-            let bindings = InternedBindingsId::from_u32(bindings);
-            let rows: RetainedUses = [(bindings, place), (bindings, 0)].into_iter().collect();
-            assert_eq!(matches!(rows, RetainedUses::Wide(_)), wide);
-            assert_eq!(rows.get(first), (bindings, place));
-            assert_eq!(rows.get(second), (bindings, 0));
+            let single = UseRecord {
+                bindings: InternedBindingsId::from_u32(bindings),
+                place: Some(PlaceOrdinal::from_u32(ordinal)),
+            };
+            let multi = UseRecord {
+                place: None,
+                ..single
+            };
+            let rows: RetainedUses = [single, multi].into_iter().collect();
+            assert_eq!(matches!(rows, RetainedUses::Full(_)), full);
+            assert_eq!(rows.get(first), single);
+            assert_eq!(rows.get(second), multi);
         }
     }
 }
