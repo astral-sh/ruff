@@ -1176,9 +1176,9 @@
             }
           ]
         },
-        "invalid-typed-dict-statement": {
-          "title": "detects invalid statements in `TypedDict` class bodies",
-          "description": "## What it does\n\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,\nmethod definitions and field values aren't allowed. None of these will be available on \"instances of\nthe `TypedDict`\" at runtime (as `dict` is the runtime class of all \"`TypedDict` instances\").\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
+        "invalid-typed-dict-key": {
+          "title": "detects invalid keys when accessing TypedDict items",
+          "description": "## What it does\n\nChecks for invalid keys when accessing or assigning items on a `TypedDict`.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\n## Example\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n```\n\n## See also\n\n- `non-literal-typed-dict-key` reports subscripts where ty cannot narrow the string key to a literal\n    or a union of literals.",
           "default": "error",
           "oneOf": [
             {
@@ -1186,9 +1186,9 @@
             }
           ]
         },
-        "invalid-typeddict-key": {
-          "title": "detects invalid keys when accessing TypedDict items",
-          "description": "## What it does\n\nChecks for invalid keys when accessing or assigning items on a `TypedDict`.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\n## Example\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n```\n\n## See also\n\n- `non-literal-typeddict-key` reports subscripts where ty cannot narrow the string key to a literal\n    or a union of literals.",
+        "invalid-typed-dict-statement": {
+          "title": "detects invalid statements in `TypedDict` class bodies",
+          "description": "## What it does\n\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,\nmethod definitions and field values aren't allowed. None of these will be available on \"instances of\nthe `TypedDict`\" at runtime (as `dict` is the runtime class of all \"`TypedDict` instances\").\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1326,9 +1326,9 @@
             }
           ]
         },
-        "non-literal-typeddict-key": {
+        "non-literal-typed-dict-key": {
           "title": "detects non-literal string keys in TypedDict subscripts",
-          "description": "## What it does\n\nReports a string key when a `TypedDict` subscript requires a known key and ty cannot narrow the key\nto a string literal or a union of string literals.\n\n## Why is this bad?\n\nEach declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check\nwhether the key exists or which value type applies.\n\n## Example\n\n```python\nfrom typing import Literal, TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typeddict-key]\n```\n\nUse instead:\n\n```py\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typeddict-key` reports invalid keys such as a misspelled field name or an integer\n    subscript.",
+          "description": "## What it does\n\nReports a string key when a `TypedDict` subscript requires a known key and ty cannot narrow the key\nto a string literal or a union of string literals.\n\n## Why is this bad?\n\nEach declared `TypedDict` key has its own value type. Given an arbitrary `str`, ty cannot check\nwhether the key exists or which value type applies.\n\n## Example\n\n```python\nfrom typing import Literal, TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n```\n\nUse instead:\n\n```py\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typed-dict-key` reports invalid keys such as a misspelled field name or an integer\n    subscript.",
           "default": "error",
           "oneOf": [
             {
@@ -1656,7 +1656,7 @@
             }
           ]
         },
-        "unknown-typeddict-constructor-key": {
+        "unknown-typed-dict-constructor-key": {
           "title": "detects unknown keys when constructing a TypedDict",
           "description": "## What it does\n\nReports keys that a `TypedDict` constructor or a dictionary literal used to initialize a `TypedDict`\ncannot accept. This includes unpacked mappings that may supply unknown keys.\n\n## Why is this bad?\n\nAn unexpected key in a constructor often means a field name was misspelled. Even an implicitly open\n`TypedDict` rejects an explicitly supplied key it does not declare. A `TypedDict` declared with\n`closed=True` also rejects a string key that might introduce an extra item.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",

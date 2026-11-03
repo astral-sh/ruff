@@ -1978,7 +1978,7 @@ def narrow_typed_dict_to_dict(value: int | Payload) -> None:
         value.clear()
         # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
         value.pop("key")
-        # error: [invalid-typeddict-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        # error: [invalid-typed-dict-key] "Unknown key "unexpected" for TypedDict `Payload`"
         value["unexpected"] = 1
         # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
         del value["key"]

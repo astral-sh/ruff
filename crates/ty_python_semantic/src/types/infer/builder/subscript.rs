@@ -14,7 +14,7 @@ use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPEDDICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
@@ -2004,9 +2004,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     } else {
                         // With explicit extra items, a string key reaches this branch if it might
-                        // overwrite a read-only item. Keep that error under `invalid-typeddict-key`.
+                        // overwrite a read-only item. Keep that error under `invalid-typed-dict-key`.
                         let lint = if typed_dict.explicit_extra_items(db).is_some() {
-                            &INVALID_TYPEDDICT_KEY
+                            &INVALID_TYPED_DICT_KEY
                         } else {
                             typed_dict_subscript_key_lint(&self.context, slice_ty)
                         };

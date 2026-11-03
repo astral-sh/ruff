@@ -89,10 +89,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
-    registry.register_lint(&INVALID_TYPEDDICT_KEY);
-    registry.register_lint(&NON_LITERAL_TYPEDDICT_KEY);
-    registry.register_lint(&UNKNOWN_TYPEDDICT_CONSTRUCTOR_KEY);
-    registry.register_alias(LintName::of("invalid-key"), &INVALID_TYPEDDICT_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_KEY);
+    registry.register_lint(&NON_LITERAL_TYPED_DICT_KEY);
+    registry.register_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY);
+    registry.register_alias(LintName::of("invalid-key"), &INVALID_TYPED_DICT_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -412,8 +412,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-typeddict-key.md")]
-    pub(crate) static INVALID_TYPEDDICT_KEY = {
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-key.md")]
+    pub(crate) static INVALID_TYPED_DICT_KEY = {
         summary: "detects invalid keys when accessing TypedDict items",
         status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
@@ -1468,8 +1468,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/non-literal-typeddict-key.md")]
-    pub(crate) static NON_LITERAL_TYPEDDICT_KEY = {
+    #[doc = include_str!("../../resources/lint_docs/non-literal-typed-dict-key.md")]
+    pub(crate) static NON_LITERAL_TYPED_DICT_KEY = {
         summary: "detects non-literal string keys in TypedDict subscripts",
         status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
@@ -1477,8 +1477,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unknown-typeddict-constructor-key.md")]
-    pub(crate) static UNKNOWN_TYPEDDICT_CONSTRUCTOR_KEY = {
+    #[doc = include_str!("../../resources/lint_docs/unknown-typed-dict-constructor-key.md")]
+    pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
         summary: "detects unknown keys when constructing a TypedDict",
         status: LintStatus::stable("0.0.97"),
         default_level: Level::Error,
@@ -4438,7 +4438,7 @@ fn report_invalid_base<'env, 'db>(
     Some(diagnostic)
 }
 
-/// Uses `non-literal-typeddict-key` only when every alternative in the rejected key type is
+/// Uses `non-literal-typed-dict-key` only when every alternative in the rejected key type is
 /// a string of unknown value. This keeps a misspelled literal or a non-string in a mixed union
 /// visible when non-literal key errors are suppressed.
 pub(super) fn typed_dict_subscript_key_lint<'db>(
@@ -4464,9 +4464,9 @@ pub(super) fn typed_dict_subscript_key_lint<'db>(
         key => is_non_literal_string(key),
     };
     if non_literal {
-        &NON_LITERAL_TYPEDDICT_KEY
+        &NON_LITERAL_TYPED_DICT_KEY
     } else {
-        &INVALID_TYPEDDICT_KEY
+        &INVALID_TYPED_DICT_KEY
     }
 }
 
