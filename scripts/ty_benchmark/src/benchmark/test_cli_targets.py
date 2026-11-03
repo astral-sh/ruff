@@ -89,3 +89,35 @@ class CliTargetsTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "No Python source files"):
                 write_cli_targets(project._replace(exclude=["pkg"]), root)
+
+            (root / "pkg/untracked[1].py").touch()
+            with self.assertRaisesRegex(ValueError, "Unsupported benchmark exclusion"):
+                write_cli_targets(project, root)
+
+    def test_native_discovery_excludes_generated_python_subtrees(self):
+        project = Project(
+            name="sample",
+            repository="",
+            revision="",
+            install_arguments=[],
+            python_version="3.12",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / "pkg").mkdir()
+            (root / "pkg/main.py").touch()
+            (root / "assets").mkdir()
+            (root / "assets/data.json").touch()
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            dependency = root / "venv/lib/site-packages/dependency"
+            dependency.mkdir(parents=True)
+            (dependency / "__init__.py").touch()
+            (root / "pkg/untracked.py").touch()
+
+            native = write_cli_targets(project, root)
+            self.assertEqual(native.include, ["."])
+            self.assertEqual(native.exclude, ["pkg/untracked.py", "venv"])
+            self.assertEqual(
+                (root / FILE_LIST).read_text(encoding="utf-8"), "./pkg/main.py\n"
+            )

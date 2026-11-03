@@ -51,8 +51,8 @@ def write_cli_targets(project: Project, checkout: Path) -> Project:
     if not targets:
         raise ValueError(f"No Python source files selected for {project.name}")
     for target in targets:
-        # Pyrefly and Pyright interpret paths as globs. Response files use one
-        # argument per line. Refuse paths those formats cannot represent literally.
+        # Native include/exclude formats use globs and the audit is line-based.
+        # Refuse paths those formats cannot represent literally.
         if any(char in target for char in "\r\n\\*?[]{}"):
             raise ValueError(f"Unsupported benchmark source path: {target!r}")
         if not (checkout / target).is_file():
@@ -92,6 +92,9 @@ def write_cli_targets(project: Project, checkout: Path) -> Project:
         while path.parent not in selected_parents and path.parent != PurePosixPath("."):
             path = path.parent
         exclusions.add(path.as_posix())
+    for exclusion in exclusions:
+        if any(char in exclusion for char in "\r\n\\*?[]{}"):
+            raise ValueError(f"Unsupported benchmark exclusion: {exclusion!r}")
     native_project = project._replace(
         include=list(project.include) or ["."], exclude=sorted(exclusions)
     )
