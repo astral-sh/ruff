@@ -788,21 +788,13 @@ impl<'db> TypeAliasType<'db> {
                         .value_type_with_recursion(db, visitor.recursion_context)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                    // Freshening can change the arguments of `Alias[T]` while preserving its definition.
-                    let alias = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
+                    // If the type mapping does not result in any change to this type alias, keep the
+                    // alias node instead of eagerly expanding it. A recursive backedge also returns
+                    // the alias itself, and fully static aliases must retain their original identity.
+                    if mapped == ty
+                        || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
                     {
-                        self.map_stored_specialization(db, type_mapping, visitor)
-                    } else {
-                        self
-                    };
-                    // Retain the alias if it still represents the mapped type. A recursive backedge
-                    // also returns the original alias itself.
-                    if mapped == ty {
                         ty
-                    } else if alias.value_type_with_recursion(db, visitor.recursion_context)
-                        == mapped
-                    {
-                        Type::TypeAlias(alias)
                     } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
                         && self.is_recursive(db)
                     {

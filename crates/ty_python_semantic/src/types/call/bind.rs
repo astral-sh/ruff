@@ -3655,6 +3655,17 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
+        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
+        // quantify away `P` before call specialization can use it.
+        if self.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .generic_context
+                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
+        }) {
+            return;
+        }
+
         // If any of the overloads being called are generic, we need to "freshen" their generic
         // contexts. The typevars bound by this generic context might collide with other visible
         // occurrences of the same generic context. This happens most often when referring to a
@@ -3669,11 +3680,7 @@ impl<'db> CallableBinding<'db> {
             let Some(generic_context) = overload.signature.generic_context else {
                 continue;
             };
-            // A ParamSpec can capture another occurrence of this same generic callable, even
-            // through a container. Keep the callee's variables separate from the captured ones.
-            if nonce_generator.should_freshen(db, generic_context)
-                || generic_context_has_paramspec(db, generic_context)
-            {
+            if nonce_generator.should_freshen(db, generic_context) {
                 overload.freshen_bound_typevars(db, env, nonce.value());
             }
         }
@@ -8863,22 +8870,36 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred = CallInference {
-            db,
-            env,
-            signature: &self.signature,
-            arguments,
-            argument_matches: &self.argument_matches,
-            call_expression_tcx,
-            return_ty: self.return_ty,
-            is_partial_application: self.is_partial_application,
-            is_constructor: self.constructor_context.is_some(),
-            inferable_typevars: self
-                .signature
-                .generic_context
-                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
+        let infer = |binding: &Self| {
+            CallInference {
+                db,
+                env,
+                signature: &binding.signature,
+                arguments,
+                argument_matches: &binding.argument_matches,
+                call_expression_tcx,
+                return_ty: binding.return_ty,
+                is_partial_application: binding.is_partial_application,
+                is_constructor: binding.constructor_context.is_some(),
+                inferable_typevars: binding
+                    .signature
+                    .generic_context
+                    .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
+            }
+            .infer(constraints)
+        };
+
+        let mut inferred = infer(self);
+        if let Some(freshness) = inferred
+            .inference
+            .and_then(|inference| inference.captured_paramspec_freshness(db))
+        {
+            // If a decorator captures another occurrence of itself, its parameter list can
+            // refer to the callee's own variables. Give the callee a separate set before
+            // substituting into the captured callback.
+            self.freshen_bound_typevars(db, env, freshness.increment().value());
+            inferred = infer(self);
         }
-        .infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,

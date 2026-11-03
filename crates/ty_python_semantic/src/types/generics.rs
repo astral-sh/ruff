@@ -31,7 +31,7 @@ use crate::types::tuple::{
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
-    TypeVarSet,
+    TypeVarNonce, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -2581,6 +2581,18 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Returns the highest freshness of a callee type variable in an inferred parameter list.
+    pub(super) fn captured_paramspec_freshness(self, db: &'db dyn Db) -> Option<TypeVarNonce> {
+        let context = self.generic_context(db);
+        let mut captures = context
+            .variables(db)
+            .zip(self.merged_types(db))
+            .filter_map(|(variable, inferred)| inferred.filter(|_| variable.is_paramspec(db)))
+            .peekable();
+        captures.peek()?;
+        max_typevar_freshness_matching_generic_context(db, captures, context)
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
