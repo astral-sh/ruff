@@ -29,6 +29,13 @@ from a import thing  # error: "Module `a` has no member `thing`"
 reveal_type(thing)  # revealed: Unknown
 ```
 
+## Suppressing `import-not-found` with the previous rule name
+
+```py
+import missing_module  # ty: ignore[unresolved-import]
+from math import missing_member  # type: ignore[ty:unresolved-import]
+```
+
 ## Resolved import of symbol from unresolved import
 
 `a.py`:

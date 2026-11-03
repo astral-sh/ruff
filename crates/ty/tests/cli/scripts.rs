@@ -727,7 +727,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
+    error[import-not-found]: Cannot resolve imported module `layout_dependency`
      --> scripts/script.py:6:6
       |
     6 | from layout_dependency import value as layout_value
@@ -736,7 +736,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `local_dependency`
+    error[import-not-found]: Cannot resolve imported module `local_dependency`
      --> scripts/script.py:7:6
       |
     7 | from local_dependency import value as local_value
@@ -745,7 +745,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> scripts/script.py:8:6
       |
     8 | from shared import value
@@ -828,7 +828,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `extra_only`
+    error[import-not-found]: Cannot resolve imported module `extra_only`
      --> scripts/script.py:6:6
       |
     6 | from extra_only import value as extra
@@ -837,7 +837,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `project_only`
+    error[import-not-found]: Cannot resolve imported module `project_only`
      --> scripts/script.py:7:6
       |
     7 | from project_only import value as project
@@ -989,7 +989,7 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `project_dependency`
+    error[import-not-found]: Cannot resolve imported module `project_dependency`
      --> scripts/script.py:6:6
       |
     6 | from project_dependency import value

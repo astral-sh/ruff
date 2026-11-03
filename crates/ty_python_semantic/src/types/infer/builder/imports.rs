@@ -13,7 +13,7 @@ use crate::{
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
-            MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
+            IMPORT_NOT_FOUND, MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT,
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
@@ -127,7 +127,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
     }
 
-    fn report_unresolved_import(
+    fn report_import_not_found(
         &self,
         range: TextRange,
         level: u32,
@@ -151,7 +151,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
+        let Some(builder) = self.context.report_lint(&IMPORT_NOT_FOUND, range) else {
             return;
         };
 
@@ -286,7 +286,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
+            self.report_import_not_found(alias.range(), 0, Some(name), Some(&full_module_name));
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -403,7 +403,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// `package`, not `child`. Relative imports are resolved to an absolute module name.
     ///
     /// Return `None` if the module name is invalid or the module cannot be resolved.
-    /// Emit an unresolved-import diagnostic for resolution failures; syntax errors are
+    /// Emit an import-not-found diagnostic for resolution failures; syntax errors are
     /// reported elsewhere.
     fn check_import_from_module_is_resolvable(
         &mut self,
@@ -444,7 +444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_import_not_found(module_ref.range(), *level, module, None);
                 return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -454,14 +454,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                     self.file().path(db)
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_import_not_found(module_ref.range(), *level, module, None);
                 return None;
             }
         };
 
         let resolved = resolve_module(db, importing_file, &module_name);
         if resolved.is_none() {
-            self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
+            self.report_import_not_found(module_ref.range(), *level, module, Some(&module_name));
         }
 
         resolved
@@ -637,7 +637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(builder) = self
             .context
-            .report_lint(&UNRESOLVED_IMPORT, ast::AnyNodeRef::Alias(alias))
+            .report_lint(&IMPORT_NOT_FOUND, ast::AnyNodeRef::Alias(alias))
         else {
             return;
         };
@@ -763,7 +763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Some(builder) = self.context.report_lint(
-            &UNRESOLVED_IMPORT,
+            &IMPORT_NOT_FOUND,
             ast::AnyNodeRef::StmtImportFrom(import_from),
         ) else {
             return;

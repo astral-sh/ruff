@@ -309,7 +309,7 @@ if False:
 ```
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from mod import MyInt
 
 reveal_type(MyInt)  # revealed: Unknown

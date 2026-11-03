@@ -8,6 +8,10 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
 use regex::{Captures, Regex};
+use rustc_hash::FxHashMap;
+
+use ruff_db::diagnostic::LintName;
+use ty_python_semantic::lint::LintId;
 
 use crate::ROOT_DIR;
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
@@ -65,11 +69,25 @@ fn generate_markdown() -> String {
     let mut lints: Vec<_> = registry.lints().iter().collect();
     lints.sort_by_key(|a| a.name());
 
+    let mut aliases: FxHashMap<LintId, Vec<LintName>> = FxHashMap::default();
+
+    // Map of {<rule ID>: <aliases for that rule>}
+    for (name, lint) in registry.aliases() {
+        aliases.entry(lint).or_default().push(name);
+    }
+
     // Replace `rule-name` with [`rule-name`](url) for any known rule names,
     // turning them into inline links automatically.
     let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
     for lint in lints {
+        // Keep links to the old rule heading working after a rename.
+        if let Some(names) = aliases.get(lint) {
+            for name in names.iter().sorted() {
+                let _ = writeln!(output, r#"<a id="{name}"></a>"#);
+            }
+            output.push('\n');
+        }
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
         // Reformat headers as bold text

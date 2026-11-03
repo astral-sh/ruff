@@ -499,7 +499,7 @@ except Exception:
 
     result = make
 finally:
-    from unknown_module import member as result  # error: [unresolved-import]
+    from unknown_module import member as result  # error: [import-not-found]
 ```
 
 ## Decorated methods with implicit class attributes

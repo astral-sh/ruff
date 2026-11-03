@@ -406,7 +406,7 @@ after narrowing rules out another type.
 
 ```py
 from typing import Any
-from missing import UnknownBase  # error: [unresolved-import]
+from missing import UnknownBase  # error: [import-not-found]
 from ty_extensions import Intersection, Not, static_assert
 from ty_extensions._internal import is_assignable_to
 

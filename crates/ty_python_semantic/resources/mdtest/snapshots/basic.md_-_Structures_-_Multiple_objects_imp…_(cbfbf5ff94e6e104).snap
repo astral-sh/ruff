@@ -13,14 +13,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
 ## mdtest_snippet.py
 
 ```
-1 | # error: [unresolved-import]
+1 | # error: [import-not-found]
 2 | from does_not_exist import foo, bar, baz
 ```
 
 # Diagnostics
 
 ```
-error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+error[import-not-found]: Cannot resolve imported module `does_not_exist`
  --> src/mdtest_snippet.py:2:6
   |
 2 | from does_not_exist import foo, bar, baz

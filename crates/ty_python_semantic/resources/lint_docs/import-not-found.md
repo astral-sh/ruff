@@ -1,10 +1,11 @@
 ## What it does
 
-Checks for import statements for which the module cannot be resolved.
+Checks for imports where ty cannot find the module or a member named in a `from` import.
 
 ## Why is this bad?
 
-Importing a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.
+Importing a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from
+an existing module raises `ImportError`.
 
 These diagnostics can often be caused due to ty's Python environment or search paths being
 configured incorrectly. See the
@@ -16,4 +17,7 @@ for more details.
 ```python
 # ModuleNotFoundError: No module named 'mathh'
 import mathh  # error
+
+# ImportError: cannot import name 'sine' from 'math'
+from math import sine  # error
 ```

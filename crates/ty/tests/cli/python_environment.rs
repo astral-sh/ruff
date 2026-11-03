@@ -190,7 +190,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package` has no member `nonexistent_submodule`
+    error[import-not-found]: Module `package` has no member `nonexistent_submodule`
      --> src/package/__init__.py:1:15
       |
     1 | from . import nonexistent_submodule
@@ -306,7 +306,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `string.templatelib`
+    error[import-not-found]: Cannot resolve imported module `string.templatelib`
      --> test.py:1:8
       |
     1 | import string.templatelib
@@ -388,7 +388,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
@@ -399,7 +399,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -421,7 +421,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -432,7 +432,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -454,7 +454,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -465,7 +465,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -487,7 +487,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -498,7 +498,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -551,7 +551,7 @@ import bar",
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
@@ -597,7 +597,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:18
       |
     1 | import foo, bar, baz
@@ -640,7 +640,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -672,7 +672,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -706,7 +706,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -721,7 +721,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   7. <temp_dir>/ (first-party code)
     info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     Found 1 diagnostic
 
@@ -1275,7 +1275,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
-    error[unresolved-import]: Module `typing` has no member `TypeAliasType`
+    error[import-not-found]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
     6 | from typing import TypeAliasType  # added in Python 3.12
@@ -1478,7 +1478,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1496,7 +1496,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1514,7 +1514,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1533,7 +1533,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1554,7 +1554,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1573,7 +1573,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1592,7 +1592,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1611,7 +1611,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1697,7 +1697,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:2:6
       |
     2 | from package1 import ActiveVenv
@@ -1707,7 +1707,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:3:6
       |
     3 | from package1 import ChildConda
@@ -1717,7 +1717,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:4:6
       |
     4 | from package1 import WorkingVenv
@@ -1727,7 +1727,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:5:6
       |
     5 | from package1 import BaseConda
@@ -1749,7 +1749,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1767,7 +1767,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1786,7 +1786,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1807,7 +1807,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1826,7 +1826,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1845,7 +1845,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1864,7 +1864,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -2051,7 +2051,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> tests/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2120,7 +2120,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2161,7 +2161,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2198,7 +2198,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/foo.py:2:8
       |
     2 | import baz
@@ -2250,7 +2250,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/main.py:2:8
       |
     2 | import baz
@@ -2261,7 +2261,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> src/main.py:3:8
       |
     3 | import foo

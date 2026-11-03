@@ -140,7 +140,7 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `shared_package` has no member `FromLocalVenv`
+    error[import-not-found]: Module `shared_package` has no member `FromLocalVenv`
      --> test.py:9:28
       |
     9 | from shared_package import FromLocalVenv
@@ -215,7 +215,7 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `ty_package`
+    error[import-not-found]: Cannot resolve imported module `ty_package`
      --> test.py:2:6
       |
     2 | from ty_package import TyEnvClass
@@ -337,7 +337,7 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `system_package`
+    error[import-not-found]: Cannot resolve imported module `system_package`
      --> test.py:3:6
       |
     3 | from system_package import SystemEnvClass

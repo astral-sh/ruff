@@ -1174,9 +1174,13 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
     fn from_iter<T: IntoIterator<Item = (RangedValue<String>, RangedValue<Level>)>>(
         iter: T,
     ) -> Self {
-        Self {
-            inner: iter.into_iter().collect(),
+        let mut rules = Self::default();
+        for (name, level) in iter {
+            // Move repeated selectors to the end so they take precedence over an intervening
+            // alias or `all` selector.
+            rules.inner.insert_before(rules.inner.len(), name, level);
         }
+        rules
     }
 }
 
@@ -1753,7 +1757,7 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+    /// A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
     ///
     /// Details on supported glob patterns:
     /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
