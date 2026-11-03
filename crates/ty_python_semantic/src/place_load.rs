@@ -322,7 +322,8 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         )
     }
 
-    /// Resolves an indexed or syntactic place using the file and scope already known to inference.
+    /// Starts resolving `place_expr` in `scope`. When supplied, `local_operand` must identify
+    /// this read in that scope because its IDs index the scope's place and use-def tables.
     pub(crate) fn from_source(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,

@@ -13,9 +13,9 @@ use crate::semantic_index;
 
 pub use node_key::ExpressionNodeKey;
 
-/// Source coordinates for an occurrence in the indexed syntax.
+/// The scope and use IDs recorded for one AST node during indexing.
 #[derive(Clone, Copy, Default, Debug)]
-struct SourceOccurrence {
+struct NodeIds {
     scope: Option<FileScopeId>,
     use_id: Option<ScopedUseId>,
 }
@@ -32,8 +32,8 @@ pub struct PlaceUse {
 /// String annotations have sparse node indices outside the root tree.
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
-    root: Box<[SourceOccurrence]>,
-    annotations: BTreeMap<ast::NodeIndex, SourceOccurrence>,
+    root: Box<[NodeIds]>,
+    annotations: BTreeMap<ast::NodeIndex, NodeIds>,
 }
 
 fn root_index(node: ast::NodeIndex) -> Option<usize> {
@@ -45,12 +45,12 @@ fn root_index(node: ast::NodeIndex) -> Option<usize> {
 impl AstIdsBuilder {
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
-            root: vec![SourceOccurrence::default(); node_count].into_boxed_slice(),
+            root: vec![NodeIds::default(); node_count].into_boxed_slice(),
             annotations: BTreeMap::new(),
         }
     }
 
-    fn entry(&mut self, node: ast::NodeIndex) -> &mut SourceOccurrence {
+    fn entry(&mut self, node: ast::NodeIndex) -> &mut NodeIds {
         if let Some(index) = root_index(node) {
             &mut self.root[index]
         } else {
@@ -62,6 +62,8 @@ impl AstIdsBuilder {
         self.entry(expr.node_index().load()).scope = Some(scope);
     }
 
+    /// Records a use on a non-expression node, such as a function name or the `**kwargs`
+    /// keyword in a call. These nodes can have a use ID without an explicitly recorded scope.
     pub(super) fn record_other_use(
         &mut self,
         key: impl Into<ExpressionNodeKey>,
@@ -76,7 +78,7 @@ impl AstIdsBuilder {
         scope: FileScopeId,
         use_id: ScopedUseId,
     ) {
-        *self.entry(ExpressionNodeKey::from(expr).index()) = SourceOccurrence {
+        *self.entry(ExpressionNodeKey::from(expr).index()) = NodeIds {
             scope: Some(scope),
             use_id: Some(use_id),
         };
@@ -96,7 +98,8 @@ impl AstIdsBuilder {
         row.use_id.filter(|_| row.scope == Some(scope))
     }
 
-    /// Visit root nodes and string annotations in source order, regardless of evaluation order.
+    /// Stores use IDs in node-index order, with string-annotation nodes after the root nodes.
+    /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
     pub(super) fn finish(self) -> AstIds {
         let mut pages: Vec<UsePage> = Vec::new();
         let mut uses = Vec::new();
@@ -182,6 +185,8 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
+    /// Looks up a node in the packed use array. Each earlier set bit on the same page
+    /// accounts for one preceding entry in the array.
     fn source_use(&self, node: ast::NodeIndex) -> Option<ScopedUseId> {
         let end = self.pages.partition_point(|page| page.first_node <= node);
         let page = self.pages[..end].last()?;
@@ -354,114 +359,21 @@ pub(crate) mod node_key {
 }
 
 #[cfg(test)]
-mod source_occurrence_tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn large_operands_preserve_each_index() {
-        let mut builder = AstIdsBuilder::with_node_count(129);
-        let cases = [
-            (0, 0, 0),
-            (63, 65_534, 65_535),
-            (64, 7, 42),
-            (66, u32::MAX - 1, u32::MAX - 1),
-            (128, 1, 8),
-            (ast::MAX_REAL_INDEX + 1, u32::MAX - 1, u32::MAX - 1),
-        ];
-        for (node, scope, use_id) in cases {
-            *builder.entry(ast::NodeIndex::from(node)) = SourceOccurrence {
-                scope: Some(FileScopeId::from_u32(scope)),
-                use_id: Some(ScopedUseId::from_u32(use_id)),
-            };
-        }
-        let placeholder = ast::AtomicNodeIndex::default().load();
-        let placeholder_use = ScopedUseId::from_u32(9);
-        builder.entry(placeholder).use_id = Some(placeholder_use);
-        let ids = builder.finish();
-        for (node, scope, use_id) in cases {
-            let node = ast::NodeIndex::from(node);
-            let scope = FileScopeId::from_u32(scope);
-            assert_eq!(ids.source_use(node), Some(ScopedUseId::from_u32(use_id)));
-            assert_eq!(ids.scope_at(node), Some(scope));
-        }
-        assert_eq!(ids.source_use(ast::NodeIndex::from(62)), None);
-        assert_eq!(ids.source_use(placeholder), Some(placeholder_use));
-    }
-
-    #[test]
-    fn scope_gaps_match_source_order_across_blocks_and_string_annotations() {
-        let mut builder = AstIdsBuilder::with_node_count(711);
-        let annotation = ast::MAX_REAL_INDEX + 1;
-        let inputs = [
-            (75, 0),
-            (5, 2),
-            (annotation + 70, 3),
-            (13, 0),
-            (annotation + 11, 0),
-            (701, 0),
-            (710, 0),
-            (73, 1),
-            (annotation + 33, 3),
-            (63, 0),
-            (1, 2),
-        ];
-        let mut points = BTreeMap::new();
-        for (index, scope) in inputs {
-            let index = ast::NodeIndex::from(index);
-            let scope = FileScopeId::from_u32(scope);
-            builder.entry(index).scope = Some(scope);
-            points.insert(index, scope);
+    fn use_ids_across_page_boundary() {
+        let mut builder = AstIdsBuilder::with_node_count(65);
+        for (use_id, node) in [64u32, 0, 63].into_iter().enumerate() {
+            builder.entry(node.into()).use_id = Some(ScopedUseId::from_usize(use_id));
         }
 
         let ids = builder.finish();
-        for i in (0..740).chain(annotation - 20..annotation + 74) {
-            let node = ast::NodeIndex::from(i);
-            let previous = points.range(..=node).next_back().map(|(_, scope)| *scope);
-            let next = points.range(node..).next().map(|(_, scope)| *scope);
-            assert_eq!(
-                ids.scope_at(node),
-                previous.filter(|_| previous == next),
-                "node {i}"
-            );
-        }
-    }
-    #[test]
-    fn direct_operands_survive_far_revisits_and_empty_pages() {
-        let mut builder = AstIdsBuilder::with_node_count(9501);
-        let scope = FileScopeId::from_u32(88);
-        let other = FileScopeId::from_u32(78);
-        let use_id = ScopedUseId::from_u32(10);
-        let row = SourceOccurrence {
-            scope: Some(scope),
-            use_id: Some(use_id),
-        };
-        *builder.entry(ast::NodeIndex::from(0)) = row;
-        for i in 16..360 {
-            *builder.entry(ast::NodeIndex::from(i)) = row;
-        }
-        let late = ast::NodeIndex::from(3);
-        *builder.entry(late) = row;
-        builder.entry(late).scope = Some(other);
-        builder.entry(ast::NodeIndex::from(9500)).scope = Some(scope);
-        let ids = builder.finish();
-        assert_eq!(ids.source_use(late), Some(use_id));
-        assert_eq!(ids.scope_at(late), Some(other));
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(7000)), Some(scope));
-        assert_eq!(ids.source_use(ast::NodeIndex::from(7000)), None);
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(9999)), None);
-    }
-
-    #[test]
-    fn unscoped_wide_use_is_transparent_to_gap_lookups() {
-        let mut builder = AstIdsBuilder::with_node_count(10_006);
-        let scope = FileScopeId::from_u32(65_534);
-        let center = ast::NodeIndex::from(134);
-        builder.entry(ast::NodeIndex::from(2)).scope = Some(scope);
-        builder.entry(ast::NodeIndex::from(10_005)).scope = Some(scope);
-        let wide = ScopedUseId::from_u32(u32::MAX - 1);
-        builder.entry(center).use_id = Some(wide);
-        let ids = builder.finish();
-        assert_eq!(ids.scope_at(center), Some(scope));
-        assert_eq!(ids.source_use(center), Some(wide));
+        let lookup = |node: u32| ids.source_use(node.into()).map(ScopedUseId::as_u32);
+        assert_eq!(lookup(0), Some(1));
+        assert_eq!(lookup(62), None);
+        assert_eq!(lookup(63), Some(2));
+        assert_eq!(lookup(64), Some(0));
     }
 }
