@@ -21,13 +21,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
  6 | class MyProtocol(Protocol):
  7 |     x: int
  8 | 
- 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+ 9 | # error: [instantiate-abstract-class] "Cannot instantiate class `MyProtocol`"
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
 11 | 
 12 | class GenericProtocol[T](Protocol):
 13 |     x: T
 14 | 
-15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
+15 | # error: [instantiate-abstract-class] "Cannot instantiate class `GenericProtocol`"
 16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
 17 | class SubclassOfMyProtocol(MyProtocol): ...
 18 | 
@@ -52,7 +52,7 @@ error[call-non-callable]: Object of type `<special-form 'typing.Protocol'>` is n
 ```
 
 ```
-error[call-non-callable]: Cannot instantiate class `MyProtocol`
+error[instantiate-abstract-class]: Cannot instantiate class `MyProtocol`
   --> src/mdtest_snippet.py:10:13
    |
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
@@ -66,7 +66,7 @@ info: Protocol classes cannot be instantiated
 ```
 
 ```
-error[call-non-callable]: Cannot instantiate class `GenericProtocol`
+error[instantiate-abstract-class]: Cannot instantiate class `GenericProtocol`
   --> src/mdtest_snippet.py:16:13
    |
 16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
