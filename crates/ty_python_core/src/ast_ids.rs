@@ -7,6 +7,7 @@ use ruff_python_ast::ExprRef;
 use crate::Db;
 use crate::HasTrackedScope;
 use crate::ProgramFile;
+use crate::frozen::FrozenMap;
 use crate::place::ScopedPlaceId;
 use crate::scope::FileScopeId;
 use crate::semantic_index;
@@ -14,7 +15,7 @@ use crate::semantic_index;
 pub use node_key::ExpressionNodeKey;
 
 /// Source coordinates for an occurrence in the indexed syntax.
-#[derive(Clone, Copy, Default, Debug, get_size2::GetSize)]
+#[derive(Clone, Copy, Default, Debug)]
 struct SourceOccurrence {
     scope: Option<FileScopeId>,
     use_id: Option<ScopedUseId>,
@@ -28,144 +29,38 @@ pub struct PlaceUse {
     pub place: ScopedPlaceId,
 }
 
-#[derive(Clone, Copy, Debug, Default, get_size2::GetSize)]
-struct Operand {
-    scope: u16,
-    use_id: u16,
+/// Indexed by root AST node while the flow builder visits expressions in evaluation order.
+/// String annotations have sparse node indices outside the root tree.
+#[derive(Debug)]
+pub(super) struct AstIdsBuilder {
+    root: Box<[SourceOccurrence]>,
+    annotations: BTreeMap<ast::NodeIndex, SourceOccurrence>,
 }
 
-impl Operand {
-    const EXTENDED: u16 = u16::MAX;
-
-    fn from_occurrence(row: SourceOccurrence) -> Option<Self> {
-        let scope = u16::try_from(row.scope.map_or(0, |scope| scope.as_u32() + 1)).ok()?;
-        if scope == Self::EXTENDED {
-            return None;
-        }
-        Some(Self {
-            scope,
-            use_id: u16::try_from(row.use_id.map_or(0, |use_id| use_id.as_u32() + 1)).ok()?,
-        })
-    }
-
-    fn occurrence(self) -> SourceOccurrence {
-        debug_assert_ne!(self.scope, Self::EXTENDED);
-        SourceOccurrence {
-            scope: u32::from(self.scope)
-                .checked_sub(1)
-                .map(FileScopeId::from_u32),
-            use_id: u32::from(self.use_id)
-                .checked_sub(1)
-                .map(ScopedUseId::from_u32),
-        }
-    }
+fn root_index(node: ast::NodeIndex) -> Option<usize> {
+    node.as_u32()
+        .filter(|&index| index <= ast::MAX_REAL_INDEX)
+        .map(|index| index as usize)
 }
 
-const PAGE_SIZE: usize = 64;
-
-#[derive(Clone, Debug, get_size2::GetSize)]
-struct SourcePage {
-    rows: [Operand; PAGE_SIZE],
-    has_scope: bool,
-}
-
-impl Default for SourcePage {
-    fn default() -> Self {
-        Self {
-            rows: [Operand::default(); PAGE_SIZE],
-            has_scope: false,
-        }
-    }
-}
-
-#[derive(Default, Debug, get_size2::GetSize)]
-pub(crate) struct AstIds {
-    pages: Vec<SourcePage>,
-    // Used only for unmarked identifiers, which need the surrounding explicit scopes.
-    // The directory lets a lookup cross arbitrarily long empty spans in logarithmic time.
-    occupied: std::collections::BTreeSet<usize>,
-    // Full-width operands and the sparse indices of separately parsed annotations.
-    exceptional: BTreeMap<ast::NodeIndex, SourceOccurrence>,
-}
-
-impl AstIds {
-    /// Allocate the source slots once using the indexed root tree's existing extent.
-    /// Sparse annotation indices are kept separately and do not affect this size.
+impl AstIdsBuilder {
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
-            pages: Vec::with_capacity(node_count.div_ceil(PAGE_SIZE)),
-            ..Self::default()
+            root: vec![SourceOccurrence::default(); node_count].into_boxed_slice(),
+            annotations: BTreeMap::new(),
         }
     }
 
-    fn regular_index(node: ast::NodeIndex) -> Option<usize> {
-        node.as_u32()
-            .filter(|&id| id <= ast::MAX_REAL_INDEX)
-            .map(|id| id as usize)
-    }
-
-    fn slot(&mut self, index: usize, marks_scope: bool) -> &mut Operand {
-        let page = index / PAGE_SIZE;
-        if page >= self.pages.len() {
-            self.pages.resize_with(page + 1, SourcePage::default);
+    fn entry(&mut self, node: ast::NodeIndex) -> &mut SourceOccurrence {
+        if let Some(index) = root_index(node) {
+            &mut self.root[index]
+        } else {
+            self.annotations.entry(node).or_default()
         }
-        let entries = &mut self.pages[page];
-        if marks_scope && !entries.has_scope {
-            entries.has_scope = true;
-            self.occupied.insert(page);
-        }
-        &mut entries.rows[index % PAGE_SIZE]
-    }
-
-    fn get(&self, node: ast::NodeIndex) -> SourceOccurrence {
-        if let Some(index) = Self::regular_index(node) {
-            let Some(page) = self.pages.get(index / PAGE_SIZE) else {
-                return SourceOccurrence::default();
-            };
-            let row = page.rows[index % PAGE_SIZE];
-            if row.scope != Operand::EXTENDED {
-                return row.occurrence();
-            }
-        }
-        self.exceptional.get(&node).copied().unwrap_or_default()
-    }
-
-    fn set(&mut self, node: ast::NodeIndex, value: SourceOccurrence) {
-        if let Some(index) = Self::regular_index(node) {
-            let slot = self.slot(index, value.scope.is_some());
-            if slot.scope != Operand::EXTENDED
-                && let Some(compact) = Operand::from_occurrence(value)
-            {
-                *slot = compact;
-                return;
-            }
-            slot.scope = Operand::EXTENDED;
-        }
-        self.exceptional.insert(node, value);
-    }
-
-    fn mark_scope(&mut self, node: ast::NodeIndex, scope: FileScopeId) {
-        if let Some(index) = Self::regular_index(node) {
-            let slot = self.slot(index, true);
-            if slot.scope != Operand::EXTENDED {
-                if let Ok(compact) = u16::try_from(scope.as_u32())
-                    && compact < Operand::EXTENDED - 1
-                {
-                    slot.scope = compact + 1;
-                    return;
-                }
-                let mut row = slot.occurrence();
-                row.scope = Some(scope);
-                slot.scope = Operand::EXTENDED;
-                self.exceptional.insert(node, row);
-                return;
-            }
-        }
-        self.exceptional.entry(node).or_default().scope = Some(scope);
     }
 
     pub(super) fn record_expression(&mut self, expr: &impl HasTrackedScope, scope: FileScopeId) {
-        self.mark_scope(expr.node_index().load(), scope);
+        self.entry(expr.node_index().load()).scope = Some(scope);
     }
 
     pub(super) fn record_other_use(
@@ -173,10 +68,7 @@ impl AstIds {
         key: impl Into<ExpressionNodeKey>,
         use_id: ScopedUseId,
     ) {
-        let node = key.into().index();
-        let mut row = self.get(node);
-        row.use_id = Some(use_id);
-        self.set(node, row);
+        self.entry(key.into().index()).use_id = Some(use_id);
     }
 
     pub(super) fn record_place_use(
@@ -185,75 +77,150 @@ impl AstIds {
         scope: FileScopeId,
         use_id: ScopedUseId,
     ) {
-        self.set(
-            ExpressionNodeKey::from(expr).index(),
-            SourceOccurrence {
-                scope: Some(scope),
-                use_id: Some(use_id),
-            },
-        );
-    }
-
-    fn scope_in_page(&self, page_id: usize, offset: usize, before: bool) -> Option<FileScopeId> {
-        let rows = &self.pages.get(page_id)?.rows;
-        let lookup = |i: usize| {
-            let scope = rows[i].scope;
-            if scope == Operand::EXTENDED {
-                let node = ast::NodeIndex::from(u32::try_from(page_id * PAGE_SIZE + i).unwrap());
-                self.exceptional[&node].scope
-            } else {
-                u32::from(scope).checked_sub(1).map(FileScopeId::from_u32)
-            }
+        *self.entry(ExpressionNodeKey::from(expr).index()) = SourceOccurrence {
+            scope: Some(scope),
+            use_id: Some(use_id),
         };
-        if before {
-            (0..=offset).rev().find_map(lookup)
-        } else {
-            (offset..PAGE_SIZE).find_map(lookup)
-        }
     }
 
-    fn bordering_scope(&self, id: usize, before: bool) -> Option<FileScopeId> {
-        let page = id / PAGE_SIZE;
-        if let Some(scope) = self.scope_in_page(page, id % PAGE_SIZE, before) {
-            return Some(scope);
-        }
-        if before {
-            let previous = self.occupied.range(..page).next_back()?;
-            self.scope_in_page(*previous, PAGE_SIZE - 1, true)
+    pub(super) fn try_scoped_use(
+        &self,
+        scope: FileScopeId,
+        key: impl Into<ExpressionNodeKey>,
+    ) -> Option<ScopedUseId> {
+        let node = key.into().index();
+        let row = if let Some(index) = root_index(node) {
+            self.root.get(index)?
         } else {
-            let next = self.occupied.range(page + 1..).next()?;
-            self.scope_in_page(*next, 0, false)
+            self.annotations.get(&node)?
+        };
+        row.use_id.filter(|_| row.scope == Some(scope))
+    }
+
+    /// Keep one row per use and one range per run of expressions in the same scope.
+    /// Walking the root slots in source order also puts out-of-order visits in their final order.
+    pub(super) fn finish(self) -> AstIds {
+        let mut scopes = Vec::new();
+        let mut uses = Vec::new();
+        let pages = self
+            .root
+            .chunks(PAGE_SIZE)
+            .enumerate()
+            .map(|(page, rows)| {
+                let first_use = u32::try_from(uses.len()).expect("at most one use per root node");
+                // The last range from the previous page can extend into or across this one.
+                let first_scope = u32::try_from(scopes.len().saturating_sub(1))
+                    .expect("at most one scope range per root node");
+                let mut mask = 0;
+                for (offset, row) in rows.iter().enumerate() {
+                    if let Some(scope) = row.scope {
+                        let index = u32::try_from(page * PAGE_SIZE + offset)
+                            .expect("root AST node indices fit in u32");
+                        ScopeRange::record(&mut scopes, ast::NodeIndex::from(index), scope);
+                    }
+                    if let Some(use_id) = row.use_id {
+                        mask |= 1 << offset;
+                        uses.push(use_id);
+                    }
+                }
+                SourcePage {
+                    first_use,
+                    first_scope,
+                    mask,
+                }
+            })
+            .collect();
+
+        let mut annotation_uses = Vec::new();
+        for (node, row) in self.annotations {
+            if let Some(scope) = row.scope {
+                ScopeRange::record(&mut scopes, node, scope);
+            }
+            if let Some(use_id) = row.use_id {
+                annotation_uses.push((node, use_id));
+            }
         }
+        AstIds {
+            pages,
+            uses: uses.into_boxed_slice(),
+            scopes: scopes.into_boxed_slice(),
+            annotation_uses: FrozenMap::from_entries(annotation_uses),
+        }
+    }
+}
+
+const PAGE_SIZE: usize = u64::BITS as usize;
+
+/// Locates uses and scope ranges for 64 consecutive root AST nodes.
+/// Each set bit corresponds to one consecutive entry in `AstIds::uses`.
+#[derive(Debug, get_size2::GetSize)]
+struct SourcePage {
+    first_use: u32,
+    first_scope: u32,
+    mask: u64,
+}
+
+#[derive(Debug, get_size2::GetSize)]
+struct ScopeRange {
+    start: ast::NodeIndex,
+    end: ast::NodeIndex,
+    scope: FileScopeId,
+}
+
+impl ScopeRange {
+    /// Unmarked identifiers between two expressions inherit their scope if both agree.
+    fn record(ranges: &mut Vec<Self>, node: ast::NodeIndex, scope: FileScopeId) {
+        if let Some(last) = ranges.last_mut()
+            && last.scope == scope
+        {
+            last.end = node;
+        } else {
+            ranges.push(Self {
+                start: node,
+                end: node,
+                scope,
+            });
+        }
+    }
+}
+
+#[derive(Debug, get_size2::GetSize)]
+pub(crate) struct AstIds {
+    pages: Box<[SourcePage]>,
+    uses: Box<[ScopedUseId]>,
+    scopes: Box<[ScopeRange]>,
+    annotation_uses: FrozenMap<ast::NodeIndex, ScopedUseId>,
+}
+
+impl AstIds {
+    fn source_use(&self, node: ast::NodeIndex) -> Option<ScopedUseId> {
+        let Some(index) = root_index(node) else {
+            return self.annotation_uses.get(&node).copied();
+        };
+        let page = self.pages.get(index / PAGE_SIZE)?;
+        let bit = 1_u64 << (index % PAGE_SIZE);
+        if page.mask & bit == 0 {
+            return None;
+        }
+        let preceding = (page.mask & (bit - 1)).count_ones();
+        Some(self.uses[(page.first_use + preceding) as usize])
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
-        if let Some(scope) = self.get(node).scope {
-            return Some(scope);
-        }
-        let first_annotation = ast::NodeIndex::from(ast::MAX_REAL_INDEX + 1);
-        let (prev, next) = if let Some(id) = Self::regular_index(node) {
-            (
-                self.bordering_scope(id, true)?,
-                self.bordering_scope(id, false).or_else(|| {
-                    self.exceptional
-                        .range(first_annotation..)
-                        .find_map(|(_, row)| row.scope)
-                })?,
-            )
+        // Most pages fall in a single scope. Even with nested scopes, at most one new
+        // range can start per node in the page.
+        let range = if let Some(page) = root_index(node).and_then(|i| self.pages.get(i / PAGE_SIZE))
+        {
+            self.scopes[page.first_scope as usize..]
+                .iter()
+                .find(|range| node <= range.end)?
         } else {
-            (
-                self.exceptional
-                    .range(first_annotation..node)
-                    .rev()
-                    .find_map(|(_, row)| row.scope)
-                    .or_else(|| self.bordering_scope(ast::MAX_REAL_INDEX as usize, true))?,
-                self.exceptional
-                    .range(node..)
-                    .find_map(|(_, row)| row.scope)?,
-            )
+            let index = self.scopes.partition_point(|range| range.end < node);
+            self.scopes.get(index)?
         };
-        (prev == next).then_some(prev)
+        (range.start <= node).then_some(range.scope)
     }
+
     pub(super) fn expression_scope(&self, node: &impl HasTrackedScope) -> Option<FileScopeId> {
         self.scope_at(node.node_index().load())
     }
@@ -262,8 +229,9 @@ impl AstIds {
         &self,
         expr: ast::ExprRef<'_>,
     ) -> Option<(FileScopeId, ScopedUseId)> {
-        let row = self.get(ExpressionNodeKey::from(expr).index());
-        Some((row.scope?, row.use_id?))
+        let node = ExpressionNodeKey::from(expr).index();
+        let use_id = self.source_use(node)?;
+        Some((self.scope_at(node)?, use_id))
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
@@ -272,16 +240,7 @@ impl AstIds {
     }
 
     pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
-        self.get(key.into().index()).use_id
-    }
-
-    pub(super) fn try_scoped_use(
-        &self,
-        scope: FileScopeId,
-        key: impl Into<ExpressionNodeKey>,
-    ) -> Option<ScopedUseId> {
-        let row = self.get(key.into().index());
-        (row.scope == Some(scope)).then_some(row.use_id).flatten()
+        self.source_use(key.into().index())
     }
 }
 
@@ -422,33 +381,32 @@ mod source_occurrence_tests {
 
     #[test]
     fn large_operands_preserve_each_index() {
-        let node = ast::NodeIndex::from(7);
-        let mut ids = AstIds::default();
-        for (scope, use_id) in [
-            (0, 0),
-            (65533, 65534),
-            (65534, 0),
-            (0, 65535),
-            (u32::MAX - 1, u32::MAX - 1),
-        ] {
-            let scope = FileScopeId::from_u32(scope);
-            let use_id = ScopedUseId::from_u32(use_id);
-            ids.set(
-                node,
-                SourceOccurrence {
-                    scope: Some(scope),
-                    use_id: Some(use_id),
-                },
-            );
-            let row = ids.get(node);
-            assert_eq!((row.scope, row.use_id), (Some(scope), Some(use_id)));
+        let mut builder = AstIdsBuilder::with_node_count(65);
+        let cases = [
+            (0, 0, 0),
+            (63, 65_534, 65_535),
+            (64, u32::MAX - 1, u32::MAX - 1),
+            (ast::MAX_REAL_INDEX + 1, u32::MAX - 1, u32::MAX - 1),
+        ];
+        for (node, scope, use_id) in cases {
+            *builder.entry(ast::NodeIndex::from(node)) = SourceOccurrence {
+                scope: Some(FileScopeId::from_u32(scope)),
+                use_id: Some(ScopedUseId::from_u32(use_id)),
+            };
         }
-        assert_eq!(ids.exceptional.len(), 1);
+        let ids = builder.finish();
+        for (node, scope, use_id) in cases {
+            let node = ast::NodeIndex::from(node);
+            let scope = FileScopeId::from_u32(scope);
+            assert_eq!(ids.source_use(node), Some(ScopedUseId::from_u32(use_id)));
+            assert_eq!(ids.scope_at(node), Some(scope));
+        }
+        assert_eq!(ids.source_use(ast::NodeIndex::from(62)), None);
     }
 
     #[test]
     fn scope_gaps_match_source_order_across_blocks_and_string_annotations() {
-        let mut ids = AstIds::default();
+        let mut builder = AstIdsBuilder::with_node_count(711);
         let annotation = ast::MAX_REAL_INDEX + 1;
         let inputs = [
             (75, 0),
@@ -467,10 +425,11 @@ mod source_occurrence_tests {
         for (index, scope) in inputs {
             let index = ast::NodeIndex::from(index);
             let scope = FileScopeId::from_u32(scope);
-            ids.mark_scope(index, scope);
+            builder.entry(index).scope = Some(scope);
             points.insert(index, scope);
         }
 
+        let ids = builder.finish();
         for i in (0..740).chain(annotation - 20..annotation + 74) {
             let node = ast::NodeIndex::from(i);
             let previous = points.range(..=node).next_back().map(|(_, scope)| *scope);
@@ -484,54 +443,41 @@ mod source_occurrence_tests {
     }
     #[test]
     fn direct_operands_survive_far_revisits_and_empty_pages() {
-        let mut ids = AstIds::default();
+        let mut builder = AstIdsBuilder::with_node_count(9501);
         let scope = FileScopeId::from_u32(88);
         let other = FileScopeId::from_u32(78);
+        let use_id = ScopedUseId::from_u32(10);
         let row = SourceOccurrence {
             scope: Some(scope),
-            use_id: Some(ScopedUseId::from_u32(10)),
+            use_id: Some(use_id),
         };
-        ids.set(ast::NodeIndex::from(0), row);
+        *builder.entry(ast::NodeIndex::from(0)) = row;
         for i in 16..360 {
-            ids.set(ast::NodeIndex::from(i), row);
+            *builder.entry(ast::NodeIndex::from(i)) = row;
         }
         let late = ast::NodeIndex::from(3);
-        ids.set(late, row);
-        assert!(!ids.exceptional.contains_key(&late));
-        ids.mark_scope(late, other);
-        let back = ids.get(late);
-        assert_eq!((back.scope, back.use_id), (Some(other), row.use_id));
-        let far = ast::NodeIndex::from(9500);
-        ids.mark_scope(far, scope);
+        *builder.entry(late) = row;
+        builder.entry(late).scope = Some(other);
+        builder.entry(ast::NodeIndex::from(9500)).scope = Some(scope);
+        let ids = builder.finish();
+        assert_eq!(ids.source_use(late), Some(use_id));
+        assert_eq!(ids.scope_at(late), Some(other));
         assert_eq!(ids.scope_at(ast::NodeIndex::from(7000)), Some(scope));
-        ids.mark_scope(far, other);
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(7000)), None);
+        assert_eq!(ids.source_use(ast::NodeIndex::from(7000)), None);
         assert_eq!(ids.scope_at(ast::NodeIndex::from(9999)), None);
-        // An ordinary overflow entry must never be mistaken for a string-annotation mark.
-        let ann = ast::NodeIndex::from(ast::MAX_REAL_INDEX + 25);
-        ids.mark_scope(ann, other);
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(9999)), Some(other));
     }
 
     #[test]
     fn unscoped_wide_use_is_transparent_to_gap_lookups() {
-        let mut ids = AstIds::default();
+        let mut builder = AstIdsBuilder::with_node_count(10_006);
         let scope = FileScopeId::from_u32(65_534);
         let center = ast::NodeIndex::from(134);
-        ids.mark_scope(ast::NodeIndex::from(2), scope);
-        ids.mark_scope(ast::NodeIndex::from(10_005), scope);
+        builder.entry(ast::NodeIndex::from(2)).scope = Some(scope);
+        builder.entry(ast::NodeIndex::from(10_005)).scope = Some(scope);
         let wide = ScopedUseId::from_u32(u32::MAX - 1);
-        ids.set(
-            center,
-            SourceOccurrence {
-                use_id: Some(wide),
-                ..SourceOccurrence::default()
-            },
-        );
+        builder.entry(center).use_id = Some(wide);
+        let ids = builder.finish();
         assert_eq!(ids.scope_at(center), Some(scope));
-        ids.mark_scope(center, FileScopeId::global());
-        assert_eq!(ids.get(center).use_id, Some(wide));
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(100)), None);
-        assert_eq!(ids.scope_at(ast::NodeIndex::from(9_000)), None);
+        assert_eq!(ids.source_use(center), Some(wide));
     }
 }

@@ -28,7 +28,7 @@ use ty_module_resolver::{
 
 use crate::ProgramFile;
 use crate::ast_ids::node_key::ExpressionNodeKey;
-use crate::ast_ids::{AstIds, ScopedUseId};
+use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
@@ -276,7 +276,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: AstIds,
+    ast_ids: AstIdsBuilder,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -338,7 +338,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            ast_ids: AstIds::with_node_count(module_ref.node_count()),
+            ast_ids: AstIdsBuilder::with_node_count(module_ref.node_count()),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
@@ -3380,7 +3380,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let ast_ids = self.ast_ids;
+        let ast_ids = self.ast_ids.finish();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
