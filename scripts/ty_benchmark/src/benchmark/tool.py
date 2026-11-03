@@ -368,7 +368,8 @@ class Zuban(Tool):
             "mode": "mypy",
             "python_version": project.python_version,
             "python_executable": venv.python.as_posix(),
-            "mypy_path": [path.as_posix() for path in sorted(search_paths)],
+            # Match native discovery's physical paths to avoid duplicate module identities.
+            "mypy_path": sorted({path.resolve().as_posix() for path in search_paths}),
             "files": list(project.include),
             "exclude": [
                 r"\A"
