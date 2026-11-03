@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtClassDefFields;
 use ruff_python_ast::{ExprKind, StmtClassDef};
 use ruff_python_semantic::analyze::class::{
     ClassMemberBoundness, ClassMemberKind, any_member_declaration,
@@ -74,11 +75,11 @@ impl Violation for EqWithoutHash {
 }
 
 /// PLW1641
-pub(crate) fn object_without_hash_method(checker: &Checker, class: StmtClassDef<'_>) {
+pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDefFields<'_>) {
     if checker.source_type.is_stub() {
         return;
     }
-    let eq_hash = EqHash::from_class(class);
+    let eq_hash = EqHash::from_class(class.node);
     if matches!(
         eq_hash,
         EqHash {
@@ -86,7 +87,7 @@ pub(crate) fn object_without_hash_method(checker: &Checker, class: StmtClassDef<
             hash: HasMethod::No
         }
     ) {
-        checker.report_diagnostic(EqWithoutHash, class.name().range());
+        checker.report_diagnostic(EqWithoutHash, class.name.range());
     }
 }
 

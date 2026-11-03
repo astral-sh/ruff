@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Argument;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     BuildId, Builder, CmpOp, Expr, ExprBytesLiteral, ExprCall, ExprKind, ExprStringLiteral,
@@ -85,7 +85,7 @@ const ESCAPABLE_SINGLE_CHARACTERS: &str = "abfnrtv";
 /// RUF055
 pub(crate) fn unnecessary_regular_expression(
     checker: &Checker,
-    call: ExprCall<'_>,
+    call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     // adapted from unraw_re_pattern
@@ -101,7 +101,7 @@ pub(crate) fn unnecessary_regular_expression(
 
     // skip calls with more than `pattern` and `string` arguments (and `repl`
     // for `sub`)
-    let Some(re_func) = ReFunc::from_call_expr(semantic, call, func) else {
+    let Some(re_func) = ReFunc::from_call_expr(semantic, call.node, func) else {
         return;
     };
 

@@ -3,8 +3,9 @@ use crate::codes::Category;
 use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subclass};
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Arguments, Expr, ExprKind, Identifier, StmtFunctionDef};
+use ruff_python_ast::{Arguments, Expr, ExprKind, Identifier};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -100,7 +101,7 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, &expr
 /// AIR303
 pub(crate) fn airflow_3_incompatible_method_signature_def(
     checker: &Checker,
-    function_def: StmtFunctionDef<'_>,
+    function_def: &StmtFunctionDefFields<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -108,7 +109,7 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
 
     // Check for deprecated get_link signature in BaseOperatorLink subclasses
     if is_method_in_subclass(
-        function_def,
+        function_def.node,
         checker.semantic(),
         "get_link",
         |qualified_name| {
@@ -118,7 +119,7 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
             )
         },
     ) {
-        let parameters = function_def.parameters();
+        let parameters = function_def.parameters;
         let positional_count = parameters.posonlyargs().len() + parameters.args().len();
 
         let is_valid_signature = match positional_count {
@@ -145,7 +146,7 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
                         "Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.",
                     ),
                 },
-                function_def.name().range(),
+                function_def.name.range(),
             );
         }
     }

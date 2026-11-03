@@ -111,9 +111,9 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &Checker, call: ast::ExprCall<'_>) {
-    let func = call.func();
-    let arguments = call.arguments();
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
 
     let Some(iterable) = arguments.args().first() else {
         return;
@@ -131,8 +131,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: ast::ExprCall<'_
 
     let fix_style = QuadraticListSummationFixStyle::from_target_version(checker.target_version());
     let mut diagnostic =
-        checker.report_diagnostic(QuadraticListSummation { fix_style }, call.range());
-    diagnostic.try_set_fix(|| convert_to_fix(iterable, call, checker, fix_style));
+        checker.report_diagnostic(QuadraticListSummation { fix_style }, call.range);
+    diagnostic.try_set_fix(|| convert_to_fix(iterable, call.node, checker, fix_style));
 }
 
 fn convert_to_fix(

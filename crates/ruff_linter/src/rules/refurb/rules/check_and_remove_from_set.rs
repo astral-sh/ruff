@@ -4,7 +4,6 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, Builder, CmpOp, Expr, ExprKind};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_set;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -70,19 +69,19 @@ impl AlwaysFixableViolation for CheckAndRemoveFromSet {
 }
 
 /// FURB132
-pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: ast::StmtIf<'_>) {
+pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIfFields<'_>) {
     // In order to fit the profile, we need if without else clauses and with only one statement in its body.
-    if if_stmt.body().len() != 1 || !if_stmt.elif_else_clauses().is_empty() {
+    if if_stmt.body.len() != 1 || !if_stmt.elif_else_clauses.is_empty() {
         return;
     }
 
     // The `if` test should be `element in set`.
-    let Some((check_element, check_set)) = match_check(if_stmt) else {
+    let Some((check_element, check_set)) = match_check(if_stmt.node) else {
         return;
     };
 
     // The `if` body should be `set.remove(element)`.
-    let Some((remove_element, remove_set)) = match_remove(if_stmt) else {
+    let Some((remove_element, remove_set)) = match_remove(if_stmt.node) else {
         return;
     };
 
@@ -118,12 +117,12 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: ast::StmtIf<
             element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
             set: check_set.id().to_string(),
         },
-        if_stmt.range(),
+        if_stmt.range,
     );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
         make_suggestion(check_set, check_element, checker.generator()),
-        if_stmt.start(),
-        if_stmt.end(),
+        if_stmt.range.start(),
+        if_stmt.range.end(),
     )));
 }
 

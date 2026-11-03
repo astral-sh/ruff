@@ -87,12 +87,12 @@ pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
 /// Apply RUF068 to `__all__.extend()`.
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
 ) {
-    let func = call.func();
+    let func = call.func;
     let (Some([value_passed]), true) = (
-        call.arguments().args().as_array(),
-        call.arguments().keywords().is_empty(),
+        call.arguments.args().as_array(),
+        call.arguments.keywords().is_empty(),
     ) else {
         return;
     };

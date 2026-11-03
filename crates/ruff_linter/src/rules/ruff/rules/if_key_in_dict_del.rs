@@ -49,19 +49,19 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: StmtIf<'_>) {
-    if !stmt.elif_else_clauses().is_empty() {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &ast::StmtIfFields<'_>) {
+    if !stmt.elif_else_clauses.is_empty() {
         return;
     }
 
-    let Some([body_stmt]) = stmt.body().as_array() else {
+    let Some([body_stmt]) = stmt.body.as_array() else {
         return;
     };
     let StmtKind::Delete(delete) = body_stmt.classify() else {
         return;
     };
 
-    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(stmt.test()) else {
+    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(stmt.test) else {
         return;
     };
     let Some((del_dict, del_key)) = extract_dict_and_key_from_del(delete.targets()) else {
@@ -76,7 +76,7 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: StmtIf<'_>) {
         return;
     }
 
-    let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
+    let fix = replace_with_dict_pop_fix(checker, stmt.node, test_dict, test_key);
 
     checker
         .report_diagnostic(IfKeyInDictDel, delete.range())

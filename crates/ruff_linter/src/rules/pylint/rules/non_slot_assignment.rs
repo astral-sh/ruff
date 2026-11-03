@@ -1,9 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Expr, ExprAttribute, ExprKind, ExprName, StmtClassDef, StmtKind, Suite,
-};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprKind, ExprName, StmtKind, Suite};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -64,19 +62,20 @@ impl Violation for NonSlotAssignment {
 }
 
 /// PLE0237
-pub(crate) fn non_slot_assignment(checker: &Checker, class_def: StmtClassDef<'_>) {
+pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassDefFields<'_>) {
     let semantic = checker.semantic();
 
     // If the class inherits from another class (aside from `object`), then it's possible that
     // the parent class defines the relevant `__slots__`.
     if !class_def
+        .node
         .bases()
         .all(|base| semantic.match_builtin_expr(base, "object"))
     {
         return;
     }
 
-    for attribute in is_attributes_not_in_slots(class_def.body()) {
+    for attribute in is_attributes_not_in_slots(class_def.body) {
         checker.report_diagnostic(
             NonSlotAssignment {
                 name: attribute.name.to_string(),

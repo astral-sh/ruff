@@ -46,14 +46,14 @@ impl Violation for SnmpInsecureVersion {
 /// S508
 pub(crate) fn snmp_insecure_version(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if matches!(
         qualified_name.segments(),
         ["pysnmp", "hlapi", .., "CommunityData"]
     ) {
-        if let Some(keyword) = call.arguments().find_keyword("mpModel") {
+        if let Some(keyword) = call.arguments.find_keyword("mpModel") {
             if matches!(
                 keyword.value().as_int_literal(),
                 Some(&Int::ZERO | &Int::ONE)

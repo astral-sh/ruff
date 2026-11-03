@@ -89,9 +89,9 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let mut duplicate_keywords = None;
-    for keyword in call.arguments().keywords() {
+    for keyword in call.arguments.keywords() {
         // keyword is a spread operator (indicated by None).
         if keyword.arg().is_some() {
             continue;
@@ -132,7 +132,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: ast::ExprCall<'_>
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     &keyword,
-                    call.arguments(),
+                    call.arguments,
                     Parentheses::Preserve,
                     checker.source(),
                     checker.tokens(),
@@ -142,7 +142,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: ast::ExprCall<'_>
         } else {
             // Compute the set of duplicate keywords (lazily).
             if duplicate_keywords.is_none() {
-                duplicate_keywords = Some(duplicates(call));
+                duplicate_keywords = Some(duplicates(call.node));
             }
 
             // Avoid fixing if doing so could introduce a duplicate keyword argument.

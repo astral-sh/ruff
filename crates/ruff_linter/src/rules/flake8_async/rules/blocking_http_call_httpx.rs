@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExprCall, ExprKind};
+use ruff_python_ast::{self as ast, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
@@ -105,14 +105,14 @@ impl TypeChecker for HttpxClientChecker {
 }
 
 /// ASYNC212
-pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn blocking_http_call_httpx(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
     let semantic = checker.semantic();
     if !semantic.in_async_context() {
         return;
     }
 
-    let Some(ast::ExprAttributeFields { value, attr, .. }) = call
-        .func()
+    let Some(ast::ExprAttributeFields { value, attr, .. }) = call_fields
+        .func
         .as_attribute_expr()
         .map(ruff_python_ast::ExprAttribute::fields)
     else {
@@ -145,7 +145,7 @@ pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: ExprCall<'_>) {
                     name: name.id().to_string(),
                     call: attr.id().to_string(),
                 },
-                call.func().range(),
+                call_fields.func.range(),
             );
         }
     }

@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, ExprSubscript};
 
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, SemanticModel};
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -60,25 +59,25 @@ impl Violation for SliceCopy {
 }
 
 /// FURB145
-pub(crate) fn slice_copy(checker: &Checker, subscript: ExprSubscript<'_>) {
-    if subscript.ctx().is_store() || subscript.ctx().is_del() {
+pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscriptFields<'_>) {
+    if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
 
-    let Some(name) = match_list_full_slice(subscript, checker.semantic()) else {
+    let Some(name) = match_list_full_slice(subscript.node, checker.semantic()) else {
         return;
     };
-    let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range);
     let replacement = generate_method_call(name.as_str(), "copy", checker.generator());
 
-    let applicability = if checker.comment_ranges().intersects(subscript.range()) {
+    let applicability = if checker.comment_ranges().intersects(subscript.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
 
     diagnostic.set_fix(Fix::applicable_edit(
-        Edit::replacement(replacement, subscript.start(), subscript.end()),
+        Edit::replacement(replacement, subscript.range.start(), subscript.range.end()),
         applicability,
     ));
 }

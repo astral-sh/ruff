@@ -96,34 +96,40 @@ impl Violation for AirflowTaskBranchAsShortCircuit {
 }
 
 /// AIR004 (decorator form)
-pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+pub(crate) fn task_branch_as_short_circuit(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    if !is_airflow_task_variant(function_def, checker.semantic(), "branch") {
+    if !is_airflow_task_variant(function_def.node, checker.semantic(), "branch") {
         return;
     }
 
-    if could_be_short_circuit(function_def) {
+    if could_be_short_circuit(function_def.node) {
         checker.report_diagnostic(
             AirflowTaskBranchAsShortCircuit {
                 kind: BranchKind::Decorator,
             },
-            function_def.range(),
+            function_def.range,
         );
     }
 }
 
 /// AIR004 (operator form)
-pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn branch_python_operator_as_short_circuit(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
     let semantic = checker.semantic();
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -146,7 +152,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: a
         return;
     }
 
-    let Some(keyword) = call.arguments().find_keyword("python_callable") else {
+    let Some(keyword) = call.arguments.find_keyword("python_callable") else {
         return;
     };
 
@@ -171,7 +177,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: a
             AirflowTaskBranchAsShortCircuit {
                 kind: BranchKind::Operator,
             },
-            call.func().range(),
+            call.func.range(),
         );
     }
 }

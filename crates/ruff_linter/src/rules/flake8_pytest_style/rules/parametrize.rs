@@ -1,3 +1,4 @@
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Builder, ExprFields, ExprKind, ExprListFields, ExprTupleFields, NodeList};
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -867,29 +868,33 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &Checker, call: ExprCall<'_>, qualified_name: &QualifiedName) {
+pub(crate) fn parametrize(
+    checker: &Checker,
+    call: &ExprCallFields<'_>,
+    qualified_name: &QualifiedName,
+) {
     if !matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"]) {
         return;
     }
 
     if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = call.arguments().find_argument_value("argnames", 0);
-        let values = call.arguments().find_argument_value("argvalues", 1);
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
 
         if let (Some(names), Some(values)) = (names, values) {
-            check_names(checker, call, names, values);
+            check_names(checker, call.node, names, values);
         }
     }
     if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = call.arguments().find_argument_value("argnames", 0);
-        let values = call.arguments().find_argument_value("argvalues", 1);
+        let names = call.arguments.find_argument_value("argnames", 0);
+        let values = call.arguments.find_argument_value("argvalues", 1);
 
         if let (Some(names), Some(values)) = (names, values) {
             check_values(checker, names, values);
         }
     }
     if checker.is_rule_enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = call.arguments().find_argument_value("argvalues", 1) {
+        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
             check_duplicates(checker, values);
         }
     }

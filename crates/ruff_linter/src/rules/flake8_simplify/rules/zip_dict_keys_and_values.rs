@@ -1,8 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, ExprKind, ExprName, Identifier};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, ExprName, Identifier};
 use ruff_python_semantic::analyze::typing::is_dict;
-use ruff_text_size::Ranged;
 
 use crate::codes::Category;
 use crate::fix::edits;
@@ -65,9 +64,9 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: ExprCall<'_>) {
-    let func = expr.func();
-    let arguments = expr.arguments();
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFields<'_>) {
+    let func = expr.func;
+    let arguments = expr.arguments;
     let args = arguments.args();
     let keywords = arguments.keywords();
     match keywords.slice(..) {
@@ -117,27 +116,27 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: ExprCall<'_>) {
 
     let expected = edits::pad(
         format!("{}.items()", checker.locator().slice(var1)),
-        expr.range(),
+        expr.range,
         checker.locator(),
     );
-    let actual = checker.locator().slice(expr);
+    let actual = checker.locator().slice(expr.node);
 
     let mut diagnostic = checker.report_diagnostic(
         ZipDictKeysAndValues {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
         },
-        expr.range(),
+        expr.range,
     );
 
-    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+    let applicability = if checker.comment_ranges().intersects(expr.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
 
     diagnostic.set_fix(Fix::applicable_edit(
-        Edit::range_replacement(expected, expr.range()),
+        Edit::range_replacement(expected, expr.range),
         applicability,
     ));
 }

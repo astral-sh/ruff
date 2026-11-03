@@ -97,13 +97,16 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+pub(crate) fn mutable_argument_default(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
     // Skip stub files
     if checker.source_type.is_stub() {
         return;
     }
 
-    for parameter in function_def.parameters().iter_non_variadic_params() {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
@@ -128,7 +131,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: ast::Stm
             let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if let Some(fix) = move_initialization(function_def, parameter, default, checker) {
+            if let Some(fix) = move_initialization(function_def.node, parameter, default, checker) {
                 diagnostic.set_fix(fix);
             }
         }

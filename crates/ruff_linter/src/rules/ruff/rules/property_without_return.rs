@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{Expr, ExprKind, Stmt, StmtFunctionDef, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
@@ -53,21 +54,21 @@ impl Violation for PropertyWithoutReturn {
 }
 
 /// RUF066
-pub(crate) fn property_without_return(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunctionDefFields<'_>) {
     let semantic = checker.semantic();
 
     if checker.source_type.is_stub() || semantic.in_protocol_or_abstract_method() {
         return;
     }
 
-    let decorator_list = function_def.decorator_list();
-    let body = function_def.body();
-    let name = function_def.name();
+    let decorator_list = function_def.decorator_list;
+    let body = function_def.body;
+    let name = function_def.name;
 
     let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
     if !visibility::is_property(decorator_list, extra_property_decorators, semantic)
         || visibility::is_overload(decorator_list, semantic)
-        || function_type::is_stub(function_def, semantic)
+        || function_type::is_stub(function_def.node, semantic)
     {
         return;
     }
@@ -82,7 +83,7 @@ pub(crate) fn property_without_return(checker: &Checker, function_def: StmtFunct
         PropertyWithoutReturn {
             name: name.to_string(),
         },
-        function_def.identifier(),
+        function_def.node.identifier(),
     );
 }
 

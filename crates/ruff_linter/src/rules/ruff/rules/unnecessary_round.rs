@@ -1,10 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, ExprKind, Number};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, Number};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -49,13 +48,13 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &Checker, call: ExprCall<'_>) {
-    if !checker.semantic().match_builtin_expr(call.func(), "round") {
+pub(crate) fn unnecessary_round(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func, "round") {
         return;
     }
 
     let Some((rounded, rounded_value, ndigits_value)) =
-        rounded_and_ndigits(call.arguments(), checker.semantic())
+        rounded_and_ndigits(call.arguments, checker.semantic())
     else {
         return;
     };
@@ -94,7 +93,7 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: ExprCall<'_>) {
         _ => return,
     };
 
-    if checker.comment_ranges().intersects(call.range()) {
+    if checker.comment_ranges().intersects(call.range) {
         applicability = Applicability::Unsafe;
     }
 
@@ -103,17 +102,17 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: ExprCall<'_>) {
         .current_expression_parent()
         .map_or_else(|| checker.semantic().current_statement().into(), Into::into);
     let content = unwrapped_call_argument(
-        call,
+        call.node,
         rounded,
         Some(parent),
         checker.tokens(),
         checker.source(),
     );
-    let edit = Edit::range_replacement(content, call.range());
+    let edit = Edit::range_replacement(content, call.range);
     let fix = Fix::applicable_edit(edit, applicability);
 
     checker
-        .report_diagnostic(UnnecessaryRound, call.range())
+        .report_diagnostic(UnnecessaryRound, call.range)
         .set_fix(fix);
 }
 

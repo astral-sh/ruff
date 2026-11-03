@@ -71,7 +71,8 @@ impl Violation for SuperCallWithParameters {
 }
 
 /// UP008
-pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn super_call_with_parameters(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let call = call_fields.node;
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(call, checker) {
@@ -94,7 +95,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let Some([first_arg, second_arg]) = call.arguments().args().as_array() else {
+    let Some([first_arg, second_arg]) = call_fields.arguments.args().as_array() else {
         return;
     };
 
@@ -248,13 +249,13 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) 
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(SuperCallWithParameters, call.arguments().range());
+        checker.report_diagnostic(SuperCallWithParameters, call_fields.arguments.range());
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
-    if call.arguments().keywords().is_empty() {
+    if call_fields.arguments.keywords().is_empty() {
         let applicability = if checker
             .comment_ranges()
-            .intersects(call.arguments().range())
+            .intersects(call_fields.arguments.range())
         {
             Applicability::Unsafe
         } else {
@@ -263,8 +264,8 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) 
 
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::deletion(
-                call.arguments().start() + TextSize::new(1),
-                call.arguments().end() - TextSize::new(1),
+                call_fields.arguments.start() + TextSize::new(1),
+                call_fields.arguments.end() - TextSize::new(1),
             ),
             applicability,
         ));

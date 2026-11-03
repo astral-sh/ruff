@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::StmtClassDefFields;
 use ruff_python_semantic::analyze;
 use ruff_text_size::Ranged;
 
@@ -67,9 +67,10 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 }
 
 /// FURB180
-pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: StmtClassDef<'_>) {
+pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def_fields: &StmtClassDefFields<'_>) {
+    let class_def = class_def_fields.node;
     // Determine whether the class definition contains at least one argument.
-    let Some(arguments) = class_def.arguments() else {
+    let Some(arguments) = class_def_fields.arguments else {
         return;
     };
 

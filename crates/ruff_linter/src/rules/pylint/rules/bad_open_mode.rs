@@ -52,12 +52,12 @@ impl Violation for BadOpenMode {
 }
 
 /// PLW1501
-pub(crate) fn bad_open_mode(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some(kind) = is_open(call.func(), checker.semantic()) else {
+pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some(kind) = is_open(call.func, checker.semantic()) else {
         return;
     };
 
-    let Some(mode) = extract_mode(call, kind) else {
+    let Some(mode) = extract_mode(call.node, kind) else {
         return;
     };
 

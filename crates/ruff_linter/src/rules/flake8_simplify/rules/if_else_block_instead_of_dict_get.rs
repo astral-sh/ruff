@@ -82,10 +82,14 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 }
 
 /// SIM401
-pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: ast::StmtIf<'_>) {
-    let test = stmt_if.test();
-    let body = stmt_if.body();
-    let elif_else_clauses = stmt_if.elif_else_clauses();
+pub(crate) fn if_else_block_instead_of_dict_get(
+    checker: &Checker,
+    stmt_if_fields: &ast::StmtIfFields<'_>,
+) {
+    let stmt_if = stmt_if_fields.node;
+    let test = stmt_if_fields.test;
+    let body = stmt_if_fields.body;
+    let elif_else_clauses = stmt_if_fields.elif_else_clauses;
 
     let Some([body_stmt]) = body.as_array() else {
         return;
@@ -195,7 +199,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: ast:
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
-        stmt_if.range(),
+        stmt_if_fields.range,
     );
     if !checker
         .comment_ranges()
@@ -203,7 +207,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: ast:
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
-            stmt_if.range(),
+            stmt_if_fields.range,
         )));
     }
 }

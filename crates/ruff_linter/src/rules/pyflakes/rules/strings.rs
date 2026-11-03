@@ -7,8 +7,8 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Identifier, NodeList};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier, NodeList};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -814,19 +814,14 @@ pub(crate) fn percent_format_star_requires_sequence(
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
-    call: ExprCall<'_>,
+    call_fields: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
     keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
-    let mut missing = Vec::new();
-    for (index, keyword) in call.arguments.keywords().enumerate() {
-        let Some(name) = &keyword.arg else {
-            // An unpacking may supply any of the format fields.
-            return;
-        };
-        if !summary.keywords.contains(name.id()) {
-            missing.push((index, name.id(), keyword.value.as_ref()));
-        }
+    let call = call_fields.node;
+    // If there are any **kwargs, abort.
+    if has_star_star_kwargs(&call.arguments) {
+        return;
     }
 
     let keyword_names = keywords.iter().filter_map(|keyword| {
@@ -856,7 +851,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let names: Vec<Name> = missing.iter().map(|(_, name, _)| (*name).clone()).collect();
     let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
-        call.range(),
+        call_fields.range,
     );
     diagnostic.try_set_fix(|| {
         let side_effects = missing.iter().any(|(_, _, value)| {
@@ -885,7 +880,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
-    call: ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
     args: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) {
@@ -921,14 +916,14 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 .map(ToString::to_string)
                 .collect::<Vec<String>>(),
         },
-        call.range(),
+        call.range,
     );
 
     if is_contiguous_from_end(&missing, args.len()) {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
-                call,
+                call.node,
                 checker.locator(),
                 checker.stylist(),
             )?;
@@ -948,7 +943,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
     args: NodeList<'_, ruff_python_ast::kind::Expr>,
     keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
@@ -991,17 +986,17 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range());
+        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range);
     }
 }
 
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
+        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range);
     }
 }

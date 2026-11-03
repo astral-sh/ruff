@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -66,17 +66,17 @@ impl Violation for OsPathSamefile {
 }
 
 /// PTH121
-pub(crate) fn os_path_samefile(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
+pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if segments != ["os", "path", "samefile"] {
         return;
     }
 
     let fix_enabled = is_fix_os_path_samefile_enabled(checker.settings())
-        && !has_unknown_keywords_or_starred_expr(call.arguments(), &["f1", "f2"]);
+        && !has_unknown_keywords_or_starred_expr(call.arguments, &["f1", "f2"]);
 
     check_os_pathlib_two_arg_calls(
         checker,
-        call,
+        call.node,
         "samefile",
         "f1",
         "f2",

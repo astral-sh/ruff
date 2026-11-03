@@ -106,9 +106,9 @@ fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: ast::ExprCall<'_>) {
-    let func = call.func();
-    let arguments = call.arguments();
+pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
     let args = arguments.args();
 
     // Require exactly two positional arguments.
@@ -164,7 +164,7 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: ast::ExprCall<'_>
             checker.semantic(),
         )?;
         let reference_edit =
-            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
+            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range);
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
 }

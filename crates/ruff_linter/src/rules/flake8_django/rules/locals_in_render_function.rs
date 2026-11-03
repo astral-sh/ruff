@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, ExprKind};
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -46,14 +47,14 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn locals_in_render_function(checker: &Checker, call: &ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func())
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["django", "shortcuts", "render"])
         })
@@ -61,7 +62,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: ExprCall<'_>) {
         return;
     }
 
-    if let Some(argument) = call.arguments().find_argument_value("context", 2) {
+    if let Some(argument) = call.arguments.find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
             checker.report_diagnostic(DjangoLocalsInRenderFunction, argument.range());
         }
