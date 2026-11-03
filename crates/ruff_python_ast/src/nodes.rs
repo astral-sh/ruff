@@ -21,6 +21,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
+use crate::token::{TokenKind, Tokens};
 use crate::{
     Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
     Stmt, TypeParam, int,
@@ -4034,6 +4035,17 @@ impl Identifier {
 
     pub fn is_valid(&self) -> bool {
         !self.id.is_empty()
+    }
+
+    /// Returns the source range of each component of a dotted import name. The parser normalizes
+    /// the stored name, so its spelling and the spacing around dots can differ from the source.
+    pub fn component_ranges(&self, tokens: &Tokens) -> impl Iterator<Item = TextRange> {
+        tokens
+            .in_range(self.range)
+            .iter()
+            // During error recovery the parser also accepts keywords as import components.
+            .filter(|token| token.kind() == TokenKind::Identifier || token.kind().is_keyword())
+            .map(Ranged::range)
     }
 }
 
