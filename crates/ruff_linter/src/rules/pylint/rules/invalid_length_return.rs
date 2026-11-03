@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{Expr, StmtFunctionDef, UnaryOp};
+use ruff_python_ast::{Expr, UnaryOp};
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -51,8 +52,12 @@ impl Violation for InvalidLengthReturnType {
 }
 
 /// PLE0303
-pub(crate) fn invalid_length_return(checker: &Checker, function_def: StmtFunctionDef<'_>) {
-    if function_def.name().as_str() != "__len__" {
+pub(crate) fn invalid_length_return(
+    checker: &Checker,
+    function_def_fields: &StmtFunctionDefFields<'_>,
+) {
+    let function_def = function_def_fields.node;
+    if function_def_fields.name.as_str() != "__len__" {
         return;
     }
 

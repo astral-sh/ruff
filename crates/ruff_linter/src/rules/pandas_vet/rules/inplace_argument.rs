@@ -58,14 +58,15 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub(crate) fn inplace_argument(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn inplace_argument(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let call = call_fields.node;
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
     // If the function doesn't take an `inplace` argument, abort.
-    if !call
-        .func()
+    if !call_fields
+        .func
         .as_attribute_expr()
         .is_some_and(|func| accepts_inplace_argument(func.attr().as_str()))
     {
@@ -73,7 +74,7 @@ pub(crate) fn inplace_argument(checker: &Checker, call: ast::ExprCall<'_>) {
     }
 
     let mut seen_star = false;
-    for keyword in call.arguments().keywords().iter().rev() {
+    for keyword in call_fields.arguments.keywords().iter().rev() {
         let Some(arg) = keyword.arg() else {
             seen_star = true;
             continue;

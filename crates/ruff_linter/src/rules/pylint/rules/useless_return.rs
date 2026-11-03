@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
-use ruff_python_ast::{Expr, StmtFunctionDef, StmtKind};
+use ruff_python_ast::{Expr, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,16 +53,17 @@ impl AlwaysFixableViolation for UselessReturn {
 /// PLR1711
 pub(crate) fn useless_return(
     checker: &Checker,
-    function: StmtFunctionDef<'_>,
+    function_fields: &StmtFunctionDefFields<'_>,
     returns: Option<Expr<'_>>,
 ) {
+    let function = function_fields.node;
     // Skip functions that have a return annotation that is not `None`.
     if !returns.is_none_or(ruff_python_ast::Expr::is_none_literal_expr) {
         return;
     }
 
     // Find the last statement in the function.
-    let body = function.body();
+    let body = function_fields.body;
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
         return;

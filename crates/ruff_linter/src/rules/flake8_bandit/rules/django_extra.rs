@@ -46,8 +46,8 @@ impl Violation for DjangoExtra {
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &Checker, call: ast::ExprCall<'_>) {
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -56,8 +56,8 @@ pub(crate) fn django_extra(checker: &Checker, call: ast::ExprCall<'_>) {
         return;
     }
 
-    if is_call_insecure(call) {
-        checker.report_diagnostic(DjangoExtra, call.arguments().range());
+    if is_call_insecure(call.node) {
+        checker.report_diagnostic(DjangoExtra, call.arguments.range());
     }
 }
 

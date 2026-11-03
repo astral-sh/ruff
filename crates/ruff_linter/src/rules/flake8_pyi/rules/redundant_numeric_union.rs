@@ -1,8 +1,9 @@
 use bitflags::bitflags;
 use ruff_python_ast::ExprKind;
+use ruff_python_ast::StmtFunctionDefFields;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyParameter, Expr, PythonVersion, StmtFunctionDef};
+use ruff_python_ast::{AnyParameter, Expr, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
@@ -83,12 +84,12 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: &StmtFunctionDefFields<'_>) {
     let skip_dispatch_annotation =
-        is_singledispatch_implementation(function_def, checker.semantic());
+        is_singledispatch_implementation(function_def.node, checker.semantic());
 
     for annotation in function_def
-        .parameters()
+        .parameters
         .iter()
         .filter_map(AnyParameter::annotation)
         .skip(usize::from(skip_dispatch_annotation))

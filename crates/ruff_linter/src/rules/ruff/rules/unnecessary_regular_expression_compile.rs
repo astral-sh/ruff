@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind};
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -53,18 +52,21 @@ impl Violation for UnnecessaryRegularExpressionCompile {
 }
 
 /// `unnecessary-regular-expression-compile`
-pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_regular_expression_compile(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
     let value = attribute.value();
-    let Some(re_func) = reducible_re_method(attr.as_str(), call.arguments()) else {
+    let Some(re_func) = reducible_re_method(attr.as_str(), call.arguments) else {
         return;
     };
 
@@ -75,10 +77,7 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: as
         return;
     }
 
-    checker.report_diagnostic(
-        UnnecessaryRegularExpressionCompile { re_func },
-        call.range(),
-    );
+    checker.report_diagnostic(UnnecessaryRegularExpressionCompile { re_func }, call.range);
 }
 
 /// If `pattern.<attr>(<arguments>)` is equivalent to a call to the top-level `re.<attr>(...)`,

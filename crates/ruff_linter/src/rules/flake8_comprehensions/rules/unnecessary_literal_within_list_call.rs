@@ -65,17 +65,21 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: ast::ExprCall<'_>) {
-    if !call.arguments().keywords().is_empty() {
+pub(crate) fn unnecessary_literal_within_list_call(
+    checker: &Checker,
+    call_fields: &ast::ExprCallFields<'_>,
+) {
+    let call = call_fields.node;
+    if !call_fields.arguments.keywords().is_empty() {
         return;
     }
-    if call.arguments().args().len() > 1 {
+    if call_fields.arguments.args().len() > 1 {
         return;
     }
     let Some(argument) = helpers::first_argument_with_matching_function(
         "list",
-        call.func(),
-        call.arguments().args(),
+        call_fields.func,
+        call_fields.arguments.args(),
     ) else {
         return;
     };
@@ -90,7 +94,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: ast:
         UnnecessaryLiteralWithinListCall {
             kind: argument_kind,
         },
-        call.range(),
+        call_fields.range,
     );
 
     // Convert `list([1, 2])` to `[1, 2]`

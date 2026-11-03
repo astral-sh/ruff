@@ -52,8 +52,11 @@ impl Violation for StopIterationReturn {
 }
 
 /// PLR1708
-pub(crate) fn stop_iteration_return(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
-    if !function_def.body_may_contain_yield() {
+pub(crate) fn stop_iteration_return(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
+    if !function_def.node.body_may_contain_yield() {
         return;
     }
 
@@ -63,7 +66,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: ast::StmtFu
         stop_iteration_raises: Vec::new(),
     };
 
-    analyzer.visit_body(function_def.body());
+    analyzer.visit_body(function_def.body);
 
     if analyzer.has_yield {
         for raise_stmt in analyzer.stop_iteration_raises {

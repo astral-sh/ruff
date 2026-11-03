@@ -48,16 +48,16 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
+pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtClassDefFields<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
-    if !is_model_form(class_def, checker.semantic()) {
+    if !is_model_form(class_def.node, checker.semantic()) {
         return;
     }
 
-    for element in class_def.body() {
+    for element in class_def.body {
         let StmtKind::ClassDef(class_def_node) = element.classify() else {
             continue;
         };

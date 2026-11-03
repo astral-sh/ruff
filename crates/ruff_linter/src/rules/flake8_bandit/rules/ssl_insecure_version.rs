@@ -53,7 +53,7 @@ impl Violation for SslInsecureVersion {
 /// S502
 pub(crate) fn ssl_insecure_version(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     let keyword = match qualified_name.segments() {
@@ -62,7 +62,7 @@ pub(crate) fn ssl_insecure_version(
         _ => return,
     };
 
-    let Some(keyword) = call.arguments().find_keyword(keyword) else {
+    let Some(keyword) = call.arguments.find_keyword(keyword) else {
         return;
     };
 

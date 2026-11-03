@@ -66,8 +66,8 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
 }
 
 /// C401 (`set(generator)`)
-pub(crate) fn unnecessary_generator_set(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
+pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call.node) else {
         return;
     };
     let ExprKind::Generator(generator_node) = argument.classify() else {
@@ -88,13 +88,12 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: ast::ExprCall<'
                     UnnecessaryGeneratorSet {
                         short_circuit: true,
                     },
-                    call.range(),
+                    call.range,
                 );
                 let iterator =
                     format!("set({})", checker.locator().slice(generator.iter().range()));
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    iterator,
-                    call.range(),
+                    iterator, call.range,
                 )));
                 return;
             }
@@ -106,30 +105,30 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: ast::ExprCall<'
         UnnecessaryGeneratorSet {
             short_circuit: false,
         },
-        call.range(),
+        call.range,
     );
     let fix = {
         // Replace `set(` with `}`.
         let call_start = Edit::replacement(
-            pad_start("{", call.range(), checker.locator(), checker.semantic()),
-            call.start(),
-            call.arguments().start() + TextSize::from(1),
+            pad_start("{", call.range, checker.locator(), checker.semantic()),
+            call.range.start(),
+            call.arguments.start() + TextSize::from(1),
         );
 
         // Replace `)` with `}`.
         // Place `}` at argument's end or at trailing comma if present
         let after_arg_tokens = checker
             .tokens()
-            .in_range(TextRange::new(argument.end(), call.end()));
+            .in_range(TextRange::new(argument.end(), call.range.end()));
         let right_brace_loc = after_arg_tokens
             .iter()
             .find(|token| token.kind() == TokenKind::Comma)
-            .map_or(call.arguments().end(), Ranged::end)
+            .map_or(call.arguments.end(), Ranged::end)
             - TextSize::from(1);
         let call_end = Edit::replacement(
-            pad_end("}", call.range(), checker.locator(), checker.semantic()),
+            pad_end("}", call.range, checker.locator(), checker.semantic()),
             right_brace_loc,
-            call.end(),
+            call.range.end(),
         );
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
@@ -137,7 +136,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: ast::ExprCall<'
         if parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range = parenthesized_range(argument, (call.arguments()).into(), checker.tokens())
+            let range = parenthesized_range(argument, (call.arguments).into(), checker.tokens())
                 .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.

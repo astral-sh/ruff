@@ -109,7 +109,7 @@ impl Violation for FastApiUnusedPathParameter {
 /// FAST003
 pub(crate) fn fastapi_unused_path_parameter(
     checker: &Checker,
-    function_def: ast::StmtFunctionDef<'_>,
+    function_def: &ast::StmtFunctionDefFields<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
@@ -117,7 +117,7 @@ pub(crate) fn fastapi_unused_path_parameter(
 
     // Get the route path from the decorator.
     let route_decorator = function_def
-        .decorator_list()
+        .decorator_list
         .iter()
         .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
 
@@ -142,7 +142,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     // Extract the arguments from the function signature
     let mut named_args = vec![];
 
-    for parameter_with_default in non_posonly_non_variadic_parameters(function_def) {
+    for parameter_with_default in non_posonly_non_variadic_parameters(function_def.node) {
         let parameter = parameter_with_default.parameter();
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
@@ -177,7 +177,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         // the path parameter injection won't work, but we also can't fix it (yet), since we'd need
         // to make the parameter non-positional-only.
         let is_positional = function_def
-            .parameters()
+            .parameters
             .posonlyargs()
             .iter()
             .any(|param| param.name() == path_param);
@@ -185,7 +185,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {
                 arg_name: path_param.to_string(),
-                function_name: function_def.name().to_string(),
+                function_name: function_def.name.to_string(),
                 is_positional,
             },
             #[expect(clippy::cast_possible_truncation)]
@@ -196,7 +196,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
             if let Some(edit) = add_parameter(
                 path_param,
-                function_def.parameters(),
+                function_def.parameters,
                 checker.locator().contents(),
             ) {
                 diagnostic.set_fix(Fix::unsafe_edit(edit));

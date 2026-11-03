@@ -116,11 +116,11 @@ impl PatchApi {
 }
 
 /// `shared-clock-mock`
-pub(crate) fn shared_clock_mock(checker: &Checker, call: ExprCall<'_>) {
-    let Some(api) = PatchApi::from_call(checker, call) else {
+pub(crate) fn shared_clock_mock(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some(api) = PatchApi::from_call(checker, call.node) else {
         return;
     };
-    let Some(target) = call.arguments().find_argument_value("target", 0) else {
+    let Some(target) = call.arguments.find_argument_value("target", 0) else {
         return;
     };
 
@@ -139,7 +139,7 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: ExprCall<'_>) {
                 _ => "attribute",
             };
             let Some(member) = call
-                .arguments()
+                .arguments
                 .find_argument_value(attribute, 1)
                 .and_then(ruff_python_ast::Expr::as_string_literal_expr)
             else {

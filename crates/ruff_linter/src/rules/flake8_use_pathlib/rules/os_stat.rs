@@ -2,7 +2,8 @@ use std::fmt;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, Arguments, ExprCall, ExprKind, PythonVersion};
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::{ArgOrKeyword, Arguments, ExprKind, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -108,7 +109,7 @@ impl fmt::Display for StatMethod {
 }
 
 // PTH116
-pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
+pub(crate) fn os_stat(checker: &Checker, call: &ExprCallFields<'_>, segment: &[&str]) {
     if segment != ["os", "stat"] {
         return;
     }
@@ -119,11 +120,11 @@ pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
     //           0         1           2
     // os.stat(path, *, dir_fd=None, follow_symlinks=True)
     // ```
-    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments, "dir_fd") {
         return;
     }
 
-    let Some(path_args) = call.arguments().find_argument_value("path", 0) else {
+    let Some(path_args) = call.arguments.find_argument_value("path", 0) else {
         return;
     };
 
@@ -134,24 +135,22 @@ pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
     let method = if checker.target_version() >= PythonVersion::PY310 {
         Some(StatMethod::Stat)
     } else {
-        match is_boolean_literal_or_default(call.arguments(), "follow_symlinks") {
+        match is_boolean_literal_or_default(call.arguments, "follow_symlinks") {
             Some(true) => Some(StatMethod::Stat),
             Some(false) => Some(StatMethod::LStat),
             None => None,
         }
     };
 
-    let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsStat { method }, call.func().range());
+    let range = call.range;
+    let mut diagnostic = checker.report_diagnostic(OsStat { method }, call.func.range());
 
     if !is_fix_os_stat_enabled(checker.settings()) {
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(
-        call.arguments(),
-        &["path", "dir_fd", "follow_symlinks"],
-    ) {
+    if has_unknown_keywords_or_starred_expr(call.arguments, &["path", "dir_fd", "follow_symlinks"])
+    {
         return;
     }
 
@@ -162,7 +161,7 @@ pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range.start(),
             checker.semantic(),
         )?;
 
@@ -184,8 +183,7 @@ pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
             _ => None,
         };
 
-        let stat_args =
-            itertools::join(call.arguments().iter_source_order().filter_map(args), ", ");
+        let stat_args = itertools::join(call.arguments.iter_source_order().filter_map(args), ", ");
 
         let replacement = if is_pathlib_path_call(checker, path_args) {
             format!("{path_code}.{method}({stat_args})")

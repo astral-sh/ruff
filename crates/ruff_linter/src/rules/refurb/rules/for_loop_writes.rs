@@ -96,15 +96,15 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) {
 }
 
 /// FURB122
-pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: StmtFor<'_>) {
+pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
     // Loops with bindings are handled later.
-    if !binding_names(for_stmt.target()).is_empty() {
+    if !binding_names(for_stmt.target).is_empty() {
         return;
     }
 
     let scope_id = checker.semantic().scope_id;
 
-    for_loop_writes(checker, for_stmt, scope_id, &[]);
+    for_loop_writes(checker, for_stmt.node, scope_id, &[]);
 }
 
 /// Find the names in a `for` loop target

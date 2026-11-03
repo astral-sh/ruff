@@ -84,19 +84,22 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 /// DJ012
-pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
+pub(crate) fn unordered_body_content_in_model(
+    checker: &Checker,
+    class_def: &ast::StmtClassDefFields<'_>,
+) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
-    if !helpers::is_model(class_def, checker.semantic()) {
+    if !helpers::is_model(class_def.node, checker.semantic()) {
         return;
     }
 
     // Track all the element types we've seen so far.
     let mut element_types = Vec::new();
     let mut prev_element_type = None;
-    for element in class_def.body() {
+    for element in class_def.body {
         let Some(element_type) = get_element_type(element, checker.semantic()) else {
             continue;
         };

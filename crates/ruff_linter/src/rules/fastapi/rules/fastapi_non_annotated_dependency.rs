@@ -106,10 +106,10 @@ impl Violation for FastApiNonAnnotatedDependency {
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &Checker,
-    function_def: ast::StmtFunctionDef<'_>,
+    function_def: &ast::StmtFunctionDefFields<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
-        || !is_fastapi_route(function_def, checker.semantic())
+        || !is_fastapi_route(function_def.node, checker.semantic())
     {
         return;
     }
@@ -119,10 +119,10 @@ pub(crate) fn fastapi_non_annotated_dependency(
     let mut seen_default = false;
 
     for parameter in function_def
-        .parameters()
+        .parameters
         .args()
         .iter()
-        .chain(function_def.parameters().kwonlyargs())
+        .chain(function_def.parameters.kwonlyargs())
     {
         let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
         else {

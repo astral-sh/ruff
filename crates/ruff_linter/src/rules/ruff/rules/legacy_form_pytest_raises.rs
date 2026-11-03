@@ -121,15 +121,18 @@ impl PytestContextType {
 }
 
 /// RUF061
-pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn legacy_raises_warns_deprecated_call(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     let semantic = checker.semantic();
-    let Some(context_type) = PytestContextType::from_expr_name(call.func(), semantic) else {
+    let Some(context_type) = PytestContextType::from_expr_name(call.func, semantic) else {
         return;
     };
 
     let (func_arg_name, func_arg_position) = context_type.func_arg();
     if call
-        .arguments()
+        .arguments
         .find_argument(func_arg_name, func_arg_position)
         .is_none()
     {
@@ -140,14 +143,14 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: ast::
         let items = with_node.items();
         if items
             .iter()
-            .any(|item| item.context_expr().as_call_expr() == Some(call))
+            .any(|item| item.context_expr().as_call_expr() == Some(call.node))
         {
             return;
         }
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(LegacyFormPytestRaises { context_type }, call.range());
+        checker.report_diagnostic(LegacyFormPytestRaises { context_type }, call.range);
 
     let stmt = semantic.current_statement();
     if has_leading_content(stmt.start(), checker.source())

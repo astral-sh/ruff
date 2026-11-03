@@ -52,7 +52,8 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_literal_set(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let call = call_fields.node;
     let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
         return;
     };
@@ -63,7 +64,8 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call.range());
+    let mut diagnostic =
+        checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call_fields.range);
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
@@ -75,9 +77,10 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>
 
         match elts {
             // If the list or tuple is empty, replace the entire call with `set()`.
-            args if args.is_empty() => {
-                Fix::unsafe_edit(Edit::range_replacement("set()".to_string(), call.range()))
-            }
+            args if args.is_empty() => Fix::unsafe_edit(Edit::range_replacement(
+                "set()".to_string(),
+                call_fields.range,
+            )),
             // If it's a single-element tuple (with no whitespace around it), remove the trailing
             // comma.
             args if let Some([elt]) = args.as_array() && argument.is_tuple_expr()
@@ -88,14 +91,24 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>
             {
                 // Replace from the start of the call to the start of the inner element.
                 let call_start = Edit::replacement(
-                    pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                    pad_start(
+                        "{",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     call.start(),
                     elt.start(),
                 );
 
                 // Replace from the end of the inner element to the end of the call with `}`.
                 let call_end = Edit::replacement(
-                    pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                    pad_end(
+                        "}",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     elt.end(),
                     call.end(),
                 );
@@ -105,14 +118,24 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>
             _ => {
                 // Replace from the start of the call to the start of the inner list or tuple with `{`.
                 let call_start = Edit::replacement(
-                    pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                    pad_start(
+                        "{",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     call.start(),
                     argument.start() + TextSize::from(1),
                 );
 
                 // Replace from the end of the inner list or tuple to the end of the call with `}`.
                 let call_end = Edit::replacement(
-                    pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                    pad_end(
+                        "}",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     argument.end() - TextSize::from(1),
                     call.end(),
                 );

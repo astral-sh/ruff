@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ArgOrKeyword;
 use ruff_python_ast::ExprBooleanLiteral;
-use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,7 +70,7 @@ impl Violation for BuiltinOpen {
 }
 
 // PTH123
-pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
+pub(crate) fn builtin_open(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if !matches!(segments, ["" | "builtins", "open"]) {
         return;
     }
@@ -94,23 +95,23 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
     // ```text
     // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
     // ```
-    let file_arg = call.arguments().find_argument_value("file", 0);
+    let file_arg = call.arguments.find_argument_value("file", 0);
 
     if call
-        .arguments()
+        .arguments
         .find_argument_value("closefd", 6)
         .is_some_and(|expr| {
             !expr
                 .as_boolean_literal_expr()
                 .is_some_and(ExprBooleanLiteral::value)
         })
-        || is_argument_non_default(call.arguments(), "opener", 7)
+        || is_argument_non_default(call.arguments, "opener", 7)
         || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
     {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func().range());
+    let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func.range());
 
     if !is_fix_builtin_open_enabled(checker.settings()) {
         return;
@@ -121,7 +122,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
     };
 
     if has_unknown_keywords_or_starred_expr(
-        call.arguments(),
+        call.arguments,
         &[
             "file",
             "mode",
@@ -139,7 +140,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range.start(),
             checker.semantic(),
         )?;
 
@@ -163,7 +164,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
         };
 
         let open_args = itertools::join(
-            call.arguments()
+            call.arguments
                 .iter_source_order()
                 .enumerate()
                 .filter_map(|(i, arg)| args(i, arg)),
@@ -176,7 +177,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
             format!("{binding}({file_code}).open({open_args})")
         };
 
-        let range = call.range();
+        let range = call.range;
 
         let applicability = if checker.comment_ranges().intersects(range) {
             Applicability::Unsafe

@@ -3,9 +3,8 @@ use rustc_hash::FxHashSet;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Stmt, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -47,14 +46,17 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
     }
 }
 /// SIM116
-pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: StmtIf<'_>) {
+pub(crate) fn if_else_block_instead_of_dict_lookup(
+    checker: &Checker,
+    stmt_if: &ast::StmtIfFields<'_>,
+) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
     // * The else clause must be empty, or a single `return`.
-    let body = stmt_if.body();
-    let test = stmt_if.test();
-    let elif_else_clauses = stmt_if.elif_else_clauses();
+    let body = stmt_if.body;
+    let test = stmt_if.test;
+    let elif_else_clauses = stmt_if.elif_else_clauses;
 
     let ExprKind::Compare(compare) = test.classify() else {
         return;
@@ -82,12 +84,12 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: S
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if is_sys_version_block(stmt_if, checker.semantic()) {
+    if is_sys_version_block(stmt_if.node, checker.semantic()) {
         return;
     }
 
     // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
-    if is_type_checking_block(stmt_if, checker.semantic()) {
+    if is_type_checking_block(stmt_if.node, checker.semantic()) {
         return;
     }
 
@@ -155,5 +157,5 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: S
         return;
     }
 
-    checker.report_diagnostic(IfElseBlockInsteadOfDictLookup, stmt_if.range());
+    checker.report_diagnostic(IfElseBlockInsteadOfDictLookup, stmt_if.range);
 }

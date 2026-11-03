@@ -63,13 +63,16 @@ impl Violation for FallibleContextManager {
 }
 
 /// RUF075
-pub(crate) fn fallible_context_manager(checker: &Checker, function_def: StmtFunctionDef<'_>) {
-    if !has_contextmanager_decorator(checker, function_def) {
+pub(crate) fn fallible_context_manager(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
+    if !has_contextmanager_decorator(checker, function_def.node) {
         return;
     }
 
     let mut visitor = YieldFinallyVisitor::new(checker);
-    visitor.visit_body_with_terminal(function_def.body(), true);
+    visitor.visit_body_with_terminal(function_def.body, true);
 }
 
 fn has_contextmanager_decorator(checker: &Checker, function_def: StmtFunctionDef<'_>) -> bool {

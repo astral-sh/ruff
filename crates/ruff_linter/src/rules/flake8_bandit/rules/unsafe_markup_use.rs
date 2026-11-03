@@ -1,9 +1,9 @@
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{Expr, ExprCall, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::codes::Category;
@@ -90,7 +90,7 @@ impl Violation for UnsafeMarkupUse {
 }
 
 /// S704
-pub(crate) fn unsafe_markup_call(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCallFields<'_>) {
     if checker
         .settings()
         .flake8_bandit
@@ -102,11 +102,11 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: ExprCall<'_>) {
         return;
     }
 
-    if !is_unsafe_call(call, checker.semantic(), checker.settings()) {
+    if !is_unsafe_call(call.node, checker.semantic(), checker.settings()) {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -118,7 +118,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: ExprCall<'_>) {
         UnsafeMarkupUse {
             name: qualified_name.to_string(),
         },
-        call.range(),
+        call.range,
     );
 }
 

@@ -157,13 +157,13 @@ fn key_in_dict(
 }
 
 /// SIM118 in a `for` loop.
-pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: ast::StmtFor<'_>) {
+pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
     key_in_dict(
         checker,
-        for_stmt.target(),
-        for_stmt.iter(),
+        for_stmt.target,
+        for_stmt.iter,
         CmpOp::In,
-        for_stmt.into(),
+        for_stmt.node.into(),
     );
 }
 

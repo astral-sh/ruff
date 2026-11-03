@@ -74,8 +74,9 @@ impl Violation for TooManyPositionalArguments {
 /// PLR0917
 pub(crate) fn too_many_positional_arguments(
     checker: &Checker,
-    function_def: ast::StmtFunctionDef<'_>,
+    function_def_fields: &ast::StmtFunctionDefFields<'_>,
 ) {
+    let function_def = function_def_fields.node;
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -83,11 +84,11 @@ pub(crate) fn too_many_positional_arguments(
     let semantic = checker.semantic();
 
     // Count the number of positional arguments.
-    let num_positional_args = function_def
-        .parameters()
+    let num_positional_args = function_def_fields
+        .parameters
         .posonlyargs()
         .iter()
-        .chain(function_def.parameters().args())
+        .chain(function_def_fields.parameters.args())
         .filter(|param| {
             !checker
                 .settings()
@@ -102,8 +103,8 @@ pub(crate) fn too_many_positional_arguments(
 
     // Allow excessive arguments in `@override` or `@overload` methods, since they're required
     // to adhere to the parent signature.
-    if visibility::is_override(function_def.decorator_list(), semantic)
-        || visibility::is_overload(function_def.decorator_list(), semantic)
+    if visibility::is_override(function_def_fields.decorator_list, semantic)
+        || visibility::is_overload(function_def_fields.decorator_list, semantic)
     {
         return;
     }
@@ -141,8 +142,8 @@ pub(crate) fn too_many_positional_arguments(
         function_def.identifier(),
     );
     if is_subject_to_liskov_substitution_principle(
-        function_def.name().as_str(),
-        function_def.decorator_list(),
+        function_def_fields.name.as_str(),
+        function_def_fields.decorator_list,
         semantic.current_scope(),
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,

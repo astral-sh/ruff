@@ -53,10 +53,10 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 /// RUF032: `Decimal()` called with float literal argument
 pub(crate) fn decimal_from_float_literal_syntax(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
-    let Some(arg) = call.arguments().args().first() else {
+    let Some(arg) = call.arguments.args().first() else {
         return;
     };
 

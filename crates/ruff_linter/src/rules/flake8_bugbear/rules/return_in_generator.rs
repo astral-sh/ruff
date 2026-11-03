@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{Expr, ExprKind, Stmt, StmtFunctionDef, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
@@ -93,22 +94,22 @@ impl Violation for ReturnInGenerator {
 }
 
 /// B901
-pub(crate) fn return_in_generator(checker: &Checker, function_def: StmtFunctionDef<'_>) {
-    if !function_def.body_may_contain_yield() {
+pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDefFields<'_>) {
+    if !function_def.node.body_may_contain_yield() {
         return;
     }
 
-    if function_def.name().id() == "__await__" {
+    if function_def.name.id() == "__await__" {
         return;
     }
 
     // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
-    if function_def.is_async() {
+    if function_def.is_async {
         return;
     }
 
     if function_def
-        .decorator_list()
+        .decorator_list
         .iter()
         .any(|decorator| is_pytest_hookimpl_wrapper(decorator, checker.semantic()))
     {
@@ -116,7 +117,7 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: StmtFunctionD
     }
 
     let mut visitor = ReturnInGeneratorVisitor::default();
-    visitor.visit_body(function_def.body());
+    visitor.visit_body(function_def.body);
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {

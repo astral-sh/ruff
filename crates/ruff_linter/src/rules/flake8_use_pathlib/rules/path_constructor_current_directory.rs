@@ -1,8 +1,9 @@
 use std::ops::Range;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{ExprCall, ExprKind, Operator};
+use ruff_python_ast::{ExprKind, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
 /// PTH201
 pub(crate) fn path_constructor_current_directory(
     checker: &Checker,
-    call: ExprCall<'_>,
+    call: &ExprCallFields<'_>,
     segments: &[&str],
 ) {
     let applicability = |range| {
@@ -69,7 +70,7 @@ pub(crate) fn path_constructor_current_directory(
         }
     };
 
-    let arguments = call.arguments();
+    let arguments = call.arguments;
 
     if !is_pure_path_subclass_with_preview(checker, segments) {
         return;
@@ -96,10 +97,10 @@ pub(crate) fn path_constructor_current_directory(
     match parent_and_next_path_fragment_range(checker.semantic(), checker.tokens()) {
         Some((parent_range, next_fragment_range)) => {
             let next_fragment_expr = checker.locator().slice(next_fragment_range);
-            let call_expr = checker.locator().slice(call.range());
+            let call_expr = checker.locator().slice(call.range);
 
             let relative_argument_range: Range<usize> = {
-                let range = arg.range() - call.start();
+                let range = arg.range() - call.range.start();
                 range.start().into()..range.end().into()
             };
 
@@ -118,7 +119,7 @@ pub(crate) fn path_constructor_current_directory(
                 checker.source(),
                 checker.tokens(),
             )?;
-            Ok(Fix::applicable_edit(edit, applicability(call.range())))
+            Ok(Fix::applicable_edit(edit, applicability(call.range)))
         }),
     }
 }

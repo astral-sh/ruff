@@ -73,15 +73,19 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+pub(crate) fn too_many_arguments(
+    checker: &Checker,
+    function_def_fields: &ast::StmtFunctionDefFields<'_>,
+) {
+    let function_def = function_def_fields.node;
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
     }
     let semantic = checker.semantic();
 
-    let num_arguments = function_def
-        .parameters()
+    let num_arguments = function_def_fields
+        .parameters
         .iter_non_variadic_params()
         .filter(|param| {
             !checker
@@ -97,8 +101,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: ast::StmtFunct
 
     // Allow excessive arguments in `@override` or `@overload` methods, since they're required
     // to adhere to the parent signature.
-    if visibility::is_override(function_def.decorator_list(), checker.semantic())
-        || visibility::is_overload(function_def.decorator_list(), checker.semantic())
+    if visibility::is_override(function_def_fields.decorator_list, checker.semantic())
+        || visibility::is_overload(function_def_fields.decorator_list, checker.semantic())
     {
         return;
     }
@@ -136,8 +140,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: ast::StmtFunct
         function_def.identifier(),
     );
     if is_subject_to_liskov_substitution_principle(
-        function_def.name().as_str(),
-        function_def.decorator_list(),
+        function_def_fields.name.as_str(),
+        function_def_fields.decorator_list,
         semantic.current_scope(),
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,

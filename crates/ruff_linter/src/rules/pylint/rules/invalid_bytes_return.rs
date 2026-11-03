@@ -46,8 +46,12 @@ impl Violation for InvalidBytesReturnType {
 }
 
 /// PLE0308
-pub(crate) fn invalid_bytes_return(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
-    if function_def.name().as_str() != "__bytes__" {
+pub(crate) fn invalid_bytes_return(
+    checker: &Checker,
+    function_def_fields: &ast::StmtFunctionDefFields<'_>,
+) {
+    let function_def = function_def_fields.node;
+    if function_def_fields.name.as_str() != "__bytes__" {
         return;
     }
 

@@ -111,11 +111,11 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: ExprIf<'_>)
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: StmtIf<'_>) {
+pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIfFields<'_>) {
     if checker.target_version() < PythonVersion::PY39 {
         return;
     }
-    if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {
+    if let Some(removal_data) = affix_removal_data_stmt(if_stmt.node) {
         if affix_matches_slice_bound(&removal_data, checker.semantic()) {
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
@@ -125,7 +125,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: StmtIf<'_>)
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,
                 },
-                if_stmt.range(),
+                if_stmt.range,
             );
 
             let replacement = generate_assignment_with_removeaffix(
@@ -134,14 +134,14 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: StmtIf<'_>)
                 checker.locator(),
             );
 
-            let applicability = if checker.comment_ranges().intersects(if_stmt.range()) {
+            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
 
             diagnostic.set_fix(Fix::applicable_edit(
-                Edit::replacement(replacement, if_stmt.start(), if_stmt.end()),
+                Edit::replacement(replacement, if_stmt.range.start(), if_stmt.range.end()),
                 applicability,
             ));
         }

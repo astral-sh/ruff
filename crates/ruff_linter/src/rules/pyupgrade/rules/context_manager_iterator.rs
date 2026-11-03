@@ -87,8 +87,11 @@ impl Violation for ContextManagerIterator {
 }
 
 /// UP052
-pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFunctionDef<'_>) {
-    let Some(decorator) = function.decorator_list().last() else {
+pub(crate) fn context_manager_iterator(
+    checker: &Checker,
+    function: &ast::StmtFunctionDefFields<'_>,
+) {
+    let Some(decorator) = function.decorator_list.last() else {
         return;
     };
     let Some(qualified_name) = checker
@@ -97,12 +100,12 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
     else {
         return;
     };
-    let (iterator, generator) = match (function.is_async(), qualified_name.segments()) {
+    let (iterator, generator) = match (function.is_async, qualified_name.segments()) {
         (false, ["contextlib", "contextmanager"]) => ("Iterator", "Generator"),
         (true, ["contextlib", "asynccontextmanager"]) => ("AsyncIterator", "AsyncGenerator"),
         _ => return,
     };
-    let Some(annotation) = function.returns() else {
+    let Some(annotation) = function.returns else {
         return;
     };
     let (expression, simple, tokens) =
@@ -140,7 +143,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
     };
 
     let mut visitor = GeneratorBody::default();
-    visitor.visit_body(function.body());
+    visitor.visit_body(function.body);
     if !visitor.has_yield {
         return;
     }
@@ -164,7 +167,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
             parenthesized_range(item, parent.into(), tokens).unwrap_or_else(|| item.range());
         let import = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from(module, generator),
-            function.start(),
+            function.range.start(),
             checker.semantic(),
         );
         // Reuse an existing import from the other module if it conflicts with
@@ -174,7 +177,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
             import.or_else(|_| {
                 checker.importer().get_or_import_symbol(
                     &ImportRequest::import_from("typing", generator),
-                    function.start(),
+                    function.range.start(),
                     checker.semantic(),
                 )
             })?
@@ -182,7 +185,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
             import.or_else(|_| {
                 checker.importer().get_or_import_symbol(
                     &ImportRequest::import_from("collections.abc", generator),
-                    function.start(),
+                    function.range.start(),
                     checker.semantic(),
                 )
             })?
@@ -192,7 +195,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
         let (object_edit, return_type) = if visitor.returns_value {
             checker.importer().get_or_import_builtin_symbol(
                 "object",
-                function.start(),
+                function.range.start(),
                 checker.semantic(),
             )?
         } else {
@@ -201,7 +204,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFun
         let arguments =
             if checker.target_version() >= PythonVersion::PY313 && !visitor.returns_value {
                 None
-            } else if function.is_async() {
+            } else if function.is_async {
                 Some(", None".to_string())
             } else {
                 Some(format!(", None, {return_type}"))

@@ -54,13 +54,16 @@ impl Violation for RedefinedSlotsInSubclass {
 }
 
 // PLW0244
-pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: StmtClassDef<'_>) {
+pub(crate) fn redefined_slots_in_subclass(
+    checker: &Checker,
+    class_def: &ast::StmtClassDefFields<'_>,
+) {
     // Early return if this is not a subclass
-    if class_def.bases().is_empty() {
+    if class_def.node.bases().is_empty() {
         return;
     }
 
-    let body = class_def.body();
+    let body = class_def.body;
     let class_slots = slots_members(body);
 
     // If there are no slots, we're safe
@@ -73,7 +76,7 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: StmtClas
         reason = "each slot is checked independently against the base classes"
     )]
     for slot in class_slots {
-        check_super_slots(checker, class_def, &slot);
+        check_super_slots(checker, class_def.node, &slot);
     }
 }
 

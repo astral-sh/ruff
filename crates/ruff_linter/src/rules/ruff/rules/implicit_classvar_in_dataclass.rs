@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtClassDefFields;
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{ExprKind, StmtClassDef, StmtKind};
+use ruff_python_ast::{ExprKind, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -68,14 +69,17 @@ impl Violation for ImplicitClassVarInDataclass {
 }
 
 /// RUF045
-pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: StmtClassDef<'_>) {
-    let dataclass_kind = dataclass_kind(class_def, checker.semantic());
+pub(crate) fn implicit_class_var_in_dataclass(
+    checker: &mut Checker,
+    class_def: &StmtClassDefFields<'_>,
+) {
+    let dataclass_kind = dataclass_kind(class_def.node, checker.semantic());
 
     if !matches!(dataclass_kind, Some((DataclassKind::Stdlib, _))) {
         return;
     }
 
-    for statement in class_def.body() {
+    for statement in class_def.body {
         let StmtKind::Assign(assign) = statement.classify() else {
             continue;
         };

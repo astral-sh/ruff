@@ -3,7 +3,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, BuildId, Builder, ExprKind, Stmt, build};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -99,10 +99,14 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: ast::StmtIf<'_>) {
-    let test = stmt_if.test();
-    let body = stmt_if.body();
-    let elif_else_clauses = stmt_if.elif_else_clauses();
+pub(crate) fn if_else_block_instead_of_if_exp(
+    checker: &Checker,
+    stmt_if_fields: &ast::StmtIfFields<'_>,
+) {
+    let stmt_if = stmt_if_fields.node;
+    let test = stmt_if_fields.test;
+    let body = stmt_if_fields.body;
+    let elif_else_clauses = stmt_if_fields.elif_else_clauses;
 
     // `test: None` to only match an `else` clause
     let Some([elif_else_clause]) = elif_else_clauses.as_array() else {
@@ -261,7 +265,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: ast::S
             contents: contents.clone(),
             kind: assignment_kind,
         },
-        stmt_if.range(),
+        stmt_if_fields.range,
     );
     if !checker
         .comment_ranges()
@@ -269,7 +273,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: ast::S
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
-            stmt_if.range(),
+            stmt_if_fields.range,
         )));
     }
 }

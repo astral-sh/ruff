@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_text_size::Ranged;
@@ -78,8 +79,8 @@ fn check_patch_call(checker: &Checker, call: ExprCall<'_>, index: usize) {
 }
 
 /// PT008
-pub(crate) fn patch_with_lambda(checker: &Checker, call: ExprCall<'_>) {
-    let Some(name) = UnqualifiedName::from_expr(call.func()) else {
+pub(crate) fn patch_with_lambda(checker: &Checker, call: &ExprCallFields<'_>) {
+    let Some(name) = UnqualifiedName::from_expr(call.func) else {
         return;
     };
 
@@ -95,7 +96,7 @@ pub(crate) fn patch_with_lambda(checker: &Checker, call: ExprCall<'_>) {
             "patch"
         ] | ["unittest", "mock", "patch"]
     ) {
-        check_patch_call(checker, call, 1);
+        check_patch_call(checker, call.node, 1);
     } else if matches!(
         name.segments(),
         [
@@ -109,6 +110,6 @@ pub(crate) fn patch_with_lambda(checker: &Checker, call: ExprCall<'_>) {
             "object"
         ] | ["unittest", "mock", "patch", "object"]
     ) {
-        check_patch_call(checker, call, 2);
+        check_patch_call(checker, call.node, 2);
     }
 }
