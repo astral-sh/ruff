@@ -566,9 +566,9 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "clearscreen"
-version = "4.0.6"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d669bb552908e336ad5681789752033b45566b7e591aeaac7a614e58e5d6d8f2"
+checksum = "6ebe9918b237e4e17e25a04d539d99ef3515417a85f703e0ed8bf44353eb17b3"
 dependencies = [
  "nix",
  "terminfo",
