@@ -225,7 +225,8 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
 
 /// Shared recursive references should reuse constructor bodies when aliases are unfolded.
 fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
-    for (aliases, references) in [(4, 3), (8, 3), (32, 3), (8, 8)] {
+    // Cover both sparse and dense references between specialized aliases.
+    for (aliases, references) in [(16, 3), (8, 8)] {
         let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
         for alias in 0..aliases {
             write!(code, "A{alias} = tuple[T").unwrap();
@@ -253,22 +254,21 @@ fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
 
 /// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
 fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
-    for aliases in [4, 8] {
-        let mut code = String::new();
-        for alias in 0..aliases {
-            write!(code, "A{alias} = tuple[int").unwrap();
-            for target in 0..aliases {
-                write!(code, ", 'A{target}'").unwrap();
-            }
-            writeln!(code, "]").unwrap();
+    let aliases = 8;
+    let mut code = String::new();
+    for alias in 0..aliases {
+        write!(code, "A{alias} = tuple[int").unwrap();
+        for target in 0..aliases {
+            write!(code, ", 'A{target}'").unwrap();
         }
-        // Only define aliases: using them would also measure recursive unfolding.
-        benchmark_micro_case(
-            criterion,
-            &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
-            &code,
-        );
+        writeln!(code, "]").unwrap();
     }
+    // Only define aliases: using them would also measure recursive unfolding.
+    benchmark_micro_case(
+        criterion,
+        &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
+        &code,
+    );
 }
 
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
