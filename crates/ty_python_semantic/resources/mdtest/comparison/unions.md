@@ -49,8 +49,7 @@ def _(
 
 ## Union on both sides of the comparison
 
-With unions on both sides, we need to consider the full cross product of options when building the
-resulting (union) type:
+With unions on both sides, the result type accounts for all possible pairs of values:
 
 ```py
 from typing import Literal
@@ -61,6 +60,27 @@ def _(small: Literal[1, 2], large: Literal[2, 3]):
 
     reveal_type(small < large)  # revealed: bool
     reveal_type(small > large)  # revealed: Literal[False]
+```
+
+## Equality of string literal unions
+
+Two values drawn from the same union can still differ. Disjoint unions can only compare unequal.
+
+```py
+from typing import Literal
+
+def _(
+    value: Literal["a", "b"],
+    same: Literal["a", "b"],
+    overlapping: Literal["b", "c"],
+    disjoint: Literal["c", "d"],
+):
+    reveal_type(value == same)  # revealed: bool
+    reveal_type(value != same)  # revealed: bool
+    reveal_type(value == overlapping)  # revealed: bool
+    reveal_type(value != overlapping)  # revealed: bool
+    reveal_type(value == disjoint)  # revealed: Literal[False]
+    reveal_type(value != disjoint)  # revealed: Literal[True]
 ```
 
 ## Unsupported operations

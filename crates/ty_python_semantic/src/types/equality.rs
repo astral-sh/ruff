@@ -15,10 +15,11 @@ use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers}
 use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    TypeVarBoundOrConstraints, UnionBuilder, UnionType,
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
+    set_theoretic::matching_string_literal_union_arms,
 };
 
 mod enums;
@@ -768,6 +769,25 @@ fn evaluate_structural_comparison<'db>(
             .evaluate(other, newtype.concrete_base_type(db), branch, operator)
             .discard_narrowing(),
 
+        // Truthiness evaluation can stop at the first disagreement, before inspecting both unions.
+        (Type::Union(_), Type::Union(_))
+            if evaluator.goal == ComparisonGoal::Constraint
+                && let Some(pairs) = matching_string_literal_union_arms(db, right, left) =>
+        {
+            let mut pairs = pairs.peekable();
+            if pairs.peek().is_none() {
+                operator.result_from_equality(false)
+            } else if operator.condition_expects_equality(branch) {
+                ComparisonResult::CanNarrow(UnionType::from_elements(
+                    db,
+                    env,
+                    pairs.map(|(_, left)| left),
+                ))
+            } else {
+                // Every left value can differ from at least one of the right values.
+                ComparisonResult::Ambiguous
+            }
+        }
         (Type::Union(union), other) => {
             evaluate_union_left(evaluator, union.elements(db), other, branch, operator)
         }

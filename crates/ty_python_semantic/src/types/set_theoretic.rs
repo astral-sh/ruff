@@ -1,6 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use std::convert::Infallible;
@@ -21,6 +21,51 @@ pub(crate) mod builder;
 mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+
+/// Match arms by their exact string values in the order of the right union.
+///
+/// Indexing the left union by value avoids the quadratic cross-product of the two unions' arms.
+/// Both operands must be unions with one arm per value and at least two distinct values.
+pub(super) fn matching_string_literal_union_arms<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<impl Iterator<Item = (Type<'db>, Type<'db>)> + 'db> {
+    let (left, right) = match (left, right) {
+        (Type::Union(left), Type::Union(right)) => (left, right),
+        // Resolve aliases only when both operands could be unions. Leave bare recursive binders
+        // to the caller's usual unfolding path.
+        (Type::TypeAlias(_), Type::Union(_) | Type::TypeAlias(_))
+        | (Type::Union(_), Type::TypeAlias(_)) => (
+            left.resolve_type_alias(db).as_union()?,
+            right.resolve_type_alias(db).as_union()?,
+        ),
+        _ => return None,
+    };
+    let right = right.elements(db);
+    let mut right_values = FxHashSet::default();
+    if right.len() < 2
+        || !right.iter().all(|ty| {
+            ty.as_string_literal()
+                .is_some_and(|value| right_values.insert(value))
+        })
+    {
+        return None;
+    }
+    let left = left.elements(db);
+    let by_value = left
+        .iter()
+        .map(|&ty| Some((ty.as_string_literal()?, ty)))
+        .collect::<Option<FxHashMap<_, _>>>()?;
+    if by_value.len() < 2 || by_value.len() != left.len() {
+        return None;
+    }
+
+    Some(right.iter().filter_map(move |&ty| {
+        let left = *by_value.get(&ty.as_string_literal()?)?;
+        Some((left, ty))
+    }))
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -1135,8 +1180,25 @@ impl<'db> IntersectionType<'db> {
         )]
         fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
             let env = ProgramEnvironment::from_program(types.program(db));
+            let left = types.first(db);
+            let right = types.second(db);
+            if let Some(pairs) = matching_string_literal_union_arms(db, left, right) {
+                // Only matching values survive distribution. Simplify those pairs as usual
+                // when the literal flags differ.
+                return UnionType::from_elements(
+                    db,
+                    &env,
+                    pairs.map(|(left, right)| {
+                        if left == right {
+                            left
+                        } else {
+                            IntersectionType::from_elements(db, &env, [left, right])
+                        }
+                    }),
+                );
+            }
             IntersectionBuilder::new(db, &env)
-                .positive_elements([types.first(db), types.second(db)])
+                .positive_elements([left, right])
                 .build()
         }
 

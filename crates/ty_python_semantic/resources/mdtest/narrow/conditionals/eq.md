@@ -1870,6 +1870,30 @@ def _(x: Literal[1, 2], y: Literal[2, 3]):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
+## Narrowing overlapping string literal unions
+
+Equality narrows each operand to the shared values. For inequality, each value on either side can
+differ from some value on the other side.
+
+```py
+from typing import Literal
+
+def _(left: Literal["a", "b", "c"], right: Literal["b", "c", "d"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal["b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c"]
+    else:
+        reveal_type(left)  # revealed: Literal["a", "b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c", "d"]
+
+    if left != right:
+        reveal_type(left)  # revealed: Literal["a", "b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c", "d"]
+    else:
+        reveal_type(left)  # revealed: Literal["b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c"]
+```
+
 ## `==` with PEP 695 alias to a union of literals
 
 ```toml
