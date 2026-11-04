@@ -15,12 +15,12 @@ use ty_python_semantic::PythonVersionWithSource;
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::LintRegistry;
 
+use crate::Db;
 use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
 use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
-use crate::{Db, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -130,13 +130,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     };
     let context = OptionsContext::Script(configuration_root);
 
-    let options = resolve_script_options(
-        project_metadata,
-        &metadata,
-        uv_metadata,
-        file,
-        &mut diagnostics,
-    );
+    let options = resolve_script_options(db, &metadata, uv_metadata, file, &mut diagnostics);
     let settings = use_inline_settings
         .then(|| resolve_script_settings(db, &options, context, &mut diagnostics))
         .map(Box::new);
@@ -223,17 +217,24 @@ fn parse_script_metadata(
 }
 
 fn resolve_script_options(
-    project_metadata: &ProjectMetadata,
+    db: &dyn Db,
     metadata: &ScriptMetadata,
     uv_metadata: Option<&UvMetadata>,
     file: File,
     diagnostics: &mut ScriptConfigurationDiagnostics,
 ) -> Options {
+    let project_metadata = db.project().metadata(db);
     // When using `--config-file <FILE>`, use the settings from `<FILE>`.
     let config = if project_metadata.config_file_override().is_some() {
         project_metadata.options().clone()
     } else {
         let mut config = metadata.to_options(file, diagnostics);
+        diagnostics.extend(
+            config
+                .lint_unmerged(db)
+                .into_iter()
+                .map(|diagnostic| diagnostic.to_diagnostic()),
+        );
         if metadata.ty().is_none()
             && let Some(mut environment) = project_metadata.options().environment.clone()
         {

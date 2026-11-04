@@ -516,7 +516,7 @@ impl Options {
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
         let mut diagnostics = Vec::new();
-        let rules = self.to_rule_selection(db, &mut diagnostics);
+        let rules = self.rules.or_default().to_rule_selection(db);
 
         let terminal_options = self.terminal.or_default();
         let terminal = TerminalSettings {
@@ -581,13 +581,24 @@ impl Options {
         Ok((settings, diagnostics))
     }
 
-    #[must_use]
-    fn to_rule_selection(
-        &self,
-        db: &dyn Db,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> RuleSelection {
-        self.rules.or_default().to_rule_selection(db, diagnostics)
+    /// Lint options from one source, such as `ty.toml`, `pyproject.toml`, CLI arguments, or editor settings.
+    ///
+    /// When resolving project settings, lint each source separately so unknown or renamed rules
+    /// are reported even if a higher-priority source overrides them. When resolving a script,
+    /// only its inline options need linting because the project already checked the shared sources.
+    ///
+    /// Checks that depend on the merged settings belong in [`Self::to_settings`].
+    pub(crate) fn lint_unmerged(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+        let mut diagnostics = Vec::new();
+        if let Some(rules) = &self.rules {
+            rules.lint(db, &mut diagnostics);
+        }
+        if let Some(overrides) = &self.overrides {
+            for section in &overrides.0 {
+                OverrideOptions::lint(db, section, &mut diagnostics);
+            }
+        }
+        diagnostics
     }
 
     fn to_overrides_settings(
@@ -1196,12 +1207,31 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 }
 
 impl Rules {
-    /// Convert the rules to a `RuleSelection` with diagnostics.
-    pub(crate) fn to_rule_selection(
-        &self,
-        db: &dyn Db,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> RuleSelection {
+    fn lint(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
+        let registry = db.lint_registry();
+        for name in self.inner.keys() {
+            if name.as_str() == "all" {
+                continue;
+            }
+            let diagnostic = match registry.get(name) {
+                Ok(lint) if lint.name().as_str() != name.as_str() => OptionDiagnostic::new(
+                    DiagnosticId::RenamedRule,
+                    format!("Rule `{name}` has been renamed to `{}`", lint.name()),
+                    Severity::Warning,
+                ),
+                Ok(_) => continue,
+                // TODO: Add a note if the value was configured on the CLI.
+                Err(error) => OptionDiagnostic::new(
+                    DiagnosticId::UnknownRule,
+                    error.to_string(),
+                    Severity::Warning,
+                ),
+            };
+            diagnostics.push(diagnostic.at(db, name, None));
+        }
+    }
+
+    pub(crate) fn to_rule_selection(&self, db: &dyn Db) -> RuleSelection {
         let registry = db.lint_registry();
 
         // Initialize the selection with the defaults
@@ -1230,36 +1260,9 @@ impl Rules {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
                 }
-                continue;
+            } else if let Ok(lint) = registry.get(rule_name) {
+                set_lint_level(lint);
             }
-
-            let diagnostic = match registry.get(rule_name) {
-                Ok(lint) => {
-                    set_lint_level(lint);
-                    if lint.name().as_str() == rule_name.as_str() {
-                        continue;
-                    }
-                    OptionDiagnostic::new(
-                        DiagnosticId::RenamedRule,
-                        format!("Rule `{rule_name}` has been renamed to `{}`", lint.name()),
-                        Severity::Warning,
-                    )
-                }
-                Err(error) => OptionDiagnostic::new(
-                    DiagnosticId::UnknownRule,
-                    error.to_string(),
-                    Severity::Warning,
-                ),
-            };
-
-            // The file may have been deleted since its configuration was read. In that
-            // case, report the diagnostic without a configuration-file annotation.
-            // TODO: Add a note if the value was configured on the CLI.
-            let annotation = source
-                .file(db)
-                .map(Span::from)
-                .map(|span| Annotation::primary(span.with_optional_range(rule_name.range())));
-            diagnostics.push(diagnostic.with_annotation(annotation));
         }
 
         selection
@@ -2080,38 +2083,19 @@ pub struct OverrideOptions {
     analysis: Option<AnalysisOptions>,
 }
 
-trait ToOverride {
-    fn to_override(
-        &self,
-        db: &dyn Db,
-        project_root: &SystemPath,
-        global_rules: Option<&Rules>,
-        global_analysis: Option<&AnalysisOptions>,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<Option<Override>, Box<OptionDiagnostic>>;
-}
-
-impl ToOverride for RangedValue<OverrideOptions> {
-    fn to_override(
-        &self,
-        db: &dyn Db,
-        project_root: &SystemPath,
-        global_rules: Option<&Rules>,
-        global_analysis: Option<&AnalysisOptions>,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
-        let rules = self.rules.or_default();
-        let analysis = self.analysis.or_default();
-
-        // First, warn about incorrect or useless overrides.
-        if rules.is_empty() && *analysis == AnalysisOptions::default() {
+impl OverrideOptions {
+    fn lint(db: &dyn Db, section: &RangedValue<Self>, diagnostics: &mut Vec<OptionDiagnostic>) {
+        if let Some(rules) = &section.rules {
+            rules.lint(db, diagnostics);
+        }
+        if section.is_empty() {
             let mut diagnostic = OptionDiagnostic::new(
                 DiagnosticId::UselessOverridesSection,
                 "Useless `overrides` section".to_string(),
                 Severity::Warning,
             );
 
-            diagnostic = if self.rules.is_none() && self.analysis.is_none() {
+            diagnostic = if section.rules.is_none() && section.analysis.is_none() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     "It has no `rules` or `analysis` table",
@@ -2121,7 +2105,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
                     "Add a `[overrides.rules]` or `[overrides.analysis]` table...",
                 ))
             } else {
-                if self.rules.is_some() && rules.is_empty() {
+                if section.rules.is_some() {
                     diagnostic = diagnostic.sub(SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         "The `rules` table is empty",
@@ -2132,7 +2116,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
                     ));
                 }
 
-                if self.analysis.is_some() && *analysis == AnalysisOptions::default() {
+                if section.analysis.is_some() {
                     diagnostic = diagnostic.sub(SubDiagnostic::new(
                         SubDiagnosticSeverity::Info,
                         "The `analysis` table is empty",
@@ -2147,21 +2131,16 @@ impl ToOverride for RangedValue<OverrideOptions> {
                 "or remove the `[[overrides]]` section if there's nothing to override",
             ));
 
-            // Add source annotation if we have source information
-            if let Some(file) = self.source().file(db) {
-                let annotation =
-                    Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                        .message("This overrides section overrides no settings");
-                diagnostic = diagnostic.with_annotation(Some(annotation));
-            }
-
-            diagnostics.push(diagnostic);
-            // Return `None`, because this override doesn't override anything
-            return Ok(None);
+            diagnostics.push(diagnostic.at(
+                db,
+                section,
+                Some("This overrides section overrides no settings"),
+            ));
+            return;
         }
 
-        let include_missing = self.include.is_none();
-        let exclude_empty = self
+        let include_missing = section.include.is_none();
+        let exclude_empty = section
             .exclude
             .as_ref()
             .is_none_or(|exclude| exclude.is_empty());
@@ -2174,7 +2153,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
                 Severity::Warning,
             );
 
-            diagnostic = if self.exclude.is_none() {
+            diagnostic = if section.exclude.is_none() {
                 diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     "It has no `include` or `exclude` option restricting the files",
@@ -2198,19 +2177,34 @@ impl ToOverride for RangedValue<OverrideOptions> {
                 if the configuration should apply to all files",
             ));
 
-            // Add source annotation if we have source information
-            if let Some(file) = self.source().file(db) {
-                let annotation =
-                    Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                        .message("This overrides section applies to all files");
-                diagnostic = diagnostic.with_annotation(Some(annotation));
-            }
+            diagnostics.push(diagnostic.at(
+                db,
+                section,
+                Some("This overrides section applies to all files"),
+            ));
+        }
+    }
 
-            diagnostics.push(diagnostic);
+    fn is_empty(&self) -> bool {
+        self.rules.as_ref().is_none_or(Rules::is_empty)
+            && self
+                .analysis
+                .as_ref()
+                .is_none_or(|analysis| *analysis == AnalysisOptions::default())
+    }
+
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>> {
+        if self.is_empty() {
+            return Ok(None);
         }
 
-        // The override is at least (partially) valid.
-        // Construct the matcher and resolve the settings.
         let include = build_include_filter(
             db,
             project_root,
@@ -2230,16 +2224,16 @@ impl ToOverride for RangedValue<OverrideOptions> {
         let files = IncludeExcludeFilter::new(include, exclude);
 
         // Merge global rules with override rules, with override rules taking precedence
-        let mut merged_rules = rules.into_owned();
+        let mut merged_rules = self.rules.clone().unwrap_or_default();
 
         if let Some(global_rules) = global_rules {
             merged_rules = merged_rules.combine(global_rules.clone());
         }
 
         // Convert merged rules to rule selection
-        let rule_selection = merged_rules.to_rule_selection(db, diagnostics);
+        let rule_selection = merged_rules.to_rule_selection(db);
 
-        let mut merged_analysis = analysis.into_owned();
+        let mut merged_analysis = self.analysis.clone().unwrap_or_default();
 
         if let Some(global_analysis) = global_analysis {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
@@ -2491,6 +2485,19 @@ impl OptionDiagnostic {
     #[must_use]
     fn with_annotation(self, annotation: Option<Annotation>) -> Self {
         OptionDiagnostic { annotation, ..self }
+    }
+
+    fn at<T>(self, db: &dyn Db, value: &RangedValue<T>, label: Option<&'static str>) -> Self {
+        let annotation = value.source().file(db).map(|file| {
+            let annotation =
+                Annotation::primary(Span::from(file).with_optional_range(value.range()));
+            if let Some(label) = label {
+                annotation.message(label)
+            } else {
+                annotation
+            }
+        });
+        self.with_annotation(annotation)
     }
 
     fn with_source_sub<T>(

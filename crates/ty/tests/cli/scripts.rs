@@ -115,6 +115,41 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
+fn shared_config_override_warns_once_across_scripts() -> anyhow::Result<()> {
+    let script = "
+        # /// script
+        # [tool.ty]
+        # ///
+    ";
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [[overrides]]
+            [overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        ("a.py", script),
+        ("b.py", script),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args([
+        "--config-file", "ty.toml", "--output-format", "concise", "a.py", "b.py"
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ty.toml:2:1: warning[unnecessary-overrides-section] Unnecessary `overrides` section: This overrides section applies to all files
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn renamed_rule_in_script_metadata() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",

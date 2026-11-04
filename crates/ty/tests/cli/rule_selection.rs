@@ -264,7 +264,8 @@ fn configuration_conflicting_rule_alias_levels() {
     ----- stdout -----
     warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
     test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
-    Found 2 diagnostics
+    ty.toml:3:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    Found 3 diagnostics
 
     ----- stderr -----
     "
@@ -386,11 +387,17 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
             r#"
             [tool.ty.rules]
             division-by-zer = "warn" # incorrect rule name
+
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "error"
             "#,
         ),
         ("test.py", "print(10)"),
     ])?;
 
+    // ty warns once about `division-by-zer`, even though the override inherits it.
     assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
@@ -405,6 +412,21 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    // The same typo written on the command line has its own diagnostic.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "division-by-zer", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    pyproject.toml:3:1: warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
 
     Ok(())
 }
