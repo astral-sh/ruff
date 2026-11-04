@@ -21,6 +21,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::preview::{
     is_hug_parens_with_braces_and_square_brackets_enabled,
+    is_remove_redundant_generator_parentheses_enabled,
     is_remove_redundant_list_parentheses_enabled,
 };
 
@@ -121,9 +122,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Parentheses::Never => false,
         };
 
-        // Lists already delimit their contents. Keep an outer pair only when it
-        // carries comments that would otherwise move into or out of the list.
-        if parenthesize && can_omit_redundant_list_parentheses(expression, f.context()) {
+        // These expressions already delimit their contents. Keep an outer pair
+        // when it carries comments that would otherwise move across those delimiters.
+        if parenthesize && can_omit_redundant_parentheses(expression, f.context()) {
             parenthesize = false;
         }
 
@@ -154,9 +155,14 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     }
 }
 
-fn can_omit_redundant_list_parentheses(expression: &Expr, context: &PyFormatContext) -> bool {
-    is_remove_redundant_list_parentheses_enabled(context)
-        && matches!(expression, Expr::List(_) | Expr::ListComp(_))
+fn can_omit_redundant_parentheses(expression: &Expr, context: &PyFormatContext) -> bool {
+    let enabled = match expression {
+        Expr::List(_) | Expr::ListComp(_) => is_remove_redundant_list_parentheses_enabled(context),
+        Expr::Generator(_) => is_remove_redundant_generator_parentheses_enabled(context),
+        _ => false,
+    };
+
+    enabled
         && !context.comments().has_leading(expression)
         && !context.comments().has_trailing(expression)
 }
@@ -1188,7 +1194,7 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
     if context.is_expression_parenthesized(expr.into())
-        && !can_omit_redundant_list_parentheses(expr, context)
+        && !can_omit_redundant_parentheses(expr, context)
     {
         return Some(OwnParentheses::NonEmpty);
     }

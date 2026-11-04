@@ -27,3 +27,10 @@ pub(crate) const fn is_remove_redundant_list_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses around generator expressions.
+pub(crate) const fn is_remove_redundant_generator_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

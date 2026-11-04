@@ -506,6 +506,8 @@ The next style includes these changes in preview:
 
 - Remove redundant parentheses around list displays and list comprehensions, such as
     `call(([1, 2]))` becoming `call([1, 2])`. Parentheses that carry comments are retained.
+- Remove redundant parentheses around generator expressions, including a generator used as the
+    sole argument of a call. Comments and magic trailing commas can require parentheses.
 
 ### F-string formatting
 
