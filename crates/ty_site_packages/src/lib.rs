@@ -119,9 +119,7 @@ impl SitePackagesPaths {
     /// Tries to detect the version from the layout of the `site-packages` directory.
     pub fn python_version_from_layout(&self) -> Option<PythonVersionWithSource> {
         if cfg!(windows) {
-            // The path to `site-packages` on Unix is
-            // `<sys.prefix>/lib/pythonX.Y/site-packages`,
-            // but on Windows it's `<sys.prefix>/Lib/site-packages`.
+            // Windows `site-packages` paths don't contain the Python version.
             return None;
         }
 
@@ -418,6 +416,10 @@ impl PythonEnvironment {
         matches!(self, Self::Virtual(_))
     }
 }
+
+// On Windows, conda-forge's Python 3.15+ searches `lib\python\site-packages`
+// before the standard `Lib\site-packages`.
+const WINDOWS_LIB_DIRS: [&str; 2] = [r"lib\python", "Lib"];
 
 /// Enumeration of the subdirectories of `sys.prefix` that could contain a
 /// `site-packages` directory if the host system is Unix-like.
@@ -1642,17 +1644,21 @@ fn site_packages_directories_from_sys_prefix(
         sys_prefix_path.inner
     );
 
-    if cfg!(target_os = "windows") {
-        let site_packages = sys_prefix_path.join(r"Lib\site-packages");
-        return system
-            .is_directory(&site_packages)
-            .then(|| SitePackagesPaths::from([site_packages]))
-            .ok_or_else(|| {
-                SitePackagesDiscoveryError::NoSitePackagesDirFound(
-                    sys_prefix_path.to_owned(),
-                    system.dyn_clone(),
-                )
-            });
+    let mut directories = SitePackagesPaths::default();
+    if cfg!(windows) {
+        for lib_dir in WINDOWS_LIB_DIRS {
+            let path = sys_prefix_path.join(lib_dir).join("site-packages");
+            if system.is_directory(&path) {
+                directories.insert_with_settings_diagnostic_path(path, None);
+            }
+        }
+        if directories.is_empty() {
+            return Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
+                sys_prefix_path.to_owned(),
+                system.dyn_clone(),
+            ));
+        }
+        return Ok(directories);
     }
 
     // In the Python standard library's `site.py` module (used for finding `site-packages`
@@ -1680,7 +1686,6 @@ fn site_packages_directories_from_sys_prefix(
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
     // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
 
-    let mut directories = SitePackagesPaths::default();
     let is_debian_system_prefix = sys_prefix_path.as_str() == "/usr";
     let settings_diagnostic_path =
         settings_diagnostic_path_from_sys_prefix(sys_prefix_path, system);
@@ -1791,11 +1796,14 @@ fn real_stdlib_directory_from_sys_prefix(
         sys_prefix_path.inner
     );
 
-    if cfg!(target_os = "windows") {
-        let stdlib = sys_prefix_path.join("Lib");
-        return system.is_directory(&stdlib).then_some(stdlib).ok_or(
-            StdlibDiscoveryError::NoStdlibFound(sys_prefix_path.to_owned(), system.dyn_clone()),
-        );
+    if cfg!(windows) {
+        return WINDOWS_LIB_DIRS
+            .into_iter()
+            .map(|lib_dir| sys_prefix_path.join(lib_dir))
+            .find(|path| system.is_directory(path))
+            .ok_or_else(|| {
+                StdlibDiscoveryError::NoStdlibFound(sys_prefix_path.to_owned(), system.dyn_clone())
+            });
     }
 
     // If we were able to figure out what Python version this installation is,
@@ -2976,8 +2984,7 @@ mod tests {
                 Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(..))
             );
         } else {
-            // On Windows, we look for `Lib/site-packages` directly instead of listing the entries
-            // of `lib/...` — so we don't see the intermediate failure
+            // Windows probes each package directory directly.
             assert_matches!(
                 site_packages,
                 Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(..))
@@ -3007,6 +3014,33 @@ mod tests {
             site_packages,
             Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(..))
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn conda_forge_windows_layout() -> Result<(), Box<dyn std::error::Error>> {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/conda");
+        let stdlib = prefix.join(r"lib\python");
+        let packages = stdlib.join("site-packages");
+        let legacy_packages = prefix.join(r"Lib\site-packages");
+
+        let fs = system.memory_file_system();
+        fs.create_directory_all(&packages)?;
+        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        let env = PythonEnvironment::discover(None, &system)?.expect("CONDA_PREFIX is set");
+        assert_eq!(
+            env.site_packages_paths(&system)?,
+            std::slice::from_ref(&packages)
+        );
+
+        fs.create_directory_all(&legacy_packages)?;
+        assert_eq!(
+            env.site_packages_paths(&system)?,
+            [packages, legacy_packages].as_slice()
+        );
+        assert_eq!(env.real_stdlib_path(&system)?, stdlib);
+        Ok(())
     }
 
     #[test]
