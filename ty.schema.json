@@ -1498,7 +1498,7 @@
         },
         "renamed-rule-in-ignore-comment": {
           "title": "detects ignore comments that use a rule's old name",
-          "description": "## What it does\n\nChecks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.\n\n## Why is this bad?\n\nThe old name still suppresses the rule. Using the current name makes it easier to find the rule in\ndiagnostics and documentation. The automatic fix replaces just the rule name. If the comment already\nincludes the current name, remove the old name from the list.\n\n## Examples\n\n```py\n# error\nimport missing_module  # ty: ignore[unresolved-import]\n```\n\nUse instead:\n\n```py\nimport missing_module  # ty: ignore[import-not-found]\n```",
+          "description": "## What it does\n\nChecks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.\n\n## Why is this bad?\n\nWhen ty renames a rule, the old name still works in ignore comments. Prefer the current name to keep\nignore comments consistent across your codebase.\n\n## Examples\n\n```py\n# error\nimport missing_module  # ty: ignore[unresolved-import]\n```\n\nThe automatic fix changes only the rule name.\n\n```py\nimport missing_module  # ty: ignore[import-not-found]\n```\n\nIf the comment already lists both names, remove the old name manually.",
           "default": "warn",
           "oneOf": [
             {

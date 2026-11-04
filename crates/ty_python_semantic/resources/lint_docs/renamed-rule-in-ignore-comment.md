@@ -4,9 +4,8 @@ Checks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.
 
 ## Why is this bad?
 
-The old name still suppresses the rule. Using the current name makes it easier to find the rule in
-diagnostics and documentation. The automatic fix replaces just the rule name. If the comment already
-includes the current name, remove the old name from the list.
+When ty renames a rule, the old name still works in ignore comments. Prefer the current name to keep
+ignore comments consistent across your codebase.
 
 ## Examples
 
@@ -15,8 +14,10 @@ includes the current name, remove the old name from the list.
 import missing_module  # ty: ignore[unresolved-import]
 ```
 
-Use instead:
+The automatic fix changes only the rule name.
 
 ```py
 import missing_module  # ty: ignore[import-not-found]
 ```
+
+If the comment already lists both names, remove the old name manually.
