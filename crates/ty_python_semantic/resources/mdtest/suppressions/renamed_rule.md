@@ -1,7 +1,8 @@
 # Renamed rules in ignore comments
 
-The mdtest registry defines `old-rule-name` as an alias for `new-rule-name`. The rule never emits a
-diagnostic, so these examples disable warnings about unused ignore comments.
+For purposes of testing the `renamed-rule-in-ignore-comment` lint rule,
+the mdtest registry defines `old-rule-name` as an alias for `new-rule-name`. These dummy rules do not
+actually emit a diagnostic, so we ignore unused ignore comments in this test suite.
 
 ```toml
 [rules]
