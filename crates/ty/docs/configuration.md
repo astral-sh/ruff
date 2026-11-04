@@ -37,8 +37,6 @@ Configures the enabled rules and their severity.
 The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
-If the same table specifies both a rule's current name and an alias, the current name takes precedence.
-
 Valid severities are:
 
 * `ignore`: Disable the rule.
@@ -47,6 +45,8 @@ Valid severities are:
 
 By default, ty exits with code 1 if it emits any warning or error diagnostics.
 Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
+
+If the same table specifies both a rule's current name and an alias, the current name takes precedence.
 
 **Default value**: `{...}`
 

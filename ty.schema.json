@@ -47,7 +47,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
