@@ -14,6 +14,7 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::binary_like::can_omit_comparison_operand_parentheses;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, optional_parentheses,
     parenthesized,
@@ -636,10 +637,17 @@ pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatConte
         // ```
         true
     } else {
-        fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
+        fn is_parenthesized(
+            (expr, omit_parentheses): (&Expr, bool),
+            context: &PyFormatContext,
+        ) -> bool {
+            let parentheses = if omit_parentheses {
+                has_own_parentheses(expr, context)
+            } else {
+                has_parentheses(expr, context)
+            };
             // Don't break subscripts except in parenthesized context. It looks weird.
-            !expr.is_subscript_expr()
-                && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
+            !expr.is_subscript_expr() && parentheses.is_some_and(OwnParentheses::is_non_empty)
         }
 
         // Only use the layout if the first expression starts with parentheses
@@ -660,7 +668,8 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: u32,
     any_parenthesized_expressions: bool,
-    last: Option<&'input Expr>,
+    /// The expression and whether its redundant source parentheses are omitted.
+    last: Option<(&'input Expr, bool)>,
     first: First<'input>,
     context: &'input PyFormatContext<'input>,
 }
@@ -755,12 +764,19 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 range: _,
                 node_index: _,
                 ops,
-                operands: _,
+                operands,
             }) => {
                 self.update_max_precedence_with_count(
                     OperatorPrecedence::Comparator,
                     ops.len() as u32,
                 );
+                for operand in operands {
+                    self.visit_expression(
+                        operand,
+                        can_omit_comparison_operand_parentheses(operand, self.context),
+                    );
+                }
+                return;
             }
             Expr::Call(ast::ExprCall {
                 range_start: _,
@@ -771,14 +787,14 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized
                 self.visit_expr(func);
-                self.last = Some(expr);
+                self.last = Some((expr, false));
                 return;
             }
             Expr::Subscript(ast::ExprSubscript { value, .. }) => {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the subscript is always parenthesized
                 self.visit_expr(value);
-                self.last = Some(expr);
+                self.last = Some((expr, false));
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
@@ -795,7 +811,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 if has_parentheses(value, self.context).is_some() {
                     self.update_max_precedence(OperatorPrecedence::Attribute);
                 }
-                self.last = Some(expr);
+                self.last = Some((expr, false));
                 return;
             }
 
@@ -843,20 +859,30 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
         walk_expr(self, expr);
     }
-}
 
-impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
-    fn visit_expr(&mut self, expr: &'input Expr) {
-        self.last = Some(expr);
+    fn visit_expression(&mut self, expr: &'input Expr, omit_parentheses: bool) {
+        self.last = Some((expr, omit_parentheses));
 
         // Rule only applies for non-parenthesized expressions.
-        if self.context.is_expression_parenthesized(expr.into()) {
+        if !omit_parentheses && self.context.is_expression_parenthesized(expr.into()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
         }
 
-        self.first.set_if_none(First::Expression(expr));
+        // Calls and attributes update `last` while visiting their children.
+        // Retain the normalized parentheses for the enclosing operand itself.
+        if self.last.is_some_and(|(last, _)| std::ptr::eq(last, expr)) {
+            self.last = Some((expr, omit_parentheses));
+        }
+        self.first
+            .set_if_none(First::Expression(expr, omit_parentheses));
+    }
+}
+
+impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
+    fn visit_expr(&mut self, expr: &'input Expr) {
+        self.visit_expression(expr, false);
     }
 }
 
@@ -867,7 +893,8 @@ enum First<'a> {
     /// Expression starts with a non-parentheses token. E.g. `not a`
     Token,
 
-    Expression(&'a Expr),
+    /// The expression and whether its redundant source parentheses are omitted.
+    Expression(&'a Expr, bool),
 }
 
 impl<'a> First<'a> {
@@ -878,10 +905,10 @@ impl<'a> First<'a> {
         }
     }
 
-    fn expression(self) -> Option<&'a Expr> {
+    fn expression(self) -> Option<(&'a Expr, bool)> {
         match self {
             First::None | First::Token => None,
-            First::Expression(expr) => Some(expr),
+            First::Expression(expr, omit_parentheses) => Some((expr, omit_parentheses)),
         }
     }
 }

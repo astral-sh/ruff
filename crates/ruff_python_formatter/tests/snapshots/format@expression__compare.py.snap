@@ -129,6 +129,19 @@ c = (
     # 6
 )
 
+# Normalize operands before choosing line breaks, including nested comparisons.
+assert (
+    (call_with_a_long_name(first_argument, second_argument, third_argument))
+    == (expected_result_with_a_long_name)
+    and (other.attribute) != (None)
+)
+assert ((a + b)) == ((c - d))
+assert (not a) == b
+assert (a < b) == (c < d)
+assert (value := compute()) == (expected)
+assert ("first part of a long implicitly concatenated string "
+        "second part of a long implicitly concatenated string") == (expected)
+
 # Implicit strings and comments
 
 assert (
@@ -358,6 +371,19 @@ c = (
     # 6
 )
 
+# Normalize operands before choosing line breaks, including nested comparisons.
+assert (call_with_a_long_name(first_argument, second_argument, third_argument)) == (
+    expected_result_with_a_long_name
+) and (other.attribute) != (None)
+assert (a + b) == (c - d)
+assert (not a) == b
+assert (a < b) == (c < d)
+assert (value := compute()) == (expected)
+assert (
+    "first part of a long implicitly concatenated string "
+    "second part of a long implicitly concatenated string"
+) == (expected)
+
 # Implicit strings and comments
 
 assert (
@@ -468,4 +494,70 @@ c = (
  )
  
  [
+@@ -120,9 +117,9 @@
+     obj=rel_obj, using=instance._state.db
+ ).id
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
+-    obj=rel_obj, using=instance._state.db
+-).id
++ct_match = (
++    aaaaaaaaaaaaaaaa == self.get_content_type(obj=rel_obj, using=instance._state.db).id
++)
+ 
+ ct_match = aaaaaaaaaaact_id == self.get_content_type(
+     obj=rel_obj, using=instance._state.db
+@@ -138,9 +135,9 @@
+     obj=rel_obj, using=instance._state.db
+ )[id]
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
+-    obj=rel_obj, using=instance._state.db
+-)[id]
++ct_match = (
++    aaaaaaaaaaaaaaaa == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
++)
+ 
+ # Subscripts expressions with trailing attributes.
+ 
+@@ -153,9 +150,10 @@
+     obj, rel_obj, using, instance._state.db
+ ].id
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type[
+-    obj, rel_obj, using, instance._state.db
+-].id
++ct_match = (
++    aaaaaaaaaaaaaaaa
++    == self.get_content_type[obj, rel_obj, using, instance._state.db].id
++)
+ 
+ # comments
+ 
+@@ -169,17 +167,19 @@
+ )
+ 
+ # Normalize operands before choosing line breaks, including nested comparisons.
+-assert (call_with_a_long_name(first_argument, second_argument, third_argument)) == (
+-    expected_result_with_a_long_name
+-) and (other.attribute) != (None)
++assert (
++    call_with_a_long_name(first_argument, second_argument, third_argument)
++    == expected_result_with_a_long_name
++    and other.attribute != None
++)
+ assert (a + b) == (c - d)
+ assert (not a) == b
+ assert (a < b) == (c < d)
+-assert (value := compute()) == (expected)
++assert (value := compute()) == expected
+ assert (
+     "first part of a long implicitly concatenated string "
+-    "second part of a long implicitly concatenated string"
+-) == (expected)
++    "second part of a long implicitly concatenated string" == expected
++)
+ 
+ # Implicit strings and comments
+ 
 ```

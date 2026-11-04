@@ -516,6 +516,8 @@ The next style includes these changes in preview:
     `data[1, 2]`, while retaining nested tuple indices and version-sensitive unpacking syntax.
 - Remove redundant parentheses in unpacking targets, while retaining nested tuple structure
     and parentheses that affect annotated assignments.
+- Remove redundant parentheses around simple comparison operands, while retaining grouping
+    for arithmetic, Boolean expressions, nested comparisons, and comments.
 
 ### F-string formatting
 

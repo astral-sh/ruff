@@ -65,3 +65,10 @@ pub(crate) const fn is_remove_redundant_unpacking_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses around simple comparison operands.
+pub(crate) const fn is_remove_redundant_comparison_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
