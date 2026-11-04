@@ -5580,7 +5580,36 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.push_statement(CurrentStatement::new(stmt));
         self.visit_stmt_impl(stmt);
-        let current_statement = self.pop_statement();
+        let mut current_statement = self.pop_statement();
+
+        // An unannotated return supplies no element type to a collection returned directly
+        // or packed into a tuple. Nested operations, such as a method call in that tuple,
+        // can still constrain their receiver.
+        let unconstrained_values: &[ast::Expr] = if !current_statement.collection_uses.is_empty()
+            && let ast::Stmt::Return(ret) = stmt
+            && let Some(value) = ret.value.as_deref()
+            && let Some(function) = self.scopes[self.current_scope()].node().as_function()
+            && function.node(self.module).returns.is_none()
+        {
+            match value {
+                ast::Expr::Tuple(tuple) => &tuple.elts,
+                value => std::slice::from_ref(value),
+            }
+        } else {
+            &[]
+        };
+
+        let mut collection_defs = FxHashSet::default();
+        // Only the first use of each collection can supply constraints in a statement.
+        // Preserve that choice even when the first use supplies no return type context.
+        current_statement
+            .collection_uses
+            .retain(|(definition, expr)| {
+                collection_defs.insert(*definition)
+                    && unconstrained_values
+                        .binary_search_by_key(expr, Into::into)
+                        .is_err()
+            });
 
         if current_statement.lambda_expressions.is_empty()
             && current_statement.collection_uses.is_empty()
@@ -5604,15 +5633,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
-        let mut collection_defs = FxHashSet::default();
         for (collection_def, use_expression) in current_statement.collection_uses {
-            // If the same collection is referenced multiple times in this statement,
-            // we only consider the first occurrence, as collection use constraints are
-            // tracked at the statement level.
-            if !collection_defs.insert(collection_def) {
-                continue;
-            }
-
             self.uses_by_collection
                 .entry(collection_def)
                 .or_default()
