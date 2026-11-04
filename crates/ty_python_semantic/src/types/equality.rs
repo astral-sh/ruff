@@ -23,6 +23,7 @@ use super::{
 
 mod enums;
 
+pub(super) use self::enums::enum_has_distinct_member_equality;
 use self::enums::evaluate_enum_comparison;
 
 /// The result of evaluating a runtime comparison between two types.

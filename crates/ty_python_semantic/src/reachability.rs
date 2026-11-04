@@ -201,12 +201,12 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_narrowing_constraints, infer_predicate_truthiness,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        same_enum_or_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1716,6 +1716,19 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, env, singleton_ty) {
                 Truthiness::AlwaysFalse
+            } else {
+                Truthiness::Ambiguous
+            }
+        }
+        PatternPredicateKind::Or(predicates)
+            if let Some(matched) = same_enum_or_pattern_type(db, env, predicates, subject_ty) =>
+        {
+            if subject_ty.is_disjoint_from(db, env, matched) {
+                Truthiness::AlwaysFalse
+            } else if IntersectionType::from_positive_and_negative(db, env, subject_ty, matched)
+                .is_never()
+            {
+                Truthiness::AlwaysTrue
             } else {
                 Truthiness::Ambiguous
             }
