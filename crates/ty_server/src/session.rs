@@ -18,7 +18,6 @@ use lsp_types::{
 };
 use lsp_types::{ExitNotification, Notification};
 use ruff_db::Db;
-use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPath};
 use ruff_python_ast::PySourceType;
@@ -833,19 +832,6 @@ impl Session {
             ));
             ProjectDatabase::use_defaults(metadata, system)
         });
-
-        // Inline editor settings have no document URI for publishing a diagnostic.
-        if workspace.settings.override_options().is_some() {
-            for diagnostic in db.project().option_diagnostics(&db) {
-                if diagnostic.primary_span().is_none() && diagnostic.severity() == Severity::Warning
-                {
-                    client.show_warning_message(format_args!(
-                        "ty configuration for {uri}: {}",
-                        diagnostic.headline_message()
-                    ));
-                }
-            }
-        }
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);

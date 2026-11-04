@@ -322,14 +322,6 @@ fn conflicting_rule_alias_in_editor_settings() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let warning = server.await_notification::<lsp_types::ShowMessageNotification>();
-    assert_json_snapshot!(warning, @r#"
-    {
-      "type": 2,
-      "message": "ty configuration for file://<temp_dir>/src: Rule `unresolved-import` has been renamed to `import-not-found`"
-    }
-    "#);
-
     server.open_text_document(main, content, 1);
     let diagnostics = server.document_diagnostic_request(main, None);
     insta::assert_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @"1:0..1:9[WARNING]: Name `undefined` used when not defined");
