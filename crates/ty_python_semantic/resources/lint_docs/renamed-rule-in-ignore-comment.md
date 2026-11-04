@@ -9,26 +9,5 @@ ignore comments consistent across your codebase.
 
 ## Examples
 
-<div hidden>
-
-```toml
-[rules]
-unused-ignore-comment = "ignore"
-```
-
-</div>
-
-Suppose ty renames `old-rule-name` to `new-rule-name`.
-
-```py
-# error
-x = 1  # ty: ignore[old-rule-name]
-```
-
-The automatic fix changes only the rule name.
-
-```py
-x = 1  # ty: ignore[new-rule-name]
-```
-
-If the comment already lists both names, remove the old name manually.
+If ty renames `old-rule-name` to `new-rule-name`, the automatic fix changes
+`# ty: ignore[old-rule-name]` to `# ty: ignore[new-rule-name]`.
