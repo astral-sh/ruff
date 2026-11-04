@@ -2094,27 +2094,25 @@ impl OverrideOptions {
                 Severity::Warning,
             );
 
-            if section.rules.is_none() && section.analysis.is_none() {
-                diagnostic = diagnostic
-                    .sub(SubDiagnostic::new(
-                        SubDiagnosticSeverity::Info,
-                        "It has no `rules` or `analysis` table",
-                    ))
-                    .sub(SubDiagnostic::new(
-                        SubDiagnosticSeverity::Info,
-                        "Add a `[overrides.rules]` or `[overrides.analysis]` table...",
-                    ));
+            diagnostic = if section.rules.is_none() && section.analysis.is_none() {
+                diagnostic = diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    "It has no `rules` or `analysis` table",
+                ));
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    "Add a `[overrides.rules]` or `[overrides.analysis]` table...",
+                ))
             } else {
                 if section.rules.is_some() {
-                    diagnostic = diagnostic
-                        .sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "The `rules` table is empty",
-                        ))
-                        .sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "Add a rule to `[overrides.rules]` to override specific rules...",
-                        ));
+                    diagnostic = diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "The `rules` table is empty",
+                    ));
+                    diagnostic = diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "Add a rule to `[overrides.rules]` to override specific rules...",
+                    ));
                 }
 
                 if section.analysis.is_some() {
@@ -2123,56 +2121,66 @@ impl OverrideOptions {
                         "The `analysis` table is empty",
                     ));
                 }
-            }
 
-            diagnostics.push(
                 diagnostic
-                    .sub(SubDiagnostic::new(
-                        SubDiagnosticSeverity::Info,
-                        "or remove the `[[overrides]]` section if there's nothing to override",
-                    ))
-                    .at(
-                        db,
-                        section,
-                        Some("This overrides section overrides no settings"),
-                    ),
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "or remove the `[[overrides]]` section if there's nothing to override",
+            ));
+
+            diagnostics.push(diagnostic.at(
+                db,
+                section,
+                Some("This overrides section overrides no settings"),
+            ));
+            return;
+        }
+
+        let include_missing = section.include.is_none();
+        let exclude_empty = section
+            .exclude
+            .as_ref()
+            .is_none_or(|exclude| exclude.is_empty());
+
+        if include_missing && exclude_empty {
+            // Neither include nor exclude specified - applies to all files
+            let mut diagnostic = OptionDiagnostic::new(
+                DiagnosticId::UnnecessaryOverridesSection,
+                "Unnecessary `overrides` section".to_string(),
+                Severity::Warning,
             );
-        } else if section.include.is_none()
-            && section
-                .exclude
-                .as_ref()
-                .is_none_or(|exclude| exclude.is_empty())
-        {
-            diagnostics.push(
-                OptionDiagnostic::new(
-                    DiagnosticId::UnnecessaryOverridesSection,
-                    "Unnecessary `overrides` section".to_string(),
-                    Severity::Warning,
-                )
-                .sub(SubDiagnostic::new(
+
+            diagnostic = if section.exclude.is_none() {
+                diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
-                    if section.exclude.is_none() {
-                        "It has no `include` or `exclude` option restricting the files"
-                    } else {
-                        "It has no `include` option and `exclude` is empty"
-                    },
+                    "It has no `include` or `exclude` option restricting the files",
                 ))
-                .sub(SubDiagnostic::new(
+            } else {
+                diagnostic.sub(SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
-                    "Restrict the files by adding a pattern to `include` or `exclude`...",
+                    "It has no `include` option and `exclude` is empty",
                 ))
-                .sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "or remove the `[[overrides]]` section \
-                    and merge the configuration into the root `[rules]` table \
-                    if the configuration should apply to all files",
-                ))
-                .at(
-                    db,
-                    section,
-                    Some("This overrides section applies to all files"),
-                ),
-            );
+            };
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "Restrict the files by adding a pattern to `include` or `exclude`...",
+            ));
+
+            diagnostic = diagnostic.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "or remove the `[[overrides]]` section \
+                and merge the configuration into the root `[rules]` table \
+                if the configuration should apply to all files",
+            ));
+
+            diagnostics.push(diagnostic.at(
+                db,
+                section,
+                Some("This overrides section applies to all files"),
+            ));
         }
     }
 
