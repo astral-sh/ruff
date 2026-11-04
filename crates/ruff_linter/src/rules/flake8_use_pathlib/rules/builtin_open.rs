@@ -69,6 +69,10 @@ impl Violation for BuiltinOpen {
 
 // PTH123
 pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if !matches!(segments, ["" | "builtins", "open"]) {
+        return;
+    }
+
     // `closefd` and `opener` are not supported by pathlib, so check if they
     // are set to non-default values.
     // https://github.com/astral-sh/ruff/issues/7620
@@ -103,10 +107,6 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         || is_argument_non_default(&call.arguments, "opener", 7)
         || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
     {
-        return;
-    }
-
-    if !matches!(segments, ["" | "builtins", "open"]) {
         return;
     }
 
