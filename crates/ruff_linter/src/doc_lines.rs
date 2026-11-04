@@ -71,7 +71,8 @@ struct StringLinesVisitor<'a> {
 
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
-        if let StmtKind::Expr(expr_node) = stmt.classify() {
+        let kind = stmt.classify();
+        if let StmtKind::Expr(expr_node) = kind {
             let expr = expr_node.value();
             if expr.is_string_literal_expr() {
                 for line in
@@ -81,7 +82,7 @@ impl StatementVisitor<'_> for StringLinesVisitor<'_> {
                 }
             }
         }
-        walk_stmt(self, stmt);
+        walk_stmt(self, kind);
     }
 }
 

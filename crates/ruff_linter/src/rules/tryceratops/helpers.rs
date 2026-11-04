@@ -23,7 +23,8 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
 
 impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
     fn visit_expr(&mut self, expr: Expr<'b>) {
-        if let ExprKind::Call(call) = expr.classify() {
+        let kind = expr.classify();
+        if let ExprKind::Call(call) = kind {
             match call.func().classify() {
                 ExprKind::Attribute(expr_attribute) => {
                     let attr = expr_attribute.attr();
@@ -50,7 +51,7 @@ impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
                 _ => {}
             }
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 
     fn visit_except_handler(&mut self, _except_handler: ExceptHandler<'b>) {

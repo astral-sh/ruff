@@ -495,7 +495,8 @@ impl<'db> LegacyTypeVarCollector<'db> {
 
 impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
     fn visit_expr(&mut self, expr: ast::Expr<'ast>) {
-        if let ExprKind::StringLiteral(string) = expr.classify()
+        let kind = expr.classify();
+        if let ExprKind::StringLiteral(string) = kind
             && let Some(string_literal) = string.as_single_part_string()
         {
             let file = self.alias_definition.program_file(self.db);
@@ -511,7 +512,7 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
             }
         }
 
-        match expr.classify() {
+        match kind {
             ExprKind::Subscript(subscript) => match self.expression_type(subscript.value()) {
                 // Literal values and Annotated metadata do not bind type parameters.
                 Some(Type::SpecialForm(SpecialFormType::Literal)) => return,
@@ -529,6 +530,6 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
             _ => {}
         }
 
-        ast_visitor::walk_expr(self, expr);
+        ast_visitor::walk_expr(self, kind);
     }
 }

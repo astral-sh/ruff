@@ -236,7 +236,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 }
                 self.reset_usage_count();
             }
-            _ => visitor::walk_stmt(self, stmt),
+            kind => visitor::walk_stmt(self, kind),
         }
     }
 
@@ -256,7 +256,8 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if let ExprKind::Named(named) = expr.classify() {
+        let kind = expr.classify();
+        if let ExprKind::Named(named) = kind {
             let target = named.target();
             if self.name_matches(target) {
                 self.overridden = true;
@@ -284,7 +285,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 }
                 if !self.overridden {
                     self.nested = true;
-                    visitor::walk_expr(self, elt);
+                    visitor::walk_expr(self, elt.classify());
                     self.nested = false;
                 }
             }
@@ -301,9 +302,9 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 if !self.overridden {
                     self.nested = true;
                     if let Some(key) = key {
-                        visitor::walk_expr(self, key);
+                        visitor::walk_expr(self, key.classify());
                     }
-                    visitor::walk_expr(self, value);
+                    visitor::walk_expr(self, value.classify());
                     self.nested = false;
                 }
             }
@@ -324,7 +325,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                         self.exprs.push(expr);
                     }
                 } else {
-                    visitor::walk_expr(self, expr);
+                    visitor::walk_expr(self, kind);
                 }
             }
         }

@@ -1587,7 +1587,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     }
 
     fn visit_pattern(&mut self, pattern: Pattern<'db>) {
-        let binding = pattern.capture_name();
+        let binding = pattern.classify().capture_name();
 
         let previous_binding = self.pattern_binding;
         self.pattern_binding = binding;

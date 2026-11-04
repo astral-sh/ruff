@@ -147,7 +147,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
             }
             return;
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, expr.classify());
     }
 }
 

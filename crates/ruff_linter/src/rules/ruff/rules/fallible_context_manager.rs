@@ -222,7 +222,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 }
             }
 
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 
@@ -235,7 +235,7 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 }
             }
             ExprKind::Lambda(_) => {}
-            _ => walk_expr(self, expr),
+            kind => walk_expr(self, kind),
         }
     }
 }

@@ -159,7 +159,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
 
             guard.secondary_annotation_without_message(expr);
         } else {
-            visitor::walk_expr(self, expr);
+            visitor::walk_expr(self, expr.classify());
         }
     }
 }

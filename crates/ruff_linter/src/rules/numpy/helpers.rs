@@ -25,7 +25,8 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
         if self.found_import {
             return;
         }
-        if let StmtKind::ImportFrom(import_from) = stmt.classify() {
+        let kind = stmt.classify();
+        if let StmtKind::ImportFrom(import_from) = kind {
             let module = import_from.module();
             let names = import_from.names();
             if module.is_some_and(|module| module == self.module)
@@ -38,7 +39,7 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
                 return;
             }
         }
-        statement_visitor::walk_stmt(self, stmt);
+        statement_visitor::walk_stmt(self, kind);
     }
 
     fn visit_body(&mut self, body: Suite<'_>) {

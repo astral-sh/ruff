@@ -11,7 +11,7 @@ pub(super) use expression::expression;
 pub(super) use module::module;
 pub(super) use parameter::parameter;
 pub(super) use parameters::parameters;
-pub(super) use pattern::pattern;
+pub(super) use pattern::pattern_name;
 pub(super) use statement::statement;
 pub(super) use string_like::string_like;
 pub(super) use suite::suite;

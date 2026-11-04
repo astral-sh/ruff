@@ -239,7 +239,7 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
         }
 
         self.sibling = Some(stmt);
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt.classify());
     }
 
     fn visit_body(&mut self, body: Suite<'a>) {

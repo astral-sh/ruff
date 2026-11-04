@@ -155,8 +155,10 @@ struct InnerForWithAssignTargetsVisitor<'a, 'b> {
 
 impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
     fn visit_stmt(&mut self, stmt: Stmt<'b>) {
-        // Collect target expressions.
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
+            // Don't recurse into blocks that create a new scope.
+            StmtKind::ClassDef(_) | StmtKind::FunctionDef(_) => return,
             StmtKind::For(stmt_for) => {
                 let target = stmt_for.target();
 
@@ -248,15 +250,7 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
             }
             _ => {}
         }
-        // Decide whether to recurse.
-        match stmt.classify() {
-            // Don't recurse into blocks that create a new scope.
-            StmtKind::ClassDef(_) | StmtKind::FunctionDef(_) => {}
-            // Otherwise, do recurse.
-            _ => {
-                walk_stmt(self, stmt);
-            }
-        }
+        walk_stmt(self, kind);
     }
 }
 

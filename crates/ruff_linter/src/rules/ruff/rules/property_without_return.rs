@@ -103,7 +103,7 @@ impl Visitor<'_> for PropertyVisitor {
 
         match expr.classify() {
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => self.found = true,
-            _ => walk_expr(self, expr),
+            kind => walk_expr(self, kind),
         }
     }
 
@@ -117,7 +117,7 @@ impl Visitor<'_> for PropertyVisitor {
             StmtKind::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

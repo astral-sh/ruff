@@ -83,7 +83,8 @@ struct GeneratorAnalyzer<'a, 'b> {
 
 impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
     fn visit_stmt(&mut self, stmt: ast::Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(_) => {}
             StmtKind::Raise(raise) if let Some(exc) = raise.exc() => {
                 if self
@@ -93,20 +94,21 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
                 {
                     self.stop_iteration_raises.push(raise);
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: ast::Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Lambda(_) => {}
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
-            _ => walk_expr(self, expr),
+            _ => walk_expr(self, kind),
         }
     }
 }

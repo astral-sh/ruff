@@ -339,12 +339,13 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
     fn visit_stmt(&mut self, _stmt: Stmt<'a>) {}
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Lambda(expr_lambda) => {
                 let parameters = expr_lambda.parameters();
 
                 self.lambdas.push(parameters);
-                visitor::walk_expr(self, expr);
+                visitor::walk_expr(self, kind);
                 self.lambdas.pop();
             }
             ExprKind::Name(expr_name) if expr_name.ctx() == ExprContext::Load => {
@@ -364,7 +365,7 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
                     }
                 }
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => visitor::walk_expr(self, kind),
         }
     }
 

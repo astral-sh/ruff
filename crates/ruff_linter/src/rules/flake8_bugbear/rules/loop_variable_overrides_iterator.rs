@@ -113,7 +113,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 range: _,
                 node: _,
             }) => {
-                visitor::walk_expr(self, body);
+                visitor::walk_expr(self, body.classify());
 
                 if let Some(parameters) = parameters {
                     for parameter in parameters.iter_non_variadic_params() {
@@ -121,7 +121,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                     }
                 }
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => visitor::walk_expr(self, expr.classify()),
         }
     }
 }

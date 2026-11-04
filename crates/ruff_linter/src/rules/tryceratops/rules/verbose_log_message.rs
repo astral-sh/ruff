@@ -108,7 +108,7 @@ impl<'a> Visitor<'a> for NameVisitor<'a> {
         match expr.classify() {
             ExprKind::Name(name) if name.ctx().is_load() => self.names.push(name),
             ExprKind::Attribute(_) => {}
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 }

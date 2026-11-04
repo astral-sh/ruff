@@ -151,22 +151,20 @@ impl StatementVisitor<'_> for SkipsElseFinder {
         if self.found {
             return;
         }
-        match stmt.fields() {
+        match stmt.classify() {
             // `break`/`return`/`raise` all skip the enclosing loop's
             // `else` clause; see Python docs on `else` clauses for loops.
-            ast::StmtFields::Break(_) | ast::StmtFields::Return(_) | ast::StmtFields::Raise(_) => {
+            StmtKind::Break(_) | StmtKind::Return(_) | StmtKind::Raise(_) => {
                 self.found = true;
             }
             // Don't look inside nested loop bodies, but do check their
             // `else` clause — a `break` there targets the enclosing loop.
-            ast::StmtFields::For(ast::StmtForFields { orelse, .. })
-            | ast::StmtFields::While(ast::StmtWhileFields { orelse, .. }) => {
-                self.visit_body(orelse);
-            }
+            StmtKind::For(stmt) => self.visit_body(stmt.orelse()),
+            StmtKind::While(stmt) => self.visit_body(stmt.orelse()),
             // Nested function/class bodies can't affect the enclosing
             // loop's control flow.
-            ast::StmtFields::FunctionDef(_) | ast::StmtFields::ClassDef(_) => {}
-            _ => statement_visitor::walk_stmt(self, stmt),
+            StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
+            kind => statement_visitor::walk_stmt(self, kind),
         }
     }
 }
@@ -343,14 +341,15 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     }
 
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             // Ex) `del items[0]`
             StmtKind::Delete(stmt_delete) => {
                 let range = stmt_delete.range();
                 let targets = stmt_delete.targets();
 
                 self.handle_delete(range, targets);
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_stmt(self, kind);
             }
 
             // Ex) `items[0] = 1`
@@ -359,7 +358,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 let targets = stmt_assign.targets();
 
                 self.handle_assign(range, targets);
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_stmt(self, kind);
             }
 
             // Ex) `items += [1]`
@@ -368,7 +367,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 let target = stmt_aug_assign.target();
 
                 self.handle_aug_assign(range, target);
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_stmt(self, kind);
             }
 
             // Ex) `for y in other: ...`
@@ -527,18 +526,19 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
             // Default case.
             _ => {
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_stmt(self, kind);
             }
         }
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
         // Ex) `items.append(1)`
-        if let ExprKind::Call(call) = expr.classify() {
+        let kind = expr.classify();
+        if let ExprKind::Call(call) = kind {
             let func = call.func();
             self.handle_call(func);
         }
 
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 }

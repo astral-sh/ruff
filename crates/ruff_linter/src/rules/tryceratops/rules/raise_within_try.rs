@@ -72,7 +72,7 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
         match stmt.classify() {
             StmtKind::Raise(_) => self.raises.push(stmt),
             StmtKind::Try(_) => (),
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

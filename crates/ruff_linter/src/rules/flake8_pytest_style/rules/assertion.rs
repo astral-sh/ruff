@@ -255,13 +255,14 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
 
 impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::Assert(_) => {
                 self.pending_assert = Some(stmt);
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_stmt(self, kind);
                 self.pending_assert = None;
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => visitor::walk_stmt(self, kind),
         }
     }
 
@@ -282,7 +283,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
                     self.pending_assert = None;
                 }
             }
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 }

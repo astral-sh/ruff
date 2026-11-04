@@ -796,16 +796,16 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
             }
             ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields { is_async, .. }) => {
                 self.scopes.push(Scope::Function { is_async });
-                ruff_python_ast::visitor::walk_stmt(self, stmt);
+                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
                 self.scopes.pop().unwrap();
             }
             ast::StmtFields::Try(_) => {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
-                ruff_python_ast::visitor::walk_stmt(self, stmt);
+                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
                 self.in_try = was_in_try;
             }
             _ => {
-                ruff_python_ast::visitor::walk_stmt(self, stmt);
+                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
             }
         }
     }
@@ -815,7 +815,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         match expr.fields() {
             ast::ExprFields::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });
-                ruff_python_ast::visitor::walk_expr(self, expr);
+                ruff_python_ast::visitor::walk_expr(self, expr.classify());
                 self.scopes.pop().unwrap();
             }
             ast::ExprFields::ListComp(ast::ExprListCompFields {
@@ -855,7 +855,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.pop().unwrap();
             }
             _ => {
-                ruff_python_ast::visitor::walk_expr(self, expr);
+                ruff_python_ast::visitor::walk_expr(self, expr.classify());
             }
         }
     }
