@@ -58,6 +58,7 @@ exclude = [
 
 [dependency-groups]
 dev = [
+    { include-group = "jaq" },
     "astral-dev-toolchain-cargo-codspeed>=5.0.1",
     "astral-dev-toolchain-cargo-deny>=0.20.2",
     "astral-dev-toolchain-cargo-fuzz>=0.13.2",
@@ -66,6 +67,9 @@ dev = [
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=2.0.0",
     "prek==0.5.5",
+]
+jaq = [
+    "astral-dev-toolchain-jaq>=3.1.1",
 ]
 release = [
     "rooster==0.1.1",

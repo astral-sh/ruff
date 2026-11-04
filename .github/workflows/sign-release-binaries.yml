@@ -62,6 +62,10 @@ jobs:
           path: github-archives
           merge-multiple: true
 
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
+
       - name: "Collect built release wheels"
         shell: bash
         env:
@@ -78,7 +82,7 @@ jobs:
             test "${#candidates[@]}" -eq 1
             mkdir -p "wheels/$target"
             cp "${candidates[0]}" "wheels/$target/"
-          done < <(jq -r '.[]' <<< "$TARGETS")
+          done < <(jaq -r '.[]' <<< "$TARGETS")
           candidates=(wheel-artifacts/wheels-sdist/ruff-*.tar.gz)
           test "${#candidates[@]}" -eq 1
           mkdir sdists

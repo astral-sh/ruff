@@ -22,6 +22,7 @@ on:
       - "crates/ruff_python_parser/**"
       - "crates/ruff_python_stdlib/**"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
+      - ".github/actions/setup-ruff-workspace/action.yml"
       - ".github/ty-ecosystem.toml"
       - ".github/ty-ecosystem-constraints.txt"
       - "crates/ty_python_semantic/resources/primer/**"
@@ -151,20 +152,10 @@ jobs:
       # Enable experimental support for installing PEP 723 script dependencies.
       TY_UV: scripts
     steps:
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: $/.github/actions/setup-ruff-workspace
         with:
           python-version: "3.13"
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.7"
-          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
-          ignore-empty-workdir: true
-          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
-          # since its cache-invalidation keys aren't available until the build artifacts
-          # are downloaded. But the cache doesn't help us much here anyway, since the
-          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
-          # The cache would only save us from building two Git dependencies which are both
-          # small, pure-Python projects.
+          # The lockfiles arrive with the artifacts, and only two small Git dependencies would be cached.
           enable-cache: false
 
       - name: Download ty binaries, flaky project list, config, constraints, and dependency metadata
@@ -216,20 +207,11 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: $/.github/actions/setup-ruff-workspace
         with:
           python-version: "3.13"
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.7"
-          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
-          ignore-empty-workdir: true
-          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
-          # since its cache-invalidation keys aren't available until the build artifacts
-          # are downloaded. But the cache doesn't help us much here anyway, since the
-          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
-          # The cache would only save us from building two Git dependencies which are both
-          # small, pure-Python projects.
+          group: jaq
+          # The lockfiles arrive with the artifacts, and only two small Git dependencies would be cached.
           enable-cache: false
 
       - name: Download ecosystem-analyzer dependency metadata
@@ -249,9 +231,9 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           BASE_REF_NAME: ${{ github.event.pull_request.base.ref }}
         run: |
-          # Merge shard diagnostics
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
+          # jaq slurps each input file separately, so feed all shards through stdin.
+          cat diagnostics-base-*.json | jaq -s '{ outputs: [.[].outputs[]] }' > diagnostics-base.json
+          cat diagnostics-PR-*.json   | jaq -s '{ outputs: [.[].outputs[]] }' > diagnostics-PR.json
 
           mkdir dist
 
