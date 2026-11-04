@@ -502,6 +502,11 @@ If you've identified a new deviation, please [file an issue](https://github.com/
 Similar to [Black](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style), Ruff implements formatting changes
 under the [`preview`](https://docs.astral.sh/ruff/settings/#format_preview) flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
 
+The next style includes these changes in preview:
+
+- Remove redundant parentheses around list displays and list comprehensions, such as
+    `call(([1, 2]))` becoming `call([1, 2])`. Parentheses that carry comments are retained.
+
 ### F-string formatting
 
 _Stabilized in Ruff 0.9.0_

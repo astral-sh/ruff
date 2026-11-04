@@ -20,3 +20,10 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses around list displays and list comprehensions.
+pub(crate) const fn is_remove_redundant_list_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

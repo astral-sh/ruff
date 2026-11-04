@@ -19,7 +19,10 @@ use crate::expression::parentheses::{
     parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
+use crate::preview::{
+    is_hug_parens_with_braces_and_square_brackets_enabled,
+    is_remove_redundant_list_parentheses_enabled,
+};
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -111,12 +114,19 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Slice(expr) => expr.format().fmt(f),
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
-        let parenthesize = match parentheses {
+        let mut parenthesize = match parentheses {
             Parentheses::Preserve => f.context().is_expression_parenthesized(expression.into()),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
         };
+
+        // Lists already delimit their contents. Keep an outer pair only when it
+        // carries comments that would otherwise move into or out of the list.
+        if parenthesize && can_omit_redundant_list_parentheses(expression, f.context()) {
+            parenthesize = false;
+        }
+
         if parenthesize {
             let comments = f.context().comments().clone();
             let node_comments = comments.leading_dangling_trailing(expression);
@@ -142,6 +152,13 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             write!(f, [format_expr])
         }
     }
+}
+
+fn can_omit_redundant_list_parentheses(expression: &Expr, context: &PyFormatContext) -> bool {
+    is_remove_redundant_list_parentheses_enabled(context)
+        && matches!(expression, Expr::List(_) | Expr::ListComp(_))
+        && !context.comments().has_leading(expression)
+        && !context.comments().has_trailing(expression)
 }
 
 /// The comments below are trailing on the addition, but it's also outside the
@@ -1170,7 +1187,9 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if context.is_expression_parenthesized(expr.into()) {
+    if context.is_expression_parenthesized(expr.into())
+        && !can_omit_redundant_list_parentheses(expr, context)
+    {
         return Some(OwnParentheses::NonEmpty);
     }
 
