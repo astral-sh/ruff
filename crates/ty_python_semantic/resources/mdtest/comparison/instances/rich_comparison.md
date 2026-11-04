@@ -266,7 +266,7 @@ not. Thus, the correct answer here for the `reveal_type` is `int | Unknown`.
 (This test is referenced from `mdtest/binary/instances.md`)
 
 ```py
-from does_not_exist import Foo  # error: [unresolved-import]
+from does_not_exist import Foo  # error: [import-not-found]
 
 reveal_type(Foo)  # revealed: Unknown
 

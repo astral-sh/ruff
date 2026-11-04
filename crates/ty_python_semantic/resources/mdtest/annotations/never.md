@@ -74,6 +74,6 @@ python-version = "3.10"
 ```
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from typing import Never
 ```

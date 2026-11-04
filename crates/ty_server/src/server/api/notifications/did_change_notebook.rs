@@ -24,7 +24,7 @@ impl SyncNotificationHandler for DidChangeNotebookHandler {
         }: types::DidChangeNotebookDocumentParams,
     ) -> Result<()> {
         let mut document = session
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
         document

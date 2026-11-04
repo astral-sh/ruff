@@ -22,8 +22,8 @@ A literal pattern only matches the exact module name. ty continues to emit a dia
 unresolved submodule imports:
 
 ```py
-from foo.sub import bar  # error: [unresolved-import]
-import foo.sub.bar  # error: [unresolved-import]
+from foo.sub import bar  # error: [import-not-found]
+import foo.sub.bar  # error: [import-not-found]
 ```
 
 ## `**` wildcard matches
@@ -51,7 +51,7 @@ But it doesn't match a module that only contains a component named `foo`, if tha
 component is not `foo`:
 
 ```py
-from bar import foo  # error: [unresolved-import]
+from bar import foo  # error: [import-not-found]
 ```
 
 ### Starting `**`
@@ -77,7 +77,7 @@ component is not `foo`:
 `main.py`:
 
 ```py
-from foo.bar import foo  # error: [unresolved-import]
+from foo.bar import foo  # error: [import-not-found]
 ```
 
 ### Middle `**`
@@ -113,7 +113,7 @@ from testing.foo import baz
 it doesn't match `.`
 
 ```py
-import test.ing.foo  # error: [unresolved-import]
+import test.ing.foo  # error: [import-not-found]
 ```
 
 ## `*` combined with `**`
@@ -133,9 +133,9 @@ import awscli
 import awscli.alias
 import awscli.customizations.sagemaker
 from awscli.customizations import sagemaker
-import awws  # error: [unresolved-import]
-import foo.aws  # error: [unresolved-import]
-import caws  # error: [unresolved-import]
+import awws  # error: [import-not-found]
+import foo.aws  # error: [import-not-found]
+import caws  # error: [import-not-found]
 
 reveal_type(aws)  # revealed: Unknown
 reveal_type(awscli)  # revealed: Unknown
@@ -165,8 +165,8 @@ import awscli.customizations.sagemaker
 import caws
 import caws.foo.bar
 from awscli.customizations import sagemaker
-import awws  # error: [unresolved-import]
-import foo.aws  # error: [unresolved-import]
+import awws  # error: [import-not-found]
+import foo.aws  # error: [import-not-found]
 
 reveal_type(aws)  # revealed: Unknown
 reveal_type(awscli)  # revealed: Unknown
@@ -185,7 +185,7 @@ reveal_type(caws.foo.bar)  # revealed: Unknown
 Patterns can be negated, similar to gitignore. If multiple patterns match a given import, a later
 matching pattern (positive or negated) will always have priority over an earlier one in the list. If
 the last matching pattern is positive, a module will be allowlisted. If the last matching pattern is
-negated, ty's usual `unresolved-import` diagnostics will be emitted for the import.
+negated, ty's usual `import-not-found` diagnostics will be emitted for the import.
 
 ### Negative pattern after positive pattern
 
@@ -198,12 +198,12 @@ allowed-unresolved-imports = ["test.**", "!test.foo"]
 
 ```py
 from test.bar import baz
-from test.foo import bar  # error: [unresolved-import]
+from test.foo import bar  # error: [import-not-found]
 ```
 
 This syntax can be useful when overriding parent configurations. For example, a project's main
 configuration might allowlist all `test`-module imports, but an overriding configuration in a
-subproject could use a negated pattern to reapply strict `unresolved-import` settings for `test.foo`
+subproject could use a negated pattern to reapply strict `import-not-found` settings for `test.foo`
 modules specifically.
 
 ### Positive pattern after negative pattern
@@ -217,7 +217,7 @@ allowed-unresolved-imports = ["test.**", "!test.**", "test.foo"]
 ```
 
 ```py
-from test.bar import baz  # error: [unresolved-import]
+from test.bar import baz  # error: [import-not-found]
 from test.foo import bar
 ```
 

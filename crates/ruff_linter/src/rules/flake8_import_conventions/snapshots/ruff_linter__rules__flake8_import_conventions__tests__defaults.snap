@@ -7,245 +7,283 @@ ICN001 [*] `altair` should be imported as `alt`
 5 | def unconventional():
 6 |     import altair
   |            ^^^^^^
-7 |     import matplotlib.pyplot
-8 |     import numpy
+7 |     import datetime
+8 |     import matplotlib.pyplot
   |
 help: Alias `altair` to `alt`
   |
 5 | def unconventional():
   -     import altair
 6 +     import altair as alt
-7 |     import matplotlib.pyplot
+7 |     import datetime
   |
 note: This is an unsafe fix and may change runtime behavior
 
-ICN001 `matplotlib.pyplot` should be imported as `plt`
+ICN001 [*] `datetime` should be imported as `dt`
  --> defaults.py:7:12
   |
 5 | def unconventional():
 6 |     import altair
-7 |     import matplotlib.pyplot
-  |            ^^^^^^^^^^^^^^^^^
-8 |     import numpy
-9 |     import pandas
+7 |     import datetime
+  |            ^^^^^^^^
+8 |     import matplotlib.pyplot
+9 |     import numpy
   |
-help: Alias `matplotlib.pyplot` to `plt`
-
-ICN001 [*] `numpy` should be imported as `np`
-  --> defaults.py:8:12
-   |
- 6 |     import altair
- 7 |     import matplotlib.pyplot
- 8 |     import numpy
-   |            ^^^^^
- 9 |     import pandas
-10 |     import seaborn
-   |
-help: Alias `numpy` to `np`
+help: Alias `datetime` to `dt`
   |
-7 |     import matplotlib.pyplot
-  -     import numpy
-8 +     import numpy as np
-9 |     import pandas
+6 |     import altair
+  -     import datetime
+7 +     import datetime as dt
+8 |     import matplotlib.pyplot
   |
 note: This is an unsafe fix and may change runtime behavior
 
-ICN001 [*] `pandas` should be imported as `pd`
+ICN001 `matplotlib.pyplot` should be imported as `plt`
+  --> defaults.py:8:12
+   |
+ 6 |     import altair
+ 7 |     import datetime
+ 8 |     import matplotlib.pyplot
+   |            ^^^^^^^^^^^^^^^^^
+ 9 |     import numpy
+10 |     import pandas
+   |
+help: Alias `matplotlib.pyplot` to `plt`
+
+ICN001 [*] `numpy` should be imported as `np`
   --> defaults.py:9:12
    |
- 7 |     import matplotlib.pyplot
- 8 |     import numpy
- 9 |     import pandas
+ 7 |     import datetime
+ 8 |     import matplotlib.pyplot
+ 9 |     import numpy
+   |            ^^^^^
+10 |     import pandas
+11 |     import seaborn
+   |
+help: Alias `numpy` to `np`
+   |
+8  |     import matplotlib.pyplot
+   -     import numpy
+9  +     import numpy as np
+10 |     import pandas
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN001 [*] `pandas` should be imported as `pd`
+  --> defaults.py:10:12
+   |
+ 8 |     import matplotlib.pyplot
+ 9 |     import numpy
+10 |     import pandas
    |            ^^^^^^
-10 |     import seaborn
-11 |     import tkinter
+11 |     import seaborn
+12 |     import tkinter
    |
 help: Alias `pandas` to `pd`
    |
-8  |     import numpy
+9  |     import numpy
    -     import pandas
-9  +     import pandas as pd
-10 |     import seaborn
+10 +     import pandas as pd
+11 |     import seaborn
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `seaborn` should be imported as `sns`
-  --> defaults.py:10:12
+  --> defaults.py:11:12
    |
- 8 |     import numpy
- 9 |     import pandas
-10 |     import seaborn
+ 9 |     import numpy
+10 |     import pandas
+11 |     import seaborn
    |            ^^^^^^^
-11 |     import tkinter
-12 |     import networkx
+12 |     import tkinter
+13 |     import networkx
    |
 help: Alias `seaborn` to `sns`
    |
-9  |     import pandas
+10 |     import pandas
    -     import seaborn
-10 +     import seaborn as sns
-11 |     import tkinter
+11 +     import seaborn as sns
+12 |     import tkinter
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `tkinter` should be imported as `tk`
-  --> defaults.py:11:12
+  --> defaults.py:12:12
    |
- 9 |     import pandas
-10 |     import seaborn
-11 |     import tkinter
+10 |     import pandas
+11 |     import seaborn
+12 |     import tkinter
    |            ^^^^^^^
-12 |     import networkx
+13 |     import networkx
    |
 help: Alias `tkinter` to `tk`
    |
-10 |     import seaborn
+11 |     import seaborn
    -     import tkinter
-11 +     import tkinter as tk
-12 |     import networkx
+12 +     import tkinter as tk
+13 |     import networkx
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `networkx` should be imported as `nx`
-  --> defaults.py:12:12
+  --> defaults.py:13:12
    |
-10 |     import seaborn
-11 |     import tkinter
-12 |     import networkx
+11 |     import seaborn
+12 |     import tkinter
+13 |     import networkx
    |            ^^^^^^^^
 help: Alias `networkx` to `nx`
    |
-11 |     import tkinter
+12 |     import tkinter
    -     import networkx
-12 +     import networkx as nx
-13 |
+13 +     import networkx as nx
+14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `altair` should be imported as `alt`
-  --> defaults.py:16:22
+  --> defaults.py:17:22
    |
-15 | def unconventional_aliases():
-16 |     import altair as altr
+16 | def unconventional_aliases():
+17 |     import altair as altr
    |                      ^^^^
-17 |     import matplotlib.pyplot as plot
-18 |     import numpy as nmp
+18 |     import datetime as date_time
+19 |     import matplotlib.pyplot as plot
    |
 help: Alias `altair` to `alt`
    |
-15 | def unconventional_aliases():
+16 | def unconventional_aliases():
    -     import altair as altr
-16 +     import altair as alt
-17 |     import matplotlib.pyplot as plot
+17 +     import altair as alt
+18 |     import datetime as date_time
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN001 [*] `datetime` should be imported as `dt`
+  --> defaults.py:18:24
+   |
+16 | def unconventional_aliases():
+17 |     import altair as altr
+18 |     import datetime as date_time
+   |                        ^^^^^^^^^
+19 |     import matplotlib.pyplot as plot
+20 |     import numpy as nmp
+   |
+help: Alias `datetime` to `dt`
+   |
+17 |     import altair as altr
+   -     import datetime as date_time
+18 +     import datetime as dt
+19 |     import matplotlib.pyplot as plot
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
-  --> defaults.py:17:33
+  --> defaults.py:19:33
    |
-15 | def unconventional_aliases():
-16 |     import altair as altr
-17 |     import matplotlib.pyplot as plot
+17 |     import altair as altr
+18 |     import datetime as date_time
+19 |     import matplotlib.pyplot as plot
    |                                 ^^^^
-18 |     import numpy as nmp
-19 |     import pandas as pdas
+20 |     import numpy as nmp
+21 |     import pandas as pdas
    |
 help: Alias `matplotlib.pyplot` to `plt`
    |
-16 |     import altair as altr
+18 |     import datetime as date_time
    -     import matplotlib.pyplot as plot
-17 +     import matplotlib.pyplot as plt
-18 |     import numpy as nmp
+19 +     import matplotlib.pyplot as plt
+20 |     import numpy as nmp
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `numpy` should be imported as `np`
-  --> defaults.py:18:21
+  --> defaults.py:20:21
    |
-16 |     import altair as altr
-17 |     import matplotlib.pyplot as plot
-18 |     import numpy as nmp
+18 |     import datetime as date_time
+19 |     import matplotlib.pyplot as plot
+20 |     import numpy as nmp
    |                     ^^^
-19 |     import pandas as pdas
-20 |     import seaborn as sbrn
+21 |     import pandas as pdas
+22 |     import seaborn as sbrn
    |
 help: Alias `numpy` to `np`
    |
-17 |     import matplotlib.pyplot as plot
+19 |     import matplotlib.pyplot as plot
    -     import numpy as nmp
-18 +     import numpy as np
-19 |     import pandas as pdas
+20 +     import numpy as np
+21 |     import pandas as pdas
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `pandas` should be imported as `pd`
-  --> defaults.py:19:22
+  --> defaults.py:21:22
    |
-17 |     import matplotlib.pyplot as plot
-18 |     import numpy as nmp
-19 |     import pandas as pdas
+19 |     import matplotlib.pyplot as plot
+20 |     import numpy as nmp
+21 |     import pandas as pdas
    |                      ^^^^
-20 |     import seaborn as sbrn
-21 |     import tkinter as tkr
+22 |     import seaborn as sbrn
+23 |     import tkinter as tkr
    |
 help: Alias `pandas` to `pd`
    |
-18 |     import numpy as nmp
+20 |     import numpy as nmp
    -     import pandas as pdas
-19 +     import pandas as pd
-20 |     import seaborn as sbrn
+21 +     import pandas as pd
+22 |     import seaborn as sbrn
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `seaborn` should be imported as `sns`
-  --> defaults.py:20:23
+  --> defaults.py:22:23
    |
-18 |     import numpy as nmp
-19 |     import pandas as pdas
-20 |     import seaborn as sbrn
+20 |     import numpy as nmp
+21 |     import pandas as pdas
+22 |     import seaborn as sbrn
    |                       ^^^^
-21 |     import tkinter as tkr
-22 |     import networkx as nxy
+23 |     import tkinter as tkr
+24 |     import networkx as nxy
    |
 help: Alias `seaborn` to `sns`
    |
-19 |     import pandas as pdas
+21 |     import pandas as pdas
    -     import seaborn as sbrn
-20 +     import seaborn as sns
-21 |     import tkinter as tkr
+22 +     import seaborn as sns
+23 |     import tkinter as tkr
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `tkinter` should be imported as `tk`
-  --> defaults.py:21:23
+  --> defaults.py:23:23
    |
-19 |     import pandas as pdas
-20 |     import seaborn as sbrn
-21 |     import tkinter as tkr
+21 |     import pandas as pdas
+22 |     import seaborn as sbrn
+23 |     import tkinter as tkr
    |                       ^^^
-22 |     import networkx as nxy
+24 |     import networkx as nxy
    |
 help: Alias `tkinter` to `tk`
    |
-20 |     import seaborn as sbrn
+22 |     import seaborn as sbrn
    -     import tkinter as tkr
-21 +     import tkinter as tk
-22 |     import networkx as nxy
+23 +     import tkinter as tk
+24 |     import networkx as nxy
    |
 note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `networkx` should be imported as `nx`
-  --> defaults.py:22:24
+  --> defaults.py:24:24
    |
-20 |     import seaborn as sbrn
-21 |     import tkinter as tkr
-22 |     import networkx as nxy
+22 |     import seaborn as sbrn
+23 |     import tkinter as tkr
+24 |     import networkx as nxy
    |                        ^^^
 help: Alias `networkx` to `nx`
    |
-21 |     import tkinter as tkr
+23 |     import tkinter as tkr
    -     import networkx as nxy
-22 +     import networkx as nx
-23 |
+24 +     import networkx as nx
+25 |
    |
 note: This is an unsafe fix and may change runtime behavior

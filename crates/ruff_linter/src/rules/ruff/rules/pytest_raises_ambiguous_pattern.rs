@@ -138,7 +138,7 @@ fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool 
 /// * `\d`, `\D`: Digit and non-digit
 /// * `\s`, `\S`: Whitespace and non-whitespace
 /// * `\w`, `\W`: Word and non-word character
-/// * `\z`: End of input
+/// * `\z`, `\Z`: End of input
 ///
 /// `\u`, `\U`, `\N`, `\x`, `\a`, `\f`, `\n`, `\r`, `\t`, `\v`
 /// are also valid in normal strings and thus do not count.
@@ -146,7 +146,10 @@ fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool 
 /// while backreferences (e.g., `\1`) are not valid without groups,
 /// both of which should be caught in [`string_has_unescaped_metacharacters`].
 const fn escaped_char_is_regex_metasequence(c: char) -> bool {
-    matches!(c, 'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z')
+    matches!(
+        c,
+        'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z' | 'Z'
+    )
 }
 
 const fn char_is_regex_metacharacter(c: char) -> bool {

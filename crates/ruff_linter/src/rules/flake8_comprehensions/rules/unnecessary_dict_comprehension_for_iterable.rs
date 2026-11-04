@@ -78,7 +78,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &Checker,
     dict_comp: &ast::ExprDictComp,
 ) {
-    let [generator] = dict_comp.generators.as_slice() else {
+    let [generator] = dict_comp.generators.as_ref() else {
         return;
     };
 
@@ -209,9 +209,9 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
     let iterable = generator.iter.clone();
     let args = Arguments {
         args: if value.is_none_literal_expr() {
-            Box::from([iterable])
+            [iterable].into()
         } else {
-            Box::from([iterable, value.clone()])
+            [iterable, value.clone()].into()
         },
         keywords: std::iter::empty().collect(),
         range: TextRange::default(),

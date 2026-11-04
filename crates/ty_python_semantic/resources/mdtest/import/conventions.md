@@ -75,9 +75,9 @@ from typing import Any as Any, Literal as Literal
 Here, none of the symbols are being re-exported in the stub file.
 
 ```py
-# error: 15 [unresolved-import] "Module `b` has no member `foo`"
-# error: 20 [unresolved-import] "Module `b` has no member `Any`"
-# error: 25 [unresolved-import] "Module `b` has no member `Literal`"
+# error: 15 [import-not-found] "Module `b` has no member `foo`"
+# error: 20 [import-not-found] "Module `b` has no member `Any`"
+# error: 25 [import-not-found] "Module `b` has no member `Literal`"
 from b import foo, Any, Literal
 
 reveal_type(Any)  # revealed: Unknown

@@ -5,9 +5,9 @@ expression: "lex_source_with_offset(source, TextSize::new(7))"
 ## Tokens
 ```
 [
-    Name 7..8,
+    Identifier 7..8,
     Plus 9..10,
-    Name 11..12,
+    Identifier 11..12,
     Newline 12..12,
 ]
 ```

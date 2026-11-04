@@ -418,7 +418,8 @@ def get_models_tuple() -> tuple[Model]:
 
 ## Callable special forms
 
-ty distinguishes same-named classes nested in the signatures of two callable special forms.
+Appending an incompatible callable special form to a list produces a diagnostic that distinguishes
+same-named classes nested in the two signatures.
 
 `first.py`:
 
@@ -432,14 +433,12 @@ Application = Callable[[StartResponse], int]
 
 ```py
 from typing import Callable
+import first
 
-try:
-    from first import Application, StartResponse
-except ImportError:
-    class StartResponse: ...
+class StartResponse: ...
 
-    # error: [invalid-assignment] "Object of type `<Callable special-form '(mdtest_snippet.StartResponse, /) -> int'>` is not assignable to `<Callable special-form '(first.StartResponse, /) -> int'>`"
-    Application = Callable[[StartResponse], int]
+# error: [invalid-argument-type] "Expected `<Callable special-form '(first.StartResponse, /) -> int'>`, found `<Callable special-form '(mdtest_snippet.StartResponse, /) -> int'>`"
+[first.Application].append(Callable[[StartResponse], int])
 ```
 
 ## Method and constructor descriptions

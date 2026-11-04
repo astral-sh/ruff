@@ -112,59 +112,40 @@ impl State {
 mod tests {
     use anyhow::{Context, Result, bail};
     use crossbeam::channel::unbounded;
-    use lsp_server::{Message, Response};
-    use lsp_types::ProgressParams;
+    use lsp_server::Message;
+    use lsp_types::{ProgressParams, ProgressToken};
 
     use crate::capabilities::ResolvedClientCapabilities;
-    use crate::server::{Action, Event};
+    use crate::server::LazyWorkDoneProgress;
     use crate::session::client::Client;
 
-    use super::ScriptProgress;
+    use super::State;
 
     #[test]
-    fn script_progress_counts_pending_scripts_and_shows_last_started() -> Result<()> {
+    fn script_progress_reports_completion_counts_and_last_started() -> Result<()> {
         let (main_loop, actions) = unbounded();
         let (sender, messages) = unbounded();
         let client = Client::new(main_loop, sender);
-        let progress = ScriptProgress::default();
-        let capabilities = ResolvedClientCapabilities::WORK_DONE_PROGRESS;
-        let script = |name: &str| {
-            progress
-                .for_script(&client, capabilities, name.to_string())
-                .context("progress is supported")
+        let work_done = LazyWorkDoneProgress::new(
+            &client,
+            Some(ProgressToken::String("scripts".into())),
+            "Synchronizing scripts",
+            ResolvedClientCapabilities::WORK_DONE_PROGRESS,
+        );
+        let mut state = State {
+            total: 2,
+            ..State::default()
         };
-        let acknowledge_progress = || -> Result<()> {
-            let Event::Action(Action::SendRequest(request)) = actions.try_recv()? else {
-                bail!("expected progress creation request");
-            };
-            request
-                .response_handler
-                .handle_response(&client, Response::new_ok(0.into(), ()));
-            Ok(())
-        };
-
-        // Queued requests show their count before any uv command starts.
-        let mut first = script("first.py")?;
-        acknowledge_progress()?;
-        let mut second = script("second.py")?;
-        first.started();
-        second.started();
-
-        // A replacement run keeps the same count. Finishing it keeps the last started name.
-        second.finished();
-        second.started();
-        second.finished();
-        second.completed();
-
-        // Failure to start uv still completes the request when its error is handled.
-        script("failed.py")?.completed();
-        first.finished();
-        first.completed();
-
-        // Abandoning a later request closes its indicator without reporting completion.
-        let abandoned = script("abandoned.py")?;
-        acknowledge_progress()?;
-        drop(abandoned);
+        state.report_progress(&work_done);
+        state.last_started = "first.py".into();
+        state.report_progress(&work_done);
+        state.last_started = "second.py".into();
+        state.report_progress(&work_done);
+        state.completed = 1;
+        state.report_progress(&work_done);
+        state.completed = 2;
+        state.report_progress(&work_done);
+        drop(work_done);
 
         assert_eq!(
             messages
@@ -172,18 +153,13 @@ mod tests {
                 .map(progress_notification)
                 .collect::<Result<Vec<_>>>()?,
             [
-                "begin: 0/1",
+                "begin: ",
                 "report: 0/2",
                 "report: 0/2: first.py",
                 "report: 0/2: second.py",
-                "report: 0/2: second.py",
                 "report: 1/2: second.py",
-                "report: 1/3: second.py",
-                "report: 2/3: second.py",
-                "report: 3/3: second.py",
+                "report: 2/2: second.py",
                 "end: Finished synchronizing scripts",
-                "begin: 0/1",
-                "end: ",
             ]
         );
         assert!(actions.is_empty());

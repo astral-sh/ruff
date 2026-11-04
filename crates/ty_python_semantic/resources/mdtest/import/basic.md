@@ -1,5 +1,153 @@
 # Structures
 
+## Imported modules can be reassigned
+
+Importing a module binds its current module-literal type, but does not declare that later
+assignments must preserve that exact type.
+
+```py
+import os
+from types import ModuleType
+
+def normalize(module: ModuleType) -> ModuleType:
+    return module
+
+os = normalize(os)
+reveal_type(os)  # revealed: ModuleType
+```
+
+## Imported names can be rebound by match patterns in loops
+
+Checking whether an imported name is `Final` must not recursively infer synthetic loop or
+comprehension bindings when a match pattern rebinds that name.
+
+```py
+import os as x
+
+class C:
+    x = object()
+
+items = [object()]
+
+for _ in items:
+    match (x for _ in items):
+        case C.x as x:
+            pass
+        case C():
+            x = 0
+```
+
+## Imported names can be rebound by context managers
+
+An imported name is an ordinary binding, so a context-manager target may replace it with a value of
+another type.
+
+`values.py`:
+
+```py
+value: str = "before"
+```
+
+```py
+from values import value
+
+class Manager:
+    def __enter__(self) -> int:
+        return 1
+
+    def __exit__(self, exc_type, exc_value, traceback): ...
+
+with Manager() as value:
+    reveal_type(value)  # revealed: int
+```
+
+## Imported names can participate in cyclic loop and match bindings
+
+Names introduced by `from` imports can create the same cyclic loop and match bindings as imported
+modules, even when the imported value is not final.
+
+`source.py`:
+
+```py
+value = object()
+```
+
+`main.py`:
+
+```py
+from source import value
+
+class Matcher:
+    value = object()
+
+items = [object()]
+
+for _ in items:
+    match (value for _ in items):
+        case Matcher.value as value:
+            pass
+        case Matcher():
+            value = 0
+```
+
+## Existing annotations constrain imported bindings
+
+An import must respect an existing declaration without creating a conflicting declaration of its
+own.
+
+`values.py`:
+
+```py
+value: str = "available"
+```
+
+```py
+value: str | None
+
+try:
+    from values import value
+except ImportError:
+    value = None
+
+reveal_type(value)  # revealed: str | None
+```
+
+## Imported values must satisfy existing annotations
+
+Although an import does not declare a type, its value must still be assignable to an existing local
+declaration.
+
+`values.py`:
+
+```py
+value: str = "incompatible"
+```
+
+```py
+value: int
+
+from values import value  # error: [invalid-assignment]
+
+reveal_type(value)  # revealed: int
+```
+
+## Star-imported names can be reassigned
+
+Wildcard imports bind the names they introduce without declaring their imported types.
+
+`values.py`:
+
+```py
+value: str = "before"
+```
+
+```py
+from values import *
+
+value = 1
+reveal_type(value)  # revealed: Literal[1]
+```
+
 ## Class import following
 
 ```py
@@ -121,7 +269,7 @@ class C: ...
 <!-- snapshot-diagnostics -->
 
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
+import zqzqzqzqzqzqzq  # error: [import-not-found] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
 ```
 
 ## Unresolvable submodule imports
@@ -130,10 +278,10 @@ import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported mod
 
 ```py
 # Topmost component resolvable, submodule not resolvable:
-import a.foo  # error: [unresolved-import] "Cannot resolve imported module `a.foo`"
+import a.foo  # error: [import-not-found] "Cannot resolve imported module `a.foo`"
 
 # Topmost component unresolvable:
-import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
+import b.foo  # error: [import-not-found] "Cannot resolve imported module `b.foo`"
 ```
 
 `a/__init__.py`:
@@ -173,7 +321,7 @@ If multiple members are imported from a module that cannot be resolved, only a s
 emitted for the `import from` statement:
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from does_not_exist import foo, bar, baz
 ```
 
@@ -187,9 +335,9 @@ python-version = "3.10"
 ```
 
 ```py
-import tomllib  # error: [unresolved-import]
-from string.templatelib import Template  # error: [unresolved-import]
-from importlib.resources import abc  # error: [unresolved-import]
+import tomllib  # error: [import-not-found]
+from string.templatelib import Template  # error: [import-not-found]
+from importlib.resources import abc  # error: [import-not-found]
 ```
 
 ## Attempting to import a stdlib submodule when both parts haven't yet been added
@@ -206,10 +354,10 @@ python-version = "3.10"
 ```
 
 ```py
-import compression.zstd  # error: [unresolved-import]
-from compression import zstd  # error: [unresolved-import]
-import compression.fakebutwhocansay  # error: [unresolved-import]
-from compression import fakebutwhocansay  # error: [unresolved-import]
+import compression.zstd  # error: [import-not-found]
+from compression import zstd  # error: [import-not-found]
+import compression.fakebutwhocansay  # error: [import-not-found]
+from compression import fakebutwhocansay  # error: [import-not-found]
 ```
 
 ## Attempting to import a stdlib module that was previously removed
@@ -222,8 +370,8 @@ python-version = "3.13"
 ```
 
 ```py
-import aifc  # error: [unresolved-import]
-from distutils import sysconfig  # error: [unresolved-import]
+import aifc  # error: [import-not-found]
+from distutils import sysconfig  # error: [import-not-found]
 ```
 
 ## Cannot shadow core standard library modules
@@ -235,7 +383,7 @@ x: int
 ```
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from types import x
 
 from types import FunctionType

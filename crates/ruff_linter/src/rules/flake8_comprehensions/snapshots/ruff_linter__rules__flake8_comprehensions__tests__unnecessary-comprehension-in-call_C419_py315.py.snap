@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C419 Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
  --> C419_py315.py:3:5
   |
 1 | xs = [[1], [2]]
@@ -11,11 +11,24 @@ C419 Unnecessary list comprehension
 4 | any({*x for x in xs})
   |
 help: Remove unnecessary comprehension
+  |
+2 |
+  - all([*x for x in xs])
+3 + all(*x for x in xs)
+4 | any({*x for x in xs})
+  |
+note: This is an unsafe fix and may change runtime behavior
 
-C419 Unnecessary set comprehension
+C419 [*] Unnecessary set comprehension
  --> C419_py315.py:4:5
   |
 3 | all([*x for x in xs])
 4 | any({*x for x in xs})
   |     ^^^^^^^^^^^^^^^^
 help: Remove unnecessary comprehension
+  |
+3 | all([*x for x in xs])
+  - any({*x for x in xs})
+4 + any(*x for x in xs)
+  |
+note: This is an unsafe fix and may change runtime behavior

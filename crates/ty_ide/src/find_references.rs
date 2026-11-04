@@ -287,6 +287,35 @@ def f(items):
     }
 
     #[test]
+    fn normalized_identifier_references_across_files() {
+        let test = CursorTest::builder()
+            .source("lib.py", "<CURSOR>C = 1")
+            .source(
+                "main.py",
+                r#"
+from lib import 𝒞
+print(𝒞)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> lib.py:1:1
+          |
+        1 | C = 1
+          | -
+          |
+         ::: main.py:2:17
+          |
+        2 | from lib import 𝒞
+          |                 -
+        3 | print(𝒞)
+          |       -
+        ");
+    }
+
+    #[test]
     fn parameter_references_in_function() {
         let test = cursor_test(
             "
@@ -1331,6 +1360,76 @@ def process_model():
     }
 
     #[test]
+    fn multi_file_instance_attribute_references() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class C:
+    def __init__(self) -> None:
+        self.<CURSOR>value: int = 42
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import C
+
+print(C().value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> lib.py:4:14
+          |
+        4 |         self.value: int = 42
+          |              -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
+    fn multi_file_comprehension_attribute_references() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class C:
+    def __init__(self) -> None:
+        [None for self.<CURSOR>value in [42]]
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import C
+
+print(C().value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> lib.py:4:24
+          |
+        4 |         [None for self.value in [42]]
+          |                        -----
+          |
+         ::: main.py:4:11
+          |
+        4 | print(C().value)
+          |           -----
+        ");
+    }
+
+    #[test]
     fn multi_file_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
@@ -1517,26 +1616,37 @@ result = func(value=42)
         let test = CursorTest::builder()
             .source(
                 "utils.py",
-                "
+                r#"
 def func(value: int):
     return value * 2
-
-result = func(value<CURSOR>=42)
-",
+"#,
             )
             .source(
                 "caller.py",
-                "
+                r#"
+from utils import func
+
+result = func(value<CURSOR>=42)
+"#,
+            )
+            .source(
+                "other.py",
+                r#"
 from utils import func
 
 result = func(value=1)
-",
+"#,
             )
             .build();
 
         assert_snapshot!(test.references(), @"
         info[references]: Found 4 references
          --> caller.py:4:15
+          |
+        4 | result = func(value=42)
+          |               -----
+          |
+         ::: other.py:4:15
           |
         4 | result = func(value=1)
           |               -----
@@ -1547,9 +1657,6 @@ result = func(value=1)
           |          -----
         3 |     return value * 2
           |            -----
-        4 |
-        5 | result = func(value=42)
-          |               -----
         ");
     }
 
@@ -1621,39 +1728,79 @@ instance = ExampleClass(old_name="test")
     }
 
     #[test]
-    fn multi_file_nested_function_parameter_references_do_not_include_keyword_argument_labels() {
+    fn multi_file_nested_function_parameter_references_include_keyword_argument_labels() {
         let test = CursorTest::builder()
             .source(
-                "outer.py",
-                "
-def outer():
-    def inner(<CURSOR>value: int):
-        return value * 2
-    return inner
-",
+                "lib.py",
+                r#"
+class Handler:
+    def __init__(self) -> None:
+        def process(*, <CURSOR>value: int) -> int:
+            return value
+        self.process = process
+"#,
             )
             .source(
                 "caller.py",
-                "
-from outer import outer
+                r#"
+from lib import Handler
 
-func = outer()
-result = func(value=10)
-",
+Handler().process(value=42)
+"#,
             )
             .build();
 
-        // TODO(parameter-keyword-references): Nested callable owners are intentionally excluded by
-        // the external-visibility heuristic (perf/signal tradeoff).
-        // Ideal output would also include `caller.py` at `func(value=10)` on `value`.
         assert_snapshot!(test.references(), @"
-        info[references]: Found 2 references
-         --> outer.py:3:15
+        info[references]: Found 3 references
+         --> caller.py:4:19
           |
-        3 |     def inner(value: int):
-          |               -----
-        4 |         return value * 2
-          |                -----
+        4 | Handler().process(value=42)
+          |                   -----
+          |
+         ::: lib.py:4:24
+          |
+        4 |         def process(*, value: int) -> int:
+          |                        -----
+        5 |             return value
+          |                    -----
+        ");
+    }
+
+    #[test]
+    fn multi_file_nested_class_parameter_references_include_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class Outer:
+    class Inner:
+        def method(self, *, <CURSOR>value: int) -> int:
+            return value
+"#,
+            )
+            .source(
+                "caller.py",
+                r#"
+from lib import Outer
+
+Outer.Inner().method(value=42)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> caller.py:4:22
+          |
+        4 | Outer.Inner().method(value=42)
+          |                      -----
+          |
+         ::: lib.py:4:29
+          |
+        4 |         def method(self, *, value: int) -> int:
+          |                             -----
+        5 |             return value
+          |                    -----
         ");
     }
 

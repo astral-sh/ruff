@@ -141,7 +141,7 @@ class SubclassOfGenericAlias(GenericSubclass[int]): ...
 @final
 class FinalClass: ...
 
-final: FinalClass = SubclassOfGenericAlias()
+final_value: FinalClass = SubclassOfGenericAlias()
 literal: Literal[1] = SubclassOfGenericAlias()
 ```
 
@@ -175,7 +175,7 @@ non-final classes, but not to final classes:
 ```py
 from typing import final
 
-from somewhere import UnknownBase  # error: [unresolved-import]
+from somewhere import UnknownBase  # error: [import-not-found]
 
 class Arbitrary: ...
 

@@ -678,6 +678,35 @@ def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
     reveal_type(left is not right)  # revealed: bool
 ```
 
+## Recursive tuple aliases
+
+Ordering can be determined by the first unequal element, even when a later element is recursive.
+Membership can likewise be established by a known element of the tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+Implicit = tuple[Literal[1], "Implicit | None"]
+type Explicit = tuple[Literal[1], Explicit | None]
+
+def implicit(value: Implicit):
+    reveal_type(value < (2, None))  # revealed: Literal[True]
+    reveal_type(value > (2, None))  # revealed: Literal[False]
+    reveal_type((2, None) > value)  # revealed: Literal[True]
+    reveal_type(1 in value)  # revealed: Literal[True]
+
+def explicit(value: Explicit):
+    reveal_type(value < (2, None))  # revealed: Literal[True]
+    reveal_type(value > (2, None))  # revealed: Literal[False]
+    reveal_type((2, None) > value)  # revealed: Literal[True]
+    reveal_type(1 in value)  # revealed: Literal[True]
+```
+
 ## Recursive NamedTuple
 
 ```py
@@ -689,4 +718,28 @@ class Node(NamedTuple):
 
 def _(n: Node):
     reveal_type(n.parent is n)  # revealed: bool
+```
+
+While membership compares a `Needle` with `First`, it encounters a recursive comparison with
+`Second`. Comparing `Second` directly establishes that the children differ because `First` and
+`Needle` have different tags.
+
+```py
+from typing import Literal
+
+class Needle(NamedTuple):
+    child: Needle | Literal["needle"]
+    tag: Literal[1]
+
+class First(NamedTuple):
+    child: Second | Literal["candidate"]
+    tag: Literal[0]
+
+class Second(NamedTuple):
+    child: First | Literal["candidate"]
+    tag: Literal[1]
+
+def membership(needle: Needle, first: First, second: Second) -> None:
+    reveal_type(needle in (first, second))  # revealed: Literal[False]
+    reveal_type(needle in (second, first))  # revealed: Literal[False]
 ```

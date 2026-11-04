@@ -6,6 +6,7 @@ use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -13,7 +14,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.
@@ -44,6 +45,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     print(item)
 /// print("All items printed")
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if the `else` line has a trailing comment (e.g., `else:  # comment`),
+/// since the fix deletes the comment.
 ///
 /// ## References
 /// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
@@ -83,6 +88,7 @@ pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt]
             checker.locator(),
             checker.indexer(),
             checker.stylist(),
+            checker.comment_ranges(),
         )
     });
 }
@@ -136,6 +142,7 @@ fn remove_else(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
+    comment_ranges: &CommentRanges,
 ) -> Result<Fix> {
     let Some(start) = orelse.first() else {
         return Err(anyhow::anyhow!("Empty `else` clause"));
@@ -169,11 +176,22 @@ fn remove_else(
             stylist,
         )?;
 
+        // The `else` line is replaced, so a trailing comment on it (e.g., `else:  # comment`) is
+        // deleted.
+        let applicability = if comment_ranges.intersects(locator.line_range(else_range.start())) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
         // Replace the content from the start of the `else` to the end of the loop.
-        Ok(Fix::safe_edit(Edit::replacement(
-            indented,
-            locator.line_start(else_range.start()),
-            locator.full_line_end(end.end()),
-        )))
+        Ok(Fix::applicable_edit(
+            Edit::replacement(
+                indented,
+                locator.line_start(else_range.start()),
+                locator.full_line_end(end.end()),
+            ),
+            applicability,
+        ))
     }
 }

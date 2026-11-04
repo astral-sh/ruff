@@ -139,17 +139,17 @@ class Mat:
         return 42
 
 def invalid_binary_operators(
-    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in type annotation"
-    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in type annotation"
-    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in type annotation"
-    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in type annotation"
-    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in type annotation"
-    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in type annotation"
-    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in type annotation"
-    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in type annotation"
-    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
-    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
-    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
+    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in a parameter annotation"
+    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in a parameter annotation"
+    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in a parameter annotation"
+    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in a parameter annotation"
+    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in a parameter annotation"
+    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in a parameter annotation"
+    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in a parameter annotation"
+    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in a parameter annotation"
+    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in a parameter annotation"
+    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in a parameter annotation"
+    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     l: 5 & 3,
@@ -347,6 +347,9 @@ def func3(t: tuple[*Ts]):
 
 ## Ellipses in the wrong place in a `tuple` specialization
 
+An ellipsis is only valid after a single, non-unpacked element type. Each misplaced ellipsis is
+reported at its own location.
+
 ```toml
 [environment]
 python-version = "3.11"
@@ -377,6 +380,31 @@ def invalid_typevartuple_ellipsis(
     # error: [invalid-type-form] "Invalid `tuple` specialization: `...` cannot be used after an unpacked element"
     unpacked: tuple[Unpack[Ts], ...],
 ) -> None: ...
+```
+
+Multiple misplaced ellipses in an alias produce separate diagnostics, each highlighting only the
+offending ellipsis:
+
+```py
+# snapshot: invalid-type-form
+# snapshot: invalid-type-form
+X = tuple[int, ..., ...]
+y: X
+```
+
+```snapshot
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:16
+   |
+27 | X = tuple[int, ..., ...]
+   |                ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
+
+
+error[invalid-type-form]: Invalid `tuple` specialization
+  --> src/mdtest_snippet.py:27:21
+   |
+27 | X = tuple[int, ..., ...]
+   |                     ^^^ `...` can only be used as the second element in a two-element `tuple` specialization
 ```
 
 ## Invalid AST nodes in string annotations
@@ -1240,26 +1268,17 @@ python-version = "3.12"
 class C:
     list = 42
 
-    # TODO: `visible_ancestor_scopes` skips the class through nested annotation scopes,
-    # so we incorrectly offer a fix that resolves `list` to `C.list`.
     type Alias[T] = [int]  # snapshot: invalid-type-form
 ```
 
 ```snapshot
-error[invalid-type-form]: List literals are not allowed in this context in a type alias value
- --> src/mdtest_snippet.py:6:21
+error[invalid-type-form]: List literals are not allowed in this context in a type alias definition
+ --> src/mdtest_snippet.py:4:21
   |
-6 |     type Alias[T] = [int]  # snapshot: invalid-type-form
+4 |     type Alias[T] = [int]  # snapshot: invalid-type-form
   |                     ^^^^^ Did you mean `list[int]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-help: Replace with `list[...]`
-  |
-5 |     # so we incorrectly offer a fix that resolves `list` to `C.list`.
-  -     type Alias[T] = [int]  # snapshot: invalid-type-form
-6 +     type Alias[T] = list[int]  # snapshot: invalid-type-form
-  |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 #### Collection literal fixes with project-level builtin overrides
@@ -1349,6 +1368,59 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 4 | quoted_set: "{int}"  # snapshot: invalid-type-form
   |              ^^^^^ Did you mean `set[int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+#### Recursive type aliases in collection hints
+
+Collection suggestions preserve the name of a recursive alias, including when it appears in a union.
+Quoted annotations receive the same suggestions.
+
+```py
+Tree = tuple[int, "Tree | None"]
+
+def consume(
+    trees: "[Tree]",  # snapshot: invalid-type-form
+    pair: "(Tree, int)",  # snapshot: invalid-type-form
+    mapping: "{str: Tree}",  # snapshot: invalid-type-form
+    roots: "{Tree | None}",  # snapshot: invalid-type-form
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:4:13
+  |
+4 |     trees: "[Tree]",  # snapshot: invalid-type-form
+  |             ^^^^^^ Did you mean `list[Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:5:12
+  |
+5 |     pair: "(Tree, int)",  # snapshot: invalid-type-form
+  |            ^^^^^^^^^^^ Did you mean `tuple[Tree, int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:6:15
+  |
+6 |     mapping: "{str: Tree}",  # snapshot: invalid-type-form
+  |               ^^^^^^^^^^^ Did you mean `dict[str, Tree]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in parameter annotations
+ --> src/mdtest_snippet.py:7:13
+  |
+7 |     roots: "{Tree | None}",  # snapshot: invalid-type-form
+  |             ^^^^^^^^^^^^^ Did you mean `set[Tree | None]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

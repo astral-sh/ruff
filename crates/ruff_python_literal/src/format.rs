@@ -501,7 +501,7 @@ impl FieldNamePart {
                         if ch == ']' {
                             return if index.is_empty() {
                                 Err(FormatParseError::EmptyAttribute)
-                            } else if let Ok(index) = index.parse::<usize>() {
+                            } else if let Some(index) = parse_index(&index) {
                                 Ok(FieldNamePart::Index(index))
                             } else {
                                 Ok(FieldNamePart::StringIndex(index))
@@ -540,7 +540,7 @@ impl FieldName {
 
         let field_type = if first.is_empty() {
             FieldType::Auto
-        } else if let Ok(index) = first.parse::<usize>() {
+        } else if let Some(index) = parse_index(&first) {
             FieldType::Index(index)
         } else {
             FieldType::Keyword(first)
@@ -734,6 +734,18 @@ impl<'a> FromTemplate<'a> for FormatString {
     fn from_raw_str(text: &'a str) -> Result<Self, Self::Err> {
         FormatString::parse(text, true)
     }
+}
+
+/// Python only treats an all-digit field name or element index as an integer, so `"{+0}"` is the
+/// keyword `+0`, not index 0. `usize::from_str` accepts a leading `+`, hence the explicit check.
+///
+/// See the `arg_name` and `element_index` productions in the
+/// [format string syntax](https://docs.python.org/3/library/string.html#format-string-syntax).
+fn parse_index(text: &str) -> Option<usize> {
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    text.parse().ok()
 }
 
 #[cfg(test)]
@@ -1029,6 +1041,23 @@ mod tests {
                     FieldNamePart::Attribute("attr".to_owned()),
                     FieldNamePart::Index(0),
                     FieldNamePart::StringIndex("string".to_owned())
+                ],
+            })
+        );
+        assert_eq!(
+            FieldName::parse("+0"),
+            Ok(FieldName {
+                field_type: FieldType::Keyword("+0".to_owned()),
+                parts: Vec::new(),
+            })
+        );
+        assert_eq!(
+            FieldName::parse("0[+1][-1]"),
+            Ok(FieldName {
+                field_type: FieldType::Index(0),
+                parts: vec![
+                    FieldNamePart::StringIndex("+1".to_owned()),
+                    FieldNamePart::StringIndex("-1".to_owned()),
                 ],
             })
         );

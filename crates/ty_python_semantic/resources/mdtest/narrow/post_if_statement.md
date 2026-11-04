@@ -504,8 +504,22 @@ async def main(val: int | None):
 data: dict[str, str] = {}
 api_key = data.get("api_key")
 
-if not api_key:
+if api_key is None:
     exit(1)
 
-reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str
+```
+
+## Reading two places in both branches preserves their individual types
+
+```py
+def _(condition: bool, number: int, text: str):
+    if condition:
+        pair = (number, text)
+    else:
+        pair = (text, number)
+
+    reveal_type(number)  # revealed: int
+    reveal_type(text)  # revealed: str
+    return pair
 ```

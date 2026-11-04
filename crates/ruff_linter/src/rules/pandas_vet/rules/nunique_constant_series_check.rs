@@ -63,18 +63,12 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
 }
 
 /// PD101
-pub(crate) fn nunique_constant_series_check(
-    checker: &Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
+pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: &ast::ExprCompare) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    let ([op], [right]) = (ops, comparators) else {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -116,5 +110,5 @@ pub(crate) fn nunique_constant_series_check(
         return;
     }
 
-    checker.report_diagnostic(PandasNuniqueConstantSeriesCheck, expr.range());
+    checker.report_diagnostic(PandasNuniqueConstantSeriesCheck, compare.range());
 }

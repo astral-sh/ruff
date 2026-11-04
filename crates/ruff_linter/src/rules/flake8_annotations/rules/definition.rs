@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Definition;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType};
@@ -486,8 +486,8 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 /// ## What it does
-/// Checks that function arguments are annotated with a more specific type than
-/// `Any`.
+/// Checks that function arguments and return values are annotated with a more
+/// specific type than `Any`.
 ///
 /// ## Why is this bad?
 /// `Any` is a special type indicating an unconstrained type. When an
@@ -503,13 +503,13 @@ impl Violation for MissingReturnTypeClassMethod {
 /// from typing import Any
 ///
 ///
-/// def foo(x: Any): ...
+/// def foo(x: Any) -> Any: ...
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// def foo(x: int): ...
+/// def foo(x: int) -> int: ...
 /// ```
 ///
 /// ## Known problems

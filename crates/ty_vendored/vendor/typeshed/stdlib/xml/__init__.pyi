@@ -20,7 +20,7 @@ etree -- The ElementTree XML library.  This is a subset of the full
 # valid, and causes them to be included in a star import. See #6523
 import sys
 
-__all__ = ["dom", "parsers", "sax", "etree"]  # noqa: F822  # pyright: ignore[reportUnsupportedDunderAll]
+__all__ = ["dom", "parsers", "sax", "etree"]  # ruff: ignore[undefined-export]  # pyright: ignore[reportUnsupportedDunderAll]
 
 if sys.version_info >= (3, 15):
     __all__ += ["is_valid_name"]  # pyright: ignore[reportUnsupportedDunderAll]

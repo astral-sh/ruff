@@ -101,7 +101,6 @@ pub(crate) fn line_too_long(
             &[]
         },
         settings.tab_size,
-        settings.preview,
     ) {
         context.report_diagnostic(
             LineTooLong(overlong.width(), limit.value() as usize),

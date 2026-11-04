@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -13,11 +14,11 @@ use crate::rules::flake8_use_pathlib::{
 };
 use crate::{Edit, Fix};
 
-pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
-        return;
-    };
-
+pub(crate) fn replaceable_by_pathlib(
+    checker: &Checker,
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
+) {
     let range = call.func.range();
     match qualified_name.segments() {
         // PTH122

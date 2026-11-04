@@ -114,7 +114,7 @@ def nested_transitive[T, U, V]() -> None:
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # revealed: tuple[Solution[U=int, T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
@@ -205,13 +205,11 @@ def chain_stu[S, T, U]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
+    # revealed: tuple[Solution[S=int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
+    # revealed: tuple[Solution[T=int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=S@chain_stu | int | T@chain_stu]]
+    # revealed: tuple[Solution[U=int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
 
 def chain_uts[U, T, S]() -> None:
@@ -221,21 +219,69 @@ def chain_uts[U, T, S]() -> None:
     static_assert(chain == linked)
 
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
-    # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
+    # revealed: tuple[Solution[S=int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
+    # revealed: tuple[Solution[T=int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
-    # revealed: tuple[Solution[U=S@chain_uts | int | T@chain_uts]]
+    # revealed: tuple[Solution[U=int]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[S, T, U]))
+```
+
+## Non-inferable constraint source order and typevar orientation
+
+A non-inferable constraint can appear before or after inferable constraints, and a bare relationship
+can be encoded with either variable as its subject. Unrelated non-inferable variables are omitted,
+but a directly related non-inferable variable must be retained regardless of its orientation.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_constraint_first[I, J, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def noninferable_constraint_last[I, J, N]() -> None:
+    constraints = ConstraintSet.range(str, I, str) & ConstraintSet.range(bytes, J, bytes) & ConstraintSet.range(int, N, int)
+    # revealed: tuple[Solution[I=str, J=bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[I, J]))
+
+def inferable_subject[I, N]() -> None:
+    constraints = ConstraintSet.range(N, I, N)
+    # TODO: sometimes: revealed tuple[Solution[I=N@inferable_subject, N=I@inferable_subject]]
+    # revealed: tuple[Solution[N=I@inferable_subject, I=N@inferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+
+def noninferable_subject[N, I]() -> None:
+    constraints = ConstraintSet.range(I, N, I)
+    # TODO: sometimes: revealed tuple[Solution[N=I@noninferable_subject, I=N@noninferable_subject]]
+    # revealed: tuple[Solution[I=N@noninferable_subject, N=I@noninferable_subject]]
+    reveal_type(constraints.solutions(inferable=tuple[I]))
+```
+
+## Non-inferable bound checks are ordering-independent
+
+Changing the internal constraint order must not allow a non-inferable type variable to violate its
+declared bound.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_declared_bound[T, U: str]() -> None:
+    constraints = ConstraintSet.equality(U, int) & ConstraintSet.equality(T, bytes)
+    # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+
+    reversed_constraints = ConstraintSet.equality(T, bytes) & ConstraintSet.equality(U, int)
+    # revealed: None
+    reveal_type(reversed_constraints.solutions(inferable=tuple[T]))
 ```
 
 ## Abstraction and non-inferable typevars
 
-Removing non-inferable typevars rebuilds the TDD with `ite`; irrelevant positive decisions must not
-leak onto the surviving paths. Universal abstraction of an alternative must likewise leave only the
-unrelated branch.
+Irrelevant non-inferable typevars must not appear in reported solution bindings, and irrelevant
+positive decisions must not leak onto independent alternatives. Universal abstraction of an
+alternative must likewise leave only the unrelated branch.
 
 ```py
 from ty_extensions import static_assert
@@ -247,10 +293,9 @@ def noninferable_nested[T, U, V]() -> None:
     ) | ConstraintSet.lower_bound(bytes, V)
 
     # `U` is deliberately non-inferable here.
-    # TODO: We should not include a solution for non-inferable U.
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
-    # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never, V=bytes], Solution[V=bytes]]
+    # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int], V=bytes], Solution[V=bytes]]
+    # revealed: tuple[Solution[T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, V]))
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
@@ -342,9 +387,6 @@ def listify[T](value: T) -> list[T]:
 
 def invariant_callable[U, V]() -> None:
     constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
-    # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
-    # TODO: sometimes: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
 
 ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
@@ -362,8 +404,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    # revealed: object
+    # revealed: int
     reveal_type(get_value(value))
 ```
 
@@ -519,4 +560,51 @@ def high_fanout[
     # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
     # revealed: None
     reveal_type(impossible.solutions_for(R11, inferable=inferable))
+```
+
+## Satisfiability checks exceeding the traversal budget
+
+Independent alternatives can produce too many paths to check within the computation budget. An
+incomplete check returns `bool`, without claiming either literal result. This applies both to
+checking that a constraint set never holds and to checking that its negation always holds. Orderings
+that reach the contradiction early can instead prove the result within the budget.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def bounded[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, X]() -> None:
+    # (A = int ∨ A = str) ∧ … ∧ (R = int ∨ R = str)
+    choices = (
+        (ConstraintSet.equality(A, int) | ConstraintSet.equality(A, str))
+        & (ConstraintSet.equality(B, int) | ConstraintSet.equality(B, str))
+        & (ConstraintSet.equality(C, int) | ConstraintSet.equality(C, str))
+        & (ConstraintSet.equality(D, int) | ConstraintSet.equality(D, str))
+        & (ConstraintSet.equality(E, int) | ConstraintSet.equality(E, str))
+        & (ConstraintSet.equality(F, int) | ConstraintSet.equality(F, str))
+        & (ConstraintSet.equality(G, int) | ConstraintSet.equality(G, str))
+        & (ConstraintSet.equality(H, int) | ConstraintSet.equality(H, str))
+        & (ConstraintSet.equality(I, int) | ConstraintSet.equality(I, str))
+        & (ConstraintSet.equality(J, int) | ConstraintSet.equality(J, str))
+        & (ConstraintSet.equality(K, int) | ConstraintSet.equality(K, str))
+        & (ConstraintSet.equality(L, int) | ConstraintSet.equality(L, str))
+        & (ConstraintSet.equality(M, int) | ConstraintSet.equality(M, str))
+        & (ConstraintSet.equality(N, int) | ConstraintSet.equality(N, str))
+        & (ConstraintSet.equality(O, int) | ConstraintSet.equality(O, str))
+        & (ConstraintSet.equality(P, int) | ConstraintSet.equality(P, str))
+        & (ConstraintSet.equality(Q, int) | ConstraintSet.equality(Q, str))
+        & (ConstraintSet.equality(R, int) | ConstraintSet.equality(R, str))
+    )
+    # Every combination of choices eventually encounters X = int ∧ X = str.
+    impossible = ConstraintSet.equality(X, int) & ConstraintSet.equality(X, str) & choices
+    # TODO: sometimes: revealed Literal[True]
+    # revealed: bool
+    reveal_type(impossible.is_never_satisfied(inferable=tuple[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, X]))
+
+    # TODO: sometimes: revealed Literal[True]
+    # revealed: bool
+    reveal_type((~impossible).is_always_satisfied(inferable=tuple[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, X]))
+
+    # Finding one witness for the choices alone does not require exploring every combination.
+    # revealed: Literal[False]
+    reveal_type(choices.is_never_satisfied(inferable=tuple[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R]))
 ```

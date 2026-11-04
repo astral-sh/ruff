@@ -660,65 +660,63 @@ Module(
                                                                     range: 505..524,
                                                                     value: FStringValue {
                                                                         inner: Single(
-                                                                            FString(
-                                                                                FString {
-                                                                                    range: 505..524,
-                                                                                    node_index: NodeIndex(None),
-                                                                                    elements: [
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 507..514,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "caught ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 514..523,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Call(
-                                                                                                    ExprCall {
-                                                                                                        node_index: NodeIndex(None),
-                                                                                                        range: 515..522,
-                                                                                                        func: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 515..519,
-                                                                                                                id: Name("type"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        arguments: Arguments {
-                                                                                                            range: 519..522,
+                                                                            FString {
+                                                                                range: 505..524,
+                                                                                node_index: NodeIndex(None),
+                                                                                elements: [
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 507..514,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: "caught ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 514..523,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Call(
+                                                                                                ExprCall {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 515..522,
+                                                                                                    func: Name(
+                                                                                                        ExprName {
                                                                                                             node_index: NodeIndex(None),
-                                                                                                            args: [
-                                                                                                                Name(
-                                                                                                                    ExprName {
-                                                                                                                        node_index: NodeIndex(None),
-                                                                                                                        range: 520..521,
-                                                                                                                        id: Name("e"),
-                                                                                                                        ctx: Load,
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                            keywords: [],
+                                                                                                            range: 515..519,
+                                                                                                            id: Name("type"),
+                                                                                                            ctx: Load,
                                                                                                         },
+                                                                                                    ),
+                                                                                                    arguments: Arguments {
+                                                                                                        range: 519..522,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        args: [
+                                                                                                            Name(
+                                                                                                                ExprName {
+                                                                                                                    node_index: NodeIndex(None),
+                                                                                                                    range: 520..521,
+                                                                                                                    id: Name("e"),
+                                                                                                                    ctx: Load,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ],
+                                                                                                        keywords: [],
                                                                                                     },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                    ],
-                                                                                    flags: FStringFlags {
-                                                                                        quote_style: Double,
-                                                                                        prefix: Regular,
-                                                                                        triple_quoted: false,
-                                                                                        unclosed: false,
-                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: false,
+                                                                                    unclosed: false,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         ),
                                                                     },
                                                                 },
@@ -781,65 +779,63 @@ Module(
                                                                     range: 557..576,
                                                                     value: FStringValue {
                                                                         inner: Single(
-                                                                            FString(
-                                                                                FString {
-                                                                                    range: 557..576,
-                                                                                    node_index: NodeIndex(None),
-                                                                                    elements: [
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 559..566,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "caught ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 566..575,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Call(
-                                                                                                    ExprCall {
-                                                                                                        node_index: NodeIndex(None),
-                                                                                                        range: 567..574,
-                                                                                                        func: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 567..571,
-                                                                                                                id: Name("type"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        arguments: Arguments {
-                                                                                                            range: 571..574,
+                                                                            FString {
+                                                                                range: 557..576,
+                                                                                node_index: NodeIndex(None),
+                                                                                elements: [
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 559..566,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: "caught ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 566..575,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Call(
+                                                                                                ExprCall {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 567..574,
+                                                                                                    func: Name(
+                                                                                                        ExprName {
                                                                                                             node_index: NodeIndex(None),
-                                                                                                            args: [
-                                                                                                                Name(
-                                                                                                                    ExprName {
-                                                                                                                        node_index: NodeIndex(None),
-                                                                                                                        range: 572..573,
-                                                                                                                        id: Name("e"),
-                                                                                                                        ctx: Load,
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                            keywords: [],
+                                                                                                            range: 567..571,
+                                                                                                            id: Name("type"),
+                                                                                                            ctx: Load,
                                                                                                         },
+                                                                                                    ),
+                                                                                                    arguments: Arguments {
+                                                                                                        range: 571..574,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        args: [
+                                                                                                            Name(
+                                                                                                                ExprName {
+                                                                                                                    node_index: NodeIndex(None),
+                                                                                                                    range: 572..573,
+                                                                                                                    id: Name("e"),
+                                                                                                                    ctx: Load,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ],
+                                                                                                        keywords: [],
                                                                                                     },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                    ],
-                                                                                    flags: FStringFlags {
-                                                                                        quote_style: Double,
-                                                                                        prefix: Regular,
-                                                                                        triple_quoted: false,
-                                                                                        unclosed: false,
-                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: false,
+                                                                                    unclosed: false,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         ),
                                                                     },
                                                                 },
@@ -1095,101 +1091,99 @@ Module(
                                                                     range: 704..750,
                                                                     value: FStringValue {
                                                                         inner: Single(
-                                                                            FString(
-                                                                                FString {
-                                                                                    range: 704..750,
-                                                                                    node_index: NodeIndex(None),
-                                                                                    elements: [
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 706..713,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "caught ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 713..722,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Call(
-                                                                                                    ExprCall {
-                                                                                                        node_index: NodeIndex(None),
-                                                                                                        range: 714..721,
-                                                                                                        func: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 714..718,
-                                                                                                                id: Name("type"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        arguments: Arguments {
-                                                                                                            range: 718..721,
+                                                                            FString {
+                                                                                range: 704..750,
+                                                                                node_index: NodeIndex(None),
+                                                                                elements: [
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 706..713,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: "caught ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 713..722,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Call(
+                                                                                                ExprCall {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 714..721,
+                                                                                                    func: Name(
+                                                                                                        ExprName {
                                                                                                             node_index: NodeIndex(None),
-                                                                                                            args: [
-                                                                                                                Name(
-                                                                                                                    ExprName {
-                                                                                                                        node_index: NodeIndex(None),
-                                                                                                                        range: 719..720,
-                                                                                                                        id: Name("e"),
-                                                                                                                        ctx: Load,
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                            keywords: [],
+                                                                                                            range: 714..718,
+                                                                                                            id: Name("type"),
+                                                                                                            ctx: Load,
                                                                                                         },
-                                                                                                    },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 722..735,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: " with nested ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 735..749,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Attribute(
-                                                                                                    ExprAttribute {
+                                                                                                    ),
+                                                                                                    arguments: Arguments {
+                                                                                                        range: 718..721,
                                                                                                         node_index: NodeIndex(None),
-                                                                                                        range: 736..748,
-                                                                                                        value: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 736..737,
-                                                                                                                id: Name("e"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        attr: Identifier {
-                                                                                                            id: Name("exceptions"),
-                                                                                                            range: 738..748,
-                                                                                                            node_index: NodeIndex(None),
-                                                                                                        },
-                                                                                                        ctx: Load,
+                                                                                                        args: [
+                                                                                                            Name(
+                                                                                                                ExprName {
+                                                                                                                    node_index: NodeIndex(None),
+                                                                                                                    range: 719..720,
+                                                                                                                    id: Name("e"),
+                                                                                                                    ctx: Load,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ],
+                                                                                                        keywords: [],
                                                                                                     },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                    ],
-                                                                                    flags: FStringFlags {
-                                                                                        quote_style: Double,
-                                                                                        prefix: Regular,
-                                                                                        triple_quoted: false,
-                                                                                        unclosed: false,
-                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 722..735,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: " with nested ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 735..749,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Attribute(
+                                                                                                ExprAttribute {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 736..748,
+                                                                                                    value: Name(
+                                                                                                        ExprName {
+                                                                                                            node_index: NodeIndex(None),
+                                                                                                            range: 736..737,
+                                                                                                            id: Name("e"),
+                                                                                                            ctx: Load,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    attr: Identifier {
+                                                                                                        id: Name("exceptions"),
+                                                                                                        range: 738..748,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                    },
+                                                                                                    ctx: Load,
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: false,
+                                                                                    unclosed: false,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         ),
                                                                     },
                                                                 },
@@ -1252,101 +1246,99 @@ Module(
                                                                     range: 784..830,
                                                                     value: FStringValue {
                                                                         inner: Single(
-                                                                            FString(
-                                                                                FString {
-                                                                                    range: 784..830,
-                                                                                    node_index: NodeIndex(None),
-                                                                                    elements: [
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 786..793,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "caught ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 793..802,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Call(
-                                                                                                    ExprCall {
-                                                                                                        node_index: NodeIndex(None),
-                                                                                                        range: 794..801,
-                                                                                                        func: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 794..798,
-                                                                                                                id: Name("type"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        arguments: Arguments {
-                                                                                                            range: 798..801,
+                                                                            FString {
+                                                                                range: 784..830,
+                                                                                node_index: NodeIndex(None),
+                                                                                elements: [
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 786..793,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: "caught ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 793..802,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Call(
+                                                                                                ExprCall {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 794..801,
+                                                                                                    func: Name(
+                                                                                                        ExprName {
                                                                                                             node_index: NodeIndex(None),
-                                                                                                            args: [
-                                                                                                                Name(
-                                                                                                                    ExprName {
-                                                                                                                        node_index: NodeIndex(None),
-                                                                                                                        range: 799..800,
-                                                                                                                        id: Name("e"),
-                                                                                                                        ctx: Load,
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                            keywords: [],
+                                                                                                            range: 794..798,
+                                                                                                            id: Name("type"),
+                                                                                                            ctx: Load,
                                                                                                         },
-                                                                                                    },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                        Literal(
-                                                                                            InterpolatedStringLiteralElement {
-                                                                                                range: 802..815,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: " with nested ",
-                                                                                            },
-                                                                                        ),
-                                                                                        Interpolation(
-                                                                                            InterpolatedElement {
-                                                                                                range: 815..829,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                expression: Attribute(
-                                                                                                    ExprAttribute {
+                                                                                                    ),
+                                                                                                    arguments: Arguments {
+                                                                                                        range: 798..801,
                                                                                                         node_index: NodeIndex(None),
-                                                                                                        range: 816..828,
-                                                                                                        value: Name(
-                                                                                                            ExprName {
-                                                                                                                node_index: NodeIndex(None),
-                                                                                                                range: 816..817,
-                                                                                                                id: Name("e"),
-                                                                                                                ctx: Load,
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        attr: Identifier {
-                                                                                                            id: Name("exceptions"),
-                                                                                                            range: 818..828,
-                                                                                                            node_index: NodeIndex(None),
-                                                                                                        },
-                                                                                                        ctx: Load,
+                                                                                                        args: [
+                                                                                                            Name(
+                                                                                                                ExprName {
+                                                                                                                    node_index: NodeIndex(None),
+                                                                                                                    range: 799..800,
+                                                                                                                    id: Name("e"),
+                                                                                                                    ctx: Load,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ],
+                                                                                                        keywords: [],
                                                                                                     },
-                                                                                                ),
-                                                                                                debug_text: None,
-                                                                                                conversion: None,
-                                                                                                format_spec: None,
-                                                                                            },
-                                                                                        ),
-                                                                                    ],
-                                                                                    flags: FStringFlags {
-                                                                                        quote_style: Double,
-                                                                                        prefix: Regular,
-                                                                                        triple_quoted: false,
-                                                                                        unclosed: false,
-                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                    Literal(
+                                                                                        InterpolatedStringLiteralElement {
+                                                                                            range: 802..815,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            value: " with nested ",
+                                                                                        },
+                                                                                    ),
+                                                                                    Interpolation(
+                                                                                        InterpolatedElement {
+                                                                                            range: 815..829,
+                                                                                            node_index: NodeIndex(None),
+                                                                                            expression: Attribute(
+                                                                                                ExprAttribute {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 816..828,
+                                                                                                    value: Name(
+                                                                                                        ExprName {
+                                                                                                            node_index: NodeIndex(None),
+                                                                                                            range: 816..817,
+                                                                                                            id: Name("e"),
+                                                                                                            ctx: Load,
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    attr: Identifier {
+                                                                                                        id: Name("exceptions"),
+                                                                                                        range: 818..828,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                    },
+                                                                                                    ctx: Load,
+                                                                                                },
+                                                                                            ),
+                                                                                            debug_text: None,
+                                                                                            conversion: None,
+                                                                                            format_spec: None,
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                flags: FStringFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Regular,
+                                                                                    triple_quoted: false,
+                                                                                    unclosed: false,
                                                                                 },
-                                                                            ),
+                                                                            },
                                                                         ),
                                                                     },
                                                                 },

@@ -33,6 +33,152 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Self-referential slot values
+
+Rebuilding a dictionary from its own contents preserves the dictionary type of a slotted attribute.
+
+```py
+class Slotted:
+    __slots__ = ("data",)
+
+    def __init__(self, **data):
+        self.data = data
+
+    def update(self):
+        self.data = {"a": self.data["a"]}
+
+# not a great type, but we do know that it's a dictionary with string keys!
+reveal_type(Slotted().data)  # revealed: dict[str, Unknown] | dict[str, Divergent]
+```
+
+## Slots storing their own descriptors
+
+Inference converges when a slot contains its own class descriptor, preserving the descriptor type.
+
+```py
+class Slotted:
+    __slots__ = ("value",)
+
+    def __init__(self):
+        self.value = Slotted.value
+
+reveal_type(Slotted().value)  # revealed: MemberDescriptorType
+```
+
+## Assigning a bound method in a loop
+
+Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,
+without introducing `Divergent` into the attribute's type.
+
+```py
+class C:
+    def __init__(self):
+        self.value = 0
+        while isinstance(self.value, int):
+            self.value = [self.value].copy
+
+reveal_type(C().value)  # revealed: int | (() -> list[int])
+```
+
+## Wrapping an attribute in a loop
+
+Recursive container assignments converge even when a loop predicate narrows the attribute.
+
+```py
+class C:
+    def __init__(self):
+        self.value = [0]
+        while isinstance(self.value, list):
+            self.value = [self.value]
+
+reveal_type(C().value)  # revealed: list[int] | list[Divergent]
+```
+
+## Wrapping list elements in tuples
+
+Both list assignments contribute to the inferred attribute type.
+
+```py
+class Items:
+    def update(self, values) -> None:
+        self.items = [*values]
+        self.items = [(x,) for x in self.items]
+        reveal_type(self.items)  # revealed: list[Unknown]
+
+def _(items: Items):
+    items.update(items.items)
+    reveal_type(items.items)  # revealed: list[Unknown] | list[tuple[Unknown]]
+    items.items.missing  # error: [unresolved-attribute]
+```
+
+## Reading an attribute with a growing type argument
+
+Reading `value` before checking `advance` starts inference at the member lookup. Each update nests
+the type argument one level deeper, so inference eventually falls back to `Unknown`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class Box[T]:
+    next: Box[tuple[T]]
+
+def read(c: C):
+    reveal_type(c.value)  # revealed: Unknown
+
+class C:
+    def __init__(self):
+        self.value = Box[int]()
+
+    def advance(self, other: C):
+        self.value = other.value.next
+```
+
+## Unwrapping a finite nest of tuples
+
+Each update removes one layer until indexing a string yields another string. The inferred type
+preserves enough information to report a missing attribute even after many updates.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+type FiveLayers[T] = tuple[tuple[tuple[tuple[tuple[T]]]]]
+
+class C:
+    def __init__(self, value: FiveLayers[FiveLayers[FiveLayers[str]]]):
+        self.value = value
+
+    def advance(self):
+        self.value = self.value[0]
+
+def read(c: C):
+    c.value.missing  # error: [unresolved-attribute]
+```
+
+## Concatenating recursively growing tuples
+
+Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
+length. Inference converges to a variable-length tuple while preserving its element type.
+
+```py
+class Tuples:
+    def __init__(self) -> None:
+        self.appended = ()
+        self.prepended = ()
+
+    def update(self, value: int) -> None:
+        self.appended += (value,)
+        self.prepended = (value,) + self.prepended
+
+reveal_type(Tuples().appended)  # revealed: tuple[int, ...]
+reveal_type(Tuples().prepended)  # revealed: tuple[int, ...]
+```
+
 ## Cycle normalization preserves non-gradual variadic parameters
 
 Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
@@ -56,7 +202,7 @@ class Recursive:
         self.callback = c.method if flag else other.callback
 
 def check(value: Recursive):
-    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
+    reveal_type(value.callback)  # revealed: (*args: Any, **kwargs: Any) -> None
     static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
 ```
 
@@ -529,4 +675,92 @@ class Cached:
         return self._metadata
 
 reveal_type(Cached().metadata)  # revealed: int
+```
+
+## Lazy initialization in a classmethod
+
+We widen an attribute initialized with `None` to `None | Unknown`, since it is unlikely to always
+contain only `None`. A subclass can therefore replace this cache with an instance of its own type,
+and the initialization branch is reachable.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = None
+
+reveal_type(Context.current)  # revealed: None | Unknown
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should include `None | Unknown`, not be `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):  # ok
+            cls.current = ChildContext()  # ok
+```
+
+## Incompatible initialization in a classmethod
+
+An attribute initialized with an integer is inferred as `int`, without widening to include
+`Unknown`. Assigning an instance of the subclass to it should be rejected.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = 1
+
+reveal_type(Context.current)  # revealed: int
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should be `int`, not `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):
+            # TODO: Report an invalid-assignment error for assigning `ChildContext` to `int`.
+            cls.current = ChildContext()
+```
+
+## Lazy initialization in a class property
+
+The metaclass initializes `_name` to `None`. Reading the class property can therefore enter the
+branch that fills the cache, including on a class with multiple bases.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+def module_name(module: str) -> str:
+    return module
+
+class ClassProperty:
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, owner):
+        return self.getter(owner)
+
+class Meta(type):
+    def __new__(cls, name, bases, namespace):
+        namespace["_name"] = None
+        return super(Meta, cls).__new__(cls, name, bases, namespace)
+
+class Left: ...
+class Right: ...
+
+class Package(Left, Right, metaclass=Meta):
+    @ClassProperty
+    def name(cls):
+        if cls._name is None:  # ok
+            cls._name = module_name(cls.__module__)
 ```

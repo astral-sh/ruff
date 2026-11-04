@@ -360,7 +360,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([tuple.into()]),
+            args: [tuple.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff = { workspace = true }
+ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true, features = ["schemars"] }
 ruff_notebook = { workspace = true }
@@ -35,9 +36,10 @@ imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
-markdown = { version = "1.0.0" }
+markdown = { workspace = true, default-features = false }
 rayon = { workspace = true }
 regex = { workspace = true }
+rustc-hash = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

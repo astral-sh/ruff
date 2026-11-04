@@ -4,11 +4,12 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 
 use anyhow::Result;
+use ruff_command_line::TerminalColor;
 use ruff_db::system::OsSystem;
 use ty_project::ProjectMetadata;
 use ty_site_packages::PythonEnvironment;
 
-use crate::args::{ServerCommand, TerminalColor};
+use crate::args::ServerCommand;
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use crate::{ExitStatus, current_directory};

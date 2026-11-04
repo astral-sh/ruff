@@ -177,17 +177,9 @@ pub(crate) fn key_in_dict_comprehension(checker: &Checker, comprehension: &Compr
 
 /// SIM118 in a comparison.
 pub(crate) fn key_in_dict_compare(checker: &Checker, compare: &ast::ExprCompare) {
-    let [op] = &*compare.ops else {
+    let Some((left, op @ (CmpOp::In | CmpOp::NotIn), right)) = compare.as_single() else {
         return;
     };
 
-    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
-        return;
-    }
-
-    let [right] = &*compare.comparators else {
-        return;
-    };
-
-    key_in_dict(checker, &compare.left, right, *op, compare.into());
+    key_in_dict(checker, left, right, *op, compare.into());
 }

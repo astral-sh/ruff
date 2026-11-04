@@ -19,6 +19,6 @@ exit_code: 1
 ----- stdout -----
 -:1:1: I002 [*] Missing required import: `from collections.abc import Set`
 Found 1 error.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 
 ----- stderr -----

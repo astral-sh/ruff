@@ -122,3 +122,8 @@ For less formal discussion, try the typing chat room on
 are almost always present; feel free to find us there, and we're happy
 to chat.  Substantive technical discussion will be directed to the
 issue tracker.
+
+## Further Documentation
+
+See [docs/README.md](./docs/README.md) for an overview of all documentation
+available for typeshed.

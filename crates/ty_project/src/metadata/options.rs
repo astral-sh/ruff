@@ -9,22 +9,27 @@ use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ordermap::OrderMap;
 use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
+#[cfg(feature = "junit")]
+use ruff_db::diagnostic::render::JunitRenderer;
+use ruff_db::diagnostic::render::{
+    ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer, Renderer, SarifRenderer,
+};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
-    Span, SubDiagnostic, SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span, SubDiagnostic,
+    SubDiagnosticSeverity,
 };
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
-use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
-use rustc_hash::FxHasher;
-use serde::{Deserialize, Serialize};
+use rustc_hash::{FxHashMap, FxHasher};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug, Display, Write as _};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -35,12 +40,12 @@ use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
-    inferred_python_version_source_annotation,
+    PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
+    SysPrefixPathOrigin, inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -59,6 +64,19 @@ use ty_static::EnvVars;
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    /// Path to the JSON file that records existing lint diagnostics for this project.
+    /// Relative paths are resolved against the project root. Use `ty check --update-baseline`
+    /// to create or update the file.
+    ///
+    /// Diagnostic baselines are in preview. The file format may change between ty releases.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"baseline = "ty-baseline.json""#
+    )]
+    pub baseline: Option<RelativePathBuf>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -216,6 +234,14 @@ impl Options {
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
+        let python_environment_error = match &python_environment {
+            Err(ToProgramSettingsError::PythonEnvironment(error)) => Some(PythonEnvironmentError {
+                message: error.to_string().into(),
+                last_usable: None,
+            }),
+            _ => None,
+        };
+
         // If in safe-mode, fallback to None if this fails instead of erroring.
         let python_environment = strategy
             .fallback_opt(python_environment, |_| {
@@ -306,6 +332,10 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                python_environment: match python_environment_error {
+                    Some(error) => Err(error),
+                    None => Ok(python_environment),
+                },
             },
             diagnostics,
         ))
@@ -497,13 +527,13 @@ impl Options {
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
-        let src = strategy.fallback(src, |_| SrcSettings::default())?;
+        let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
-        let analysis = self
-            .analysis
-            .or_default()
-            .to_settings(db, &mut analysis_diagnostics);
+        let analysis =
+            self.analysis
+                .or_default()
+                .to_settings(db, Severity::Error, &mut analysis_diagnostics);
 
         let analysis_result: Result<_, ToSettingsError> =
             if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
@@ -527,6 +557,10 @@ impl Options {
         let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
+            baseline: self
+                .baseline
+                .as_ref()
+                .map(|path| path.absolute(context.configuration_root(), db.system())),
             rules: Arc::new(rules),
             terminal,
             src,
@@ -600,19 +634,24 @@ impl<'a> OptionsContext<'a> {
 fn python_version_from_config(
     ranged_version: &RangedValue<SupportedPythonVersion>,
 ) -> PythonVersionWithSource {
+    let source = match ranged_version.source() {
+        ValueSource::Cli => PythonVersionSource::Cli,
+        ValueSource::File(path) => PythonVersionSource::ConfigFile(PythonVersionFileSource::new(
+            path.clone(),
+            ranged_version.range(),
+        )),
+        ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+            Span::from(*file).with_optional_range(ranged_version.range()),
+        ),
+        ValueSource::Editor => PythonVersionSource::Editor,
+        ValueSource::UvMetadata => {
+            unreachable!("uv metadata does not provide a configured Python version")
+        }
+    };
+
     PythonVersionWithSource {
         version: PythonVersion::from(**ranged_version),
-        source: match ranged_version.source() {
-            ValueSource::Cli => PythonVersionSource::Cli,
-            ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-            ),
-            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
-                Span::from(*file).with_optional_range(ranged_version.range()),
-            ),
-            ValueSource::Editor => PythonVersionSource::Editor,
-            ValueSource::UvMetadata => PythonVersionSource::UvMetadata,
-        },
+        source,
     }
 }
 
@@ -741,10 +780,6 @@ fn unsupported_inferred_python_version_diagnostic(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
         )),
-        PythonVersionSource::UvMetadata => diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            "The version was provided by uv metadata.",
-        )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "ty fell back to its default Python version.",
@@ -863,7 +898,7 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.14""#,
+        default = r#""3.15""#,
         value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"
@@ -1123,9 +1158,7 @@ impl SrcOptions {
     }
 }
 
-#[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
-)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Hash, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
     /// The rules with their severity. Entries coming later in the map take precedence over
@@ -1135,13 +1168,51 @@ pub struct Rules {
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
+impl<'de> Deserialize<'de> for Rules {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let rules = Self {
+            inner: OrderMap::deserialize(deserializer)?,
+        };
+        // Check each table before merging so a separate config file or override can change the level.
+        let registry = ty_python_semantic::default_lint_registry();
+        let mut seen = FxHashMap::default();
+        for (name, level) in &rules.inner {
+            if let Ok(lint) = registry.get(name)
+                && let Some((other_name, other_level)) = seen.insert(lint, (name, level))
+                && level != other_level
+            {
+                let mut message = format!(
+                    "Conflicting levels for the same rule: `{other_name} = \"{other_level}\"` and \
+                     `{name} = \"{level}\"`"
+                );
+                let canonical = lint.name();
+                for spelling in [other_name, name] {
+                    if spelling.as_str() != canonical.as_str() {
+                        message.push('\n');
+                        let _ = write!(
+                            message,
+                            "note: `{spelling}` is a legacy alias for `{canonical}`"
+                        );
+                    }
+                }
+                return Err(serde::de::Error::custom(message));
+            }
+        }
+        Ok(rules)
+    }
+}
+
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
     fn from_iter<T: IntoIterator<Item = (RangedValue<String>, RangedValue<Level>)>>(
         iter: T,
     ) -> Self {
-        Self {
-            inner: iter.into_iter().collect(),
+        let mut rules = Self::default();
+        for (name, level) in iter {
+            // Move repeated selectors to the end so they take precedence over an intervening
+            // alias or `all` selector.
+            rules.inner.insert_before(rules.inner.len(), name, level);
         }
+        rules
     }
 }
 
@@ -1338,9 +1409,11 @@ fn build_exclude_filter(
     let system = db.system();
     let mut excludes = ExcludeFilterBuilder::new();
 
+    // Like excludes in a `ty.toml`, default excludes only apply under the project root.
+    // An explicit `../sibling/dist` is not excluded by project defaults.
     for pattern in default_patterns {
         PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(project_root))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
             });
@@ -1447,6 +1520,10 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics as a [SARIF] report.
+    ///
+    /// [SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
+    Sarif,
 }
 
 impl OutputFormat {
@@ -1458,18 +1535,30 @@ impl OutputFormat {
     pub const fn is_human_readable(&self) -> bool {
         matches!(self, OutputFormat::Full | OutputFormat::Concise)
     }
-}
 
-impl From<OutputFormat> for DiagnosticFormat {
-    fn from(value: OutputFormat) -> Self {
-        match value {
-            OutputFormat::Full => Self::Full,
-            OutputFormat::Concise => Self::Concise,
-            OutputFormat::Gitlab => Self::Gitlab,
-            OutputFormat::Github => Self::Github,
+    /// Display diagnostics in this output format.
+    pub fn display<'a>(
+        self,
+        db: &'a dyn Db,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> impl Display + use<'a> {
+        let resolver: &dyn ruff_db::Db = db;
+        fmt::from_fn(move |f| match self {
+            Self::Full => FullRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Concise => ConciseRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Gitlab => GitlabRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Github => GithubRenderer::new(&resolver, config).render(f, diagnostics),
             #[cfg(feature = "junit")]
-            OutputFormat::Junit => Self::Junit,
-        }
+            Self::Junit => JunitRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Sarif => SarifRenderer::new(
+                &resolver,
+                config,
+                db.lint_registry().rule_metadata(),
+                ruff_db::program_version().unwrap_or("Unknown"),
+            )
+            .render(f, diagnostics),
+        })
     }
 }
 
@@ -1504,7 +1593,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise | github | gitlab | junit",
+        value_type = "full | concise | github | gitlab | junit | sarif",
         example = r#"
             output-format = "concise"
         "#
@@ -1540,6 +1629,31 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// This setting controls when ty infers return types for functions without an explicit
+    /// return type annotation.
+    ///
+    /// - `"never"`: Do not infer return types from function bodies. Unannotated functions
+    ///   will have an inferred return type of `Unknown`.
+    /// - `"always"`: Infer return types for unannotated functions and methods.
+    ///
+    /// Enabling return type inference will never override explicit return type annotations.
+    /// Lambda functions are not affected by this setting and their return type will always
+    /// be inferred.
+    ///
+    /// Return types for generator functions and asynchronous functions are currently not
+    /// inferred, but we plan to change this soon.
+    ///
+    /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+    /// inference.
+    #[option(
+        default = r#""never""#,
+        value_type = r#""never" | "always""#,
+        example = r#"
+            return-type-inference = "always"
+        "#
+    )]
+    pub return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether ty should use strict narrowing for unspecialized generic classes in
     /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
@@ -1675,7 +1789,7 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+    /// A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
     ///
     /// Details on supported glob patterns:
     /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -1729,9 +1843,11 @@ impl AnalysisOptions {
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
+        invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            return_type_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
@@ -1740,6 +1856,7 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
+            return_type_inference: return_type_inference_default,
             strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
@@ -1749,27 +1866,38 @@ impl AnalysisOptions {
 
         let allowed_unresolved_imports =
             if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
-                build_module_glob_set(db, allowed_unresolved_imports, "allowed_unresolved_imports")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    allowed_unresolved_imports,
+                    "allowed_unresolved_imports",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 allowed_unresolved_imports_default
             };
 
         let replace_imports_with_any =
             if let Some(replace_imports_with_any) = replace_imports_with_any {
-                build_module_glob_set(db, replace_imports_with_any, "replace_imports_with_any")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    replace_imports_with_any,
+                    "replace_imports_with_any",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 replace_imports_with_any_default
             };
 
         AnalysisSettings {
+            return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
             strict_generic_narrowing: strict_generic_narrowing
                 .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics
@@ -1786,6 +1914,7 @@ fn build_module_glob_set(
     db: &dyn Db,
     patterns: &[RangedValue<String>],
     option_name: &str,
+    severity: Severity,
 ) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
@@ -1794,7 +1923,7 @@ fn build_module_glob_set(
             let diagnostic = OptionDiagnostic::new(
                 DiagnosticId::InvalidGlob,
                 format!("Invalid glob pattern `{error}`"),
-                Severity::Error,
+                severity,
             );
 
             return Err(diagnostic
@@ -1807,7 +1936,7 @@ fn build_module_glob_set(
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             "The `{option_name}` patterns resulted in a regex that is too large".to_string(),
-            Severity::Error,
+            severity,
         );
 
         Box::new(diagnostic.sub(SubDiagnostic::new(
@@ -1864,6 +1993,12 @@ pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
         Some(<Self as RustDoc>::rust_doc())
+    }
+
+    fn kind() -> OptionSetKind {
+        OptionSetKind::Array {
+            example: r#"include = ["src"]"#,
+        }
     }
 
     fn record(visit: &mut dyn Visit) {
@@ -2126,7 +2261,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.to_settings(db, diagnostics);
+        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
 
         let override_instance = Override {
             files,
@@ -2224,19 +2359,14 @@ pub struct ToSettingsError {
 
 impl ToSettingsError {
     pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        let db: &dyn ruff_db::Db = db;
-
         fmt::from_fn(move |f| {
-            let display_config = DisplayDiagnosticConfig::new("ty")
-                .format(self.output_format.into())
-                .color(self.color);
+            let display_config = DisplayDiagnosticConfig::new("ty").color(self.color);
 
             write!(
                 f,
                 "{}",
-                self.diagnostic
-                    .to_diagnostic()
-                    .display(&db, &display_config)
+                self.output_format
+                    .display(db, &display_config, &[self.diagnostic.to_diagnostic()])
             )
         })
     }

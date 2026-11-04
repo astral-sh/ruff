@@ -1,12 +1,10 @@
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_python_ast::helpers::{
-    ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
-};
+use ruff_python_ast::helpers::{pep_604_union, typing_optional, typing_union};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::visibility;
@@ -54,7 +52,7 @@ pub(crate) fn auto_return_type(
 ) -> Option<AutoPythonType> {
     // Collect all the `return` statements.
     let returns = {
-        let mut visitor = ReturnStatementVisitor::default();
+        let mut visitor = ReturnTypeVisitor::default();
         visitor.visit_body(&function.body);
 
         // Ignore generators.
@@ -112,6 +110,30 @@ pub(crate) fn auto_return_type(
         ResolvedPythonType::Union(python_types) => Some(AutoPythonType::Union(python_types)),
         ResolvedPythonType::Unknown => None,
         ResolvedPythonType::TypeError => None,
+    }
+}
+
+#[derive(Default)]
+struct ReturnTypeVisitor<'a> {
+    returns: Vec<&'a ast::StmtReturn>,
+    is_generator: bool,
+}
+
+impl<'a> Visitor<'a> for ReturnTypeVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            Stmt::Return(stmt) => self.returns.push(stmt),
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
+            self.is_generator = true;
+        } else {
+            visitor::walk_expr(self, expr);
+        }
     }
 }
 
