@@ -1,0 +1,5 @@
+[
+  { "line_width": 88 },
+  { "line_width": 40 },
+  { "line_width": 40, "magic_trailing_comma": "ignore" }
+]

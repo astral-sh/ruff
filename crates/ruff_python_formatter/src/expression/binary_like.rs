@@ -3,7 +3,7 @@ use std::ops::{Deref, Index};
 
 use smallvec::SmallVec;
 
-use ruff_formatter::write;
+use ruff_formatter::{FormatContext, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, StringLike, UnaryOp,
 };
@@ -11,18 +11,188 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRa
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{Comments, SourceComment, leading_comments, trailing_comments};
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::OperatorPrecedence;
 use crate::expression::parentheses::{
     Parentheses, in_parentheses_only_group, in_parentheses_only_if_group_breaks,
     in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
-    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
+    optional_parentheses, write_in_parentheses_only_group_end_tag,
+    write_in_parentheses_only_group_start_tag,
 };
 use crate::prelude::*;
 use crate::preview::{
     is_hug_comparator_enabled, is_keep_dict_keys_with_operators_enabled,
     is_remove_redundant_comparison_parentheses_enabled, is_simplify_power_operator_hugging_enabled,
+    is_symmetric_collection_operations_enabled,
 };
 use crate::string::implicit::FormatImplicitConcatenatedString;
+
+/// Tries a split between two collection displays before expanding either display.
+pub(super) struct SymmetricCollectionOperation<'a> {
+    left: &'a Expr,
+    operator: OperatorSymbol,
+    right: &'a Expr,
+}
+
+impl<'a> SymmetricCollectionOperation<'a> {
+    pub(super) fn new(expression: &'a Expr, context: &PyFormatContext) -> Option<Self> {
+        if !is_symmetric_collection_operations_enabled(context)
+            || context.comments().has(expression)
+        {
+            return None;
+        }
+
+        let (left, operator, right) = match expression {
+            Expr::BinOp(binary) => (
+                binary.left.as_ref(),
+                OperatorSymbol::Binary(binary.op),
+                binary.right.as_ref(),
+            ),
+            Expr::Compare(compare) => {
+                let [operator] = compare.ops.as_ref() else {
+                    return None;
+                };
+                if matches!(
+                    operator,
+                    ruff_python_ast::CmpOp::In
+                        | ruff_python_ast::CmpOp::NotIn
+                        | ruff_python_ast::CmpOp::Is
+                        | ruff_python_ast::CmpOp::IsNot
+                ) {
+                    return None;
+                }
+                (
+                    compare.first_operand(),
+                    OperatorSymbol::Comparator(*operator),
+                    compare.second_operand(),
+                )
+            }
+            _ => return None,
+        };
+
+        let is_collection = |operand: &Expr| {
+            matches!(
+                operand,
+                Expr::List(_)
+                    | Expr::Tuple(_)
+                    | Expr::Set(_)
+                    | Expr::Dict(_)
+                    | Expr::ListComp(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        };
+        (is_collection(left)
+            && is_collection(right)
+            && !context.comments().contains_comments(left.into())
+            && !context.comments().contains_comments(right.into())
+            && !(context.options().magic_trailing_comma().is_respect()
+                && [left, right]
+                    .iter()
+                    .any(|operand| matches!(operand, Expr::Tuple(tuple) if tuple.elts.len() == 1))))
+        .then_some(Self {
+            left,
+            operator,
+            right,
+        })
+    }
+}
+
+impl Format<PyFormatContext<'_>> for SymmetricCollectionOperation<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        // Inspect inside `fits_expanded` as well: unlike `will_break`, this must
+        // detect forced breaks inside either collection's brackets.
+        fn has_forced_break(elements: &[FormatElement]) -> bool {
+            elements.iter().any(|element| match element {
+                FormatElement::Interned(interned) => has_forced_break(interned),
+                element => element.will_break(),
+            })
+        }
+
+        let parens_id = f.group_id("symmetric_collection_operation");
+        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
+        let parentheses = if matches!(self.operator, OperatorSymbol::Comparator(_))
+            && is_remove_redundant_comparison_parentheses_enabled(f.context())
+        {
+            Parentheses::Never
+        } else {
+            Parentheses::Preserve
+        };
+        let left = self.left.format().with_options(parentheses).memoized();
+        let right = self.right.format().with_options(parentheses).memoized();
+
+        let flat_left = format_with(|f| {
+            let mut buffer = RemoveSoftLinesBuffer::new(f);
+            write!(buffer, [left])
+        })
+        .memoized();
+        let flat_right = format_with(|f| {
+            let mut buffer = RemoveSoftLinesBuffer::new(f);
+            write!(buffer, [right])
+        })
+        .memoized();
+
+        let regular = format_with(|f| {
+            let prefix = format_with(|f| {
+                write!(
+                    f,
+                    [
+                        left,
+                        in_parentheses_only_soft_line_break_or_space(),
+                        self.operator
+                    ]
+                )
+            });
+            let content = format_with(|f| {
+                if is_keep_dict_keys_with_operators_enabled(f.context())
+                    && matches!(self.operator, OperatorSymbol::Binary(_))
+                    && matches!(self.right, Expr::Dict(_) | Expr::DictComp(_))
+                {
+                    in_parentheses_only_group(&prefix).fmt(f)?;
+                } else {
+                    prefix.fmt(f)?;
+                }
+                write!(f, [space(), right])
+            });
+            optional_parentheses(&in_parentheses_only_group(&content))
+                .with_group_id(parens_id)
+                .fmt(f)
+        });
+
+        if has_forced_break(flat_left.inspect(f)?) || has_forced_break(flat_right.inspect(f)?) {
+            return regular.fmt(f);
+        }
+
+        let single_line =
+            format_with(|f| write!(f, [flat_left, space(), self.operator, space(), flat_right]));
+        let symmetric = format_with(|f| {
+            write!(
+                f,
+                [
+                    token("("),
+                    block_indent(&format_args![
+                        flat_left,
+                        hard_line_break(),
+                        self.operator,
+                        space(),
+                        flat_right
+                    ]),
+                    token(")")
+                ]
+            )
+        });
+
+        best_fitting![
+            group(&single_line).with_id(Some(parens_id)),
+            group(&symmetric)
+                .with_id(Some(parens_id))
+                .should_expand(true),
+            regular
+        ]
+        .with_mode(BestFittingMode::AllLines)
+        .fmt(f)
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {

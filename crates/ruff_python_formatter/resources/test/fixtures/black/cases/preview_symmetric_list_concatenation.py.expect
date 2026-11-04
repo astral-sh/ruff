@@ -1,0 +1,168 @@
+# Regression test for https://github.com/psf/black/issues/260.
+search_fields = (
+    ["file__%s" % field for field in FileAdmin.search_fields]
+    + ["resource__%s" % field for field in ResourceAdmin.search_fields]
+)
+
+# Plain list displays receive the same symmetric treatment.
+names = (
+    ["Alice", "Bob", "Charlie", "Diana", "Edward"]
+    + ["Fiona", "George", "Harriet", "Isabelle"]
+)
+
+# The matching tuple, dictionary, and set operations are also symmetric.
+tuple_values = (
+    ("first_long_value", "second_long_value")
+    + ("third_long_value", "fourth_long_value")
+)
+dictionary_values = (
+    {"first_long_key": first_long_value, "second_long_key": second_long_value}
+    | {"third_long_key": third_long_value, "fourth_long_key": fourth_long_value}
+)
+set_union = (
+    {"first_long_value", "second_long_value"}
+    | {"third_long_value", "fourth_long_value"}
+)
+set_intersection = (
+    {"first_long_value", "second_long_value"}
+    & {"third_long_value", "fourth_long_value"}
+)
+
+# Every arithmetic and bitwise binary operator gets the same treatment when both operands
+# are collections.
+collection_subtraction = (
+    ["first_long_value", "second_long_value"]
+    - ["third_long_value", "fourth_long_value"]
+)
+collection_product = (
+    ("first_long_value", "second_long_value")
+    * ("third_long_value", "fourth_long_value")
+)
+collection_division = (
+    {"first_long_value", "second_long_value"}
+    / {"third_long_value", "fourth_long_value"}
+)
+collection_floor_division = (
+    ["first_long_value", "second_long_value"]
+    // ["third_long_value", "fourth_long_value"]
+)
+collection_modulo = (
+    {"first_long_value", "second_long_value"}
+    % {"third_long_value", "fourth_long_value"}
+)
+collection_matrix = (
+    ["first_long_value", "second_long_value"]
+    @ ["third_long_value", "fourth_long_value"]
+)
+collection_power = (
+    ("first_long_value", "second_long_value")
+    ** ("third_long_value", "fourth_long_value")
+)
+collection_shift = (
+    {"first_long_value", "second_long_value"}
+    << {"third_long_value", "fourth_long_value"}
+)
+collection_right_shift = (
+    {"first_long_value", "second_long_value"}
+    >> {"third_long_value", "fourth_long_value"}
+)
+collection_xor = (
+    ["first_long_value", "second_long_value"]
+    ^ ["third_long_value", "fourth_long_value"]
+)
+mixed_collection_operands = (
+    ["first_long_value", "second_long_value"]
+    + ("third_long_value", "fourth_long_value")
+)
+
+# Symbolic comparisons between collection displays also split symmetrically.
+list_equality = (
+    ["first_long_value", "second_long_value"]
+    == ["third_long_value", "fourth_long_value"]
+)
+list_comprehension_equality = (
+    [item for item in source_items]
+    == [first_value, second_value, third_value]
+)
+
+# Parenthesized scalars and generator expressions are not collection displays.
+parenthesized_scalars = (first_function_with_a_really_long_name(first_argument)) + (
+    second_function_with_a_really_long_name(second_argument)
+)
+generator_operands = (
+    first_item for first_item in first_collection_with_a_really_long_name
+) + (second_item for second_item in second_collection_with_a_really_long_name)
+
+# Comments on an operand stay attached and formatting remains stable.
+commented = (
+    ["first_long_value", "second_long_value", "third_long_value"]  # first list
+    + ["fourth_long_value", "fifth_long_value", "sixth_long_value"]
+)
+
+commented_left = (
+    ["first_value", "second_value", "third_value"]  # abc
+    + ["fourth_value", "fifth_value", "sixth_value"]
+)
+commented_right = (
+    ["first_value", "second_value", "third_value"]
+    + ["fourth_value", "fifth_value", "sixth_value"]  # abc
+)
+
+# Split symmetrically even when the RHS alone fits inside optional parentheses.
+values = (
+    [first_value, second_value, third_value]
+    + [fourth_value, fifth_value, sixth_value]
+)
+
+# Chained concatenations already use the normal delimiter split.
+chained = (
+    ["first_long_value", "second_long_value"]
+    + ["third_long_value", "fourth_long_value"]
+    + ["fifth_long_value", "sixth_long_value"]
+)
+
+# Mixed operands are not symmetric list concatenations.
+mixed_left = [
+    "first_long_value",
+    "second_long_value",
+    "third_long_value",
+] + tuple_with_a_very_long_name
+mixed_right = list_with_a_very_long_name + [
+    "first_long_value",
+    "second_long_value",
+    "third_long_value",
+]
+
+# Short concatenations stay on one line.
+small = [1, 2] + [3, 4]
+
+# Lists that already require bracket splitting keep the existing formatting.
+long_left = [
+    "first_value_with_an_extremely_long_name",
+    "second_value_with_an_extremely_long_name",
+    "third",
+] + ["short"]
+long_right = ["short"] + [
+    "first_value_with_an_extremely_long_name",
+    "second_value_with_an_extremely_long_name",
+    "third",
+]
+both_long = [
+    "first_value_with_an_extremely_long_name",
+    "second_value_with_an_extremely_long_name",
+    "third",
+] + [
+    "fourth_value_with_an_extremely_long_name",
+    "fifth_value_with_an_extremely_long_name",
+    "sixth",
+]
+
+# Magic trailing commas also keep the existing formatting.
+magic_left = [
+    "first_long_value",
+    "second_long_value",
+] + ["third_long_value", "fourth_long_value"]
+magic_right = ["first_long_value", "second_long_value"] + [
+    "third_long_value",
+    "fourth_long_value",
+]

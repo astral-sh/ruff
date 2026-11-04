@@ -524,6 +524,8 @@ The next style includes these changes in preview:
     call wraps onto multiple lines.
 - Keep an operator with its left operand when a following dictionary supplies the line breaks,
     such as `message % {"name": value,}`.
+- Split operations between two collection displays symmetrically when each operand fits on
+    its own line. Collections with magic trailing commas retain their expanded layout.
 
 ### F-string formatting
 

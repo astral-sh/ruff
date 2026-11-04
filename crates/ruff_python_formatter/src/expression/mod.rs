@@ -14,7 +14,9 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::binary_like::can_omit_comparison_operand_parentheses;
+use crate::expression::binary_like::{
+    SymmetricCollectionOperation, can_omit_comparison_operand_parentheses,
+};
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, optional_parentheses,
     parenthesized,
@@ -453,7 +455,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 | Parenthesize::IfBreaks
                 | Parenthesize::IfBreaksParenthesized
                 | Parenthesize::IfBreaksParenthesizedNested => {
-                    if can_omit_optional_parentheses(expression, f.context()) {
+                    if let Some(operation) =
+                        SymmetricCollectionOperation::new(expression, f.context())
+                    {
+                        operation.fmt(f)
+                    } else if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
                         parenthesize_if_expands(&unparenthesized).fmt(f)

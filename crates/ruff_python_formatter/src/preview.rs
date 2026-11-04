@@ -87,3 +87,8 @@ pub(crate) const fn is_hug_comparator_enabled(context: &PyFormatContext) -> bool
 pub(crate) const fn is_keep_dict_keys_with_operators_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Splits operations between collections symmetrically when each operand fits on one line.
+pub(crate) const fn is_symmetric_collection_operations_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
