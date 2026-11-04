@@ -2638,6 +2638,16 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // Leave room before Salsa's iteration limit for the fallback to reach other cycle heads.
+        const MAX_TYPE_CYCLE_ITERATIONS: u32 = 16;
+        let iteration = cycle.iteration();
+        let at_iteration_limit = iteration >= MAX_TYPE_CYCLE_ITERATIONS;
+        // A concrete seed can reappear after an iteration returns Unknown. Keep the fallback
+        // so the cycle can reach a fixed point.
+        if at_iteration_limit && previous == Self::unknown() {
+            return previous;
+        }
+
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -2651,7 +2661,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        let result = if cycle.iteration() <= crate::TAINTED_CYCLES {
+        let result = if iteration <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, env, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -2680,9 +2690,14 @@ impl<'db> Type<'db> {
         // An inferred attribute updated with `self.items += (item,)` can settle on the
         // initializer plus a single update during the first few iterations. Widen new tuple
         // lengths during those iterations too, so repeated updates are represented.
-        UnionType::widen_growing_tuples(db, env, previous, result)
+        let result = UnionType::widen_growing_tuples(db, env, previous, result)
             .unwrap_or(result)
-            .recursive_type_normalized_impl_with_cycle(db, env, cycle)
+            .recursive_type_normalized_impl_with_cycle(db, env, cycle);
+        if at_iteration_limit && result != previous {
+            Self::unknown()
+        } else {
+            result
+        }
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {

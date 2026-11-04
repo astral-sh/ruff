@@ -94,6 +94,72 @@ class C:
 reveal_type(C().value)  # revealed: list[int] | list[Divergent]
 ```
 
+## Wrapping list elements in tuples
+
+Both list assignments contribute to the inferred attribute type.
+
+```py
+class Items:
+    def update(self, values) -> None:
+        self.items = [*values]
+        self.items = [(x,) for x in self.items]
+        reveal_type(self.items)  # revealed: list[Unknown]
+
+def _(items: Items):
+    items.update(items.items)
+    reveal_type(items.items)  # revealed: list[Unknown] | list[tuple[Unknown]]
+    items.items.missing  # error: [unresolved-attribute]
+```
+
+## Reading an attribute with a growing type argument
+
+Reading `value` before checking `advance` starts inference at the member lookup. Each update nests
+the type argument one level deeper, so inference eventually falls back to `Unknown`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class Box[T]:
+    next: Box[tuple[T]]
+
+def read(c: C):
+    reveal_type(c.value)  # revealed: Unknown
+
+class C:
+    def __init__(self):
+        self.value = Box[int]()
+
+    def advance(self, other: C):
+        self.value = other.value.next
+```
+
+## Unwrapping a finite nest of tuples
+
+Each update removes one layer until indexing a string yields another string. The inferred type
+preserves enough information to report a missing attribute even after many updates.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+type FiveLayers[T] = tuple[tuple[tuple[tuple[tuple[T]]]]]
+
+class C:
+    def __init__(self, value: FiveLayers[FiveLayers[FiveLayers[str]]]):
+        self.value = value
+
+    def advance(self):
+        self.value = self.value[0]
+
+def read(c: C):
+    c.value.missing  # error: [unresolved-attribute]
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
