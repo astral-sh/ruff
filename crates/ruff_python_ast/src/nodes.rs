@@ -155,6 +155,7 @@ impl ExprCompare {
     /// Iterates over each comparison as `(left, operator, right)`.
     ///
     /// For `a < b <= c`, yields `(a, <, b)` followed by `(b, <=, c)`.
+    #[inline]
     pub fn iter(
         &self,
     ) -> impl DoubleEndedIterator<Item = (&Expr, &CmpOp, &Expr)> + ExactSizeIterator {
