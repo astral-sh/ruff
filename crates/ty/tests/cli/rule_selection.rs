@@ -378,7 +378,7 @@ fn shadowed_pyproject_rule_alias_conflict() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// An override inherits the global rules without repeating their diagnostics.
+/// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -397,6 +397,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         ("test.py", "print(10)"),
     ])?;
 
+    // ty warns once about `division-by-zer`, even though the override inherits it.
     assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
