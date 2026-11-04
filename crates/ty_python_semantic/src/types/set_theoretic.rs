@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use std::convert::Infallible;
 
@@ -1288,6 +1289,21 @@ impl<'db> IntersectionType<'db> {
             builder.add_negative_in_place(*ty);
         }
         builder.build()
+    }
+
+    /// Filter-map the positive members and intersect the results. Return `None` if no members
+    /// map successfully or the intersection exceeds the expansion budget.
+    pub(crate) fn bounded_filter_map_positive(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mapped: SmallVec<[_; 1]> = self.iter_positive(db).filter_map(transform_fn).collect();
+        if mapped.is_empty() {
+            return None;
+        }
+        Self::bounded_from_elements(db, env, mapped.iter().copied())
     }
 
     /// Compute the `__class__` type for class-backed protocols and `TypedDict` instances,

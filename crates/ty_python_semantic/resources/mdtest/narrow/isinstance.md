@@ -833,6 +833,35 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
         reveal_type(x.attribute)  # revealed: int
 ```
 
+## Truthiness checks on a tuple of classes
+
+A truthiness check on the tuple preserves its element type for a subsequent `isinstance()` check.
+
+```py
+def narrow(exc: BaseException, classes: tuple[type[ValueError], ...]) -> ValueError | None:
+    assert classes
+    if isinstance(exc, classes):
+        return exc
+    return None
+```
+
+## Narrowing after excluding a tuple subclass
+
+Ruling out a tuple subclass preserves the element type for a subsequent `isinstance()` check. If the
+check fails, the tuple could be empty, so the subject can still be a `bool`.
+
+```py
+class Special(tuple[type[bool], ...]): ...
+
+def exclude_tuple_subclass(value: object, classes: tuple[type[bool], ...]):
+    if isinstance(classes, Special):
+        return
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: bool
+    else:
+        reveal_type(value)  # revealed: object
+```
+
 ## Narrowing with generics
 
 ### Strict mode

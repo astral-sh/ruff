@@ -117,7 +117,9 @@ use crate::types::signatures::{
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::tuple::{
+    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment,
+};
 use crate::types::type_alias::{
     ManualPEP695TypeAliasType, PEP695TypeAliasType, type_alias_arguments,
 };
@@ -2581,60 +2583,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let Some(tuple_spec) = ty.tuple_instance_spec(db, env) {
-            // `except (ValueError, TypeError) as e:`
+        let infer_from_tuple = |tuple_spec: &TupleSpec<'db>| {
             UnionType::try_from_elements(
                 db,
                 env,
-                tuple_spec.iter_element_types(self.db()).map(|element| {
+                tuple_spec.iter_element_types(db).map(|element| {
                     if element.is_assignable_to(db, env, type_base_exception) {
-                        Some(element.to_instance_approximation(db, env).expect(
-                            "`Type::to_instance()` should always return `Some()` \
-                                if called on a type assignable to `type[BaseException]`",
-                        ))
+                        element.to_instance_approximation(db, env)
                     } else {
                         None
                     }
                 }),
             )
+        };
+
+        if let Some(tuple_spec) = ty.tuple_instance_spec(db, env) {
+            infer_from_tuple(&tuple_spec)
         } else if ty.is_assignable_to(db, env, type_base_exception) {
             // `except ValueError as e:`
             Some(ty.to_instance_approximation(db, env).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             ))
+        } else if let Type::Union(union) = ty
+            && let Some(caught) = union.try_map(db, env, |element| {
+                self.exception_handler_symbol_ty_from_valid_ty(*element, type_base_exception)
+            })
+        {
+            Some(caught)
         } else if ty.is_assignable_to(
             db,
             env,
             Type::homogeneous_tuple(db, env, type_base_exception),
         ) {
-            // `except exception_types as e:`, where
-            // `exception_types: tuple[type[ValueError], ...]`
-            Some(
-                ty.tuple_instance_spec(db, env)
-                    .and_then(|spec| {
-                        let specialization = spec
-                            .homogeneous_element_type(db, env)
-                            .to_instance_approximation(db, env);
-
-                        debug_assert!(specialization.is_some_and(|specialization_type| {
-                            specialization_type.is_assignable_to(
-                                db,
-                                env,
-                                KnownClass::BaseException.to_instance(db, env),
-                            )
-                        }));
-
-                        specialization
+            // A tuple can retain its element types in a positive intersection member after
+            // narrowing, for example `tuple[type[ValueError], ...] & ~AlwaysFalsy`.
+            let caught = ty
+                .resolve_type_alias(db)
+                .as_intersection()
+                .and_then(|intersection| {
+                    intersection.bounded_filter_map_positive(db, env, |member| {
+                        infer_from_tuple(member.tuple_instance_spec(db, env)?.as_ref())
                     })
-                    .unwrap_or_else(|| KnownClass::BaseException.to_instance(db, env)),
-            )
-        } else if let Type::Union(union) = ty {
-            // `except exception_types as e:`, where
-            // `exception_types: type[ValueError] | tuple[type[ValueError], ...]`
-            union.try_map(db, env, |element| {
-                self.exception_handler_symbol_ty_from_valid_ty(*element, type_base_exception)
-            })
+                });
+            Some(caught.unwrap_or_else(|| KnownClass::BaseException.to_instance(db, env)))
         } else {
             None
         }
