@@ -699,6 +699,36 @@ impl<'db> MroIterator<'db> {
     }
 }
 
+impl<'db> Iterator for MroIterator<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.first_element_yielded {
+            self.first_element_yielded = true;
+            return Some(self.first_element());
+        }
+        self.full_mro_except_first_element().next().copied()
+    }
+}
+
+impl std::iter::FusedIterator for MroIterator<'_> {}
+
+impl DoubleEndedIterator for MroIterator<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.full_mro_except_first_element()
+            .next_back()
+            .copied()
+            .or_else(|| {
+                if self.first_element_yielded {
+                    None
+                } else {
+                    self.first_element_yielded = true;
+                    Some(self.first_element())
+                }
+            })
+    }
+}
+
 impl<'db> ClassType<'db> {
     /// Walk the bases that can match a nominal relation to `target`. The lazy first
     /// entry always has the source's origin, even when a bare class is specialized.
@@ -730,36 +760,6 @@ impl<'db> ClassType<'db> {
             }
         };
         Either::Right(tail.copied())
-    }
-}
-
-impl<'db> Iterator for MroIterator<'db> {
-    type Item = ClassBase<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.first_element_yielded {
-            self.first_element_yielded = true;
-            return Some(self.first_element());
-        }
-        self.full_mro_except_first_element().next().copied()
-    }
-}
-
-impl std::iter::FusedIterator for MroIterator<'_> {}
-
-impl DoubleEndedIterator for MroIterator<'_> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.full_mro_except_first_element()
-            .next_back()
-            .copied()
-            .or_else(|| {
-                if self.first_element_yielded {
-                    None
-                } else {
-                    self.first_element_yielded = true;
-                    Some(self.first_element())
-                }
-            })
     }
 }
 
