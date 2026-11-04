@@ -82,3 +82,8 @@ pub(crate) const fn is_wrap_comprehension_in_enabled(context: &PyFormatContext) 
 pub(crate) const fn is_hug_comparator_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Keeps operators together when a following dictionary provides the line breaks.
+pub(crate) const fn is_keep_dict_keys_with_operators_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

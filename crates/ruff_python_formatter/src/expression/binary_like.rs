@@ -19,8 +19,8 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use crate::preview::{
-    is_hug_comparator_enabled, is_remove_redundant_comparison_parentheses_enabled,
-    is_simplify_power_operator_hugging_enabled,
+    is_hug_comparator_enabled, is_keep_dict_keys_with_operators_enabled,
+    is_remove_redundant_comparison_parentheses_enabled, is_simplify_power_operator_hugging_enabled,
 };
 use crate::string::implicit::FormatImplicitConcatenatedString;
 
@@ -677,13 +677,18 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
         let mut last_operator: Option<OperatorIndex> = None;
 
         let lowest_precedence = self.lowest_precedence();
-        let hug_lone_comparator = is_hug_comparator_enabled(f.context())
-            && lowest_precedence == OperatorPrecedence::Comparator
+        let single_operator = (is_hug_comparator_enabled(f.context())
+            || is_keep_dict_keys_with_operators_enabled(f.context()))
             && self
                 .operators()
                 .filter(|(_, operator)| operator.precedence() == lowest_precedence)
                 .count()
                 == 1;
+        let hug_lone_comparator = single_operator
+            && is_hug_comparator_enabled(f.context())
+            && lowest_precedence == OperatorPrecedence::Comparator;
+        let hug_dictionary =
+            single_operator && is_keep_dict_keys_with_operators_enabled(f.context());
 
         for (index, operator_part) in self.operators() {
             if operator_part.precedence() == lowest_precedence {
@@ -697,11 +702,15 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                         f.context(),
                     );
 
-                let hug_operator = hug_lone_comparator
+                let hug_comparator = hug_lone_comparator
                     && left.operands().all(|(_, operand)| {
                         is_unbracketed_comparison_operand(operand.expression(), f.context())
                     })
                     && matches!(&right.0, [OperandOrOperator::Operand(operand)] if matches!(operand.expression(), Expr::Call(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::List(_) | Expr::Set(_) | Expr::Dict(_) | Expr::Tuple(_) | Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_)));
+                let hug_operator = hug_comparator
+                    || (hug_dictionary
+                        && matches!(operator_part.symbol, OperatorSymbol::Binary(_))
+                        && matches!(&right.0, [OperandOrOperator::Operand(operand)] if matches!(operand.expression(), Expr::Dict(_) | Expr::DictComp(_))));
 
                 let left_with_operator = format_with(|f| {
                     if let Some(leading) = left.first_operand().leading_binary_comments() {

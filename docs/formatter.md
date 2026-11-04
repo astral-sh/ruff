@@ -522,6 +522,8 @@ The next style includes these changes in preview:
     redundant parentheses around short names and attribute accesses.
 - Keep a lone comparison operator with its left operand when the right-hand collection or
     call wraps onto multiple lines.
+- Keep an operator with its left operand when a following dictionary supplies the line breaks,
+    such as `message % {"name": value,}`.
 
 ### F-string formatting
 
