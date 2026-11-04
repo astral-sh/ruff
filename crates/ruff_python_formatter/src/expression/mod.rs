@@ -23,6 +23,7 @@ use crate::preview::{
     is_hug_parens_with_braces_and_square_brackets_enabled,
     is_remove_redundant_generator_parentheses_enabled,
     is_remove_redundant_list_parentheses_enabled,
+    is_remove_redundant_unpacking_parentheses_enabled,
 };
 
 mod binary_like;
@@ -165,6 +166,37 @@ fn can_omit_redundant_parentheses(expression: &Expr, context: &PyFormatContext) 
     enabled
         && !context.comments().has_leading(expression)
         && !context.comments().has_trailing(expression)
+}
+
+/// Formats an element of an unpacking target, retaining nested tuple structure.
+/// Do not use this for a plain annotated target: its parentheses affect whether
+/// the annotation is recorded in `__annotations__`.
+pub(crate) struct FormatUnpackingTarget<'a>(pub(crate) &'a Expr);
+
+impl Format<PyFormatContext<'_>> for FormatUnpackingTarget<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let is_target = match self.0 {
+            Expr::Name(ast::ExprName { ctx, .. })
+            | Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | Expr::Subscript(ast::ExprSubscript { ctx, .. })
+            | Expr::List(ast::ExprList { ctx, .. })
+            | Expr::Tuple(ast::ExprTuple { ctx, .. })
+            | Expr::Starred(ast::ExprStarred { ctx, .. }) => {
+                matches!(ctx, ast::ExprContext::Store | ast::ExprContext::Del)
+            }
+            _ => false,
+        };
+        let parentheses = if is_target
+            && is_remove_redundant_unpacking_parentheses_enabled(f.context())
+            && !f.context().comments().has_leading(self.0)
+            && !f.context().comments().has_trailing(self.0)
+        {
+            Parentheses::Never
+        } else {
+            Parentheses::Preserve
+        };
+        self.0.format().with_options(parentheses).fmt(f)
+    }
 }
 
 /// The comments below are trailing on the addition, but it's also outside the

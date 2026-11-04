@@ -3,6 +3,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprList;
 use ruff_text_size::Ranged;
 
+use crate::expression::FormatUnpackingTarget;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, empty_parenthesized, parenthesized,
 };
@@ -29,7 +30,10 @@ impl FormatNodeRule<ExprList> for FormatExprList {
 
         let items = format_with(|f| {
             f.join_comma_separated(item.end())
-                .nodes(elts.iter())
+                .entries(
+                    elts.iter()
+                        .map(|element| (element, FormatUnpackingTarget(element))),
+                )
                 .finish()
         });
 

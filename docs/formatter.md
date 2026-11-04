@@ -514,6 +514,8 @@ The next style includes these changes in preview:
     for tuples, generators, assignment expressions, comments, and line breaks.
 - Remove redundant parentheses around subscript indices, such as `data[(1, 2)]` becoming
     `data[1, 2]`, while retaining nested tuple indices and version-sensitive unpacking syntax.
+- Remove redundant parentheses in unpacking targets, while retaining nested tuple structure
+    and parentheses that affect annotated assignments.
 
 ### F-string formatting
 

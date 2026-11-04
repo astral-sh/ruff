@@ -4,6 +4,7 @@ use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::FormatUnpackingTarget;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::prelude::*;
 
@@ -158,7 +159,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
                 .format()
                 .with_options(TupleParentheses::Never)
                 .fmt(f),
-            other => other.format().fmt(f),
+            other => FormatUnpackingTarget(other).fmt(f),
         }
     }
 }

@@ -58,3 +58,10 @@ pub(crate) const fn is_remove_redundant_subscript_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses from assignment and unpacking targets.
+pub(crate) const fn is_remove_redundant_unpacking_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

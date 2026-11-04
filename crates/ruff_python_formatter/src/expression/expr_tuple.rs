@@ -4,6 +4,7 @@ use ruff_python_ast::ExprTuple;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
+use crate::expression::FormatUnpackingTarget;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, empty_parenthesized, optional_parentheses, parenthesized,
 };
@@ -169,9 +170,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized("(", &format_args![single.format(), token(",")], ")")
-                        .with_dangling_comments(dangling)
-                        .fmt(f)
+                    parenthesized(
+                        "(",
+                        &format_args![FormatUnpackingTarget(single), token(",")],
+                        ")",
+                    )
+                    .with_dangling_comments(dangling)
+                    .fmt(f)
                 }
             },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
@@ -194,7 +199,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     let separator =
                         format_with(|f| group(&format_args![token(","), space()]).fmt(f));
                     f.join_with(separator)
-                        .entries(elts.iter().formatted())
+                        .entries(elts.iter().map(FormatUnpackingTarget))
                         .finish()
                 }
                 TupleParentheses::Preserve | TupleParentheses::Subscript => {
@@ -228,7 +233,12 @@ impl<'a> ExprSequence<'a> {
 impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         f.join_comma_separated(self.tuple.end())
-            .nodes(&self.tuple.elts)
+            .entries(
+                self.tuple
+                    .elts
+                    .iter()
+                    .map(|element| (element, FormatUnpackingTarget(element))),
+            )
             .finish()
     }
 }
