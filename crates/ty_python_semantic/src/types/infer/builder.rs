@@ -12969,8 +12969,8 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            predicate_truthiness: None,
             expressions: FrozenMap::from(self.expressions),
+            predicate: None,
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,

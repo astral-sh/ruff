@@ -620,7 +620,7 @@ fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'d
         return Truthiness::Ambiguous;
     };
     let inference = infer_expression_types(db, expression, TypeContext::default());
-    inference.predicate_truthiness.unwrap_or_else(|| {
+    inference.predicate.unwrap_or_else(|| {
         let env = ProgramEnvironment::from_scope(expression.scope(db));
         let module = parsed_module(db, expression.python_file(db)).load(db);
         inference.evaluate_truthiness(db, &env, expression, &module, context)
@@ -671,7 +671,7 @@ pub(super) fn infer_expression_types_impl<'db>(
     if let InferExpression::Bare(expression) = input
         && let ExpressionKind::Predicate { context, .. } = expression.kind(db)
     {
-        inference.predicate_truthiness =
+        inference.predicate =
             Some(inference.evaluate_truthiness(db, &env, expression, &module, context));
     }
     inference
@@ -2052,7 +2052,7 @@ pub(crate) struct ExpressionInference<'db> {
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The outcome of a standalone predicate evaluated with these expression types.
-    predicate_truthiness: Option<Truthiness>,
+    predicate: Option<Truthiness>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -2142,12 +2142,12 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            expressions: FrozenMap::default(),
+            predicate: None,
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            predicate_truthiness: None,
-            expressions: FrozenMap::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -2162,7 +2162,7 @@ impl<'db> ExpressionInference<'db> {
     ) -> ExpressionInference<'db> {
         // A cyclic predicate can acquire new operands or require a different metaclass
         // lookup as inference converges. Evaluate it from the normalized types in the caller.
-        self.predicate_truthiness = None;
+        self.predicate = None;
 
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
