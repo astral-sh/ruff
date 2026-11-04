@@ -5070,7 +5070,6 @@ dependencies = [
  "mdtest",
  "ruff_db",
  "ruff_diagnostics",
- "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",

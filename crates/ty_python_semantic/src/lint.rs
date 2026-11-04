@@ -1,7 +1,10 @@
 use crate::diagnostic::did_you_mean;
 use core::fmt;
 use itertools::Itertools;
-use ruff_db::diagnostic::{DiagnosticId, LintName, RuleMetadata, Severity};
+pub use ruff_db::diagnostic::LintName;
+use ruff_db::diagnostic::{DiagnosticId, RuleMetadata, Severity};
+#[doc(hidden)]
+pub use ruff_macros::kebab_case;
 use rustc_hash::FxHashMap;
 use std::error::Error;
 use std::fmt::Formatter;
@@ -270,7 +273,7 @@ macro_rules! declare_lint {
         $(#[allow($($allow)*)])?
         $( #[doc = $doc] )+
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
-            name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),
+            name: $crate::lint::LintName::of($crate::lint::kebab_case!($name)),
             summary: $summary,
             raw_documentation: concat!($($doc, '\n',)+),
             file: file!(),
