@@ -59,17 +59,22 @@ warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed t
   |                     ^^^^^^^^^^^^^
 ```
 
+If the old name suppresses a diagnostic, `unused-type-ignore-comment` can offer to remove the
+current name. Here, `other-tool` separates the two names. A fix that removed the old name would
+touch a different part of the comment, so `--fix` could apply both deletions in one pass and expose
+the diagnostic.
+
 ```py
 # snapshot
-y = 2  # type: ignore[ty:new-rule-name, ty:old-rule-name]
+y = 2  # type: ignore[ty:new-rule-name, other-tool, ty:old-rule-name]
 ```
 
 ```snapshot
 warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed to `new-rule-name`
- --> src/mdtest_snippet.py:4:44
+ --> src/mdtest_snippet.py:4:56
   |
-4 | y = 2  # type: ignore[ty:new-rule-name, ty:old-rule-name]
-  |                                            ^^^^^^^^^^^^^
+4 | y = 2  # type: ignore[ty:new-rule-name, other-tool, ty:old-rule-name]
+  |                                                        ^^^^^^^^^^^^^
 ```
 
 ## Suppressing the rule
