@@ -522,6 +522,12 @@ impl ProjectMetadata {
         Ok(())
     }
 
+    fn validate_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+        self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+            .flat_map(|options| options.validate(db))
+            .collect()
+    }
+
     /// Returns all option layers merged according to their precedence.
     pub fn to_merged_options(&self) -> MergedOptions<'_> {
         let mut options = Options::default();
@@ -597,8 +603,14 @@ impl MergedOptions<'_> {
         db: &dyn Db,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        self.options
-            .to_settings(db, OptionsContext::Project(self.metadata.root()), strategy)
+        let validation_diagnostics = self.metadata.validate_options(db);
+        let (settings, mut diagnostics) = self.options.to_settings(
+            db,
+            OptionsContext::Project(self.metadata.root()),
+            strategy,
+        )?;
+        diagnostics.extend(validation_diagnostics);
+        Ok((settings, diagnostics))
     }
 }
 
