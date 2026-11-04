@@ -100,8 +100,8 @@ jobs:
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
+          version: "0.13.7"
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -176,8 +176,8 @@ jobs:
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+          version: "0.13.7"
+          checksum: "0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -238,8 +238,8 @@ jobs:
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "60fbd5c8a1ed681845eea28d9d622fcde03c51e91a43465b64a1e17db1ed3472"
+          version: "0.13.7"
+          checksum: "81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -329,8 +329,8 @@ jobs:
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
+          version: "0.13.7"
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps
