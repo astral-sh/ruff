@@ -5696,9 +5696,12 @@ impl<'db> Type<'db> {
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
         let fallback_member = fallback_member.member(db);
-        // A subclass can assign to an inherited method, producing an inferred instance member.
-        // Keep the original bound method type for compatible shadows. An explicit annotation or
-        // incompatible inferred value still contributes its own type.
+
+        // We do explicitly allow instance attributes to shadow methods defined on the class.
+        // If we see a definitely-bound meta-attribute (the method), and if the fallback is
+        // an instance attribute (e.g. `self.method = ...`) with a compatible type, we pretend
+        // that there is no fallback, i.e. attribute lookup simply yields the meta-attribute
+        // (the actual method on the class).
         let fallback_member = if meta_attr.is_definitely_bound()
             && let Place::Defined(DefinedPlace { origin, ty, .. }) = fallback_member.place
             && !origin.is_declared()
