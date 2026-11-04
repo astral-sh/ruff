@@ -44,3 +44,10 @@ pub(crate) const fn is_simplify_power_operator_hugging_enabled(context: &PyForma
 pub(crate) const fn is_parenthesize_tuple_in_yield_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses around expression statements.
+pub(crate) const fn is_remove_redundant_top_level_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

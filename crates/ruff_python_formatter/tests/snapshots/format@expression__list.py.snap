@@ -175,7 +175,7 @@ foo(
 ```diff
 --- Stable
 +++ Preview
-@@ -50,10 +50,10 @@
+@@ -50,11 +50,11 @@
  ]  # outer comment
  
  # Redundant parentheses around lists are removed in preview.
@@ -183,11 +183,13 @@ foo(
 -foo(([1, 2]))
 -([item for item in items])
 -([1, 2])[0]
+-(([1, 2],))
 +[]
 +foo([1, 2])
 +[item for item in items]
 +[1, 2][0]
- (([1, 2],))
++([1, 2],)
  
  # Parentheses carrying comments keep those comments outside the list.
+ (
 ```

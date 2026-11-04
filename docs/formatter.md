@@ -510,6 +510,8 @@ The next style includes these changes in preview:
     sole argument of a call. Comments and magic trailing commas can require parentheses.
 - Keep `**` unspaced for simple operands even when the power expression wraps onto multiple lines.
 - Wrap a long tuple after `yield` instead of wrapping the entire yield statement.
+- Remove redundant parentheses around standalone expressions, retaining the parentheses needed
+    for tuples, generators, assignment expressions, comments, and line breaks.
 
 ### F-string formatting
 
