@@ -512,6 +512,8 @@ The next style includes these changes in preview:
 - Wrap a long tuple after `yield` instead of wrapping the entire yield statement.
 - Remove redundant parentheses around standalone expressions, retaining the parentheses needed
     for tuples, generators, assignment expressions, comments, and line breaks.
+- Remove redundant parentheses around subscript indices, such as `data[(1, 2)]` becoming
+    `data[1, 2]`, while retaining nested tuple indices and version-sensitive unpacking syntax.
 
 ### F-string formatting
 

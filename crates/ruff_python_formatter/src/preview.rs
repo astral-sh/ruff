@@ -51,3 +51,10 @@ pub(crate) const fn is_remove_redundant_top_level_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Removes redundant parentheses around subscript indices.
+pub(crate) const fn is_remove_redundant_subscript_parentheses_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

@@ -1,4 +1,4 @@
-use ruff_formatter::{FormatRuleWithOptions, format_args};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
 use ruff_text_size::{Ranged, TextRange};
@@ -29,6 +29,10 @@ pub enum TupleParentheses {
     /// x[(a, b):]
     /// ```
     Preserve,
+
+    /// Omits tuple parentheses inside subscript brackets, retaining the comma
+    /// that distinguishes a one-element tuple from a scalar index.
+    Subscript,
 
     /// The same as [`Self::Default`] except that it uses [`optional_parentheses`] rather than
     /// [`parenthesize_if_expands`]. This avoids adding parentheses if breaking any containing parenthesized
@@ -136,6 +140,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         match elts.as_slice() {
             [] => empty_parenthesized("(", dangling, ")").fmt(f),
             [single] => match self.parentheses {
+                TupleParentheses::Subscript => {
+                    write!(f, [single.format(), token(",")])
+                }
                 TupleParentheses::Preserve if !is_parenthesized => {
                     single.format().fmt(f)?;
                     // The `TupleParentheses::Preserve` is only set by subscript expression
@@ -173,8 +180,10 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
             _ if *is_parenthesized
-                && !(self.parentheses == TupleParentheses::NeverPreserve
-                    && dangling.is_empty()) =>
+                && !(matches!(
+                    self.parentheses,
+                    TupleParentheses::NeverPreserve | TupleParentheses::Subscript
+                ) && dangling.is_empty()) =>
             {
                 parenthesized("(", &ExprSequence::new(item), ")")
                     .with_dangling_comments(dangling)
@@ -188,7 +197,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .entries(elts.iter().formatted())
                         .finish()
                 }
-                TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
+                TupleParentheses::Preserve | TupleParentheses::Subscript => {
+                    group(&ExprSequence::new(item)).fmt(f)
+                }
                 TupleParentheses::NeverPreserve => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
