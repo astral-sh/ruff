@@ -41,6 +41,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
     uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@f11dbff15181b71f2cc5e8487b1ac7d7bb03ea7d
     with:
+      threat-models: .agents/references
       runner: depot-ubuntu-22.04-16
       helper-runner: github-ubuntu-24.04-x86_64-4
       # renovate: datasource=github-release-attachments depName=astral-sh/uv
