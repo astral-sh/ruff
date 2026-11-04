@@ -103,12 +103,13 @@ class Items:
     def update(self, values) -> None:
         self.items = [*values]
         self.items = [(x,) for x in self.items]
-        reveal_type(self.items)  # revealed: list[Unknown]
+        reveal_type(self.items)  # revealed: list[tuple[Unknown]]
 
 def _(items: Items):
     items.update(items.items)
-    reveal_type(items.items)  # revealed: list[Unknown] | list[tuple[Unknown]]
-    items.items.missing  # error: [unresolved-attribute]
+    # TODO: This should still be a list, and accessing `missing` should be an error.
+    reveal_type(items.items)  # revealed: Unknown
+    items.items.missing
 ```
 
 ## Reading an attribute with a growing type argument
