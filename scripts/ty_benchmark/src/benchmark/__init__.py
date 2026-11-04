@@ -8,6 +8,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import NamedTuple
 
+from benchmark.concurrency import cli_worker_count
+
 if sys.platform == "win32":
     import mslex as shlex
 else:
@@ -43,6 +45,20 @@ def benchmark_environment(
         "APPDATA": str(config_directory),
         "TY_MAX_PARALLELISM": workers,
         "RAYON_NUM_THREADS": workers,
+    }
+
+
+def cli_benchmark_environment(
+    cwd: Path, *, single_threaded: bool = False
+) -> dict[str, str]:
+    """Apply CLI concurrency settings without changing language-server settings."""
+    return benchmark_environment(cwd, single_threaded=single_threaded) | {
+        "TY_MAX_PARALLELISM": str(
+            cli_worker_count("ty", single_threaded=single_threaded)
+        ),
+        "RAYON_NUM_THREADS": str(
+            cli_worker_count("zuban", single_threaded=single_threaded)
+        ),
     }
 
 

@@ -75,14 +75,18 @@ the measurements. Checker-specific environment overrides, including
 `TY_CONFIG_FILE` and `MYPY_NUM_WORKERS`, are removed. Ty and Pyrefly ignore Git and
 other ignore files when discovering the already-controlled CLI scope.
 
-Multicore CLI runs explicitly use the available CPU count: mypy and Pyright use
-worker processes, Pyrefly uses its thread option, and ty and Zuban use their
-thread-pool environment settings. `--single-threaded` uses zero external mypy
-workers and one worker/thread for the other checkers. Worker settings appear in
-the preflight records. On macOS, Hyperfine's peak RSS does not sum concurrent
-worker processes, so it is not total process-tree memory for mypy or Pyright.
+CLI concurrency uses one fixed value per checker across every project, defined
+in [`concurrency.py`](src/benchmark/concurrency.py). The values are calibrated on
+the 16-core M3 Max reference host rather than derived from its CPU count. See the
+[calibration methodology and results](concurrency.md) before choosing values for
+other hardware. The preflight records contain the exact arguments and pool
+settings. Language-server concurrency retains its separate settings.
 
-You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
+`--single-threaded` selects zero external mypy workers and one checking
+worker/thread for the other checkers. mypy's native parser has a separate pool
+that can still use up to eight threads; the flag does not force strictly
+single-threaded parsing. On macOS, Hyperfine's peak RSS does not sum concurrent
+worker processes, so it is not total process-tree memory for mypy or Pyright.
 
 ### Zuban
 

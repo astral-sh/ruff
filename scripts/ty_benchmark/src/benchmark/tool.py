@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import glob
 import json
-import os
 import re
 import shutil
 import sys
@@ -16,6 +15,7 @@ from typing import TYPE_CHECKING, override
 import tomlkit
 
 from benchmark import Command
+from benchmark.concurrency import cli_worker_count
 from benchmark.projects import Project
 from benchmark.targets import PYRIGHT_CONFIG
 
@@ -169,7 +169,7 @@ class Mypy(Tool):
             "--follow-imports=normal",
             "--check-untyped-defs",
             "--num-workers",
-            "0" if single_threaded else str(os.process_cpu_count() or 1),
+            str(cli_worker_count("mypy", single_threaded=single_threaded)),
             *project.include,
         ]
 
@@ -258,7 +258,12 @@ class Pyright(Tool):
         command = [str(self.path)]
 
         if not single_threaded:
-            command.extend(["--threads", str(os.process_cpu_count() or 1)])
+            command.extend(
+                [
+                    "--threads",
+                    str(cli_worker_count("pyright", single_threaded=single_threaded)),
+                ]
+            )
 
         command.extend(
             [
@@ -316,7 +321,7 @@ class Pyrefly(Tool):
             "--disable-project-excludes-heuristics=true",
             "--use-ignore-files=false",
             "--threads",
-            "1" if single_threaded else str(os.process_cpu_count() or 1),
+            str(cli_worker_count("pyrefly", single_threaded=single_threaded)),
         ]
 
         return Command(

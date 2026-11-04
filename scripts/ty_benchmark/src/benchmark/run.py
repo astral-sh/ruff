@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from benchmark import Hyperfine, benchmark_environment
+from benchmark import Hyperfine, cli_benchmark_environment
 from benchmark.preflight import validate_cli_targets
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
@@ -65,7 +65,7 @@ def main() -> None:
     parser.add_argument(
         "--single-threaded",
         action="store_true",
-        help="Run the type checkers single threaded",
+        help="Use one checking worker (mypy can still parse in parallel)",
     )
 
     parser.add_argument(
@@ -150,7 +150,7 @@ def main() -> None:
             venv.install(project.install_arguments)
             neutralize_file_directives(cwd)
             cli_project = write_cli_targets(project, cwd)
-            benchmark_env = benchmark_environment(
+            benchmark_env = cli_benchmark_environment(
                 cwd, single_threaded=args.single_threaded
             )
 
