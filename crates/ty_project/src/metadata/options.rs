@@ -612,7 +612,7 @@ impl Options {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
-    /// The directory containing a standalone script, or the working directory for a virtual script.
+    /// The directory used to resolve relative settings for the script.
     Script(&'a SystemPath),
 }
 
@@ -860,7 +860,8 @@ pub struct EnvironmentOptions {
     /// * `./python`
     ///
     /// Scripts with inline metadata have no first-party roots by default because they are
-    /// single-file programs. Set `root = ["."]` to allow importing local modules.
+    /// single-file programs. Set `root = ["."]` in the script's `[tool.ty.environment]` table
+    /// to import sibling modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -890,8 +891,8 @@ pub struct EnvironmentOptions {
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
     ///
-    /// Scripts with inline metadata use their `requires-python` field instead of
-    /// `project.requires-python`. They do not inherit the Python version of the enclosing project.
+    /// A script uses its inline `environment.python-version` first, then `requires-python`.
+    /// It falls back to the project's version if it has no inline `[tool.ty]` table.
     ///
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
