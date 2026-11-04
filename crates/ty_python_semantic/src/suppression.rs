@@ -217,8 +217,9 @@ fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
             continue;
         };
 
-        let prefix_len = suppression.kind.code_prefix().text_len();
-        let range = suppression.range.add_start(prefix_len);
+        let range = suppression
+            .range
+            .add_start(suppression.kind.code_prefix().text_len());
         let name = &source[range];
         let canonical = lint.name().as_str();
         if name == canonical {
@@ -231,20 +232,11 @@ fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
             "Rule `{name}` has been renamed to `{canonical}`"
         ));
 
-        let already_present = context
-            .suppressions
-            .lint_suppressions(range, lint)
-            .any(|other| {
-                other.comment_range == suppression.comment_range
-                    && &source[other.range.add_start(prefix_len)] == canonical
-            });
-        if !already_present {
-            diag.help(format_args!("Replace `{name}` with `{canonical}`"));
-            diag.set_fix(Fix::safe_edit(Edit::range_replacement(
-                canonical.to_owned(),
-                range,
-            )));
-        }
+        diag.help(format_args!("Replace `{name}` with `{canonical}`"));
+        diag.set_fix(Fix::safe_edit(Edit::range_replacement(
+            canonical.to_owned(),
+            range,
+        )));
     }
 }
 

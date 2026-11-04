@@ -1,8 +1,8 @@
 # Renamed rules in ignore comments
 
-For purposes of testing the `renamed-rule-in-ignore-comment` lint rule,
-the mdtest registry defines `old-rule-name` as an alias for `new-rule-name`. These dummy rules do not
-actually emit a diagnostic, so we ignore unused ignore comments in this test suite.
+For purposes of testing the `renamed-rule-in-ignore-comment` lint rule, the mdtest registry defines
+`old-rule-name` as an alias for `new-rule-name`. These dummy rules do not actually emit a
+diagnostic, so we ignore unused ignore comments in this test suite.
 
 ```toml
 [rules]
@@ -45,7 +45,13 @@ x = 1
 
 ## Both names in one comment
 
-When a comment already contains the current name, ty reports the rename without offering a fix.
+The fix renames the old name even when the comment already contains the new name. The unused-ignore
+rules can then remove the redundant entry.
+
+In an inline `ty: ignore[new-rule-name, other-rule, old-rule-name]`, the old name suppresses the
+diagnostic, so `unused-ignore-comment` can remove `new-rule-name`. If the rename fix also removed
+`old-rule-name`, the two deletions wouldn't overlap and `--fix` could apply both in one pass. That
+would leave `ty: ignore[other-rule]` and expose the diagnostic.
 
 ```py
 # snapshot
@@ -58,12 +64,14 @@ warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed t
   |
 2 | x = 1  # ty: ignore[old-rule-name, new-rule-name]
   |                     ^^^^^^^^^^^^^
+help: Replace `old-rule-name` with `new-rule-name`
+  |
+1 | # snapshot
+  - x = 1  # ty: ignore[old-rule-name, new-rule-name]
+2 + x = 1  # ty: ignore[new-rule-name, new-rule-name]
+3 | # snapshot
+  |
 ```
-
-If the old name suppresses a diagnostic, `unused-type-ignore-comment` can offer to remove the
-current name. Here, `other-tool` separates the two names. A fix that removed the old name would
-touch a different part of the comment, so `--fix` could apply both deletions in one pass and expose
-the diagnostic.
 
 ```py
 # snapshot
@@ -76,6 +84,12 @@ warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed t
   |
 4 | y = 2  # type: ignore[ty:new-rule-name, other-tool, ty:old-rule-name]
   |                                                        ^^^^^^^^^^^^^
+help: Replace `old-rule-name` with `new-rule-name`
+  |
+3 | # snapshot
+  - y = 2  # type: ignore[ty:new-rule-name, other-tool, ty:old-rule-name]
+4 + y = 2  # type: ignore[ty:new-rule-name, other-tool, ty:new-rule-name]
+  |
 ```
 
 ## Suppressing the rule
