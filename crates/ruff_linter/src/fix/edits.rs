@@ -123,6 +123,25 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
+/// Generate a `Fix` to remove the specified imports from an `import` statement.
+///
+/// Each import is identified by its imported name and, for aliased imports, the alias under which
+/// it is bound. This distinguishes the bindings when the same name is imported more than once with
+/// different aliases.
+pub(crate) fn remove_unused_imports_by_alias<'a>(
+    imports: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    locator: &Locator,
+    stylist: &Stylist,
+    indexer: &Indexer,
+) -> Result<Edit> {
+    match codemods::remove_imports_by_alias(imports, stmt, locator, stylist)? {
+        None => Ok(delete_stmt(stmt, parent, locator, indexer)),
+        Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
+    }
+}
+
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,

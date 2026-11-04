@@ -369,6 +369,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
         let import = ImportBinding {
             name,
+            alias: binding.is_alias().then_some(name),
             import,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
@@ -519,6 +520,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 struct ImportBinding<'a> {
     /// Name of the binding, which for renamed imports will differ from the qualified name.
     name: &'a str,
+    /// Alias under which the import is bound, if any (e.g., `path_join` in
+    /// `from os.path import join as path_join`).
+    alias: Option<&'a str>,
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     import: AnyImport<'a, 'a>,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -570,16 +574,15 @@ fn fix_by_removing_imports<'a>(
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
-    let member_names: Vec<Cow<'_, str>> = imports
-        .map(|ImportBinding { import, .. }| import)
-        .map(Imported::member_name)
+    let imports: Vec<(Cow<'_, str>, Option<&str>)> = imports
+        .map(|ImportBinding { import, alias, .. }| (import.member_name(), *alias))
         .collect();
-    if member_names.is_empty() {
+    if imports.is_empty() {
         bail!("Expected import bindings");
     }
 
-    let edit = fix::edits::remove_unused_imports(
-        member_names.iter().map(AsRef::as_ref),
+    let edit = fix::edits::remove_unused_imports_by_alias(
+        imports.iter().map(|(name, alias)| (name.as_ref(), *alias)),
         statement,
         parent,
         checker.locator(),
