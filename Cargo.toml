@@ -92,7 +92,7 @@ clap = { version = "4.5.3", default-features = false, features = [
     "usage",
 ] }
 clap_complete_command = { version = "0.6.0", default-features = false, features = ["nushell"] }
-clearscreen = { version = "4.0.0", default-features = false }
+clearscreen = { version = "5.0.0", default-features = false }
 codspeed-criterion-compat = { version = "5.0.0", default-features = false }
 colored = { version = "3.0.0", default-features = false }
 compact_str = { version = "0.10.0", default-features = false, features = ["std"] }
