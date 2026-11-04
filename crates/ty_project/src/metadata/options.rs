@@ -581,17 +581,14 @@ impl Options {
         Ok((settings, diagnostics))
     }
 
-    /// Lint the options in a single file (our source) for common mistakes.
+    /// Lint options from one source, such as `ty.toml`, `pyproject.toml`, CLI arguments, or editor settings.
     ///
-    /// For example, flag unknown rules, renamed rules, etc. in `ty.toml`, `pyproject.toml`, CLI arguments,
-    /// or editor configurations.
+    /// When resolving project settings, lint each source separately so unknown or renamed rules
+    /// are reported even if a higher-priority source overrides them. When resolving a script,
+    /// only its inline options need linting because the project already checked the shared sources.
     ///
-    /// Linting the file once ensures that errors in `overrides` sections are only reported
-    /// once, and not everytime the overrides are resolved for a specific file.
-    ///
-    /// Diagnostics that can only be reported when resolving
-    /// the options are reported in `to_settings`.
-    pub(crate) fn lint(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+    /// Checks that depend on the merged settings belong in [`Self::to_settings`].
+    pub(crate) fn lint_unmerged(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
         let mut diagnostics = Vec::new();
         if let Some(rules) = &self.rules {
             rules.lint(db, &mut diagnostics);

@@ -524,7 +524,7 @@ impl ProjectMetadata {
 
     fn lint_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
         self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
-            .flat_map(|options| options.lint(db))
+            .flat_map(|options| options.lint_unmerged(db))
             .collect()
     }
 

@@ -231,7 +231,7 @@ fn resolve_script_options(
         let mut config = metadata.to_options(file, diagnostics);
         diagnostics.extend(
             config
-                .lint(db)
+                .lint_unmerged(db)
                 .into_iter()
                 .map(|diagnostic| diagnostic.to_diagnostic()),
         );
