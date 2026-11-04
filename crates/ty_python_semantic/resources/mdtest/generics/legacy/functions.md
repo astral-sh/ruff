@@ -2555,6 +2555,29 @@ def read(value: T) -> list[str]:
     return value.keys()
 ```
 
+## Class patterns after narrowing a class object
+
+Inside the identity check, `A` is known to be both the exact class object and a `type[T]`. A
+successful class pattern lets us return the subject as `T`. The pattern covers every `A` instance.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+
+def match_exact_class(value: A, cls: type[T]) -> T:
+    if cls is A:
+        match value:
+            case A():
+                return value
+            case _:
+                reveal_type(value)  # revealed: Never
+    else:
+        raise AssertionError
+```
+
 ## Assignment narrowing of dynamic attributes
 
 An upper bound can provide an attribute through `__getattr__`. Assigning to that attribute does not
