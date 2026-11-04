@@ -116,7 +116,11 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 
 #[test]
 fn shared_config_override_warns_once_across_scripts() -> anyhow::Result<()> {
-    let script = "# /// script\n# [tool.ty]\n# ///\n";
+    let script = "
+        # /// script
+        # [tool.ty]
+        # ///
+    ";
     let case = CliTest::with_files([
         (
             "ty.toml",
