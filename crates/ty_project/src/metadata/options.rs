@@ -1233,28 +1233,33 @@ impl Rules {
                 continue;
             }
 
-            match registry.get(rule_name) {
+            let diagnostic = match registry.get(rule_name) {
                 Ok(lint) => {
                     set_lint_level(lint);
-                }
-                Err(error) => {
-                    // The file may have been deleted since its configuration was read. In that
-                    // case, report the diagnostic without a configuration-file annotation.
-                    let file = source.file(db);
-
-                    // TODO: Add a note if the value was configured on the CLI
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::UnknownRule,
-                        error.to_string(),
+                    if lint.name().as_str() == rule_name.as_str() {
+                        continue;
+                    }
+                    OptionDiagnostic::new(
+                        DiagnosticId::RenamedRule,
+                        format!("Rule `{rule_name}` has been renamed to `{}`", lint.name()),
                         Severity::Warning,
-                    );
-
-                    let annotation = file.map(Span::from).map(|span| {
-                        Annotation::primary(span.with_optional_range(rule_name.range()))
-                    });
-                    diagnostics.push(diagnostic.with_annotation(annotation));
+                    )
                 }
-            }
+                Err(error) => OptionDiagnostic::new(
+                    DiagnosticId::UnknownRule,
+                    error.to_string(),
+                    Severity::Warning,
+                ),
+            };
+
+            // The file may have been deleted since its configuration was read. In that
+            // case, report the diagnostic without a configuration-file annotation.
+            // TODO: Add a note if the value was configured on the CLI.
+            let annotation = source
+                .file(db)
+                .map(Span::from)
+                .map(|span| Annotation::primary(span.with_optional_range(rule_name.range())));
+            diagnostics.push(diagnostic.with_annotation(annotation));
         }
 
         selection

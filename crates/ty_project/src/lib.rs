@@ -863,12 +863,17 @@ impl Project {
             Some(diagnostic)
         });
 
-        self.settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
+        self.option_diagnostics(db)
             .chain(uv_diagnostic)
             .chain(baseline::settings_diagnostic(db))
             .collect()
+    }
+
+    /// Diagnostics produced while resolving the project's configuration options.
+    pub fn option_diagnostics(self, db: &dyn Db) -> impl Iterator<Item = Diagnostic> {
+        self.settings_diagnostics(db)
+            .iter()
+            .map(OptionDiagnostic::to_diagnostic)
     }
 }
 
