@@ -8,10 +8,10 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, CallableType, CallableTypes, InternedType, KnownClass,
         LiteralValueType, LiteralValueTypeKind, Parameter, Parameters, PropertyInstanceType,
-        Signature, StringLiteralType, Type, TypeContext, TypeFormType, TypeMapping, UnionType,
-        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        RecursiveTypeNormalization, Signature, StringLiteralType, Type, TypeContext, TypeFormType,
+        TypeMapping, UnionType, callable::CallableTypeKind, constraints::ConstraintSet,
+        function::FunctionType, known_instance::InternedConstraintSet,
+        relation::TypeRelationChecker, signatures::CallableSignature, visitor,
     },
 };
 
@@ -311,17 +311,17 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new_internal(
             db,
             self.func(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             self.program(db),
             self.class_method(db),
             self.receiver(db).try_map(db, |ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
+                ty.recursive_type_normalized_impl(db, env, normalization, true)
             })?,
         ))
     }
@@ -472,44 +472,50 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => Some(
                 KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(
                     db,
-                    function
-                        .inner(db)
-                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    function.inner(db).recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?,
                 )),
             ),
             KnownBoundMethodType::DunderCall(callable) => {
                 Some(KnownBoundMethodType::DunderCall(InternedType::new(
                     db,
-                    callable
-                        .inner(db)
-                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    callable.inner(db).recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?,
                 )))
             }
             KnownBoundMethodType::MethodTypeDunderGet(method) => {
                 Some(KnownBoundMethodType::MethodTypeDunderGet(
-                    method.recursive_type_normalized_impl(db, env, div, nested)?,
+                    method.recursive_type_normalized_impl(db, env, normalization, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(db, env, div, nested)?,
+                    property.recursive_type_normalized_impl(db, env, normalization, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(db, env, div, nested)?,
+                    property.recursive_type_normalized_impl(db, env, normalization, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderDelete(property) => {
                 Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(db, env, div, nested)?,
+                    property.recursive_type_normalized_impl(db, env, normalization, nested)?,
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)

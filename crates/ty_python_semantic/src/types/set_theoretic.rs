@@ -10,8 +10,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode,
+    RecursiveTypeNormalization, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -645,7 +645,7 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db, env)
@@ -656,28 +656,28 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(div) {
-                    return Some(ty);
+                let ty = ty.recursive_type_normalized_impl(db, env, normalization, nested)?;
+                if normalization.matches(ty) {
+                    return Some(normalization.replacement);
                 }
                 builder.add_in_place(ty);
                 empty = false;
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                if normalization.matches(*ty) {
                     builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
                 builder.add_in_place(
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div),
+                    ty.recursive_type_normalized_impl(db, env, normalization, nested)
+                        .unwrap_or(normalization.replacement),
                 );
                 empty = false;
             }
         }
         if empty {
-            builder.add_in_place(div);
+            builder.add_in_place(normalization.replacement);
         }
         Some(builder.build())
     }
@@ -1173,31 +1173,31 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let positive = if nested {
             self.positive(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, nested))
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, nested))
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
             self.positive(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div)
+                    ty.recursive_type_normalized_impl(db, env, normalization, nested)
+                        .unwrap_or(normalization.replacement)
                 })
                 .collect()
         };
 
         let negative = if nested {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, env, div, nested))?
+                .try_map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, nested))?
         } else {
             self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, nested)
-                    .unwrap_or(div)
+                ty.recursive_type_normalized_impl(db, env, normalization, nested)
+                    .unwrap_or(normalization.replacement)
             })
         };
 

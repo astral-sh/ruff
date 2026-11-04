@@ -839,3 +839,71 @@ value = 0
 while value:
     value = new_class("C", (value,))
 ```
+
+## Updating a dictionary value after a loop
+
+Inference converges when a value read from a dictionary is updated in a loop and written back to the
+same key.
+
+```py
+def accumulate(key):
+    totals = {key: 1}
+    value = totals[key]
+    for _ in key:
+        value += 1
+    totals[key] = value
+```
+
+## Mutually recursive bindings in match guards
+
+Checking a match guard converges even when its input depends on assignments in the surrounding loop.
+
+```py
+def f(subject, missing):
+    for _ in (0,):
+        match subject:
+            case 1:
+                # error: [possibly-unresolved-reference]
+                # error: [possibly-unresolved-reference]
+                x = y = y
+            case _ if x:  # error: [possibly-unresolved-reference]
+                pass
+            case None:
+                x += 0  # error: [possibly-unresolved-reference]
+            case _:
+                subject = missing
+```
+
+## Mutually recursive bindings in exception handlers
+
+Recovery converges when a `with` binding depends on the same loop's exception and `finally` paths.
+
+```py
+for x[0] in (0,):  # error: [possibly-unresolved-reference]
+    try:
+        with x as x:  # error: [possibly-unresolved-reference]
+            c = b  # error: [possibly-unresolved-reference]
+    except:
+        c = x  # error: [possibly-unresolved-reference]
+    finally:
+        b()  # error: [possibly-unresolved-reference]
+    b = c
+```
+
+## Type aliases through match captures
+
+An invalid type alias still produces a diagnostic when its value depends on a match capture and a
+lambda that refers to a later binding.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+type Alias = value  # error: [invalid-type-form]
+match ((value := 0), (Alias, lambda: other)):
+    case {0: 0} as value:
+        pass
+value != 0 and (other := value) and (value := 0)
+```

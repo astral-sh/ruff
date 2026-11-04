@@ -8,7 +8,7 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        RecursiveTypeNormalization, SubclassOfType, Type,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
             DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
@@ -115,7 +115,7 @@ impl<'db> DynamicClassAnchor<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
@@ -128,11 +128,12 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, env, div, true);
+                        let base =
+                            base.recursive_type_normalized_impl(db, env, normalization, true);
                         if nested {
                             base
                         } else {
-                            Some(base.unwrap_or(div))
+                            Some(base.unwrap_or(normalization.replacement))
                         }
                     })
                     .collect::<Option<Box<_>>>()?;
@@ -560,23 +561,29 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        let anchor = self
-            .anchor(db)
-            .recursive_type_normalized_impl(db, env, div, nested)?;
+        let anchor =
+            self.anchor(db)
+                .recursive_type_normalized_impl(db, env, normalization, nested)?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let ty = ty.recursive_type_normalized_impl(db, env, normalization, true);
+                let ty = if nested {
+                    ty?
+                } else {
+                    ty.unwrap_or(normalization.replacement)
+                };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, env, div, nested)?),
+            Some(params) => {
+                Some(params.recursive_type_normalized_impl(db, env, normalization, nested)?)
+            }
             None => None,
         };
 

@@ -46,10 +46,10 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
-    MaterializationKind, ParamSpecAttrKind, ParamSpecValue, ParameterDescription, SelfBinding,
-    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types,
-    todo_type,
+    MaterializationKind, ParamSpecAttrKind, ParamSpecValue, ParameterDescription,
+    RecursiveTypeNormalization, SelfBinding, SelfTypeVarOrigin, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -300,14 +300,16 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, env, div, nested))
+                .map(|signature| {
+                    signature.recursive_type_normalized_impl(db, env, normalization, nested)
+                })
                 .collect::<Option<SmallVec<_>>>()?,
         })
     }
@@ -1190,21 +1192,26 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let return_ty = if nested {
             self.return_ty
-                .recursive_type_normalized_impl(db, env, div, true)?
+                .recursive_type_normalized_impl(db, env, normalization, true)?
         } else {
             self.return_ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, env, normalization, true)
+                .unwrap_or(normalization.replacement)
         };
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, env, div, nested)?);
+                parameters.push(param.recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    nested,
+                )?);
             }
             Parameters::new(parameters, self.parameters.kind())
         };
@@ -6181,7 +6188,7 @@ impl<'db> Parameter<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let Parameter {
@@ -6194,11 +6201,11 @@ impl<'db> Parameter<'db> {
         } = self;
 
         let normalize_type = |ty: Type<'db>| {
-            let normalized = ty.recursive_type_normalized_impl(db, env, div, true);
+            let normalized = ty.recursive_type_normalized_impl(db, env, normalization, true);
             if nested {
                 normalized
             } else {
-                Some(normalized.unwrap_or(div))
+                Some(normalized.unwrap_or(normalization.replacement))
             }
         };
         let annotated_type = normalize_type(*annotated_type)?;

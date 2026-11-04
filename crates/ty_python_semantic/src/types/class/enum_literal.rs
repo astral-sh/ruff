@@ -13,7 +13,7 @@ use crate::types::class::{
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{RecursiveTypeNormalization, Type, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -31,15 +31,19 @@ impl<'db> EnumSpec<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let ty = ty.recursive_type_normalized_impl(db, env, normalization, true);
+                let ty = if nested {
+                    ty?
+                } else {
+                    ty.unwrap_or(normalization.replacement)
+                };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
@@ -73,13 +77,13 @@ impl<'db> DynamicEnumAnchor<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Definition { definition, spec } => Some(Self::Definition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, env, normalization, nested)?,
             }),
             Self::ScopeOffset {
                 scope,
@@ -88,7 +92,7 @@ impl<'db> DynamicEnumAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, env, normalization, nested)?,
             }),
         }
     }
@@ -114,13 +118,17 @@ impl<'db> DynamicEnumLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let mixin_type = match self.mixin_type(db) {
             Some(mixin) => {
-                let mixin = mixin.recursive_type_normalized_impl(db, env, div, true);
-                Some(if nested { mixin? } else { mixin.unwrap_or(div) })
+                let mixin = mixin.recursive_type_normalized_impl(db, env, normalization, true);
+                Some(if nested {
+                    mixin?
+                } else {
+                    mixin.unwrap_or(normalization.replacement)
+                })
             }
             None => None,
         };
@@ -129,7 +137,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             self.base_class(db),
             mixin_type,
         ))

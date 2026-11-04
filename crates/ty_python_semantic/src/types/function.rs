@@ -83,8 +83,8 @@ use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, MemberLookupPolicy,
-    SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
-    definition_expression_type, walk_signature,
+    RecursiveTypeNormalization, SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping,
+    UnionType, binding_type, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -112,7 +112,7 @@ std::thread_local! {
 ///
 /// `TypeOf` can make a function signature refer back to the same function through many different
 /// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
+/// `recursive_type_normalized_impl` signatures.
 fn visit_recursive_type_normalization<R>(
     function_literal: FunctionLiteral<'_>,
     nested: bool,
@@ -239,11 +239,16 @@ impl<'db> DataclassTransformerParams<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        let field_specifiers =
-            super::normalize_field_specifiers(db, env, self.field_specifiers(db), div, nested)?;
+        let field_specifiers = super::normalize_field_specifiers(
+            db,
+            env,
+            self.field_specifiers(db),
+            normalization,
+            nested,
+        )?;
 
         Some(Self::new(db, self.flags(db), field_specifiers))
     }
@@ -2051,7 +2056,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         visit_recursive_type_normalization(
@@ -2062,15 +2067,19 @@ impl<'db> FunctionType<'db> {
                 let mut literal = self.literal(db);
                 // A field specifier may refer back to this function or its result.
                 if let Some(params) = literal.last_definition.dataclass_transformer_params(db) {
-                    let params = params.recursive_type_normalized_impl(db, env, div, nested)?;
+                    let params =
+                        params.recursive_type_normalized_impl(db, env, normalization, nested)?;
                     literal.last_definition = literal
                         .last_definition
                         .with_dataclass_transformer_params(db, params);
                 }
                 let updated_signature = match self.updated_signature(db) {
-                    Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, env, div, nested)?)
-                    }
+                    Some(signature) => Some(signature.recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?),
                     None => None,
                 };
                 let updated_implementation_callables =
@@ -2079,7 +2088,12 @@ impl<'db> FunctionType<'db> {
                             callables
                                 .iter()
                                 .map(|callable| {
-                                    callable.recursive_type_normalized_impl(db, env, div, nested)
+                                    callable.recursive_type_normalized_impl(
+                                        db,
+                                        env,
+                                        normalization,
+                                        nested,
+                                    )
                                 })
                                 .collect::<Option<Box<_>>>()?,
                         ),
@@ -2092,10 +2106,14 @@ impl<'db> FunctionType<'db> {
                         updated_signature,
                         updated_implementation_callables,
                         match self.class_specialization(db) {
-                            Some(specialization) => Some(
-                                specialization
-                                    .recursive_type_normalized_impl(db, env, div, nested)?,
-                            ),
+                            Some(specialization) => {
+                                Some(specialization.recursive_type_normalized_impl(
+                                    db,
+                                    env,
+                                    normalization,
+                                    nested,
+                                )?)
+                            }
                             None => None,
                         },
                     ),

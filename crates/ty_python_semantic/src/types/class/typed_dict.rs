@@ -24,8 +24,9 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
-    KnownClass, MemberLookupPolicy, SelfTypeVarOrigin, Type, TypeContext, TypeMapping,
-    TypeVarVariance, TypedDictType, TypingModule, UnionType, determine_self_class,
+    KnownClass, MemberLookupPolicy, RecursiveTypeNormalization, SelfTypeVarOrigin, Type,
+    TypeContext, TypeMapping, TypeVarVariance, TypedDictType, TypingModule, UnionType,
+    determine_self_class,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -868,7 +869,7 @@ impl<'db> DynamicTypedDictAnchor<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
@@ -881,8 +882,13 @@ impl<'db> DynamicTypedDictAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                schema: schema.recursive_type_normalized_impl(db, env, div, nested)?,
-                openness: openness.recursive_type_normalized_impl(db, env, div, nested)?,
+                schema: schema.recursive_type_normalized_impl(db, env, normalization, nested)?,
+                openness: openness.recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    nested,
+                )?,
             }),
         }
     }
@@ -914,14 +920,14 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             self.typed_dict_module(db),
         ))
     }

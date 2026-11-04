@@ -4,7 +4,8 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 
 use super::{
     ApplyTypeMappingVisitor, GenericAlias, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-    KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder, visitor::TypeVisitor,
+    KnownInstanceType, RecursiveTypeNormalization, Type, TypeContext, TypeMapping, UnionBuilder,
+    visitor::TypeVisitor,
 };
 use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
 
@@ -436,15 +437,15 @@ impl<'db> UnionTypeInstance<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let normalize = |ty: Type<'db>| {
-            let normalized = ty.recursive_type_normalized_impl(db, env, div, nested);
+            let normalized = ty.recursive_type_normalized_impl(db, env, normalization, nested);
             if nested {
                 normalized
             } else {
-                Some(normalized.unwrap_or(div))
+                Some(normalized.unwrap_or(normalization.replacement))
             }
         };
         match self.kind(db) {
@@ -483,7 +484,7 @@ impl<'db> UnionTypeInstance<'db> {
                             },
                         },
                         UnionOperand::Nested(union) => UnionOperand::Nested(
-                            union.recursive_type_normalized_impl(db, env, div, nested)?,
+                            union.recursive_type_normalized_impl(db, env, normalization, nested)?,
                         ),
                     });
                 }

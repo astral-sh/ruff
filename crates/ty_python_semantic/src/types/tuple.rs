@@ -32,7 +32,7 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    IntersectionType, RecursiveTypeNormalization, Type, TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -287,14 +287,14 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new_internal(
             db,
             env.program(db),
             self.tuple(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
         ))
     }
 
@@ -1014,14 +1014,14 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         if nested {
             Some(Self::from_elements(
                 self.0
                     .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
+                    .map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, true))
                     .collect::<Option<Box<[_]>>>()?,
             ))
         } else {
@@ -1029,8 +1029,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 self.0
                     .iter()
                     .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div)
+                        ty.recursive_type_normalized_impl(db, env, normalization, true)
+                            .unwrap_or(normalization.replacement)
                     })
                     .collect::<Box<[_]>>(),
             ))
@@ -2179,18 +2179,18 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         if nested {
             let prefix = self
                 .prefix_elements()
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, true));
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable.recursive_type_normalized_impl(db, env, div, true)?,
+                    variable.recursive_type_normalized_impl(db, env, normalization, true)?,
                 ),
                 VariableSegment::TypeVarTuple(typevartuple) => {
                     VariableSegment::TypeVarTuple(typevartuple)
@@ -2200,20 +2200,20 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             let suffix = self
                 .suffix_elements()
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, true));
 
             Self::try_new(prefix, variable_segment, suffix)
         } else {
             let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
+                ty.recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or(normalization.replacement)
             });
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
                     variable
-                        .recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div),
+                        .recursive_type_normalized_impl(db, env, normalization, true)
+                        .unwrap_or(normalization.replacement),
                 ),
                 VariableSegment::TypeVarTuple(typevartuple) => {
                     VariableSegment::TypeVarTuple(typevartuple)
@@ -2221,8 +2221,8 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             };
 
             let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
+                ty.recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or(normalization.replacement)
             });
 
             Some(Self::new(prefix, variable_segment, suffix))
@@ -2682,16 +2682,22 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
+            Tuple::Fixed(tuple) => Some(Tuple::Fixed(tuple.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
+            Tuple::Variable(tuple) => Some(Tuple::Variable(tuple.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
         }
     }
 

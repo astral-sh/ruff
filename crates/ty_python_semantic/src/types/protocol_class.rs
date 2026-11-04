@@ -14,7 +14,7 @@ use crate::types::attribute_write::{
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::visitor::any_over_type_expanding_aliases;
-use crate::types::{TypeContext, UpcastPolicy};
+use crate::types::{RecursiveTypeNormalization, TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -401,13 +401,15 @@ impl<'db> ProtocolClass<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self(
-            self.0
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
+        Some(Self(self.0.recursive_type_normalized_impl(
+            db,
+            env,
+            normalization,
+            nested,
+        )?))
     }
 }
 
@@ -969,7 +971,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new(
@@ -980,7 +982,7 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(db, env, div, nested)?,
+                        data.recursive_type_normalized_impl(db, env, normalization, nested)?,
                     ))
                 })
                 .collect::<Option<BTreeMap<_, _>>>()?,
@@ -1156,19 +1158,27 @@ impl<'db> ProtocolMemberWrite<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
             Self::Type(member) => {
-                Self::Type(member.recursive_type_normalized_impl(db, env, div, nested)?)
+                Self::Type(member.recursive_type_normalized_impl(db, env, normalization, nested)?)
             }
             Self::Descriptor { descriptor, domain } => Self::Descriptor {
-                descriptor: descriptor.recursive_type_normalized_impl(db, env, div, nested)?,
+                descriptor: descriptor.recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    nested,
+                )?,
                 domain: match domain {
-                    Some(domain) => {
-                        Some(domain.recursive_type_normalized_impl(db, env, div, nested)?)
-                    }
+                    Some(domain) => Some(domain.recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?),
                     None => None,
                 },
             },
@@ -1257,15 +1267,16 @@ impl<'db> ProtocolAnnotation<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let ty = if nested {
-            self.ty.recursive_type_normalized_impl(db, env, div, true)?
+            self.ty
+                .recursive_type_normalized_impl(db, env, normalization, true)?
         } else {
             self.ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, env, normalization, true)
+                .unwrap_or(normalization.replacement)
         };
         Some(Self { ty, ..self })
     }
@@ -1414,16 +1425,16 @@ impl<'db> ProtocolPropertyType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let ty = if nested {
             self.ty()
-                .recursive_type_normalized_impl(db, env, div, true)?
+                .recursive_type_normalized_impl(db, env, normalization, true)?
         } else {
             self.ty()
-                .recursive_type_normalized_impl(db, env, div, true)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, env, normalization, true)
+                .unwrap_or(normalization.replacement)
         };
         Some(self.with_ty(ty))
     }
@@ -1793,13 +1804,13 @@ impl<'db> ProtocolMemberData<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
             kind: self
                 .kind
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             qualifiers: self.qualifiers,
             definition: self.definition,
         })
@@ -1962,35 +1973,40 @@ impl<'db> ProtocolMemberKind<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(match self {
             Self::Method(member, kind) => {
                 let ty = if nested {
-                    member.recursive_type_normalized_impl(db, env, div, true)?
+                    member.recursive_type_normalized_impl(db, env, normalization, true)?
                 } else {
                     member
-                        .recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
+                        .recursive_type_normalized_impl(db, env, normalization, true)
+                        .unwrap_or(normalization.replacement)
                 };
                 Self::Method(ty, kind)
             }
             Self::Property { read, write } => Self::Property {
                 read: match read {
-                    Some(read) => Some(read.recursive_type_normalized_impl(db, env, div, nested)?),
-                    None => None,
-                },
-                write: match write {
-                    Some(write) => {
-                        Some(write.recursive_type_normalized_impl(db, env, div, nested)?)
+                    Some(read) => {
+                        Some(read.recursive_type_normalized_impl(db, env, normalization, nested)?)
                     }
                     None => None,
                 },
+                write: match write {
+                    Some(write) => Some(write.recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?),
+                    None => None,
+                },
             },
-            Self::Attribute(attribute) => {
-                Self::Attribute(attribute.recursive_type_normalized_impl(db, env, div, nested)?)
-            }
+            Self::Attribute(attribute) => Self::Attribute(
+                attribute.recursive_type_normalized_impl(db, env, normalization, nested)?,
+            ),
         })
     }
 

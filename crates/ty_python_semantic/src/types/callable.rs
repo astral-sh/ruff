@@ -9,8 +9,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassType,
         FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
-        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        RecursiveTypeNormalization, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
@@ -1167,7 +1167,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         if matches!(self.signature_source(db), SignatureSource::Lambda(_)) {
@@ -1176,8 +1176,12 @@ impl<'db> CallableType<'db> {
         Some(
             self.with_signatures(
                 db,
-                self.signatures(db)
-                    .recursive_type_normalized_impl(db, env, div, nested)?,
+                self.signatures(db).recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    nested,
+                )?,
             ),
         )
     }

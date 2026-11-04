@@ -380,6 +380,32 @@ assert [lambda: C]  # ok
 C = 0
 ```
 
+## Recursive lambda returns after reassignment
+
+Inference also converges when the decorated name is reassigned before its annotation.
+
+```py
+from typing import Any
+
+def unknown() -> Any:
+    return 0
+
+C = 0
+
+@lambda item=0: (item, C)
+class C:
+    pass
+
+C = unknown()
+try:
+    C: int
+finally:
+    pass
+
+assert [lambda: C]  # ok
+C = 0
+```
+
 ## Recursive lambda dictionaries in diagnostics
 
 Invalid annotations and iteration still produce diagnostics when the inferred value is a dictionary
@@ -397,4 +423,30 @@ except:
 
 assert {0 for _ in (lambda: C)}  # error: [not-iterable]
 (C := 0)
+```
+
+## Recursive lambdas in invalid annotations
+
+Rebinding names shared by a lambda and a variadic parameter annotation still produces normal
+annotation diagnostics.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def unknown(value):
+    return value
+
+lambda: f
+f = unknown(0)
+type A = list[A]  # error: [invalid-type-form]
+f = lambda: f
+while unknown(0):
+    def f(*args: A):
+        pass
+
+def A(f: f):  # error: [invalid-type-form]
+    pass
 ```

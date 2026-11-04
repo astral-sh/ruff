@@ -5,8 +5,9 @@ use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-        ClassType, GenericContext, KnownClass, PromotionKind, PromotionMode, StringLiteralType,
-        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        ClassType, GenericContext, KnownClass, PromotionKind, PromotionMode,
+        RecursiveTypeNormalization, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -178,13 +179,13 @@ impl<'db> MethodWrapper<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.wrapped(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             self.kind(db),
         ))
     }
@@ -399,7 +400,7 @@ impl<'db> KnownInstanceType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
@@ -413,57 +414,57 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::Field),
             Self::UnionType(union_type) => union_type
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::UnionType),
             Self::Literal(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, normalization, true)
                 .map(Self::Literal),
             Self::Annotated(ty) => {
                 // Keep the runtime Annotated object when its wrapped type diverges. The wrapped
                 // type is still nested: TypeOf can make it another runtime Annotated object.
-                let inner = ty.recursive_type_normalized_impl(db, env, div, true);
+                let inner = ty.recursive_type_normalized_impl(db, env, normalization, true);
                 if nested {
                     inner.map(Self::Annotated)
                 } else {
-                    Some(Self::Annotated(
-                        inner.unwrap_or_else(|| InternedType::new(db, div)),
-                    ))
+                    Some(Self::Annotated(inner.unwrap_or_else(|| {
+                        InternedType::new(db, normalization.replacement)
+                    })))
                 }
             }
             Self::TypeGenericAlias(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, normalization, true)
                 .map(Self::TypeGenericAlias),
             // A stringified alias is still a string value when its aliased type diverges.
             // Preserve the wrapper so type-expression checks can validate uses of the alias.
             Self::LiteralStringAlias(ty) => Some(Self::LiteralStringAlias(
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or_else(|| InternedType::new(db, div)),
+                ty.recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or_else(|| InternedType::new(db, normalization.replacement)),
             )),
             Self::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, normalization, true)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, normalization, true)
                 .map(Self::Specialization),
             Self::NamedTupleSpec(spec) => spec
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, normalization, true)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::FunctoolsPartial),
             Self::FunctoolsPartialCall(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::FunctoolsPartialCall),
             Self::MethodWrapper(wrapper) => wrapper
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(Self::MethodWrapper),
         }
     }
@@ -794,32 +795,32 @@ impl<'db> FieldInstance<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let default_type = match self.default_type(db) {
             Some(default) if nested => {
-                Some(default.recursive_type_normalized_impl(db, env, div, true)?)
+                Some(default.recursive_type_normalized_impl(db, env, normalization, true)?)
             }
             Some(default) => Some(
                 default
-                    .recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
+                    .recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or(normalization.replacement),
             ),
             None => None,
         };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
-                input_ty.recursive_type_normalized_impl(db, env, div, true)?,
-                output_ty.recursive_type_normalized_impl(db, env, div, true)?,
+                input_ty.recursive_type_normalized_impl(db, env, normalization, true)?,
+                output_ty.recursive_type_normalized_impl(db, env, normalization, true)?,
             )),
             Some((input_ty, output_ty)) => Some((
                 input_ty
-                    .recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
+                    .recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or(normalization.replacement),
                 output_ty
-                    .recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div),
+                    .recursive_type_normalized_impl(db, env, normalization, true)
+                    .unwrap_or(normalization.replacement),
             )),
             None => None,
         };
@@ -842,7 +843,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
@@ -857,18 +858,18 @@ impl<'db> FunctoolsPartialInstance<'db> {
                     .or_recursively_defined(union.recursively_defined(db));
                 for ty in union.elements(db) {
                     builder.add_in_place(
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div),
+                        ty.recursive_type_normalized_impl(db, env, normalization, true)
+                            .unwrap_or(normalization.replacement),
                     );
                 }
                 builder.build()
             }
             wrapped => {
-                let wrapped = wrapped.recursive_type_normalized_impl(db, env, div, true);
+                let wrapped = wrapped.recursive_type_normalized_impl(db, env, normalization, true);
                 if nested {
                     wrapped?
                 } else {
-                    wrapped.unwrap_or(div)
+                    wrapped.unwrap_or(normalization.replacement)
                 }
             }
         };
@@ -876,7 +877,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
             db,
             InternedType::new(db, wrapped),
             self.partial(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
         ))
     }
 
@@ -916,16 +917,16 @@ impl<'db> InternedType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let inner = if nested {
             self.inner(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?
+                .recursive_type_normalized_impl(db, env, normalization, nested)?
         } else {
             self.inner(db)
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
+                .unwrap_or(normalization.replacement)
         };
         Some(InternedType::new(db, inner))
     }

@@ -9,9 +9,9 @@ use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
     DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
-    MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
-    TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    todo_type,
+    MemberLookupPolicy, ProtocolInstanceType, RecursiveTypeNormalization, SpecialFormType, Type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints,
+    TypedDictType, UnionBuilder, todo_type,
 };
 use ty_python_core::definition::Definition;
 
@@ -301,13 +301,16 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
-            subclass_of: self
-                .subclass_of
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+            subclass_of: self.subclass_of.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?,
         })
     }
 
@@ -655,16 +658,19 @@ impl<'db> SubclassOfInner<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
+            Self::Class(class) => Some(Self::Class(class.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Protocol(protocol) => Some(Self::Protocol(
-                protocol.recursive_type_normalized_impl(db, env, div, nested)?,
+                protocol.recursive_type_normalized_impl(db, env, normalization, nested)?,
             )),
             Self::TypeVar(_) => Some(self),
         }

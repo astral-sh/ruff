@@ -9,8 +9,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypingModule, todo_type,
+    KnownInstanceType, MaterializationKind, RecursiveTypeNormalization, SpecialFormType,
+    StaticMroError, Type, TypeContext, TypeMapping, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -51,15 +51,18 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
+            Self::Class(class) => Some(Self::Class(class.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
             Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
     }
