@@ -22,7 +22,6 @@ pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
-use std::sync::LazyLock;
 pub use suppression::suppress_single;
 pub(crate) use suppression::{
     SuppressFix, UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all,
@@ -78,43 +77,24 @@ type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Returns the default registry with all known semantic lints.
 pub fn default_lint_registry() -> &'static LintRegistry {
-    static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| lint_registry_builder().build());
-    &REGISTRY
-}
-
-/// The mdtest registry includes a no-op rule for examples that exercise rule renames.
-#[cfg(feature = "testing")]
-pub fn mdtest_lint_registry() -> &'static LintRegistry {
-    declare_lint! {
-        /// A rule that never emits a diagnostic.
-        static NEW_RULE_NAME = {
-            summary: "example of a renamed rule",
-            status: lint::LintStatus::stable("0.0.0"),
-        }
-    }
-
-    static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| {
-        let mut registry = lint_registry_builder();
-        registry.register_lint(&NEW_RULE_NAME);
-        registry.register_alias(
-            ruff_db::diagnostic::LintName::of("old-rule-name"),
-            &NEW_RULE_NAME,
-        );
+    static REGISTRY: std::sync::LazyLock<LintRegistry> = std::sync::LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
         registry.build()
     });
+
     &REGISTRY
 }
 
-fn lint_registry_builder() -> LintRegistryBuilder {
-    let mut registry = LintRegistryBuilder::default();
-    types::register_lints(&mut registry);
+/// Register all known semantic lints.
+pub fn register_lints(registry: &mut LintRegistryBuilder) {
+    types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&RENAMED_RULE_IN_IGNORE_COMMENT);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
     registry.register_lint(&BLANKET_IGNORE_COMMENT);
-    registry
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
