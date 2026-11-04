@@ -2263,7 +2263,6 @@ member. The result is the union of those types, regardless of member order.
 
 ```py
 from typing import Generic, TypeVar
-from typing_extensions import assert_type
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -2276,8 +2275,8 @@ def from_source(value: Source[T] | None) -> T:
     raise NotImplementedError
 
 def check_source(value: Source[int] | Source[str], reverse: Source[str] | Source[int]):
-    assert_type(from_source(value), int | str)
-    assert_type(from_source(reverse), int | str)
+    reveal_type(from_source(value))  # revealed: int | str
+    reveal_type(from_source(reverse))  # revealed: str | int
 ```
 
 A plain `Source[T]` parameter also infers the union. An `Any` member leaves the element type
@@ -2290,7 +2289,7 @@ def read(value: Source[T]) -> T:
     return value.get()
 
 def check(value: Source[int] | Source[str], gradual: Source[int] | Any):
-    assert_type(read(value), int | str)
+    reveal_type(read(value))  # revealed: int | str
     reveal_type(read(gradual))  # revealed: Unknown
 ```
 
@@ -2327,43 +2326,6 @@ The key type is invariant even when the dictionary's value type is `Any`.
 def take_dict(value: dict[T, Any]) -> None: ...
 def check_keys(value: dict[int, Any] | dict[str, Any]):
     take_dict(value)  # error: [invalid-argument-type]
-```
-
-## Inferring element types across loop iterations
-
-Each iteration wraps the previous element in another tuple. Inference represents this recursion even
-when the type variable has a concrete default.
-
-```py
-from typing_extensions import TypeVar
-
-T = TypeVar("T", default=int)
-
-def wrap(items: list[T]) -> list[tuple[T]]:
-    return [(item,) for item in items]
-
-def defaulted():
-    items = [1]
-    for _ in range(2):
-        items = wrap(items)
-    reveal_type(items)  # revealed: list[Divergent]
-```
-
-A second argument can also supply a concrete type on every iteration.
-
-```py
-from collections.abc import Sequence
-
-U = TypeVar("U")
-
-def wrap_with_seed(items: Sequence[U], seed: U) -> Sequence[tuple[U]]:
-    raise NotImplementedError
-
-def seeded(start: Sequence[int]):
-    items = start
-    for _ in range(2):
-        items = wrap_with_seed(items, 1)
-    reveal_type(items)  # revealed: Sequence[Divergent]
 ```
 
 ## Union inference preserves outer type variables

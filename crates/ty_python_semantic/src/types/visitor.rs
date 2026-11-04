@@ -1107,20 +1107,15 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
         query: &impl Fn(Type<'db>) -> bool,
         expansions: &AliasExpansions<'db>,
     ) -> bool {
+        let search_body = |body| search(db, env, body, query, expansions);
         any_over_type(db, env, ty, false, |nested| {
             query(nested)
                 || match nested {
-                    Type::TypeAlias(alias) => expansions.visit(db, nested, || {
-                        search(db, env, alias.value_type(db), query, expansions)
-                    }),
+                    Type::TypeAlias(alias) => {
+                        expansions.visit(db, nested, || search_body(alias.value_type(db)))
+                    }
                     Type::Recursive(recursive) => expansions.visit(db, nested, || {
-                        search(
-                            db,
-                            env,
-                            recursive.unfold(db, env).into_type(),
-                            query,
-                            expansions,
-                        )
+                        search_body(recursive.unfold(db, env).into_type())
                     }),
                     _ => false,
                 }

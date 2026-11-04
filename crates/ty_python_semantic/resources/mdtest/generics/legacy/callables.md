@@ -1044,7 +1044,8 @@ assert_type(infer_return(default=0, callback=(callback, callback, callback)), Un
 
 ## Inference from a bounded callable type variable
 
-The upper bound of a bounded type variable is used to infer the signature of a callable type:
+We use a type variable's upper bound to infer the callable signature, including when the variable is
+one member of a union.
 
 ```py
 from typing import Callable, TypeVar
@@ -1055,8 +1056,9 @@ F = TypeVar("F", bound=Callable[[int], str])
 def apply(callback: Callable[[int], T]) -> T:
     return callback(1)
 
-def _(callback: F):
+def _(callback: F, either: F | Callable[[int], int]):
     reveal_type(apply(callback))  # revealed: str
+    reveal_type(apply(either))  # revealed: str | int
 ```
 
 If the upper bound is a class type, the signature of the class's `__call__` method is used:

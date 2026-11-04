@@ -36,7 +36,7 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    may_contain_typevar_from, walk_type_with_recursion_guard,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -4164,38 +4164,35 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         visitor: &InferSpecializationVisitor<'db>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
-        // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
-        // type mappings, to represent the specialization that we are building up. At that point,
-        // this method will just need to compare `actual ≤ formal`, using constraint set
-        // assignability, and AND the result into the constraint set we are building.
-        //
-        // To make progress on that migration, we use constraint set assignability whenever
-        // possible when adding any new heuristics here. See the `Callable` clause below for an
-        // example.
+
+        // TODO: Use constraint-set assignability for every formal/actual pair at the given
+        // polarity, and intersect the result with the call's pending constraints. Prefer this
+        // approach when adding inference cases below.
 
         let has_variadic = self
             .inferable
             .iter(db)
             .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
 
-        // All members of a union argument must agree on a specialization of a nominal parameter.
-        // For example, no static choice of `T` accepts both `list[int]` and `list[str]` as `list[T]`.
         let resolved_formal = formal.resolve_type_alias(db);
         let nominal_union = if !has_variadic && resolved_formal.is_nominal_instance() {
-            actual.resolve_type_alias(db).as_union().filter(|_| {
-                may_contain_typevar_from(db, self.env, resolved_formal, self.generic_context)
-            })
+            actual.resolve_type_alias(db).as_union()
         } else {
             None
         };
 
-        // Keep alternative matches in one constraint set until all arguments have contributed
-        // their evidence. Filtering either union first can discard an obligation or apply a
-        // variable's bound to an argument member that matches a different formal member.
-        // Variadic unions retain their existing inference path, as does direct gradual evidence:
-        // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
-        // Recursive aliases retain their unfolding path, which collects leaf evidence for
-        // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
+        // The fallback below drops disjoint union members from the argument and parameter types.
+        // Comparing the full types here keeps every obligation and lets later arguments rule out
+        // alternative matches. For `actual <= formal`, one specialization must accept every member
+        // of the argument union. For example, no static `T` makes `list[int] | list[str]` assignable
+        // to `list[T]`.
+        //
+        // For now, this path handles union formals and union arguments to nominal formals.
+        // The guards preserve cases that still rely on the inference below to capture variadic
+        // parameters, unfold recursive aliases, or extract a callable signature or constructed
+        // instance type from a union member's upper bound. Gradual constraints also need to
+        // retain evidence during solving. For example, `Any <= T | None` currently simplifies
+        // to true and loses the mapping `T = Any` (https://github.com/astral-sh/ruff/pull/28307).
         if !has_variadic
             && (resolved_formal.is_union() || nominal_union.is_some())
             && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
