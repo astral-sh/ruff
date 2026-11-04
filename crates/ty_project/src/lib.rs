@@ -97,7 +97,7 @@ pub struct Project {
 
     /// The paths that should be included when checking this project.
     ///
-    /// The default (when this list is empty) is to include all files in the project root
+    /// The default (when no paths are provided) is to include all files in the project root
     /// (that satisfy the configured include and exclude patterns).
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
@@ -116,8 +116,8 @@ pub struct Project {
     /// in an IDE when the user only wants to check the open tabs. This could be modeled
     /// with `included_paths` too but it would require an explicit walk dir step that's simply unnecessary.
     #[default]
-    #[returns(deref)]
-    included_paths_list: Vec<SystemPathBuf>,
+    #[returns(ref)]
+    included_path_selection: IncludedPaths,
 
     /// Diagnostics that were generated when resolving the project settings.
     #[returns(deref)]
@@ -139,6 +139,13 @@ pub struct Project {
     #[default]
     #[returns(copy)]
     force_exclude_flag: bool,
+}
+
+/// Explicit paths and diagnostics from resolving those paths.
+#[derive(Clone, Default, get_size2::GetSize)]
+pub struct IncludedPaths {
+    paths: Vec<SystemPathBuf>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 /// A progress reporter.
@@ -244,7 +251,7 @@ impl Project {
         let program_settings = self.program_settings(db).clone();
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
-        let included_paths = self.included_paths_list(db).to_vec();
+        let included_paths = self.included_path_selection(db).clone();
         let check_mode = self.check_mode(db);
         let verbose = self.verbose_flag(db);
         let force_exclude = self.force_exclude_flag(db);
@@ -258,7 +265,7 @@ impl Project {
         self.set_program_settings(db)
             .with_durability(durability)
             .to(program_settings);
-        self.set_included_paths_list(db)
+        self.set_included_path_selection(db)
             .with_durability(durability)
             .to(included_paths);
         self.set_check_mode(db)
@@ -382,7 +389,7 @@ impl Project {
         self.settings(db).to_rules()
     }
 
-    /// Returns whether `path` is part of the project and included (see `included_paths_list`).
+    /// Returns whether `path` is part of the project and included.
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
@@ -529,6 +536,7 @@ impl Project {
         );
 
         let mut diagnostics = self.check_settings(db);
+        diagnostics.extend_from_slice(&self.included_path_selection(db).diagnostics);
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -609,9 +617,20 @@ impl Project {
     }
 
     pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
+        self.set_included_paths_with_diagnostics(db, paths, Vec::new());
+    }
+
+    /// Sets the explicit paths to check and any I/O diagnostics from resolving them.
+    pub fn set_included_paths_with_diagnostics(
+        self,
+        db: &mut dyn Db,
+        paths: Vec<SystemPathBuf>,
+        diagnostics: Vec<Diagnostic>,
+    ) {
         tracing::debug!("Setting included paths: {paths}", paths = paths.len());
 
-        self.set_included_paths_list(db).to(paths);
+        self.set_included_path_selection(db)
+            .to(IncludedPaths { paths, diagnostics });
         self.reload_files(db);
     }
 
@@ -646,9 +665,11 @@ impl Project {
     /// This can be useful to check arbitrary files, but it isn't something we recommend.
     /// We should try to support this use case but it's okay if there are some limitations around it.
     fn included_paths_or_root(self, db: &dyn Db) -> &[SystemPathBuf] {
-        match self.included_paths_list(db) {
-            [] => std::slice::from_ref(&self.metadata(db).root),
-            paths => paths,
+        let IncludedPaths { paths, diagnostics } = self.included_path_selection(db);
+        if paths.is_empty() && diagnostics.is_empty() {
+            std::slice::from_ref(&self.metadata(db).root)
+        } else {
+            paths
         }
     }
 
