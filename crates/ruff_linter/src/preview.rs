@@ -346,6 +346,15 @@ pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool 
     preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/16973#issuecomment-5269913849
+// Extends PYI010 from single-statement bodies to every statement in a stub body that is
+// not `pass`, `...`, or a docstring.
+pub(crate) const fn is_non_empty_stub_body_multiple_statements_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/27050
 pub(crate) const fn is_b005_precise_diagnostic_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
