@@ -1389,7 +1389,11 @@ fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()>
 
 #[test]
 fn shared_override_reports_each_invalid_module_glob_once() -> anyhow::Result<()> {
-    let script = "# /// script\n# [tool.ty]\n# ///\n";
+    let script = "
+        # /// script
+        # [tool.ty]
+        # ///
+    ";
     let case = CliTest::with_files([
         (
             "ty.toml",

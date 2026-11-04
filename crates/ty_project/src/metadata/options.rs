@@ -36,8 +36,7 @@ use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
-    ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings,
-    SearchPathSettingsError, SearchPaths,
+    ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
@@ -1833,12 +1832,17 @@ impl AnalysisOptions {
             let mut builder = ModuleGlobSetBuilder::new();
             for pattern in patterns {
                 if let Err(error) = builder.add(pattern) {
-                    diagnostics.push(OptionDiagnostic::invalid_module_glob(
-                        db,
-                        "allowed_unresolved_imports",
-                        pattern,
-                        &error,
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid glob pattern `{error}`"),
                         Severity::Warning,
+                    );
+                    diagnostics.push(diagnostic.with_source_sub(
+                        db,
+                        pattern,
+                        "glob",
+                        "allowed_unresolved_imports",
+                        error,
                     ));
                 }
             }
@@ -1848,12 +1852,17 @@ impl AnalysisOptions {
             let mut builder = ModuleGlobSetBuilder::new();
             for pattern in patterns {
                 if let Err(error) = builder.add(pattern) {
-                    diagnostics.push(OptionDiagnostic::invalid_module_glob(
-                        db,
-                        "replace_imports_with_any",
-                        pattern,
-                        &error,
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::InvalidGlob,
+                        format!("Invalid glob pattern `{error}`"),
                         Severity::Warning,
+                    );
+                    diagnostics.push(diagnostic.with_source_sub(
+                        db,
+                        pattern,
+                        "glob",
+                        "replace_imports_with_any",
+                        error,
                     ));
                 }
             }
@@ -1958,18 +1967,20 @@ fn build_module_glob_set(
 
     for glob in patterns {
         if let Err(error) = builder.add(glob) {
-            return Err(Box::new(OptionDiagnostic::invalid_module_glob(
-                db,
-                option_name,
-                glob,
-                &error,
+            let diagnostic = OptionDiagnostic::new(
+                DiagnosticId::InvalidGlob,
+                format!("Invalid glob pattern `{error}`"),
                 severity,
-            )));
+            );
+
+            return Err(diagnostic
+                .with_source_sub(db, glob, "glob", option_name, error)
+                .into());
         }
     }
 
-    // A bad pattern disables this matcher even when its warning was already reported
-    // while linting the override that contains it.
+    // If any override pattern is invalid, this option matches no modules, even ones
+    // covered by a valid global pattern. `lint_override` already reported the error.
     for pattern in linted_override_patterns {
         if builder.add(pattern).is_err() {
             return Ok(ModuleGlobSet::empty());
@@ -2554,21 +2565,6 @@ impl OptionDiagnostic {
             }
         });
         self.with_annotation(annotation)
-    }
-
-    fn invalid_module_glob(
-        db: &dyn Db,
-        name: &str,
-        pattern: &RangedValue<String>,
-        error: &ModuleGlobError,
-        severity: Severity,
-    ) -> Self {
-        Self::new(
-            DiagnosticId::InvalidGlob,
-            format!("Invalid glob pattern `{error}`"),
-            severity,
-        )
-        .with_source_sub(db, pattern, "glob", name, error)
     }
 
     fn with_source_sub<T>(
