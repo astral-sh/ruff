@@ -11,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueTypeKind, PromotionKind,
+    PromotionMode, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -22,11 +22,11 @@ mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
-/// Match arms by their exact string values in the order of the right union.
+/// Match exact string, bytes, or integer literals in the order of the right union.
 ///
 /// Indexing the left union by value avoids the quadratic cross-product of the two unions' arms.
 /// Both operands must be unions with one arm per value and at least two distinct values.
-pub(super) fn matching_string_literal_union_arms<'db>(
+pub(super) fn matching_literal_union_arms<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
@@ -42,27 +42,38 @@ pub(super) fn matching_string_literal_union_arms<'db>(
         ),
         _ => return None,
     };
+    // Python equality agrees with matching kind and value for these literals.
+    // Boolean literals require separate handling because `True == 1`.
+    let literal_key = |ty: Type<'db>| {
+        ty.as_literal_value_kind().filter(|kind| {
+            matches!(
+                kind,
+                LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_)
+                    | LiteralValueTypeKind::Int(_)
+            )
+        })
+    };
     let right = right.elements(db);
     let mut right_values = FxHashSet::default();
     if right.len() < 2
-        || !right.iter().all(|ty| {
-            ty.as_string_literal()
-                .is_some_and(|value| right_values.insert(value))
-        })
+        || !right
+            .iter()
+            .all(|&ty| literal_key(ty).is_some_and(|value| right_values.insert(value)))
     {
         return None;
     }
     let left = left.elements(db);
     let by_value = left
         .iter()
-        .map(|&ty| Some((ty.as_string_literal()?, ty)))
+        .map(|&ty| Some((literal_key(ty)?, ty)))
         .collect::<Option<FxHashMap<_, _>>>()?;
     if by_value.len() < 2 || by_value.len() != left.len() {
         return None;
     }
 
     Some(right.iter().filter_map(move |&ty| {
-        let left = *by_value.get(&ty.as_string_literal()?)?;
+        let left = *by_value.get(&literal_key(ty)?)?;
         Some((left, ty))
     }))
 }
@@ -1182,7 +1193,7 @@ impl<'db> IntersectionType<'db> {
             let env = ProgramEnvironment::from_program(types.program(db));
             let left = types.first(db);
             let right = types.second(db);
-            if let Some(pairs) = matching_string_literal_union_arms(db, left, right) {
+            if let Some(pairs) = matching_literal_union_arms(db, left, right) {
                 // Only matching values survive distribution. Simplify those pairs as usual
                 // when the literal flags differ.
                 return UnionType::from_elements(

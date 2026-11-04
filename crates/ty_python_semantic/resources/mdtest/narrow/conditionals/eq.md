@@ -1870,7 +1870,7 @@ def _(x: Literal[1, 2], y: Literal[2, 3]):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
-## Narrowing overlapping string literal unions
+## Narrowing overlapping string, bytes, and integer literal unions
 
 Equality narrows each operand to the shared values. For inequality, each value on either side can
 differ from some value on the other side.
@@ -1892,6 +1892,15 @@ def _(left: Literal["a", "b", "c"], right: Literal["b", "c", "d"]):
     else:
         reveal_type(left)  # revealed: Literal["b", "c"]
         reveal_type(right)  # revealed: Literal["b", "c"]
+```
+
+Each operand retains the order of its shared literals, including in unions of bytes and integers.
+
+```py
+def _(left: Literal[b"a", b"b", 0], right: Literal[0, b"b", b"c"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[b"b", 0]
+        reveal_type(right)  # revealed: Literal[0, b"b"]
 ```
 
 ## `==` with PEP 695 alias to a union of literals
@@ -2423,6 +2432,17 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[1]
     else:
         reveal_type(i)  # revealed: Literal[2]
+```
+
+When two literal unions can compare equal because `True == 1`, each operand narrows to its own
+literal.
+
+```py
+def _(left: Literal[1, 2], right: Literal[True, 3]):
+    reveal_type(left == right)  # revealed: bool
+    if left == right:
+        reveal_type(left)  # revealed: Literal[1]
+        reveal_type(right)  # revealed: Literal[True]
 ```
 
 ## Integers and booleans with non-strict equality semantics

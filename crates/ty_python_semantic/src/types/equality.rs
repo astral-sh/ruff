@@ -19,7 +19,7 @@ use super::{
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
-    set_theoretic::matching_string_literal_union_arms,
+    set_theoretic::matching_literal_union_arms,
 };
 
 mod enums;
@@ -772,7 +772,7 @@ fn evaluate_structural_comparison<'db>(
         // Truthiness evaluation can stop at the first disagreement, before inspecting both unions.
         (Type::Union(_), Type::Union(_))
             if evaluator.goal == ComparisonGoal::Constraint
-                && let Some(pairs) = matching_string_literal_union_arms(db, right, left) =>
+                && let Some(pairs) = matching_literal_union_arms(db, right, left) =>
         {
             let mut pairs = pairs.peekable();
             if pairs.peek().is_none() {

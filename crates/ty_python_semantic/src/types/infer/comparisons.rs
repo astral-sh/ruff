@@ -17,7 +17,7 @@ use crate::types::equality::{
 };
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
-use crate::types::set_theoretic::matching_string_literal_union_arms;
+use crate::types::set_theoretic::matching_literal_union_arms;
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
@@ -847,9 +847,9 @@ fn infer_binary_type_comparison_inner<'db>(
 
     if let NonIdentityOperator::Rich(rich @ (RichCompareOperator::Eq | RichCompareOperator::Ne)) =
         op
-        && let Some(mut pairs) = matching_string_literal_union_arms(db, left, right)
+        && let Some(mut pairs) = matching_literal_union_arms(db, left, right)
     {
-        // Exact string literals compare with a builtin boolean result. An overlap permits
+        // These literals compare with a builtin boolean result. An overlap permits
         // both results because each union has multiple values.
         return Ok(if pairs.next().is_some() {
             KnownClass::Bool.to_instance(db, env)

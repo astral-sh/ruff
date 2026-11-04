@@ -83,6 +83,18 @@ def _(
     reveal_type(value != disjoint)  # revealed: Literal[True]
 ```
 
+## Equality of bytes and integer literal unions
+
+```py
+from typing import Literal
+
+def compare_bytes(left: Literal[b"a", b"b"], right: Literal[b"c", b"d"]):
+    reveal_type(left == right)  # revealed: Literal[False]
+
+def compare_integers(left: Literal[1, 2], right: Literal[3, 4]):
+    reveal_type(left != right)  # revealed: Literal[True]
+```
+
 ## Unsupported operations
 
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
