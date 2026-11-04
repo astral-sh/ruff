@@ -72,3 +72,8 @@ pub(crate) const fn is_remove_redundant_comparison_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Wraps long comprehension iterables when parentheses make them fit.
+pub(crate) const fn is_wrap_comprehension_in_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

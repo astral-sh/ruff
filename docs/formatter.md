@@ -518,6 +518,8 @@ The next style includes these changes in preview:
     and parentheses that affect annotated assignments.
 - Remove redundant parentheses around simple comparison operands, while retaining grouping
     for arithmetic, Boolean expressions, nested comparisons, and comments.
+- Wrap a long comprehension iterable after `in` when parentheses help it fit, and remove
+    redundant parentheses around short names and attribute accesses.
 
 ### F-string formatting
 

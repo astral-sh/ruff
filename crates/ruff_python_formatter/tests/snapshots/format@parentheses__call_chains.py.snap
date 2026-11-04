@@ -767,19 +767,22 @@ x = (
          .str.extract(pattern=r"\.([a-z0-9]+)$", group_index=1)
          .str.replace_all(pattern=r"cxx|cpp|cc|c|hpp|h", value="C/C++")
          .str.replace_all(pattern="^f.*$", value="Fortran")
-@@ -288,9 +293,8 @@
+@@ -288,11 +293,9 @@
          if more_nested_because_line_length:
              identical_hidden_layer_sizes = all(
                  current_hidden_layer_sizes == first_hidden_layer_sizes
 -                for current_hidden_layer_sizes in self.component_config[
 -                    HIDDEN_LAYERS_SIZES
 -                ]
-+                for current_hidden_layer_sizes in self
-+                .component_config[HIDDEN_LAYERS_SIZES]
-                 .values()
-                 .attr
+-                .values()
+-                .attr
++                for current_hidden_layer_sizes in (
++                    self.component_config[HIDDEN_LAYERS_SIZES].values().attr
++                )
              )
-@@ -302,7 +306,8 @@
+ 
+ 
+@@ -302,7 +305,8 @@
              with self.read_ctx(book_type) as cursor:
                  if (
                      entry_count := len(
