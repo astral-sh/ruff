@@ -24,6 +24,6 @@ from math import sine  # error
 
 ## Rule history
 
-- v1.0.0: Renamed from `unresolved-import`.
+- v0.0.97: Renamed from `unresolved-import`.
 
     `unresolved-import` remains as a compatibility alias for this rule.
