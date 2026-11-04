@@ -1829,20 +1829,28 @@ pub struct AnalysisOptions {
 
 impl AnalysisOptions {
     fn lint_override(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
-        for (name, patterns) in [
-            (
-                "allowed_unresolved_imports",
-                &self.allowed_unresolved_imports,
-            ),
-            ("replace_imports_with_any", &self.replace_imports_with_any),
-        ] {
-            let Some(patterns) = patterns else { continue };
+        if let Some(patterns) = &self.allowed_unresolved_imports {
             let mut builder = ModuleGlobSetBuilder::new();
             for pattern in patterns {
                 if let Err(error) = builder.add(pattern) {
                     diagnostics.push(OptionDiagnostic::invalid_module_glob(
                         db,
-                        name,
+                        "allowed_unresolved_imports",
+                        pattern,
+                        &error,
+                        Severity::Warning,
+                    ));
+                }
+            }
+        }
+
+        if let Some(patterns) = &self.replace_imports_with_any {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in patterns {
+                if let Err(error) = builder.add(pattern) {
+                    diagnostics.push(OptionDiagnostic::invalid_module_glob(
+                        db,
+                        "replace_imports_with_any",
                         pattern,
                         &error,
                         Severity::Warning,
