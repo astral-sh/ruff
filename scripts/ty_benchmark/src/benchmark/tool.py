@@ -3,6 +3,7 @@ from __future__ import annotations
 import abc
 import glob
 import json
+import os
 import shutil
 import sys
 from collections.abc import Generator
@@ -28,6 +29,13 @@ def which_tool(name: str, path: Path | None = None) -> Path:
     )
 
     return Path(tool)
+
+
+def exclude_regex(pattern: str) -> str:
+    """Convert a project exclusion glob to a regex for mypy and Zuban."""
+    regex = glob.translate(pattern, recursive=True, include_hidden=True, seps="/\\")
+    # Project interpreters older than Python 3.14 do not recognize \z.
+    return r"\A" + regex.removesuffix(r"\z") + r"(?:[/\\].*)?$"
 
 
 class Tool(abc.ABC):
@@ -93,15 +101,23 @@ class Ty(Tool):
     def config(self, project: Project, venv: Venv):
         return (
             Path("ty.toml"),
-            f"""
-            [src]
-            include = [{", ".join([f'"{include}"' for include in project.include])}]
-            exclude = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
-
-            [environment]
-            python-version = "{project.python_version}"
-            python = "{venv.path.as_posix()}"
-            """,
+            tomlkit.dumps(
+                {
+                    "src": {
+                        "include": [
+                            path.replace(" ", r"\ ") for path in project.include
+                        ],
+                        "exclude": [
+                            path.replace(" ", r"\ ") for path in project.exclude
+                        ],
+                    },
+                    "environment": {
+                        "python-version": project.python_version,
+                        "python": venv.path.as_posix(),
+                        "extra-paths": list(project.import_roots),
+                    },
+                }
+            ),
         )
 
     @override
@@ -112,9 +128,6 @@ class Ty(Tool):
             "--output-format=concise",
             "--no-progress",
         ]
-
-        for exclude in project.exclude:
-            command.extend(["--exclude", exclude])
 
         return Command(name=self._name, command=command)
 
@@ -136,6 +149,24 @@ class Mypy(Tool):
         return "mypy"
 
     @override
+    def config(self, project: Project, venv: Venv):
+        return (
+            Path("mypy-benchmark.toml"),
+            tomlkit.dumps(
+                {
+                    "tool": {
+                        "mypy": {
+                            "mypy_path": list(project.import_roots),
+                            "exclude": [
+                                exclude_regex(pattern) for pattern in project.exclude
+                            ],
+                        }
+                    }
+                }
+            ),
+        )
+
+    @override
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
         path = self.path or which_tool("mypy", venv.bin)
         command = [
@@ -145,21 +176,14 @@ class Mypy(Tool):
             "--python-version",
             project.python_version,
             "--no-pretty",
-            *project.include,
+            # A dedicated config disables project and user overrides.
+            "--config-file=mypy-benchmark.toml",
+            "--follow-imports=normal",
             "--check-untyped-defs",
+            "--num-workers",
+            "0" if single_threaded else str(os.process_cpu_count() or 1),
+            *project.include,
         ]
-
-        for exclude in project.exclude:
-            # Mypy uses regex...
-            # This is far from perfect, but not terrible.
-            command.extend(
-                [
-                    "--exclude",
-                    exclude.replace(".", r"\.")
-                    .replace("**", ".*")
-                    .replace("*", r"\w.*"),
-                ]
-            )
 
         prepare = None
 
@@ -220,31 +244,27 @@ class Pyright(Tool):
             Path("pyrightconfig.json"),
             json.dumps(
                 {
-                    "exclude": [str(path) for path in project.exclude],
+                    "include": list(project.include or ["."]),
+                    "exclude": list(project.exclude),
+                    "analyzeUnannotatedFunctions": True,
                     # Set the `venv` config for pyright. Pyright only respects the `--venvpath`
                     # CLI option when `venv` is set in the configuration... 🤷‍♂️
                     "venv": venv.name,
                     # This is not the path to the venv folder, but the folder that contains the venv...
                     "venvPath": str(venv.path.parent.as_posix()),
                     "pythonVersion": project.python_version,
+                    "extraPaths": list(project.import_roots),
                 }
             ),
         )
 
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
-        command = [str(self.path), "--skipunannotated"]
+        command = [str(self.path)]
 
         if not single_threaded:
-            command.append("--threads")
+            command.extend(["--threads", str(os.process_cpu_count() or 1)])
 
-        command.extend(
-            [
-                "--level=warning",
-                "--project",
-                "pyrightconfig.json",
-                *project.include,
-            ]
-        )
+        command.extend(["--level=warning", "--project", "pyrightconfig.json"])
 
         return Command(
             name="Pyright",
@@ -269,16 +289,19 @@ class Pyrefly(Tool):
 
     @override
     def config(self, project: Project, venv: Venv):
+        settings = {
+            "project-includes": list(project.include),
+            "project-excludes": list(project.exclude),
+            "python-interpreter-path": venv.python.as_posix(),
+            "python-version": project.python_version,
+            "site-package-path": [venv.path.as_posix()],
+            "untyped-def-behavior": "check-and-infer-return-any",
+        }
+        if project.import_roots:
+            settings["search-path"] = [*project.import_roots, "."]
         return (
             Path("pyrefly.toml"),
-            f"""
-            project-includes = [{", ".join([f'"{include}"' for include in project.include])}]
-            project-excludes = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
-            python-interpreter-path = "{venv.python.as_posix()}"
-            python-version = "{project.python_version}"
-            site-package-path = ["{venv.path.as_posix()}"]
-            untyped-def-behavior="check-and-infer-return-any"
-            """,
+            tomlkit.dumps(settings),
         )
 
     @override
@@ -287,10 +310,10 @@ class Pyrefly(Tool):
             str(self.path),
             "check",
             "--output-format=min-text",
+            "--config=pyrefly.toml",
+            "--threads",
+            "1" if single_threaded else str(os.process_cpu_count() or 1),
         ]
-
-        if single_threaded:
-            command.extend(["--threads", "1"])
 
         return Command(
             name="Pyrefly",
@@ -314,7 +337,7 @@ class Zuban(Tool):
         return "zuban"
 
     def _settings(self, project: Project, venv: Venv) -> dict[str, object]:
-        search_paths = set()
+        search_paths = {venv.project_path / root for root in project.import_roots}
         for include in project.include:
             path = venv.project_path / include
             if path.is_file():
@@ -341,16 +364,10 @@ class Zuban(Tool):
             "mode": "mypy",
             "python_version": project.python_version,
             "python_executable": venv.python.as_posix(),
-            "mypy_path": [path.as_posix() for path in sorted(search_paths)],
+            # Match native discovery's physical paths to avoid duplicate module identities.
+            "mypy_path": sorted({path.resolve().as_posix() for path in search_paths}),
             "files": list(project.include),
-            "exclude": [
-                r"\A"
-                + glob.translate(
-                    pattern, recursive=True, include_hidden=True, seps="/\\"
-                ).removesuffix(r"\z")
-                + r"(?:[/\\].*)?\z"
-                for pattern in dict.fromkeys(excludes)
-            ],
+            "exclude": [exclude_regex(pattern) for pattern in dict.fromkeys(excludes)],
             "exclude_gitignore": False,
             "check_untyped_defs": True,
             "untyped_function_return_mode": "any",
@@ -373,7 +390,6 @@ class Zuban(Tool):
                 "--config-file",
                 "zuban-benchmark.toml",
                 "--no-pretty",
-                *project.include,
             ],
         )
 

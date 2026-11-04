@@ -37,6 +37,9 @@ class Project(NamedTuple):
 
     edit: IncrementalEdit | None = None
 
+    import_roots: Sequence[str] = ()
+    """Additional first-party import roots, relative to the checkout."""
+
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if (checkout_dir / ".git").exists():
@@ -137,6 +140,7 @@ ALL: Final = [
         revision="55996d1fb8342725c8a19b6023cd9439c3c1d6f7",
         python_version="3.11",
         include=["src"],
+        import_roots=["src"],
         install_arguments=[
             "-r",
             "pyproject.toml",
@@ -173,7 +177,6 @@ ALL: Final = [
             affected_files=["discord/channel.py"],
         ),
     ),
-    # Fairly chunky project, requires the pydantic mypy plugin.
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
@@ -216,6 +219,7 @@ ALL: Final = [
         revision="5ef70112a1ff19c05324ff889dd30405b1002044",
         python_version="3.11",
         include=["src"],
+        import_roots=["src"],
         install_arguments=["-r", "pyproject.toml"],
         edit=IncrementalEdit(
             edited_file="src/jinja2/nodes.py",
@@ -273,6 +277,7 @@ ALL: Final = [
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
         revision="a9452ac21852755311913cb27887b083b5007c03",
+        import_roots=["src"],
         # See https://github.com/PrefectHQ/prefect/blob/a9452ac21852755311913cb27887b083b5007c03/.pre-commit-config.yaml#L25-L39
         include=[
             "src/prefect/server/models",
@@ -439,6 +444,7 @@ ALL: Final = [
         revision="10f4d1e2d706a7722ca78e79ce05b00333a7aa5b",
         python_version="3.11",
         include=["lib/sqlalchemy"],
+        import_roots=["lib"],
         install_arguments=[
             "-r",
             "pyproject.toml",

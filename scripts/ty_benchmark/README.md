@@ -24,7 +24,8 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
-You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
+Each checker discovers files from the project's configured directories. By default,
+the CLI benchmarks use the available CPU count. Pass `--single-threaded` to use one.
 
 ### Warm check time
 
@@ -40,7 +41,7 @@ Measures how long it takes to recheck a project if there were no changes.
 
 ### LSP: Time to first diagnostic
 
-Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
+Measures how long it takes for a newly started LSP to return its first diagnostic response for each open file. A server can continue checking files in the background.
 
 Run with:
 

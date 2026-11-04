@@ -9,12 +9,14 @@ import tempfile
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Callable, Generator
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Final, override
 
 import pytest
 from lsprotocol import types as lsp
 
+from benchmark import benchmark_environment
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.projects import IncrementalEdit, Project
@@ -181,9 +183,10 @@ class LspTest(ABC):
         self.client = LSPClient()
         self.edit = edit
 
-    @property
+    @cached_property
     def cwd(self) -> Path:
-        return self.venv.project_path
+        # Use one physical path for process, workspace, and document identities.
+        return self.venv.project_path.resolve()
 
     @property
     def edited_file_path(self) -> Path:
@@ -220,7 +223,9 @@ class LspTest(ABC):
             pytest.skip(f"{self.tool.name()} doesn't support LSP")
             return
 
-        await self.client.start_io(*lsp_cmd, cwd=self.cwd)
+        await self.client.start_io(
+            *lsp_cmd, cwd=self.cwd, env=benchmark_environment(self.cwd)
+        )
 
         await self.client.initialize_async(
             lsp.InitializeParams(
@@ -284,7 +289,7 @@ class FetchDiagnostics(LspTest):
         if verbose:
             for file, diagnostics in self.diagnostics:
                 if diagnostics:
-                    print_diagnostics(file, diagnostics, self.venv.project_path)
+                    print_diagnostics(file, diagnostics, self.cwd)
 
 
 class IncrementalEditTest(LspTest):
@@ -415,7 +420,7 @@ class IncrementalEditTest(LspTest):
                 self.after_edit_diagnostics,
                 self.project.name,
                 self.tool.name(),
-                self.venv.project_path,
+                self.cwd,
             )
 
 

@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from benchmark import Hyperfine
+from benchmark import Hyperfine, benchmark_environment
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
@@ -133,12 +132,6 @@ def main() -> None:
         else ALL_PROJECTS
     )
 
-    benchmark_env = os.environ.copy()
-
-    if args.single_threaded:
-        benchmark_env["TY_MAX_PARALLELISM"] = "1"
-        benchmark_env["RAYON_NUM_THREADS"] = "1"
-
     first = True
 
     for project in projects:
@@ -146,16 +139,18 @@ def main() -> None:
             print(f"Skipping {project.name}: {skip_reason}")
             continue
 
+        if not project.include:
+            project = project._replace(include=["."])
+
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
-
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version
             )
-            venv.install(
-                project.install_arguments,
-                include_mypy=any(isinstance(suite, Mypy) for suite in suites),
+            venv.install(project.install_arguments)
+            benchmark_env = benchmark_environment(
+                cwd, single_threaded=args.single_threaded
             )
 
             commands = []

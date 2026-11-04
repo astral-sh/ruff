@@ -74,9 +74,7 @@ class Venv:
 
         return Venv(project_name=project, project_path=parent)
 
-    def install(
-        self, pip_install_args: list[str], *, include_mypy: bool = False
-    ) -> None:
+    def install(self, pip_install_args: list[str]) -> None:
         """Installs the dependencies required to type check the project."""
 
         logger.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
@@ -92,8 +90,8 @@ class Venv:
             # annotations of one of that project's dependencies
             "--exclude-newer",
             "2026-10-24T19:50:00Z",
-            # mypy needs the project environment to load project-local plugins.
-            *(["mypy"] if include_mypy else []),
+            # Project fixtures can import mypy even when only another tool is measured.
+            "mypy",
         ]
 
         try:
