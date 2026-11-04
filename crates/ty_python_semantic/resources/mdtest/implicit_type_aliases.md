@@ -3273,6 +3273,38 @@ def invalid() -> Root[int]:
     return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-type]
 ```
 
+### Shared union members in mutually recursive aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A union can include another alias both directly and through a third alias. Here `A` includes `C`
+directly and through `B`. The implicit aliases describe the same types as their PEP 695
+counterparts.
+
+```py
+from typing import Union
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+A = Union[list["C"], "B", "C"]
+B = Union[list["A"], "C"]
+C = list["B"]
+
+type Pep695A = list[Pep695C] | Pep695B | Pep695C
+type Pep695B = list[Pep695A] | Pep695C
+type Pep695C = list[Pep695B]
+
+static_assert(is_equivalent_to(A, Pep695A))
+static_assert(is_equivalent_to(B, Pep695B))
+static_assert(is_equivalent_to(C, Pep695C))
+
+valid: A = [[[]]]
+invalid: C = [1]  # error: [invalid-assignment]
+```
+
 ### Generic recursion through different paths
 
 Returning to the outer alias directly preserves its type argument. Returning through another alias

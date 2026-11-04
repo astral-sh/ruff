@@ -349,14 +349,27 @@ impl<'db> UnionType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         if type_mapping.is_structural() {
-            Type::Union(UnionType::new(
-                db,
-                self.elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                self.recursively_defined(db),
-            ))
+            // Binding can map distinct elements to the same type. For example, provisional
+            // values of another alias from two fixed-point iterations can differ only in their
+            // references to the alias being bound. Removing exact duplicates needs no semantic
+            // operations on open bodies, and it keeps the bound body independent of whether those
+            // provisional values were still distinct. Otherwise, the iteration can oscillate.
+            let elements = self
+                .elements(db)
+                .iter()
+                .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<FxOrderSet<_>>();
+            if elements.len() == 1
+                && let Some(&element) = elements.first()
+            {
+                element
+            } else {
+                Type::Union(UnionType::new(
+                    db,
+                    elements.into_iter().collect::<Box<[_]>>(),
+                    self.recursively_defined(db),
+                ))
+            }
         } else {
             self.map_leave_aliases(db, visitor.env, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
