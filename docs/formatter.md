@@ -509,6 +509,7 @@ The next style includes these changes in preview:
 - Remove redundant parentheses around generator expressions, including a generator used as the
     sole argument of a call. Comments and magic trailing commas can require parentheses.
 - Keep `**` unspaced for simple operands even when the power expression wraps onto multiple lines.
+- Wrap a long tuple after `yield` instead of wrapping the entire yield statement.
 
 ### F-string formatting
 

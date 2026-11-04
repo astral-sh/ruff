@@ -39,3 +39,8 @@ pub(crate) const fn is_remove_redundant_generator_parentheses_enabled(
 pub(crate) const fn is_simplify_power_operator_hugging_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Parenthesizes the yielded tuple instead of the whole yield statement.
+pub(crate) const fn is_parenthesize_tuple_in_yield_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

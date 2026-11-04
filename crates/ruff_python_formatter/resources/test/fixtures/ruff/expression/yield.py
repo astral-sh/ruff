@@ -119,3 +119,20 @@ result = yield (1 + f(1, 2, 3,))
 result = (yield (1 + f(1, 2, 3,)))
 
 print((yield x))
+
+# Tuple yields wrap their values without wrapping the entire statement.
+def tuple_yields():
+    yield first,
+    (yield first, second)
+    (
+        yield first_long_variable_name,
+        second_long_variable_name,
+        third_long_variable_name,
+        fourth_long_variable_name,
+    )
+    print((yield first, second))
+    result = (yield first, second), third
+    (
+        # This comment belongs to the yield expression.
+        yield first, second
+    )
