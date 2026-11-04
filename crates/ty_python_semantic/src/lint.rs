@@ -369,7 +369,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -383,7 +383,7 @@ impl LintRegistryBuilder {
     }
 
     #[track_caller]
-    pub(crate) fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
+    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
         let target = match self.by_name.get(to.name.as_str()) {
             Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
             Some(LintEntry::Alias(target)) => {
@@ -406,7 +406,7 @@ impl LintRegistryBuilder {
         );
     }
 
-    pub(crate) fn build(self) -> LintRegistry {
+    pub fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,

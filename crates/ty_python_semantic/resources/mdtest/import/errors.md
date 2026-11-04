@@ -34,6 +34,11 @@ reveal_type(thing)  # revealed: Unknown
 `unresolved-import` is an alias for `import-not-found`. Existing ignore comments that use the old
 name still suppress errors for both a missing module and a missing member.
 
+```toml
+[rules]
+renamed-rule-in-ignore-comment = "ignore"
+```
+
 ```py
 import missing_module  # ty: ignore[unresolved-import]
 from math import missing_member  # type: ignore[ty:unresolved-import]
@@ -53,9 +58,11 @@ legacy alias to the rule's canonical name.
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-import'"
+# error: [renamed-rule-in-ignore-comment]
 print(missing)  # ty: ignore[unresolved-reference, unresolved-import]
 
 # error: [unused-type-ignore-comment] "'ty:division-by-zero', 'ty:unresolved-import'"
+# error: [renamed-rule-in-ignore-comment]
 print(missing)  # type: ignore[ty:unresolved-reference, ty:division-by-zero, ty:unresolved-import]
 ```
 
