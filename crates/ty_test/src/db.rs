@@ -18,10 +18,11 @@ use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::dependency::DependencyMetadata;
-use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, LintStatus, RuleSelection};
+use ty_python_semantic::lint::{
+    Level, LintMetadata, LintRegistry, LintRegistryBuilder, LintStatus, RuleSelection,
+};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap, declare_lint,
-    register_lints,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap, register_lints,
 };
 
 #[salsa::db]
@@ -354,13 +355,15 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
 
 /// Includes a no-op rule for testing renamed rules in suppression comments.
 fn mdtest_lint_registry() -> &'static LintRegistry {
-    declare_lint! {
-        /// A rule that never emits a diagnostic.
-        static NEW_RULE_NAME = {
-            summary: "example of a renamed rule",
-            status: LintStatus::stable("0.0.0"),
-        }
-    }
+    static NEW_RULE_NAME: LintMetadata = LintMetadata {
+        name: LintName::of("new-rule-name"),
+        summary: "example of a renamed rule",
+        raw_documentation: "A rule that never emits a diagnostic.",
+        default_level: Level::Error,
+        status: LintStatus::stable("0.0.0"),
+        file: file!(),
+        line: line!(),
+    };
 
     static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| {
         let mut registry = LintRegistryBuilder::default();
