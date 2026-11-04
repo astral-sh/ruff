@@ -3,10 +3,24 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+UV_CONFIG = """\
+# Keep mypy and its runtime dependencies compatible when projects pin older versions.
+override-dependencies = [
+    "mypy==2.4.0",
+    "ast-serialize>=0.11.2,<1.0.0",
+    "librt>=0.16.0",
+]
+
+[extra-build-dependencies]
+# The pandas docs theme omits this build dependency.
+pydata-sphinx-theme = ["typing-extensions"]
+"""
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -66,8 +80,6 @@ class Venv:
         """Installs the dependencies required to type check the project."""
 
         logger.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
-        mypy_overrides = Path(__file__).with_name("mypy-overrides.txt")
-
         command = [
             "uv",
             "pip",
@@ -79,26 +91,22 @@ class Venv:
             # our projects isn't unexpectedly broken by a change in the
             # annotations of one of that project's dependencies
             "--exclude-newer",
-            "2026-06-07T00:00:00Z",
-            # Mypy needs to be installed into the project virtual environment
-            # or it fails to load project-local plugins. The override keeps
-            # project dev dependencies from pinning a different mypy version.
-            *(
-                ["--overrides", mypy_overrides.as_posix(), "mypy"]
-                if include_mypy
-                else []
-            ),
-            *pip_install_args,
+            "2026-10-24T19:50:00Z",
+            # mypy needs the project environment to load project-local plugins.
+            *(["mypy"] if include_mypy else []),
         ]
 
         try:
-            subprocess.run(
-                command,
-                cwd=self.project_path,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            with tempfile.TemporaryDirectory() as temp_dir:
+                config = Path(temp_dir) / "uv.toml"
+                config.write_text(UV_CONFIG, encoding="utf-8")
+                subprocess.run(
+                    [*command, "--config-file", str(config), *pip_install_args],
+                    cwd=self.project_path,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
         except subprocess.CalledProcessError as e:
             msg = (
                 f"Failed to install dependencies for {self.project_name}:\n\n{e.stderr}"
