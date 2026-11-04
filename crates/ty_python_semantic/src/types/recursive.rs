@@ -122,9 +122,8 @@ impl<'db> RecursiveVar<'db> {
                 arguments,
                 if self.index(db) == recursive.index(db) {
                     // An unfolded self-reference retains the application's pending materialization.
-                    recursive
-                        .materialization_kind(db)
-                        .or(self.materialization_kind(db))
+                    self.materialization_kind(db)
+                        .or(recursive.materialization_kind(db))
                 } else {
                     self.materialization_kind(db)
                 },
