@@ -109,44 +109,38 @@ impl<'db> Type<'db> {
         ))
     }
 
-    /// The callable contract for assigning a value that shadows a method on an instance.
+    /// Return a type that represents the "contract" that a callable must satisfy when attempting
+    /// to shadow a method on an instance. For example:
     ///
     /// ```python
     /// class C:
     ///     def method(self, x: int) -> str:
     ///         return str(x)
     ///
-    ///     def some_compatible_method(self, x: int) -> str:
-    ///         return str(x)
-    ///
     ///     def swap(self) -> None:
-    ///         self.method = self.some_compatible_method
-    ///
-    /// c = C()
-    /// c.swap()
-    /// c.method(42)  # Returns "42".
+    ///         self.method = xxx # which contract must the type of `xxx` satisfy?
     /// ```
     ///
-    /// Python retrieves the stored method with `self` already bound. The contract accepts any
-    /// callable compatible with the bound signature `(x: int) -> str`.
-    pub(super) fn instance_method_contract(
+    /// To construct this contract type, ty binds the original `C.method` to the receiver (`self`)
+    /// and uses its call signature, `(x: int) -> str`, as the expected type. This allows `method`
+    /// to be shadowed by non-function callables, too, even if that is not sound (those might not
+    /// have the same attributes as function-like callables).
+    pub(super) fn method_shadowing_contract(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         receiver: Type<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Type::Union(union) => {
-                union.try_map(db, env, |ty| ty.instance_method_contract(db, env, receiver))
-            }
+            Type::Union(union) => union.try_map(db, env, |ty| {
+                ty.method_shadowing_contract(db, env, receiver)
+            }),
             Type::TypeAlias(alias) => alias
                 .value_type(db)
-                .instance_method_contract(db, env, receiver),
-            // Assigning a function with `C.method = f` puts it in the class namespace,
-            // where it can bind to an instance on a later `C().method` lookup.
-            // Keep the class-attribute rules for such receivers. The subtype check
-            // also catches classes whose metaclass is a subclass of `type`.
+                .method_shadowing_contract(db, env, receiver),
             _ if self.function_like_kind(db).is_some()
+                // When the receiver is a class object (i.e. `C.method = ...` instead of `c_instance.method = ...`),
+                // it would actually overwrite the function on the class, i.e. this would not be shadowing.
                 && !receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) =>
             {
                 let bound = self.function_like_dunder_get(db, env, Some(receiver), None)?;

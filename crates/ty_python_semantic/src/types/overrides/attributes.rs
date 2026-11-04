@@ -307,7 +307,7 @@ fn bind_attribute<'db>(
                 env,
                 ty,
                 receiver,
-                ty.instance_method_contract(db, env, receiver)
+                ty.method_shadowing_contract(db, env, receiver)
                     .unwrap_or(read),
             )
         };

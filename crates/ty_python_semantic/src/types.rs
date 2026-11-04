@@ -5703,7 +5703,7 @@ impl<'db> Type<'db> {
             && let Place::Defined(DefinedPlace { origin, ty, .. }) = fallback_member.place
             && !origin.is_declared()
             && let Some(contract) =
-                meta_attr_ty.and_then(|method| method.instance_method_contract(db, env, receiver))
+                meta_attr_ty.and_then(|method| method.method_shadowing_contract(db, env, receiver))
             && ty.is_assignable_to(db, env, contract)
         {
             PlaceAndQualifiers::unbound()
