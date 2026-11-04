@@ -167,8 +167,10 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
 #[test]
 fn fix() -> anyhow::Result<()> {
     let case = CliTest::with_file(
-        "unused_ignore.py",
+        "example.py",
         r#"
+            import missing_module  # ty: ignore[unresolved-import]
+            import missing  # type: ignore[import-not-found, ty:unresolved-import]  # optional
             x = 1  # ty: ignore[unresolved-reference]
             values = [
                 # ty: ignore[]
@@ -183,16 +185,18 @@ fn fix() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    Found 2 diagnostics (2 fixed, 0 remaining).
+    Found 4 diagnostics (4 fixed, 0 remaining).
 
     ----- stderr -----
     "
     );
 
     assert_snapshot!(
-        fs::read_to_string(case.root().join("unused_ignore.py"))?,
+        fs::read_to_string(case.root().join("example.py"))?,
         @"
 
+    import missing_module  # ty: ignore[import-not-found]
+    import missing  # type: ignore[import-not-found, ty:import-not-found]  # optional
     x = 1
     values = [
         1,
@@ -200,28 +204,6 @@ fn fix() -> anyhow::Result<()> {
     "
     );
 
-    Ok(())
-}
-
-#[test]
-fn fix_renamed_rule_in_ignore_comment() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "example.py",
-        "import missing  # type: ignore[import-not-found, ty:unresolved-import]  # optional\n",
-    )?;
-
-    assert_cmd_snapshot!(case.command().arg("--fix"), @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    Found 1 diagnostic (1 fixed, 0 remaining).
-
-    ----- stderr -----
-    ");
-    assert_eq!(
-        fs::read_to_string(case.root().join("example.py"))?,
-        "import missing  # type: ignore[import-not-found, ty:import-not-found]  # optional\n"
-    );
     Ok(())
 }
 

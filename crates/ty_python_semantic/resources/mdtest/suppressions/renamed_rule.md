@@ -12,40 +12,20 @@ The old name still suppresses the import error. The fix replaces just the rule n
 
 ```py
 # snapshot
-import missing_module  # ty: ignore[unresolved-import]
-```
-
-```snapshot
-warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
- --> src/mdtest_snippet.py:2:37
-  |
-2 | import missing_module  # ty: ignore[unresolved-import]
-  |                                     ^^^^^^^^^^^^^^^^^
-help: Replace `unresolved-import` with `import-not-found`
-  |
-1 | # snapshot
-  - import missing_module  # ty: ignore[unresolved-import]
-2 + import missing_module  # ty: ignore[import-not-found]
-3 | # snapshot
-  |
-```
-
-```py
-# snapshot
 import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
 ```
 
 ```snapshot
 warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
- --> src/mdtest_snippet.py:4:61
+ --> src/mdtest_snippet.py:2:61
   |
-4 | import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
+2 | import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
   |                                                             ^^^^^^^^^^^^^^^^^
 help: Replace `unresolved-import` with `import-not-found`
   |
-3 | # snapshot
+1 | # snapshot
   - import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
-4 + import another_module  # type: ignore[unresolved-import, ty:import-not-found]  # optional
+2 + import another_module  # type: ignore[unresolved-import, ty:import-not-found]  # optional
   |
 ```
 

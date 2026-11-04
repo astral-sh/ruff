@@ -217,7 +217,8 @@ fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
             continue;
         };
 
-        let range = suppression.rule_name_range();
+        let prefix_len = suppression.kind.code_prefix().text_len();
+        let range = suppression.range.add_start(prefix_len);
         let name = &source[range];
         let canonical = lint.name().as_str();
         if name == canonical {
@@ -235,7 +236,7 @@ fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
             .lint_suppressions(range, lint)
             .any(|other| {
                 other.comment_range == suppression.comment_range
-                    && &source[other.rule_name_range()] == canonical
+                    && &source[other.range.add_start(prefix_len)] == canonical
             });
         if !already_present {
             diag.help(format_args!("Replace `{name}` with `{canonical}`"));
@@ -522,15 +523,6 @@ pub(crate) struct Suppression {
 }
 
 impl Suppression {
-    /// The range of a lint-specific rule name, excluding the `ty:` prefix in a `type: ignore`.
-    fn rule_name_range(&self) -> TextRange {
-        if self.kind.is_type_ignore() {
-            self.range.add_start("ty:".text_len())
-        } else {
-            self.range
-        }
-    }
-
     /// Returns whether this suppression covers either endpoint of `range`.
     ///
     /// Requiring endpoint containment, rather than any intersection, prevents a suppression on an
@@ -560,6 +552,14 @@ enum SuppressionKind {
 }
 
 impl SuppressionKind {
+    /// In a `type: ignore` comment, only codes prefixed with `ty:` belong to ty.
+    fn code_prefix(self) -> &'static str {
+        match self {
+            Self::Ty => "",
+            Self::TypeIgnore => "ty:",
+        }
+    }
+
     const fn is_type_ignore(self) -> bool {
         matches!(self, SuppressionKind::TypeIgnore)
     }
@@ -726,17 +726,10 @@ impl<'a> SuppressionsBuilder<'a> {
             // `ty: ignore[a, b]` or `type: ignore[a, b]`
             Some(codes) => {
                 for &code_range in codes {
-                    let code = &self.source[code_range];
-
-                    // For `type:ignore`, ignore codes that don't start with `ty:`.
-                    let code = if comment.kind().is_type_ignore() {
-                        if let Some(prefix) = code.strip_prefix("ty:") {
-                            prefix
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        code
+                    let Some(code) =
+                        self.source[code_range].strip_prefix(comment.kind().code_prefix())
+                    else {
+                        continue;
                     };
 
                     match self.lint_registry.get(code) {
