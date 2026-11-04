@@ -480,34 +480,47 @@ impl<'db> UnionElement<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
-        cycle_recovery: bool,
+        simplification: UnionSimplification,
     ) -> ReduceResult<'db> {
         if let UnionElement::Type(existing) = self {
             return ReduceResult::Type(*existing);
         }
 
-        if cycle_recovery {
-            cold_path();
+        match simplification {
+            UnionSimplification::Full => {}
+            UnionSimplification::CycleRecovery | UnionSimplification::Structural => {
+                cold_path();
 
-            // A widened literal group must absorb matching literals from later iterations for
-            // recovery to converge. Preserve that exact fallback reduction without relation queries.
-            return match self {
-                UnionElement::IntLiterals(_) => {
-                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Int))
-                }
-                UnionElement::StringLiterals(_) => {
-                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Str))
-                }
-                UnionElement::BytesLiterals(_) => {
-                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Bytes))
-                }
-                UnionElement::EnumLiterals { enum_class, .. } => ReduceResult::KeepIf(
-                    other_type
-                        .as_nominal_instance()
-                        .is_none_or(|instance| instance.class_literal(db, env) != *enum_class),
-                ),
-                UnionElement::Type(_) => unreachable!("ordinary types are handled before recovery"),
-            };
+                // Without relation queries, a literal group is still absorbed by an instance of
+                // its fallback class, such as the instance that replaces a widened group. Recovery
+                // needs this to converge, and structural rebuilding needs it to match an ordinary
+                // rebuild. Only the class of `other_type` is compared, so its type arguments,
+                // which can contain unbound recursive variables, are not inspected.
+                return match self {
+                    UnionElement::IntLiterals(_) => {
+                        ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Int))
+                    }
+                    UnionElement::StringLiterals(_) => {
+                        ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Str))
+                    }
+                    UnionElement::BytesLiterals(_) => {
+                        ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Bytes))
+                    }
+                    UnionElement::EnumLiterals { enum_class, .. } => {
+                        ReduceResult::KeepIf(other_type.as_nominal_instance().is_none_or(
+                            |instance| {
+                                // Checking for a tuple first avoids constructing the class of a
+                                // tuple from its element types.
+                                instance.has_known_class(db, KnownClass::Tuple)
+                                    || instance.class_literal(db, env) != *enum_class
+                            },
+                        ))
+                    }
+                    UnionElement::Type(_) => {
+                        unreachable!("ordinary types are handled before recovery")
+                    }
+                };
+            }
         }
 
         let mut other_type_negated_cache = None;
@@ -642,15 +655,42 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+
+/// The simplifications that a [`UnionBuilder`] performs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UnionSimplification {
+    /// All simplifications, including those that query relations between elements.
+    Full,
+    /// Joining types in a `cycle_recovery` function. Because recovery cannot introduce a new
+    /// cycle, relation-based union simplifications are skipped, and recursively defined literal
+    /// unions widen early so that recovery converges.
+    CycleRecovery,
+    /// Rebuilding a union during a structural substitution of recursive types. Elements can
+    /// contain unbound recursive variables, which no semantic operation may inspect. The builder
+    /// still flattens unions, removes `Never` and exact duplicates, and groups literals in the
+    /// same order as [`UnionSimplification::Full`], but it does not query relations between
+    /// elements. Like [`UnionSimplification::CycleRecovery`], it absorbs literals into an
+    /// instance of their fallback class by comparing classes only.
+    Structural,
+}
+
+impl UnionSimplification {
+    const fn queries_relations(self) -> bool {
+        matches!(self, Self::Full)
+    }
+
+    const fn is_cycle_recovery(self) -> bool {
+        matches!(self, Self::CycleRecovery)
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     unpack_aliases: bool,
-    /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
-    /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
-    cycle_recovery: bool,
+    simplification: UnionSimplification,
     recursively_defined: RecursivelyDefined,
 }
 
@@ -724,7 +764,7 @@ impl<'db> UnionBuilder<'db> {
             env: env.clone(),
             elements: vec![],
             unpack_aliases: true,
-            cycle_recovery: false,
+            simplification: UnionSimplification::Full,
             recursively_defined: RecursivelyDefined::No,
         }
     }
@@ -735,10 +775,27 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
-        self.cycle_recovery = val;
-        if self.cycle_recovery {
+        self.simplification = if val {
+            UnionSimplification::CycleRecovery
+        } else {
+            UnionSimplification::Full
+        };
+        if val {
             self.unpack_aliases = false;
         }
+        self
+    }
+
+    /// Rebuild a union whose elements can contain unbound recursive variables.
+    /// See [`UnionSimplification::Structural`].
+    pub(crate) fn structural(mut self) -> Self {
+        self.simplification = UnionSimplification::Structural;
+        self.unpack_aliases = false;
+        self
+    }
+
+    fn simplification(mut self, simplification: UnionSimplification) -> Self {
+        self.simplification = simplification;
         self
     }
 
@@ -792,13 +849,17 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
-        ty.assert_not_recursive_var();
+        if self.simplification != UnionSimplification::Structural {
+            ty.assert_not_recursive_var();
+        }
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
-        let cycle_recovery = self.cycle_recovery;
+        let simplification = self.simplification;
+        let cycle_recovery = simplification.is_cycle_recovery();
+        let queries_relations = simplification.queries_relations();
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
@@ -819,7 +880,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 self.recursively_defined =
                     self.recursively_defined.or(union.recursively_defined(db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                if cycle_recovery && self.recursively_defined.is_yes() {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
@@ -867,13 +928,13 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if !queries_relations
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if queries_relations => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -922,13 +983,13 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if !queries_relations
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if queries_relations => {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
                                         return;
                                     }
@@ -979,13 +1040,13 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if !queries_relations
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if queries_relations => {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
                                         return;
                                     }
@@ -1056,13 +1117,13 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if !queries_relations
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if queries_relations => {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
                                         return;
                                     }
@@ -1135,13 +1196,13 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like() && self.simplification.queries_relations();
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(db, &self.env, ty, self.cycle_recovery) {
+            let element_type = match element.try_reduce(db, &self.env, ty, self.simplification) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1163,11 +1224,11 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // `object` already contains every possible union element.
-            if !self.cycle_recovery && element_type == Type::object() {
+            if !self.simplification.is_cycle_recovery() && element_type == Type::object() {
                 return;
             }
 
-            if !self.cycle_recovery
+            if self.simplification.queries_relations()
                 && should_preserve_hashable_union(db, &self.env, ty, element_type)
             {
                 continue;
@@ -1189,7 +1250,7 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
-            if !self.cycle_recovery
+            if self.simplification.queries_relations()
                 && let Some(merged_type) =
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
@@ -1209,7 +1270,8 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if !self.cycle_recovery
+            // Adding `bool` relies on a relation query to remove the existing literal.
+            if self.simplification.queries_relations()
                 && element_type
                     .as_literal_value_kind()
                     .zip(bool_pair(ty))
@@ -1311,7 +1373,7 @@ impl<'db> UnionBuilder<'db> {
                     self.collapse_to_object();
                     return;
                 }
-            } else if !self.cycle_recovery
+            } else if self.simplification.queries_relations()
                 && let (alias @ Type::Recursive(_), Type::Intersection(negated))
                 | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
                 && negated.is_simple_negation(db)
@@ -1346,7 +1408,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
 
         let unpack_aliases = self.unpack_aliases;
-        let cycle_recovery = self.cycle_recovery;
+        let simplification = self.simplification;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1389,13 +1451,16 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        if (!cycle_recovery
+        // Both normalizations construct intersections from the elements, so they are
+        // semantic operations.
+        if (simplification.queries_relations()
             && normalize_covered_literal_exclusions(db, &self.env, &mut types, unpack_aliases))
-            || normalize_enum_complement_unions(db, &self.env, &mut types)
+            || (simplification != UnionSimplification::Structural
+                && normalize_enum_complement_unions(db, &self.env, &mut types))
         {
             let builder = UnionBuilder::new(db, &self.env)
                 .unpack_aliases(unpack_aliases)
-                .cycle_recovery(cycle_recovery)
+                .simplification(simplification)
                 .or_recursively_defined(recursively_defined);
             return types
                 .into_iter()

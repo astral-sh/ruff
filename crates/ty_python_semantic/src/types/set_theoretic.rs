@@ -340,7 +340,8 @@ impl<'db> UnionType<'db> {
         Some(builder.build())
     }
 
-    /// Map the union's elements, preserving open bodies during structural substitutions.
+    /// Map the union's elements without unpacking type aliases, preserving open bodies during
+    /// structural substitutions.
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -348,33 +349,9 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            // Binding can map distinct elements to the same type. For example, provisional
-            // values of another alias from two fixed-point iterations can differ only in their
-            // references to the alias being bound. Removing exact duplicates needs no semantic
-            // operations on open bodies, and it keeps the bound body independent of whether those
-            // provisional values were still distinct. Otherwise, the iteration can oscillate.
-            let elements = self
-                .elements(db)
-                .iter()
-                .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<FxOrderSet<_>>();
-            if elements.len() == 1
-                && let Some(&element) = elements.first()
-            {
-                element
-            } else {
-                Type::Union(UnionType::new(
-                    db,
-                    elements.into_iter().collect::<Box<[_]>>(),
-                    self.recursively_defined(db),
-                ))
-            }
-        } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            })
-        }
+        self.map_leave_aliases_impl(db, visitor.env, type_mapping.is_structural(), |element| {
+            element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        })
     }
 
     /// Apply a transformation function to all elements of the union,
@@ -396,6 +373,22 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_leave_aliases_impl(db, env, false, transform_fn)
+    }
+
+    /// Rebuild the union from its transformed elements without unpacking type aliases, or return
+    /// the union itself if no element changes.
+    ///
+    /// For a structural substitution, the transformed elements can contain unbound recursive
+    /// variables, so the union is rebuilt without relation queries between elements (see
+    /// [`UnionBuilder::structural`]).
+    fn map_leave_aliases_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        structural: bool,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let elements = self.elements(db);
@@ -403,7 +396,9 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
-                if elements.len() >= WIDE_UNION {
+                // Memoization pays for repeated relation queries, which a structural rebuild does
+                // not perform.
+                if !structural && elements.len() >= WIDE_UNION {
                     let mapped = elements[..i]
                         .iter()
                         .copied()
@@ -420,6 +415,9 @@ impl<'db> UnionType<'db> {
                     .normalize(db);
                 }
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+                if structural {
+                    builder = builder.structural();
+                }
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
