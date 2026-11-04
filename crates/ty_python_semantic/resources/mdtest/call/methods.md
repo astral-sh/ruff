@@ -853,9 +853,48 @@ Replacing with an invalid signature is an error:
 
 ### Unsoundness
 
-Shadowing a method in the way described above is actually unsound. Consider what happens if the
-class is subclassed. Since we only checked the replacement against the base class method's
-signature, shadowing the method in the subclass may lead to inconsistencies:
+Shadowing a method in the way described above is actually unsound. For one, since we allow
+replacement with arbitrary callables, we cannot guarantee that the replacement will have all
+attributes that the original bound method had. Consider:
+
+```py
+from typing import Callable
+
+class Problematic:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        class CompatibleCallable:
+            def __call__(self, x: int) -> str:
+                return str(x)
+
+        # TODO: this should not be an error
+        # error: [invalid-assignment]
+        self.method = CompatibleCallable()
+
+p = Problematic()
+```
+
+Attributes like `__self__` are usually present on bound methods (demonstrating with `p.swap` here):
+
+```py
+p.swap.__self__  # ok
+```
+
+However, after we call `swap()`, the `method` attribute is replaced with a callable that is not a
+bound method, and thus lacks the `__self__` attribute. ty does not aim to track this, and therefore
+does not emit an error for the missing `__self__` attribute:
+
+```py
+p.swap()
+# TODO: we currently emit `unresolved-attribute` here, but this will likely go away once we implement shadowing
+p.method.__self__  # error: [unresolved-attribute]
+```
+
+Maybe more importantly, consider what happens if the class is subclassed. Since we only checked the
+replacement against the base class method's signature, shadowing the method in the subclass may lead
+to inconsistencies:
 
 ```py
 class C:
