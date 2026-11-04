@@ -46,6 +46,20 @@ def benchmark_environment(
     }
 
 
+def cli_benchmark_environment(
+    cwd: Path, *, single_threaded: bool = False
+) -> dict[str, str]:
+    """Use checker concurrency defaults independently of the LSP pool limits."""
+    env = benchmark_environment(cwd, single_threaded=single_threaded)
+    # Rayon still accepts its deprecated override; Python can also override CPU discovery.
+    for key in ("RAYON_RS_NUM_CPUS", "PYTHON_CPU_COUNT"):
+        env.pop(key, None)
+    if not single_threaded:
+        env.pop("TY_MAX_PARALLELISM", None)
+        env.pop("RAYON_NUM_THREADS", None)
+    return env
+
+
 class Command(NamedTuple):
     name: str
     """The name of the command to benchmark."""

@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from benchmark import Hyperfine, benchmark_environment
+from benchmark import Hyperfine, cli_benchmark_environment
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
@@ -149,7 +149,7 @@ def main() -> None:
                 project=project.name, parent=cwd, python_version=project.python_version
             )
             venv.install(project.install_arguments)
-            benchmark_env = benchmark_environment(
+            benchmark_env = cli_benchmark_environment(
                 cwd, single_threaded=args.single_threaded
             )
 
