@@ -1894,9 +1894,19 @@ def _(left: Literal["a", "b", "c"], right: Literal["b", "c", "d"]):
         reveal_type(right)  # revealed: Literal["b", "c"]
 ```
 
-Each operand retains the order of its shared literals, including in unions of bytes and integers.
+Equality also preserves the order of the shared literals in bytes, integer, and mixed unions.
 
 ```py
+def _(left: Literal[b"a", b"b", b"c"], right: Literal[b"c", b"b", b"d"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[b"b", b"c"]
+        reveal_type(right)  # revealed: Literal[b"c", b"b"]
+
+def _(left: Literal[1, 2, 3], right: Literal[3, 2, 4]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[2, 3]
+        reveal_type(right)  # revealed: Literal[3, 2]
+
 def _(left: Literal[b"a", b"b", 0], right: Literal[0, b"b", b"c"]):
     if left == right:
         reveal_type(left)  # revealed: Literal[b"b", 0]
