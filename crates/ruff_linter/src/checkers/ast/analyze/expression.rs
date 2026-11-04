@@ -839,32 +839,73 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::TarfileUnsafeMembers) {
                 flake8_bandit::rules::tarfile_unsafe_members(checker, call);
             }
-            if checker.is_rule_enabled(Rule::UnnecessaryGeneratorList) {
-                flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryGeneratorSet) {
-                flake8_comprehensions::rules::unnecessary_generator_set(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryGeneratorDict) {
-                flake8_comprehensions::rules::unnecessary_generator_dict(
-                    checker, expr, func, args, keywords,
-                );
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryListComprehensionSet) {
-                flake8_comprehensions::rules::unnecessary_list_comprehension_set(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryListComprehensionDict) {
-                flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
-                    checker, expr, func, args, keywords,
-                );
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryLiteralSet) {
-                flake8_comprehensions::rules::unnecessary_literal_set(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryLiteralDict) {
-                flake8_comprehensions::rules::unnecessary_literal_dict(
-                    checker, expr, func, args, keywords,
-                );
+            if checker.any_rule_enabled(&[
+                Rule::UnnecessaryGeneratorList,
+                Rule::UnnecessaryGeneratorSet,
+                Rule::UnnecessaryGeneratorDict,
+                Rule::UnnecessaryListComprehensionSet,
+                Rule::UnnecessaryListComprehensionDict,
+                Rule::UnnecessaryLiteralSet,
+                Rule::UnnecessaryLiteralDict,
+                Rule::UnnecessaryLiteralWithinTupleCall,
+            ]) && args.len() == 1
+                && keywords.is_empty()
+                && let Some(name) = func.as_name_expr()
+                && let Some(argument) = args.first()
+            {
+                match (name.id.as_str(), argument) {
+                    ("list", Expr::Generator(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryGeneratorList) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
+                    }
+                    ("set", Expr::Generator(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryGeneratorSet) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_generator_set(checker, call);
+                    }
+                    ("dict", Expr::Generator(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryGeneratorDict) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_generator_dict(
+                            checker, expr, func, args, keywords,
+                        );
+                    }
+                    ("set", Expr::ListComp(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryListComprehensionSet) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_list_comprehension_set(
+                            checker, call,
+                        );
+                    }
+                    ("dict", Expr::ListComp(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryListComprehensionDict) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
+                            checker, expr, func, args, keywords,
+                        );
+                    }
+                    ("set", Expr::List(_) | Expr::Tuple(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryLiteralSet) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_literal_set(checker, call);
+                    }
+                    ("dict", Expr::List(_) | Expr::Tuple(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryLiteralDict) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_literal_dict(
+                            checker, expr, func, args, keywords,
+                        );
+                    }
+                    ("tuple", Expr::List(_) | Expr::Tuple(_))
+                        if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinTupleCall) =>
+                    {
+                        flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
+                            checker, call,
+                        );
+                    }
+                    _ => {}
+                }
             }
             if checker.is_rule_enabled(Rule::UnnecessaryCollectionCall) {
                 flake8_comprehensions::rules::unnecessary_collection_call(
@@ -872,9 +913,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     call,
                     &checker.settings().flake8_comprehensions,
                 );
-            }
-            if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinListCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);
