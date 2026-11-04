@@ -21,7 +21,7 @@ use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
-    default_lint_registry,
+    mdtest_lint_registry,
 };
 
 #[salsa::db]
@@ -164,7 +164,7 @@ impl SemanticDb for Db {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
+        mdtest_lint_registry()
     }
 
     fn verbose(&self) -> bool {
@@ -372,7 +372,7 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         "redundant-condition-strict",
     ];
 
-    let registry = default_lint_registry();
+    let registry = mdtest_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
     for rule in DISABLED_IN_MDTESTS {

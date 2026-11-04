@@ -1,31 +1,35 @@
 # Renamed rules in ignore comments
 
+The mdtest registry defines `old-rule-name` as an alias for `new-rule-name`. The rule never emits a
+diagnostic, so these examples disable warnings about unused ignore comments.
+
 ```toml
 [rules]
 renamed-rule-in-ignore-comment = "warn"
+unused-ignore-comment = "ignore"
+unused-type-ignore-comment = "ignore"
 ```
 
 ## Line-level ignores
 
-The old name still suppresses the import error. The fix replaces just the rule name, preserving the
-`ty:` prefix and other type checkers' codes in a `type: ignore` comment.
+The fix replaces just the ty rule name, preserving its `ty:` prefix and other type checkers' codes.
 
 ```py
 # snapshot
-import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
+x = 1  # type: ignore[old-rule-name, ty:old-rule-name]  # keep this comment
 ```
 
 ```snapshot
-warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
- --> src/mdtest_snippet.py:2:61
+warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed to `new-rule-name`
+ --> src/mdtest_snippet.py:2:41
   |
-2 | import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
-  |                                                             ^^^^^^^^^^^^^^^^^
-help: Replace `unresolved-import` with `import-not-found`
+2 | x = 1  # type: ignore[old-rule-name, ty:old-rule-name]  # keep this comment
+  |                                         ^^^^^^^^^^^^^
+help: Replace `old-rule-name` with `new-rule-name`
   |
 1 | # snapshot
-  - import another_module  # type: ignore[unresolved-import, ty:unresolved-import]  # optional
-2 + import another_module  # type: ignore[unresolved-import, ty:import-not-found]  # optional
+  - x = 1  # type: ignore[old-rule-name, ty:old-rule-name]  # keep this comment
+2 + x = 1  # type: ignore[old-rule-name, ty:new-rule-name]  # keep this comment
   |
 ```
 
@@ -33,49 +37,43 @@ help: Replace `unresolved-import` with `import-not-found`
 
 ```py
 # error: [renamed-rule-in-ignore-comment]
-# ty: ignore[unresolved-import]
+# ty: ignore[old-rule-name]
 
-import missing_module
+x = 1
 ```
 
 ## Both names in one comment
 
 When a comment already contains the current name, ty reports the rename without offering a fix.
 
-```toml
-[rules]
-unused-ignore-comment = "ignore"
-unused-type-ignore-comment = "ignore"
+```py
+# snapshot
+x = 1  # ty: ignore[old-rule-name, new-rule-name]
+```
+
+```snapshot
+warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed to `new-rule-name`
+ --> src/mdtest_snippet.py:2:21
+  |
+2 | x = 1  # ty: ignore[old-rule-name, new-rule-name]
+  |                     ^^^^^^^^^^^^^
 ```
 
 ```py
 # snapshot
-import missing_module  # ty: ignore[unresolved-import, import-not-found]
+y = 2  # type: ignore[ty:new-rule-name, ty:old-rule-name]
 ```
 
 ```snapshot
-warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
- --> src/mdtest_snippet.py:2:37
+warning[renamed-rule-in-ignore-comment]: Rule `old-rule-name` has been renamed to `new-rule-name`
+ --> src/mdtest_snippet.py:4:44
   |
-2 | import missing_module  # ty: ignore[unresolved-import, import-not-found]
-  |                                     ^^^^^^^^^^^^^^^^^
-```
-
-```py
-# snapshot
-import another_module  # type: ignore[ty:import-not-found, ty:unresolved-import]
-```
-
-```snapshot
-warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
- --> src/mdtest_snippet.py:4:63
-  |
-4 | import another_module  # type: ignore[ty:import-not-found, ty:unresolved-import]
-  |                                                               ^^^^^^^^^^^^^^^^^
+4 | y = 2  # type: ignore[ty:new-rule-name, ty:old-rule-name]
+  |                                            ^^^^^^^^^^^^^
 ```
 
 ## Suppressing the rule
 
 ```py
-import missing_module  # ty: ignore[unresolved-import, renamed-rule-in-ignore-comment]
+x = 1  # ty: ignore[old-rule-name, renamed-rule-in-ignore-comment]
 ```
