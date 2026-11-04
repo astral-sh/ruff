@@ -471,15 +471,22 @@ impl<'db> OverloadLiteral<'db> {
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
         let module = parsed_module(db, self.python_file(db)).load(db);
-        let use_def =
-            semantic_index(db, scope.program_file(db)).use_def_map(scope.file_scope_id(db));
-        let use_id = self
-            .body_scope(db)
-            .node(db)
-            .expect_function()
-            .node(&module)
-            .name
-            .scoped_use_id(db, self.program_file(db));
+        let index = semantic_index(db, scope.program_file(db));
+        let local_scope = scope.file_scope_id(db);
+        let node = self.body_scope(db).node(db).expect_function().node(&module);
+        // A loop can reach this same def from a previous iteration. An undecorated
+        // def cannot be its own overload, and there is no other local binding.
+        if node.decorator_list.is_empty()
+            && index.scope(local_scope).kind().is_function_like()
+            && index
+                .place_table(local_scope)
+                .symbol_by_name(node.name.as_str())
+                .is_some_and(|symbol| symbol.is_local() && !symbol.is_reassigned())
+        {
+            return None;
+        }
+        let use_def = index.use_def_map(local_scope);
+        let use_id = node.name.scoped_use_id(db, self.program_file(db));
 
         let env = ProgramEnvironment::from_scope(scope);
         let Place::Defined(DefinedPlace {
