@@ -2642,8 +2642,8 @@ impl<'db> Type<'db> {
         const MAX_TYPE_CYCLE_ITERATIONS: u32 = 16;
         let iteration = cycle.iteration();
         let at_iteration_limit = iteration >= MAX_TYPE_CYCLE_ITERATIONS;
-        // A concrete seed can reappear after an iteration returns Unknown. Keep the fallback
-        // so the cycle can reach a fixed point.
+        // Once the budget is exhausted and `previous` is `Unknown`, the cutoff below
+        // returns `Unknown` for every result. Skip normalization in that case.
         if at_iteration_limit && previous == Self::unknown() {
             return previous;
         }
