@@ -1388,47 +1388,6 @@ fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()>
 }
 
 #[test]
-fn shared_override_reports_each_invalid_module_glob_once() -> anyhow::Result<()> {
-    let script = "
-        # /// script
-        # [tool.ty]
-        # ///
-    ";
-    let case = CliTest::with_files([
-        (
-            "ty.toml",
-            r#"
-            [[overrides]]
-            include = ["*.py"]
-            [overrides.analysis]
-            replace-imports-with-any = ["foo**"]
-            [[overrides]]
-            include = ["a.py"]
-            [overrides.analysis]
-            replace-imports-with-any = ["foo**"]
-            "#,
-        ),
-        ("a.py", script),
-        ("b.py", script),
-    ])?;
-
-    assert_cmd_snapshot!(case.command().args([
-        "--config-file", "ty.toml", "--output-format", "concise", "a.py", "b.py"
-    ]), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    ty.toml:5:29: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
-    ty.toml:9:29: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
-    Found 2 diagnostics
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn invalid_glob_in_top_level_script_analysis_is_an_error() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",

@@ -36,7 +36,8 @@ use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
-    ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
+    ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings,
+    SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
@@ -1828,60 +1829,31 @@ pub struct AnalysisOptions {
 
 impl AnalysisOptions {
     fn lint_override(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
+        let mut lint_patterns = |patterns: &[RangedValue<String>], name| {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in patterns {
+                if let Err(error) = builder.add(pattern) {
+                    diagnostics.push(OptionDiagnostic::invalid_module_glob(
+                        db,
+                        pattern,
+                        name,
+                        error,
+                        Severity::Warning,
+                    ));
+                }
+            }
+        };
         if let Some(patterns) = &self.allowed_unresolved_imports {
-            let mut builder = ModuleGlobSetBuilder::new();
-            for pattern in patterns {
-                if let Err(error) = builder.add(pattern) {
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidGlob,
-                        format!("Invalid glob pattern `{error}`"),
-                        Severity::Warning,
-                    );
-                    diagnostics.push(diagnostic.with_source_sub(
-                        db,
-                        pattern,
-                        "glob",
-                        "allowed_unresolved_imports",
-                        error,
-                    ));
-                }
-            }
+            lint_patterns(patterns, "allowed_unresolved_imports");
         }
-
         if let Some(patterns) = &self.replace_imports_with_any {
-            let mut builder = ModuleGlobSetBuilder::new();
-            for pattern in patterns {
-                if let Err(error) = builder.add(pattern) {
-                    let diagnostic = OptionDiagnostic::new(
-                        DiagnosticId::InvalidGlob,
-                        format!("Invalid glob pattern `{error}`"),
-                        Severity::Warning,
-                    );
-                    diagnostics.push(diagnostic.with_source_sub(
-                        db,
-                        pattern,
-                        "glob",
-                        "replace_imports_with_any",
-                        error,
-                    ));
-                }
-            }
+            lint_patterns(patterns, "replace_imports_with_any");
         }
     }
 
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
-        invalid_glob_severity: Severity,
-        diagnostics: &mut Vec<OptionDiagnostic>,
-    ) -> AnalysisSettings {
-        self.resolve_settings(db, self, invalid_glob_severity, diagnostics)
-    }
-
-    fn resolve_settings(
-        &self,
-        db: &dyn Db,
-        unlinted: &Self,
         invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
@@ -1910,13 +1882,9 @@ impl AnalysisOptions {
                     allowed_unresolved_imports,
                     "allowed_unresolved_imports",
                     invalid_glob_severity,
-                    unlinted
-                        .allowed_unresolved_imports
-                        .as_ref()
-                        .map_or(0, Vec::len),
                 )
                 .unwrap_or_else(|error| {
-                    diagnostics.push(*error);
+                    diagnostics.extend(error.map(|error| *error));
                     ModuleGlobSet::empty()
                 })
             } else {
@@ -1930,13 +1898,9 @@ impl AnalysisOptions {
                     replace_imports_with_any,
                     "replace_imports_with_any",
                     invalid_glob_severity,
-                    unlinted
-                        .replace_imports_with_any
-                        .as_ref()
-                        .map_or(0, Vec::len),
                 )
                 .unwrap_or_else(|error| {
-                    diagnostics.push(*error);
+                    diagnostics.extend(error.map(|error| *error));
                     ModuleGlobSet::empty()
                 })
             } else {
@@ -1962,28 +1926,18 @@ fn build_module_glob_set(
     patterns: &[RangedValue<String>],
     option_name: &str,
     severity: Severity,
-    unlinted_pattern_count: usize,
-) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
+) -> Result<ModuleGlobSet, Option<Box<OptionDiagnostic>>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
-    for (index, glob) in patterns.iter().enumerate() {
+    for glob in patterns {
         if let Err(error) = builder.add(glob) {
-            // `Combine` appends override patterns after the inherited ones.
-            if index >= unlinted_pattern_count {
-                // `lint_override` already warned about this pattern. It still makes this
-                // option match no modules, even those covered by valid global patterns.
-                return Ok(ModuleGlobSet::empty());
+            if severity == Severity::Warning {
+                // Overrides inherit global patterns. Both sets were checked before merging.
+                return Err(None);
             }
-
-            let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidGlob,
-                format!("Invalid glob pattern `{error}`"),
-                severity,
-            );
-
-            return Err(diagnostic
-                .with_source_sub(db, glob, "glob", option_name, error)
-                .into());
+            let diagnostic =
+                OptionDiagnostic::invalid_module_glob(db, glob, option_name, error, severity);
+            return Err(Some(Box::new(diagnostic)));
         }
     }
 
@@ -1994,11 +1948,11 @@ fn build_module_glob_set(
             severity,
         );
 
-        Box::new(diagnostic.sub(SubDiagnostic::new(
+        Some(Box::new(diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "Please open an issue on the ty repository \
             and share the patterns that caused the error.",
-        )))
+        ))))
     })
 }
 
@@ -2310,12 +2264,7 @@ impl OverrideOptions {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.resolve_settings(
-            db,
-            global_analysis.unwrap_or(&AnalysisOptions::default()),
-            Severity::Warning,
-            diagnostics,
-        );
+        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
 
         let override_instance = Override {
             files,
@@ -2540,6 +2489,21 @@ impl OptionDiagnostic {
             annotation: None,
             sub: Vec::new(),
         }
+    }
+
+    fn invalid_module_glob(
+        db: &dyn Db,
+        glob: &RangedValue<String>,
+        option_name: &str,
+        error: ModuleGlobError,
+        severity: Severity,
+    ) -> Self {
+        Self::new(
+            DiagnosticId::InvalidGlob,
+            format!("Invalid glob pattern `{error}`"),
+            severity,
+        )
+        .with_source_sub(db, glob, "glob", option_name, error)
     }
 
     #[must_use]
