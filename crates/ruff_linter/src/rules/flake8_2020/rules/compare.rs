@@ -243,77 +243,66 @@ pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
         return;
     };
 
-    match left {
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. })
-            if is_sys(value, "version_info", checker.semantic()) =>
-        {
-            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(i),
+    match (op, left, right) {
+        (
+            _,
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(number),
+                ..
+            }),
+        ) => {
+            let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(index),
                 ..
             }) = slice.as_ref()
-            {
-                if *i == 0 {
-                    if let (
-                        operator @ (CmpOp::Eq | CmpOp::NotEq),
-                        Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(n),
-                            ..
-                        }),
-                    ) = (op, right)
-                    {
-                        if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
-                            checker.report_diagnostic(
-                                SysVersionInfo0Eq3 {
-                                    eq: matches!(*operator, CmpOp::Eq),
-                                },
-                                left.range(),
-                            );
-                        }
-                    }
-                } else if *i == 1 {
-                    if let (
-                        CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-                        Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(_),
-                            ..
-                        }),
-                    ) = (op, right)
-                    {
-                        checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
-                    }
+            else {
+                return;
+            };
+
+            match op {
+                CmpOp::Eq | CmpOp::NotEq
+                    if *index == 0
+                        && *number == 3
+                        && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
+                        && is_sys(value, "version_info", checker.semantic()) =>
+                {
+                    checker.report_diagnostic(
+                        SysVersionInfo0Eq3 {
+                            eq: *op == CmpOp::Eq,
+                        },
+                        left.range(),
+                    );
                 }
+                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE
+                    if *index == 1 && is_sys(value, "version_info", checker.semantic()) =>
+                {
+                    checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
+                }
+                _ => {}
             }
         }
-
-        Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if is_sys(value, "version_info", checker.semantic()) && attr == "minor" =>
-        {
-            if let (
-                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
-                    ..
-                }),
-            ) = (op, right)
-            {
-                checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
-            }
-        }
-
-        _ => {}
-    }
-
-    if is_sys(left, "version", checker.semantic()) {
-        if let (
+        (
             CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+            Expr::Attribute(ast::ExprAttribute { value, attr, .. }),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(_),
+                ..
+            }),
+        ) if attr == "minor" && is_sys(value, "version_info", checker.semantic()) => {
+            checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
+        }
+        (
+            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+            _,
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
-        ) = (op, right)
-        {
+        ) if is_sys(left, "version", checker.semantic()) => {
             if value.len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
             } else {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
             }
         }
+        _ => {}
     }
 }
