@@ -3408,6 +3408,38 @@ def forward[U](value: Pair[U, object], hint: U):
     reveal_type(choose(hint=hint, value=value))  # revealed: U@forward
 ```
 
+An `isinstance` check can narrow an `int` to an intersection with the caller's type variable.
+Passing the narrowed argument to a generic optional parameter preserves that intersection.
+
+```py
+def unwrap[T](value: T | None) -> T:
+    raise NotImplementedError
+
+def checked_int[U](value: int, kind: type[U]) -> U:
+    assert isinstance(value, kind)
+    result = unwrap(value)
+    reveal_type(result)  # revealed: int & U@checked_int
+    return unwrap(value)
+```
+
+Excluding `None` preserves the caller's type variable as the inferred list element type, including
+when the parameter uses a type variable bounded by `None`.
+
+```py
+def singleton[T](value: T | None) -> list[T]:
+    raise NotImplementedError
+
+def singleton_with_sentinel[T, N: None](value: T | N) -> list[T]:
+    raise NotImplementedError
+
+def non_none[U](value: U) -> list[U]:
+    assert value is not None
+    result = singleton(value)
+    reveal_type(result)  # revealed: list[U@non_none]
+    reveal_type(singleton_with_sentinel(value))  # revealed: list[U@non_none]
+    return singleton(value)
+```
+
 ## Preserving type variables when forwarding a generic union
 
 Forwarding a union to a helper with the same parameter type preserves the caller's type variable. A
