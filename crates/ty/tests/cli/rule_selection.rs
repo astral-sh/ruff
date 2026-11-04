@@ -247,9 +247,9 @@ fn configuration_conflicting_rule_alias_levels() {
     ----- stderr -----
     ");
 
-    // A higher-precedence table can still override the current name with its alias.
+    // An alias on the command line overrides the current name in ty.toml.
     assert_cmd_snapshot!(
-        case.command().args(["-c", r#"rules.unresolved-import = "warn""#, "--output-format", "concise"]),
+        case.command().args(["--warn", "unresolved-import", "--output-format", "concise"]),
         @"
     success: false
     exit_code: 1
@@ -291,6 +291,35 @@ fn configuration_rule_alias_levels_with_override() {
 
     ----- stderr -----
     ");
+}
+
+#[test]
+fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            import-not-found = "warn"
+            unresolved-import = "ignore"
+
+            [tool.ty.terminal]
+            error-on-warning = false
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
 }
 
 #[test]
