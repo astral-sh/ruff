@@ -36,7 +36,8 @@ use strum::IntoEnumIterator;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::{
-    ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
+    ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings,
+    SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
@@ -1827,20 +1828,55 @@ pub struct AnalysisOptions {
 }
 
 impl AnalysisOptions {
+    fn lint_override(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
+        for (name, patterns) in [
+            (
+                "allowed_unresolved_imports",
+                &self.allowed_unresolved_imports,
+            ),
+            ("replace_imports_with_any", &self.replace_imports_with_any),
+        ] {
+            let Some(patterns) = patterns else { continue };
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in patterns {
+                if let Err(error) = builder.add(pattern) {
+                    diagnostics.push(OptionDiagnostic::invalid_module_glob(
+                        db,
+                        name,
+                        pattern,
+                        &error,
+                        Severity::Warning,
+                    ));
+                }
+            }
+        }
+    }
+
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
-        invalid_glob_severity: Severity,
+        severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
+        self.to_settings_with_override(db, None, severity, diagnostics)
+    }
+
+    fn to_settings_with_override(
+        &self,
+        db: &dyn Db,
+        linted_override: Option<&Self>,
+        severity: Severity,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> AnalysisSettings {
+        let merged = linted_override.map(|overrides| overrides.clone().combine(self.clone()));
         let Self {
             return_type_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
-            allowed_unresolved_imports,
-            replace_imports_with_any,
-        } = self;
+            allowed_unresolved_imports: _,
+            replace_imports_with_any: _,
+        } = merged.as_ref().unwrap_or(self);
 
         let AnalysisSettings {
             return_type_inference: return_type_inference_default,
@@ -1851,37 +1887,24 @@ impl AnalysisOptions {
             replace_imports_with_any: replace_imports_with_any_default,
         } = AnalysisSettings::default();
 
-        let allowed_unresolved_imports =
-            if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
-                build_module_glob_set(
-                    db,
-                    allowed_unresolved_imports,
-                    "allowed_unresolved_imports",
-                    invalid_glob_severity,
-                )
-                .unwrap_or_else(|error| {
-                    diagnostics.push(*error);
-                    ModuleGlobSet::empty()
-                })
-            } else {
-                allowed_unresolved_imports_default
-            };
-
-        let replace_imports_with_any =
-            if let Some(replace_imports_with_any) = replace_imports_with_any {
-                build_module_glob_set(
-                    db,
-                    replace_imports_with_any,
-                    "replace_imports_with_any",
-                    invalid_glob_severity,
-                )
-                .unwrap_or_else(|error| {
-                    diagnostics.push(*error);
-                    ModuleGlobSet::empty()
-                })
-            } else {
-                replace_imports_with_any_default
-            };
+        let mut build = |name, field: fn(&Self) -> Option<&[RangedValue<String>]>, default| {
+            let patterns = field(self);
+            let checked = linted_override.and_then(field);
+            if patterns.is_none() && checked.is_none() {
+                return default;
+            }
+            build_module_glob_set(
+                db,
+                name,
+                patterns.unwrap_or_default(),
+                checked.unwrap_or_default(),
+                severity,
+            )
+            .unwrap_or_else(|error| {
+                diagnostics.push(*error);
+                ModuleGlobSet::empty()
+            })
+        };
 
         AnalysisSettings {
             return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
@@ -1891,31 +1914,46 @@ impl AnalysisOptions {
                 .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
-            allowed_unresolved_imports,
-            replace_imports_with_any,
+            allowed_unresolved_imports: build(
+                "allowed_unresolved_imports",
+                |options| options.allowed_unresolved_imports.as_deref(),
+                allowed_unresolved_imports_default,
+            ),
+            replace_imports_with_any: build(
+                "replace_imports_with_any",
+                |options| options.replace_imports_with_any.as_deref(),
+                replace_imports_with_any_default,
+            ),
         }
     }
 }
 
 fn build_module_glob_set(
     db: &dyn Db,
-    patterns: &[RangedValue<String>],
     option_name: &str,
+    patterns: &[RangedValue<String>],
+    linted_override_patterns: &[RangedValue<String>],
     severity: Severity,
 ) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
     for glob in patterns {
         if let Err(error) = builder.add(glob) {
-            let diagnostic = OptionDiagnostic::new(
-                DiagnosticId::InvalidGlob,
-                format!("Invalid glob pattern `{error}`"),
+            return Err(Box::new(OptionDiagnostic::invalid_module_glob(
+                db,
+                option_name,
+                glob,
+                &error,
                 severity,
-            );
+            )));
+        }
+    }
 
-            return Err(diagnostic
-                .with_source_sub(db, glob, "glob", option_name, error)
-                .into());
+    // A bad pattern disables this matcher even when its warning was already reported
+    // while linting the override that contains it.
+    for pattern in linted_override_patterns {
+        if builder.add(pattern).is_err() {
+            return Ok(ModuleGlobSet::empty());
         }
     }
 
@@ -2088,6 +2126,9 @@ impl OverrideOptions {
         if let Some(rules) = &section.rules {
             rules.lint(db, diagnostics);
         }
+        if let Some(analysis) = &section.analysis {
+            analysis.lint_override(db, diagnostics);
+        }
         if section.is_empty() {
             let mut diagnostic = OptionDiagnostic::new(
                 DiagnosticId::UselessOverridesSection,
@@ -2233,13 +2274,9 @@ impl OverrideOptions {
         // Convert merged rules to rule selection
         let rule_selection = merged_rules.to_rule_selection(db);
 
-        let mut merged_analysis = self.analysis.clone().unwrap_or_default();
-
-        if let Some(global_analysis) = global_analysis {
-            merged_analysis = merged_analysis.combine(global_analysis.clone());
-        }
-
-        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
+        let analysis = global_analysis
+            .unwrap_or(&AnalysisOptions::default())
+            .to_settings_with_override(db, self.analysis.as_ref(), Severity::Warning, diagnostics);
 
         let override_instance = Override {
             files,
@@ -2498,6 +2535,21 @@ impl OptionDiagnostic {
             }
         });
         self.with_annotation(annotation)
+    }
+
+    fn invalid_module_glob(
+        db: &dyn Db,
+        name: &str,
+        pattern: &RangedValue<String>,
+        error: &ModuleGlobError,
+        severity: Severity,
+    ) -> Self {
+        Self::new(
+            DiagnosticId::InvalidGlob,
+            format!("Invalid glob pattern `{error}`"),
+            severity,
+        )
+        .with_source_sub(db, pattern, "glob", name, error)
     }
 
     fn with_source_sub<T>(
