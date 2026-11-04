@@ -794,7 +794,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             let is_callable = ty.as_union().map_or(ty.is_callable_type(), |union| {
                 union.elements(db).iter().all(Type::is_callable_type)
             });
-            // Use the callable signature when inferring lambda parameters on the first pass.
+            // When shadowing e.g. `def method(self, x: int): ...` with
+            // `self.method = lambda x: str(x)`, infer `x` as `int` on the first pass.
             return TypeContext::declared(is_callable.then_some(*ty));
         }
         if let ExplicitAttributeWriteRequirement::Descriptor {
