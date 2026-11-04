@@ -451,7 +451,7 @@ if sys.version_info >= (3, 11):
 
 ### Imports
 
-When import statements appear in unreachable code, we should not emit `unresolved-import`
+When import statements appear in unreachable code, we should not emit `import-not-found`
 diagnostics:
 
 ```py

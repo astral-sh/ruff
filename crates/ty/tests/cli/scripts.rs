@@ -791,7 +791,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
+    error[import-not-found]: Cannot resolve imported module `layout_dependency`
      --> scripts/script.py:6:6
       |
     6 | from layout_dependency import value as layout_value
@@ -800,7 +800,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `local_dependency`
+    error[import-not-found]: Cannot resolve imported module `local_dependency`
      --> scripts/script.py:7:6
       |
     7 | from local_dependency import value as local_value
@@ -809,7 +809,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> scripts/script.py:8:6
       |
     8 | from shared import value
@@ -895,7 +895,7 @@ fn scripts_use_their_own_roots() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    scripts/script.py:7:6: error[unresolved-import] Cannot resolve imported module `project_only`
+    scripts/script.py:7:6: error[import-not-found] Cannot resolve imported module `project_only`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -1058,7 +1058,7 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `project_dependency`
+    error[import-not-found]: Cannot resolve imported module `project_dependency`
      --> scripts/script.py:6:6
       |
     6 | from project_dependency import value
@@ -1285,6 +1285,67 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [[tool.ty.overrides]]
+        # include = ["script.py"]
+        # [tool.ty.overrides.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:6:33: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_top_level_script_analysis_is_an_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:4:33: error[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

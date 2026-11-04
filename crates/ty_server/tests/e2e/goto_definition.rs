@@ -370,7 +370,7 @@ print(define)
         };
         assert_eq!(
             diagnostic.code,
-            Some(Code::String("unresolved-import".to_string()))
+            Some(Code::String("import-not-found".to_string()))
         );
 
         server.write_file(script, source)?;

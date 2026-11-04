@@ -84,7 +84,7 @@
       "type": "object",
       "properties": {
         "allowed-unresolved-imports": {
-          "description": "A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "description": "A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
           "type": [
             "array",
             "null"
@@ -639,6 +639,16 @@
         "implicit-concatenated-string-type-annotation": {
           "title": "detects implicit concatenated strings in type annotations",
           "description": "## What it does\n\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "import-not-found": {
+          "title": "detects unresolved imports",
+          "description": "## What it does\n\nChecks for imports where ty cannot find the module or a member named in a `from` import.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from\nan existing module raises `ImportError`.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n\n# ImportError: cannot import name 'sine' from 'math'\nfrom math import sine  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.",
           "default": "error",
           "oneOf": [
             {
@@ -1640,16 +1650,6 @@
           "title": "detects `global` statements with no definition in the global scope",
           "description": "## What it does\n\nDetects variables declared as `global` in an inner scope that have no explicit bindings or\ndeclarations in the global scope.\n\n## Why is this bad?\n\nFunction bodies with `global` statements can run in any order (or not at all), which makes it hard\nfor static analysis tools to infer the types of globals without explicit definitions or\ndeclarations.\n\n## Example\n\n### Assigning without a global-scope declaration\n\n```python\ndef f():\n    # unresolved global\n    global x  # error\n    x = 42\n\n\ndef g():\n    print(x)  # unresolved reference\n```\n\n### Use instead\n\n#### Declare the global\n\n```python\nx: int\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```\n\n#### Initialize the global\n\n```python\nx: int | None = None\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```",
           "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "unresolved-import": {
-          "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n```",
-          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

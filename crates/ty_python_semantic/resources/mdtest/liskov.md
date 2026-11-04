@@ -2835,6 +2835,39 @@ class BadChild(Base):
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Incompatible returns in an overloaded override
+
+The overloads accept both argument types from the base method, but only one returns a string. The
+diagnostic identifies the incompatible return type.
+
+```pyi
+from typing import overload
+
+class Base:
+    def get(self, x: int | bytes) -> str: ...
+
+class Child(Base):
+    @overload
+    def get(self, x: int) -> bytes: ...
+    @overload
+    def get(self, x: bytes) -> str: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `get`
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def get(self, x: bytes) -> str: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.get`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def get(self, x: int | bytes) -> str: ...
+   |         -------------------------------- `Base.get` defined here
+info: element `bytes` of union `bytes | str` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably

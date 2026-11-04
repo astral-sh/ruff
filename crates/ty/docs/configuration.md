@@ -74,7 +74,7 @@ Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostic
 
 ### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -769,7 +769,7 @@ severity levels or disable them entirely.
 
 #### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but

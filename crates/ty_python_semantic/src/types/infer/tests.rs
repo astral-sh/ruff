@@ -123,7 +123,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     settings.python_version.version = PythonVersion::PY312;
     let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
-    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+    let check = |file, expected_type, expect_invalid_syntax, expect_import_not_found| {
         let diagnostics = crate::check_file_unwrap(&db, file);
 
         assert_eq!(
@@ -137,7 +137,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
             diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.headline_message().contains("zipfile._path")),
-            expect_unresolved_import,
+            expect_import_not_found,
             "{diagnostics:#?}"
         );
 
@@ -149,7 +149,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
         assert_eq!(
             diagnostics.len(),
-            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_import_not_found),
             "{diagnostics:#?}"
         );
     };

@@ -1498,7 +1498,7 @@ class Foo:
 
 ```py
 from typing_extensions import Any, override
-from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+from does_not_exist import SomethingUnknown  # error: [import-not-found]
 
 class Parent1(Any): ...
 class Parent2(SomethingUnknown): ...

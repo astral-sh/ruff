@@ -334,7 +334,9 @@ impl PythonEnvironment {
         project_root: Option<&SystemPath>,
         system: &dyn System,
     ) -> Option<(SystemPathBuf, SysPrefixPathOrigin)> {
-        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
+        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV)
+            && !virtual_env.is_empty()
+        {
             return Some((virtual_env.into(), SysPrefixPathOrigin::VirtualEnvVar));
         }
 

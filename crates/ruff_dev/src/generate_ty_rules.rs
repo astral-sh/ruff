@@ -8,6 +8,10 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
 use regex::{Captures, Regex};
+use rustc_hash::FxHashMap;
+
+use ruff_db::diagnostic::LintName;
+use ty_python_semantic::lint::LintId;
 
 use crate::ROOT_DIR;
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
@@ -65,11 +69,27 @@ fn generate_markdown() -> String {
     let mut lints: Vec<_> = registry.lints().iter().collect();
     lints.sort_by_key(|a| a.name());
 
+    let mut aliases: FxHashMap<LintId, Vec<LintName>> = FxHashMap::default();
+
+    // Map of {<rule ID>: <aliases for that rule>}
+    for (name, lint) in registry.aliases() {
+        aliases.entry(lint).or_default().push(name);
+    }
+
     // Replace `rule-name` with [`rule-name`](url) for any known rule names,
     // turning them into inline links automatically.
     let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
     for lint in lints {
+        // Keep links to the old rule heading working after a rename.
+        let mut names = aliases.remove(lint).unwrap_or_default();
+        names.sort_unstable();
+        if !names.is_empty() {
+            for name in &names {
+                let _ = writeln!(output, r#"<a id="{name}"></a>"#);
+            }
+            output.push('\n');
+        }
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
         // Reformat headers as bold text
@@ -126,12 +146,23 @@ fn generate_markdown() -> String {
             }
         };
 
+        let quoted_name = |name: LintName| format!("\"{name}\"");
+        let search_terms = if names.is_empty() {
+            quoted_name(lint.name())
+        } else {
+            let terms = std::iter::once(lint.name())
+                .chain(names)
+                .map(quoted_name)
+                .join(" OR ");
+            format!("({terms})")
+        };
+
         let _ = writeln!(
             &mut output,
             r#"<small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
 {status_text} ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22{encoded_name}%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_terms}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
@@ -139,8 +170,8 @@ Default level: <a href="../../rules#rule-levels" title="This lint has a default 
 {documentation}
 "#,
             level = lint.default_level(),
-            encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
-                .collect::<String>(),
+            encoded_terms =
+                url::form_urlencoded::byte_serialize(search_terms.as_bytes()).collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = lint.line(),

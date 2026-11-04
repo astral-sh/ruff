@@ -3162,6 +3162,21 @@ def check(value: int | list[Any]):
     reveal_type(extract(value))  # revealed: int
 ```
 
+## An iterable matching a concrete union member
+
+Iterating over `([1],)` yields a list, so the tuple cannot match `Iterable[T]` for any `T` bounded
+by `str`. The call is valid because the tuple matches `tuple[list[Any], ...]`. This covers
+<https://github.com/astral-sh/ty/issues/4695>.
+
+```py
+from collections.abc import Iterable
+from typing import Any
+
+def accept[T: str](value: Iterable[T] | tuple[list[Any], ...]) -> None: ...
+
+accept(([1],))  # ok
+```
+
 ## Invalid members of a bounded union argument
 
 Every member of an argument union must satisfy the parameter type, including any bounds. The call is
@@ -3391,6 +3406,38 @@ def choose[T](value: Pair[T, object] | Pair[object, T], hint: T) -> T:
 def forward[U](value: Pair[U, object], hint: U):
     reveal_type(choose(value, hint))  # revealed: U@forward
     reveal_type(choose(hint=hint, value=value))  # revealed: U@forward
+```
+
+An `isinstance` check can narrow an `int` to an intersection with the caller's type variable.
+Passing the narrowed argument to a generic optional parameter preserves that intersection.
+
+```py
+def unwrap[T](value: T | None) -> T:
+    raise NotImplementedError
+
+def checked_int[U](value: int, kind: type[U]) -> U:
+    assert isinstance(value, kind)
+    result = unwrap(value)
+    reveal_type(result)  # revealed: int & U@checked_int
+    return unwrap(value)
+```
+
+Excluding `None` preserves the caller's type variable as the inferred list element type, including
+when the parameter uses a type variable bounded by `None`.
+
+```py
+def singleton[T](value: T | None) -> list[T]:
+    raise NotImplementedError
+
+def singleton_with_sentinel[T, N: None](value: T | N) -> list[T]:
+    raise NotImplementedError
+
+def non_none[U](value: U) -> list[U]:
+    assert value is not None
+    result = singleton(value)
+    reveal_type(result)  # revealed: list[U@non_none]
+    reveal_type(singleton_with_sentinel(value))  # revealed: list[U@non_none]
+    return singleton(value)
 ```
 
 ## Preserving type variables when forwarding a generic union

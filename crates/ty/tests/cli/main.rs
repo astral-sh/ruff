@@ -273,7 +273,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `utils`
+    error[import-not-found]: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -460,13 +460,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
         (
             "project/tests/test_main.py",
             r#"
-            import does_not_exist  # error: unresolved-import
+            import does_not_exist  # error: import-not-found
             "#,
         ),
         (
             "project/other.py",
             r#"
-            from main2 import z  # error: unresolved-import
+            from main2 import z  # error: import-not-found
 
             print(z)
             "#,
@@ -479,20 +479,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -513,20 +513,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -647,7 +647,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
 #[test_case(None,           &[("FORCE_COLOR", "0")]                         => true;  "force color")]
 #[test_case(None,           &[("FORCE_COLOR", ""), ("CLICOLOR_FORCE", "0")] => true;  "empty force color defers")]
 #[test_case(None,           &[("CLICOLOR_FORCE", "")]                       => false; "empty clicolor force")]
-#[test_case(None,           &[("CLICOLOR", "0")]                            => false; "clicolor requires a terminal")]
+#[test_case(None,           &[("CLICOLOR", "1")]                            => false; "clicolor requires a terminal")]
 #[test_case(None,           &[("NO_COLOR", "0"), ("CLICOLOR_FORCE", "1")]   => false; "no color beats clicolor force")]
 #[test_case(None,           &[("NO_COLOR", "0"), ("FORCE_COLOR", "0")]      => false; "no color wins")]
 #[test_case(Some("auto"),   &[("NO_COLOR", ""), ("FORCE_COLOR", "0")]       => true;  "empty no color")]

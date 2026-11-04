@@ -127,7 +127,7 @@ val = 1
 from .foo import val
 
 # .bar would not match "bar" rule because the absolute import is package.bar
-from .bar import val2  # error: [unresolved-import]
+from .bar import val2  # error: [import-not-found]
 
 reveal_type(val)  # revealed: Any
 ```

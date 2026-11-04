@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -50,17 +51,15 @@ impl Violation for SslInsecureVersion {
 }
 
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
-    let Some(keyword) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .and_then(|qualified_name| match qualified_name.segments() {
-            ["ssl", "wrap_socket"] => Some("ssl_version"),
-            ["OpenSSL", "SSL", "Context"] => Some("method"),
-            _ => None,
-        })
-    else {
-        return;
+pub(crate) fn ssl_insecure_version(
+    checker: &Checker,
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    let keyword = match qualified_name.segments() {
+        ["ssl", "wrap_socket"] => "ssl_version",
+        ["OpenSSL", "SSL", "Context"] => "method",
+        _ => return,
     };
 
     let Some(keyword) = call.arguments.find_keyword(keyword) else {

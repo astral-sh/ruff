@@ -377,7 +377,7 @@ from indirect import *  # error: [missing-direct-dependency]
 
 #### Unresolved imports and unknown ownership
 
-An import that cannot be resolved receives only `unresolved-import`. A resolved module with no known
+An import that cannot be resolved receives only `import-not-found`. A resolved module with no known
 distribution owner is not enough evidence to report a missing dependency. Standard-library imports
 do not require project dependencies either.
 
@@ -389,7 +389,7 @@ do not require project dependencies either.
 `main.py`:
 
 ```py
-import indirect  # error: [unresolved-import]
+import indirect  # error: [import-not-found]
 import unowned  # ok
 import sys  # ok
 ```

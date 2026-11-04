@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::name::{Name, QualifiedName, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -61,15 +61,17 @@ impl AlwaysFixableViolation for OSErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                [
-                    "" | "builtins",
-                    "EnvironmentError" | "IOError" | "WindowsError"
-                ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
-            )
-        })
+        .is_some_and(|name| is_os_error_alias(&name))
+}
+
+fn is_os_error_alias(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        [
+            "" | "builtins",
+            "EnvironmentError" | "IOError" | "WindowsError"
+        ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
+    )
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
@@ -186,8 +188,8 @@ pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandl
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr) {
-    if is_alias(func, checker.semantic()) {
+pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr, qualified_name: &QualifiedName) {
+    if is_os_error_alias(qualified_name) {
         atom_diagnostic(checker, func);
     }
 }

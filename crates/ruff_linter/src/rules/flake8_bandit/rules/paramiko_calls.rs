@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,14 +40,8 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["paramiko", "exec_command"])
-        })
-    {
+pub(crate) fn paramiko_call(checker: &Checker, func: &Expr, qualified_name: &QualifiedName) {
+    if matches!(qualified_name.segments(), ["paramiko", "exec_command"]) {
         checker.report_diagnostic(ParamikoCall, func.range());
     }
 }

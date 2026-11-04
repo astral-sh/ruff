@@ -25,11 +25,11 @@ use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
-use rustc_hash::FxHasher;
-use serde::{Deserialize, Serialize};
+use rustc_hash::{FxHashMap, FxHasher};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug, Display, Write as _};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -530,10 +530,10 @@ impl Options {
         let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
-        let analysis = self
-            .analysis
-            .or_default()
-            .to_settings(db, &mut analysis_diagnostics);
+        let analysis =
+            self.analysis
+                .or_default()
+                .to_settings(db, Severity::Error, &mut analysis_diagnostics);
 
         let analysis_result: Result<_, ToSettingsError> =
             if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
@@ -1159,9 +1159,7 @@ impl SrcOptions {
     }
 }
 
-#[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
-)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Hash, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case", transparent)]
 pub struct Rules {
     /// The rules with their severity. Entries coming later in the map take precedence over
@@ -1171,13 +1169,51 @@ pub struct Rules {
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
+impl<'de> Deserialize<'de> for Rules {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let rules = Self {
+            inner: OrderMap::deserialize(deserializer)?,
+        };
+        // Check each table before merging so a separate config file or override can change the level.
+        let registry = ty_python_semantic::default_lint_registry();
+        let mut seen = FxHashMap::default();
+        for (name, level) in &rules.inner {
+            if let Ok(lint) = registry.get(name)
+                && let Some((other_name, other_level)) = seen.insert(lint, (name, level))
+                && level != other_level
+            {
+                let mut message = format!(
+                    "Conflicting levels for the same rule: `{other_name} = \"{other_level}\"` and \
+                     `{name} = \"{level}\"`"
+                );
+                let canonical = lint.name();
+                for spelling in [other_name, name] {
+                    if spelling.as_str() != canonical.as_str() {
+                        message.push('\n');
+                        let _ = write!(
+                            message,
+                            "note: `{spelling}` is a legacy alias for `{canonical}`"
+                        );
+                    }
+                }
+                return Err(serde::de::Error::custom(message));
+            }
+        }
+        Ok(rules)
+    }
+}
+
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
     fn from_iter<T: IntoIterator<Item = (RangedValue<String>, RangedValue<Level>)>>(
         iter: T,
     ) -> Self {
-        Self {
-            inner: iter.into_iter().collect(),
+        let mut rules = Self::default();
+        for (name, level) in iter {
+            // Move repeated selectors to the end so they take precedence over an intervening
+            // alias or `all` selector.
+            rules.inner.insert_before(rules.inner.len(), name, level);
         }
+        rules
     }
 }
 
@@ -1754,7 +1790,7 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+    /// A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
     ///
     /// Details on supported glob patterns:
     /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -1808,6 +1844,7 @@ impl AnalysisOptions {
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
+        invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
@@ -1830,22 +1867,32 @@ impl AnalysisOptions {
 
         let allowed_unresolved_imports =
             if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
-                build_module_glob_set(db, allowed_unresolved_imports, "allowed_unresolved_imports")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    allowed_unresolved_imports,
+                    "allowed_unresolved_imports",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 allowed_unresolved_imports_default
             };
 
         let replace_imports_with_any =
             if let Some(replace_imports_with_any) = replace_imports_with_any {
-                build_module_glob_set(db, replace_imports_with_any, "replace_imports_with_any")
-                    .unwrap_or_else(|error| {
-                        diagnostics.push(*error);
-                        ModuleGlobSet::empty()
-                    })
+                build_module_glob_set(
+                    db,
+                    replace_imports_with_any,
+                    "replace_imports_with_any",
+                    invalid_glob_severity,
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
             } else {
                 replace_imports_with_any_default
             };
@@ -1868,6 +1915,7 @@ fn build_module_glob_set(
     db: &dyn Db,
     patterns: &[RangedValue<String>],
     option_name: &str,
+    severity: Severity,
 ) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
@@ -1876,7 +1924,7 @@ fn build_module_glob_set(
             let diagnostic = OptionDiagnostic::new(
                 DiagnosticId::InvalidGlob,
                 format!("Invalid glob pattern `{error}`"),
-                Severity::Error,
+                severity,
             );
 
             return Err(diagnostic
@@ -1889,7 +1937,7 @@ fn build_module_glob_set(
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             "The `{option_name}` patterns resulted in a regex that is too large".to_string(),
-            Severity::Error,
+            severity,
         );
 
         Box::new(diagnostic.sub(SubDiagnostic::new(
@@ -2214,7 +2262,7 @@ impl ToOverride for RangedValue<OverrideOptions> {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.to_settings(db, diagnostics);
+        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
 
         let override_instance = Override {
             files,

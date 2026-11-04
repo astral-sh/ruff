@@ -44,7 +44,7 @@ use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, 
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
     parsed::parsed_module,
 };
@@ -168,7 +168,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&MISSING_SLOT);
-    registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&IMPORT_NOT_FOUND);
+    registry.register_alias(LintName::of("unresolved-import"), &IMPORT_NOT_FOUND);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
@@ -1201,8 +1202,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-import.md")]
-    pub(crate) static UNRESOLVED_IMPORT = {
+    #[doc = include_str!("../../resources/lint_docs/import-not-found.md")]
+    pub(crate) static IMPORT_NOT_FOUND = {
         summary: "detects unresolved imports",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -5420,11 +5421,10 @@ pub(super) fn report_overridden_final_method<'db>(
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
     // and we don't yet track those definitions precisely enough to offer a safe fix.
     //
-    // We also only provide autofixes if the subclass member is a function definition (not an
-    // assignment like `method = some_function`). If it's an assignment, the function type
-    // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
+    // Only delete the function defined by the override. An assignment or a decorator can bind
+    // the name to a different function, possibly from another file.
     if let Type::FunctionLiteral(function) = subclass_type
-        && subclass_definition.kind(db).is_function_def()
+        && function.contains_definition(db, subclass_definition)
     {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;

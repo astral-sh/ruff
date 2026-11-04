@@ -524,6 +524,16 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        // For example, if `Base.f` accepts `bytes`, overloads of `Child.f` for `int` and `str`
+        // both fail the original check. The checker suppresses notes for individual alternatives,
+        // so trying those overloads again would leave the error context empty.
+        if let (Type::Callable(source), Type::Callable(target)) = (self, target)
+            && !source
+                .signatures(db)
+                .may_explain_relation_to(target.signatures(db))
+        {
+            return ErrorContextTree::new(relation);
+        }
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             env,
@@ -1522,6 +1532,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
+        let elements = union.elements(db);
         let check_expanded_source = || {
             // Normally non-unions cannot directly contain unions in our model due to the fact that
             // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
@@ -1539,6 +1550,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::Intersection(intersection)
                     if self.should_expand_intersection(db, intersection) =>
                 {
+                    // A plain type-variable arm already records the required lower bound if all
+                    // other arms are disjoint. Expanding `int & U` to `int` when matching
+                    // `T | None` can erase `U`.
+                    let is_plain_typevar = |element: Type<'db>| {
+                        element
+                            .as_typevar()
+                            .is_some_and(|variable| variable.domain(db) == TypeVarDomain::Type)
+                    };
+                    if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                        && elements.iter().copied().any(is_plain_typevar)
+                        && elements
+                            .iter()
+                            .copied()
+                            .filter(|&element| {
+                                !self
+                                    .as_disjointness_checker()
+                                    .check_type_pair(db, source, element)
+                                    .is_trivially_always_satisfied()
+                            })
+                            .at_most_one()
+                            .is_ok_and(|overlapping| overlapping.is_none_or(is_plain_typevar))
+                    {
+                        return self.never();
+                    }
+
                     self.check_type_pair(
                         db,
                         intersection.with_expanded_typevars_and_newtypes(db, self.env),
@@ -1560,7 +1596,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let mut elements_context = vec![];
         let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
-        let elements = union.elements(db);
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {

@@ -1,8 +1,8 @@
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
-    WorkDoneProgressParams,
+    PartialResultParams, Position, TextDocumentContentChangeWholeDocument, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkDoneProgressParams,
 };
 use lsp_types::{
     CallHierarchyIncomingCallsRequest, CallHierarchyOutgoingCallsRequest,
@@ -135,6 +135,37 @@ def caller():
     ]
     "#);
 
+    Ok(())
+}
+
+#[test]
+fn stale_outgoing_calls_on_an_imported_decorator() -> anyhow::Result<()> {
+    let content = "from hooks import trace
+
+@trace
+def label():
+    return 'café'
+";
+    let hooks = "def register_callback(func): ...
+
+def trace(func):
+    register_callback(func)
+    return func
+";
+    let mut server = TestServerBuilder::new()?
+        .with_file("main.py", content)?
+        .with_file("hooks.py", hooks)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document("main.py", content, 1);
+    let items = prepare(&mut server, "main.py", Position::new(3, 4)).unwrap();
+
+    // The saved position for `label` now falls on the imported `trace` decorator.
+    let change = TextDocumentContentChangeWholeDocument {
+        text: format!("\n{content}"),
+    };
+    server.change_text_document("main.py", vec![change.into()], 2);
+    assert!(outgoing(&mut server, items[0].clone()).is_none());
     Ok(())
 }
 
