@@ -73,32 +73,7 @@ between benchmarking and reality.
 
 ## Updating the benchmark
 
-To distinguish checker upgrades from changes to the benchmark projects, run the CLI
-and both LSP benchmarks with the existing project revisions first. Then update the
-revisions in `src/benchmark/projects.py` and rerun all three suites. Keep checker
-versions, project Python versions, and the dependency cutoff in
-`src/benchmark/venv.py` the same across both runs. A project's updated requirements
-can still change its installed dependencies.
-
-Record the hardware, operating system, tool versions, Python versions, and ty source
-revision with the results. The benchmark harness uses Python 3.15; each project's
-environment uses the Python version specified in `projects.py`.
-
 The benchmark script supports snapshotting the results when running with `--snapshot` and `--accept`.
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds
 new dependencies that we fail to install. They are not intended as a testing tool. E.g. the snapshot runner doesn't account for platform differences so that
 you might see differences when running the snapshots on your machine.
-
-## Project coverage
-
-The suite includes HTTPX's synchronous and asynchronous HTTP client, FastAPI's
-web framework, NumPy's Python implementation and array stubs, SQLAlchemy's
-typed ORM and SQL-expression APIs, and Rich's terminal rendering and formatting,
-alongside the existing application and library benchmarks. NumPy excludes its
-tests and does not build its C extensions; its
-source requires a Python 3.12 project environment.
-
-Each of these projects has an incremental edit that changes diagnostics in an
-importing file as well as exercising the edited module. Keep their source
-revisions identical across the existing- and updated-project runs when measuring
-the refresh of the other projects.
