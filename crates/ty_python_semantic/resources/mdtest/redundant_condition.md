@@ -5894,6 +5894,26 @@ if next(alias):  # ok
     pass
 ```
 
+## Implicit class names hide module environment references
+
+The implicit `__module__` in a class body and `__class__` in a method hide same-named module
+globals. Those globals do not make these conditions environment-dependent.
+
+```py
+import sys
+
+__module__ = sys.platform
+__class__ = sys.platform
+
+class Example:
+    if (__module__,):  # error: [redundant-condition] "is always truthy"
+        pass
+
+    def method(self):
+        if (__class__,):  # error: [redundant-condition] "is always truthy"
+            pass
+```
+
 ## Deliberately exhaustive `if` statements
 
 A common pattern is to have an `if` condition that is deliberately always true or false, so that the
