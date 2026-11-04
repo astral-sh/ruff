@@ -18,6 +18,7 @@ use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, With
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
 use crate::preview::is_pyi_blank_line_after_function_docstring_enabled;
+use crate::statement::stub;
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
     write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
@@ -57,6 +58,10 @@ pub enum SuiteKind {
         /// When this value is true, we don't insert trailing empty lines since the containing suite
         /// will do that.
         last_suite_in_statement: bool,
+        /// Whether this branch continues a group of decorated stub functions.
+        stub_overload_group: bool,
+        /// Whether the following alternative belongs to a decorated stub group.
+        next_branch_in_stub_group: bool,
     },
 }
 
@@ -66,6 +71,8 @@ impl Default for SuiteKind {
             // For stability, we can't insert an empty line if we don't know if the outer suite
             // also does.
             last_suite_in_statement: true,
+            stub_overload_group: false,
+            next_branch_in_stub_group: false,
         }
     }
 }
@@ -75,6 +82,8 @@ impl SuiteKind {
     pub fn other(last_suite_in_statement: bool) -> Self {
         Self::Other {
             last_suite_in_statement,
+            stub_overload_group: false,
+            next_branch_in_stub_group: false,
         }
     }
 
@@ -82,9 +91,48 @@ impl SuiteKind {
         match self {
             Self::Other {
                 last_suite_in_statement,
+                ..
             } => last_suite_in_statement,
             _ => true,
         }
+    }
+
+    pub(super) fn with_stub_overload_groups(
+        self,
+        stub_overload_group: bool,
+        next_branch_in_stub_group: bool,
+    ) -> Self {
+        match self {
+            Self::Other {
+                last_suite_in_statement,
+                ..
+            } => Self::Other {
+                last_suite_in_statement,
+                stub_overload_group,
+                next_branch_in_stub_group,
+            },
+            _ => self,
+        }
+    }
+
+    pub(super) fn is_stub_overload_group(self) -> bool {
+        matches!(
+            self,
+            Self::Other {
+                stub_overload_group: true,
+                ..
+            }
+        )
+    }
+
+    fn next_branch_in_stub_group(self) -> bool {
+        matches!(
+            self,
+            Self::Other {
+                next_branch_in_stub_group: true,
+                ..
+            }
+        )
     }
 }
 
@@ -202,7 +250,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 empty_line().fmt(f)?;
             }
 
-            first.fmt(f)?;
+            match first {
+                SuiteChildStatement::Other(statement) => {
+                    stub::format_statement(statement, statements, self.kind, f)?;
+                }
+                SuiteChildStatement::Docstring(_) => first.fmt(f)?,
+            }
 
             let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
                 && self.kind == SuiteKind::Class
@@ -239,7 +292,14 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             // Add empty lines before and after a function or class definition. If the preceding
             // node is a function or class, and contains trailing comments, then the statement
             // itself will add the requisite empty lines when formatting its comments.
-            if needs_empty_lines {
+            if let Some(empty) = stub::group_spacing(preceding, following, statements, f.context())
+            {
+                if empty {
+                    empty_line().fmt(f)?;
+                } else {
+                    hard_line_break().fmt(f)?;
+                }
+            } else if needs_empty_lines {
                 if source_type.is_stub() {
                     stub_file_empty_lines(
                         self.kind,
@@ -432,7 +492,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 )?;
                 preceding_comments = comments.leading_dangling_trailing(preceding);
             } else {
-                following.format().fmt(f)?;
+                stub::format_statement(following, statements, self.kind, f)?;
                 preceding = following;
                 preceding_comments = following_comments;
             }
@@ -470,7 +530,7 @@ impl FormatSuite {
         comments: &Comments,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
-        if self.kind.last_suite_in_statement() {
+        if self.kind.last_suite_in_statement() || self.kind.next_branch_in_stub_group() {
             // If we're at the end of the current statement, the outer suite will insert one or
             // two empty lines already.
             return Ok(());
@@ -580,18 +640,20 @@ fn stub_file_empty_lines(
         || following_comments.has_leading()
         || !stub_suite_can_omit_empty_line(preceding, following, f);
     let after_docstring = is_pyi_blank_line_after_function_docstring_enabled(f.context())
-        && trailing_function_or_class_def(Some(preceding), f.context().comments())
-            .is_some_and(|node| {
+        && trailing_function_or_class_def(Some(preceding), f.context().comments()).is_some_and(
+            |node| {
                 node.as_stmt_function_def().is_some_and(|function| {
                     function_has_only_docstring(function, f.context())
                         && !starts_same_decorated_function(function, following)
                 })
-            });
-    let require_empty_line = after_docstring || should_insert_blank_line_after_class_in_stub_file(
-        preceding.into(),
-        Some(following.into()),
-        f.context(),
-    );
+            },
+        );
+    let require_empty_line = after_docstring
+        || should_insert_blank_line_after_class_in_stub_file(
+            preceding.into(),
+            Some(following.into()),
+            f.context(),
+        );
     match kind {
         SuiteKind::TopLevel => {
             if empty_line_condition || require_empty_line {
@@ -1104,6 +1166,8 @@ def trailing_func():
     fn nested_level() {
         let formatted = format_suite(SuiteKind::Other {
             last_suite_in_statement: true,
+            stub_overload_group: false,
+            next_branch_in_stub_group: false,
         });
 
         assert_eq!(

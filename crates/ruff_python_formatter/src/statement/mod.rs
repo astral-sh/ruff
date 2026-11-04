@@ -31,6 +31,7 @@ pub(crate) mod stmt_try;
 pub(crate) mod stmt_type_alias;
 pub(crate) mod stmt_while;
 pub(crate) mod stmt_with;
+mod stub;
 pub(crate) mod suite;
 
 #[derive(Default)]

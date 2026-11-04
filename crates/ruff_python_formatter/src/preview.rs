@@ -99,3 +99,8 @@ pub(crate) const fn is_pyi_blank_line_after_function_docstring_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Keeps same-name decorated stub functions together and separates distinct groups.
+pub(crate) const fn is_pyi_overload_group_blank_lines_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

@@ -528,6 +528,8 @@ The next style includes these changes in preview:
     its own line. Collections with magic trailing commas retain their expanded layout.
 - Add a blank line after a docstring-only function in a stub file before an unrelated
     declaration or member comment.
+- Keep same-name decorated functions together in stub files, including overloads and
+    property setters, and separate groups from unrelated declarations with a blank line.
 
 ### F-string formatting
 
