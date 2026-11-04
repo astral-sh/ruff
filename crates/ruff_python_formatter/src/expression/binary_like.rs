@@ -18,6 +18,7 @@ use crate::expression::parentheses::{
     write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
 };
 use crate::prelude::*;
+use crate::preview::is_simplify_power_operator_hugging_enabled;
 use crate::string::implicit::FormatImplicitConcatenatedString;
 
 #[derive(Copy, Clone, Debug)]
@@ -688,7 +689,9 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 {
                     hard_line_break().fmt(f)?;
                 } else if is_pow {
-                    in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    if !is_simplify_power_operator_hugging_enabled(f.context()) {
+                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    }
                 } else {
                     space().fmt(f)?;
                 }

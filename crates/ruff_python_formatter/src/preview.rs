@@ -34,3 +34,8 @@ pub(crate) const fn is_remove_redundant_generator_parentheses_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Keeps simple power operators unspaced when their expression wraps.
+pub(crate) const fn is_simplify_power_operator_hugging_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
