@@ -546,7 +546,9 @@ fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
     setup_rayon();
 
     // Regression benchmark for https://github.com/astral-sh/ty/issues/3896.
-    let mut code = String::new();
+    // The first overload exercises invariant constraint solving. The second accepts the full
+    // union because no single `T` satisfies every member of `Rows`.
+    let mut code = String::from("from typing import overload\n\n");
     for i in 0..NUM_VARIANTS {
         writeln!(&mut code, "class M{i}: pass").ok();
     }
@@ -568,7 +570,11 @@ fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
         r#"
 )
 
-def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]:
+@overload
+def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]: ...
+@overload
+def map_rows(rows: Rows) -> AllResults: ...
+def map_rows(rows: object) -> object:
     return {}
 
 def perform(rows: Rows) -> AllResults:
