@@ -203,10 +203,11 @@ use crate::{
     types::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
         KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
-        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_narrowing_constraints, infer_predicate_truthiness,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        same_enum_or_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        class_pattern_coverage_target, definite_match_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_predicate_truthiness, infer_same_file_expression_type,
+        mapping_pattern_type, pattern_binding_fallthrough_type, same_enum_or_pattern_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1779,16 +1780,13 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty =
-                match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Type::instance(db, env, class.top_materialization(db))
-                    }
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Type::Callable(CallableType::top(db))
-                    }
-                    _ => return Truthiness::Ambiguous,
-                };
+            let class_ty = match class_pattern_coverage_target(db, kind) {
+                Type::ClassLiteral(class) => Type::instance(db, env, class.top_materialization(db)),
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                    Type::Callable(CallableType::top(db))
+                }
+                _ => return Truthiness::Ambiguous,
+            };
             let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
                 definite_match_pattern_type_for_subject(db, env, predicate_kind, subject_ty)
             });

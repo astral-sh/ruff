@@ -86,6 +86,25 @@ pub(crate) fn mapping_pattern_type<'db>(
         .top_materialization(db, env)
 }
 
+/// Return the class expression type for coverage analysis.
+pub(crate) fn class_pattern_coverage_target<'db>(
+    db: &'db dyn Db,
+    pattern: &ClassPatternPredicateKind<'db>,
+) -> Type<'db> {
+    let class_ty = infer_same_file_expression_type(db, pattern.class, TypeContext::default());
+    // After `cls is A`, the type of `A` can be `<class 'A'> & type[T]`. The class literal
+    // still fixes the runtime class that the pattern tests, so coverage can use it directly.
+    match class_ty {
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .find(|ty| matches!(ty, Type::ClassLiteral(_)))
+            .unwrap_or(class_ty),
+        _ => class_ty,
+    }
+}
+
 /// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
 ///
 /// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
@@ -789,7 +808,7 @@ fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
+            let class_ty = class_pattern_coverage_target(db, kind);
             match class_ty {
                 Type::ClassLiteral(class) => {
                     if class_pattern_is_exhaustive(db, env, class, resolved_subject_ty, kind, cache)
@@ -1282,7 +1301,8 @@ fn subject_independent_definite_match_pattern_type<'db>(
 ) -> Option<Type<'db>> {
     match kind {
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+            let class_ty = class_pattern_coverage_target(db, kind);
+            match class_ty {
                 Type::ClassLiteral(class) if kind.is_empty() => {
                     let class_instance_ty =
                         Type::instance(db, env, class.unknown_specialization(db))
@@ -1348,7 +1368,8 @@ pub(crate) fn definite_match_pattern_type<'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+            let class_ty = class_pattern_coverage_target(db, kind);
+            match class_ty {
                 Type::ClassLiteral(class) if kind.is_empty() => {
                     Type::instance(db, env, class.unknown_specialization(db))
                         .top_materialization(db, env)
