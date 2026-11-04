@@ -17,9 +17,6 @@ dependencies = [
     "lsprotocol>=2025.0.0",
 ]
 
-[dependency-groups]
-test = ["mypy==2.4.0"]
-
 [project.scripts]
 benchmark = "benchmark.run:main"
 

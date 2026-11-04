@@ -7,10 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from benchmark import Hyperfine, benchmark_environment
-from benchmark.preflight import validate_cli_targets
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
-from benchmark.targets import neutralize_file_directives, write_cli_targets
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
@@ -141,6 +139,9 @@ def main() -> None:
             print(f"Skipping {project.name}: {skip_reason}")
             continue
 
+        if not project.include:
+            project = project._replace(include=["."])
+
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
@@ -148,8 +149,6 @@ def main() -> None:
                 project=project.name, parent=cwd, python_version=project.python_version
             )
             venv.install(project.install_arguments)
-            neutralize_file_directives(cwd)
-            cli_project = write_cli_targets(project, cwd)
             benchmark_env = benchmark_environment(
                 cwd, single_threaded=args.single_threaded
             )
@@ -157,10 +156,8 @@ def main() -> None:
             commands = []
 
             for suite in suites:
-                suite.write_config(cli_project, venv)
-                command = suite.command(cli_project, venv, args.single_threaded)
-                validate_cli_targets(suite, command, venv, benchmark_env)
-                commands.append(command)
+                suite.write_config(project, venv)
+                commands.append(suite.command(project, venv, args.single_threaded))
 
             if not commands:
                 continue

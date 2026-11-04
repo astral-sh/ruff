@@ -20,7 +20,6 @@ from benchmark import benchmark_environment
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.projects import IncrementalEdit, Project
-from benchmark.targets import neutralize_file_directives
 from benchmark.tool import Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
@@ -60,7 +59,6 @@ def project_setup(
             project=project.name, parent=cwd, python_version=project.python_version
         )
         venv.install(project.install_arguments)
-        neutralize_file_directives(cwd)
 
         yield project, venv
 

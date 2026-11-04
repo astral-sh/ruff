@@ -24,64 +24,8 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
-All five CLIs use their native directory discovery inside the timed command.
-Before timing, the runner records the expected tracked Python files in
-`benchmark-files.txt` and derives exclusions that align the discovered scope.
-The manifest is an audit record; it is not passed as thousands of individual
-targets. Expanded include lists can add substantial checker-specific overhead.
-An untimed preflight rejects empty or mismatched root sets before Hyperfine.
-It compares actual paths for ty and mypy and native root counts for the other
-checkers. Counts alone do not establish identical files; detailed scope audits
-remain necessary when changing projects or checker versions.
-
-The runner applies each project's includes and excludes once, skips symlinks and
-untracked Python files, excludes notebooks, and prefers a stub to its adjacent implementation.
-Implementations without stubs and standalone stubs remain targets. This preserves
-imported stub types in mypy. If a file and a populated directory share a module
-name, a package directory wins; a module wins over a directory without an
-`__init__.py` or `__init__.pyi`. Paired implementations are omitted as roots for every
-checker, so this controlled workload differs from default project discovery.
-The runner prints its expected file count and SHA-256 before each project.
-`benchmark-workload.json` records root and stub counts and the fraction of
-eligible implementation lines omitted by this policy. Roots exclude imported
-dependencies, which each checker can still analyze.
-
-The runner enables unannotated-function checking and neutralizes whole-file
-checker directives in the temporary checkout, preserving ordinary line-level
-suppressions. `benchmark-source-overrides.json` records changed paths, directives
-and source hashes. mypy uses its normal import
-following with project and user configuration disabled, so per-module overrides
-and plugins cannot change its workload. Checkers can still follow different
-imports or infer different types from the same source files.
-Additional first-party import roots, including `src/` layouts and SQLAlchemy's
-`lib/`, apply to every checker. This keeps imports pointed at the checkout even
-when a dependency also installs a release of the project. Every project environment includes the same pinned mypy dependency,
-including runs that select only another tool.
-
-The pandas workload excludes `pandas/tests` for every checker. Its timing therefore
-differs from suites that include those tests; clipboard and other selected modules
-still use the common unannotated-body policy.
-
-The suite includes Django's dynamic framework code, SymPy's symbolic computation,
-the OpenAI SDK's generated typed models and clients, and pytest's implementation
-and tests. SymPy excludes test and benchmark inputs, the SDK excludes vendored
-code, and pytest excludes `testing/example_scripts`, whose files are inputs to
-nested test runs. Each exclusion applies to every checker.
-
-CLI and LSP subprocesses receive an empty user-configuration directory through
-`XDG_CONFIG_HOME` and `APPDATA`, so machine-specific diagnostic rules cannot alter
-the measurements. Checker-specific environment overrides, including
-`TY_CONFIG_FILE` and `MYPY_NUM_WORKERS`, are removed. Ty and Pyrefly ignore Git and
-other ignore files when discovering the already-controlled CLI scope.
-
-Multicore CLI runs explicitly use the available CPU count: mypy and Pyright use
-worker processes, Pyrefly uses its thread option, and ty and Zuban use their
-thread-pool environment settings. `--single-threaded` uses zero external mypy
-workers and one worker/thread for the other checkers. Worker settings appear in
-the preflight records. On macOS, Hyperfine's peak RSS does not sum concurrent
-worker processes, so it is not total process-tree memory for mypy or Pyright.
-
-You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
+Each checker discovers files from the project's configured directories. By default,
+the CLI benchmarks use the available CPU count. Pass `--single-threaded` to use one.
 
 ### Warm check time
 
@@ -97,11 +41,7 @@ Measures how long it takes to recheck a project if there were no changes.
 
 ### LSP: Time to first diagnostic
 
-Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
-
-The timer ends after the first diagnostic response for each open file. Push
-notifications can be empty or partial, so this does not establish completion of
-all background analysis.
+Measures how long it takes for a newly started LSP to return its first diagnostic response for each open file. A server can continue checking files in the background.
 
 Run with:
 
@@ -132,18 +72,6 @@ may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
 ## Updating the benchmark
-
-Run the configuration and shared-target regression tests with all five CLI tools
-installed (including the compiled ty binary and npm's Pyright):
-
-```shell
-uv run --python 3.15 --group test pytest src/benchmark/test_tool.py src/benchmark/test_cli_targets.py
-```
-
-The `test` dependency group supplies mypy for the native import regression;
-measured mypy commands still use each project's virtual environment.
-
-Record the CLI file counts and manifest hashes with the results.
 
 The benchmark script supports snapshotting the results when running with `--snapshot` and `--accept`.
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds

@@ -4,7 +4,6 @@ import abc
 import glob
 import json
 import os
-import re
 import shutil
 import sys
 from collections.abc import Generator
@@ -17,7 +16,6 @@ import tomlkit
 
 from benchmark import Command
 from benchmark.projects import Project
-from benchmark.targets import PYRIGHT_CONFIG
 
 if TYPE_CHECKING:
     from benchmark.venv import Venv
@@ -31,6 +29,13 @@ def which_tool(name: str, path: Path | None = None) -> Path:
     )
 
     return Path(tool)
+
+
+def exclude_regex(pattern: str) -> str:
+    """Convert a project exclusion glob to a regex for mypy and Zuban."""
+    regex = glob.translate(pattern, recursive=True, include_hidden=True, seps="/\\")
+    # Project interpreters older than Python 3.14 do not recognize \z.
+    return r"\A" + regex.removesuffix(r"\z") + r"(?:[/\\].*)?$"
 
 
 class Tool(abc.ABC):
@@ -122,8 +127,6 @@ class Ty(Tool):
             "check",
             "--output-format=concise",
             "--no-progress",
-            "--no-respect-ignore-files",
-            "--include-scripts",
         ]
 
         return Command(name=self._name, command=command)
@@ -150,7 +153,16 @@ class Mypy(Tool):
         return (
             Path("mypy-benchmark.toml"),
             tomlkit.dumps(
-                {"tool": {"mypy": {"mypy_path": list(project.import_roots)}}}
+                {
+                    "tool": {
+                        "mypy": {
+                            "mypy_path": list(project.import_roots),
+                            "exclude": [
+                                exclude_regex(pattern) for pattern in project.exclude
+                            ],
+                        }
+                    }
+                }
             ),
         )
 
@@ -172,16 +184,6 @@ class Mypy(Tool):
             "0" if single_threaded else str(os.process_cpu_count() or 1),
             *project.include,
         ]
-
-        if project.exclude:
-            command.extend(
-                [
-                    "--exclude",
-                    r"\A(?:"
-                    + "|".join(re.escape(path) for path in project.exclude)
-                    + r")(?:[/\\]|\Z)",
-                ]
-            )
 
         prepare = None
 
@@ -242,7 +244,9 @@ class Pyright(Tool):
             Path("pyrightconfig.json"),
             json.dumps(
                 {
-                    "exclude": [str(path) for path in project.exclude],
+                    "include": list(project.include or ["."]),
+                    "exclude": list(project.exclude),
+                    "analyzeUnannotatedFunctions": True,
                     # Set the `venv` config for pyright. Pyright only respects the `--venvpath`
                     # CLI option when `venv` is set in the configuration... 🤷‍♂️
                     "venv": venv.name,
@@ -260,13 +264,7 @@ class Pyright(Tool):
         if not single_threaded:
             command.extend(["--threads", str(os.process_cpu_count() or 1)])
 
-        command.extend(
-            [
-                "--level=warning",
-                "--project",
-                PYRIGHT_CONFIG,
-            ]
-        )
+        command.extend(["--level=warning", "--project", "pyrightconfig.json"])
 
         return Command(
             name="Pyright",
@@ -313,8 +311,6 @@ class Pyrefly(Tool):
             "check",
             "--output-format=min-text",
             "--config=pyrefly.toml",
-            "--disable-project-excludes-heuristics=true",
-            "--use-ignore-files=false",
             "--threads",
             "1" if single_threaded else str(os.process_cpu_count() or 1),
         ]
@@ -371,14 +367,7 @@ class Zuban(Tool):
             # Match native discovery's physical paths to avoid duplicate module identities.
             "mypy_path": sorted({path.resolve().as_posix() for path in search_paths}),
             "files": list(project.include),
-            "exclude": [
-                r"\A"
-                + glob.translate(
-                    pattern, recursive=True, include_hidden=True, seps="/\\"
-                ).removesuffix(r"\z")
-                + r"(?:[/\\].*)?\z"
-                for pattern in dict.fromkeys(excludes)
-            ],
+            "exclude": [exclude_regex(pattern) for pattern in dict.fromkeys(excludes)],
             "exclude_gitignore": False,
             "check_untyped_defs": True,
             "untyped_function_return_mode": "any",
