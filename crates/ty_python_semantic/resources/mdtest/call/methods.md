@@ -818,6 +818,29 @@ class Wrong:
         self.method = Wrong.method
 ```
 
+### Keyword arguments
+
+If callers can pass `x` by keyword, the shadowing callable must also accept that keyword. Both
+lambdas below accept a positional argument, but only the first accepts `x=42`.
+
+```py
+class C:
+    def method(self, x: int) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        # TODO: the first one here should not be an error
+        # error: [invalid-assignment]
+        self.method = lambda x: str(x)
+        self.method = lambda y: str(y)  # error: [invalid-assignment]
+
+c = C()
+c.swap()
+# TODO: this should not be an error
+# error: [missing-argument]
+c.method(x=42)
+```
+
 ### Classmethods and static methods
 
 The same reasoning applies to classmethods and static methods:
