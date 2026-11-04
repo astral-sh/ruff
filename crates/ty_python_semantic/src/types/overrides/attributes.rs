@@ -451,9 +451,16 @@ fn attribute_violation<'db>(
             target: target.read,
         });
     }
-    // Method overrides follow callable subtyping (including covariant returns), even
-    // when instances can shadow the method. Apply this to callable attributes as well.
     if target.is_method {
+        // ty allows methods to be shadowed with instance attributes. For example, it allows
+        // `def method(self) -> object` on `Base` to be shadowed via `base.method = lambda: 1`
+        // (where `base: Base` could also be an instance of a subclass of `Base`).
+        //
+        // This is unsound, since a subclass might narrow `method`'s return type to `str`, which
+        // would be incompatible with that replaced method. But since we allow it, the write-
+        // checks below would require subclasses of `Base` to respect the same kind of writes,
+        // i.e. they would prevent subclasses from overwriting the attribute with an annotation
+        // like `method: Callable[[], str]`. This is why we skip write-checks for methods here.
         return None;
     }
     let write = target.write?;
