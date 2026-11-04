@@ -277,12 +277,16 @@ pub enum PythonEnvironment {
 }
 
 impl PythonEnvironment {
-    /// Discover the python environment using the following priorities:
+    /// Discovers the Python environment in order of priority:
     ///
-    /// 1. activated virtual environment
-    /// 2. conda (child)
-    /// 3. project virtual environment, when a project root is provided
-    /// 4. conda (base)
+    /// 1. An activated virtual environment.
+    /// 2. An active child Conda or Pixi environment containing Python.
+    /// 3. A `.venv` in the project root, if provided.
+    /// 4. An active base Conda environment containing Python.
+    /// 5. A Python interpreter on `PATH`.
+    ///
+    /// If the project's `.venv` fails to resolve, discovery continues. An error resolving a
+    /// selected Conda environment or `VIRTUAL_ENV` is returned to the caller.
     pub fn discover(
         project_root: Option<&SystemPath>,
         system: &dyn System,
@@ -327,9 +331,8 @@ impl PythonEnvironment {
         Ok(None)
     }
 
-    /// Returns the virtual environment location to try and its origin, without checking whether
-    /// it exists. `VIRTUAL_ENV` takes precedence over a child Conda environment, followed by the
-    /// project's `.venv`. System Python fallbacks are handled by [`Self::discover`].
+    /// Returns the first virtual environment candidate in the search order used by [`Self::discover`]
+    /// and its origin. The project's `.venv` is a candidate even before the directory exists.
     pub fn virtual_environment_candidate(
         project_root: Option<&SystemPath>,
         system: &dyn System,
@@ -1022,7 +1025,7 @@ impl CondaEnvironmentKind {
     }
 }
 
-/// Read `CONDA_PREFIX` and confirm that it has the expected kind
+/// Returns the active Conda prefix if it has the expected kind and contains Python.
 fn conda_environment_from_env(
     system: &dyn System,
     kind: CondaEnvironmentKind,
@@ -1037,7 +1040,17 @@ fn conda_environment_from_env(
         return None;
     }
 
-    Some(path)
+    // A Conda or Pixi environment can supply tools or native libraries without installing
+    // Python. Look for the same interpreter paths that uv checks during discovery.
+    let interpreters: &[&str] = if cfg!(windows) {
+        &["python.exe", "Scripts/python.exe", "bin/python.exe"]
+    } else {
+        &["bin/python", "bin/python3"]
+    };
+    interpreters
+        .iter()
+        .any(|interpreter| system.is_file(&path.join(interpreter)))
+        .then_some(path)
 }
 
 fn environment_from_binary(system: &dyn System, binary: &str) -> Option<PythonEnvironment> {
@@ -2332,43 +2345,76 @@ mod tests {
         }
     }
 
+    /// A Conda environment created with `conda create -p` uses its full path as its name.
+    /// It takes precedence over the project's `.venv` only when it contains Python.
     #[test]
-    fn unnamed_conda_environment_precedes_project_venv() -> Result<(), Box<dyn std::error::Error>> {
+    fn unnamed_conda_environment_with_and_without_python() -> Result<(), Box<dyn std::error::Error>>
+    {
         let system = TestSystem::default();
-        let prefix = SystemPath::new("/conda/envs/custom");
-        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        let prefix = SystemPath::new("/custom");
         system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, prefix.as_str());
-        let fs = system.memory_file_system();
-        fs.create_directory_all(prefix)?;
-        fs.create_directory_all("/python")?;
-        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python\n")?;
+        system.memory_file_system().create_directory_all(prefix)?;
+        let python = if cfg!(windows) {
+            "python.exe"
+        } else {
+            "bin/python"
+        };
+        assert_conda_precedence(&system, prefix, python)
+    }
 
-        let environment = PythonEnvironment::discover(Some(SystemPath::new("/project")), &system)?;
-        assert_eq!(
-            environment.map(|environment| environment.sys_prefix().to_path_buf()),
-            Some(system.canonicalize_path(prefix)?)
-        );
+    /// Even when `_CONDA_ROOT` matches the prefix, a Pixi environment takes precedence over
+    /// the project's `.venv` only when it contains Python.
+    #[test]
+    fn pixi_environment_with_and_without_python() -> Result<(), Box<dyn std::error::Error>> {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/pixi/envs/default");
+        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, "project:default");
+        system.set_env_var(EnvVars::CONDA_ROOT, prefix.as_str());
+        system
+            .memory_file_system()
+            .write_file_all(prefix.join("conda-meta/pixi"), "")?;
+        let python = if cfg!(windows) {
+            "bin/python.exe"
+        } else {
+            "bin/python3"
+        };
+        assert_conda_precedence(&system, prefix, python)
+    }
+
+    /// Checks that discovery selects the project's `.venv` until the prefix contains an interpreter.
+    fn assert_conda_precedence(
+        system: &TestSystem,
+        prefix: &SystemPath,
+        python: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        let fs = system.memory_file_system();
+        fs.create_directory_all("/python")?;
+        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python")?;
+
+        let discover = || {
+            PythonEnvironment::discover(Some(SystemPath::new("/project")), system)
+                .map(|environment| environment.map(|env| env.sys_prefix().to_path_buf()))
+        };
+        let venv = SystemPath::new("/project/.venv");
+        assert_eq!(discover()?, Some(system.canonicalize_path(venv)?));
+
+        fs.write_file_all(prefix.join(python), "")?;
+        assert_eq!(discover()?, Some(system.canonicalize_path(prefix)?));
         Ok(())
     }
 
+    /// Discovery finds no environment when neither the active base Conda prefix nor PATH supplies Python.
     #[test]
-    fn pixi_environment_precedes_project_venv() -> Result<(), Box<dyn std::error::Error>> {
+    fn base_conda_without_python() {
         let system = TestSystem::default();
-        let prefix = SystemPath::new("/pixi/envs/default");
-        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
-        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, "project:default");
-        system.set_env_var(EnvVars::CONDA_ROOT, prefix.as_str());
-        let fs = system.memory_file_system();
-        fs.write_file_all(prefix.join("conda-meta/pixi"), "")?;
-        fs.create_directory_all("/python")?;
-        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python\n")?;
-
-        let environment = PythonEnvironment::discover(Some(SystemPath::new("/project")), &system)?;
-        assert_eq!(
-            environment.map(|environment| environment.sys_prefix().to_path_buf()),
-            Some(system.canonicalize_path(prefix)?)
-        );
-        Ok(())
+        system.set_env_var(EnvVars::CONDA_PREFIX, "/conda");
+        system.set_env_var(EnvVars::CONDA_ROOT, "/conda");
+        system
+            .memory_file_system()
+            .create_directory_all("/conda")
+            .unwrap();
+        assert_eq!(PythonEnvironment::discover(None, &system).unwrap(), None);
     }
 
     #[derive(Default)]

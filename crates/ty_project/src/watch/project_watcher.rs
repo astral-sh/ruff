@@ -217,6 +217,13 @@ impl WatchPaths {
 ///   those unrelated directories. A nonrecursive parent watch would need additional logic to
 ///   register the environment watch again after recreation.
 ///
+/// ## Conda and Pixi environments
+///
+/// We intentionally skip dedicated watches for Python executables under `CONDA_PREFIX`.
+/// Reliably detecting their creation would require watching even a prefix that ty skipped in
+/// favor of the project's `.venv`. If the prefix gains its first interpreter or loses its last,
+/// the language server or `ty check --watch` may need a restart to switch to or from that prefix.
+///
 /// ## uv workspace metadata
 ///
 /// Metadata refreshes use the existing workspace, project, environment, and module search-path
