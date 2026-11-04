@@ -759,9 +759,8 @@ still invokes the original function on the class. It prints "original" and retur
 reveal_type(C.method(c, 42))  # revealed: str
 ```
 
-Since this is a common pattern to shadow methods on instances of a class this way, ty does supports
-this pattern. We generally allow this replacement if the callable being assigned has a signature
-that is compatible with the original method:
+Since this is a common pattern, ty does support it. We generally allow this replacement if the
+callable being assigned has a signature that is compatible with the original method:
 
 ```py
 from typing import Callable
@@ -815,6 +814,8 @@ class Wrong:
         self.method = lambda: ""  # error: [invalid-assignment]
         self.method = lambda self, x: ""  # error: [invalid-assignment]
         self.method = lambda x: x  # error: [invalid-assignment]
+        # TODO: This should be an error
+        self.method = Wrong.method
 ```
 
 ### Classmethods and static methods
@@ -883,7 +884,7 @@ d.swap()
 
 # TODO: these errors should not occur
 # TODO: the type is currently `object` (which is fine), since we union the return types of `D.method` and `C.method`.
-# This will likely turn into `str` when we allow shadowing, but `d.method(42)` actually returns and `int` after swapping.
+# This will likely turn into `str` when we allow shadowing, but `d.method(42)` actually returns an `int` after swapping.
 # error: [invalid-argument-type]
 # error: [missing-argument]
 reveal_type(d.method(42))  # revealed: object
