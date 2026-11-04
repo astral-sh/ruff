@@ -24,8 +24,8 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
-Each checker discovers files from the project's configured directories. By default,
-the CLI benchmarks use the available CPU count. Pass `--single-threaded` to use one.
+Each checker discovers files from the project's configured directories and uses its
+default worker settings. Pass `--single-threaded` to limit checker parallelism.
 
 ### Warm check time
 

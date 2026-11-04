@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import glob
 import json
-import os
 import shutil
 import sys
 from collections.abc import Generator
@@ -180,10 +179,10 @@ class Mypy(Tool):
             "--config-file=mypy-benchmark.toml",
             "--follow-imports=normal",
             "--check-untyped-defs",
-            "--num-workers",
-            "0" if single_threaded else str(os.process_cpu_count() or 1),
-            *project.include,
         ]
+        if single_threaded:
+            command.extend(["--num-workers", "0"])
+        command.extend(project.include)
 
         prepare = None
 
@@ -259,16 +258,14 @@ class Pyright(Tool):
         )
 
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
-        command = [str(self.path)]
-
-        if not single_threaded:
-            command.extend(["--threads", str(os.process_cpu_count() or 1)])
-
-        command.extend(["--level=warning", "--project", "pyrightconfig.json"])
-
         return Command(
             name="Pyright",
-            command=command,
+            command=[
+                str(self.path),
+                "--level=warning",
+                "--project",
+                "pyrightconfig.json",
+            ],
         )
 
     @override
@@ -311,9 +308,9 @@ class Pyrefly(Tool):
             "check",
             "--output-format=min-text",
             "--config=pyrefly.toml",
-            "--threads",
-            "1" if single_threaded else str(os.process_cpu_count() or 1),
         ]
+        if single_threaded:
+            command.extend(["--threads", "1"])
 
         return Command(
             name="Pyrefly",
