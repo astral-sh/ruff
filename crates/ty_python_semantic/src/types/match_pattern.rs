@@ -1,7 +1,6 @@
 use std::hash::{Hash, Hasher};
 
-use crate::Db;
-use crate::ProgramEnvironment;
+use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
@@ -14,8 +13,10 @@ use ty_python_core::predicate::{
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::equality::{
-    ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
+    ComparisonSoundnessPolicy, enum_has_distinct_member_equality, evaluate_type_equality,
+    is_same_enum_domain,
 };
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -938,6 +939,50 @@ fn pattern_fallthrough_type<'db>(
     IntersectionType::from_positive_and_negative(db, env, subject_ty, definitely_matched)
 }
 
+/// Return the exact set of values matched within the subject's enum by an OR of member patterns.
+pub(crate) fn same_enum_or_pattern_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    patterns: &[PatternPredicateKind<'db>],
+    subject_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let mut literals = patterns.iter().map(|pattern| {
+        let PatternPredicateKind::Value(value) = pattern else {
+            return None;
+        };
+        infer_same_file_expression_type(db, *value, TypeContext::default()).as_enum_literal()
+    });
+    let first = literals.next()??;
+    let enum_class = first.enum_class_literal(db);
+    if !is_same_enum_pattern_domain(db, env, subject_ty, first)
+        || !enum_has_distinct_member_equality(db, enum_class)
+    {
+        return None;
+    }
+
+    // Expression inference already resolves aliases to canonical member literals.
+    let mut members = FxOrderSet::from_iter([Type::enum_literal(first)]);
+    for literal in literals {
+        let literal = literal?;
+        if literal.enum_class_literal(db) != enum_class {
+            return None;
+        }
+        members.insert(Type::enum_literal(literal));
+    }
+
+    if members.len() == 1 {
+        return members.first().copied();
+    }
+    // A general union builder can widen a large literal union to the whole enum, which would
+    // incorrectly exclude the unmatched members when the pattern fails.
+    let members: Box<[_]> = members.into_iter().collect();
+    Some(Type::Union(UnionType::new(
+        db,
+        members,
+        RecursivelyDefined::No,
+    )))
+}
+
 /// Return the fallthrough type for a binding that can reach a later match case.
 ///
 /// Failure of a sequence pattern establishes length and indexed-element facts at the instant of
@@ -984,6 +1029,15 @@ fn try_pattern_binding_fallthrough_type<'db>(
         PatternPredicateKind::Sequence(sequence) => {
             try_sequence_pattern_binding_fallthrough_type(db, env, sequence, subject_ty, budget)
         }
+        PatternPredicateKind::Or(patterns)
+            if let Some(matched) = same_enum_or_pattern_type(db, env, patterns, subject_ty) =>
+        {
+            // Subtract all the members in one intersection so we don't rebuild the growing list
+            // of exclusions for every alternative, especially when the subject is `Self`.
+            Ok(IntersectionType::from_positive_and_negative(
+                db, env, subject_ty, matched,
+            ))
+        }
         PatternPredicateKind::Or(patterns) => {
             patterns.iter().try_fold(subject_ty, |remaining, pattern| {
                 try_pattern_binding_fallthrough_type(db, env, pattern, remaining, budget)
@@ -1007,6 +1061,11 @@ fn conservative_pattern_binding_fallthrough_type<'db>(
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     match kind {
+        PatternPredicateKind::Or(patterns)
+            if let Some(matched) = same_enum_or_pattern_type(db, env, patterns, subject_ty) =>
+        {
+            IntersectionType::from_positive_and_negative(db, env, subject_ty, matched)
+        }
         PatternPredicateKind::Or(patterns) => {
             patterns.iter().fold(subject_ty, |remaining, pattern| {
                 conservative_pattern_binding_fallthrough_type(db, env, pattern, remaining)

@@ -2163,6 +2163,35 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4893>.
+///
+/// Checking for an implicit return requires proving that the two OR patterns cover every member.
+fn benchmark_enum_or_pattern_exhaustiveness(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let mut code = "from enum import StrEnum\n\nclass Status(StrEnum):\n".to_string();
+        for index in 0..num_members {
+            writeln!(code, "    M{index} = \"m{index}\"").ok();
+        }
+
+        code.push_str("\n    @property\n    def is_active(self) -> bool:\n        match self:\n");
+        let split = num_members * 3 / 10;
+        for (group, result) in [(0..split, "True"), (split..num_members, "False")] {
+            let alternatives = group.map(|index| format!("Status.M{index}")).join(" | ");
+            writeln!(
+                code,
+                "            case {alternatives}:\n                return {result}"
+            )
+            .ok();
+        }
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[enum_or_pattern_exhaustiveness_{num_members}]"),
+            &code,
+        );
+    }
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4676>.
 ///
 /// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
@@ -2767,6 +2796,7 @@ criterion_group!(
     benchmark_gradual_intersection_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
+    benchmark_enum_or_pattern_exhaustiveness,
     benchmark_tuple_class_pattern_captures,
     benchmark_nested_class_pattern_capture,
     benchmark_nested_class_pattern_exhaustiveness,
