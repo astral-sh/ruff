@@ -520,6 +520,8 @@ The next style includes these changes in preview:
     for arithmetic, Boolean expressions, nested comparisons, and comments.
 - Wrap a long comprehension iterable after `in` when parentheses help it fit, and remove
     redundant parentheses around short names and attribute accesses.
+- Keep a lone comparison operator with its left operand when the right-hand collection or
+    call wraps onto multiple lines.
 
 ### F-string formatting
 

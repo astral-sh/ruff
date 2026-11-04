@@ -77,3 +77,8 @@ pub(crate) const fn is_remove_redundant_comparison_parentheses_enabled(
 pub(crate) const fn is_wrap_comprehension_in_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Keeps a lone comparison operator with its left operand when the right side wraps.
+pub(crate) const fn is_hug_comparator_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

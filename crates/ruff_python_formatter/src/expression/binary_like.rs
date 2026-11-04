@@ -19,7 +19,8 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use crate::preview::{
-    is_remove_redundant_comparison_parentheses_enabled, is_simplify_power_operator_hugging_enabled,
+    is_hug_comparator_enabled, is_remove_redundant_comparison_parentheses_enabled,
+    is_simplify_power_operator_hugging_enabled,
 };
 use crate::string::implicit::FormatImplicitConcatenatedString;
 
@@ -676,6 +677,13 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
         let mut last_operator: Option<OperatorIndex> = None;
 
         let lowest_precedence = self.lowest_precedence();
+        let hug_lone_comparator = is_hug_comparator_enabled(f.context())
+            && lowest_precedence == OperatorPrecedence::Comparator
+            && self
+                .operators()
+                .filter(|(_, operator)| operator.precedence() == lowest_precedence)
+                .count()
+                == 1;
 
         for (index, operator_part) in self.operators() {
             if operator_part.precedence() == lowest_precedence {
@@ -689,26 +697,35 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                         f.context(),
                     );
 
-                if let Some(leading) = left.first_operand().leading_binary_comments() {
-                    leading_comments(leading).fmt(f)?;
-                }
+                let hug_operator = hug_lone_comparator
+                    && left.operands().all(|(_, operand)| {
+                        is_unbracketed_comparison_operand(operand.expression(), f.context())
+                    })
+                    && matches!(&right.0, [OperandOrOperator::Operand(operand)] if matches!(operand.expression(), Expr::Call(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::List(_) | Expr::Set(_) | Expr::Dict(_) | Expr::Tuple(_) | Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_)));
 
-                match &left.0 {
-                    [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
-                    _ => in_parentheses_only_group(&left).fmt(f)?,
-                }
-
-                if let Some(trailing) = left.last_operand().trailing_binary_comments() {
-                    trailing_comments(trailing).fmt(f)?;
-                }
-
-                if is_pow {
-                    in_parentheses_only_soft_line_break().fmt(f)?;
+                let left_with_operator = format_with(|f| {
+                    if let Some(leading) = left.first_operand().leading_binary_comments() {
+                        leading_comments(leading).fmt(f)?;
+                    }
+                    match &left.0 {
+                        [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
+                        _ => in_parentheses_only_group(&left).fmt(f)?,
+                    }
+                    if let Some(trailing) = left.last_operand().trailing_binary_comments() {
+                        trailing_comments(trailing).fmt(f)?;
+                    }
+                    if is_pow {
+                        in_parentheses_only_soft_line_break().fmt(f)?;
+                    } else {
+                        in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+                    }
+                    operator_part.fmt(f)
+                });
+                if hug_operator {
+                    in_parentheses_only_group(&left_with_operator).fmt(f)?;
                 } else {
-                    in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+                    left_with_operator.fmt(f)?;
                 }
-
-                operator_part.fmt(f)?;
 
                 // Format the operator on its own line if the right side has any leading comments.
                 if operator_part.has_trailing_comments()
@@ -744,6 +761,35 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
             [OperandOrOperator::Operand(operand)] => operand.fmt(f),
             _ => in_parentheses_only_group(&right).fmt(f),
         }
+    }
+}
+
+fn is_unbracketed_comparison_operand(expression: &Expr, context: &PyFormatContext) -> bool {
+    if context.comments().contains_comments(expression.into())
+        || (context.is_expression_parenthesized(expression.into())
+            && !can_omit_comparison_operand_parentheses(expression, context))
+    {
+        return false;
+    }
+    match expression {
+        Expr::Name(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::FString(_)
+        | Expr::TString(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => true,
+        Expr::Attribute(attribute) => {
+            !context.is_expression_parenthesized(attribute.value.as_ref().into())
+                && is_unbracketed_comparison_operand(&attribute.value, context)
+        }
+        Expr::UnaryOp(unary) => {
+            !context.is_expression_parenthesized(unary.operand.as_ref().into())
+                && is_unbracketed_comparison_operand(&unary.operand, context)
+        }
+        _ => false,
     }
 }
 
