@@ -79,7 +79,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Lower `dict(a=..., b=...)` to synthetic `(Literal["a"], value)` pairs so we can
         // reuse dict-literal inference. We key the synthetic name off the value node because
-        // `infer_collection_literal` operates on expressions rather than keywords.
+        // `try_infer_collection_literal` operates on expressions rather than keywords.
         let items = arguments
             .keywords
             .iter()
@@ -106,7 +106,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        self.infer_collection_literal(
+        self.try_infer_collection_literal(
             KnownClass::Dict,
             collection_expr,
             &items,

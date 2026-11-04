@@ -7510,63 +7510,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
-        let db = self.db();
-        let ast::ExprList {
-            range: _,
-            node_index: _,
-            elts,
-            ctx: _,
-        } = list;
-
-        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
-        let mut infer_elt_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
+        let elts = list.elts.iter().map(|elt| [Some(elt)]).collect_vec();
+        let infer_elt_ty = |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
         self.infer_collection_literal(
             KnownClass::List,
             Some(list.into()),
             &elts,
-            &mut infer_elt_ty,
+            infer_elt_ty,
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::List.to_specialized_instance(
-                db,
-                self.program_environment(),
-                &[Type::unknown()],
-            )
-        })
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
-        let db = self.db();
-        let ast::ExprSet {
-            range: _,
-            node_index: _,
-            elts,
-        } = set;
-
-        let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
+        let elts = set.elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
-        let mut infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
+        let infer_elt_ty = |builder: &mut Self, arg: ArgExpr<'db, '_>| {
             let (_, elt, elt_tcx) = arg;
             builder.infer_set_element(elt, elt_tcx, fallback_tcx)
         };
 
-        self.infer_collection_literal(
-            KnownClass::Set,
-            Some(set.into()),
-            &elts,
-            &mut infer_elt_ty,
-            tcx,
-        )
-        .unwrap_or_else(|| {
-            KnownClass::Set.to_specialized_instance(
-                db,
-                self.program_environment(),
-                &[Type::unknown()],
-            )
-        })
+        self.infer_collection_literal(KnownClass::Set, Some(set.into()), &elts, infer_elt_ty, tcx)
     }
 
     /// Infers a set element, optionally with a fallback context for an incomplete `TypedDict` key.
@@ -7726,7 +7690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid inferring the items multiple times if we already attempted to infer the
         // dictionary literal as a `TypedDict`. This also allows us to infer using the
         // type context of the expected `TypedDict` field.
-        let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
+        let infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
             item_types
                 .get(&elt.node_index().load())
                 .copied()
@@ -7738,16 +7702,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             KnownClass::Dict,
             Some(dict.into()),
             &items,
-            &mut infer_elt_ty,
+            infer_elt_ty,
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::Dict.to_specialized_instance(db, env, &[Type::unknown(), Type::unknown()])
-        })
+    }
+
+    fn infer_collection_literal<'expr, const N: usize>(
+        &mut self,
+        class: KnownClass,
+        expression: Option<ast::ExprRef<'_>>,
+        elements: &[[Option<&'expr ast::Expr>; N]],
+        mut infer_element: impl FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.try_infer_collection_literal(class, expression, elements, &mut infer_element, tcx)
+            .unwrap_or_else(|| {
+                class.to_specialized_instance(
+                    self.db(),
+                    self.program_environment(),
+                    &[Type::unknown(); N],
+                )
+            })
     }
 
     // Infer the type of a collection literal expression.
-    fn infer_collection_literal<'expr, const N: usize>(
+    fn try_infer_collection_literal<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
@@ -7761,7 +7740,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
-            let inferred_ty = speculative_builder.infer_collection_literal_impl(
+            let inferred_ty = speculative_builder.try_infer_collection_literal_impl(
                 collection_class,
                 collection_expr,
                 elts,
@@ -7792,7 +7771,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        self.infer_collection_literal_impl(
+        self.try_infer_collection_literal_impl(
             collection_class,
             collection_expr,
             elts,
@@ -7802,7 +7781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the type of a collection literal expression.
-    fn infer_collection_literal_impl<'expr, const N: usize>(
+    fn try_infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: Option<ast::ExprRef<'_>>,
@@ -8428,15 +8407,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         elements: [Option<&ast::Expr>; N],
         inference: &ScopeInference<'db>,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
-        let mut infer_element_ty =
-            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
-
+    ) -> Type<'db> {
         self.infer_collection_literal(
             collection_class,
             Some(collection_expr),
             &[elements],
-            &mut infer_element_ty,
+            |_, (_, elt, _)| inference.expression_type(elt),
             tcx,
         )
     }
@@ -8446,7 +8422,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         listcomp: &ast::ExprListComp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let db = self.db();
         let ast::ExprListComp {
             range: _,
             node_index: _,
@@ -8473,13 +8448,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inference,
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::List.to_specialized_instance(
-                db,
-                self.program_environment(),
-                &[Type::unknown()],
-            )
-        })
     }
 
     fn infer_set_comprehension_expression(
@@ -8487,7 +8455,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         setcomp: &ast::ExprSetComp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let db = self.db();
         let ast::ExprSetComp {
             range: _,
             node_index: _,
@@ -8514,13 +8481,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inference,
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::Set.to_specialized_instance(
-                db,
-                self.program_environment(),
-                &[Type::unknown()],
-            )
-        })
     }
 
     fn infer_dict_comprehension_expression(
@@ -8528,7 +8488,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         dictcomp: &ast::ExprDictComp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let db = self.db();
         let ast::ExprDictComp {
             range: _,
             node_index: _,
@@ -8556,13 +8515,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inference,
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::Dict.to_specialized_instance(
-                db,
-                self.program_environment(),
-                &[Type::unknown(), Type::unknown()],
-            )
-        })
     }
 
     fn infer_generator_expression_scope(
@@ -8611,7 +8563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(
+        self.try_infer_collection_literal(
             KnownClass::List,
             Some(listcomp.into()),
             &elts,
@@ -8639,7 +8591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-        self.infer_collection_literal(
+        self.try_infer_collection_literal(
             KnownClass::Set,
             Some(setcomp.into()),
             &elts,
@@ -8669,7 +8621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut infer_elt_ty =
                 |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
-            self.infer_collection_literal(
+            self.try_infer_collection_literal(
                 KnownClass::Dict,
                 Some(dictcomp.into()),
                 &elts,
@@ -8883,28 +8835,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        let (body_ty, orelse_ty) = if is_collection_literal(body)
-            && prefer_collection_literal_peer_context(db, env, tcx)
-            && !is_nonempty_collection_literal_with_empty_peer(body, orelse)
-        {
-            // Infer the peer branch first so the body can use its type as context.
-            let orelse_ty = self.infer_expression(orelse, tcx);
-            let body_ty = self.infer_expression_with_collection_literal_peer_context(
-                body,
-                tcx,
-                Some(orelse_ty),
-            );
-            (body_ty, orelse_ty)
-        } else {
-            let body_ty = self.infer_expression(body, tcx);
-            let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
-                orelse,
-                tcx,
-                Some(body_ty),
-            );
-            (body_ty, orelse_ty)
-        };
-
         let test_truthiness = match test_ty.try_bool(db, env) {
             Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
             Err(err) => {
@@ -8915,12 +8845,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.check_condition_redundancy(test, test_ty);
 
+        let prefer_peer =
+            is_collection_literal(body) && prefer_collection_literal_peer_context(db, env, tcx);
+        if prefer_peer
+            && test_truthiness.is_ambiguous()
+            && let Some(ty) = self.infer_joint_collection_literals(body, orelse, tcx)
+        {
+            self.finish_expression_type(body, ty, tcx);
+            self.finish_expression_type(orelse, ty, tcx);
+            return ty;
+        }
+
+        // Infer the peer branch first so the body can use its type as context.
+        let orelse_ty = (prefer_peer && !is_empty_collection_literal(orelse))
+            .then(|| self.infer_expression(orelse, tcx));
+        let body_ty =
+            self.infer_expression_with_collection_literal_peer_context(body, tcx, orelse_ty);
+        let orelse_ty = orelse_ty.unwrap_or_else(|| {
+            self.infer_expression_with_collection_literal_peer_context(orelse, tcx, Some(body_ty))
+        });
+
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
             Truthiness::Uninhabited => Type::Never,
         }
+    }
+
+    /// Infer a merged collection type from two distinct literal expressions.
+    fn infer_joint_collection_literals(
+        &mut self,
+        body: &ast::Expr,
+        orelse: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        // A generic TypedDict can have known fields even when its type arguments are unsolved.
+        if tcx
+            .annotation
+            .is_some_and(|ty| ty.as_typed_dict().is_some())
+        {
+            return None;
+        }
+
+        let infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
+            builder.infer_expression(elt, tcx)
+        };
+
+        let (class, left, right) = match (body, orelse) {
+            (ast::Expr::List(left), ast::Expr::List(right)) => {
+                (KnownClass::List, &left.elts, &right.elts)
+            }
+            (ast::Expr::Set(left), ast::Expr::Set(right)) => {
+                (KnownClass::Set, &left.elts, &right.elts)
+            }
+            (ast::Expr::Dict(left), ast::Expr::Dict(right)) => {
+                let items = left
+                    .items
+                    .iter()
+                    .chain(&right.items)
+                    .map(|item| [item.key.as_ref(), Some(&item.value)])
+                    .collect_vec();
+
+                return Some(self.infer_collection_literal(
+                    KnownClass::Dict,
+                    None,
+                    &items,
+                    infer_elt_ty,
+                    tcx,
+                ));
+            }
+            _ => return None,
+        };
+
+        let elts = left
+            .iter()
+            .chain(right)
+            .map(|elt| [Some(elt)])
+            .collect_vec();
+
+        Some(self.infer_collection_literal(class, None, &elts, infer_elt_ty, tcx))
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {
@@ -9317,7 +9321,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let elements: [[Option<&ast::Expr>; 1]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
 
-        self.infer_collection_literal(
+        self.try_infer_collection_literal(
             collection_class,
             Some(call_expression.into()),
             &elements,
@@ -13076,19 +13080,10 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
     )
 }
 
-// An empty literal cannot provide element types for the other branch. Infer the
-// nonempty branch first so the empty branch can use those types as context.
-fn is_nonempty_collection_literal_with_empty_peer(
-    expression: &ast::Expr,
-    peer: &ast::Expr,
-) -> bool {
-    match (expression, peer) {
-        (ast::Expr::List(expression), ast::Expr::List(peer)) => {
-            !expression.elts.is_empty() && peer.elts.is_empty()
-        }
-        (ast::Expr::Dict(expression), ast::Expr::Dict(peer)) => {
-            !expression.items.is_empty() && peer.items.is_empty()
-        }
+fn is_empty_collection_literal(expression: &ast::Expr) -> bool {
+    match expression {
+        ast::Expr::List(list) => list.elts.is_empty(),
+        ast::Expr::Dict(dict) => dict.items.is_empty(),
         _ => false,
     }
 }
