@@ -189,7 +189,7 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
                 }
             }
             StmtKind::Try(_) | StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }
@@ -271,7 +271,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                 }
             }
             StmtKind::Try(_) | StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

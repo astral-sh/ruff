@@ -354,17 +354,19 @@ impl<'a> crate::TypeParam<'a> {
     }
 }
 
-impl<'a> crate::Pattern<'a> {
+impl<'a> super::PatternKind<'a> {
     /// The name bound by this pattern itself, excluding nested patterns.
     pub fn capture_name(self) -> Option<Identifier<'a>> {
-        match self.classify() {
+        match self {
             super::PatternKind::MatchAs(node) => node.name(),
             super::PatternKind::MatchStar(node) => node.name(),
             super::PatternKind::MatchMapping(node) => node.items().rest(),
             _ => None,
         }
     }
+}
 
+impl crate::Pattern<'_> {
     pub fn is_irrefutable(self) -> bool {
         match self.classify() {
             super::PatternKind::MatchAs(node) => node

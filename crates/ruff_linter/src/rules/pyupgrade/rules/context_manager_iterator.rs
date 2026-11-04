@@ -227,7 +227,8 @@ struct GeneratorBody {
 
 impl<'a> Visitor<'a> for GeneratorBody {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
             StmtKind::Return(return_stmt) => {
                 if return_stmt
@@ -236,20 +237,21 @@ impl<'a> Visitor<'a> for GeneratorBody {
                 {
                     self.returns_value = true;
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Lambda(_) => {}
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
-            _ => walk_expr(self, expr),
+            _ => walk_expr(self, kind),
         }
     }
 }

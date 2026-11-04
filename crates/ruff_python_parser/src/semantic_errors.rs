@@ -2191,7 +2191,7 @@ impl Visitor<'_> for ComprehensionIterableNamedExpressionVisitor {
         {
             self.ranges.push(range);
         }
-        walk_expr(self, expr);
+        walk_expr(self, expr.classify());
     }
 }
 
@@ -2202,7 +2202,8 @@ struct ClassBodyNamedExpressionVisitor {
 
 impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Lambda(expr_lambda) => {
                 let parameters = expr_lambda.parameters();
 
@@ -2226,7 +2227,7 @@ impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
             }
             _ => {}
         }
-        walk_expr(self, expr);
+        walk_expr(self, kind);
     }
 }
 
@@ -2242,7 +2243,8 @@ struct ReboundComprehensionVisitor<'a> {
 
 impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Lambda(expr_lambda) => {
                 let parameters = expr_lambda.parameters();
 
@@ -2258,7 +2260,7 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
                 if !self.direct_targets.is_empty() =>
             {
                 let direct_targets = std::mem::take(&mut self.direct_targets);
-                walk_expr(self, expr);
+                walk_expr(self, kind);
                 self.direct_targets = direct_targets;
                 return;
             }
@@ -2274,7 +2276,7 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             }
             _ => {}
         }
-        walk_expr(self, expr);
+        walk_expr(self, kind);
     }
 }
 
@@ -2286,16 +2288,17 @@ struct ReturnVisitor {
 
 impl Visitor<'_> for ReturnVisitor {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             // Do not recurse into nested functions; they're evaluated separately.
             StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
             StmtKind::Return(stmt_return) if stmt_return.value().is_some() => {
                 let range = stmt_return.range();
 
                 self.return_range = Some(range);
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
@@ -2305,7 +2308,7 @@ impl Visitor<'_> for ReturnVisitor {
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
             }
-            _ => walk_expr(self, expr),
+            kind => walk_expr(self, kind),
         }
     }
 }
@@ -2563,7 +2566,8 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Named(_) => {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
@@ -2596,7 +2600,7 @@ where
             }
             _ => {}
         }
-        ast::visitor::walk_expr(self, expr);
+        ast::visitor::walk_expr(self, kind);
     }
 
     fn visit_type_param(&mut self, type_param: ast::TypeParam<'_>) {

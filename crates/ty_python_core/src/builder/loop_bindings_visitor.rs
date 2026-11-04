@@ -156,24 +156,26 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                     self.add_place_from_target(target);
                 }
             }
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: ast::Expr<'ast>) {
         // the walrus operator
-        if let ExprKind::Named(node) = expr.classify() {
+        let kind = expr.classify();
+        if let ExprKind::Named(node) = kind {
             self.add_place_from_target(node.target());
         }
-        walk_expr(self, expr);
+        walk_expr(self, kind);
     }
 
     fn visit_pattern(&mut self, pattern: ast::Pattern<'ast>) {
-        if let Some(name) = pattern.capture_name() {
+        let kind = pattern.classify();
+        if let Some(name) = kind.capture_name() {
             self.bound_places
                 .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
         }
-        walk_pattern(self, pattern);
+        walk_pattern(self, kind);
     }
 }
 

@@ -1247,7 +1247,7 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
                 self.visit_expr(orelse);
             }
 
-            _ => walk_expr(self, expression),
+            kind => walk_expr(self, kind),
         }
     }
 }

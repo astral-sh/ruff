@@ -123,7 +123,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
     }
 
     fn visit_pattern(&mut self, pattern: Pattern<'db>) {
-        match pattern.classify() {
+        let kind = pattern.classify();
+        match kind {
             PatternKind::MatchAs(pattern_match_as) => {
                 let pattern = pattern_match_as.pattern();
                 let name = pattern_match_as.name();
@@ -160,7 +161,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             PatternKind::MatchSequence(_)
             | PatternKind::MatchOr(_)
             | PatternKind::MatchClass(_) => {
-                walk_pattern(self, pattern);
+                walk_pattern(self, kind);
             }
             PatternKind::MatchSingleton(_) | PatternKind::MatchValue(_) => {}
         }
@@ -282,7 +283,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::StmtFields::Expr(_)
             | ast::StmtFields::For(_)
             | ast::StmtFields::Assign(_)
-            | ast::StmtFields::Match(_) => walk_stmt(self, stmt),
+            | ast::StmtFields::Match(_) => walk_stmt(self, stmt.classify()),
 
             ast::StmtFields::Global(_)
             | ast::StmtFields::Raise(_)
@@ -297,7 +298,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
     }
 
     fn visit_expr(&mut self, expr: Expr<'db>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Name(expr_name) => {
                 let id = expr_name.id();
                 let ctx = expr_name.ctx();
@@ -324,7 +326,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 let mut walrus_finder = WalrusFinder {
                     export_finder: self,
                 };
-                walk_expr(&mut walrus_finder, expr);
+                walk_expr(&mut walrus_finder, kind);
             }
 
             ExprKind::BoolOp(_)
@@ -347,7 +349,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ExprKind::IpyEscapeCommand(_)
             | ExprKind::Dict(_)
             | ExprKind::Set(_)
-            | ExprKind::Await(_) => walk_expr(self, expr),
+            | ExprKind::Await(_) => walk_expr(self, kind),
         }
     }
 }
@@ -358,7 +360,8 @@ struct WalrusFinder<'a, 'db> {
 
 impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
     fn visit_expr(&mut self, expr: Expr<'db>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             // It's important for us to short-circuit here for lambdas specifically,
             // as walruses cannot leak out of the body of a lambda function.
             ExprKind::Lambda(_)
@@ -411,7 +414,7 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ExprKind::IpyEscapeCommand(_)
             | ExprKind::Dict(_)
             | ExprKind::Set(_)
-            | ExprKind::Await(_) => walk_expr(self, expr),
+            | ExprKind::Await(_) => walk_expr(self, kind),
         }
     }
 }

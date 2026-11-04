@@ -134,7 +134,8 @@ struct ReturnInGeneratorVisitor {
 
 impl Visitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
@@ -142,9 +143,9 @@ impl Visitor<'_> for ReturnInGeneratorVisitor {
                 let range = stmt_return.range();
 
                 self.return_ = Some(range);
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
@@ -154,7 +155,7 @@ impl Visitor<'_> for ReturnInGeneratorVisitor {
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
             }
-            _ => walk_expr(self, expr),
+            kind => walk_expr(self, kind),
         }
     }
 }

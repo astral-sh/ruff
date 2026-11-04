@@ -24,8 +24,9 @@ use crate::rules::{
 use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over an [`Expr`] syntax node.
-pub(crate) fn expression(expr: Expr<'_>, checker: &Checker) {
-    match expr.classify() {
+pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
+    let expr = kind.view();
+    match kind {
         ExprKind::Subscript(subscript) => {
             let fields = subscript.fields();
             let value = fields.value;

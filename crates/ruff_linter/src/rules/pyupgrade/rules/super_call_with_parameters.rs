@@ -351,11 +351,12 @@ impl ClassCellReferenceFinder {
 
 impl<'a> Visitor<'a> for ClassCellReferenceFinder {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::ClassDef(_) => {}
             _ => {
                 if !self.has_class_cell {
-                    walk_stmt(self, stmt);
+                    walk_stmt(self, kind);
                 }
             }
         }
@@ -368,6 +369,6 @@ impl<'a> Visitor<'a> for ClassCellReferenceFinder {
             self.has_class_cell = true;
             return;
         }
-        walk_expr(self, expr);
+        walk_expr(self, expr.classify());
     }
 }

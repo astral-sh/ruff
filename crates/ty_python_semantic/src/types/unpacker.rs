@@ -44,7 +44,7 @@ struct UnknownTargetCollector<'db, 'map> {
 impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
     fn visit_expr(&mut self, expr: Expr<'ast>) {
         self.targets.insert(expr.into(), Type::unknown());
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, expr.classify());
     }
 }
 

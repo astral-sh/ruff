@@ -72,7 +72,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
                 ExprContext::Store => self.stored.push(name),
                 _ => {}
             },
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 }
@@ -87,7 +87,8 @@ struct SuspiciousVariablesVisitor<'a> {
 /// functions, but not bound as arguments).
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(stmt_function_def) => {
                 let parameters = stmt_function_def.parameters();
                 let body = stmt_function_def.body();
@@ -125,11 +126,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }
             _ => {}
         }
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, kind);
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Call(expr_call) => {
                 let func = expr_call.func();
                 let arguments = expr_call.arguments();
@@ -207,7 +209,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }
             _ => {}
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 }
 
@@ -268,7 +270,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
             _ => {}
         }
 
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, stmt.classify());
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
@@ -277,7 +279,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
             return;
         }
 
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, expr.classify());
     }
 
     fn visit_comprehension(&mut self, comprehension: Comprehension<'a>) {

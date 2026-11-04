@@ -563,10 +563,11 @@ pub struct NameFinder<'a> {
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if let flat::ExprKind::Name(name) = expr.classify() {
+        let kind = expr.classify();
+        if let flat::ExprKind::Name(name) = kind {
             self.names.insert(name.id(), name);
         }
-        crate::flat::visitor::walk_expr(self, expr);
+        crate::flat::visitor::walk_expr(self, kind);
     }
 }
 
@@ -579,12 +580,13 @@ pub struct StoredNameFinder<'a> {
 
 impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if let flat::ExprKind::Name(name) = expr.classify() {
+        let kind = expr.classify();
+        if let flat::ExprKind::Name(name) = kind {
             if name.ctx().is_store() {
                 self.names.insert(name.id(), name);
             }
         }
-        crate::flat::visitor::walk_expr(self, expr);
+        crate::flat::visitor::walk_expr(self, kind);
     }
 }
 
@@ -610,7 +612,7 @@ impl<'a> StatementVisitor<'a> for ReturnStatementVisitor<'a> {
                 // Don't recurse.
             }
             flat::StmtKind::Return(stmt) => self.returns.push(stmt),
-            _ => crate::flat::statement_visitor::walk_stmt(self, stmt),
+            kind => crate::flat::statement_visitor::walk_stmt(self, kind),
         }
     }
 }
@@ -671,7 +673,7 @@ impl Visitor<'_> for AwaitVisitor {
             ast::StmtFields::For(ast::StmtForFields { is_async: true, .. }) => {
                 self.seen_await = true;
             }
-            _ => crate::flat::visitor::walk_stmt(self, stmt),
+            _ => crate::flat::visitor::walk_stmt(self, stmt.classify()),
         }
     }
 
@@ -679,7 +681,7 @@ impl Visitor<'_> for AwaitVisitor {
         if let ast::ExprFields::Await(ast::ExprAwaitFields { .. }) = expr.fields() {
             self.seen_await = true;
         } else {
-            crate::flat::visitor::walk_expr(self, expr);
+            crate::flat::visitor::walk_expr(self, expr.classify());
         }
     }
 

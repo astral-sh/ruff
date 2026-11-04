@@ -161,7 +161,7 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
 
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
-            _ => visitor::walk_stmt(self, stmt),
+            kind => visitor::walk_stmt(self, kind),
         }
     }
 
@@ -186,7 +186,7 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             }
         }
 
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, expr.classify());
     }
 }
 

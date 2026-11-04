@@ -973,14 +973,15 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
         }
 
-        visitor::walk_except_handler(self, handler);
+        visitor::walk_except_handler(self, handler_inner);
         self.currently_suspended_exceptions = None;
         // Clear exception variables when leaving the except handler
         self.exception_variables.clear();
     }
 
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::Raise(stmt_raise) => {
                 let exc = stmt_raise.exc();
 
@@ -1042,11 +1043,12 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             _ => {}
         }
 
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, kind);
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Yield(expr_yield) if let Some(value) = expr_yield.value() => {
                 let range = expr_yield.range();
 
@@ -1074,7 +1076,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             ExprKind::Lambda(_) => return,
             _ => {}
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 }
 
