@@ -214,7 +214,7 @@ fn parse_script_metadata(
     };
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.prioritize_all_selectors();
+        options.order_rule_selectors();
     }
 
     metadata

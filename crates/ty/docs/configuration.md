@@ -37,6 +37,8 @@ Configures the enabled rules and their severity.
 The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
+If the same table specifies both a rule's current name and an alias, the current name takes precedence.
+
 Valid severities are:
 
 * `ignore`: Disable the rule.

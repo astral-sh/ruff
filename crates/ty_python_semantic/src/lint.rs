@@ -458,6 +458,11 @@ impl LintRegistry {
         &self.lints
     }
 
+    /// Returns whether `name` is a registered alias for a lint.
+    pub fn is_alias(&self, name: &str) -> bool {
+        matches!(self.by_name.get(name), Some(LintEntry::Alias(_)))
+    }
+
     /// Returns an iterator over all known aliases and to their target lints.
     ///
     /// This iterator includes aliases that point to removed lints.
