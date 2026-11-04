@@ -218,7 +218,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                     self.any_skipped = true;
                 }
             }
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 }

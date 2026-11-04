@@ -64,7 +64,7 @@ impl<'a> StatementVisitor<'a> for ControlFlowVisitor<'a> {
             StmtKind::Return(_) => self.returns.push(stmt),
             StmtKind::Break(_) => self.breaks.push(stmt),
             StmtKind::Continue(_) => self.continues.push(stmt),
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

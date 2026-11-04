@@ -236,19 +236,19 @@ impl RecordVisitor {
 impl<'a> Visitor<'a> for RecordVisitor {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
         self.enter_node(stmt);
-        walk_stmt(self, stmt);
+        walk_stmt(self, stmt.classify());
         self.exit_node();
     }
 
     fn visit_annotation(&mut self, expr: Expr<'a>) {
         self.enter_node(expr);
-        walk_expr(self, expr);
+        walk_expr(self, expr.classify());
         self.exit_node();
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
         self.enter_node(expr);
-        walk_expr(self, expr);
+        walk_expr(self, expr.classify());
         self.exit_node();
     }
 
@@ -276,7 +276,8 @@ impl<'a> Visitor<'a> for RecordVisitor {
 
     fn visit_except_handler(&mut self, except_handler: ExceptHandler<'a>) {
         self.enter_node(except_handler);
-        walk_except_handler(self, except_handler);
+        let ruff_python_ast::ExceptHandlerKind::ExceptHandler(handler) = except_handler.classify();
+        walk_except_handler(self, handler);
         self.exit_node();
     }
 
@@ -318,13 +319,13 @@ impl<'a> Visitor<'a> for RecordVisitor {
 
     fn visit_pattern(&mut self, pattern: Pattern<'a>) {
         self.enter_node(pattern);
-        walk_pattern(self, pattern);
+        walk_pattern(self, pattern.classify());
         self.exit_node();
     }
 
     fn visit_type_param(&mut self, type_param: TypeParam<'a>) {
         self.enter_node(type_param);
-        walk_type_param(self, type_param);
+        walk_type_param(self, type_param.classify());
         self.exit_node();
     }
 

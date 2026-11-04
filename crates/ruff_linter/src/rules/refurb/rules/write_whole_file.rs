@@ -121,12 +121,13 @@ impl<'a, 'b> WriteMatcher<'a, 'b> {
 
 impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        if matches!(stmt.classify(), StmtKind::While(_) | StmtKind::For(_)) {
+        let kind = stmt.classify();
+        if matches!(kind, StmtKind::While(_) | StmtKind::For(_)) {
             self.loop_counter += 1;
-            visitor::walk_stmt(self, stmt);
+            visitor::walk_stmt(self, kind);
             self.loop_counter -= 1;
         } else {
-            visitor::walk_stmt(self, stmt);
+            visitor::walk_stmt(self, kind);
         }
     }
 
@@ -160,7 +161,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
             }
             return;
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, expr.classify());
     }
 }
 

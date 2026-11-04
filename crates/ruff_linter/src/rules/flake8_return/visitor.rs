@@ -86,7 +86,8 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
 
 impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::ClassDef(class) => {
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
@@ -107,7 +108,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                     visitor::walk_decorator(self, decorator);
                 }
                 if let Some(returns) = function.returns() {
-                    visitor::walk_expr(self, returns);
+                    visitor::walk_expr(self, returns.classify());
                 }
                 visitor::walk_parameters(self, function.parameters());
                 self.parents.pop();
@@ -189,7 +190,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
 
         self.sibling = Some(stmt);
         self.parents.push(stmt);
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, kind);
         self.parents.pop();
     }
 
@@ -201,7 +202,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
             ExprKind::YieldFrom(_) | ExprKind::Yield(_) => {
                 self.stack.is_generator = true;
             }
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 

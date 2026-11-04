@@ -683,12 +683,13 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
                 }
             }
             StmtKind::FunctionDef(_) => {}
-            _ => visitor::walk_stmt(self, stmt),
+            kind => visitor::walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
@@ -708,7 +709,7 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
                 {
                     self.addfinalizer_call = Some(expr);
                 }
-                visitor::walk_expr(self, expr);
+                visitor::walk_expr(self, kind);
             }
             _ => {}
         }

@@ -170,10 +170,11 @@ impl<'a> MutationVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        if match_mutation(stmt, self.target) {
+        let kind = stmt.classify();
+        if match_mutation(kind, self.target) {
             self.is_mutated = true;
         } else {
-            walk_stmt(self, stmt);
+            walk_stmt(self, kind);
         }
     }
 }
@@ -181,8 +182,8 @@ impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
 /// Check if a statement is (probably) a modification to the list assigned to the given identifier.
 ///
 /// For example, `foo.append(bar)` would return `true` if `id` is `foo`.
-fn match_mutation(stmt: Stmt<'_>, id: &str) -> bool {
-    match stmt.classify() {
+fn match_mutation(stmt: StmtKind<'_>, id: &str) -> bool {
+    match stmt {
         // Ex) `foo.append(bar)`
         StmtKind::Expr(stmt_expr) => {
             let value = stmt_expr.value();

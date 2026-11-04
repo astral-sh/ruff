@@ -1,5 +1,5 @@
 use ruff_python_ast::types::Node;
-use ruff_python_ast::{Expr, Stmt, StmtKind, helpers};
+use ruff_python_ast::{Expr, StmtKind, helpers};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -15,8 +15,9 @@ use crate::rules::{
 use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over a statement.
-pub(crate) fn statement(stmt: Stmt<'_>, checker: &mut Checker) {
-    match stmt.classify() {
+pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
+    let stmt = kind.view();
+    match kind {
         StmtKind::Global(stmt_global) => {
             let names = stmt_global.names();
 

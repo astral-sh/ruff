@@ -134,7 +134,7 @@ impl StatementVisitor<'_> for LoopControlFlowVisitor {
             StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

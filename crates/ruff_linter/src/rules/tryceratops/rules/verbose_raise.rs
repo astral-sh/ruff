@@ -108,10 +108,10 @@ impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
                 let finalbody = stmt_try.finalbody();
 
                 for stmt in body.iter().chain(finalbody) {
-                    walk_stmt(self, stmt);
+                    walk_stmt(self, stmt.classify());
                 }
             }
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

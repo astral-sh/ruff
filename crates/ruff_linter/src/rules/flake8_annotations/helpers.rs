@@ -260,15 +260,16 @@ impl<'a> Visitor<'a> for ReturnTypeVisitor<'a> {
         match stmt.classify() {
             StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
             StmtKind::Return(stmt) => self.returns.push(stmt),
-            _ => visitor::walk_stmt(self, stmt),
+            kind => visitor::walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if let ExprKind::Yield(_) | ExprKind::YieldFrom(_) = expr.classify() {
+        let kind = expr.classify();
+        if let ExprKind::Yield(_) | ExprKind::YieldFrom(_) = kind {
             self.is_generator = true;
         } else {
-            visitor::walk_expr(self, expr);
+            visitor::walk_expr(self, kind);
         }
     }
 }

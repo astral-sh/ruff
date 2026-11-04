@@ -239,13 +239,9 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
             return;
         }
 
-        match stmt.fields() {
-            ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
-                node: import_from,
-                names,
-                ..
-            }) => {
-                for alias in names {
+        match stmt.classify() {
+            ast::StmtKind::ImportFrom(import_from) => {
+                for alias in import_from.names() {
                     let name = alias.name();
                     let asname = alias.asname();
                     // `from module import *` where `module` is a module with a top-level `__all__`
@@ -285,7 +281,8 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::StmtFields::Assign(ast::StmtAssignFields { targets, value, .. }) => {
+            ast::StmtKind::Assign(assign) => {
+                let ast::StmtAssignFields { targets, value, .. } = assign.fields();
                 let Some([target]) = targets.as_array() else {
                     return;
                 };
@@ -308,30 +305,21 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::StmtFields::AugAssign(ast::StmtAugAssignFields {
-                target,
-                op: Operator::Add,
-                value,
-                ..
-            }) => {
+            ast::StmtKind::AugAssign(assign) if assign.op() == Operator::Add => {
                 if self.origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
                 }
-                if !is_dunder_all(target) {
+                if !is_dunder_all(assign.target()) {
                     return;
                 }
-                if !self.extend(value) {
+                if !self.extend(assign.value()) {
                     self.invalid = true;
                 }
             }
 
-            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if !is_dunder_all(target) {
+            ast::StmtKind::AnnAssign(assign) if let Some(value) = assign.value() => {
+                if !is_dunder_all(assign.target()) {
                     return;
                 }
                 match value.fields() {
@@ -350,7 +338,8 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::StmtFields::Expr(ast::StmtExprFields { value: expr, .. }) => {
+            ast::StmtKind::Expr(stmt) => {
+                let expr = stmt.value();
                 if self.origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
@@ -378,15 +367,10 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::StmtFields::If(ast::StmtIfFields {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => match self.evaluate_test_expr(test) {
-                Some(Truthiness::AlwaysTrue) => self.visit_body(body),
+            ast::StmtKind::If(stmt) => match self.evaluate_test_expr(stmt.test()) {
+                Some(Truthiness::AlwaysTrue) => self.visit_body(stmt.body()),
                 Some(Truthiness::AlwaysFalse) => {
-                    for elif_else_clause in elif_else_clauses {
+                    for elif_else_clause in stmt.elif_else_clauses() {
                         let test = elif_else_clause.test();
                         let body = elif_else_clause.body();
                         if let Some(test) = test {
@@ -408,33 +392,31 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 Some(Truthiness::Ambiguous | Truthiness::Uninhabited) | None => {}
             },
 
-            ast::StmtFields::For(..)
-            | ast::StmtFields::While(..)
-            | ast::StmtFields::With(..)
-            | ast::StmtFields::Match(..)
-            | ast::StmtFields::Try(..) => {
-                walk_stmt(self, stmt);
-            }
+            kind @ (ast::StmtKind::For(..)
+            | ast::StmtKind::While(..)
+            | ast::StmtKind::With(..)
+            | ast::StmtKind::Match(..)
+            | ast::StmtKind::Try(..)) => walk_stmt(self, kind),
 
-            ast::StmtFields::FunctionDef(..) | ast::StmtFields::ClassDef(..) => {
+            ast::StmtKind::FunctionDef(..) | ast::StmtKind::ClassDef(..) => {
                 // Avoid recursing into any nested scopes as `__all__` is only valid at the module
                 // level.
             }
 
-            ast::StmtFields::AugAssign(..)
-            | ast::StmtFields::AnnAssign(..)
-            | ast::StmtFields::Delete(..)
-            | ast::StmtFields::Return(..)
-            | ast::StmtFields::Raise(..)
-            | ast::StmtFields::Assert(..)
-            | ast::StmtFields::Import(..)
-            | ast::StmtFields::Global(..)
-            | ast::StmtFields::Nonlocal(..)
-            | ast::StmtFields::TypeAlias(..)
-            | ast::StmtFields::Pass(..)
-            | ast::StmtFields::Break(..)
-            | ast::StmtFields::Continue(..)
-            | ast::StmtFields::IpyEscapeCommand(..) => {}
+            ast::StmtKind::AugAssign(..)
+            | ast::StmtKind::AnnAssign(..)
+            | ast::StmtKind::Delete(..)
+            | ast::StmtKind::Return(..)
+            | ast::StmtKind::Raise(..)
+            | ast::StmtKind::Assert(..)
+            | ast::StmtKind::Import(..)
+            | ast::StmtKind::Global(..)
+            | ast::StmtKind::Nonlocal(..)
+            | ast::StmtKind::TypeAlias(..)
+            | ast::StmtKind::Pass(..)
+            | ast::StmtKind::Break(..)
+            | ast::StmtKind::Continue(..)
+            | ast::StmtKind::IpyEscapeCommand(..) => {}
         }
     }
 }

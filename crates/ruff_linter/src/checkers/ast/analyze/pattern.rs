@@ -6,16 +6,8 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::pep8_naming;
 
-/// Run lint rules over a [`Pattern`] syntax node.
-pub(crate) fn pattern(pattern: Pattern<'_>, checker: &Checker) {
-    let Some(name) = pattern.capture_name() else {
-        return;
-    };
-
-    check_pattern_name(checker, name);
-}
-
-fn check_pattern_name(checker: &Checker, name: Identifier<'_>) {
+/// Check the name bound by a pattern.
+pub(crate) fn pattern_name(name: Identifier<'_>, checker: &Checker) {
     if checker.is_rule_enabled(Rule::NonLowercaseVariableInFunction)
         && checker.semantic().current_scope().kind.is_function()
     {

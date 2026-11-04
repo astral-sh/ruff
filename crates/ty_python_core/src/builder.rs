@@ -3492,22 +3492,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         match kind {
             ExprKind::Name(node) => {
-                self.visit_place_expression(expr, node.ctx());
+                self.visit_place_expression(kind, node.ctx());
             }
             ExprKind::Attribute(node) => {
-                self.visit_place_expression(expr, node.ctx());
+                self.visit_place_expression(kind, node.ctx());
             }
             ExprKind::Subscript(node) => {
-                self.visit_place_expression(expr, node.ctx());
+                self.visit_place_expression(kind, node.ctx());
             }
             // A nested list or tuple unpack can raise after earlier targets have been assigned.
             ExprKind::List(node) => {
                 self.record_exception_checkpoint_if(node.ctx() == ExprContext::Store);
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
             ExprKind::Tuple(node) => {
                 self.record_exception_checkpoint_if(node.ctx() == ExprContext::Store);
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
             ExprKind::Named(node) => {
                 self.visit_expr(node.value());
@@ -3605,7 +3605,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ExprKind::Call(_) | ExprKind::BinOp(_) => {
-                walk_expr(self, expr);
+                walk_expr(self, kind);
                 self.record_exception_checkpoint();
             }
             ExprKind::UnaryOp(unary) => {
@@ -3628,28 +3628,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ExprKind::BoolOp(node) => self.visit_bool_expression(node, context),
             ExprKind::StringLiteral(_) => {
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
             ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
                 }
-                walk_expr(self, expr);
+                walk_expr(self, kind);
                 self.record_exception_checkpoint();
             }
             ExprKind::Await(_) => {
                 self.mark_current_comprehension_async();
-                walk_expr(self, expr);
+                walk_expr(self, kind);
                 self.record_exception_checkpoint();
             }
             _ => {
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
         }
     }
 
-    fn visit_place_expression(&mut self, expr: Expr<'ast>, ctx: ExprContext) {
+    fn visit_place_expression(&mut self, kind: ExprKind<'ast>, ctx: ExprContext) {
+        let expr = kind.view();
         // Record place effects after walking the expression. For names, this is
         // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
         // child evaluation can introduce bindings (for example via walrus operators),
@@ -3659,7 +3660,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
                 && let PlaceExpr::Member(member) = &mut place_expr
                 && member.is_instance_attribute_candidate()
-                && let Some(attribute) = expr.as_attribute_expr()
+                && let ExprKind::Attribute(attribute) = kind
             {
                 // We specifically mark direct attribute assignments to the first
                 // parameter of a method, i.e. typically `self` or `cls`.
@@ -3698,7 +3699,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             deferred_effects = Some((place_expr, is_use, is_definition));
         }
 
-        walk_expr(self, expr);
+        walk_expr(self, kind);
 
         let is_use = deferred_effects
             .as_ref()
@@ -3897,7 +3898,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut()
             .record_range_reachability(stmt.range(), in_type_checking_block);
 
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(function_def) => {
                 let ast::StmtFunctionDefFields {
                     decorator_list,
@@ -5348,7 +5350,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             StmtKind::Raise(_) => {
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
                 self.record_exception_checkpoint();
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
@@ -5356,7 +5358,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             StmtKind::Return(_) => {
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
@@ -5432,7 +5434,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id().clone(), range);
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
             StmtKind::Nonlocal(stmt_nonlocal) => {
                 let range = stmt_nonlocal.range();
@@ -5483,13 +5485,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id().clone(), range);
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
             StmtKind::Delete(stmt_delete) => {
                 let targets = stmt_delete.targets();
 
                 // We will check the target expressions and then delete them.
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
                 for target in targets {
                     if let Some(mut target) = PlaceExpr::try_from_expr(target) {
                         if let PlaceExpr::Symbol(symbol) = &mut target {
@@ -5591,7 +5593,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             _ => {
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
         }
     }
@@ -5753,8 +5755,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_pattern(&mut self, pattern: Pattern<'ast>) {
-        if let ast::PatternFields::MatchOr(ast::PatternMatchOrFields { patterns, .. }) =
-            pattern.fields()
+        let kind = pattern.classify();
+        if let ast::PatternKind::MatchOr(or_pattern) = kind
+            && let patterns = or_pattern.patterns()
             && let Some((last, alternatives)) = patterns.split_last()
             && (
                 // Capture-free alternatives do not affect bindings and need no flow merge.
@@ -5788,9 +5791,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             return;
         }
 
-        walk_pattern(self, pattern);
+        walk_pattern(self, kind);
 
-        if let Some(name) = pattern.capture_name() {
+        if let Some(name) = kind.capture_name() {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(

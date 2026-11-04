@@ -1078,7 +1078,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Track whether we've seen module docstrings, non-imports, etc.
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::Expr(stmt_expr)
                 if !self.semantic.seen_module_docstring_boundary()
                     && stmt_expr.value().is_string_literal_expr() =>
@@ -1138,7 +1139,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 1: Binding
-        match stmt.classify() {
+        match kind {
             StmtKind::AugAssign(stmt_aug_assign) => {
                 let target = stmt_aug_assign.target();
 
@@ -1334,7 +1335,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 2: Traversal
-        match stmt.classify() {
+        match kind {
             StmtKind::FunctionDef(function_def) => {
                 let name = function_def.name();
                 let body = function_def.body();
@@ -1716,11 +1717,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.pop_branch();
                 }
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => visitor::walk_stmt(self, kind),
         }
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
-            match stmt.classify() {
+            match kind {
                 StmtKind::Assign(stmt_assign) => {
                     let targets = stmt_assign.targets();
 
@@ -1742,7 +1743,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 3: Clean-up
 
         // Step 4: Analysis
-        analyze::statement(stmt, self);
+        analyze::statement(kind, self);
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
@@ -1800,7 +1801,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
-        let inherits_boolean_test = match expr.classify() {
+        let kind = expr.classify();
+        let inherits_boolean_test = match kind {
             ExprKind::BoolOp(_) => true,
             ExprKind::UnaryOp(unary) => unary.op() == UnaryOp::Not,
             _ => false,
@@ -1810,7 +1812,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 1: Binding
-        match expr.classify() {
+        match kind {
             ExprKind::Call(expr_call) => {
                 let func = expr_call.func();
 
@@ -1835,7 +1837,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 2: Traversal
-        match expr.classify() {
+        match kind {
             ExprKind::ListComp(expr_list_comp) => {
                 let elt = expr_list_comp.elt();
                 let generators = expr_list_comp.generators();
@@ -2217,10 +2219,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
                 // the `ExprContext` at the top-level.
                 if self.semantic.in_subscript() {
-                    visitor::walk_expr(self, expr);
+                    visitor::walk_expr(self, kind);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
                     self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
-                    visitor::walk_expr(self, expr);
+                    visitor::walk_expr(self, kind);
                 } else {
                     self.visit_expr(value);
 
@@ -2300,11 +2302,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             ExprKind::FString(_) => {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
-                visitor::walk_expr(self, expr);
+                visitor::walk_expr(self, kind);
             }
             ExprKind::TString(_) => {
                 self.semantic.flags |= SemanticModelFlags::T_STRING;
-                visitor::walk_expr(self, expr);
+                visitor::walk_expr(self, kind);
             }
             ExprKind::Named(expr_named) => {
                 let target = expr_named.target();
@@ -2315,11 +2317,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT;
                 self.visit_expr(target);
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => visitor::walk_expr(self, kind),
         }
 
         // Step 3: Clean-up
-        match expr.classify() {
+        match kind {
             ExprKind::Lambda(_)
             | ExprKind::Generator(_)
             | ExprKind::ListComp(_)
@@ -2332,7 +2334,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 4: Analysis
-        match expr.classify() {
+        match kind {
             ExprKind::StringLiteral(string_literal) => {
                 analyze::string_like(string_literal.into(), self);
             }
@@ -2345,7 +2347,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         self.semantic.flags = flags_snapshot;
-        analyze::expression(expr, self);
+        analyze::expression(kind, self);
         self.semantic.pop_node();
     }
 
@@ -2354,31 +2356,26 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
         // Step 1: Binding
-        let binding = match except_handler.classify() {
-            ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
-                let name = except_handler_except_handler.name();
+        let ExceptHandlerKind::ExceptHandler(handler) = except_handler.classify();
+        let binding = if let Some(name) = handler.name() {
+            // Store the existing binding, if any.
+            let binding_id = self.semantic.lookup_binding(name.as_str());
 
-                if let Some(name) = name {
-                    // Store the existing binding, if any.
-                    let binding_id = self.semantic.lookup_binding(name.as_str());
+            // Add the bound exception name to the scope.
+            self.add_binding(
+                name.as_str(),
+                name.range(),
+                BindingKind::BoundException,
+                BindingFlags::empty(),
+            );
 
-                    // Add the bound exception name to the scope.
-                    self.add_binding(
-                        name.as_str(),
-                        name.range(),
-                        BindingKind::BoundException,
-                        BindingFlags::empty(),
-                    );
-
-                    Some((name, binding_id))
-                } else {
-                    None
-                }
-            }
+            Some((name, binding_id))
+        } else {
+            None
         };
 
         // Step 2: Traversal
-        walk_except_handler(self, except_handler);
+        walk_except_handler(self, handler);
 
         // Step 3: Clean-up
         if let Some((name, binding_id)) = binding {
@@ -2391,7 +2388,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 4: Analysis
-        analyze::except_handler(except_handler, self);
+        analyze::except_handler(handler, self);
 
         self.semantic.flags = flags_snapshot;
     }
@@ -2425,7 +2422,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_pattern(&mut self, pattern: Pattern<'a>) {
         // Step 1: Binding
-        if let Some(name) = pattern.capture_name() {
+        let kind = pattern.classify();
+        let capture_name = kind.capture_name();
+        if let Some(name) = capture_name {
             self.add_binding(
                 name.as_str(),
                 name.range(),
@@ -2435,10 +2434,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 2: Traversal
-        walk_pattern(self, pattern);
+        walk_pattern(self, kind);
 
         // Step 4: Analysis
-        if let Some(name) = name {
+        if let Some(name) = capture_name {
             analyze::pattern_name(name, self);
         }
     }

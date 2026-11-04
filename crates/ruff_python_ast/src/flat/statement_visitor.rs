@@ -1,7 +1,7 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
 use crate::flat;
-use crate::{ElifElseClause, ExceptHandler, MatchCase, Stmt};
+use crate::{ElifElseClause, ExceptHandler, ExceptHandlerExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
 pub trait StatementVisitor<'a> {
@@ -9,10 +9,11 @@ pub trait StatementVisitor<'a> {
         walk_body(self, body);
     }
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        walk_stmt(self, stmt);
+        walk_stmt(self, stmt.classify());
     }
     fn visit_except_handler(&mut self, except_handler: ExceptHandler<'a>) {
-        walk_except_handler(self, except_handler);
+        let flat::ExceptHandlerKind::ExceptHandler(handler) = except_handler.classify();
+        walk_except_handler(self, handler);
     }
     fn visit_elif_else_clause(&mut self, elif_else_clause: ElifElseClause<'a>) {
         walk_elif_else_clause(self, elif_else_clause);
@@ -28,8 +29,8 @@ pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: fl
     }
 }
 
-pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: Stmt<'a>) {
-    match stmt.classify() {
+pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: flat::StmtKind<'a>) {
+    match stmt {
         flat::StmtKind::FunctionDef(stmt_function_def) => {
             let body = stmt_function_def.body();
 
@@ -94,15 +95,9 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: St
 
 pub fn walk_except_handler<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
-    except_handler: ExceptHandler<'a>,
+    handler: ExceptHandlerExceptHandler<'a>,
 ) {
-    match except_handler.classify() {
-        flat::ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
-            let body = except_handler_except_handler.body();
-
-            visitor.visit_body(body);
-        }
-    }
+    visitor.visit_body(handler.body());
 }
 
 pub fn walk_elif_else_clause<'a, V: StatementVisitor<'a> + ?Sized>(

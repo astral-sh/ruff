@@ -21,7 +21,7 @@ use crate::{
 /// Use [`Builder::rewrite_node`](crate::flat::Builder::rewrite_node) to build a modified subtree.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        walk_stmt(self, stmt);
+        walk_stmt(self, stmt.classify());
     }
     fn visit_annotation(&mut self, expr: Expr<'a>) {
         walk_annotation(self, expr);
@@ -30,7 +30,7 @@ pub trait Visitor<'a> {
         walk_decorator(self, decorator);
     }
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        walk_expr(self, expr);
+        walk_expr(self, expr.classify());
     }
     fn visit_expr_context(&mut self, expr_context: ExprContext) {
         walk_expr_context(self, expr_context);
@@ -51,7 +51,8 @@ pub trait Visitor<'a> {
         walk_comprehension(self, comprehension);
     }
     fn visit_except_handler(&mut self, except_handler: ExceptHandler<'a>) {
-        walk_except_handler(self, except_handler);
+        let flat::ExceptHandlerKind::ExceptHandler(handler) = except_handler.classify();
+        walk_except_handler(self, handler);
     }
     fn visit_arguments(&mut self, arguments: Arguments<'a>) {
         walk_arguments(self, arguments);
@@ -78,13 +79,13 @@ pub trait Visitor<'a> {
         walk_type_params(self, type_params);
     }
     fn visit_type_param(&mut self, type_param: TypeParam<'a>) {
-        walk_type_param(self, type_param);
+        walk_type_param(self, type_param.classify());
     }
     fn visit_match_case(&mut self, match_case: MatchCase<'a>) {
         walk_match_case(self, match_case);
     }
     fn visit_pattern(&mut self, pattern: Pattern<'a>) {
-        walk_pattern(self, pattern);
+        walk_pattern(self, pattern.classify());
     }
     fn visit_pattern_arguments(&mut self, pattern_arguments: PatternArguments<'a>) {
         walk_pattern_arguments(self, pattern_arguments);
@@ -137,8 +138,8 @@ pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
     visitor.visit_body(elif_else_clause.body());
 }
 
-pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: Stmt<'a>) {
-    match stmt.classify() {
+pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, kind: flat::StmtKind<'a>) {
+    match kind {
         flat::StmtKind::FunctionDef(stmt_function_def) => {
             let parameters = stmt_function_def.parameters();
             let body = stmt_function_def.body();
@@ -346,8 +347,8 @@ pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: D
     visitor.visit_expr(decorator.expression());
 }
 
-pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: Expr<'a>) {
-    match expr.classify() {
+pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, kind: flat::ExprKind<'a>) {
+    match kind {
         flat::ExprKind::BoolOp(bool_op) => {
             visitor.visit_bool_op(bool_op.op());
             for value in bool_op.values() {
@@ -519,19 +520,12 @@ pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
 
 pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
-    except_handler: ExceptHandler<'a>,
+    handler: crate::ExceptHandlerExceptHandler<'a>,
 ) {
-    match except_handler.classify() {
-        flat::ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
-            let type_ = except_handler_except_handler.type_();
-            let body = except_handler_except_handler.body();
-
-            if let Some(expr) = type_ {
-                visitor.visit_expr(expr);
-            }
-            visitor.visit_body(body);
-        }
+    if let Some(expr) = handler.type_() {
+        visitor.visit_expr(expr);
     }
+    visitor.visit_body(handler.body());
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: Arguments<'a>) {
@@ -590,8 +584,11 @@ pub fn walk_type_params<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param
     }
 }
 
-pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param: TypeParam<'a>) {
-    match type_param.classify() {
+pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    kind: flat::TypeParamKind<'a>,
+) {
+    match kind {
         flat::TypeParamKind::TypeVar(type_param_type_var) => {
             let bound = type_param_type_var.bound();
             let default = type_param_type_var.default();
@@ -628,8 +625,8 @@ pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, match_case:
     visitor.visit_body(match_case.body());
 }
 
-pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: Pattern<'a>) {
-    match pattern.classify() {
+pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, kind: flat::PatternKind<'a>) {
+    match kind {
         flat::PatternKind::MatchValue(pattern_match_value) => {
             let value = pattern_match_value.value();
 

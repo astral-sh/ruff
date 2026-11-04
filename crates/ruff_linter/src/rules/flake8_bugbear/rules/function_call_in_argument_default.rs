@@ -102,7 +102,8 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
 
 impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Call(expr_call) => {
                 let func = expr_call.func();
                 let semantic = self.checker.semantic();
@@ -126,12 +127,12 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                         expr.range(),
                     );
                 }
-                visitor::walk_expr(self, expr);
+                visitor::walk_expr(self, kind);
             }
             ExprKind::Lambda(_) => {
                 // Don't recurse.
             }
-            _ => visitor::walk_expr(self, expr),
+            _ => visitor::walk_expr(self, kind),
         }
     }
 }
