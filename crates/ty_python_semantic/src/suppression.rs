@@ -10,6 +10,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{PythonFile, files::File, parsed::parsed_module, source::source_text};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -49,6 +50,15 @@ declare_lint! {
     pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../resources/lint_docs/renamed-rule-in-ignore-comment.md")]
+    pub(crate) static RENAMED_RULE_IN_IGNORE_COMMENT = {
+        summary: "detects ignore comments that use a rule's old name",
+        status: LintStatus::stable("0.0.97"),
         default_level: Level::Warn,
     }
 }
@@ -146,6 +156,7 @@ pub(crate) fn check_suppressions(
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
+    check_renamed_rules(&mut context);
     check_invalid_suppression(&mut context);
     check_blanket_suppressions(&mut context);
     check_unused_suppressions(&mut context);
@@ -191,6 +202,40 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     for unknown in &context.suppressions.unknown {
         if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
             diag.into_diagnostic(&unknown.reason);
+        }
+    }
+}
+
+fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&RENAMED_RULE_IN_IGNORE_COMMENT) {
+        return;
+    }
+
+    let source = source_text(context.db, context.file());
+    for suppression in context.suppressions.iter() {
+        let SuppressionTarget::Lint(lint) = suppression.target else {
+            continue;
+        };
+
+        // A lint-specific `type: ignore` includes the `ty:` prefix in its range.
+        let range = if suppression.kind.is_type_ignore() {
+            suppression.range.add_start("ty:".text_len())
+        } else {
+            suppression.range
+        };
+        let name = &source[range];
+        let canonical = lint.name();
+        if name != canonical.as_str()
+            && let Some(diag) = context.report_lint(&RENAMED_RULE_IN_IGNORE_COMMENT, range)
+        {
+            let mut diag = diag.into_diagnostic(format_args!(
+                "Rule `{name}` has been renamed to `{canonical}`"
+            ));
+            diag.help(format_args!("Replace `{name}` with `{canonical}`"));
+            diag.set_fix(Fix::safe_edit(Edit::range_replacement(
+                canonical.to_string(),
+                range,
+            )));
         }
     }
 }

@@ -204,6 +204,28 @@ fn fix() -> anyhow::Result<()> {
 }
 
 #[test]
+fn fix_renamed_rule_in_ignore_comment() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "example.py",
+        "import missing  # type: ignore[unresolved-import, ty:unresolved-import]  # optional\n",
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--fix"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 1 diagnostic (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+    assert_eq!(
+        fs::read_to_string(case.root().join("example.py"))?,
+        "import missing  # type: ignore[unresolved-import, ty:import-not-found]  # optional\n"
+    );
+    Ok(())
+}
+
+#[test]
 fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "example.py",

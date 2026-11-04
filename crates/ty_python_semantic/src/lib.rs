@@ -5,7 +5,7 @@
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
     BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
-    UNUSED_TYPE_IGNORE_COMMENT,
+    RENAMED_RULE_IN_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
 pub use db::Db;
@@ -92,6 +92,7 @@ fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
+    registry.register_lint(&RENAMED_RULE_IN_IGNORE_COMMENT);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
     registry.register_lint(&BLANKET_IGNORE_COMMENT);
 }
