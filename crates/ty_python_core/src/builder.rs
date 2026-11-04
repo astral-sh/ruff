@@ -5601,14 +5601,32 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.visit_stmt_impl(stmt);
         let mut current_statement = self.pop_statement();
 
+        // An unannotated return supplies no element type to a collection returned directly
+        // or packed into a tuple. Nested operations, such as a method call in that tuple,
+        // can still constrain their receiver.
+        let unconstrained_values: &[ast::Expr] = if !current_statement.collection_uses.is_empty()
+            && let ast::Stmt::Return(ret) = stmt
+            && let Some(value) = ret.value.as_deref()
+            && let Some(function) = self.scopes[self.current_scope()].node().as_function()
+            && function.node(self.module).returns.is_none()
+        {
+            match value {
+                ast::Expr::Tuple(tuple) => &tuple.elts,
+                value => std::slice::from_ref(value),
+            }
+        } else {
+            &[]
+        };
+
+        let mut collection_defs = FxHashSet::default();
         // We currently only consider certain types of statements to introduce constraints
         // on collection initializers. This restriction is mostly for performance reasons, as we
         // want to avoid "reads" of a collection contributing to the complexity of the cycles
         // created by full-scope collection inference.
         current_statement
             .collection_uses
-            .retain(|(_, use_expression)| {
-                match stmt {
+            .retain(|(collection_def, use_expression)| {
+                let supported = match stmt {
                     // A return involving the collection object.
                     ruff_python_ast::Stmt::Return(_) => true,
 
@@ -5640,7 +5658,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     _ => false,
-                }
+                };
+
+                // Constraints are recorded for the first eligible use of each collection.
+                // Preserve that choice even when the use supplies no type context.
+                supported
+                    && collection_defs.insert(*collection_def)
+                    && unconstrained_values
+                        .binary_search_by_key(use_expression, Into::into)
+                        .is_err()
             });
 
         if current_statement.lambda_expressions.is_empty()
@@ -5665,15 +5691,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
-        let mut collection_defs = FxHashSet::default();
         for (collection_def, use_expression) in current_statement.collection_uses {
-            // If the same collection is referenced multiple times in this statement,
-            // we only consider the first occurrence, as collection use constraints are
-            // tracked at the statement level.
-            if !collection_defs.insert(collection_def) {
-                continue;
-            }
-
             self.uses_by_collection
                 .entry(collection_def)
                 .or_default()

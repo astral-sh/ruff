@@ -3173,6 +3173,29 @@ reveal_type(x14)  # revealed: list[Divergent]
 reveal_type(x15)  # revealed: list[Divergent]
 ```
 
+A tuple return annotation constrains the collections in the corresponding positions:
+
+```py
+def collect() -> tuple[list[int], dict[str, bytes]]:
+    values = []
+    entries = {}
+    reveal_type(values)  # revealed: list[int]
+    reveal_type(entries)  # revealed: dict[str, bytes]
+    return values, entries
+```
+
+A method call inside an unannotated return can still constrain its receiver:
+
+```py
+def collect_and_append():
+    values = []
+    entries = []
+    values.append("first")
+    reveal_type(values)  # revealed: list[str]
+    reveal_type(entries)  # revealed: list[int]
+    return values, entries.append(1)
+```
+
 Collection-use constraints must converge when multiple collection literals are used in a container
 literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>:
 
