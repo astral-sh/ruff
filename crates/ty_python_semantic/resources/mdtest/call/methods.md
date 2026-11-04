@@ -926,6 +926,29 @@ reveal_type(d.method(42))  # revealed: str
 We might therefore consider implementing a stricter check that emits a diagnostic on the problematic
 `self.method = self.seemingly_compatible` assignment above.
 
+### Identity of a shadowed static method
+
+A static method that can optionally be replaced should not retain its identity as a singleton type
+that refers to `def format`:
+
+```py
+from typing import Callable
+
+class Formatter:
+    @staticmethod
+    def format(text: str, /) -> str:
+        return text
+
+    def __init__(self, custom: Callable[[str], str] | None = None) -> None:
+        if custom is not None:
+            self.format = custom
+
+def check(formatter: Formatter) -> None:
+    reveal_type(formatter.format("hello"))  # revealed: str
+    # TODO: This should be `bool` because the instance may hold the custom callable.
+    reveal_type(formatter.format is Formatter.format)  # revealed: Literal[True]
+```
+
 ## Error cases: Calling `__get__` for methods
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
