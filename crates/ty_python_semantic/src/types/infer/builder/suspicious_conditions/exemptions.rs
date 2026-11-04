@@ -25,8 +25,8 @@ use ty_python_core::{
 use crate::{
     Db, Program, ProgramEnvironment,
     place::{
-        ConsideredDefinitions, Provenance, RequiresExplicitReExport, place_by_id,
-        place_from_bindings,
+        ConsideredDefinitions, Provenance, RequiresExplicitReExport, class_body_implicit_symbol,
+        place_by_id, place_from_bindings,
     },
     place_load::{
         ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep,
@@ -43,7 +43,7 @@ use crate::{
             TypeInferenceBuilder,
             builder::suspicious_conditions::{SuiteExitKind, suite_ends_with_exit},
         },
-        infer_definition_types, infer_expression_types,
+        infer_definition_types, infer_expression_types, original_class_type,
     },
 };
 
@@ -445,6 +445,18 @@ fn place_condition_definition_info<'db>(
                         name,
                     ));
                     break;
+                }
+                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name))
+                    if class_body_implicit_symbol(db, &env, &name)
+                        .place
+                        .is_definitely_bound() =>
+                {
+                    return info;
+                }
+                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::DunderClass(definition))
+                    if original_class_type(db, definition).is_some() =>
+                {
+                    return info;
                 }
                 PlaceLoadSourceKind::Implicit(_) => continue,
             };
