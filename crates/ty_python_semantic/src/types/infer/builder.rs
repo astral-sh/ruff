@@ -10,7 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -103,6 +103,7 @@ use crate::types::infer::{
     TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::known_instance::DeprecatedInstance;
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::member::inherited_class_body_declaration;
 use crate::types::narrow::NarrowingEvaluatorExtension;
@@ -10511,62 +10512,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    /// Check if the given ty is `@deprecated` or not
+    /// Report deprecated targets of a reference, including union alternatives.
     fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type<'db>) {
-        // First handle classes
-        if let Type::ClassLiteral(class_literal) = ty {
-            let Some(deprecated) = class_literal.deprecated(self.db()) else {
-                return;
-            };
+        let db = self.db();
+        let mut functions = SmallVec::<[_; 1]>::new();
 
-            let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
-                return;
-            };
+        for target in reference_deprecations(db, ty) {
+            match target {
+                ReferenceDeprecation::Class(class_literal, deprecated) => {
+                    let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, &ranged)
+                    else {
+                        return;
+                    };
 
-            let class_name = class_literal.name(self.db());
-            let mut diag =
-                builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
-            if let Some(message) = deprecated.message {
-                diag.set_primary_annotation_message(message.value(self.db()));
+                    let class_name = class_literal.name(db);
+                    let mut diag = builder
+                        .into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
+                    if let Some(message) = deprecated.message {
+                        diag.set_primary_annotation_message(message.value(db));
+                    }
+                    diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                }
+                ReferenceDeprecation::Function(function) => functions.push(function),
             }
-            diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-            return;
         }
 
-        // Next handle functions
-        let function = match ty {
-            Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(bound) => {
-                self.check_deprecated(ranged, bound.func(self.db()));
-                return;
-            }
-            Type::Callable(callable) => {
-                self.report_deprecated_functions(ranged, callable.deprecated(self.db()));
-                return;
-            }
-            _ => return,
-        };
-
-        // References to a function only check its implementation. Deprecated overloads are
-        // checked at call sites, after resolving which signatures accept the arguments.
-        let Some(deprecated) = function.implementation_deprecated(self.db()) else {
-            return;
-        };
-
-        let Some(builder) = self
-            .context
-            .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
-        else {
-            return;
-        };
-
-        let func_name = function.name(self.db());
-        let mut diag =
-            builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
-        if let Some(message) = deprecated.message {
-            diag.set_primary_annotation_message(message.value(self.db()));
-        }
-        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+        self.report_deprecated_functions(ranged, functions);
     }
 
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
@@ -10648,7 +10619,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// implicitly, so their implementations still need to be reported.
     fn report_deprecated_call(
         &self,
-        ranged: impl Ranged,
+        func: &ast::Expr,
         callable_type: Type<'db>,
         functions: impl IntoIterator<Item = OverloadLiteral<'db>>,
     ) {
@@ -10657,12 +10628,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             callable_type,
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
         );
-        self.report_deprecated_functions(
-            ranged,
-            functions
-                .into_iter()
-                .filter(|function| function.is_overload(db) || !is_function_reference),
-        );
+        let mut functions: SmallVec<[_; 1]> = functions
+            .into_iter()
+            .filter(|function| function.is_overload(db) || !is_function_reference)
+            .collect();
+
+        if callable_type.is_union() && functions.iter().any(|function| !function.is_overload(db)) {
+            // A union's explicit references can be nested inside the callee. Remove only the
+            // implementations those references check; implicit methods still need a call warning.
+            any_over_expr(func, |expr| {
+                if matches!(
+                    expr,
+                    ast::Expr::Name(ast::ExprName {
+                        ctx: ExprContext::Load,
+                        ..
+                    }) | ast::Expr::Attribute(ast::ExprAttribute {
+                        ctx: ExprContext::Load,
+                        ..
+                    })
+                ) {
+                    for target in reference_deprecations(db, self.expression_type(expr)) {
+                        if let ReferenceDeprecation::Function(function) = target {
+                            functions.retain(|candidate| {
+                                candidate.is_overload(db) || *candidate != function
+                            });
+                        }
+                    }
+                }
+                functions.iter().all(|function| function.is_overload(db))
+            });
+        }
+
+        self.report_deprecated_functions(func, functions);
     }
 
     /// Report a deprecated callable only when its union alternative has no non-deprecated
@@ -12643,6 +12640,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_insert(constraints.clone());
         }
     }
+}
+
+/// Iterates over deprecations checked by references, including union alternatives.
+fn reference_deprecations<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> impl Iterator<Item = ReferenceDeprecation<'db>> {
+    let mut pending = SmallVec::<[_; 1]>::from_slice(&[ty]);
+    std::iter::from_fn(move || {
+        while let Some(ty) = pending.pop() {
+            match ty {
+                Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                Type::BoundMethod(bound) => pending.push(bound.func(db)),
+                Type::ClassLiteral(class) => {
+                    if let Some(deprecated) = class.deprecated(db) {
+                        return Some(ReferenceDeprecation::Class(class, deprecated));
+                    }
+                }
+                Type::FunctionLiteral(function) => {
+                    // References check the implementation; overloads are selected at call sites.
+                    if let (_, Some(implementation)) = function.overloads_and_implementation(db)
+                        && implementation.deprecated(db).is_some()
+                    {
+                        return Some(ReferenceDeprecation::Function(implementation));
+                    }
+                }
+                Type::Callable(callable) => {
+                    if let Some(deprecated) = callable.deprecated(db) {
+                        return Some(ReferenceDeprecation::Function(deprecated));
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    })
+}
+
+enum ReferenceDeprecation<'db> {
+    Class(ClassLiteral<'db>, DeprecatedInstance<'db>),
+    Function(OverloadLiteral<'db>),
 }
 
 /// The inferred result of a boolean or comparison chain.

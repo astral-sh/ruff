@@ -145,6 +145,15 @@ def replaced_again(value: int) -> str:
 replaced_again(1)  # error: [deprecated] "outer deprecation"
 ```
 
+References through a union also retain the deprecation on a callable replacement.
+
+```py
+def example(flag: bool):
+    choice = old if flag else int  # error: [deprecated] "use current instead"
+    ref = choice  # error: [deprecated] "use current instead"
+    choice(1)  # error: [deprecated] "use current instead"
+```
+
 ## Callable method replacements
 
 ```toml
@@ -552,6 +561,14 @@ AliasClass = DeprType  # error: [deprecated] "Use OtherType instead"
 # TODO: these diagnostics ideally shouldn't fire
 alias_func()  # error: [deprecated] "Use other_func instead"
 AliasClass()  # error: [deprecated] "Use OtherType instead"
+```
+
+References to union-valued aliases also warn if a possible class is deprecated.
+
+```py
+def conditional_alias(flag: bool):
+    choice = DeprType if flag else object  # error: [deprecated] "Use OtherType instead"
+    ref = choice  # error: [deprecated] "Use OtherType instead"
 ```
 
 ## Conditional definitions shadowing builtins
@@ -1508,9 +1525,9 @@ def example(flag: bool):
     class NewClass: ...
 ```
 
-### Calls through union-valued aliases
+### References and calls through union-valued aliases
 
-Ordinary calls through a union-valued alias also report a deprecated implementation.
+References and calls through a union-valued alias report a deprecated implementation.
 
 ```py
 from typing_extensions import deprecated
@@ -1525,7 +1542,51 @@ def new(value: object) -> object:
 def ordinary_call(flag: bool):
     # error: [deprecated] "old function"
     choice = old if flag else new
+    ref = choice  # error: [deprecated] "old function"
     choice(1)  # error: [deprecated] "old function"
+```
+
+A reference reports several deprecated implementations together.
+
+```py
+@deprecated("also old")
+def also_old(value: object) -> object:
+    return value
+
+def several_targets(flag: bool):
+    # error: [deprecated] "old function"
+    # error: [deprecated] "also old"
+    choice = old if flag else also_old
+    ref = choice  # error: [deprecated] "Possible use of deprecated functions: `old`, `also_old`"
+```
+
+A call still reports a deprecated method invoked implicitly by another union member.
+
+```py
+class Callable:
+    @deprecated("old __call__")
+    def __call__(self, value: object) -> object:
+        return value
+
+def implicit_call(flag: bool):
+    choice = old if flag else Callable()  # error: [deprecated] "old function"
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __call__"
+    choice(1)
+```
+
+References nested inside a callee also warn once. A subscripted result with no function reference
+still needs a call-site warning.
+
+```py
+def nested_callee(flag: bool, index: int):
+    choice = old if flag else new  # error: [deprecated] "old function"
+    (choice,)[0](1)  # error: [deprecated] "old function"
+    (choice if flag else new)(1)  # error: [deprecated] "old function"
+
+    functions = (old, new)  # error: [deprecated] "old function"
+    functions[index](1)  # error: [deprecated] "old function"
+    (chosen := functions[index])(1)  # error: [deprecated] "old function"
 ```
 
 ### Conditional decorators with overloads
@@ -2347,6 +2408,15 @@ class Second(Base): ...
 
 def check(value: First | Second):
     value()  # error: [deprecated] "base call"
+```
+
+Explicit references to the inherited method also report it once.
+
+```py
+def method_reference(value: First | Second):
+    method = value.__call__  # error: [deprecated] "base call"
+    ref = method  # error: [deprecated] "base call"
+    method()  # error: [deprecated] "base call"
 ```
 
 Separate calls each produce a warning, even when they are on the same line.
