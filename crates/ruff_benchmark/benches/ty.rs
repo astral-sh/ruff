@@ -251,6 +251,26 @@ fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
     }
 }
 
+/// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
+fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
+    for aliases in [4, 8] {
+        let mut code = String::new();
+        for alias in 0..aliases {
+            write!(code, "A{alias} = tuple[int").unwrap();
+            for target in 0..aliases {
+                write!(code, ", 'A{target}'").unwrap();
+            }
+            writeln!(code, "]").unwrap();
+        }
+        // Only define aliases: using them would also measure recursive unfolding.
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
+            &code,
+        );
+    }
+}
+
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     // This is a micro benchmark, but it is effectively identical to a code sample
     // observed "in the wild":
@@ -2732,6 +2752,7 @@ criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_mutually_recursive_aliases,
+    benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
