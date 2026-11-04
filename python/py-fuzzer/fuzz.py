@@ -311,7 +311,7 @@ def fuzz_code(
     # Saved inputs already failed during detection. Keep the original source in
     # the report if an intermittent failure stops reproducing during minimization.
     if args.minimize_failures or contains_reportable_bug(code, args):
-        if args.github_annotations and not args.minimize_failures:
+        if args.output_format is OutputFormat.GITHUB and not args.minimize_failures:
             print(
                 f"::error::{args.executable} fuzzing failed on seed {seed}", flush=True
             )
@@ -748,6 +748,11 @@ class Executable(enum.StrEnum):
     TY = "ty"
 
 
+class OutputFormat(enum.StrEnum):
+    GITHUB = "github"
+    TEXT = "text"
+
+
 @dataclass(slots=True, frozen=True, kw_only=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
@@ -756,7 +761,7 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
-    github_annotations: bool
+    output_format: OutputFormat
     github_issue_path: Path | None
     github_comment_path: Path | None
     budget_minutes: float | None
@@ -811,8 +816,8 @@ def parse_args() -> ResolvedCliArgs:
     )
     parser.add_argument(
         "--output-format",
-        choices=("text", "github"),
-        default="text",
+        choices=[member.value for member in OutputFormat],
+        default=OutputFormat.TEXT.value,
         help="Use 'github' to emit GitHub Actions error annotations for detected failures (default: text).",
     )
     parser.add_argument(
@@ -975,7 +980,7 @@ def parse_args() -> ResolvedCliArgs:
     return ResolvedCliArgs(
         seeds=sorted(map(Seed, seen_seeds)),
         quiet=args.quiet,
-        github_annotations=args.output_format == "github",
+        output_format=OutputFormat(args.output_format),
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,

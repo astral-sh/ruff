@@ -1044,14 +1044,20 @@ jobs:
       - name: Prepare fuzz status messages
         id: status
         if: >-
-          !cancelled() && steps.upload-failures.outputs.artifact-id != '' &&
+          !cancelled() && (steps.fuzz.outcome == 'success' || steps.upload-failures.outputs.artifact-id != '') &&
           github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository
         env:
+          FUZZ_OUTCOME: ${{ steps.fuzz.outcome }}
           FAILURES_URL: ${{ steps.upload-failures.outputs.artifact-url }}
         run: |
           mkdir "$RUNNER_TEMP/ty-fuzz-status"
-          echo 'Panic or timeout detected. Minimization in progress…' > "$RUNNER_TEMP/ty-fuzz-status/progress.md"
-          printf 'Minimization report unavailable. [Download the failing inputs](%s).\n' "$FAILURES_URL" > "$RUNNER_TEMP/ty-fuzz-status/ty-fuzz-report.md"
+          cd "$RUNNER_TEMP/ty-fuzz-status"
+          if [[ "$FUZZ_OUTCOME" == "success" ]]; then
+            echo 'The fuzzer found no new ty panics or timeouts.' > status.md
+          else
+            echo 'Panic or timeout detected. Minimization in progress…' > status.md
+            printf 'Minimization report unavailable. [Download the failing inputs](%s).\n' "$FAILURES_URL" > ty-fuzz-report.md
+          fi
       - name: Upload the fuzz status messages
         id: upload-status
         if: ${{ !cancelled() && steps.status.outcome == 'success' }}
@@ -1063,7 +1069,9 @@ jobs:
 
   notify-ty-fuzz:
     needs: fuzz-ty
-    if: ${{ !cancelled() && needs.fuzz-ty.outputs.status != '' }}
+    if: >-
+      !cancelled() && needs.fuzz-ty.outputs.status != '' &&
+      (needs.fuzz-ty.result == 'success' || needs.fuzz-ty.outputs.failures != '')
     uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@main # zizmor: ignore[unpinned-uses]
     secrets:
       KV_API_URL: ${{ secrets.KV_API_URL }}
@@ -1074,8 +1082,9 @@ jobs:
     with:
       report: ty-fuzz
       artifact: ty-fuzz-status
-      filename: progress.md
-      title: ty fuzz failures
+      filename: status.md
+      title: ty fuzz results
+      update-existing-only: ${{ needs.fuzz-ty.result == 'success' }}
 
   minimize-ty-fuzz:
     name: Minimize ty fuzz failures
@@ -1128,7 +1137,8 @@ jobs:
     # The progress notice must finish first so it cannot overwrite the reproducers.
     needs: [fuzz-ty, notify-ty-fuzz, minimize-ty-fuzz]
     if: >-
-      always() && (needs.minimize-ty-fuzz.outputs.report != '' || needs.fuzz-ty.outputs.status != '') &&
+      always() && needs.fuzz-ty.outputs.failures != '' &&
+      (needs.minimize-ty-fuzz.outputs.report != '' || needs.fuzz-ty.outputs.status != '') &&
       github.repository == 'astral-sh/ruff' &&
       github.event.pull_request.head.repo.full_name == github.repository
     uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@main # zizmor: ignore[unpinned-uses]
