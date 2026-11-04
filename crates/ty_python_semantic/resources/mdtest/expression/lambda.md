@@ -242,12 +242,13 @@ node()[1](0)  # error: [too-many-positional-arguments]
 ## Decorator returning the decorated name in a dictionary
 
 The decorator reads the class binding while its type is being inferred. The later declaration and
-reassignment give the lookup another possible value.
+reassignment give the lookup another possible value. The other dictionary value is a lambda whose
+signature undergoes promotion inside the nested dictionary.
 
 ```py
 from typing import Any
 
-@lambda cls: {"self": C}
+@lambda cls: {"self": C, "callback": lambda: 0}
 class C:
     pass
 
@@ -260,6 +261,25 @@ read = lambda: C
 read()
 C = 0
 reveal_type(C)  # revealed: Literal[0]
+```
+
+The decorator can return either a list or a dictionary. Both branches read the name being defined,
+and the dictionary also contains a callback.
+
+```py
+@lambda choose=0: [Choice] if choose else {"self": Choice, "callback": lambda: 0}
+class Choice:
+    pass
+
+try:
+    Choice: Any
+except Exception:
+    pass
+
+read_choice = lambda: Choice
+read_choice()
+Choice = 0
+reveal_type(Choice)  # revealed: Literal[0]
 ```
 
 ## Mutually recursive return types

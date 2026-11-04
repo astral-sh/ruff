@@ -2728,54 +2728,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::ProtocolInstance(..))
     }
 
-    /// Forward references to enclosing recursive bindings in a lookup's first concrete result.
-    ///
-    /// For example, the decorator `@lambda cls: {"self": C}` on a class `C` can read the
-    /// class's own binding. The class needs to see its marker inside the dictionary to recognize
-    /// that recursion. Dropping the marker during lookup would substitute the previous dictionary
-    /// for `C` on every iteration. Later iterations can discard the marker as the binding resolves.
-    pub(crate) fn cycle_normalized_for_lookup(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        previous: Self,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        let normalized = self.cycle_normalized(db, env, previous, cycle);
-        let own_marker = Self::divergent(cycle.id());
-        if let Self::Union(union) = self
-            && previous.same_divergent_marker(own_marker)
-            && !normalized.is_divergent()
-        {
-            let mut outer_markers = union.elements(db).iter().copied().filter(|ty| {
-                ty.is_recursive_divergent()
-                    && !ty.same_divergent_marker(own_marker)
-                    && cycle
-                        .head_ids()
-                        .any(|id| ty.same_divergent_marker(Self::divergent(id)))
-            });
-            if let Some(first) = outer_markers.next() {
-                return UnionType::from_elements_cycle_recovery(
-                    db,
-                    env,
-                    [normalized, first].into_iter().chain(outer_markers),
-                );
-            }
-        }
-        normalized
-    }
-
     pub(crate) fn cycle_normalized(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        previous: Self,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.cycle_normalized_impl(db, env, previous, cycle)
-    }
-
-    fn cycle_normalized_impl(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
@@ -2809,17 +2762,20 @@ impl<'db> Type<'db> {
             } else {
                 self
             }
-        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
-            && let Some(merged) = current.merge_cycle_recovery(db, previous)
-        {
-            Type::GenericAlias(merged)
         } else {
-            // The current type is unioned to the previous type. Unioning in the reverse order can
-            // cause the fixed-point iterations to converge slowly or even fail. Consider the case
-            // where the order of union types is different between the previous and current cycle.
-            // We should use the previous union type as the base and only add new element types in
-            // this cycle, if any.
-            UnionType::from_elements_cycle_recovery(db, env, [previous, self])
+            // Joining every previous unrolling of a recursive constructor can grow forever.
+            // Widen the repeating branch before adding this iteration to the running union.
+            let current =
+                self.widen_recursive_growth(db, env, previous, Self::divergent(cycle.id()));
+            if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (current, previous)
+                && let Some(merged) = current.merge_cycle_recovery(db, previous)
+            {
+                Type::GenericAlias(merged)
+            } else {
+                // Use the previous union as the base. Changing the order of its elements between
+                // iterations can delay or prevent convergence.
+                UnionType::from_elements_cycle_recovery(db, env, [previous, current])
+            }
         };
         // An inferred attribute updated with `self.items += (item,)` can settle on the
         // initializer plus a single update during the first few iterations. Widen new tuple

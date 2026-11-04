@@ -1346,6 +1346,65 @@ pub(super) fn any_over_type<'db>(
     any_over_type_impl(db, env, ty, mode, query)
 }
 
+/// Return the immediate children of a stored type in field order, without evaluating a lazy body.
+pub(super) fn stored_type_children<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+) -> SmallVec<[Type<'db>; 4]> {
+    struct Children<'a, 'db> {
+        env: &'a TypeOperations<'db>,
+        types: RefCell<SmallVec<[Type<'db>; 4]>>,
+    }
+
+    impl<'db> TypeVisitorHooks<'db> for Children<'_, 'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, _db: &'db dyn Db, _visit: &TypeVisit<'_, 'db, Self>, ty: Type<'db>) {
+            self.types.borrow_mut().push(ty);
+        }
+
+        fn visit_type_alias_type(
+            &self,
+            db: &'db dyn Db,
+            _visit: &TypeVisit<'_, 'db, Self>,
+            alias: TypeAliasType<'db>,
+        ) {
+            if let Some(arguments) = alias.specialization(db) {
+                self.types
+                    .borrow_mut()
+                    .extend_from_slice(arguments.types(db));
+            }
+        }
+
+        fn visit_recursive_type(
+            &self,
+            db: &'db dyn Db,
+            _visit: &TypeVisit<'_, 'db, Self>,
+            recursive: RecursiveType<'db>,
+        ) {
+            if let Some(arguments) = recursive.arguments(db) {
+                self.types
+                    .borrow_mut()
+                    .extend_from_slice(arguments.types(db));
+            }
+        }
+    }
+
+    let children = Children {
+        env,
+        types: RefCell::default(),
+    };
+    TypeVisitorContext::new(&children).visit_type_contents(db, ty);
+    children.types.into_inner()
+}
+
 /// Searches through alias arguments, including runtime alias objects, without evaluating alias
 /// bodies or other lazy attributes.
 /// This also visits arguments that the alias's value does not use.

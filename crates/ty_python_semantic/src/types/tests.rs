@@ -715,6 +715,72 @@ fn pending_narrowing_intersections_are_order_independent() {
 }
 
 #[test]
+fn cycle_widening_follows_the_repeated_constructor() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+    let list = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
+    let pair = |left, right| Type::heterogeneous_tuple(&db, &env, [left, right]);
+
+    let one = list(int);
+    let two = list(one);
+    let three = list(two);
+
+    // A single new constructor can come from a finite dependency.
+    assert_eq!(two.widen_recursive_growth(&db, &env, one, divergent), two);
+    // The second nested list repeats exactly the substitution that produced the first.
+    assert_eq!(
+        three.widen_recursive_growth(&db, &env, two, divergent),
+        list(divergent)
+    );
+    assert_eq!(
+        pair(int, three).widen_recursive_growth(&db, &env, pair(int, two), divergent),
+        pair(int, list(divergent))
+    );
+    // Similar terms in different fields do not establish growth in either field.
+    assert_eq!(
+        pair(int, three).widen_recursive_growth(&db, &env, pair(two, int), divergent),
+        pair(int, three)
+    );
+
+    // The same value can be copied from a different field without introducing recursion.
+    assert_eq!(
+        pair(three, three).widen_recursive_growth(&db, &env, pair(two, three), divergent),
+        pair(three, three)
+    );
+
+    // Previous iterations may already have accumulated several alternatives. A new list that
+    // wraps them can still grow, while selecting an existing alternative is finite.
+    let joined = UnionType::from_elements_cycle_recovery(&db, &env, [two, three]);
+    assert_eq!(
+        three.widen_recursive_growth(&db, &env, joined, divergent),
+        three
+    );
+    assert_eq!(
+        list(joined).widen_recursive_growth(&db, &env, joined, divergent),
+        list(UnionType::from_elements_cycle_recovery(
+            &db,
+            &env,
+            [two, divergent]
+        ))
+    );
+
+    // Both return paths embed the same previous approximation.
+    let alternatives = |item| {
+        let dict = KnownClass::Dict.to_specialized_instance(&db, &env, &[int, item]);
+        UnionType::from_elements_cycle_recovery(&db, &env, [list(item), dict])
+    };
+    let seed = UnionType::from_elements_cycle_recovery(&db, &env, [int, list(int)]);
+    let first = alternatives(seed);
+    let second = alternatives(first);
+    assert_eq!(
+        second.widen_recursive_growth(&db, &env, first, divergent),
+        alternatives(divergent)
+    );
+}
+
+#[test]
 fn recursive_annotated_normalization() {
     let db = setup_db();
     let env = db.program_environment();
