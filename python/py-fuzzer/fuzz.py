@@ -311,13 +311,13 @@ def fuzz_code(
     # Saved inputs already failed during detection. Keep the original source in
     # the report if an intermittent failure stops reproducing during minimization.
     if args.minimize_failures or contains_reportable_bug(code, args):
-        if args.save_failures is None:
-            return minimize_failure(seed, code, args, deadline, cancelled)
-        (args.save_failures / f"{seed}.py").write_text(code, encoding="utf-8")
-        if os.environ.get("GITHUB_ACTIONS") == "true":
+        if args.github_annotations and not args.minimize_failures:
             print(
                 f"::error::{args.executable} fuzzing failed on seed {seed}", flush=True
             )
+        if args.save_failures is None:
+            return minimize_failure(seed, code, args, deadline, cancelled)
+        (args.save_failures / f"{seed}.py").write_text(code, encoding="utf-8")
         bug = Bug(source=code, minimization_succeeded=False)
 
     return FuzzResult(
@@ -756,6 +756,7 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
+    github_annotations: bool
     github_issue_path: Path | None
     github_comment_path: Path | None
     budget_minutes: float | None
@@ -807,6 +808,12 @@ def parse_args() -> ResolvedCliArgs:
         "--quiet",
         action="store_true",
         help="Print fewer things to the terminal while running the fuzzer",
+    )
+    parser.add_argument(
+        "--output-format",
+        choices=("text", "github"),
+        default="text",
+        help="Use 'github' to emit GitHub Actions error annotations for detected failures (default: text).",
     )
     parser.add_argument(
         "--budget-minutes",
@@ -968,6 +975,7 @@ def parse_args() -> ResolvedCliArgs:
     return ResolvedCliArgs(
         seeds=sorted(map(Seed, seen_seeds)),
         quiet=args.quiet,
+        github_annotations=args.output_format == "github",
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,

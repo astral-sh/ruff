@@ -1049,6 +1049,7 @@ jobs:
             --test-executable=ty-new \
             --baseline-executable=ty-old \
             --only-new-bugs \
+            --output-format=github \
             --save-failures=ty-fuzz-failures \
             ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
             --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
