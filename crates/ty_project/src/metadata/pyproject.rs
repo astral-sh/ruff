@@ -46,7 +46,7 @@ impl PyProject {
         if let Some(tool) = &mut pyproject.tool
             && let Some(ty) = &mut tool.ty
         {
-            ty.order_rule_selectors();
+            ty.order_rule_selectors(ty_python_semantic::default_lint_registry());
         }
         Ok(pyproject)
     }

@@ -40,7 +40,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
-use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
+use ty_python_semantic::lint::{Level, LintRegistry, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
@@ -134,7 +134,7 @@ impl Options {
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
-        options.order_rule_selectors();
+        options.order_rule_selectors(ty_python_semantic::default_lint_registry());
         Ok(options)
     }
 
@@ -160,13 +160,17 @@ impl Options {
         Ok(())
     }
 
-    /// Apply `all` first, then aliases, then specific rule names within each table.
+    /// Sorts rule selectors according to their precedence.
+    ///
+    /// From highest to lowest precedence
+    /// * normal rule names
+    /// * An alias for another rule (the new name wins over the old name)
+    /// * `all`
     ///
     /// TOML tables are unordered. Establish the order before merging so an alias in a
     /// higher-precedence table can still override the current name in a lower-precedence table.
-    pub(crate) fn order_rule_selectors(&mut self) {
+    pub(crate) fn order_rule_selectors(&mut self, registry: &LintRegistry) {
         let sort = |rules: &mut Rules| {
-            let registry = ty_python_semantic::default_lint_registry();
             rules.inner.sort_by_cached_key(|name, _| {
                 if name.as_str() == "all" {
                     0
@@ -190,13 +194,17 @@ impl Options {
         }
     }
 
-    pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
+    pub fn deserialize_with<'de, D>(
+        source: ValueSource,
+        deserializer: D,
+        registry: &LintRegistry,
+    ) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let _guard = ValueSourceGuard::new(source, false);
         let mut options = Self::deserialize(deserializer)?;
-        options.order_rule_selectors();
+        options.order_rule_selectors(registry);
         Ok(options)
     }
 
