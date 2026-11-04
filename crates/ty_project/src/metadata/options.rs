@@ -25,11 +25,10 @@ use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxHashMap, FxHasher};
-use serde::{Deserialize, Deserializer, Serialize};
+use rustc_hash::FxHasher;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::fmt::{self, Debug, Display, Write as _};
+use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -41,7 +40,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
-use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
+use ty_python_semantic::lint::{Level, LintRegistry, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
@@ -99,6 +98,8 @@ pub struct Options {
     ///
     /// By default, ty exits with code 1 if it emits any warning or error diagnostics.
     /// Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
+    ///
+    /// If the same table specifies both a rule's current name and an alias, the current name takes precedence.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
@@ -133,7 +134,7 @@ impl Options {
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
-        options.prioritize_all_selectors();
+        options.order_rule_selectors(ty_python_semantic::default_lint_registry());
         Ok(options)
     }
 
@@ -159,23 +160,26 @@ impl Options {
         Ok(())
     }
 
-    /// Ensures that the `all` selector is applied before per-rule selectors
-    /// in all rule tables (top-level and overrides).
+    /// Sorts rule selectors according to their precedence.
     ///
-    /// This must be called after deserializing from TOML and before any
-    /// [`Combine::combine`] calls, because TOML tables are unordered and the
-    /// `toml` crate sorts keys lexicographically.
-    pub(crate) fn prioritize_all_selectors(&mut self) {
-        // Stable sort that moves all `all` selectors before non-`all` selectors
-        // while preserving relative order among non-`all` entries.
+    /// From highest to lowest precedence
+    /// * normal rule names
+    /// * An alias for another rule (the new name wins over the old name)
+    /// * `all`
+    ///
+    /// TOML tables are unordered. Establish the order before merging so an alias in a
+    /// higher-precedence table can still override the current name in a lower-precedence table.
+    pub(crate) fn order_rule_selectors(&mut self, registry: &LintRegistry) {
         let sort = |rules: &mut Rules| {
-            rules.inner.sort_by(
-                |key_a, _, key_b, _| match (**key_a == "all", **key_b == "all") {
-                    (true, false) => Ordering::Less,
-                    (false, true) => Ordering::Greater,
-                    _ => Ordering::Equal,
-                },
-            );
+            rules.inner.sort_by_cached_key(|name, _| {
+                if name.as_str() == "all" {
+                    0
+                } else if registry.is_alias(name) {
+                    1
+                } else {
+                    2
+                }
+            });
         };
 
         if let Some(rules) = &mut self.rules {
@@ -190,12 +194,18 @@ impl Options {
         }
     }
 
-    pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
+    pub fn deserialize_with<'de, D>(
+        source: ValueSource,
+        deserializer: D,
+        registry: &LintRegistry,
+    ) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let _guard = ValueSourceGuard::new(source, false);
-        Self::deserialize(deserializer)
+        let mut options = Self::deserialize(deserializer)?;
+        options.order_rule_selectors(registry);
+        Ok(options)
     }
 
     /// Resolve configured paths and discover defaults according to the project or script context.
@@ -1159,48 +1169,16 @@ impl SrcOptions {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Hash, get_size2::GetSize)]
-#[serde(rename_all = "kebab-case", transparent)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
+)]
+#[serde(transparent)]
 pub struct Rules {
     /// The rules with their severity. Entries coming later in the map take precedence over
     /// earlier entries (e.g. a `all` selector earlier in the hash map will be overridden
     /// by a specific rule selector coming after it but if `all` is the last selector, then it
     /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
-}
-
-impl<'de> Deserialize<'de> for Rules {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let rules = Self {
-            inner: OrderMap::deserialize(deserializer)?,
-        };
-        // Check each table before merging so a separate config file or override can change the level.
-        let registry = ty_python_semantic::default_lint_registry();
-        let mut seen = FxHashMap::default();
-        for (name, level) in &rules.inner {
-            if let Ok(lint) = registry.get(name)
-                && let Some((other_name, other_level)) = seen.insert(lint, (name, level))
-                && level != other_level
-            {
-                let mut message = format!(
-                    "Conflicting levels for the same rule: `{other_name} = \"{other_level}\"` and \
-                     `{name} = \"{level}\"`"
-                );
-                let canonical = lint.name();
-                for spelling in [other_name, name] {
-                    if spelling.as_str() != canonical.as_str() {
-                        message.push('\n');
-                        let _ = write!(
-                            message,
-                            "note: `{spelling}` is a legacy alias for `{canonical}`"
-                        );
-                    }
-                }
-                return Err(serde::de::Error::custom(message));
-            }
-        }
-        Ok(rules)
-    }
 }
 
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {

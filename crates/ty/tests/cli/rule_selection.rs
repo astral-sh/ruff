@@ -222,7 +222,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A single rules table rejects conflicting levels for two names of the same rule.
+/// The canonical name wins over an alias with a conflicting level in the same table.
 #[test]
 fn configuration_conflicting_rule_alias_levels() {
     let case = CliTest::with_files([
@@ -231,28 +231,35 @@ fn configuration_conflicting_rule_alias_levels() {
             "ty.toml",
             r#"
             [rules]
-            unresolved-import = "ignore"
-            import-not-found = "error"
+            unresolved-import = "error"
+            import-not-found = "ignore"
             "#,
         ),
     ])
     .unwrap();
 
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 2
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    ty failed
-      Cause: <temp_dir>/ty.toml is not a valid `ty.toml`
-      Cause: TOML parse error at line 2, column 1
-      |
-    2 | [rules]
-      | ^^^^^^^
-    Conflicting levels for the same rule: `import-not-found = "error"` and `unresolved-import = "ignore"`
-    note: `unresolved-import` is a legacy alias for `import-not-found`
-    "#);
+    ");
+
+    // An alias on the command line overrides the current name in ty.toml.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "unresolved-import", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
 }
 
 /// A rule's name and its alias can select the same level, and a separate override can change it.
@@ -284,6 +291,68 @@ fn configuration_rule_alias_levels_with_override() {
 
     ----- stderr -----
     ");
+}
+
+#[test]
+fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            import-not-found = "warn"
+            unresolved-import = "ignore"
+
+            [tool.ty.terminal]
+            error-on-warning = false
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn shadowed_pyproject_rule_alias_conflict() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            import-not-found = "ignore"
+            "#,
+        ),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-import = "warn"
+            import-not-found = "error"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN Ignoring the `tool.ty` section in `<temp_dir>/pyproject.toml` because `<temp_dir>/ty.toml` takes precedence.
+    ");
+    Ok(())
 }
 
 /// ty warns about unknown rules specified in a configuration file

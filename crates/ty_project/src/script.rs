@@ -13,6 +13,7 @@ use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
 use ty_python_semantic::dependency::DependencyMetadata;
+use ty_python_semantic::lint::LintRegistry;
 
 use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
@@ -102,7 +103,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     }
 
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
-    let metadata = parse_script_metadata(file, tag, &mut diagnostics);
+    let metadata = parse_script_metadata(file, tag, db.lint_registry(), &mut diagnostics);
     let environment = script_environment(db, file);
     let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
 
@@ -185,6 +186,7 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
 fn parse_script_metadata(
     file: File,
     tag: &ScriptTag,
+    registry: &LintRegistry,
     diagnostics: &mut ScriptConfigurationDiagnostics,
 ) -> ScriptMetadata {
     let result = {
@@ -214,7 +216,7 @@ fn parse_script_metadata(
     };
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.prioritize_all_selectors();
+        options.order_rule_selectors(registry);
     }
 
     metadata

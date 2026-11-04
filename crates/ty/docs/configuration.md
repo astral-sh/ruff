@@ -46,6 +46,8 @@ Valid severities are:
 By default, ty exits with code 1 if it emits any warning or error diagnostics.
 Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
 
+If the same table specifies both a rule's current name and an alias, the current name takes precedence.
+
 **Default value**: `{...}`
 
 **Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
