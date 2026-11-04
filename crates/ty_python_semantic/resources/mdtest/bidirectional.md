@@ -614,8 +614,7 @@ reveal_type(x1)  # revealed: list[(int, /) -> object] | list[(str, /) -> object]
 
 # revealed: Unknown
 x2: tuple[Callable[[int], object]] | tuple[Callable[[str], object]] = (lambda value: reveal_type(value),)
-# TODO: This should reveal `tuple[(value: int) -> int] | tuple[(value: str) -> str]`.
-reveal_type(x2)  # revealed: tuple[(value: int) -> Unknown] | tuple[(value: str) -> Unknown]
+reveal_type(x2)  # revealed: tuple[(value: int) -> int] | tuple[(value: str) -> str]
 
 x3: list[A] | list[dict[str, int]] = [reveal_type({"value": 1})]  # revealed: dict[str, int]
 reveal_type(x3)  # revealed: list[A] | list[dict[str, int]]
