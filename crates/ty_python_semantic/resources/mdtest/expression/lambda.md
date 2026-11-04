@@ -230,12 +230,36 @@ first tuple item:
 node = lambda: (1, node)
 
 reveal_type(node()[1]()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
 ```
 
 The returned lambda still takes no arguments:
 
 ```py
 node()[1](0)  # error: [too-many-positional-arguments]
+```
+
+## Decorator returning the decorated name in a dictionary
+
+The decorator reads the class binding while its type is being inferred. The later declaration and
+reassignment give the lookup another possible value.
+
+```py
+from typing import Any
+
+@lambda cls: {"self": C}
+class C:
+    pass
+
+try:
+    C: Any
+except Exception:
+    pass
+
+read = lambda: C
+read()
+C = 0
+reveal_type(C)  # revealed: Literal[0]
 ```
 
 ## Mutually recursive return types
