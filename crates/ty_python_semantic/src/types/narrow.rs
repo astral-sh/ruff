@@ -637,29 +637,16 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
             Type::Intersection(intersection) => {
-                if intersection.negative(db).is_empty() {
-                    let mut builder = IntersectionBuilder::new(db, env);
-                    let mut any_member = false;
-                    for element in intersection.positive(db) {
-                        // A member that yields no constraint (e.g. a parametrized
-                        // generic alias, which is not a valid runtime isinstance
-                        // target) should be SKIPPED, not abort narrowing on the
-                        // whole intersection. Narrowing on the remaining members
-                        // is still sound.
-                        if let Some(c) = self.generate(db, *element) {
-                            builder.add_positive_in_place(c);
-                            any_member = true;
-                        }
-                    }
-                    if any_member {
-                        Some(builder.build())
-                    } else {
-                        None
-                    }
-                } else {
-                    // TODO: can we do better here?
-                    None
+                // The positive members bound what can match even when negative members rule out
+                // some class-info values. That bound does not tell us what must match.
+                if !is_positive && !intersection.negative(db).is_empty() {
+                    return None;
                 }
+
+                // A member such as a parameterized generic alias may yield no constraint.
+                // The remaining members can still narrow the subject.
+                intersection
+                    .bounded_filter_map_positive(db, env, |element| self.generate(db, element))
             }
             Type::Union(union) => union.try_map(db, env, |element| self.generate(db, *element)),
             Type::TypeVar(bound_typevar) => {
