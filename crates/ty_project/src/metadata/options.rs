@@ -581,12 +581,16 @@ impl Options {
         Ok((settings, diagnostics))
     }
 
-    /// Report issues in one configuration source, including entries that a higher-priority
-    /// source overrides.
+    /// Lint the options in a single file (our source) for common mistakes.
     ///
-    /// For example, `division-by-zer` in the `[rules]` table of `ty.toml` gets one warning,
-    /// even if several overrides inherit it. Passing `--warn division-by-zer` on the command
-    /// line as well produces a second warning for the CLI argument.
+    /// For example, flag unknown rules, renamed rules, etc. in `ty.toml`, `pyproject.toml`, CLI arguments,
+    /// or editor configurations.
+    ///
+    /// Linting the file once ensures that errors in `overrides` sections are only reported
+    /// once, and not everytime the overrides are resolved for a specific file.
+    ///
+    /// Diagnostics that can only be reported when resolving
+    /// the options are reported in `to_settings`.
     pub(crate) fn lint(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
         let mut diagnostics = Vec::new();
         if let Some(rules) = &self.rules {
