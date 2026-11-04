@@ -217,23 +217,30 @@ fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
             continue;
         };
 
-        // A lint-specific `type: ignore` includes the `ty:` prefix in its range.
-        let range = if suppression.kind.is_type_ignore() {
-            suppression.range.add_start("ty:".text_len())
-        } else {
-            suppression.range
-        };
+        let range = suppression.rule_name_range();
         let name = &source[range];
-        let canonical = lint.name();
-        if name != canonical.as_str()
-            && let Some(diag) = context.report_lint(&RENAMED_RULE_IN_IGNORE_COMMENT, range)
-        {
-            let mut diag = diag.into_diagnostic(format_args!(
-                "Rule `{name}` has been renamed to `{canonical}`"
-            ));
+        let canonical = lint.name().as_str();
+        if name == canonical {
+            continue;
+        }
+        let Some(diag) = context.report_lint(&RENAMED_RULE_IN_IGNORE_COMMENT, range) else {
+            continue;
+        };
+        let mut diag = diag.into_diagnostic(format_args!(
+            "Rule `{name}` has been renamed to `{canonical}`"
+        ));
+
+        let already_present = context
+            .suppressions
+            .lint_suppressions(range, lint)
+            .any(|other| {
+                other.comment_range == suppression.comment_range
+                    && &source[other.rule_name_range()] == canonical
+            });
+        if !already_present {
             diag.help(format_args!("Replace `{name}` with `{canonical}`"));
             diag.set_fix(Fix::safe_edit(Edit::range_replacement(
-                canonical.to_string(),
+                canonical.to_owned(),
                 range,
             )));
         }
@@ -515,6 +522,15 @@ pub(crate) struct Suppression {
 }
 
 impl Suppression {
+    /// The range of a lint-specific rule name, excluding the `ty:` prefix in a `type: ignore`.
+    fn rule_name_range(&self) -> TextRange {
+        if self.kind.is_type_ignore() {
+            self.range.add_start("ty:".text_len())
+        } else {
+            self.range
+        }
+    }
+
     /// Returns whether this suppression covers either endpoint of `range`.
     ///
     /// Requiring endpoint containment, rather than any intersection, prevents a suppression on an

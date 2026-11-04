@@ -207,7 +207,7 @@ fn fix() -> anyhow::Result<()> {
 fn fix_renamed_rule_in_ignore_comment() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "example.py",
-        "import missing  # type: ignore[unresolved-import, ty:unresolved-import]  # optional\n",
+        "import missing  # type: ignore[import-not-found, ty:unresolved-import]  # optional\n",
     )?;
 
     assert_cmd_snapshot!(case.command().arg("--fix"), @"
@@ -220,7 +220,7 @@ fn fix_renamed_rule_in_ignore_comment() -> anyhow::Result<()> {
     ");
     assert_eq!(
         fs::read_to_string(case.root().join("example.py"))?,
-        "import missing  # type: ignore[unresolved-import, ty:import-not-found]  # optional\n"
+        "import missing  # type: ignore[import-not-found, ty:import-not-found]  # optional\n"
     );
     Ok(())
 }

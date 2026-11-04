@@ -58,6 +58,42 @@ help: Replace `unresolved-import` with `import-not-found`
 import missing_module
 ```
 
+## Both names in one comment
+
+When a comment already contains the current name, ty reports the rename without offering a fix.
+
+```toml
+[rules]
+unused-ignore-comment = "ignore"
+unused-type-ignore-comment = "ignore"
+```
+
+```py
+# snapshot
+import missing_module  # ty: ignore[unresolved-import, import-not-found]
+```
+
+```snapshot
+warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
+ --> src/mdtest_snippet.py:2:37
+  |
+2 | import missing_module  # ty: ignore[unresolved-import, import-not-found]
+  |                                     ^^^^^^^^^^^^^^^^^
+```
+
+```py
+# snapshot
+import another_module  # type: ignore[ty:import-not-found, ty:unresolved-import]
+```
+
+```snapshot
+warning[renamed-rule-in-ignore-comment]: Rule `unresolved-import` has been renamed to `import-not-found`
+ --> src/mdtest_snippet.py:4:63
+  |
+4 | import another_module  # type: ignore[ty:import-not-found, ty:unresolved-import]
+  |                                                               ^^^^^^^^^^^^^^^^^
+```
+
 ## Suppressing the rule
 
 ```py
