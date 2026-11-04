@@ -1872,20 +1872,19 @@ impl AnalysisOptions {
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
-        severity: Severity,
+        invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
-        self.to_settings_with_override(db, None, severity, diagnostics)
+        self.resolve_settings(db, self, invalid_glob_severity, diagnostics)
     }
 
-    fn to_settings_with_override(
+    fn resolve_settings(
         &self,
         db: &dyn Db,
-        linted_override: Option<&Self>,
-        severity: Severity,
+        unlinted: &Self,
+        invalid_glob_severity: Severity,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
-        let merged = linted_override.map(|overrides| overrides.clone().combine(self.clone()));
         let Self {
             return_type_inference,
             strict_generic_narrowing,
@@ -1893,7 +1892,7 @@ impl AnalysisOptions {
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
-        } = merged.as_ref().unwrap_or(self);
+        } = self;
 
         let AnalysisSettings {
             return_type_inference: return_type_inference_default,
@@ -1904,43 +1903,45 @@ impl AnalysisOptions {
             replace_imports_with_any: replace_imports_with_any_default,
         } = AnalysisSettings::default();
 
-        let allowed_unresolved_imports = if allowed_unresolved_imports.is_some() {
-            build_module_glob_set(
-                db,
-                "allowed_unresolved_imports",
-                self.allowed_unresolved_imports
-                    .as_deref()
-                    .unwrap_or_default(),
-                linted_override
-                    .and_then(|options| options.allowed_unresolved_imports.as_deref())
-                    .unwrap_or_default(),
-                severity,
-            )
-            .unwrap_or_else(|error| {
-                diagnostics.push(*error);
-                ModuleGlobSet::empty()
-            })
-        } else {
-            allowed_unresolved_imports_default
-        };
+        let allowed_unresolved_imports =
+            if let Some(allowed_unresolved_imports) = allowed_unresolved_imports {
+                build_module_glob_set(
+                    db,
+                    allowed_unresolved_imports,
+                    "allowed_unresolved_imports",
+                    invalid_glob_severity,
+                    unlinted
+                        .allowed_unresolved_imports
+                        .as_ref()
+                        .map_or(0, Vec::len),
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
+            } else {
+                allowed_unresolved_imports_default
+            };
 
-        let replace_imports_with_any = if replace_imports_with_any.is_some() {
-            build_module_glob_set(
-                db,
-                "replace_imports_with_any",
-                self.replace_imports_with_any.as_deref().unwrap_or_default(),
-                linted_override
-                    .and_then(|options| options.replace_imports_with_any.as_deref())
-                    .unwrap_or_default(),
-                severity,
-            )
-            .unwrap_or_else(|error| {
-                diagnostics.push(*error);
-                ModuleGlobSet::empty()
-            })
-        } else {
-            replace_imports_with_any_default
-        };
+        let replace_imports_with_any =
+            if let Some(replace_imports_with_any) = replace_imports_with_any {
+                build_module_glob_set(
+                    db,
+                    replace_imports_with_any,
+                    "replace_imports_with_any",
+                    invalid_glob_severity,
+                    unlinted
+                        .replace_imports_with_any
+                        .as_ref()
+                        .map_or(0, Vec::len),
+                )
+                .unwrap_or_else(|error| {
+                    diagnostics.push(*error);
+                    ModuleGlobSet::empty()
+                })
+            } else {
+                replace_imports_with_any_default
+            };
 
         AnalysisSettings {
             return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
@@ -1958,15 +1959,22 @@ impl AnalysisOptions {
 
 fn build_module_glob_set(
     db: &dyn Db,
-    option_name: &str,
     patterns: &[RangedValue<String>],
-    linted_override_patterns: &[RangedValue<String>],
+    option_name: &str,
     severity: Severity,
+    unlinted_pattern_count: usize,
 ) -> Result<ModuleGlobSet, Box<OptionDiagnostic>> {
     let mut builder = ModuleGlobSetBuilder::new();
 
-    for glob in patterns {
+    for (index, glob) in patterns.iter().enumerate() {
         if let Err(error) = builder.add(glob) {
+            // `Combine` appends override patterns after the inherited ones.
+            if index >= unlinted_pattern_count {
+                // `lint_override` already warned about this pattern. It still makes this
+                // option match no modules, even those covered by valid global patterns.
+                return Ok(ModuleGlobSet::empty());
+            }
+
             let diagnostic = OptionDiagnostic::new(
                 DiagnosticId::InvalidGlob,
                 format!("Invalid glob pattern `{error}`"),
@@ -1976,14 +1984,6 @@ fn build_module_glob_set(
             return Err(diagnostic
                 .with_source_sub(db, glob, "glob", option_name, error)
                 .into());
-        }
-    }
-
-    // If any override pattern is invalid, this option matches no modules, even ones
-    // covered by a valid global pattern. `lint_override` already reported the error.
-    for pattern in linted_override_patterns {
-        if builder.add(pattern).is_err() {
-            return Ok(ModuleGlobSet::empty());
         }
     }
 
@@ -2304,9 +2304,18 @@ impl OverrideOptions {
         // Convert merged rules to rule selection
         let rule_selection = merged_rules.to_rule_selection(db);
 
-        let analysis = global_analysis
-            .unwrap_or(&AnalysisOptions::default())
-            .to_settings_with_override(db, self.analysis.as_ref(), Severity::Warning, diagnostics);
+        let mut merged_analysis = self.analysis.clone().unwrap_or_default();
+
+        if let Some(global_analysis) = global_analysis {
+            merged_analysis = merged_analysis.combine(global_analysis.clone());
+        }
+
+        let analysis = merged_analysis.resolve_settings(
+            db,
+            global_analysis.unwrap_or(&AnalysisOptions::default()),
+            Severity::Warning,
+            diagnostics,
+        );
 
         let override_instance = Override {
             files,
