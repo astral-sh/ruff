@@ -1882,8 +1882,8 @@ impl AnalysisOptions {
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
-            allowed_unresolved_imports: _,
-            replace_imports_with_any: _,
+            allowed_unresolved_imports,
+            replace_imports_with_any,
         } = merged.as_ref().unwrap_or(self);
 
         let AnalysisSettings {
@@ -1895,23 +1895,42 @@ impl AnalysisOptions {
             replace_imports_with_any: replace_imports_with_any_default,
         } = AnalysisSettings::default();
 
-        let mut build = |name, field: fn(&Self) -> Option<&[RangedValue<String>]>, default| {
-            let patterns = field(self);
-            let checked = linted_override.and_then(field);
-            if patterns.is_none() && checked.is_none() {
-                return default;
-            }
+        let allowed_unresolved_imports = if allowed_unresolved_imports.is_some() {
             build_module_glob_set(
                 db,
-                name,
-                patterns.unwrap_or_default(),
-                checked.unwrap_or_default(),
+                "allowed_unresolved_imports",
+                self.allowed_unresolved_imports
+                    .as_deref()
+                    .unwrap_or_default(),
+                linted_override
+                    .and_then(|options| options.allowed_unresolved_imports.as_deref())
+                    .unwrap_or_default(),
                 severity,
             )
             .unwrap_or_else(|error| {
                 diagnostics.push(*error);
                 ModuleGlobSet::empty()
             })
+        } else {
+            allowed_unresolved_imports_default
+        };
+
+        let replace_imports_with_any = if replace_imports_with_any.is_some() {
+            build_module_glob_set(
+                db,
+                "replace_imports_with_any",
+                self.replace_imports_with_any.as_deref().unwrap_or_default(),
+                linted_override
+                    .and_then(|options| options.replace_imports_with_any.as_deref())
+                    .unwrap_or_default(),
+                severity,
+            )
+            .unwrap_or_else(|error| {
+                diagnostics.push(*error);
+                ModuleGlobSet::empty()
+            })
+        } else {
+            replace_imports_with_any_default
         };
 
         AnalysisSettings {
@@ -1922,16 +1941,8 @@ impl AnalysisOptions {
                 .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
-            allowed_unresolved_imports: build(
-                "allowed_unresolved_imports",
-                |options| options.allowed_unresolved_imports.as_deref(),
-                allowed_unresolved_imports_default,
-            ),
-            replace_imports_with_any: build(
-                "replace_imports_with_any",
-                |options| options.replace_imports_with_any.as_deref(),
-                replace_imports_with_any_default,
-            ),
+            allowed_unresolved_imports,
+            replace_imports_with_any,
         }
     }
 }
