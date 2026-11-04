@@ -22,7 +22,7 @@ env:
 jobs:
   prepare:
     name: "prepare signing inputs"
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     permissions:
       contents: read
     outputs:
@@ -205,7 +205,7 @@ jobs:
   assemble:
     name: "assemble signed release artifacts"
     needs: [prepare, sign-macos, sign-windows]
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     permissions:
       contents: read
     outputs:

@@ -77,7 +77,7 @@ jobs:
   plan:
     permissions:
       "contents": "read"
-    runs-on: "depot-ubuntu-24.04-4"
+    runs-on: "nscloud-ubuntu-24.04-amd64-4x16"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
       tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
@@ -193,7 +193,7 @@ jobs:
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
     permissions:
       "contents": "read"
-    runs-on: "depot-ubuntu-24.04-4"
+    runs-on: "nscloud-ubuntu-24.04-amd64-4x16"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
@@ -257,7 +257,7 @@ jobs:
       - generate-checksum-manifest
     permissions:
       "contents": "read"
-    runs-on: "depot-ubuntu-24.04-4"
+    runs-on: "nscloud-ubuntu-24.04-amd64-4x16"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -326,7 +326,7 @@ jobs:
       "contents": "read"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: "depot-ubuntu-24.04-4"
+    runs-on: "nscloud-ubuntu-24.04-amd64-4x16"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
@@ -439,7 +439,7 @@ jobs:
     # `custom-publish-crates` is intentionally not a dependency because a crates.io outage should
     # not block the rest of the release.
     if: ${{ always() && needs.host.result == 'success' && needs.sign-release-binaries.result == 'success' && needs.release-gate.result == 'success' && (needs.custom-publish-pypi.result == 'skipped' || needs.custom-publish-pypi.result == 'success') && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
-    runs-on: "depot-ubuntu-24.04-4"
+    runs-on: "nscloud-ubuntu-24.04-amd64-4x16"
     environment:
       name: release
     permissions:

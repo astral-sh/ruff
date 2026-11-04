@@ -41,7 +41,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
     uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@f11dbff15181b71f2cc5e8487b1ac7d7bb03ea7d
     with:
-      runner: depot-ubuntu-22.04-16
+      # The review sandbox requires `bubblewrap` to create its root filesystem.
+      runner: namespace-profile-ubuntu-24-04-16;container.privileged=true
       helper-runner: github-ubuntu-24.04-x86_64-4
       # renovate: datasource=github-release-attachments depName=astral-sh/uv
       uv-version: "0.13.7"
@@ -51,6 +52,9 @@ jobs:
         export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/pull-request-review-tools"
         uv sync --locked --only-dev
         echo "$UV_PROJECT_ENVIRONMENT/bin" >> "$GITHUB_PATH"
+        # Namespace grants `sudo` to the `runner` group; `codex-action` removes user rules.
+        sudo sed -i 's/^%runner[[:space:]]/runner /' /etc/sudoers
+        sudo visudo -c
     secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       contents: read
@@ -424,7 +428,7 @@ jobs:
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-8' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-8x32' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -440,7 +444,7 @@ jobs:
 
   cargo-test-linux:
     name: "cargo test (linux)"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -520,7 +524,7 @@ jobs:
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
     # release builds timeout on GitHub runners, so this job is just skipped on forks in the `if` check
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: nscloud-ubuntu-22.04-amd64-16x64
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -638,7 +642,7 @@ jobs:
 
   cargo-build-msrv:
     name: "cargo build (msrv)"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-24.04-amd64-8x32' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -693,7 +697,7 @@ jobs:
     name: "fuzz parser"
     # Concurrent pushes can observe the same missing corpus before either publishes it.
     concurrency: ${{ github.workflow }}-fuzz-parser-${{ github.ref }}
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     needs: determine_changes
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'no-test') &&
@@ -799,7 +803,7 @@ jobs:
 
   ecosystem:
     name: "ecosystem"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-24.04-amd64-8x32' || 'ubuntu-latest' }}
     needs: determine_changes
     outputs:
       html-files: ${{ steps.reports.outputs.html-files }}
@@ -975,7 +979,7 @@ jobs:
 
   fuzz-ty:
     name: "Fuzz for new ty panics/timeouts"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     needs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
@@ -1110,7 +1114,7 @@ jobs:
 
   ty-completion-evaluation:
     name: "ty completion evaluation"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main' }}
     env:
@@ -1168,7 +1172,7 @@ jobs:
 
   pgo:
     name: "PGO"
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: nscloud-ubuntu-24.04-amd64-8x32
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.release == 'true' && !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     timeout-minutes: 20
@@ -1190,7 +1194,7 @@ jobs:
 
   prek:
     name: "prek"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'nscloud-ubuntu-22.04-amd64-16x64' || 'ubuntu-latest' }}
     needs: determine_changes
     timeout-minutes: 10
     steps:
@@ -1321,7 +1325,10 @@ jobs:
 
   benchmarks-instrumented-ruff:
     name: "benchmarks instrumented (ruff)"
-    runs-on: depot-ubuntu-24.04
+    runs-on:
+      - nscloud-ubuntu-24.04-amd64-2x8-with-features
+      # CodSpeed needs to disable ASLR and trace benchmark processes.
+      - namespace-features:container.privileged=true
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -1376,7 +1383,7 @@ jobs:
 
   benchmarks-instrumented-ty-build:
     name: "benchmarks instrumented ty (build)"
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -1419,7 +1426,10 @@ jobs:
 
   benchmarks-instrumented-ty-run:
     name: "benchmarks instrumented ty (${{ matrix.mode }}: ${{ matrix.name }})"
-    runs-on: depot-ubuntu-24.04
+    runs-on:
+      - nscloud-ubuntu-24.04-amd64-2x8-with-features
+      # CodSpeed needs to disable ASLR and trace benchmark processes.
+      - namespace-features:container.privileged=true
     needs: benchmarks-instrumented-ty-build
     timeout-minutes: 20
     permissions:

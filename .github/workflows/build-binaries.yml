@@ -41,7 +41,7 @@ env:
 jobs:
   sdist:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -292,7 +292,7 @@ jobs:
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'depot-ubuntu-24.04-8' || 'depot-ubuntu-24.04-4' }}
+    runs-on: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'nscloud-ubuntu-24.04-amd64-8x32' || 'nscloud-ubuntu-24.04-amd64-4x16' }}
     strategy:
       matrix:
         target:
@@ -329,6 +329,7 @@ jobs:
           maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: 2_17
+          docker-options: ${{ matrix.target == 'i686-unknown-linux-gnu' && '--platform linux/386' || '' }}
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
@@ -445,7 +446,7 @@ jobs:
 
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     strategy:
       matrix:
         platform:
@@ -536,7 +537,7 @@ jobs:
 
   musllinux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     strategy:
       matrix:
         target:
@@ -603,7 +604,7 @@ jobs:
 
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: nscloud-ubuntu-24.04-amd64-4x16
     strategy:
       matrix:
         platform:
