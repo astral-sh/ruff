@@ -249,25 +249,6 @@ fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
             &code,
         );
     }
-
-    // Checking the definitions alone should not repeatedly normalize shared subexpressions.
-    for aliases in [8, 16] {
-        let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
-        for alias in 0..aliases {
-            let next = (alias + 1) % aliases;
-            let other = (alias + 2) % aliases;
-            writeln!(
-                code,
-                "A{alias} = T | list['A{next}[T]'] | dict[str, 'A{other}[T]']"
-            )
-            .unwrap();
-        }
-        benchmark_micro_case(
-            criterion,
-            &format!("ty_micro[mutually_recursive_alias_definitions_{aliases}]"),
-            &code,
-        );
-    }
 }
 
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {

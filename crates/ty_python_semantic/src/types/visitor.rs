@@ -6,14 +6,13 @@ use std::hash::Hash;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
-use ty_python_core::program::Program;
 
 use crate::types::{
-    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, ClassLiteral,
-    EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
-    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
-    TypeGuardType, TypeIsType, TypedDictType, UnionType,
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
+    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
+    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
+    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
+    TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -25,7 +24,7 @@ use crate::types::{
     method::{walk_bound_method_type, walk_method_wrapper_type},
     newtype::{NewType, walk_newtype_base, walk_newtype_instance_type},
     protocol_class::walk_protocol_instance_interface,
-    set_theoretic::{UnionBuilder, walk_intersection_type, walk_union},
+    set_theoretic::{walk_intersection_type, walk_union},
     subclass_of::walk_subclass_of_type,
     type_alias::{walk_type_alias_arguments, walk_type_alias_type},
     type_form::walk_typeform_type,
@@ -1149,137 +1148,6 @@ where
         TypeSearchMode::SkipLazyAttributes
     };
     any_over_type_impl(db, env, ty, mode, query)
-}
-
-#[salsa::tracked]
-impl<'db> Type<'db> {
-    /// Whether recursive normalization is known to leave this type unchanged for every cycle and
-    /// nesting depth. Cache this property without retaining a separate result for each cycle head.
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn is_recursive_normalization_identity(
-        self,
-        db: &'db dyn Db,
-        program: Program<'db>,
-    ) -> bool {
-        let env = ProgramEnvironment::from_program(program);
-        let visitor = RecursiveNormalizationVisitor {
-            env: &env,
-            seen: TypeCollector::default(),
-            unchanged: Cell::new(true),
-        };
-        visitor.visit_type(db, self);
-        visitor.unchanged.get()
-    }
-}
-
-/// Inspect stored types without evaluating deferred type attributes.
-/// Keep this walk in sync with recursive normalization and its pending-marker checks.
-struct RecursiveNormalizationVisitor<'a, 'db> {
-    env: &'a ProgramEnvironment<'db>,
-    seen: TypeCollector<'db>,
-    unchanged: Cell<bool>,
-}
-
-impl<'db> TypeVisitor<'db> for RecursiveNormalizationVisitor<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        self.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if !self.unchanged.get() {
-            return;
-        }
-        match ty {
-            Type::Divergent(_)
-            // These representations can change without a divergent marker, or store metadata
-            // outside the ordinary type walk. Let their normalizers inspect that metadata.
-            | Type::EnumComplement(_)
-            | Type::TypeForm(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ClassLiteral(ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_)) => self.unchanged.set(false),
-            _ => walk_type_with_recursion_guard(db, ty, self, &self.seen),
-        }
-    }
-
-    fn visit_function_type(&self, _db: &'db dyn Db, _function: FunctionType<'db>) {
-        // Function normalization also depends on the active function recursion guard.
-        self.unchanged.set(false);
-    }
-
-    fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
-        walk_union(db, union, self);
-        if self.unchanged.get() {
-            // Structural substitutions can leave duplicates, and recursive literal unions can
-            // widen even without a marker. Check the same reductions as the normalizer.
-            let mut builder = UnionBuilder::new(db, self.env)
-                .cycle_recovery(true)
-                .or_recursively_defined(union.recursively_defined(db));
-            for &element in union.elements(db) {
-                builder.add_in_place(element);
-            }
-            self.unchanged.set(builder.build() == Type::Union(union));
-        }
-    }
-
-    fn visit_protocol_instance_type(&self, _db: &'db dyn Db, _protocol: ProtocolInstanceType<'db>) {
-        // Normalization can inspect the origin of a materialized protocol, not just its interface.
-        self.unchanged.set(false);
-    }
-
-    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-        walk_callable_type(db, callable, self);
-        // Normalization also visits defaults and the return placeholder of ParamSpec values.
-        for signature in &callable.signatures(db).overloads {
-            self.visit_type(db, signature.return_ty);
-            for parameter in signature.parameters() {
-                if let Some(default) = parameter.eager_default_type() {
-                    self.visit_type(db, default);
-                }
-            }
-        }
-    }
-
-    fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
-        match known {
-            // Runtime unions are flattened during normalization even without markers.
-            KnownInstanceType::UnionType(_) => self.unchanged.set(false),
-            KnownInstanceType::Specialization(specialization) => {
-                walk_specialization_types(db, specialization, self);
-            }
-            KnownInstanceType::FunctoolsPartial(partial)
-            | KnownInstanceType::FunctoolsPartialCall(partial) => {
-                self.visit_type(db, partial.wrapped(db).inner(db));
-                self.visit_callable_type(db, partial.partial(db));
-            }
-            KnownInstanceType::NamedTupleSpec(spec) => {
-                for field in spec.fields(db) {
-                    self.visit_type(db, field.ty);
-                    if let Some(default) = field.default {
-                        self.visit_type(db, default);
-                    }
-                }
-            }
-            _ => walk_known_instance_type(db, known, self),
-        }
-    }
-
-    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if let Some(arguments) = recursive.arguments(db) {
-            walk_specialization_types(db, arguments, self);
-        }
-    }
-
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        walk_type_alias_arguments(db, alias, self);
-    }
 }
 
 #[cfg(test)]

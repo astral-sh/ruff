@@ -3822,9 +3822,6 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        if self.is_recursive_normalization_identity(db, env.program(db)) {
-            return self;
-        }
         let normalized =
             self.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
                 cycle
@@ -3923,9 +3920,6 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if self.is_recursive_normalization_identity(db, env.program(db)) {
-            return Some(self);
-        }
         if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
             return None;
         }
