@@ -526,6 +526,8 @@ The next style includes these changes in preview:
     such as `message % {"name": value,}`.
 - Split operations between two collection displays symmetrically when each operand fits on
     its own line. Collections with magic trailing commas retain their expanded layout.
+- Add a blank line after a docstring-only function in a stub file before an unrelated
+    declaration or member comment.
 
 ### F-string formatting
 

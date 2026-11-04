@@ -92,3 +92,10 @@ pub(crate) const fn is_keep_dict_keys_with_operators_enabled(context: &PyFormatC
 pub(crate) const fn is_symmetric_collection_operations_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Separates docstring-only stub functions from unrelated declarations.
+pub(crate) const fn is_pyi_blank_line_after_function_docstring_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

@@ -17,6 +17,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::preview::is_pyi_blank_line_after_function_docstring_enabled;
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
     write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
@@ -578,7 +579,15 @@ fn stub_file_empty_lines(
     let empty_line_condition = preceding_comments.has_trailing()
         || following_comments.has_leading()
         || !stub_suite_can_omit_empty_line(preceding, following, f);
-    let require_empty_line = should_insert_blank_line_after_class_in_stub_file(
+    let after_docstring = is_pyi_blank_line_after_function_docstring_enabled(f.context())
+        && trailing_function_or_class_def(Some(preceding), f.context().comments())
+            .is_some_and(|node| {
+                node.as_stmt_function_def().is_some_and(|function| {
+                    function_has_only_docstring(function, f.context())
+                        && !starts_same_decorated_function(function, following)
+                })
+            });
+    let require_empty_line = after_docstring || should_insert_blank_line_after_class_in_stub_file(
         preceding.into(),
         Some(following.into()),
         f.context(),
@@ -602,6 +611,29 @@ fn stub_file_empty_lines(
             }
         }
     }
+}
+
+pub(crate) fn function_has_only_docstring(
+    function: &ast::StmtFunctionDef,
+    context: &PyFormatContext,
+) -> bool {
+    matches!(function.body.as_slice(), [statement]
+        if DocstringStmt::try_from_statement(statement, SuiteKind::Function, context).is_some()
+            && !context.comments().has_trailing_own_line(statement))
+}
+
+/// A conditional declaration can continue an adjacent overload or property group.
+fn starts_same_decorated_function(preceding: &ast::StmtFunctionDef, following: &Stmt) -> bool {
+    let following = match following {
+        Stmt::FunctionDef(function) => Some(function),
+        Stmt::If(statement) => statement.body.first().and_then(Stmt::as_function_def_stmt),
+        _ => None,
+    };
+    !preceding.decorator_list.is_empty()
+        && following.is_some_and(|following| {
+            !following.decorator_list.is_empty()
+                && preceding.name.as_str() == following.name.as_str()
+        })
 }
 
 /// Checks if an empty line should be inserted after a class definition.
