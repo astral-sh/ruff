@@ -1,23 +1,32 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
 ---
+ICN001 `datetime` should be imported as `dt`
+ --> tricky.py:3:8
+  |
+1 | """Test cases for difficult renames."""
+2 |
+3 | import datetime
+  |        ^^^^^^^^
+help: Alias `datetime` to `dt`
+
 ICN001 [*] `pandas` should be imported as `pd`
- --> tricky.py:7:16
-  |
-5 |     try:
-6 |         global pandas
-7 |         import pandas
-  |                ^^^^^^
-8 |     except ImportError:
-9 |         return False
-  |
+  --> tricky.py:9:16
+   |
+ 7 |     try:
+ 8 |         global pandas
+ 9 |         import pandas
+   |                ^^^^^^
+10 |     except ImportError:
+11 |         return False
+   |
 help: Alias `pandas` to `pd`
-  |
-5 |     try:
-  -         global pandas
-  -         import pandas
-6 +         global pd
-7 +         import pandas as pd
-8 |     except ImportError:
-  |
+   |
+7  |     try:
+   -         global pandas
+   -         import pandas
+8  +         global pd
+9  +         import pandas as pd
+10 |     except ImportError:
+   |
 note: This is an unsafe fix and may change runtime behavior
