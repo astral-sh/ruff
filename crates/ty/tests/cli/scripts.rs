@@ -115,6 +115,37 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
+fn renamed_rule_in_script_metadata() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.rules]
+        # unresolved-import = "ignore"
+        # ///
+
+        import missing
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> script.py:4:3
+      |
+    4 | # unresolved-import = "ignore"
+      |   ^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
 fn script_inherits_project_python_version() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("ty.toml", "environment.python-version = '3.14'"),

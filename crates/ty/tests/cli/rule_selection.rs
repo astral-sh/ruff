@@ -129,6 +129,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+
     warning[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
@@ -147,7 +149,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |     ^^^^^
     info: rule `division-by-zero` was selected on the command line
 
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     INFO Indexed 1 file(s) in 0.000s
@@ -238,14 +240,20 @@ fn configuration_conflicting_rule_alias_levels() {
     ])
     .unwrap();
 
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
 
     ----- stderr -----
-    ");
+    "#);
 
     // An alias on the command line overrides the current name in ty.toml.
     assert_cmd_snapshot!(
@@ -254,8 +262,9 @@ fn configuration_conflicting_rule_alias_levels() {
     success: false
     exit_code: 1
     ----- stdout -----
+    warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
     test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
-    Found 1 diagnostic
+    Found 2 diagnostics
 
     ----- stderr -----
     "
@@ -283,14 +292,26 @@ fn configuration_rule_alias_levels_with_override() {
     ])
     .unwrap();
 
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:9:1
+      |
+    9 | unresolved-import = "ignore"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 2 diagnostics
 
     ----- stderr -----
-    ");
+    "#);
 }
 
 #[test]
@@ -314,8 +335,9 @@ fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()>
     success: true
     exit_code: 0
     ----- stdout -----
+    pyproject.toml:4:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
     test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
-    Found 1 diagnostic
+    Found 2 diagnostics
 
     ----- stderr -----
     ");
