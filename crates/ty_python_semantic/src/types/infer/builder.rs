@@ -10735,16 +10735,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Retrieve the lexical operand produced for this expression in the current scope.
-    /// Separately parsed annotations and synthetic references still resolve from their syntax.
-    fn source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+    fn indexed_source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
         if !self.in_string_annotation()
             && let Some(operand) = self.index.expression_place_use(expr)
             && self.index.scope_id(operand.scope) == self.scope()
         {
             let place = self.index.place_table(operand.scope).place(operand.place);
-            return Some(SourcePlace::Indexed(place, operand));
+            Some(SourcePlace::Indexed(place, operand))
+        } else {
+            None
         }
-        PlaceExpr::try_from_expr(expr).map(SourcePlace::Syntax)
+    }
+
+    /// Separately parsed annotations and synthetic references resolve from their syntax.
+    fn source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+        self.indexed_source_place(expr)
+            .or_else(|| PlaceExpr::try_from_expr(expr).map(SourcePlace::Syntax))
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
@@ -10757,11 +10763,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         name_node: &ast::ExprName,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
+        let expr = ast::ExprRef::Name(name_node);
         let place_expr = self
-            .source_place(ast::ExprRef::Name(name_node))
-            .expect("a name is a lexical place");
+            .indexed_source_place(expr)
+            .unwrap_or_else(|| SourcePlace::Syntax(PlaceExpr::from_expr_name(name_node)));
 
-        let (resolved, _) = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(&place_expr, expr);
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,

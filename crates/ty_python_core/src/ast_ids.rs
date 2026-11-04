@@ -115,10 +115,9 @@ impl AstIdsBuilder {
         let mut pages: Vec<UsePage> = Vec::new();
         let mut uses = Vec::new();
         let mut scopes = Vec::new();
-        let root = self.root.into_iter().enumerate().map(|(index, row)| {
-            let index = u32::try_from(index).expect("root AST node indices fit in u32");
-            (ast::NodeIndex::from(index), row)
-        });
+        let root = (0..=ast::MAX_REAL_INDEX)
+            .map(ast::NodeIndex::from)
+            .zip(self.root);
         for (node, row) in root.chain(self.annotations) {
             if let Some(scope) = row.scope {
                 ScopeRange::record(&mut scopes, node, scope);
@@ -129,9 +128,13 @@ impl AstIdsBuilder {
             {
                 page.mask |= bit;
             } else {
+                // Each set bit accounts for one distinct node in the use array.
+                let first_use = pages
+                    .last()
+                    .map_or(0, |last| last.first_use + last.mask.count_ones());
                 pages.push(UsePage {
                     first_node: node,
-                    first_use: u32::try_from(uses.len()).expect("at most one use per AST node"),
+                    first_use,
                     mask: 1,
                 });
             }
@@ -230,7 +233,7 @@ impl AstIds {
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.try_use_id(key)
-            .expect("no use ID for this source occurrence")
+            .expect("the flow builder should have recorded this use")
     }
 
     pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
@@ -375,8 +378,8 @@ mod tests {
 
     #[test]
     fn use_ids_across_page_boundary() {
-        let mut builder = AstIdsBuilder::with_node_count(65);
-        for (use_id, node) in [64u32, 0, 63].into_iter().enumerate() {
+        let mut builder = AstIdsBuilder::with_node_count(129);
+        for (use_id, node) in [64u32, 0, 63, 128].into_iter().enumerate() {
             builder.entry(node.into()).use_id = Some(ScopedUseId::from_usize(use_id));
         }
 
@@ -386,5 +389,6 @@ mod tests {
         assert_eq!(lookup(62), None);
         assert_eq!(lookup(63), Some(2));
         assert_eq!(lookup(64), Some(0));
+        assert_eq!(lookup(128), Some(3));
     }
 }
