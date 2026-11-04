@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 
-use crate::renamer::Renamer;
+use crate::renamer::{Renamer, ShadowedKind};
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -83,19 +83,19 @@ pub(crate) fn unconventional_import_alias(
         },
         binding.range(),
     );
-    if !import.is_submodule_import() {
-        if checker.semantic().is_available(expected_alias) {
-            diagnostic.try_set_fix(|| {
-                let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) = Renamer::rename(
-                    name,
-                    expected_alias,
-                    scope,
-                    checker.semantic(),
-                    checker.stylist(),
-                )?;
-                Ok(Fix::unsafe_edits(edit, rest))
-            });
-        }
+    if !import.is_submodule_import()
+        && !ShadowedKind::new(binding, expected_alias, checker).shadows_any()
+    {
+        diagnostic.try_set_fix(|| {
+            let scope = &checker.semantic().scopes[binding.scope];
+            let (edit, rest) = Renamer::rename(
+                name,
+                expected_alias,
+                scope,
+                checker.semantic(),
+                checker.stylist(),
+            )?;
+            Ok(Fix::unsafe_edits(edit, rest))
+        });
     }
 }
