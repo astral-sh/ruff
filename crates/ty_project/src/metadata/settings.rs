@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use ruff_db::diagnostic::Severity;
 use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
+use crate::metadata::options::{AnalysisOptionsContext, InnerOverrideOptions, OutputFormat};
 use crate::script::Script;
 use crate::{Db, glob::IncludeExcludeFilter};
 
@@ -229,7 +228,7 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
 
     let rules = rules.to_rule_selection(db);
     // The analysis options were already validated when building the individual overrides.
-    let analysis = analysis.to_settings(db, Severity::Warning, &mut Vec::new());
+    let analysis = analysis.to_settings(db, AnalysisOptionsContext::Override, &mut Vec::new());
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }

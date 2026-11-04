@@ -541,10 +541,11 @@ impl Options {
         let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
-        let analysis =
-            self.analysis
-                .or_default()
-                .to_settings(db, Severity::Error, &mut analysis_diagnostics);
+        let analysis = self.analysis.or_default().to_settings(
+            db,
+            AnalysisOptionsContext::TopLevel,
+            &mut analysis_diagnostics,
+        );
 
         let analysis_result: Result<_, ToSettingsError> =
             if let Some(diagnostic) = analysis_diagnostics.into_iter().next() {
@@ -1854,7 +1855,7 @@ impl AnalysisOptions {
     pub(super) fn to_settings(
         &self,
         db: &dyn Db,
-        invalid_glob_severity: Severity,
+        context: AnalysisOptionsContext,
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
@@ -1881,7 +1882,7 @@ impl AnalysisOptions {
                     db,
                     allowed_unresolved_imports,
                     "allowed_unresolved_imports",
-                    invalid_glob_severity,
+                    context,
                 )
                 .unwrap_or_else(|error| {
                     diagnostics.extend(error.map(|error| *error));
@@ -1897,7 +1898,7 @@ impl AnalysisOptions {
                     db,
                     replace_imports_with_any,
                     "replace_imports_with_any",
-                    invalid_glob_severity,
+                    context,
                 )
                 .unwrap_or_else(|error| {
                     diagnostics.extend(error.map(|error| *error));
@@ -1921,17 +1922,27 @@ impl AnalysisOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AnalysisOptionsContext {
+    TopLevel,
+    Override,
+}
+
 fn build_module_glob_set(
     db: &dyn Db,
     patterns: &[RangedValue<String>],
     option_name: &str,
-    severity: Severity,
+    context: AnalysisOptionsContext,
 ) -> Result<ModuleGlobSet, Option<Box<OptionDiagnostic>>> {
     let mut builder = ModuleGlobSetBuilder::new();
+    let severity = match context {
+        AnalysisOptionsContext::TopLevel => Severity::Error,
+        AnalysisOptionsContext::Override => Severity::Warning,
+    };
 
     for glob in patterns {
         if let Err(error) = builder.add(glob) {
-            if severity == Severity::Warning {
+            if context == AnalysisOptionsContext::Override {
                 // Overrides inherit global patterns. Both sets were checked before merging.
                 return Err(None);
             }
@@ -2264,7 +2275,8 @@ impl OverrideOptions {
             merged_analysis = merged_analysis.combine(global_analysis.clone());
         }
 
-        let analysis = merged_analysis.to_settings(db, Severity::Warning, diagnostics);
+        let analysis =
+            merged_analysis.to_settings(db, AnalysisOptionsContext::Override, diagnostics);
 
         let override_instance = Override {
             files,
