@@ -5,6 +5,9 @@ requires-python = ">=3.14"
 [options]
 exclude-newer = "2026-10-24T19:50:00Z"
 
+[options.exclude-newer-package]
+zuban = "2026-10-30T00:00:00Z"
+
 [manifest]
 build-constraints = [{ name = "uv-build", specifier = "==0.13.5", hashes = ["sha256:21b9a3a0c3d3149ae69b00763181b57f64f57e93c90babaacc50e1c8fcd52373", "sha256:2f54c5db98d6a2ffe068bafdbe808a8f05c3e8a438bdc97372c72ec0d9f76ca6", "sha256:3b28bf2621439b5b610501bd6f1b69e7df22429bb4b1c7d70984cbef0ab42bb1", "sha256:4aeacc231382ee53758eb0e36a0ac959289dc91135417ef51a77a4054f504f86", "sha256:57399f778f42185ee92ec0648566ee5d7fa6e5a1ce393a5f28945f64430c140d", "sha256:7f76eda736ef61d1eea933fd8738daed037185ea15a77bd830f4a8f0b92cc62f", "sha256:88f1e4db3643bf3ef0b01d73e4713852cc309eb42cd2888040b11211e228daf6", "sha256:ac96c9d47b9362e28b4cb449d94deddc6dd17066aec8ef1365d2e025b77ab6b5", "sha256:b9d93d71dded1334608050653f276fa92e9f52bdc6665851fbec9e4bd4e69790", "sha256:bcc4ff9554a670c8a9bc7c7cb20bd9d9d8a800015a47ad85e094d80c57d403c4", "sha256:beae1ddc2e342292d87c7eb9438941b77af0375d44aa49b19e0d080d67e12199", "sha256:c41ce4e20e2132ecb6b8cadeffc579dec0054fd460cccd6134ddd3a627a8f3a6", "sha256:c480dc7e8a0c8920cf44860406d424f99c6d301e2e47b5927181b50c7c3ea6fd", "sha256:c95a3d092cb8880b37f35013f9f7339f3867bc422abed36776255f34e22bc62c", "sha256:cf846dbf229aec735d2952cc5c7c8754e5456ab7dfea4e93f9d394f20bed2a4e", "sha256:cfb36db3ae5bdad9e76a2c68896477ceea954b5293db4647bfabd0916fd19cec", "sha256:e0a22c1a0f42ddde37e02ec9d0472178054275f0da3801bc7907979b431b6235", "sha256:e99d81ad7821e916448546c53323835cc927c06ee5f4c6c8e9584f8813478f00", "sha256:ecc732a8e79b677b72d67dcf8c367ca0a35e952330ff9b1037371dca0cf69e0e"] }]
 
@@ -169,6 +172,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tomlkit"
+version = "0.15.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/72/fc01563df95c189a9f65850096bdc205bc2fe37da6c740cd64afaf18d07e/tomlkit-0.15.2.tar.gz", hash = "sha256:83e32755ba1d20d9340bd069ee97e9f6232ba2346b63ffcba425de01f7e327a6", size = 190522, upload-time = "2026-10-16T04:07:08.166Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/46/7d84138a60a8bd796825b2d38ebe92d0d16501ca57d501b7c5d677401bbc/tomlkit-0.15.2-py3-none-any.whl", hash = "sha256:05562412163a3037b94497385fb7f9204c637bc605af7a48199e41cf2272f437", size = 52225, upload-time = "2026-10-16T04:07:09.216Z" },
+]
+
+[[package]]
 name = "ty-benchmark"
 version = "0.0.1"
 source = { editable = "." }
@@ -179,6 +191,8 @@ dependencies = [
     { name = "pyrefly" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
+    { name = "tomlkit" },
+    { name = "zuban" },
 ]
 
 [package.metadata]
@@ -189,6 +203,8 @@ requires-dist = [
     { name = "pyrefly", specifier = "==1.4.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-benchmark", specifier = ">=4.0.0" },
+    { name = "tomlkit", specifier = ">=0.13.3" },
+    { name = "zuban", specifier = "==0.10.2" },
 ]
 
 [[package]]
@@ -198,4 +214,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5", size = 113555, upload-time = "2026-07-02T08:40:05.92Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8", size = 45571, upload-time = "2026-07-02T08:40:04.659Z" },
+]
+
+[[package]]
+name = "zuban"
+version = "0.10.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/eb/5b15139d92e667ed98d41d07c62f815709b85d960e3e5a41dce90f080f78/zuban-0.10.2-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:bf32f741a7b579a7b3500803729144493c0016364bc852feaa8db44f9fe13f7d", size = 11617429, upload-time = "2026-10-29T15:44:54.423Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/a1/1fd1f5e94be99d3d2a7cb6bfd8dd8a0872905f3980dffb6cb6ce00872840/zuban-0.10.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ae00078be67ca93bca9b25bb39f4abebe3cf1a1cda8aa3c7b142d25bed75bc38", size = 11409605, upload-time = "2026-10-29T15:44:57.195Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/8c/dd342810155db2aac880e077b9fbba56e07ce759ab723ea1e11f4edb695c/zuban-0.10.2-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:a9be001e140d9b86bb6f09298e4ad21a01073a1d47e5171f9cc7de65d1d54c73", size = 28803766, upload-time = "2026-10-29T15:44:59.84Z" },
+    { url = "https://files.pythonhosted.org/packages/36/18/17d95ed7d800230970bdc90872f36e9f3a1a5ec7296fa7ba4bf7b2fdcca4/zuban-0.10.2-py3-none-manylinux2014_armv7l.manylinux_2_17_armv7l.whl", hash = "sha256:097b5abb799207cbfeea233accbd8bf440742bfe482a064e47b17ce698a66799", size = 28997359, upload-time = "2026-10-29T15:45:02.91Z" },
+    { url = "https://files.pythonhosted.org/packages/92/bf/d3b1dae8163eb9d86ed6797c39ce5b50f377defcd9a917ba9d97a330936a/zuban-0.10.2-py3-none-manylinux2014_i686.manylinux_2_17_i686.whl", hash = "sha256:1d247a12d60dae489372074c7a5695b5d7b32b2e324e6445f54aebda2512a11c", size = 30199005, upload-time = "2026-10-29T15:45:05.877Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/a9/8a4542e31be2c09292f431015055015f0c918d0f0232264672d545f115d5/zuban-0.10.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c8b4a34e46ac3ee89cea9783c2a1f4fa6fa271bb59e99e7146d8233566ff8a29", size = 32199078, upload-time = "2026-10-29T15:45:08.892Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/55/a68158322cf3cf7ae6d2b56e41683a6104f325c50ed1fcf4dccc0395c2cc/zuban-0.10.2-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:2a023e4583020bf8e7109aaca391055b75f96b3d98ca6e714ccad55e58340e4a", size = 28992978, upload-time = "2026-10-29T15:45:12.16Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/71/798d0f33d3821f4bf1cfd73a4b9c71742b1c3b811c02a966703a6a95c89d/zuban-0.10.2-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:0b1d159d75f5d525ef25f305e5dc29eb8ba1596195e04bf8b66b8b031b01e8da", size = 29443939, upload-time = "2026-10-29T15:45:15.393Z" },
+    { url = "https://files.pythonhosted.org/packages/84/44/ce29964021ba394600e0713918883501da4db90d2d80af9429040c0b59d6/zuban-0.10.2-py3-none-musllinux_1_2_i686.whl", hash = "sha256:dbab08b9ab53468f9ac28774b89dfaae695c4f9326b680771fe152b778987d89", size = 30101210, upload-time = "2026-10-29T15:45:18.33Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/32/b4a93835cb83bd99faba0362e2a560595fc365179529c2190094bb184c81/zuban-0.10.2-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:b2a2fcdeeab56f091a376e65a7b26c044b6be44e1360214de65db7908248ddb9", size = 29419261, upload-time = "2026-10-29T15:45:21.176Z" },
+    { url = "https://files.pythonhosted.org/packages/08/a3/50554f3857c449921b635575745fe590055df6e8fe7e6482488df6673c0c/zuban-0.10.2-py3-none-win32.whl", hash = "sha256:97779d50273efdf75ed6edefbfd71a9bb6045467ac21a6e83a15933e4a8ec7bc", size = 10275468, upload-time = "2026-10-29T15:45:23.919Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/c2/dc2fff9bb2adcff092d9314096c5e0d7215f6358dccc4bcdf1c18b11c39d/zuban-0.10.2-py3-none-win_amd64.whl", hash = "sha256:48483b9ec019da045b7f826c496f2ab1639c3f036fcab6e9e74b42d4e2fa3d34", size = 11017736, upload-time = "2026-10-29T15:45:27.151Z" },
 ]

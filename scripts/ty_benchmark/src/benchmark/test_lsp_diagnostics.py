@@ -18,7 +18,7 @@ from lsprotocol import types as lsp
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.projects import IncrementalEdit, Project
-from benchmark.tool import Pyrefly, Pyright, Tool, Ty
+from benchmark.tool import Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
 # Tools to benchmark (only those with LSP support).
@@ -26,6 +26,7 @@ TOOLS_TO_BENCHMARK: Final = [
     Ty(),
     Pyright(),
     Pyrefly(),
+    Zuban(),
 ]
 
 SEVERITY_LABELS: Final = {
@@ -121,10 +122,8 @@ def run_benchmark(
         edited_file_path.copy(edited_file_backup)
 
     try:
-        tool.write_config(project, venv)
-
         # Use asyncio.Runner to keep the same event loop alive across setup and measure.
-        with asyncio.Runner() as runner:
+        with tool.configure_lsp(project, venv), asyncio.Runner() as runner:
 
             def setup():
                 if edited_file_backup:
@@ -225,6 +224,9 @@ class LspTest(ABC):
 
         await self.client.initialize_async(
             lsp.InitializeParams(
+                initialization_options=self.tool.lsp_initialization_options(
+                    self.project, self.venv
+                ),
                 root_uri=self.cwd.as_uri(),
                 workspace_folders=[
                     lsp.WorkspaceFolder(uri=self.cwd.as_uri(), name=self.cwd.name)
