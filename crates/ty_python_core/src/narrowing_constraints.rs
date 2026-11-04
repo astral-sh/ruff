@@ -311,6 +311,7 @@ impl NarrowingConstraintsBuilder {
         self.or_uncached(a, b)
     }
 
+    /// Compute the disjunction of two interior nodes in ascending ID order after a cache miss.
     fn or_uncached(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -377,6 +378,7 @@ impl NarrowingConstraintsBuilder {
         self.and_uncached(a, b)
     }
 
+    /// Compute the conjunction of two interior nodes in ascending ID order after a cache miss.
     fn and_uncached(
         &mut self,
         a: ScopedNarrowingConstraint,

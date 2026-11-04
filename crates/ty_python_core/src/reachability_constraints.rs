@@ -447,6 +447,8 @@ impl ReachabilityConstraintsBuilder {
         self.or_uncached(a, b)
     }
 
+    /// Compute the disjunction on a cache miss with the operands in ascending ID order.
+    /// The first operand is an interior node and the second can be `AMBIGUOUS`.
     fn or_uncached(
         &mut self,
         a: ScopedReachabilityConstraintId,
@@ -526,6 +528,8 @@ impl ReachabilityConstraintsBuilder {
         self.and_uncached(a, b)
     }
 
+    /// Compute the conjunction on a cache miss with the operands in ascending ID order.
+    /// The first operand is an interior node and the second can be `AMBIGUOUS`.
     fn and_uncached(
         &mut self,
         a: ScopedReachabilityConstraintId,
