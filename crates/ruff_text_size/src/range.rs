@@ -294,7 +294,7 @@ impl TextRange {
     /// The unchecked version (`Sub::sub`) will _always_ panic on overflow,
     /// in contrast to primitive integers, which check in debug mode only.
     #[inline]
-    pub(crate) fn checked_sub(self, offset: TextSize) -> Option<TextRange> {
+    fn checked_sub(self, offset: TextSize) -> Option<TextRange> {
         Some(TextRange {
             start: self.start.checked_sub(offset)?,
             end: self.end.checked_sub(offset)?,
