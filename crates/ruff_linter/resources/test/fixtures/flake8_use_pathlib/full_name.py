@@ -100,6 +100,24 @@ os.chmod(p, dir_fd=7)
 os.chmod(8)
 os.chmod(x)
 
+# https://github.com/astral-sh/ruff/issues/17699
+# `getsize`/`getatime`/`getmtime`/`getctime`/`isdir`/`isfile`/`exists`/`samefile` all
+# delegate to `os.stat`, so they also accept a file descriptor in place of a path,
+# which `pathlib` doesn't support.
+os.path.getsize(8)
+os.path.getatime(8)
+os.path.getmtime(8)
+os.path.getctime(8)
+os.path.isdir(8)
+os.path.isfile(8)
+os.path.exists(8)
+os.path.samefile(8, "b")
+os.path.samefile("a", 8)
+
+# `islink` uses `os.lstat`, which doesn't accept a file descriptor, so it should
+# still be flagged.
+os.path.islink(8)
+
 # if `src_dir_fd` or `dst_dir_fd` are set, suppress the diagnostic
 os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
 os.replace("src", "dst", src_dir_fd=1)
