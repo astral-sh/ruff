@@ -522,9 +522,9 @@ impl ProjectMetadata {
         Ok(())
     }
 
-    fn validate_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+    fn lint_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
         self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
-            .flat_map(|options| options.validate(db))
+            .flat_map(|options| options.lint(db))
             .collect()
     }
 
@@ -603,13 +603,13 @@ impl MergedOptions<'_> {
         db: &dyn Db,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        let validation_diagnostics = self.metadata.validate_options(db);
+        let lint_diagnostics = self.metadata.lint_options(db);
         let (settings, mut diagnostics) = self.options.to_settings(
             db,
             OptionsContext::Project(self.metadata.root()),
             strategy,
         )?;
-        diagnostics.extend(validation_diagnostics);
+        diagnostics.extend(lint_diagnostics);
         Ok((settings, diagnostics))
     }
 }

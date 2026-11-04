@@ -581,19 +581,20 @@ impl Options {
         Ok((settings, diagnostics))
     }
 
-    /// Validate the options from a single configuration source.
+    /// Report issues in one configuration source, including entries that a higher-priority
+    /// source overrides.
     ///
     /// For example, `division-by-zer` in the `[rules]` table of `ty.toml` gets one warning,
     /// even if several overrides inherit it. Passing `--warn division-by-zer` on the command
     /// line as well produces a second warning for the CLI argument.
-    pub(crate) fn validate(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+    pub(crate) fn lint(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
         let mut diagnostics = Vec::new();
         if let Some(rules) = &self.rules {
-            rules.validate(db, &mut diagnostics);
+            rules.lint(db, &mut diagnostics);
         }
         if let Some(overrides) = &self.overrides {
             for section in &overrides.0 {
-                OverrideOptions::validate(db, section, &mut diagnostics);
+                OverrideOptions::lint(db, section, &mut diagnostics);
             }
         }
         diagnostics
@@ -1205,7 +1206,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 }
 
 impl Rules {
-    fn validate(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
+    fn lint(&self, db: &dyn Db, diagnostics: &mut Vec<OptionDiagnostic>) {
         let registry = db.lint_registry();
         for name in self.inner.keys() {
             if name.as_str() == "all" {
@@ -2082,9 +2083,9 @@ pub struct OverrideOptions {
 }
 
 impl OverrideOptions {
-    fn validate(db: &dyn Db, section: &RangedValue<Self>, diagnostics: &mut Vec<OptionDiagnostic>) {
+    fn lint(db: &dyn Db, section: &RangedValue<Self>, diagnostics: &mut Vec<OptionDiagnostic>) {
         if let Some(rules) = &section.rules {
-            rules.validate(db, diagnostics);
+            rules.lint(db, diagnostics);
         }
         if section.is_empty() {
             let mut diagnostic = OptionDiagnostic::new(
