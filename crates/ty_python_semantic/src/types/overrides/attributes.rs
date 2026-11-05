@@ -25,6 +25,7 @@ use crate::{
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
+        member::uses_special_method_lookup,
     },
 };
 
@@ -94,7 +95,7 @@ enum AttributeContractKind {
 }
 
 /// Whether every alternative has method binding behavior rather than only a call signature.
-fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+pub(super) fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     ty.as_union()
         .map_or(std::slice::from_ref(&ty), |union| union.elements(db))
         .iter()
@@ -586,10 +587,15 @@ pub(super) fn check_override<'db>(
     // `object.__hash__`, have method signatures but no general attribute contract.
     // Receiver annotations still describe instance storage even if a method with
     // the same name exists in the class body.
+    let policy = if uses_special_method_lookup(name) {
+        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+    } else {
+        MemberLookupPolicy::default()
+    };
     if definition.place(db).is_symbol()
         && [class, superclass].into_iter().all(|owner| {
             owner
-                .own_class_member(db, env, None, name)
+                .own_class_member_with_policy(db, env, None, name, policy)
                 .inner
                 .place
                 .ignore_possibly_undefined()

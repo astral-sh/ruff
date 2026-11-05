@@ -1488,28 +1488,6 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         let inherited_generic_context = if policy.no_inherited_generic_context() {
             None
         } else {
@@ -1522,7 +1500,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        let mut member = match result {
+        match result {
             ClassMemberResult::Done(result) => result.finalize(db, env),
             ClassMemberResult::TypedDict(module) => typed_dict_class_member(
                 db,
@@ -1532,15 +1510,7 @@ impl<'db> StaticClassLiteral<'db> {
                 policy,
                 name,
             ),
-        };
-
-        // We generally treat dunder attributes with `Callable` types as function-like callables.
-        // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, env, ty));
         }
-
-        member
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
@@ -1556,29 +1526,8 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> Member<'db> {
-        fn into_dunder_paramspec_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
-                {
-                    Type::Callable(callable_ty.into_dunder_paramspec(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         let code_generator = CodeGeneratorKind::from_static_class(db, self);
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
@@ -1621,12 +1570,35 @@ impl<'db> StaticClassLiteral<'db> {
 
         let sources = self.member_sources(db);
         let symbol = sources.table.symbol_id(name);
-        let member = class_member_with_symbol(db, sources.scope, symbol).map_type(|ty| {
-            let ty = if name.starts_with("__") && name.ends_with("__") {
-                into_dunder_paramspec_callable(db, env, ty)
-            } else {
-                ty
-            };
+        let mut member = class_member_with_symbol(db, sources.scope, symbol);
+        // Decide before applying this class's specialization: `Callable[P, R]` and a bare `F`
+        // describe the stored callable's full signature. Eligible inferred class-body callables
+        // and callables found during class-only lookup are assumed to be methods. Ordinary
+        // instance reads promote `ClassVar` callables separately to preserve their declared types
+        // for assignment checks.
+        // TODO: An inherited annotation can already be specialized when a subclass supplies a
+        // default. Preserve its original binding behavior in that case too.
+        if let Place::Defined(place) = &mut member.inner.place {
+            if place.origin.is_declared()
+                && !member.inner.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                && match place.ty.resolve_type_alias(db) {
+                    Type::TypeVar(_) => true,
+                    Type::Union(union) => union.elements(db).iter().all(|element| {
+                        let element = element.resolve_type_alias(db);
+                        element.is_type_var() || element.is_none(db)
+                    }),
+                    _ => false,
+                }
+            {
+                member
+                    .inner
+                    .qualifiers
+                    .insert(TypeQualifiers::NO_FUNCTION_BINDING);
+            }
+            let class_only = policy.no_instance_fallback();
+            if class_only || !place.origin.is_declared() {
+                place.ty = place.ty.into_function_like_callable(db, env, class_only);
+            }
 
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
@@ -1639,18 +1611,16 @@ impl<'db> StaticClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (inherited_generic_context, ty, specialization, name) {
-                (
-                    Some(generic_context),
-                    Type::FunctionLiteral(function),
-                    Some(_),
-                    "__new__" | "__init__",
-                ) => Type::FunctionLiteral(
+            if let Some(generic_context) = inherited_generic_context
+                && specialization.is_some()
+                && matches!(name, "__new__" | "__init__")
+                && let Type::FunctionLiteral(function) = place.ty
+            {
+                place.ty = Type::FunctionLiteral(
                     function.with_inherited_generic_context(db, generic_context),
-                ),
-                _ => ty,
+                );
             }
-        });
+        }
 
         if self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
@@ -1696,7 +1666,6 @@ impl<'db> StaticClassLiteral<'db> {
         if enum_metadata(db, ClassLiteral::Static(self))
             .is_some_and(|metadata| metadata.contains_member(name))
         {
-            let mut member = member;
             member.inner.qualifiers.insert(TypeQualifiers::READ_ONLY);
             return member;
         }
@@ -2061,7 +2030,14 @@ impl<'db> StaticClassLiteral<'db> {
                     .to_class_literal(db, env)
                     .as_class_literal()?
                     .as_static()?
-                    .own_class_member(db, env, inherited_generic_context, None, name)
+                    .own_class_member(
+                        db,
+                        env,
+                        inherited_generic_context,
+                        None,
+                        name,
+                        MemberLookupPolicy::default(),
+                    )
                     .ignore_possibly_undefined()
                     .map(|ty| {
                         ty.apply_type_mapping(
@@ -2174,7 +2150,14 @@ impl<'db> StaticClassLiteral<'db> {
                     .to_class_literal(db, env)
                     .as_class_literal()?
                     .as_static()?
-                    .own_class_member(db, env, self.inherited_generic_context(db), None, name)
+                    .own_class_member(
+                        db,
+                        env,
+                        self.inherited_generic_context(db),
+                        None,
+                        name,
+                        MemberLookupPolicy::default(),
+                    )
                     .ignore_possibly_undefined()
                     .map(|ty| {
                         let self_class = determine_self_class(

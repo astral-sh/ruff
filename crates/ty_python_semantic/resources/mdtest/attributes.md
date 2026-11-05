@@ -5673,6 +5673,22 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
 help: Consider explicitly importing `baz.bar`
 ```
 
+## Function attributes on callables accessed through `super()`
+
+Class-only lookup treats a gradual callable as a method descriptor. Its underlying function exposes
+function attributes:
+
+```py
+from collections.abc import Callable
+
+class Base:
+    method: Callable[..., int]
+
+class Child(Base):
+    def check(self) -> None:
+        reveal_type(super().method.__func__.__code__)  # revealed: CodeType
+```
+
 ## Diagnostic for function attribute accessed on `Callable` type
 
 We show a special help message here that explains that not all callables are functions.

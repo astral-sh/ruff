@@ -49,6 +49,36 @@ def _(a: dict[str, int], b: Mapping[str, int], c: HasKeysAndGetItem, d: object):
     reveal_type({**d})  # revealed: dict[Unknown, Unknown]
 ```
 
+## Unpacking with instance-stored `keys`
+
+Unpacking calls `keys()` through ordinary attribute access. A callable stored on the instance does
+not bind a receiver:
+
+```py
+from collections.abc import Callable
+
+class Mapping:
+    def __init__(self, keys: Callable[[], list[str]]) -> None:
+        self.keys = keys
+
+    def __getitem__(self, key: str) -> int:
+        return 1
+
+reveal_type({**Mapping(lambda: ["key"])})  # revealed: dict[str, int]
+```
+
+The callable must accept a call with no arguments:
+
+```py
+class InvalidMapping:
+    keys: Callable[[object], list[str]]
+
+    def __getitem__(self, key: str) -> int:
+        return 1
+
+{**InvalidMapping()}  # error: [invalid-argument-type]
+```
+
 ## Dict of functions
 
 ```py

@@ -3329,6 +3329,67 @@ class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
 ```
 
+## Callable dunder overrides
+
+Override checking uses class-only lookup for methods invoked by operators.
+
+```pyi
+from collections.abc import Callable
+
+class Base:
+    def __add__(self, other: object, /) -> int: ...
+    def __getitem__(self, key: int, /) -> int: ...
+
+class Callables(Base):
+    __add__: Callable[[object, object], bool]  # ok
+    __getitem__: Callable[[object, int], bool]  # ok
+```
+
+Methods overriding these callable annotations are compared with their bound signatures:
+
+```pyi
+class Methods(Callables):
+    def __add__(self, other: object, /) -> bool: ...  # ok
+    def __getitem__(self, key: int, extra: int, /) -> bool: ...  # error: [invalid-method-override]
+```
+
+Python uses ordinary attribute lookup for a custom dunder name. Here, the base attribute accepts two
+arguments, so the overriding method must accept both after binding its receiver.
+
+```pyi
+class CustomBase:
+    __custom__: Callable[[object, int], int]
+
+class CustomChild(CustomBase):
+    def __custom__(self, value: int, /) -> int: ...  # error: [invalid-attribute-override]
+```
+
+Receiver annotations retain their instance-storage contracts:
+
+```pyi
+class InstanceAttributes(Base):
+    def __init__(self) -> None:
+        # error: [invalid-attribute-override]
+        self.__add__: Callable[[object, object], int] = lambda receiver, other: 1
+```
+
+## Callable dunder overrides through a permissive base
+
+A callable override can refine an intermediate method's gradual return type:
+
+```pyi
+from collections.abc import Callable
+from typing import Any
+
+class Base:
+    def __eq__(self, other: object, /) -> Any: ...
+
+class Child(Base):
+    __eq__: Callable[[object, object], str]  # ok
+```
+
+TODO: Incompatible callable annotations overriding methods are not yet validated.
+
 ## Methods replacing inferred callable defaults
 
 A class assigned to an unannotated attribute is callable without binding a receiver. An overriding

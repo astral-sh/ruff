@@ -9,7 +9,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeTransformer,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
@@ -111,6 +112,53 @@ impl<'db> Type<'db> {
     /// A function-like callable will bind `self` when accessed as an attribute on an instance.
     pub(crate) fn function_like_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
+    }
+
+    /// Promote regular callable signatures with a receiver to method descriptors.
+    pub(super) fn into_function_like_callable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        allow_gradual: bool,
+    ) -> Type<'db> {
+        struct IntoFunctionLikeCallable;
+
+        fn into_function_like_callable<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            allow_gradual: bool,
+            visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
+        ) -> Type<'db> {
+            let promote = |ty| into_function_like_callable(db, env, ty, allow_gradual, visitor);
+            match ty {
+                Type::Callable(callable)
+                    if callable.is_regular(db)
+                        && callable.signatures(db).iter().any(|signature| {
+                            signature.parameters().get_positional(0).is_some()
+                                || allow_gradual && signature.parameters().is_gradual()
+                        }) =>
+                {
+                    Type::Callable(callable.into_function_like(db))
+                }
+                Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+                    let value = alias.value_type(db);
+                    let transformed = promote(value);
+                    if transformed == value {
+                        ty
+                    } else {
+                        transformed
+                    }
+                }),
+                Type::Union(union) => union.map(db, env, |element| promote(*element)),
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, env, |element| promote(*element))
+                }
+                _ => ty,
+            }
+        }
+
+        into_function_like_callable(db, env, self, allow_gradual, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`
@@ -516,13 +564,12 @@ pub enum CallableTypeKind {
     /// Calculator().add(1, 2)  # Returns 3; both arguments are still required.
     /// ```
     ///
-    /// As a heuristic, class-member lookup converts dunder attributes of this kind to
-    /// [`Self::FunctionLike`] if their signatures can accept parameters. See
-    /// [`Self::DunderParamSpec`] for the exception for `Callable[P, R]` attributes.
+    /// Inferred class-body callables and `ClassVar` callables with a positional receiver act as
+    /// method descriptors. Class-only lookup, including implicit calls and `super()`, also binds
+    /// explicitly annotated callables with a positional or gradual receiver.
     ///
-    /// For example, `len(Sized())` implicitly calls `__len__` on the `Sized` instance. We
-    /// treat the `Callable`-typed `__len__` as a function, so accessing `Sized().__len__`
-    /// binds the `instance` parameter and gives it the signature `() -> int`:
+    /// For example, `len(Sized())` looks up `__len__` on the class and binds the instance.
+    /// Direct access through `Sized().__len__` keeps the declared signature.
     ///
     /// ```python
     /// from collections.abc import Callable
@@ -600,37 +647,6 @@ pub enum CallableTypeKind {
     ///
     /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     FunctionLike,
-
-    /// A `Callable[P, R]`-typed dunder attribute whose parameters come from a `ParamSpec`.
-    ///
-    /// This has the runtime assumptions of [`Self::Regular`]: truthiness is ambiguous,
-    /// member lookup exposes `object` attributes, and we do not treat these callables as
-    /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
-    /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
-    /// already describe the callable's arguments.
-    ///
-    /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
-    /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    ///
-    /// class Callback[**P]:
-    ///     __call__: Callable[P, int]
-    ///
-    /// class Length(Callback[[str]]):
-    ///     def __call__(self, text: str) -> int:
-    ///         return len(text)
-    ///
-    /// def invoke(callback: Callback[[str]]) -> int:
-    ///     return callback("hello")
-    ///
-    /// invoke(Length())  # Returns 5.
-    /// ```
-    ///
-    /// This variant is used to represent the callable object itself; [`Self::ParamSpecValue`]
-    /// represents the parameter list substituted for `P`.
-    DunderParamSpec,
 
     /// A callable with the descriptor behavior of `staticmethod`.
     StaticMethodLike,
@@ -836,11 +852,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
-    }
-
-    pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
+    fn is_regular(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::Regular)
     }
 
@@ -925,12 +937,8 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
+    fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::FunctionLike)
-    }
-
-    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }
 
     pub(crate) fn apply_self_with_receiver(

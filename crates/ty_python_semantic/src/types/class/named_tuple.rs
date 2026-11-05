@@ -128,7 +128,14 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 .to_class_literal(db, env)
                 .as_class_literal()?
                 .as_static()?
-                .own_class_member(db, env, inherited_generic_context, None, name)
+                .own_class_member(
+                    db,
+                    env,
+                    inherited_generic_context,
+                    None,
+                    name,
+                    MemberLookupPolicy::default(),
+                )
                 .ignore_possibly_undefined()
         }
     }
@@ -396,7 +403,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                         .to_class_literal(db, env)
                         .as_class_literal()?
                         .as_static()?
-                        .own_class_member(db, env, None, None, name)
+                        .own_class_member(db, env, None, None, name, MemberLookupPolicy::default())
                         .ignore_possibly_undefined()
                         .map(|ty| {
                             ty.apply_type_mapping(

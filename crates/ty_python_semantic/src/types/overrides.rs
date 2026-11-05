@@ -42,6 +42,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        member::uses_special_method_lookup,
         tuple::Tuple,
     },
 };
@@ -1356,8 +1357,8 @@ fn check_class_declaration<'db>(
 }
 
 /// Look up `__new__` on the class so generated and decorated callables retain `cls`
-/// until they are bound for the override comparison. Hashing ignores instance storage
-/// and binds descriptors on the class, as for implicit calls to `__hash__`.
+/// until they are bound for the override comparison. Compare special methods using the
+/// signature seen by implicit calls. Hashing uses class-only lookup even for `__hash__ = None`.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1365,17 +1366,20 @@ fn lookup_override_member<'db>(
     name: &Name,
 ) -> PlaceAndQualifiers<'db> {
     if name == "__new__" {
-        class.class_member(db, env, name, MemberLookupPolicy::default())
-    } else if name == "__hash__" {
-        Type::instance(db, env, class).member_lookup_with_policy(
-            db,
-            env,
-            name,
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
-    } else {
-        Type::instance(db, env, class).member(db, env, name)
+        return class.class_member(db, env, name, MemberLookupPolicy::default());
     }
+    let policy = if name == "__hash__"
+        || uses_special_method_lookup(name)
+            && class
+                .class_member(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| attributes::is_method_type(db, ty))
+    {
+        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+    } else {
+        MemberLookupPolicy::default()
+    };
+    Type::instance(db, env, class).member_lookup_with_policy(db, env, name, policy)
 }
 
 /// Resolve `__new__` descriptors and normalize callable objects before binding the

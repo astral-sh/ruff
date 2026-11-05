@@ -4655,6 +4655,23 @@ static_assert(not is_assignable_to(NominalWithStaticMethod, P))
 static_assert(not is_assignable_to(NominalSubtype | NominalWithStaticMethod, P))
 ```
 
+An explicitly annotated callable can implement an ordinary protocol method. Its signature on
+instance access must match the bound protocol method:
+
+```py
+from collections.abc import Callable
+
+def check(callback: Callable[[int], None], needs_receiver: Callable[[object, int], None]) -> None:
+    class Compatible:
+        m: Callable[[int], None] = callback
+
+    class Incompatible:
+        m: Callable[[object, int], None] = needs_receiver
+
+    good: P = Compatible()  # ok
+    bad: P = Incompatible()  # error: [invalid-assignment]
+```
+
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
 member: a method member specified by a protocol `P` must exist on the *meta-type* of `T` for `T` to
 be a subtype of `P`:
@@ -6407,6 +6424,21 @@ class ClassVarAttributeBad(Protocol):
 
 static_assert(not is_subtype_of(ClassVarAttributeBad, Method))
 static_assert(not is_assignable_to(ClassVarAttributeBad, Method))
+```
+
+Matching class-variable annotations remain compatible, including optional callable values:
+
+```py
+class ClassVarCallable(Protocol):
+    f: ClassVar[Callable[[object, int], int]]
+    optional: ClassVar[Callable[[object, int], int] | None]
+
+class ImplementsClassVarCallable:
+    f: ClassVar[Callable[[object, int], int]]
+    optional: ClassVar[Callable[[object, int], int] | None]
+
+static_assert(is_subtype_of(ImplementsClassVarCallable, ClassVarCallable))
+static_assert(is_assignable_to(ImplementsClassVarCallable, ClassVarCallable))
 ```
 
 ## Narrowing of protocols

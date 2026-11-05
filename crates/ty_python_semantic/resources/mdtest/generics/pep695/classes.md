@@ -2269,6 +2269,241 @@ class Pair[T, U]:
         reveal_type(other.first)  # revealed: list[T@Pair]
 ```
 
+## Protocols with a callable type variable
+
+Specializing a protocol's `__call__: F` preserves the callable's full signature without binding a
+receiver. The protocol remains assignable to compatible `Callable` types.
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+
+class Wrapper[F: Callable[..., object]](Protocol):
+    __call__: F
+
+def wrap[F: Callable[..., object]](function: F) -> Wrapper[F]:
+    raise NotImplementedError
+
+def f(value: int) -> str:
+    return ""
+
+wrapped = wrap(f)
+reveal_type(wrapped(1))  # revealed: str
+reveal_type(wrapped.__call__(1))  # revealed: str
+callback: Callable[[int], str] = wrapped  # ok
+wrapped("wrong")  # error: [invalid-argument-type]
+```
+
+The same behavior applies when the protocol is explicitly specialized with a regular callable type.
+
+```py
+def check(wrapper: Wrapper[Callable[[int], str]]) -> Callable[[int], str]:
+    reveal_type(wrapper(1))  # revealed: str
+    return wrapper  # ok
+```
+
+## Generic callable operator attributes
+
+Specializing a callable operator's `ParamSpec` or substituting a function for its type variable
+preserves all parameters, including a first parameter that could accept the instance. Implicit
+operator calls therefore still require both arguments:
+
+```py
+from collections.abc import Callable
+
+class Operator[**P, F: Callable[..., object]]:
+    __add__: Callable[P, str]
+    __sub__: F
+
+def as_operator[F: Callable[..., object]](function: F) -> Operator[[object, int], F]:
+    raise NotImplementedError
+
+def subtract(receiver: object, value: int) -> str:
+    return str(value)
+
+operator = as_operator(subtract)
+reveal_type(operator.__add__)  # revealed: (object, int, /) -> str
+reveal_type(operator.__sub__(object(), 1))  # revealed: str
+operator + 1  # error: [unsupported-operator]
+operator - 1  # error: [unsupported-operator]
+```
+
+## Methods overriding generic callable attributes
+
+Override checks preserve the full signature of a specialized `Callable[P, R]` or bare type variable.
+An overriding method must accept all of those arguments after its own receiver is bound.
+
+The optional mutable-override rule is disabled here to isolate signature compatibility.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class Base[**P, F]:
+    __add__: Callable[P, str]
+    __getitem__: F
+
+class Compatible(Base[[object, int], Callable[[object, int], str]]):
+    def __add__(self, first: object, second: int, /) -> str: ...  # ok
+    def __getitem__(self, first: object, second: int, /) -> str: ...  # ok
+
+class Incompatible(Base[[object, int], Callable[[object, int], str]]):
+    def __add__(self, second: int, /) -> str: ...  # error: [invalid-attribute-override]
+    def __getitem__(self, second: int, /) -> str: ...  # error: [invalid-attribute-override]
+```
+
+## Generic callable attributes accessed through `super()`
+
+`super()` preserves the full signature of attributes declared as `Callable[P, R]` or a type
+variable, even when specialization gives them a positional first parameter. In a union, a concrete
+callable alternative still binds its receiver:
+
+```py
+from collections.abc import Callable
+
+class Base[**P, F]:
+    callback: Callable[P, str]
+    value: F
+    optional: F | None
+    mixed: Callable[P, str] | Callable[[object, bytes], bytes]
+
+class Child(Base[[object, int], Callable[[object, int], str]]):
+    def check(self) -> None:
+        reveal_type(super().callback)  # revealed: (object, int, /) -> str
+        reveal_type(super().value)  # revealed: (object, int, /) -> str
+        reveal_type(super().optional)  # revealed: ((object, int, /) -> str) | None
+        reveal_type(super().mixed)  # revealed: ((object, int, /) -> str) | ((bytes, /) -> bytes)
+```
+
+A function substituted for the type variable also remains unbound:
+
+```py
+from ty_extensions._internal import TypeOf
+
+def f(receiver: object, value: int) -> str:
+    return ""
+
+class FunctionChild(Base[[object, int], TypeOf[f]]):
+    def check(self) -> None:
+        reveal_type(super().value)  # revealed: def f(receiver: object, value: int) -> str
+        reveal_type(super().optional)  # revealed: (def f(receiver: object, value: int) -> str) | None
+```
+
+## Functions stored in generic instance attributes
+
+Reading a function stored in an attribute declared as `value: T` preserves its arguments and
+function attributes. The function is returned unchanged, just as it is at runtime when stored on an
+instance.
+
+```py
+class Holder[T]:
+    value: T
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+def format_bytes(value: bytes) -> str:
+    return value.hex()
+
+holder = Holder(format_bytes)
+reveal_type(holder.value(b""))  # revealed: str
+reveal_type(holder.value.__code__)  # revealed: CodeType
+holder.value("wrong")  # error: [invalid-argument-type]
+```
+
+An optional callable retains its signature and function attributes after narrowing away `None`:
+
+```py
+from collections.abc import Callable
+
+class OptionalHolder[F: Callable[..., object]]:
+    value: F | None = None
+
+    def __init__(self, value: F) -> None:
+        self.value = value
+
+optional = OptionalHolder(format_bytes)
+if optional.value is not None:
+    reveal_type(optional.value)  # revealed: (value: bytes) -> str
+    reveal_type(optional.value.__code__)  # revealed: CodeType
+```
+
+## Descriptors and generic attributes
+
+A descriptor supplied as a type argument can be stored on a concrete subclass. Instance access
+retains both the descriptor result and the possibility of an instance value; `super()` only
+considers class storage.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 1
+
+class Base[T]:
+    value: T
+    with_default: T | Descriptor = Descriptor()
+
+class Concrete(Base[Descriptor]):
+    value = Descriptor()  # ok
+
+def read(value: Base[Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: int | Descriptor
+
+reveal_type(Concrete().value)  # revealed: int | Descriptor
+
+class Child(Concrete):
+    def inspect(self) -> None:
+        reveal_type(super().value)  # revealed: int
+```
+
+A union containing an explicit descriptor still invokes that descriptor on instance access:
+
+```py
+reveal_type(Base[str]().with_default)  # revealed: str | int
+```
+
+A union substituted for the type variable preserves function types, including intersections, while
+invoking explicit descriptors:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+from ty_extensions._internal import TypeOf
+
+def f(value: str) -> str:
+    return value
+
+def check_mixed(value: Base[TypeOf[f] | Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: (def f(value: str) -> str) | int | Descriptor
+
+def check_intersection(value: Base[Intersection[TypeOf[f], Any] | Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: ((def f(value: str) -> str) & Any) | int | Descriptor
+```
+
+Class access binds a `classmethod` stored on the subclass and unwraps a `staticmethod` to its
+original function.
+
+```py
+def with_value[T](descriptor: T) -> type[Base[T]]:
+    class Subclass(Base[Any]):
+        value = descriptor
+
+    return Subclass
+
+def method(cls: type, value: int) -> int:
+    return value
+
+reveal_type(with_value(classmethod(method)).value(1))  # revealed: int
+reveal_type(with_value(staticmethod(method)).value)  # revealed: def method(cls: type, value: int) -> int
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
