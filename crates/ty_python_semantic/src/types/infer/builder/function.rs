@@ -15,13 +15,13 @@ use crate::{
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
-            INVALID_PARAMSPEC, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-            TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
-            add_type_expression_reference_link, is_invalid_typed_dict_literal,
-            report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-            report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_runtime_checkable,
-            report_invalid_total_ordering_call,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, MISSING_PARAMETER_ANNOTATION, REDUNDANT_CAST,
+            STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT,
+            USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
+            is_invalid_typed_dict_literal, report_bad_argument_to_get_protocol_members,
+            report_bad_argument_to_protocol_interface, report_implicit_return_type,
+            report_invalid_generator_function_return_type, report_invalid_return_type,
+            report_invalid_runtime_checkable, report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
@@ -67,7 +67,7 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, find_node::covering_node};
+use ruff_python_ast::{self as ast, AnyParameterRef, find_node::covering_node};
 use ruff_text_size::Ranged;
 
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
@@ -524,9 +524,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function.returns.is_some(),
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
+        let is_overload_implementation = function_literal.has_separate_implementation(db);
+        if !is_overload_implementation
+            && self.context.is_lint_enabled(&MISSING_PARAMETER_ANNOTATION)
+        {
+            self.check_parameter_annotations(definition, function);
+        }
         let function_type = FunctionType::new(db, function_literal, None);
         let is_decorated_overload_implementation =
-            has_transforming_decorators && function_literal.has_separate_implementation(db);
+            has_transforming_decorators && is_overload_implementation;
         let is_decorated_overload = has_transforming_decorators && overload_literal.is_overload(db);
 
         let mut inferred_ty = Type::FunctionLiteral(
@@ -728,6 +734,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 diagnostic.help("Consider replacing this function body with `...` or `pass`");
                 break;
+            }
+        }
+    }
+
+    fn check_parameter_annotations(
+        &self,
+        definition: Definition<'db>,
+        function: &ast::StmtFunctionDef,
+    ) {
+        let parameters = &function.parameters;
+        let has_positional_parameters =
+            !parameters.posonlyargs.is_empty() || !parameters.args.is_empty();
+        let skip_receiver = has_positional_parameters
+            && MethodReceiverKind::from_function(self.db(), definition, function).is_some();
+        for parameter in parameters.iter().skip(usize::from(skip_receiver)) {
+            if parameter.annotation().is_none()
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&MISSING_PARAMETER_ANNOTATION, parameter.as_parameter())
+            {
+                let prefix = match parameter {
+                    AnyParameterRef::NonVariadic(_) => "",
+                    AnyParameterRef::Variadic(arg) if Some(arg) == parameters.vararg.as_deref() => {
+                        "*"
+                    }
+                    AnyParameterRef::Variadic(_) => "**",
+                };
+                let name = parameter.name();
+                builder.into_diagnostic(format_args!(
+                    "Missing type annotation for parameter `{prefix}{name}`"
+                ));
             }
         }
     }
