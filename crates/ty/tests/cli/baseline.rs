@@ -172,7 +172,14 @@ x: int = 1.5
 fn baseline_accepts_previous_rule_name() {
     let case = CliTest::with_files([
         // Both diagnostics underline `missing`. Renaming the import rule reverses their sort order.
-        ("test.py", "from typing import Final\nmissing: Final = 0\nimport missing"),
+        (
+            "test.py",
+            "
+            from typing import Final
+            missing: Final = 0
+            import missing
+            ",
+        ),
         (
             "baseline.json",
             r#"{
