@@ -282,10 +282,12 @@ impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
 
 /// Candidate paths for [`PythonEnvironment::discover`], collected before checking the filesystem.
 #[derive(Debug)]
-pub struct VirtualEnvironmentCandidates {
-    pub virtual_env_var: Option<SystemPathBuf>,
-    pub conda_prefix: Option<SystemPathBuf>,
-    pub project_venv: Option<SystemPathBuf>,
+pub enum VirtualEnvironmentCandidates {
+    VirtualEnvVar(SystemPathBuf),
+    NoVirtualEnvVar {
+        conda_prefix: Option<SystemPathBuf>,
+        project_venv: Option<SystemPathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -309,18 +311,23 @@ impl PythonEnvironment {
         project_root: Option<&SystemPath>,
         system: &dyn System,
     ) -> Result<Option<Self>, SitePackagesDiscoveryError> {
-        let candidates = Self::virtual_environment_candidates(project_root, system);
         let resolve = |path: &SystemPath, origin| {
             tracing::debug!("Resolving {origin}: {path}");
             Self::new(path, origin, system)
         };
 
-        if let Some(path) = candidates.virtual_env_var.as_deref() {
-            return resolve(path, SysPrefixPathOrigin::VirtualEnvVar).map(Some);
-        }
+        let candidates = Self::virtual_environment_candidates(project_root, system);
+        let (conda_prefix, project_venv) = match candidates {
+            VirtualEnvironmentCandidates::VirtualEnvVar(path) => {
+                return resolve(&path, SysPrefixPathOrigin::VirtualEnvVar).map(Some);
+            }
+            VirtualEnvironmentCandidates::NoVirtualEnvVar {
+                conda_prefix,
+                project_venv,
+            } => (conda_prefix, project_venv),
+        };
 
-        let conda = candidates
-            .conda_prefix
+        let conda = conda_prefix
             .as_deref()
             .map(|path| (path, CondaEnvironmentKind::from_prefix_path(system, path)));
         if let Some((path, CondaEnvironmentKind::Child)) = conda
@@ -329,7 +336,7 @@ impl PythonEnvironment {
             return resolve(path, SysPrefixPathOrigin::CondaPrefixVar).map(Some);
         }
 
-        if let Some(path) = candidates.project_venv.as_deref() {
+        if let Some(path) = project_venv.as_deref() {
             match resolve(path, SysPrefixPathOrigin::LocalVenv) {
                 Ok(environment) => return Ok(Some(environment)),
                 Err(err) if system.is_directory(path) => {
@@ -371,14 +378,9 @@ impl PythonEnvironment {
                 .map(SystemPathBuf::from)
         };
         if let Some(path) = from_env(EnvVars::VIRTUAL_ENV) {
-            return VirtualEnvironmentCandidates {
-                virtual_env_var: Some(path),
-                conda_prefix: None,
-                project_venv: None,
-            };
+            return VirtualEnvironmentCandidates::VirtualEnvVar(path);
         }
-        VirtualEnvironmentCandidates {
-            virtual_env_var: None,
+        VirtualEnvironmentCandidates::NoVirtualEnvVar {
             conda_prefix: from_env(EnvVars::CONDA_PREFIX),
             project_venv: project_root.map(|root| root.join(".venv")),
         }

@@ -38,6 +38,7 @@ use ty_python_core::{
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
+    VirtualEnvironmentCandidates,
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
