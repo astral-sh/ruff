@@ -337,18 +337,6 @@ impl Bindings {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
-
-    pub(super) fn finish(
-        &mut self,
-        narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
-        self.live_bindings.shrink_to_fit();
-        for binding in &self.live_bindings {
-            reachability_constraints.mark_used(binding.reachability_constraint);
-            narrowing_constraints.mark_used(binding.narrowing_constraint);
-        }
-    }
 }
 
 /// One of the live bindings for a single place at some point in control flow.

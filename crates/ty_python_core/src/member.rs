@@ -35,6 +35,12 @@ impl Member {
         &self.expression
     }
 
+    /// Returns the final string key in a member such as `self.movie["year"]`.
+    pub fn string_subscript_key(&self) -> Option<&str> {
+        let segment = self.expression.segments().last()?;
+        (segment.kind == SegmentKind::StringSubscript).then_some(segment.text)
+    }
+
     /// Is the place given a value in its containing scope?
     pub(crate) const fn is_bound(&self) -> bool {
         self.flags.contains(MemberFlags::IS_BOUND)

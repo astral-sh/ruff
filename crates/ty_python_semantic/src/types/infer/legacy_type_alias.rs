@@ -393,7 +393,7 @@ fn unique_forwarding_target<'db>(
                 target = Some(definition);
             }
             DefinitionState::Undefined => unbound = true,
-            DefinitionState::Deleted => return Err(()),
+            DefinitionState::Deleted | DefinitionState::Invalidated => return Err(()),
         }
     }
     if target.is_some() && unbound && !assume_bound {

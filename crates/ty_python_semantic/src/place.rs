@@ -15,9 +15,9 @@ use crate::reachability::{
     evaluate_reachability_with_cache,
 };
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
-    may_exist_at_runtime,
+    DynamicType, KnownClass, MemberLookupPolicy, NarrowingTarget, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    is_discarded_dict_key_assignment, may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -837,7 +837,7 @@ pub(crate) fn has_bound_prefix<'db>(
                     return true;
                 }
             }
-            DefinitionState::Deleted => {}
+            DefinitionState::Deleted | DefinitionState::Invalidated => {}
         }
     }
     !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
@@ -1774,7 +1774,9 @@ fn loop_header_reachability_impl<'db>(
             // necessary for prior uses in the loop to see it.
             // Discarded dictionary-key bindings also require a fallback to the receiver's
             // value type instead of contributing their assigned value.
-            DefinitionState::Defined(_) | DefinitionState::Deleted => {
+            DefinitionState::Defined(_)
+            | DefinitionState::Deleted
+            | DefinitionState::Invalidated => {
                 deleted_reachability = deleted_reachability.or(reachability);
                 deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
@@ -1916,7 +1918,7 @@ fn place_from_bindings_impl<'db>(
                 DefinitionState::Undefined => {
                     return None;
                 }
-                DefinitionState::Deleted => {
+                DefinitionState::Deleted | DefinitionState::Invalidated => {
                     deleted_reachability = deleted_reachability.or_else(|| {
                         evaluate_reachability_with_cache(
                             db,
@@ -2031,7 +2033,7 @@ fn place_from_bindings_impl<'db>(
                             narrowing_constraint.narrowing_constraints(),
                             predicates,
                             narrowing_constraint.predicate_narrowing_targets(),
-                            binding.place(db),
+                            NarrowingTarget::from(binding.place(db)),
                             binding_ty,
                         )
                     })

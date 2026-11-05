@@ -22,7 +22,8 @@ use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
-use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::infer::{InferenceFlags, TypeExpressionFlags, infer_definition_types};
+use crate::types::narrow::NarrowingTarget;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
@@ -34,12 +35,14 @@ use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, ClassType,
     CycleDetector, DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, MemberLookupPolicy, Parameter, Parameters, SpecialFormType,
-    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance,
+    StaticClassLiteral, StringLiteralType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, UnionType, UnionTypeInstance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
-use ty_python_core::definition::Definition;
-use ty_python_core::place::PlaceExpr;
+use ty_python_core::ExpressionNodeKey;
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::narrowing_constraints::ConstraintKey;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
 
@@ -505,6 +508,96 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &constraint_keys,
                 )
             })
+    }
+
+    /// Checks whether the receiver's constructor supplied a key or a membership test proved it
+    /// present. An unpack can check several keys at the same use of the receiver.
+    ///
+    /// ```python
+    /// def release_year(movie: Movie, key: Literal["year"]):
+    ///     if "year" in movie:
+    ///         return movie[key]
+    /// ```
+    pub(super) fn typed_dict_receiver_key_presence(
+        &self,
+        receiver: &ast::Expr,
+    ) -> impl Fn(&str) -> Type<'db> {
+        let db = self.db();
+        let constructor_keys = self
+            .typed_dict_constructor_keys
+            .get(&ExpressionNodeKey::from(receiver));
+
+        // In `(movie := other)["year"]`, the load is `other`. The assignment itself has no use ID.
+        let receiver = receiver.expression_value();
+        let place = PlaceExpr::try_from_expr(receiver).map(|place| {
+            let (_, constraints) = self.infer_place_load(&place, ast::ExprRef::from(receiver));
+            (place, constraints)
+        });
+        let unknown = KnownClass::Bool.to_instance(db, self.program_environment());
+        move |key| {
+            if constructor_keys.is_some_and(|keys| keys.iter().any(|name| name == key)) {
+                return Type::bool_literal(true);
+            }
+            let Some((place, constraints)) = &place else {
+                return unknown;
+            };
+            let key = StringLiteralType::new(db, key);
+            self.narrow_place_with_applicable_constraints(
+                PlaceExprRef::from(place),
+                |place| NarrowingTarget::ContainsKey(place, key),
+                unknown,
+                constraints,
+            )
+        }
+    }
+
+    /// Applies writes, deletions, and membership checks on a literal subscript to the
+    /// key presence inferred from its receiver.
+    pub(super) fn typed_dict_key_is_present(
+        &self,
+        initial_presence: Type<'db>,
+        item: Option<(PlaceExprRef<'_>, &[(FileScopeId, ConstraintKey)])>,
+    ) -> bool {
+        let presence = item.map_or(initial_presence, |(item, constraints)| {
+            self.narrow_place_with_applicable_constraints(
+                item,
+                NarrowingTarget::KeyPresence,
+                initial_presence,
+                constraints,
+            )
+        });
+        presence == Type::bool_literal(true)
+    }
+
+    /// Checks whether the `TypedDict` constructor that bound the receiver in the current
+    /// scope supplied `key`. Reassigning the receiver can change which keys are present.
+    ///
+    /// ```python
+    /// movie = Movie(title="Alien", year=1979)
+    /// movie["year"]
+    /// movie = Movie(title="Aliens")
+    /// movie["year"]  # "year" may be missing
+    /// ```
+    pub(super) fn typed_dict_key_presence_at_definition(
+        &self,
+        definition: Definition<'db>,
+        key: &str,
+    ) -> Type<'db> {
+        let db = self.db();
+        if definition.scope(db) == self.scope()
+            && matches!(
+                definition.kind(db),
+                DefinitionKind::Assignment(_)
+                    | DefinitionKind::AnnotatedAssignment(_)
+                    | DefinitionKind::NamedExpression(_)
+            )
+            && infer_definition_types(db, definition)
+                .initial_typed_dict_keys()
+                .is_some_and(|keys| keys.iter().any(|name| name == key))
+        {
+            return Type::bool_literal(true);
+        }
+        KnownClass::Bool.to_instance(db, self.program_environment())
     }
 
     pub(super) fn infer_explicit_class_specialization(

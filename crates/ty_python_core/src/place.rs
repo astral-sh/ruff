@@ -80,6 +80,23 @@ impl PlaceExpr {
         MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
     }
 
+    /// Returns the subscript place whose presence a literal key-membership test checks.
+    ///
+    /// Here the comparison identifies the place `movie["year"]`.
+    ///
+    /// ```python
+    /// if "year" in movie:
+    ///     print(movie["year"])
+    /// ```
+    pub fn from_key_membership(compare: &ast::ExprCompare) -> Option<Self> {
+        let (key, ast::CmpOp::In | ast::CmpOp::NotIn, container) = compare.as_single()? else {
+            return None;
+        };
+        key.as_string_literal_expr()?;
+        let container = MemberExprBuilder::visit_expr(ast::ExprRef::from(container))?;
+        Self::try_from_member_expr(MemberExprBuilder::visit_subscript_expr(&container, key)?)
+    }
+
     /// Tries to create a `PlaceExpr` from a member expression.
     ///
     /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
@@ -695,6 +712,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
         for operand in &expr_compare.operands {
             self.add_narrowing_target(operand, &mut places);
+        }
+
+        // Include the implied subscript so later reads can use this test to determine
+        // whether the key is present.
+        if let Some(item) = PlaceExpr::from_key_membership(expr_compare)
+            && let Some(place) = self.places.place_id(PlaceExprRef::from(&item))
+        {
+            places.insert(place);
         }
 
         let can_narrow_tagged_union_base = matches!(
