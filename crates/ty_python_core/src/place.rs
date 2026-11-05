@@ -196,6 +196,7 @@ impl Hash for PlaceTable {
         for symbol in self.symbols.iter() {
             symbol.name().hash(state);
             symbol.is_used().hash(state);
+            symbol.is_used_only_for_keyword_unpacking().hash(state);
             symbol.is_bound().hash(state);
             symbol.is_declared().hash(state);
             symbol.is_global().hash(state);

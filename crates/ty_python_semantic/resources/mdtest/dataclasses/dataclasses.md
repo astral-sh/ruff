@@ -1868,6 +1868,42 @@ reveal_type(Foo.__match_args__)  # revealed: Unknown
 reveal_type(Foo.__weakref__)  # revealed: Unknown
 ```
 
+The unavailable options can appear in an unreachable branch of a version-dependent argument:
+
+```py
+import sys
+
+@dataclass(**({"slots": True} if sys.version_info >= (3, 10) else {}))  # no diagnostic
+class Versioned:
+    value: int
+
+Versioned(1)  # no diagnostic
+Versioned(value=1)  # no diagnostic
+```
+
+### Version-dependent options on newer Python versions
+
+The same version guard is accepted on a newer Python version, but its slots are not recognized.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from dataclasses import dataclass
+
+@dataclass(**({"slots": True} if sys.version_info >= (3, 10) else {}))  # no diagnostic
+class Versioned:
+    value: int
+
+Versioned(1)  # no diagnostic
+Versioned(value=1)  # no diagnostic
+# error: [unresolved-attribute]
+reveal_type(Versioned.__slots__)  # revealed: Unknown
+```
+
 ## `Final` fields
 
 Dataclass fields can be annotated with `Final`, which means that the field cannot be reassigned

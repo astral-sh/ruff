@@ -205,6 +205,33 @@ def _(value: int | str) -> None:
     reveal_type(choose(**{"x": value}))  # revealed: int | str
 ```
 
+### Expanding conditional dictionary arguments
+
+Conditional dictionary arguments currently lose their individual keys during overload selection.
+
+```py
+from typing import Literal, overload
+
+@overload
+def choose() -> None: ...
+@overload
+def choose(*, x: int) -> int: ...
+@overload
+def choose(*, x: str, y: str) -> str: ...
+def choose(*, x: int | str | None = None, y: str = "") -> int | str | None: ...
+```
+
+Even statically selected branches lose their keys, producing undesirable return types:
+
+```py
+def selected() -> None:
+    reveal_type(choose(**({"x": 1} if True else {})))  # revealed: Unknown
+    reveal_type(choose(**({"x": 1} if False else {})))  # revealed: Unknown
+
+    kwargs = {"x": 1} if False else {"x": "one", "y": "two"}
+    reveal_type(choose(**kwargs))  # revealed: None
+```
+
 ### Expanding first argument
 
 If the set of argument lists created by expanding the first argument evaluates successfully, the
