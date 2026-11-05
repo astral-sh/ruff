@@ -556,6 +556,14 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    pub(super) fn variable_index(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<usize> {
+        self.variables_inner(db).get_index_of(&typevar)
+    }
+
     pub(crate) fn contains(
         self,
         db: &'db dyn Db,
@@ -1381,8 +1389,7 @@ impl<'db> Specialization<'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
+            .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
     }
 
@@ -2581,6 +2588,17 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Whether inference supplied a type for this variable, before applying defaults.
+    pub(super) fn has_inferred_type(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        self.generic_context(db)
+            .variable_index(db, typevar)
+            .is_some_and(|index| self.merged_types(db)[index].is_some())
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {

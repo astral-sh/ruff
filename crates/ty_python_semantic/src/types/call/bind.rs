@@ -61,7 +61,7 @@ use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
     TypeVarInferenceSolutions, walk_specialization_types,
 };
-use crate::types::infer::original_class_type;
+use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
@@ -5970,7 +5970,8 @@ fn parameter_context_specialization<'db>(
     generic_context: GenericContext<'db>,
     inference: Option<TypeVarInference<'db>>,
     return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-) -> Specialization<'db> {
+    return_context_kind: TypeContextKind,
+) -> ArgumentContextSpecialization<'db> {
     // The marker distinguishes unsolved type variables without defaults from gradual types
     // inferred from arguments. Only the former are ignored during fixpoint iteration.
     let argument_specialization = inference.map(|inference| {
@@ -5987,7 +5988,7 @@ fn parameter_context_specialization<'db>(
     // approach would be to propagate constraint sets as type context, making bidirectional
     // inference constraint-set-aware, or to infer constraint sets directly for argument types,
     // and avoid the need to construct type context before call inference has completed.
-    generic_context.specialize_recursive(
+    let types = generic_context.specialize_recursive(
         db,
         generic_context.variables(db).map(|typevar| {
             let identity = typevar.identity(db);
@@ -6030,7 +6031,24 @@ fn parameter_context_specialization<'db>(
                     .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
             )
         }),
-    )
+    );
+
+    let kinds = types
+        .generic_context(db)
+        .variables(db)
+        .map(|typevar| {
+            let identity = typevar.identity(db);
+            if return_type_solutions.contains_key(&identity) {
+                Some(return_context_kind)
+            } else {
+                inference
+                    .is_some_and(|inference| inference.has_inferred_type(db, identity))
+                    .then_some(TypeContextKind::Inferred)
+            }
+        })
+        .collect();
+
+    ArgumentContextSpecialization { types, kinds }
 }
 
 /// Completed inference and its diagnostics, passed together to argument validation.
@@ -6654,7 +6672,7 @@ impl<'db> CallInference<'_, 'db> {
 
         // TODO: ParamSpec and TypeVarTuple inference still uses legacy type mappings, which
         // cannot distinguish validity constraints from inference evidence.
-        let use_legacy_solver = self.call_expression_tcx.is_declared()
+        let use_legacy_solver = !self.call_expression_tcx.is_validity()
             || generic_context
                 .variables(db)
                 .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
@@ -8010,6 +8028,28 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
+/// The call specialization inferred during fixpoint generic call inference.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct ArgumentContextSpecialization<'db> {
+    types: Specialization<'db>,
+    kinds: Vec<Option<TypeContextKind>>,
+}
+
+impl<'db> ArgumentContextSpecialization<'db> {
+    fn kind_for(
+        &self,
+        db: &'db dyn Db,
+        variable: BoundTypeVarInstance<'db>,
+    ) -> Option<TypeContextKind> {
+        let index = self
+            .types
+            .generic_context(db)
+            .variable_index(db, variable.identity(db))?;
+
+        self.kinds[index]
+    }
+}
+
 /// The type context to use when inferring a call-site argument, for a given binding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ArgumentTypeContext<'db> {
@@ -8453,15 +8493,19 @@ impl<'db> Binding<'db> {
                     .annotated_type();
                 // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
                 // type variables in the same way as for arguments to an ordinary generic call.
-                contexts.push(parameter_type.apply_optional_specialization(
-                    db,
-                    specialized_overload.argument_type_context_specialization(
+                contexts.push(
+                    parameter_type.apply_optional_specialization(
                         db,
-                        env,
-                        constraints,
-                        call_expression_tcx,
+                        specialized_overload
+                            .argument_type_context_specialization(
+                                db,
+                                env,
+                                constraints,
+                                call_expression_tcx,
+                            )
+                            .map(|specialization| specialization.types),
                     ),
-                ));
+                );
             }
         }
         (!contexts.is_empty()).then(|| UnionType::from_elements(db, env, contexts))
@@ -8542,7 +8586,7 @@ impl<'db> Binding<'db> {
     /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
     /// ```
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn argument_type_context(
+    pub(crate) fn argument_type_context<'a>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8551,8 +8595,11 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
-        specialization: impl Fn() -> Option<Specialization<'db>>,
-    ) -> Option<ArgumentTypeContext<'db>> {
+        specialization: impl Fn() -> Option<&'a ArgumentContextSpecialization<'db>>,
+    ) -> Option<ArgumentTypeContext<'db>>
+    where
+        'db: 'a,
+    {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [matched_parameter] = argument_matches.parameters.as_slice() else {
             return None;
@@ -8567,7 +8614,8 @@ impl<'db> Binding<'db> {
             self.merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
-                    specialization().and_then(|specialization| specialization.get(db, paramspec))
+                    specialization()
+                        .and_then(|specialization| specialization.types.get(db, paramspec))
                 })?
                 .as_paramspec_value(db)
         };
@@ -8586,6 +8634,8 @@ impl<'db> Binding<'db> {
                 TypeContext::validity(bound),
             ));
         }
+
+        let mut tcx_kind = TypeContextKind::Declared;
 
         // If this is a generic call, specialize the parameter type using the computed constraints.
         if self.signature.generic_context.is_some() {
@@ -8621,7 +8671,16 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type = parameter_type.apply_optional_specialization(db, specialization());
+            if let Some(specialization) = specialization() {
+                if let Type::TypeVar(variable) = parameter_type.resolve_type_alias(db)
+                    && let Some(parameter_tcx_kind) = specialization.kind_for(db, variable)
+                {
+                    tcx_kind = parameter_tcx_kind;
+                }
+
+                parameter_type = parameter_type.apply_specialization(db, specialization.types);
+            }
+
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
@@ -8633,21 +8692,22 @@ impl<'db> Binding<'db> {
                 )
             {
                 parameter_type = expected;
+                tcx_kind = call_expression_tcx.kind();
             }
         }
 
         // A parameter specialized using the declared type of an outer type variable should remain
         // as validity type context.
-        let context =
-            if !call_expression_tcx.is_declared() && parameter_type != original_parameter_type {
-                TypeContext::validity(parameter_type)
-            } else {
-                TypeContext::declared(Some(parameter_type))
-            };
+        if tcx_kind == TypeContextKind::Declared
+            && call_expression_tcx.is_validity()
+            && parameter_type != original_parameter_type
+        {
+            tcx_kind = TypeContextKind::Validity;
+        }
 
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            context,
+            TypeContext::new(Some(parameter_type), tcx_kind),
         ))
     }
 
@@ -8667,24 +8727,27 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<Cow<'db, ArgumentContextSpecialization<'db>>> {
         /// With no evidence from the expected return type, every call in this program
         /// with the same generic context and inferred arguments has the same parameter context.
         #[salsa::tracked(
-            returns(copy),
+            returns(as_ref),
             cycle_initial = |_, _, _| None,
             heap_size = ruff_memory_usage::heap_size,
         )]
         fn inferred_parameter_context<'db>(
             db: &'db dyn Db,
             key: ParameterContextKey<'db>,
-        ) -> Option<Specialization<'db>> {
+        ) -> Option<ArgumentContextSpecialization<'db>> {
             let (generic_context, program, inference) = match key {
                 ParameterContextKey::Uninferred(context) => {
-                    return Some(context.repeat_specialization(
-                        db,
-                        Type::Dynamic(DynamicType::UnspecializedTypeVar),
-                    ));
+                    return Some(ArgumentContextSpecialization {
+                        types: context.repeat_specialization(
+                            db,
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar),
+                        ),
+                        kinds: vec![None; context.len(db)],
+                    });
                 }
                 ParameterContextKey::Inferred(inference) => {
                     let context = inference.generic_context(db);
@@ -8700,6 +8763,7 @@ impl<'db> Binding<'db> {
                 generic_context,
                 Some(inference),
                 &FxHashMap::default(),
+                TypeContextKind::Declared,
             ))
         }
 
@@ -8748,15 +8812,16 @@ impl<'db> Binding<'db> {
                 ParameterContextKey::new(db, env, generic_context, self.inference),
             )
         {
-            return Some(specialization);
+            return Some(Cow::Borrowed(specialization));
         }
-        Some(parameter_context_specialization(
+        Some(Cow::Owned(parameter_context_specialization(
             db,
             env,
             generic_context,
             self.inference,
             &return_type_solutions,
-        ))
+            call_expression_tcx.kind(),
+        )))
     }
 
     /// Records the overload's source definition index for later diagnostics.

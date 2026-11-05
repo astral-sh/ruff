@@ -83,6 +83,7 @@ pub(crate) use expression_truthiness::TruthinessAnalyzer;
 mod tests;
 mod type_context;
 pub(crate) use type_context::TypeContext;
+pub(super) use type_context::TypeContextKind;
 
 /// The inferred alias type, or a cycle error retaining a type for recovery.
 pub(super) type LegacyTypeAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
