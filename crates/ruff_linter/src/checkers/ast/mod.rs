@@ -1058,11 +1058,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt.syntax_node());
+        let kind = stmt.classify();
 
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
-        if !stmt.is_function_def_stmt() {
-            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        if !matches!(kind, StmtKind::FunctionDef(_)) {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(kind, context));
         }
 
         // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
@@ -1078,7 +1079,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Track whether we've seen module docstrings, non-imports, etc.
-        let kind = stmt.classify();
         match kind {
             StmtKind::Expr(stmt_expr)
                 if !self.semantic.seen_module_docstring_boundary()
@@ -3253,7 +3253,7 @@ impl<'a> Checker<'a> {
                 let parameters = function_def_node.parameters();
 
                 self.with_semantic_checker(|semantic, context| {
-                    semantic.visit_stmt(function_def_node.into(), context);
+                    semantic.visit_stmt(StmtKind::FunctionDef(function_def_node), context);
                 });
 
                 self.visit_parameters(parameters);

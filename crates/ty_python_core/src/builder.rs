@@ -3886,13 +3886,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_stmt_impl(&mut self, stmt: Stmt<'ast>) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        let kind = stmt.classify();
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(kind, context));
 
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(stmt.range(), in_type_checking_block);
 
-        let kind = stmt.classify();
         match kind {
             StmtKind::FunctionDef(function_def) => {
                 let ast::StmtFunctionDefFields {
