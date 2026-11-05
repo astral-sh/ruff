@@ -36,10 +36,9 @@ pub struct NewType<'db> {
     // The base type of this NewType, if it's eagerly specified. This is typically `None` when a
     // `NewType` is first encountered, because the base type is lazy/deferred to avoid panics in
     // the recursive case. This becomes `Some` when a `NewType` is modified by methods like
-    // `.normalize()`. Callers should use the `base` method instead of accessing this field
-    // directly.
+    // `.normalize()`. Use `base` unless traversing only the eagerly available type structure.
     #[returns(copy)]
-    eager_base: Option<NewTypeBase<'db>>,
+    pub(super) eager_base: Option<NewTypeBase<'db>>,
 }
 
 impl get_size2::GetSize for NewType<'_> {}

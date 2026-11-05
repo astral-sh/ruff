@@ -364,6 +364,13 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
+    pub(super) fn lookup_anchor(&self) -> Option<ClassType<'db>> {
+        match self {
+            Self::Resolved(owner) => Some(owner.lookup_anchor),
+            Self::Dynamic(_) | Self::Divergent(_) => None,
+        }
+    }
+
     fn descriptor_binding(
         self,
         db: &'db dyn Db,

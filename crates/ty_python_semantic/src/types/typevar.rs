@@ -897,7 +897,7 @@ impl TypeVarNonce {
         self.0
     }
 
-    fn increment(self) -> Self {
+    pub(super) fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
@@ -905,7 +905,7 @@ impl TypeVarNonce {
         )
     }
 
-    fn add(self, delta: u32) -> Self {
+    pub(super) fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -966,12 +966,14 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
-/// Returns a freshening delta if a binder would collide with an occurrence in `types`.
-pub(super) fn freshening_delta<'db>(
+/// Returns the highest nonce to avoid when a binder collides with an occurrence in `types`
+/// or an enclosing comparison has already reserved nonces.
+pub(super) fn freshen_above<'db>(
     db: &'db dyn Db,
     types: impl IntoIterator<Item = Type<'db>>,
     generic_context: GenericContext<'db>,
-) -> Option<u32> {
+    reserved: Option<TypeVarNonce>,
+) -> Option<TypeVarNonce> {
     struct Freshness<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         binders: GenericContext<'db>,
@@ -1024,15 +1026,12 @@ pub(super) fn freshening_delta<'db>(
         binders: generic_context,
         seen: TypeCollector::default(),
         collides: Cell::new(false),
-        max: Cell::new(TypeVarNonce::NONE),
+        max: Cell::new(reserved.unwrap_or_default()),
     };
     for ty in types {
         visitor.visit_type(db, ty);
     }
-    visitor
-        .collides
-        .get()
-        .then(|| visitor.max.get().increment().value())
+    (visitor.collides.get() || reserved.is_some()).then(|| visitor.max.get())
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
@@ -1584,6 +1583,27 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    pub(super) fn freshen_bound_typevars(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        Type::TypeVar(self)
+            .apply_type_mapping_impl(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context,
+                    delta,
+                },
+                TypeContext::default(),
+                visitor,
+            )
+            .as_typevar()
+            .unwrap_or(self)
+    }
+
     fn freshen_with_mapping(
         self,
         db: &'db dyn Db,
@@ -1850,7 +1870,7 @@ impl<'db> BindingContext<'db> {
         }
     }
 
-    fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub(super) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,

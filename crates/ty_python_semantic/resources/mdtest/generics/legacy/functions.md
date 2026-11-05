@@ -540,6 +540,42 @@ def narrowed(value: Source[S]) -> None:
         reveal_type(require_text(value))  # revealed: str
 ```
 
+## Independent protocol arguments with a generic method
+
+Each argument can specialize the same generic method independently when it satisfies a protocol.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+S = TypeVar("S")
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Produces(Protocol[T_co]):
+    def get(self) -> T_co: ...
+
+class Array(Generic[T_co]):
+    def get(self: "Array[S]") -> S:
+        def check(xs: Array[int], ys: Array[S]) -> None:
+            # Checking xs.get introduces a separate binding of S from the one in ys.
+            # revealed: tuple[int, S@get]
+            reveal_type(pair(xs, ys))
+            # revealed: tuple[S@get, int]
+            reveal_type(pair(ys, xs))
+
+        raise NotImplementedError
+
+def pair(x: Produces[T], y: Produces[U]) -> tuple[T, U]:
+    return x.get(), y.get()
+
+def check(xs: Array[int], ys: Array[str], zs: Array[S]) -> None:
+    # revealed: tuple[int, str]
+    reveal_type(pair(xs, ys))
+    # revealed: tuple[S@check, str]
+    reveal_type(pair(zs, ys))
+```
+
 ## Inferring a constrained typevar
 
 ```py
@@ -2481,9 +2517,8 @@ def head(xs: list[T]) -> T:
     return xs[0]
 
 reveal_type(invoke(identity, 1))  # revealed: Literal[1]
-
-# TODO: this should be `Unknown | int`
-reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+# revealed: int
+reveal_type(invoke(head, [1, 2, 3]))
 ```
 
 ## Opaque decorators don't affect typevar binding
