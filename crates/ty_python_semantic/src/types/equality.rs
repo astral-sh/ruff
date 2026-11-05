@@ -618,20 +618,24 @@ fn evaluate_comparison_once<'db>(
 ) -> ComparisonResult<'db> {
     if let Some(comparison) = WideLiteralComparison::new(evaluator.db, &evaluator.env, left, right)
     {
-        if comparison
-            .truthiness(evaluator.db, LiteralComparisonKind::Equality)
-            .is_always_false()
-        {
-            return operator.result_from_equality(false);
-        }
-        return if evaluator.goal == ComparisonGoal::Constraint
+        if evaluator.goal == ComparisonGoal::Constraint
             && operator.condition_expects_equality(branch)
-            && let Some(constraint) = comparison.positive_constraint(
+        {
+            return match comparison.positive_constraint(
                 evaluator.db,
                 &evaluator.env,
                 LiteralComparisonKind::Equality,
             ) {
-            ComparisonResult::CanNarrow(constraint)
+                Some(Type::Never) => operator.result_from_equality(false),
+                Some(constraint) => ComparisonResult::CanNarrow(constraint),
+                None => ComparisonResult::Ambiguous,
+            };
+        }
+        return if comparison
+            .truthiness(evaluator.db, LiteralComparisonKind::Equality)
+            .is_always_false()
+        {
+            operator.result_from_equality(false)
         } else {
             ComparisonResult::Ambiguous
         };

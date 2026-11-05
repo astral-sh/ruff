@@ -569,8 +569,9 @@ impl<'db> WideLiteralComparison<'db> {
         )
     }
 
-    /// Applying the constraint intersects it with the original operand. When even the
-    /// shared literals would form a large product, narrow to their builtin classes.
+    /// Disjoint operands produce `Some(Type::Never)`. Applying a nonempty constraint
+    /// intersects it with the original operand. When the shared literals would form a
+    /// large product, narrow to their builtin classes.
     pub(super) fn positive_constraint(
         self,
         db: &'db dyn Db,

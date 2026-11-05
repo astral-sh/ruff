@@ -83,18 +83,6 @@ def _(
     reveal_type(value != disjoint)  # revealed: Literal[True]
 ```
 
-## Equality of bytes and integer literal unions
-
-```py
-from typing import Literal
-
-def compare_bytes(left: Literal[b"a", b"b"], right: Literal[b"c", b"d"]):
-    reveal_type(left == right)  # revealed: Literal[False]
-
-def compare_integers(left: Literal[1, 2], right: Literal[3, 4]):
-    reveal_type(left != right)  # revealed: Literal[True]
-```
-
 ## Comparing wide literal unions
 
 For two wide unions of integers, ty can infer `bool` without determining the ordering of each pair.
@@ -108,6 +96,7 @@ Digit = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 def _(tens: Digit, ones: Digit, other_ones: Digit, missing: bool):
     low = 10 * tens + ones  # 0 through 99
     high = 100 + low  # 100 through 199
+    reveal_type(low != high)  # revealed: Literal[True]
     reveal_type(low < high)  # revealed: bool
 
     if low == 42:
@@ -187,6 +176,45 @@ def _(tens: Digit, ones: Digit, use_custom: bool, custom: Reflected):
     value = 10 * tens + ones
     other = custom if use_custom else value
     reveal_type(value < other)  # revealed: bytes | bool
+```
+
+## Comparing wide string and bytes literal unions
+
+Concatenating two of nine letters gives 81 possible values. Adding a prefix makes a disjoint union.
+Equality identifies the disjoint values, while substring tests can infer `bool` even when every
+needle is longer than every haystack.
+
+```py
+from typing import Literal
+
+Letter = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+ByteLetter = Literal[b"a", b"b", b"c", b"d", b"e", b"f", b"g", b"h", b"i"]
+
+def _(first: Letter, second: Letter, first_byte: ByteLetter, second_byte: ByteLetter, flag: bool):
+    text = first + second
+    data = first_byte + second_byte
+    prefixed_text = "_" + text
+    prefixed_data = b"_" + data
+    reveal_type(prefixed_text == text)  # revealed: Literal[False]
+    reveal_type(prefixed_data != data)  # revealed: Literal[True]
+    reveal_type(prefixed_text in text)  # revealed: bool
+    reveal_type(prefixed_data not in data)  # revealed: bool
+```
+
+When there is one shared two-letter value, equality narrows to it.
+
+```py
+    if text == ("ab" if flag else prefixed_text):
+        reveal_type(text)  # revealed: Literal["ab"]
+    if data == (b"ab" if flag else prefixed_data):
+        reveal_type(data)  # revealed: Literal[b"ab"]
+```
+
+A text needle is unsupported when the haystack can be `bytes`.
+
+```py
+    haystack = text if flag else data
+    text in haystack  # error: [unsupported-operator]
 ```
 
 ## Unsupported operations
