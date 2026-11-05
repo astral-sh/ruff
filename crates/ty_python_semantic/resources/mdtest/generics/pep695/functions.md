@@ -5902,6 +5902,16 @@ def concrete(value: int):
     reveal_type(defaults(value))
 ```
 
+The default also uses the recursive call's type argument inside a recursive alias.
+
+```py
+type Node[T] = tuple[T, Node[T] | None]
+
+def make[T, U = Node[T]](value: T) -> U:
+    result: Node[int] = make(1)  # ok
+    raise NotImplementedError
+```
+
 ## Type arguments in annotation metadata
 
 Expressions in `Annotated` metadata can call constructors specialized with the enclosing function's
