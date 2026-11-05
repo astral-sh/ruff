@@ -825,6 +825,23 @@ c.swap()
 c.method(x=42)
 ```
 
+When a method accepts arguments only by keyword, a shadowing lambda can list those parameters in
+either order. Here, callers pass `y` by name, so the lambda's `y` should be inferred as `int`.
+
+```py
+class D:
+    def method(self, *, x: str, y: int) -> int:
+        return y
+
+    def swap(self) -> None:
+        self.method = lambda x, y: y + 1
+        # TODO: Infer the lambda's parameter types by name for keyword-only arguments.
+        # See https://github.com/astral-sh/ty/issues/4935
+        # error: [invalid-assignment]
+        # error: [unsupported-operator]
+        self.method = lambda y, x: y + 1
+```
+
 ### Classmethods and static methods
 
 The same reasoning applies to classmethods and static methods:
@@ -928,8 +945,9 @@ We might therefore consider implementing a stricter check that emits a diagnosti
 
 ### Explicitly annotated instance attributes
 
-When the instance attribute assignment is explicitly annotated with a type that is incompatible with the method it shadows,
-we assume that shadowing is intentional, and prefer the annotation over the method's type:
+When the instance attribute assignment is explicitly annotated with a type that is incompatible with
+the method it shadows, we assume that shadowing is intentional, and prefer the annotation over the
+method's type:
 
 ```py
 class C:
