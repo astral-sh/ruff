@@ -1325,14 +1325,27 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The `site-packages` directory is used by ty for external import.
-/// Ty does the following checks to discover the `site-packages` directory in the order:
-/// 1) If `VIRTUAL_ENV` environment variable is set
-/// 2) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
+fn write_conda_interpreters(case: &CliTest) -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python"
+    };
+    for prefix in ["conda", "conda/envs/conda-env"] {
+        case.write_file(format!("{prefix}/{python}"), "")?;
+    }
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external imports.
+/// ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If the `VIRTUAL_ENV` environment variable is set to a non-empty value
+/// 2) If `CONDA_PREFIX` points to a child environment (e.g. its directory name matches
+///    `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
-/// 4) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
-///    or if `_CONDA_ROOT` is set (and `_CONDA_ROOT` == `CONDA_PREFIX`)
+/// 4) If `CONDA_PREFIX` points to the base environment (e.g. `_CONDA_ROOT` == `CONDA_PREFIX`)
 ///
+/// A Conda environment is considered only if it contains a Python interpreter.
 /// This test (and the next one) is aiming at validating the logic around these cases.
 ///
 /// To do this we create a program that has these 4 imports:
@@ -1373,6 +1386,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// │               └── package1
 /// │                   └── __init__.py
 /// └── conda
+///     ├── bin/python
 ///     ├── lib
 ///     │   └── python3.13
 ///     │       └── site-packages
@@ -1380,6 +1394,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///     │               └── __init__.py
 ///     └── envs
 ///         └── conda-env
+///             ├── bin/python
 ///             └── lib
 ///                 └── python3.13
 ///                     └── site-packages
@@ -1387,7 +1402,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///                             └── __init__.py
 ///
 /// test.py imports package1
-/// And the command is run in the `child` directory.
+/// And the command is run in the `project` directory.
 #[test]
 fn check_venv_resolution_with_working_venv() -> anyhow::Result<()> {
     let child_conda_package1_path = if cfg!(windows) {
@@ -1471,6 +1486,8 @@ home = ./
             "#,
         ),
     ])?;
+
+    write_conda_interpreters(&case)?;
 
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
@@ -1583,7 +1600,7 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
+    // run with CONDA_DEFAULT_ENV set to the directory name of CONDA_PREFIX, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
@@ -1606,7 +1623,7 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1621,19 +1638,19 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find WorkingVenv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
-     --> test.py:5:22
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    5 | from package1 import BaseConda
-      |                      ^^^^^^^^^
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
 
     Found 1 diagnostic
 
@@ -1708,6 +1725,8 @@ home = ./
             "#,
         ),
     ])?;
+
+    write_conda_interpreters(&case)?;
 
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
@@ -1859,7 +1878,7 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1878,7 +1897,7 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----

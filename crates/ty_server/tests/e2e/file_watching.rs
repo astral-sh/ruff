@@ -1,7 +1,7 @@
 use anyhow::Result;
 use insta::{assert_json_snapshot, assert_snapshot};
 use lsp_types::{
-    BaseUri, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
+    BaseUri, FileChangeType, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
     TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
 };
 use ruff_db::system::SystemPath;
@@ -242,6 +242,58 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     assert_snapshot!(
         condensed_document_diagnostic_snapshot(server.document_diagnostic_request(main, None)),
         @r#"1:14..1:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#
+    );
+    Ok(())
+}
+
+/// A single deletion notification for the Pixi directory named by `CONDA_PREFIX` makes ty
+/// resolve imports in the open file from the workspace's `.venv`.
+#[test]
+fn deleting_pixi_prefix_selects_project_venv() -> Result<()> {
+    let builder = TestServerBuilder::new()?;
+    let workspace = builder.file_path("workspace");
+    let prefix = workspace.join(".pixi/envs/dev");
+    let venv = workspace.join(".venv");
+    let main = workspace.join("main.py");
+    let source =
+        "from typing import reveal_type\nfrom dependency import origin\nreveal_type(origin)";
+    let (python, dependency) = if cfg!(windows) {
+        ("python.exe", "Lib/site-packages/dependency.py")
+    } else {
+        ("bin/python", "lib/python3.13/site-packages/dependency.py")
+    };
+
+    let mut server = builder
+        .with_workspace(&workspace, None)?
+        .with_env_var("CONDA_PREFIX", prefix.as_str())
+        .with_files([
+            (prefix.join("conda-meta/pixi"), ""),
+            (prefix.join(python), ""),
+            (prefix.join(dependency), "origin = 'pixi'"),
+            (venv.join(dependency), "origin = 'venv'"),
+        ])?
+        .with_file(
+            venv.join("pyvenv.cfg"),
+            format!("home = {workspace}\nversion = 3.13\n"),
+        )?
+        .with_file(&main, source)?
+        // Disable relative patterns so a single workspace-wide watch covers both environments.
+        .with_watched_file_support(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    watcher_registrations(&mut server)?;
+    server.open_text_document(&main, source, 1);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        @r#"2:12..2:18[INFORMATION]: Revealed type: `Literal["pixi"]`"#
+    );
+
+    std::fs::remove_dir_all(&prefix)?;
+    server.did_change_watched_file(&prefix, FileChangeType::Deleted);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        @r#"2:12..2:18[INFORMATION]: Revealed type: `Literal["venv"]`"#
     );
     Ok(())
 }
