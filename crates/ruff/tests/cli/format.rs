@@ -876,7 +876,6 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
 #[test]
 fn check_bom_only_file() -> Result<()> {
     let test = CliTest::with_file("example.py", "\u{feff}")?;
-    // The deletion line contains the literal BOM.
     assert_cmd_snapshot!(test.format_command().args(["--check", "example.py"]), @"
     success: false
     exit_code: 1
@@ -884,7 +883,7 @@ fn check_bom_only_file() -> Result<()> {
     unformatted: File would be reformatted
      --> example.py:1:1
       |
-      - ﻿
+      - �
       |
 
     1 file would be reformatted

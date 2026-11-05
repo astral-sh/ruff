@@ -349,16 +349,63 @@ impl std::fmt::Display for Line {
 }
 
 fn show_nonprinting(s: &str) -> Cow<'_, str> {
-    if s.find(['\x07', '\x08', '\x1b', '\x7f']).is_some() {
-        Cow::Owned(
-            s.replace('\x07', "␇")
-                .replace('\x08', "␈")
-                .replace('\x1b', "␛")
-                .replace('\x7f', "␡"),
-        )
-    } else {
-        Cow::Borrowed(s)
+    // The diff includes its line ending in the text to display.
+    let content = s.trim_end_matches(['\r', '\n']);
+
+    // Accumulate the comparisons without an early exit so LLVM can vectorize the scan.
+    // The Unicode characters below start with 0xE2 or 0xEF in UTF-8. Other lead bytes
+    // in that range are harmless false positives.
+    let mut may_need_replacement = false;
+    for byte in content.bytes() {
+        let control = byte.is_ascii_control() && byte != b'\t';
+        may_need_replacement |= control | (0xe2..=0xef).contains(&byte);
     }
+    if !may_need_replacement {
+        return Cow::Borrowed(s);
+    }
+
+    let mut output = String::with_capacity(s.len());
+    for ch in content.chars() {
+        let visible = match ch {
+            '\0' => '␀',
+            '\x01' => '␁',
+            '\x02' => '␂',
+            '\x03' => '␃',
+            '\x04' => '␄',
+            '\x05' => '␅',
+            '\x06' => '␆',
+            '\x07' => '␇',
+            '\x08' => '␈',
+            '\x0b' => '␋',
+            '\x0c' => '␌',
+            '\r' => '␍',
+            '\x0e' => '␎',
+            '\x0f' => '␏',
+            '\x10' => '␐',
+            '\x11' => '␑',
+            '\x12' => '␒',
+            '\x13' => '␓',
+            '\x14' => '␔',
+            '\x15' => '␕',
+            '\x16' => '␖',
+            '\x17' => '␗',
+            '\x18' => '␘',
+            '\x19' => '␙',
+            '\x1a' => '␚',
+            '\x1b' => '␛',
+            '\x1c' => '␜',
+            '\x1d' => '␝',
+            '\x1e' => '␞',
+            '\x1f' => '␟',
+            '\x7f' => '␡',
+            '\u{200d}' => continue,
+            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}' => '�',
+            _ => ch,
+        };
+        output.push(visible);
+    }
+    output.push_str(&s[content.len()..]);
+    Cow::Owned(output)
 }
 
 fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
@@ -389,6 +436,14 @@ mod tests {
             create_notebook_diagnostics, create_syntax_error_diagnostics,
         },
     };
+
+    #[test]
+    fn nonprinting_diff_characters() {
+        assert_eq!(
+            super::show_nonprinting("→\u{200d}\u{202e}a\r\u{2069}\t\u{feff}！\r\n"),
+            "→�a␍�\t�！\r\n"
+        );
+    }
 
     #[test]
     fn output() {
