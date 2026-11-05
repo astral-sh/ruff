@@ -3357,8 +3357,7 @@ class WrappedBase:
     f = classmethod(impl)
 
 class WrappedChild(WrappedBase):
-    # TODO: Apply the same exemption from the write check as for the decorator form.
-    f: Callable[[], str]  # error: [invalid-mutable-override]
+    f: Callable[[], str]  # ok
 ```
 
 ## Methods replacing inferred callable defaults

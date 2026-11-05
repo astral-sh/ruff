@@ -37,6 +37,7 @@ struct AttributeContract<'db> {
     write: Option<Type<'db>>,
     is_property: bool,
     is_method: bool,
+    skip_write_check: bool,
     is_frozen_field: bool,
     qualifiers: TypeQualifiers,
 }
@@ -272,6 +273,7 @@ fn bind_attribute<'db>(
     } = *attribute;
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
+    let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
     let (read, write) = if is_descriptor {
         let read = Type::resolve_descriptor_access(
             db,
@@ -288,9 +290,7 @@ fn bind_attribute<'db>(
         .bind_self_typevars(db, env, receiver);
         // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
         // signatures, just like decorated definitions; the function's identity can change.
-        let read = if is_method
-            || matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)))
-        {
+        let read = if is_method || is_method_wrapper {
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -345,6 +345,7 @@ fn bind_attribute<'db>(
         },
         is_property: alternatives.iter().any(Type::is_property_instance),
         is_method,
+        skip_write_check: is_method || is_descriptor && is_method_wrapper,
         is_frozen_field: is_frozen && literal.is_own_dataclass_instance_field(db, name),
         qualifiers,
     })
@@ -451,7 +452,7 @@ fn attribute_violation<'db>(
             target: target.read,
         });
     }
-    if target.is_method {
+    if target.skip_write_check {
         // ty allows methods to be shadowed with instance attributes. For example, it allows
         // `def method(self) -> object` on `Base` to be shadowed via `base.method = lambda: 1`
         // (where `base: Base` could also be an instance of a subclass of `Base`).
