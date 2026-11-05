@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        const HAS_SCOPE_DECLARATION = 1 << 7;
     }
 }
 
@@ -84,6 +85,11 @@ impl Symbol {
     /// Is the symbol `nonlocal` its containing scope?
     pub fn is_nonlocal(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
+    }
+
+    /// Returns whether a `global` or `nonlocal` statement makes this symbol refer to another scope.
+    pub fn has_scope_declaration(&self) -> bool {
+        self.flags.contains(SymbolFlags::HAS_SCOPE_DECLARATION)
     }
 
     /// Is the symbol defined in this scope, vs referring to some enclosing scope?
@@ -132,6 +138,10 @@ impl Symbol {
 
     pub(super) fn mark_nonlocal(&mut self) {
         self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
+    }
+
+    pub(super) fn mark_scope_declaration(&mut self) {
+        self.insert_flags(SymbolFlags::HAS_SCOPE_DECLARATION);
     }
 
     pub(super) fn mark_bound(&mut self) {

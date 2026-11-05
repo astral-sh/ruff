@@ -5434,9 +5434,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_global() {
                         continue;
                     }
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
-                        .mark_global();
+                    let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
+                    symbol.mark_global();
+                    symbol.mark_scope_declaration();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id.clone(), *range);
@@ -5486,9 +5486,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_nonlocal() {
                         continue;
                     }
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
-                        .mark_nonlocal();
+                    let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
+                    symbol.mark_nonlocal();
+                    symbol.mark_scope_declaration();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id.clone(), *range);
