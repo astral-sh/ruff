@@ -153,6 +153,19 @@ def _(book: Book):
     reveal_type(book.pk)  # revealed: int
 ```
 
+Django allows clearing an automatic primary key when copying a model instance.
+
+```py
+def _(book: Book, key: int | None):
+    book.pk = None
+    book.id = None
+    reveal_type(book.pk)  # revealed: int
+    reveal_type(book.id)  # revealed: int
+    book.pk = key
+    book.pk = "invalid"  # error: [invalid-assignment]
+    book.id = "invalid"  # error: [invalid-assignment]
+```
+
 A subclass inherits the primary key behavior of its parent.
 
 ```py
@@ -176,6 +189,7 @@ class Book(models.Model):
 def _(book: Book):
     reveal_type(book.isbn)  # revealed: str
     reveal_type(book.pk)  # revealed: str
+    book.pk = None  # error: [invalid-assignment]
 
     # This is an error now, `id` is not created when a custom primary key is defined.
     book.id  # error: [unresolved-attribute]

@@ -236,10 +236,38 @@ pub(in crate::types) fn synthesized_member<'db>(
         return None;
     }
     match name {
-        "id" | "pk" => primary_key_member(db, env, class, specialization, name),
+        "id" | "pk" => match primary_key_member(db, env, class, specialization, name)? {
+            PrimaryKeyMember::Automatic(ty) | PrimaryKeyMember::Explicit(ty) => Some(ty),
+        },
         _ => display_method(db, env, class, specialization, name)
             .or_else(|| date_navigation_method(db, env, class, specialization, name))
             .or_else(|| foreign_key_id_member(db, env, class, specialization, name)),
+    }
+}
+
+enum PrimaryKeyMember<'db> {
+    Automatic(Type<'db>),
+    Explicit(Type<'db>),
+}
+
+pub(in crate::types) fn is_automatic_primary_key_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    name: &str,
+    member_ty: Type<'db>,
+) -> bool {
+    if matches!(name, "id" | "pk")
+        && let Type::NominalInstance(instance) = object_ty
+        && let Some((class, specialization)) = instance.class(db, env).static_class_literal(db)
+        && is_model(db, class)
+    {
+        matches!(
+            primary_key_member(db, env, class, specialization, name),
+            Some(PrimaryKeyMember::Automatic(ty)) if ty == member_ty
+        )
+    } else {
+        false
     }
 }
 
@@ -266,7 +294,7 @@ fn primary_key_member<'db>(
     class: StaticClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
     name: &str,
-) -> Option<Type<'db>> {
+) -> Option<PrimaryKeyMember<'db>> {
     // Explicit `id` or `pk` attributes on base classes take precedence over a synthesized
     // attribute on this model.
     if class
@@ -289,8 +317,11 @@ fn primary_key_member<'db>(
         }
         if let Some(field) = own_primary_key(db, base) {
             return (name == "pk").then(|| {
-                foreign_key_id_type(db, env, field, specialization)
-                    .unwrap_or_else(|| field.ty.apply_optional_specialization(db, specialization))
+                PrimaryKeyMember::Explicit(
+                    foreign_key_id_type(db, env, field, specialization).unwrap_or_else(|| {
+                        field.ty.apply_optional_specialization(db, specialization)
+                    }),
+                )
             });
         }
     }
@@ -304,6 +335,7 @@ fn primary_key_member<'db>(
         .place
         .ignore_possibly_undefined()?
         .to_instance_approximation(db, env)
+        .map(PrimaryKeyMember::Automatic)
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
