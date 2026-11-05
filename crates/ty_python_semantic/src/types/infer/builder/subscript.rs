@@ -15,7 +15,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    POSSIBLY_MISSING_TYPED_DICT_KEY, TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::dict::dict_literal_key_value_types;
@@ -499,6 +499,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
+        if self
+            .context
+            .is_lint_enabled(&POSSIBLY_MISSING_TYPED_DICT_KEY)
+            && let Some(keys) = string_literal_values(db, slice_ty.resolve_type_alias(db))
+        {
+            for key in keys {
+                if value_ty.typed_dict_key_required(db, env, key) != Some(false) {
+                    continue;
+                }
+                let place = PlaceExpr::try_from_expr(subscript);
+                let receiver_presence = self.typed_dict_receiver_key_presence(&subscript.value);
+                if self.typed_dict_key_is_present(
+                    receiver_presence(key),
+                    place
+                        .as_ref()
+                        .map(|place| (PlaceExprRef::from(place), constraint_keys.as_slice())),
+                ) {
+                    continue;
+                }
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&POSSIBLY_MISSING_TYPED_DICT_KEY, slice.as_ref())
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Key {key:?} may be missing from `{}`",
+                        value_ty.display(db, env)
+                    ));
+                }
+            }
+        }
         self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
             .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
             .map_err(|recovery_ty| {

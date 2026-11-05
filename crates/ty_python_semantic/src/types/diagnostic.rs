@@ -147,6 +147,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_MISSING_SUBMODULE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
+    registry.register_lint(&POSSIBLY_MISSING_TYPED_DICT_KEY);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SHADOWED_TYPE_VARIABLE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
@@ -977,6 +978,15 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_IMPORT = {
         summary: "detects possibly missing imports",
         status: LintStatus::stable("0.0.1-alpha.22"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/possibly-missing-typed-dict-key.md")]
+    pub(crate) static POSSIBLY_MISSING_TYPED_DICT_KEY = {
+        summary: "detects reads of potentially missing TypedDict keys",
+        status: LintStatus::stable("0.0.97"),
         default_level: Level::Ignore,
     }
 }
