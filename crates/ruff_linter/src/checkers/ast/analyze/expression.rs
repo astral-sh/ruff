@@ -472,10 +472,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::RegexFlagAlias) {
                 refurb::rules::regex_flag_alias(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::DatetimeTimezoneUTC) {
-                if checker.target_version() >= PythonVersion::PY311 {
-                    pyupgrade::rules::datetime_utc_alias(checker, expr);
-                }
+            if checker.is_rule_enabled(Rule::DatetimeTimezoneUTC)
+                && checker.target_version() >= PythonVersion::PY311
+                && attribute.attr.as_str() == "utc"
+            {
+                pyupgrade::rules::datetime_utc_alias(checker, expr);
             }
             if checker.is_rule_enabled(Rule::TypingTextStrAlias) {
                 pyupgrade::rules::typing_text_str_alias(checker, expr);
