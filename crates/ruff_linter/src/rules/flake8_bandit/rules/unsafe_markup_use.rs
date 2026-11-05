@@ -1,5 +1,5 @@
 use ruff_python_ast::ExprCallFields;
-use ruff_python_ast::{Expr, ExprCall, ExprKind};
+use ruff_python_ast::{Arguments, Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -102,7 +102,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCallFields<'_>) {
         return;
     }
 
-    if !is_unsafe_call(call.node, checker.semantic(), checker.settings()) {
+    if !is_unsafe_call(call.arguments, checker.semantic(), checker.settings()) {
         return;
     }
 
@@ -134,14 +134,18 @@ fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> 
         .any(|target| *qualified_name == target)
 }
 
-fn is_unsafe_call(call: ExprCall<'_>, semantic: &SemanticModel, settings: &LinterSettings) -> bool {
+fn is_unsafe_call(
+    arguments: Arguments<'_>,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
     // technically this could be circumvented by using a keyword argument
     // but without type-inference we can't really know which keyword argument
     // corresponds to the first positional argument and either way it is
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    matches!(call.arguments().args().as_array(), Some([first]) if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
+    matches!(arguments.args().as_array(), Some([first]) if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
 }
 
 fn is_whitelisted_call(

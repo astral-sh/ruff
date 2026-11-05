@@ -56,17 +56,14 @@ pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCallFields<'_>) {
         return;
     }
 
-    if is_call_insecure(call.node) {
+    if is_call_insecure(call.arguments) {
         checker.report_diagnostic(DjangoExtra, call.arguments.range());
     }
 }
 
-fn is_call_insecure(call: ast::ExprCall<'_>) -> bool {
+fn is_call_insecure(arguments: ast::Arguments<'_>) -> bool {
     for (argument_name, position) in [("select", 0), ("where", 1), ("tables", 3)] {
-        if let Some(argument) = call
-            .arguments()
-            .find_argument_value(argument_name, position)
-        {
+        if let Some(argument) = arguments.find_argument_value(argument_name, position) {
             match argument_name {
                 "select" => match argument.classify() {
                     ExprKind::Dict(dict) => {
