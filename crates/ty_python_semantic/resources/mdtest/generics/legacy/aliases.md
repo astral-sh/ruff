@@ -188,7 +188,7 @@ def outer(value: T) -> T:
     def identity(other: Captured) -> Captured:
         return other
 
-    return identity(value)  # no diagnostic
+    return identity(value)  # ok
 ```
 
 The alias can also have its own parameters. Specializing them preserves the captured parameter.
@@ -205,9 +205,9 @@ def generic_outer(value: T) -> tuple[T, int]:
     def strings(other: Pair[str]) -> Pair[str]:
         return other
 
-    strings((value, "text"))  # no diagnostic
+    strings((value, "text"))  # ok
     integers((value, "text"))  # error: [invalid-argument-type]
-    return integers((value, 1))  # no diagnostic
+    return integers((value, 1))  # ok
 ```
 
 ## Constructor inference through captured alias parameters

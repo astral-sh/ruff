@@ -3407,7 +3407,7 @@ def outer(captured: T) -> None:
     local = Local[int](1)
     # revealed: tuple[int]
     reveal_type(local.value)
-    unchanged: tuple[T] = local.captured  # no diagnostic
+    unchanged: tuple[T] = local.captured  # ok
 ```
 
 ## Annotated attributes preserve captured type variables
@@ -3427,13 +3427,13 @@ def outer(captured: T) -> None:
         captured: T
 
         def __init__(self, value: U, captured: T) -> None:
-            self.value = value  # no diagnostic
-            self.captured = captured  # no diagnostic
+            self.value = value  # ok
+            self.captured = captured  # ok
 
     local = Local[int](1, captured)
     # revealed: int
     reveal_type(local.value)
-    unchanged: T = local.captured  # no diagnostic
+    unchanged: T = local.captured  # ok
     Local[int]("wrong", captured)  # error: [invalid-argument-type]
     Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
@@ -4018,8 +4018,8 @@ class Required(Generic[T]):
     def __init__(self: "Required[str]", value: str = "") -> None: ...
     def __init__(self, value: object = 0) -> None: ...
 
-Required[int]()  # no diagnostic
-Required[str]()  # no diagnostic
+Required[int]()  # ok
+Required[str]()  # ok
 Required[bytes]()  # error: [no-matching-overload]
 Required[int]("wrong")  # error: [no-matching-overload]
 ```

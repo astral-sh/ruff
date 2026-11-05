@@ -1826,8 +1826,8 @@ A variadic parameter can accept both the receiver and the explicit constructor a
 class Plain:
     def __init__(*args: *tuple[object, ...]) -> None: ...
 
-Plain()  # no diagnostic
-Plain(1, "a")  # no diagnostic
+Plain()  # ok
+Plain(1, "a")  # ok
 ```
 
 ## Union `self` annotations with variadic constructor parameters

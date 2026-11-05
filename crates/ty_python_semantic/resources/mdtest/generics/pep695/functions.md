@@ -4512,8 +4512,8 @@ def outer[T](value: T) -> None:
     def inner(value: T, count: int = 1) -> T:
         return value
 
-    first: T = inner(value)  # no diagnostic
-    second: T = inner(value, 2)  # no diagnostic
+    first: T = inner(value)  # ok
+    second: T = inner(value, 2)  # ok
 ```
 
 ## `~T` is never assignable to `T`
@@ -4536,7 +4536,7 @@ enclosing function's type variables.
 def recover[T](value: list[T]) -> list[T]:
     result: list[T] = value
     result = None  # error: [invalid-assignment]
-    return result  # no diagnostic
+    return result  # ok
 ```
 
 ## `Callable` parameters
@@ -5870,13 +5870,13 @@ def recursive[T](value: T) -> T:
 
     def accepts(callback: Callable[[T], T]) -> None: ...
 
-    accepts(generic)  # no diagnostic
+    accepts(generic)  # ok
     captured(1)  # error: [invalid-argument-type]
     # revealed: Literal[1]
     reveal_type(recursive(1))
     # revealed: T@recursive
     reveal_type(captured(value))
-    return recursive(value)  # no diagnostic
+    return recursive(value)  # ok
 ```
 
 ## Type parameter defaults referring to other parameters
@@ -5895,7 +5895,7 @@ def defaults[T, U = list[T], V = tuple[U, T]](value: T) -> tuple[U, V]:
 
 def check[T](value: T) -> tuple[list[T], tuple[list[T], T]]:
     result = defaults(value)
-    return result  # no diagnostic
+    return result  # ok
 
 def concrete(value: int):
     # revealed: tuple[list[int], tuple[list[int], int]]
@@ -5921,7 +5921,7 @@ type parameters.
 from typing import Annotated
 
 def metadata[T](value: T) -> None:
-    annotated: Annotated[int, list[T]([value])]  # no diagnostic
+    annotated: Annotated[int, list[T]([value])]  # ok
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
