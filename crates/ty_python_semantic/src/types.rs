@@ -387,12 +387,6 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.
-///
-/// Use this to inspect the declared type of a variable or parameter. The type of its annotation
-/// expression is an input to declaration inference, and can differ from the declaration's type.
-///
-/// To inspect the value assigned by a definition, use [`binding_type`] instead; that type can be
-/// narrower than the declared type.
 pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -404,8 +398,6 @@ pub(crate) fn inferred_declaration<'db>(
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
-///
-/// Use [`inferred_declaration`] to read the declared type of the annotated variable or parameter.
 ///
 /// ## Panics
 /// If the expression is absent from the semantic index for the definition's file.
@@ -426,8 +418,6 @@ fn definition_expression_type<'db>(
 /// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
 /// but not the scope of nodes parsed from its contents: those nodes are absent from the semantic
 /// index. This helper lets the caller supply the enclosing annotation's scope for such nodes.
-/// It still returns the expression's type; use [`inferred_declaration`] for the declared type of
-/// an annotated variable or parameter.
 fn definition_expression_type_in_scope<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
