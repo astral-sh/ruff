@@ -951,6 +951,28 @@ print()
         ");
     }
 
+    #[test]
+    fn bom_with_full_file_range() {
+        let mut env = TestEnvironment::new();
+        let contents = "\u{feff}import foo";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::up_to(contents.text_len()));
+        diagnostic.annotate(Annotation::primary(span));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | import foo
+          | ^^^^^^^^^^
+        ");
+    }
+
     /// We previously rendered this correctly, but the header was falling back to 1:1 for ranges
     /// pointing to the final newline in a file. Like Ruff, we now use the offset of the first
     /// character in the nonexistent final line in the header.
