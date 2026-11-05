@@ -24,15 +24,13 @@ Released on 2026-11-05.
 
 - Coalesce source slices when formatting attributes ([#29841](https://github.com/astral-sh/ruff/pull/29841))
 - Collect return statements with a statement-only visitor ([#29911](https://github.com/astral-sh/ruff/pull/29911))
-- Defer value comparisons for repeated dictionary keys (F601, F602) ([#29739](https://github.com/astral-sh/ruff/pull/29739))
+- \[`pyflakes`\] Defer value comparisons for repeated dictionary keys (`F601`, `F602`) ([#29739](https://github.com/astral-sh/ruff/pull/29739))
 - Format node fields directly when comment handling is unnecessary ([#29853](https://github.com/astral-sh/ruff/pull/29853))
 - Reduce formatter source-slice overhead ([#29855](https://github.com/astral-sh/ruff/pull/29855))
 - Reuse a callee's qualified name across lint rules ([#29916](https://github.com/astral-sh/ruff/pull/29916))
 - Skip invalid string character checks when the source contains none ([#29883](https://github.com/astral-sh/ruff/pull/29883))
 - Use a Bloom filter for formatter comment lookups ([#29852](https://github.com/astral-sh/ruff/pull/29852))
 - Use a concrete buffer for ordinary writes ([#29819](https://github.com/astral-sh/ruff/pull/29819))
-- [ty] Avoid inferring a member prefix's type to check whether it is bound ([#30057](https://github.com/astral-sh/ruff/pull/30057))
-- [ty] Skip previous overload lookup for singly bound local functions ([#30027](https://github.com/astral-sh/ruff/pull/30027))
 
 ### CLI
 
