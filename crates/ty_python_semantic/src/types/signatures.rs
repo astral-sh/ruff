@@ -175,7 +175,7 @@ impl<'db> CallableSignature<'db> {
             [signature]
                 if signature.generic_context.is_none()
                     && signature.definition.is_none()
-                    && signature.parameters == Parameters::bottom()
+                    && signature.parameters.is_bottom()
                     && signature.return_ty.is_divergent()
         )
     }
