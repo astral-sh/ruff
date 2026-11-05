@@ -360,6 +360,9 @@ pub struct SemanticIndex<'db> {
 pub struct NarrowingAliasPredicate<'db> {
     /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
     pub expression: Expression<'db>,
+    /// Loop-header definitions for narrowed places that can reach this use from loops entered
+    /// after evaluating the alias.
+    pub intervening_loop_headers: Box<[ScopedDefinitionId]>,
 }
 
 impl<'db> SemanticIndex<'db> {
