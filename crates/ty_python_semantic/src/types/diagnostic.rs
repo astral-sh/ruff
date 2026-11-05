@@ -841,7 +841,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-parameter-annotation.md")]
     pub(crate) static MISSING_PARAMETER_ANNOTATION = {
         summary: "detects function parameters without type annotations",
-        status: LintStatus::stable("0.0.98"),
+        status: LintStatus::stable("0.0.99"),
         default_level: Level::Ignore,
     }
 }
