@@ -1651,6 +1651,7 @@ jobs:
         uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         env:
           CODSPEED_PERF_ENABLED: false
+          CODSPEED_DISABLE_MEMORY_CAPTURE_STACK: true
         with:
           mode: "walltime,memory"
           run: uv run --locked --only-dev cargo codspeed run --bench ruff_walltime
