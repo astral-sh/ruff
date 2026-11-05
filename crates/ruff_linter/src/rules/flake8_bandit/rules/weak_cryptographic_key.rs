@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{Arguments, ExprCallFields};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -51,7 +51,7 @@ impl Violation for WeakCryptographicKey {
 }
 
 /// S505
-pub(crate) fn weak_cryptographic_key(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCallFields<'_>) {
     let Some((cryptographic_key, range)) = extract_cryptographic_key(checker, call) else {
         return;
     };
@@ -98,9 +98,9 @@ impl Display for CryptographicKey {
 
 fn extract_cryptographic_key(
     checker: &Checker,
-    call: ExprCall<'_>,
+    call: &ExprCallFields<'_>,
 ) -> Option<(CryptographicKey, TextRange)> {
-    let qualified_name = checker.semantic().resolve_qualified_name(call.func())?;
+    let qualified_name = checker.semantic().resolve_qualified_name(call.func)?;
     match qualified_name.segments() {
         [
             "cryptography",
@@ -111,15 +111,15 @@ fn extract_cryptographic_key(
             "generate_private_key",
         ] => match *function {
             "dsa" => {
-                let (key_size, range) = extract_int_argument(call, "key_size", 0)?;
+                let (key_size, range) = extract_int_argument(call.arguments, "key_size", 0)?;
                 Some((CryptographicKey::Dsa { key_size }, range))
             }
             "rsa" => {
-                let (key_size, range) = extract_int_argument(call, "key_size", 1)?;
+                let (key_size, range) = extract_int_argument(call.arguments, "key_size", 1)?;
                 Some((CryptographicKey::Rsa { key_size }, range))
             }
             "ec" => {
-                let argument = call.arguments().find_argument_value("curve", 0)?;
+                let argument = call.arguments.find_argument_value("curve", 0)?;
                 let expr_attribute = argument.as_attribute_expr()?;
                 let attr = expr_attribute.attr();
                 let value = expr_attribute.value();
@@ -142,11 +142,11 @@ fn extract_cryptographic_key(
         },
         ["Crypto" | "Cryptodome", "PublicKey", function, "generate"] => match *function {
             "DSA" => {
-                let (key_size, range) = extract_int_argument(call, "bits", 0)?;
+                let (key_size, range) = extract_int_argument(call.arguments, "bits", 0)?;
                 Some((CryptographicKey::Dsa { key_size }, range))
             }
             "RSA" => {
-                let (key_size, range) = extract_int_argument(call, "bits", 0)?;
+                let (key_size, range) = extract_int_argument(call.arguments, "bits", 0)?;
                 Some((CryptographicKey::Dsa { key_size }, range))
             }
             _ => None,
@@ -156,11 +156,11 @@ fn extract_cryptographic_key(
 }
 
 fn extract_int_argument(
-    call: ExprCall<'_>,
+    arguments: Arguments<'_>,
     name: &str,
     position: usize,
 ) -> Option<(u16, TextRange)> {
-    let argument = call.arguments().find_argument_value(name, position)?;
+    let argument = arguments.find_argument_value(name, position)?;
     let i = argument.as_int_literal()?;
     Some((i.as_u16()?, argument.range()))
 }

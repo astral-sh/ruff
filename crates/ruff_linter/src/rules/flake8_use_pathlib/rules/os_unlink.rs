@@ -81,7 +81,7 @@ pub(crate) fn os_unlink(checker: &Checker, call: &ExprCallFields<'_>, segments: 
 
     check_os_pathlib_single_arg_calls(
         checker,
-        call.node,
+        call,
         "unlink()",
         "path",
         is_fix_os_unlink_enabled(checker.settings()),

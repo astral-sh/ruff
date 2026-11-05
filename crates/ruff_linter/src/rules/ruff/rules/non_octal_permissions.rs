@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprCall, ExprKind, Keyword};
+use ruff_python_ast::{Expr, ExprCallFields, ExprKind, Keyword};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
@@ -90,7 +90,7 @@ impl Violation for NonOctalPermissions {
 }
 
 /// RUF064
-pub(crate) fn non_octal_permissions(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCallFields<'_>) {
     if let Some(mode_arg) = find_func_mode_arg(call, checker.semantic())
         .or_else(|| find_method_mode_arg(call, checker.semantic()))
     {
@@ -149,41 +149,47 @@ fn check_mode(checker: &Checker, mode_arg: Expr<'_>) {
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
 
-fn find_func_mode_arg<'a>(call: ExprCall<'a>, semantic: &SemanticModel) -> Option<Expr<'a>> {
-    let qualified_name = semantic.resolve_qualified_name(call.func())?;
+fn find_func_mode_arg<'a>(call: &ExprCallFields<'a>, semantic: &SemanticModel) -> Option<Expr<'a>> {
+    let qualified_name = semantic.resolve_qualified_name(call.func)?;
 
     match qualified_name.segments() {
-        ["os", "umask"] => call.arguments().find_argument_value("mode", 0),
+        ["os", "umask"] => call.arguments.find_argument_value("mode", 0),
         [
             "os",
             "chmod" | "fchmod" | "lchmod" | "mkdir" | "makedirs" | "mkfifo" | "mknod",
-        ] => call.arguments().find_argument_value("mode", 1),
-        ["os", "open"] => call.arguments().find_argument_value("mode", 2),
+        ] => call.arguments.find_argument_value("mode", 1),
+        ["os", "open"] => call.arguments.find_argument_value("mode", 2),
         ["dbm", "open"] | ["dbm", "gnu" | "ndbm", "open"] => {
-            call.arguments().find_argument_value("mode", 2)
+            call.arguments.find_argument_value("mode", 2)
         }
         _ => None,
     }
 }
 
-fn find_method_mode_arg<'a>(call: ExprCall<'a>, semantic: &SemanticModel) -> Option<Expr<'a>> {
-    let (type_name, attr_name) = resolve_method_call(call.func(), semantic)?;
+fn find_method_mode_arg<'a>(
+    call: &ExprCallFields<'a>,
+    semantic: &SemanticModel,
+) -> Option<Expr<'a>> {
+    let (type_name, attr_name) = resolve_method_call(call.func, semantic)?;
 
     match (type_name.segments(), attr_name) {
         (
             ["pathlib", "Path" | "PosixPath" | "WindowsPath"],
             "chmod" | "lchmod" | "mkdir" | "touch",
-        ) => call.arguments().find_argument_value("mode", 0),
+        ) => call.arguments.find_argument_value("mode", 0),
         _ => None,
     }
 }
 
-fn find_func_parent_mode_arg<'a>(call: ExprCall<'a>, semantic: &SemanticModel) -> Option<Expr<'a>> {
-    let qualified_name = semantic.resolve_qualified_name(call.func())?;
+fn find_func_parent_mode_arg<'a>(
+    call: &ExprCallFields<'a>,
+    semantic: &SemanticModel,
+) -> Option<Expr<'a>> {
+    let qualified_name = semantic.resolve_qualified_name(call.func)?;
 
     match qualified_name.segments() {
         ["os", "makedirs"] => call
-            .arguments()
+            .arguments
             .find_keyword("parent_mode")
             .map(Keyword::value),
         _ => None,
@@ -191,14 +197,14 @@ fn find_func_parent_mode_arg<'a>(call: ExprCall<'a>, semantic: &SemanticModel) -
 }
 
 fn find_method_parent_mode_arg<'a>(
-    call: ExprCall<'a>,
+    call: &ExprCallFields<'a>,
     semantic: &SemanticModel,
 ) -> Option<Expr<'a>> {
-    let (type_name, attr_name) = resolve_method_call(call.func(), semantic)?;
+    let (type_name, attr_name) = resolve_method_call(call.func, semantic)?;
 
     match (type_name.segments(), attr_name) {
         (["pathlib", "Path" | "PosixPath" | "WindowsPath"], "mkdir") => call
-            .arguments()
+            .arguments
             .find_keyword("parent_mode")
             .map(Keyword::value),
         _ => None,

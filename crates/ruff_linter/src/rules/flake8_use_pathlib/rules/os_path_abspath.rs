@@ -83,7 +83,7 @@ pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCallFields<'_>, segm
 
     check_os_pathlib_single_arg_calls(
         checker,
-        call.node,
+        call,
         "resolve()",
         "path",
         is_fix_os_path_abspath_enabled(checker.settings()),

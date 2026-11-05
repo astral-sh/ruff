@@ -240,16 +240,16 @@ impl LoggingCallType {
 
 pub(crate) fn find_logging_call(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    func: Expr<'_>,
 ) -> Option<(LoggingCallType, TextRange)> {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
-    match call.func().classify() {
+    match func.classify() {
         ExprKind::Attribute(expr_attribute) => {
             let attr = expr_attribute.attr();
 
             let call_type = LoggingCallType::from_attribute(attr.as_str())?;
             if !logging::is_logger_candidate(
-                call.func(),
+                func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
@@ -258,27 +258,27 @@ pub(crate) fn find_logging_call(
             Some((call_type, attr.range()))
         }
         ExprKind::Name(_) => {
-            let qualified_name = checker.semantic().resolve_qualified_name(call.func())?;
+            let qualified_name = checker.semantic().resolve_qualified_name(func)?;
             let ["logging", attribute] = qualified_name.segments() else {
                 return None;
             };
             let call_type = LoggingCallType::from_attribute(attribute)?;
-            Some((call_type, call.func().range()))
+            Some((call_type, func.range()))
         }
         _ => None,
     }
 }
 
 /// Check logging calls for violations.
-pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some((logging_call_type, range)) = find_logging_call(checker, call) else {
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some((logging_call_type, range)) = find_logging_call(checker, call.func) else {
         return;
     };
 
     // G001, G002, G003, G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
-    if let Some(format_arg) = call.arguments().find_argument_value("msg", msg_pos) {
-        check_msg(checker, format_arg, call.arguments(), msg_pos);
+    if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
+        check_msg(checker, format_arg, call.arguments, msg_pos);
     }
 
     // G010
@@ -297,7 +297,7 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
 
     // G101
     if checker.is_rule_enabled(Rule::LoggingExtraAttrClash) {
-        if let Some(extra) = call.arguments().find_keyword("extra") {
+        if let Some(extra) = call.arguments.find_keyword("extra") {
             check_log_record_attr_clash(checker, extra);
         }
     }
@@ -307,7 +307,7 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
-        let Some(exc_info) = logging::exc_info(call.arguments(), checker.semantic()) else {
+        let Some(exc_info) = logging::exc_info(call.arguments, checker.semantic()) else {
             return;
         };
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {

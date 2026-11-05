@@ -57,15 +57,15 @@ impl Violation for TarfileIgnoreZerosTrue {
 /// `tarfile-ignore-zeros-true`
 pub(crate) fn tarfile_ignore_zeros_true(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     // Keyword-only on the openers, but the `TarFile` constructor also takes it
     // positionally, after `name, mode, fileobj, format, tarinfo, dereference`.
     let argument = match qualified_name.segments() {
-        ["tarfile", "TarFile"] => call.arguments().find_argument("ignore_zeros", 6),
+        ["tarfile", "TarFile"] => call.arguments.find_argument("ignore_zeros", 6),
         ["tarfile", "open"] | ["tarfile", "TarFile", "open"] => call
-            .arguments()
+            .arguments
             .find_keyword("ignore_zeros")
             .map(ArgOrKeyword::Keyword),
         _ => None,

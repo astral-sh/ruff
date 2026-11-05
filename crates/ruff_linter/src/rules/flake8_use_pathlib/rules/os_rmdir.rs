@@ -81,7 +81,7 @@ pub(crate) fn os_rmdir(checker: &Checker, call: &ExprCallFields<'_>, segments: &
 
     check_os_pathlib_single_arg_calls(
         checker,
-        call.node,
+        call,
         "rmdir()",
         "path",
         is_fix_os_rmdir_enabled(checker.settings()),

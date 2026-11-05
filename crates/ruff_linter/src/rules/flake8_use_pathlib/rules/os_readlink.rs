@@ -97,7 +97,7 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCallFields<'_>, segments
 
     check_os_pathlib_single_arg_calls(
         checker,
-        call.node,
+        call,
         "readlink()",
         "path",
         is_fix_os_readlink_enabled(checker.settings()),
