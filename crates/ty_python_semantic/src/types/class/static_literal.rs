@@ -3078,6 +3078,26 @@ impl<'db> StaticClassLiteral<'db> {
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
+                        if declared_ty.is_function_like(db) {
+                            return match declaredness {
+                                Definedness::AlwaysDefined => {
+                                    // We reach this branch when we look for instance attributes named `foo`, but
+                                    // there is also an actual `def foo(..)` function definition on the class body.
+                                    // In this case, we pretend that there is no instance attribute with the same
+                                    // name, i.e. we don't look for `self.foo = ...` assignments and just return
+                                    // "unbound". This allows the function definition to take precedence over any
+                                    // instance attribute, which enables use cases where a method is deliberately
+                                    // shadowed by an instance attribute (e.g. `self.foo = replacement_method`).
+                                    // We check the validity of that assignment elsewhere, but when looking up
+                                    // `foo`, we simply use the function definition as the source of truth.
+                                    Member::unbound()
+                                }
+                                Definedness::PossiblyUndefined => {
+                                    // For possibly-undefined functions, we still look for instance attributes.
+                                    sources.implicit_attribute(db, name, MethodDecorator::None)
+                                }
+                            };
+                        }
 
                         let implicit = match declaredness {
                             Definedness::AlwaysDefined

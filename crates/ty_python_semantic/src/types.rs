@@ -5698,6 +5698,23 @@ impl<'db> Type<'db> {
         let fallback_properties = fallback_member.deprecated_properties(db);
         let fallback_member = fallback_member.member(db);
 
+        // We do explicitly allow instance attributes to shadow methods defined on the class.
+        // If we see a definitely-bound meta-attribute (the method), and if the fallback is
+        // an instance attribute (e.g. `self.method = ...`) with a compatible type, we pretend
+        // that there is no fallback, i.e. attribute lookup simply yields the meta-attribute
+        // (the actual method on the class).
+        let fallback_member = if meta_attr.is_definitely_bound()
+            && let Place::Defined(DefinedPlace { origin, ty, .. }) = fallback_member.place
+            && !origin.is_declared()
+            && let Some(contract) =
+                meta_attr_ty.and_then(|method| method.method_shadowing_contract(db, env, receiver))
+            && ty.is_assignable_to(db, env, contract)
+        {
+            PlaceAndQualifiers::unbound()
+        } else {
+            fallback_member
+        };
+
         // A slot stores the same instance attribute described by the receiver's declarations.
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
         // declaration established by the receiver's class.
