@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
-#[cfg(any(feature = "ty_instrumented", feature = "ty_walltime"))]
+#[cfg(any(
+    feature = "ruff_walltime",
+    feature = "ty_instrumented",
+    feature = "ty_walltime"
+))]
 pub mod checkout;
 #[cfg(any(feature = "ruff_instrumented", feature = "ty_instrumented"))]
 pub mod criterion;

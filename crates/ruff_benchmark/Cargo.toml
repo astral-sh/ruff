@@ -17,6 +17,7 @@ test = false
 doctest = false
 
 [dependencies]
+ruff = { workspace = true, optional = true }
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
@@ -28,6 +29,7 @@ ty_project = { workspace = true, optional = true }
 ty_python_semantic = { workspace = true, optional = true }
 
 anyhow = { workspace = true }
+clap = { workspace = true, optional = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false, optional = true }
 divan = { workspace = true, optional = true }
@@ -52,7 +54,7 @@ tempfile = { workspace = true }
 ty_static = { workspace = true }
 
 [features]
-default = ["module_resolution", "ruff_instrumented", "ty_ide", "ty_instrumented", "ty_walltime"]
+default = ["module_resolution", "ruff_instrumented", "ruff_walltime", "ty_ide", "ty_instrumented", "ty_walltime"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
@@ -62,6 +64,8 @@ ruff_instrumented = [
     "mimalloc",
     "tikv-jemallocator",
 ]
+# Enables the whole-project Ruff benchmarks
+ruff_walltime = ["clap", "divan", "ruff", "mimalloc", "tikv-jemallocator"]
 # Enables the ty instrumented benchmarks
 ty_instrumented = ["criterion", "ty_project", "ty_python_semantic", "ruff_python_trivia"]
 # Enables the module-resolution benchmark
@@ -91,6 +95,11 @@ required-features = ["ruff_instrumented"]
 name = "formatter"
 harness = false
 required-features = ["ruff_instrumented"]
+
+[[bench]]
+name = "ruff_walltime"
+harness = false
+required-features = ["ruff_walltime"]
 
 [[bench]]
 name = "ty"
