@@ -13,6 +13,10 @@ pub(super) enum PackedIds<T> {
 
 impl<T: Copy + Into<u32>> From<Vec<T>> for PackedIds<T> {
     fn from(ids: Vec<T>) -> Self {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the largest ID fits in the selected integer width"
+        )]
         match ids.iter().copied().map(Into::into).max().unwrap_or(0) {
             0..=0xff => Self::U8(ids.into_iter().map(|id| id.into() as u8).collect()),
             0x100..=0xffff => Self::U16(ids.into_iter().map(|id| id.into() as u16).collect()),
