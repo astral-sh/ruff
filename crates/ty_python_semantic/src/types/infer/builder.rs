@@ -3,6 +3,7 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map;
 use std::convert::Infallible;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
@@ -287,6 +288,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// separately from expression types.
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
 
+    /// A constructor can supply an optional key that a later deletion removes.
+    typed_dict_constructor_keys: FxHashMap<ExpressionNodeKey, Arc<[Name]>>,
+
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
@@ -537,6 +541,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
+            typed_dict_constructor_keys: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
@@ -657,7 +662,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .extend(string_annotations.iter().copied());
                 }
                 DefinitionInferenceExtra::Undecorated(_)
-                | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
+                | DefinitionInferenceExtra::DiscardsDictKeyAssignments
+                | DefinitionInferenceExtra::InitialTypedDictKeys(_) => {}
                 DefinitionInferenceExtra::Other(extra) => {
                     self.legacy_aliases
                         .extend(extra.legacy_aliases.iter().copied());
@@ -750,18 +756,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Replacing an expression's type also replaces any truthiness override. A newly inferred
-    /// comparison may no longer need an override, so extending the sparse map alone is not enough.
+    /// Replacing an expression's type also replaces the facts inferred for that expression.
+    /// A different type context can change a comparison's truthiness or which keys a call supplies.
     fn extend_expression_types(
         &mut self,
         expressions: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>,
     ) {
-        if self.comparison_truthiness.is_empty() {
+        if self.comparison_truthiness.is_empty() && self.typed_dict_constructor_keys.is_empty() {
             self.expressions.extend(expressions);
         } else {
             for (expression, ty) in expressions {
                 self.expressions.insert(expression, ty);
                 self.comparison_truthiness.remove(&expression);
+                self.typed_dict_constructor_keys.remove(&expression);
             }
         }
     }
@@ -775,6 +782,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.legacy_aliases.iter().copied());
             self.comparison_truthiness
                 .extend(extra.comparison_truthiness.iter().copied());
+            self.typed_dict_constructor_keys
+                .extend(extra.typed_dict_constructor_keys.iter().cloned());
             self.context.extend(&extra.context);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.called_functions
@@ -804,6 +813,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.typed_dict_constructor_keys.extend(
+            inference
+                .typed_dict_constructor_keys
+                .iter()
+                .map(|(expr, keys)| (*expr, Arc::clone(keys))),
+        );
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -7762,7 +7777,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let items = items
+        self.infer_dict_literal_items(dict, tcx, &item_types)
+    }
+
+    /// Infers a plain dictionary, reusing the item types from an attempted `TypedDict` match.
+    fn infer_dict_literal_items(
+        &mut self,
+        dict: &ast::ExprDict,
+        tcx: TypeContext<'db>,
+        item_types: &FxHashMap<ast::NodeIndex, Type<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        let items = dict
+            .items
             .iter()
             .map(|item| [item.key.as_ref(), Some(&item.value)])
             .collect_vec();
@@ -8884,6 +8912,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
+            if let Some(keys) = result.initial_typed_dict_keys() {
+                self.typed_dict_constructor_keys.insert(
+                    ExpressionNodeKey::from(ast::ExprRef::from(named)),
+                    Arc::clone(keys),
+                );
+            }
             result.binding_type(definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
@@ -12158,6 +12192,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            typed_dict_constructor_keys,
             qualifiers: _,
             type_expression_flags,
             collection_use_constraints,
@@ -12202,6 +12237,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             expressions,
             comparison_truthiness,
+            typed_dict_constructor_keys,
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
@@ -12223,6 +12259,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            typed_dict_constructor_keys: _,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12362,6 +12399,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness: _,
+            typed_dict_constructor_keys: _,
             bindings,
             called_functions,
             expression_cache: _,
@@ -12409,12 +12447,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.finish_inferred_definition(definition)
     }
 
-    fn finish_inferred_definition(self, definition: Definition<'db>) -> DefinitionInference<'db> {
+    fn finish_inferred_definition(
+        mut self,
+        definition: Definition<'db>,
+    ) -> DefinitionInference<'db> {
+        // An enclosing call can unpack the value of `(movie := Movie(year=1979))`.
+        let initial_typed_dict_keys = if !self.typed_dict_constructor_keys.is_empty()
+            && let DefinitionKind::NamedExpression(named) = definition.kind(self.db())
+        {
+            let value = &named.node(self.module()).value;
+            self.typed_dict_constructor_keys
+                .remove(&ExpressionNodeKey::from(value))
+        } else {
+            None
+        };
         let Self {
             legacy_aliases,
             context,
             expressions,
             comparison_truthiness,
+            typed_dict_constructor_keys: _,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12447,6 +12499,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
             + usize::from(!legacy_aliases.is_empty())
             + usize::from(!comparison_truthiness.is_empty())
+            + usize::from(initial_typed_dict_keys.is_some())
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
@@ -12488,6 +12541,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if discards_dict_key_assignments => Some(Box::new(
                 DefinitionInferenceExtra::DiscardsDictKeyAssignments,
             )),
+            (1, None) if let Some(keys) = initial_typed_dict_keys => Some(Box::new(
+                DefinitionInferenceExtra::InitialTypedDictKeys(keys),
+            )),
             (0, Some(undecorated_type)) => Some(Box::new(DefinitionInferenceExtra::Undecorated(
                 Box::new(undecorated_type),
             ))),
@@ -12504,6 +12560,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let extra = OtherDefinitionInferenceExtra {
                     legacy_aliases: legacy_aliases.into_iter().collect(),
                     comparison_truthiness: FrozenMap::from(comparison_truthiness),
+                    initial_typed_dict_keys,
                     string_annotations: FrozenSet::from(string_annotations),
                     expected_types: FrozenMap::from(expected_types),
                     collection_use_constraints,
@@ -12617,6 +12674,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             expressions,
             comparison_truthiness: _,
+            typed_dict_constructor_keys: _,
             scope,
             cycle_recovery,
             qualifiers,
@@ -12705,6 +12763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             expressions: _,
             comparison_truthiness: _,
+            typed_dict_constructor_keys: _,
             string_annotations: _,
             expected_types: _,
             scope: _,
@@ -12770,6 +12829,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            typed_dict_constructor_keys,
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
@@ -12812,6 +12872,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.extend_expression_types(expressions);
         self.comparison_truthiness.extend(comparison_truthiness);
+        self.typed_dict_constructor_keys
+            .extend(typed_dict_constructor_keys);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
@@ -12941,6 +13003,7 @@ struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
+    typed_dict_constructor_keys: FxHashMap<ExpressionNodeKey, Arc<[Name]>>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
     string_annotations: FxHashSet<ExpressionNodeKey>,
@@ -12972,6 +13035,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         !self.legacy_aliases.is_empty()
             || !self.string_annotations.is_empty()
             || !self.comparison_truthiness.is_empty()
+            || !self.typed_dict_constructor_keys.is_empty()
             || !self.type_expression_flags.is_empty()
             || !self.collection_use_constraints.is_empty()
             || !self.expected_types.is_empty()
@@ -13001,6 +13065,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
                 legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
+                typed_dict_constructor_keys: FrozenMap::from(self.typed_dict_constructor_keys),
                 expected_types: FrozenMap::from(self.expected_types),
                 type_expression_flags: FrozenMap::from(self.type_expression_flags),
                 bindings: self.bindings.into_boxed_slice(),

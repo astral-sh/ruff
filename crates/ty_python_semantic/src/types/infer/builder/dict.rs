@@ -3,10 +3,7 @@ use ruff_python_ast::{self as ast, HasNodeIndex};
 use rustc_hash::FxHashMap;
 
 use super::{ArgExpr, TypeInferenceBuilder};
-use crate::types::typed_dict::{
-    extract_unpacked_typed_dict_keys_from_value_type, infer_unpacked_keyword_types,
-    validate_typed_dict_constructor,
-};
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -43,26 +40,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let supports_typed_dict_context = {
                 let mut speculative_builder = self.speculate_without_diagnostics();
                 let env = speculative_builder.program_environment();
-                infer_unpacked_keyword_types(arguments, |expr, tcx| {
-                    speculative_builder.infer_expression(expr, tcx)
-                })
-                .into_iter()
-                .flatten()
-                .all(|keyword_ty| {
-                    keyword_ty.is_assignable_to(db, env, Type::TypedDict(typed_dict))
-                        || extract_unpacked_typed_dict_keys_from_value_type(db, env, keyword_ty)
-                            .is_some()
-                })
+                arguments
+                    .keywords
+                    .iter()
+                    .filter(|keyword| keyword.arg.is_none())
+                    .all(|keyword| {
+                        let keyword_ty = speculative_builder
+                            .infer_expression(&keyword.value, TypeContext::default());
+                        keyword_ty.is_assignable_to(db, env, Type::TypedDict(typed_dict))
+                            || extract_unpacked_typed_dict_keys_from_value_type(db, env, keyword_ty)
+                                .is_some()
+                    })
             };
 
             if supports_typed_dict_context {
-                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
-                validate_typed_dict_constructor(
-                    &self.context,
+                self.prepare_typed_dict_constructor(
                     typed_dict,
                     arguments,
-                    func.into(),
-                    |expr, _| self.expression_type(expr),
+                    ast::AnyNodeRef::from(func),
                 );
 
                 return Some(Type::TypedDict(typed_dict));
