@@ -481,7 +481,7 @@ impl<'db> WideLiteralComparison<'db> {
     /// can compare equal. Preserving disjointness here avoids checking an unreachable
     /// comparison between later elements.
     pub(super) fn truthiness(self, db: &'db dyn Db, kind: LiteralComparisonKind) -> Truthiness {
-        if self.matching_left(db, kind).next().is_some() {
+        if self.matching_literals(db, kind).next().is_some() {
             // Even when some values match, the wide union also contains other values.
             Truthiness::Ambiguous
         } else {
@@ -489,16 +489,16 @@ impl<'db> WideLiteralComparison<'db> {
         }
     }
 
-    fn matching_left(
+    fn matching_literals(
         self,
         db: &'db dyn Db,
         kind: LiteralComparisonKind,
     ) -> impl Iterator<Item = Type<'db>> {
+        let bool_key = move |value| match kind {
+            LiteralComparisonKind::Equality => Type::int_literal(i64::from(value)),
+            LiteralComparisonKind::Identity => Type::bool_literal(value),
+        };
         let keys = move |ty: Type<'db>| {
-            let bool_key = |value| match kind {
-                LiteralComparisonKind::Equality => Type::int_literal(i64::from(value)),
-                LiteralComparisonKind::Identity => Type::bool_literal(value),
-            };
             let (first, second) = match ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(value)) => (bool_key(value), None),
                 Some(kind) => (Type::LiteralValue(LiteralValueType::promotable(kind)), None),
@@ -508,11 +508,27 @@ impl<'db> WideLiteralComparison<'db> {
             std::iter::once(first).chain(second)
         };
 
-        let right: FxHashSet<_> = self.right.iter().copied().flat_map(keys).collect();
-        self.left
-            .iter()
-            .copied()
-            .filter(move |&ty| keys(ty).any(|key| right.contains(&key)))
+        // Equality filters the left operand. An identity check constrains it by the right
+        // operand's type, including its union order and the promotability of its literals.
+        let (candidates, other) = match kind {
+            LiteralComparisonKind::Equality => (self.left, self.right),
+            LiteralComparisonKind::Identity => (self.right, self.left),
+        };
+        let other_keys: FxHashSet<_> = other.iter().copied().flat_map(keys).collect();
+        candidates.iter().copied().filter_map(move |ty| {
+            // For identity, intersecting the left operand with the right-hand `bool` already
+            // preserves the literal flags of any matching left-hand boolean.
+            if matches!(kind, LiteralComparisonKind::Equality) && ty.is_bool(db) {
+                let [matches_false, matches_true] =
+                    [false, true].map(|value| other_keys.contains(&bool_key(value)));
+                return match (matches_false, matches_true) {
+                    (true, true) => Some(ty),
+                    (false, false) => None,
+                    _ => Some(Type::bool_literal(matches_true)),
+                };
+            }
+            keys(ty).any(|key| other_keys.contains(&key)).then_some(ty)
+        })
     }
 
     fn comparison_class(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
@@ -561,8 +577,8 @@ impl<'db> WideLiteralComparison<'db> {
         env: &ProgramEnvironment<'db>,
         kind: LiteralComparisonKind,
     ) -> Option<Type<'db>> {
-        let shared: Vec<_> = self.matching_left(db, kind).collect();
-        if shared.len() == self.left.len() {
+        let shared: Vec<_> = self.matching_literals(db, kind).collect();
+        if shared.as_slice() == self.left {
             return None;
         }
         Some(

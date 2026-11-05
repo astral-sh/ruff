@@ -147,6 +147,35 @@ only when the preceding elements can be equal.
     (low, None) < (low, 1)  # error: [unsupported-operator]
 ```
 
+An identity check preserves the order of the shared strings from the right operand. When those
+strings were inferred from expressions, they still widen to `str` in a list.
+
+```py
+def _(tens: Digit, ones: Digit, flag: bool, kind: Literal["a", "b"]):
+    number = 10 * tens + ones
+    left = kind if flag else number
+    label = "b" if ones else "a"
+    right = label if flag else 100 + number
+    if left is right:
+        reveal_type(left)  # revealed: Literal["b", "a"]
+        reveal_type([left])  # revealed: list[str]
+```
+
+A `bool` in a wide union can narrow even when all the other union members match. Here the integers
+on the right range from 1 through 100, so `True` is the only boolean that compares equal.
+
+```py
+def _(tens: Digit, ones: Digit, high_digit: Literal[1, 2, 3, 4, 5], boolean: bool):
+    left = 10 * high_digit + ones + 1 if tens else boolean  # bool or 11 through 60
+    right = 10 * tens + ones + 1  # 1 through 100
+    if left == right and isinstance(left, bool):
+        reveal_type(left)  # revealed: Literal[True]
+
+    false_or_high = False if ones else right + 100
+    if left is false_or_high:
+        reveal_type(left)  # revealed: Literal[False]
+```
+
 A custom reflected comparison can contribute its own return type alongside the literal alternatives.
 
 ```py
