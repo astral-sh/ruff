@@ -3332,11 +3332,11 @@ class IncompatibleAttribute(MethodBase):
 ## Methods overriding annotated callable defaults
 
 PyTorch's `Module` annotates (or used to) its default `forward` as `Callable[..., Any]`. In this
-secnario, we allow a subclass to override it with a method that declares its own parameters and
+scenario, we allow a subclass to override it with a method that declares its own parameters and
 return type ([ty #4823](https://github.com/astral-sh/ty/issues/4823)). This might be seen as a
-subclass limitation in the sense that *writes* to the `forward` attribute are now restricted,
-but since we allow shadowing of methods with instance attributes, it seems consistent to allow
-this as well:
+subclass limitation in the sense that *writes* to the `forward` attribute are now restricted, but
+since we allow shadowing of methods with instance attributes, it seems consistent to allow this as
+well:
 
 ```toml
 [rules]

@@ -36,10 +36,16 @@ struct AttributeContract<'db> {
     read: Type<'db>,
     write: Option<Type<'db>>,
     is_property: bool,
-    is_method: bool,
-    skip_write_check: bool,
+    method_kind: AttributeMethodKind,
     is_frozen_field: bool,
     qualifiers: TypeQualifiers,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AttributeMethodKind {
+    Method,
+    Wrapper,
+    Other,
 }
 
 /// An inferred default has no declared attribute contract, but its value can still
@@ -344,8 +350,13 @@ fn bind_attribute<'db>(
             write
         },
         is_property: alternatives.iter().any(Type::is_property_instance),
-        is_method,
-        skip_write_check: is_method || is_descriptor && is_method_wrapper,
+        method_kind: if is_method {
+            AttributeMethodKind::Method
+        } else if is_descriptor && is_method_wrapper {
+            AttributeMethodKind::Wrapper
+        } else {
+            AttributeMethodKind::Other
+        },
         is_frozen_field: is_frozen && literal.is_own_dataclass_instance_field(db, name),
         qualifiers,
     })
@@ -435,12 +446,14 @@ fn attribute_violation<'db>(
     {
         return None;
     }
-    if source.is_method && target.is_method
+    let source_is_method = source.method_kind == AttributeMethodKind::Method;
+    let target_is_method = target.method_kind == AttributeMethodKind::Method;
+    if source_is_method && target_is_method
         || target.qualifiers.contains(TypeQualifiers::FINAL)
         || !source.is_property
             && !target.is_property
-            && !source.is_method
-            && !target.is_method
+            && !source_is_method
+            && !target_is_method
             && source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
                 != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     {
@@ -452,7 +465,7 @@ fn attribute_violation<'db>(
             target: target.read,
         });
     }
-    if target.skip_write_check {
+    if target.method_kind != AttributeMethodKind::Other {
         // ty allows methods to be shadowed with instance attributes. For example, it allows
         // `def method(self) -> object` on `Base` to be shadowed via `base.method = lambda: 1`
         // (where `base: Base` could also be an instance of a subclass of `Base`).
@@ -642,7 +655,8 @@ pub(super) fn check_override<'db>(
     let target = match member_contract(db, env, superclass, receiver, name, inherited_kind) {
         Some(MemberContract::Attribute(target)) => target,
         Some(MemberContract::Inferred(target))
-            if source.is_method && target.try_upcast_to_callable(db, env).is_some() =>
+            if source.method_kind == AttributeMethodKind::Method
+                && target.try_upcast_to_callable(db, env).is_some() =>
         {
             return OverrideCheck::Callable;
         }
@@ -651,7 +665,7 @@ pub(super) fn check_override<'db>(
     // Final attributes are exempt from attribute compatibility checks, but finality
     // and signature compatibility are independent: suppressing a finality diagnostic
     // must not hide an incompatible method signature.
-    if source.is_method
+    if source.method_kind == AttributeMethodKind::Method
         && target.qualifiers.contains(TypeQualifiers::FINAL)
         && target.read.try_upcast_to_callable(db, env).is_some()
     {
