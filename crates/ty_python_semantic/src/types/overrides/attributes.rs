@@ -457,11 +457,11 @@ fn attribute_violation<'db>(
         // `def method(self) -> object` on `Base` to be shadowed via `base.method = lambda: 1`
         // (where `base: Base` could also be an instance of a subclass of `Base`).
         //
-        // This is unsound, since a subclass might narrow `method`'s return type to `str`, which
-        // would be incompatible with that replaced method. But since we allow it, the write-
-        // checks below would require subclasses of `Base` to respect the same kind of writes,
-        // i.e. they would prevent subclasses from overwriting the attribute with an annotation
-        // like `method: Callable[[], str]`. This is why we skip write-checks for methods here.
+        // We also allow overrides where the return type is covariantly narrowed because
+        // that's what users expect. We skip the write check to preserve that behavior.
+        //
+        // These two rules are unsound together. The assignment above is valid through a
+        // `Base` reference, but it would break a subclass with a return type of `str`.
         return None;
     }
     let write = target.write?;
