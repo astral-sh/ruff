@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -65,7 +65,7 @@ impl Violation for OsPathGetatime {
 }
 
 /// PTH203
-pub(crate) fn os_path_getatime(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
+pub(crate) fn os_path_getatime(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if segments != ["os", "path", "getatime"] {
         return;
     }

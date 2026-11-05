@@ -13,8 +13,8 @@ use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Arguments, BoolOp, Expr, ExprCall, ExprKind, NodeList, Stmt, StmtKind, StmtWith,
-    Suite, SyntaxNode, UnaryOp, visitor, whitespace,
+    self as ast, Arguments, BoolOp, Expr, ExprCallFields, ExprKind, NodeList, Stmt, StmtKind,
+    StmtWith, Suite, SyntaxNode, UnaryOp, visitor, whitespace,
 };
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind};
@@ -398,11 +398,11 @@ impl Violation for PytestUnittestRaisesAssertion {
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ExprCallFields<'_>) {
     // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
     if let StmtKind::With(with_node) = checker.semantic().current_statement().classify() {
         let items = with_node.items();
-        let call_ref = SyntaxNode::from(call);
+        let call_ref = SyntaxNode::from(call.node);
 
         if items.iter().any(|item| {
             SyntaxNode::from(item.context_expr()).ptr_eq(call_ref) && item.optional_vars().is_some()
@@ -464,7 +464,7 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
         }
     }
 
-    unittest_raises_assertion(call, edits, checker);
+    unittest_raises_assertion(&call.fields(), edits, checker);
 }
 
 fn corresponding_context_expr<'a>(binding: &Binding, with: StmtWith<'a>) -> Option<Expr<'a>> {
@@ -483,8 +483,8 @@ fn corresponding_context_expr<'a>(binding: &Binding, with: StmtWith<'a>) -> Opti
     })
 }
 
-fn unittest_raises_assertion(call: ExprCall<'_>, extra_edits: Vec<Edit>, checker: &Checker) {
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+fn unittest_raises_assertion(call: &ExprCallFields<'_>, extra_edits: Vec<Edit>, checker: &Checker) {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -500,22 +500,22 @@ fn unittest_raises_assertion(call: ExprCall<'_>, extra_edits: Vec<Edit>, checker
         PytestUnittestRaisesAssertion {
             assertion: attr.to_string(),
         },
-        call.func().range(),
+        call.func.range(),
     );
 
     if !checker
         .comment_ranges()
-        .has_comments(&call, checker.source())
+        .has_comments(&call.node, checker.source())
     {
-        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), call.arguments()) {
+        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_pytest_raises, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("pytest", "raises"),
-                    call.func().start(),
+                    call.func.start(),
                     checker.semantic(),
                 )?;
                 let replace_call =
-                    Edit::range_replacement(format!("{binding}({args})"), call.range());
+                    Edit::range_replacement(format!("{binding}({args})"), call.range);
 
                 Ok(Fix::unsafe_edits(
                     import_pytest_raises,

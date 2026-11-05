@@ -1190,7 +1190,7 @@ fn call_with_qualified_name(checker: &Checker, fields: &ExprCallFields<'_>) {
         flake8_bandit::rules::paramiko_call(checker, fields.func, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::Debugger) {
-        flake8_debugger::rules::debugger_call(checker, call, &qualified_name);
+        flake8_debugger::rules::debugger_call(checker, fields, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::PandasUseOfDotReadTable) {
         pandas_vet::rules::use_of_read_table(checker, fields, &qualified_name);
@@ -1247,16 +1247,16 @@ fn call_with_qualified_name(checker: &Checker, fields: &ExprCallFields<'_>) {
     }
     let segments = qualified_name.segments();
     if checker.is_rule_enabled(Rule::OsPathGetsize) {
-        flake8_use_pathlib::rules::os_path_getsize(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_getsize(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathGetatime) {
-        flake8_use_pathlib::rules::os_path_getatime(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_getatime(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathGetctime) {
-        flake8_use_pathlib::rules::os_path_getctime(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_getctime(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathGetmtime) {
-        flake8_use_pathlib::rules::os_path_getmtime(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_getmtime(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathAbspath) {
         flake8_use_pathlib::rules::os_path_abspath(checker, fields, segments);
@@ -1271,28 +1271,28 @@ fn call_with_qualified_name(checker: &Checker, fields: &ExprCallFields<'_>) {
         flake8_use_pathlib::rules::os_unlink(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathExists) {
-        flake8_use_pathlib::rules::os_path_exists(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_exists(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathExpanduser) {
-        flake8_use_pathlib::rules::os_path_expanduser(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_expanduser(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathBasename) {
-        flake8_use_pathlib::rules::os_path_basename(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_basename(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathDirname) {
-        flake8_use_pathlib::rules::os_path_dirname(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_dirname(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathIsabs) {
-        flake8_use_pathlib::rules::os_path_isabs(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_isabs(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathIsdir) {
-        flake8_use_pathlib::rules::os_path_isdir(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_isdir(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathIsfile) {
-        flake8_use_pathlib::rules::os_path_isfile(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_isfile(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsPathIslink) {
-        flake8_use_pathlib::rules::os_path_islink(checker, call, segments);
+        flake8_use_pathlib::rules::os_path_islink(checker, fields, segments);
     }
     if checker.is_rule_enabled(Rule::OsReadlink) {
         flake8_use_pathlib::rules::os_readlink(checker, fields, segments);
@@ -1364,7 +1364,7 @@ fn call_with_qualified_name(checker: &Checker, fields: &ExprCallFields<'_>) {
         ruff::rules::starmap_zip(checker, fields, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
-        ruff::rules::tarfile_ignore_zeros_true(checker, call, &qualified_name);
+        ruff::rules::tarfile_ignore_zeros_true(checker, fields, &qualified_name);
     }
 }
 
@@ -1492,7 +1492,7 @@ fn call_rules(call: ExprCall<'_>, checker: &Checker) {
                                 pyupgrade::rules::format_literals(checker, &call_fields, &summary);
                             }
                             if checker.is_rule_enabled(Rule::FString) {
-                                pyupgrade::rules::f_strings(checker, call, &summary);
+                                pyupgrade::rules::f_strings(checker, &call_fields, &summary);
                             }
                         }
                     }
@@ -1664,7 +1664,7 @@ fn call_rules(call: ExprCall<'_>, checker: &Checker) {
         flake8_bandit::rules::flask_debug_true(checker, &call_fields);
     }
     if checker.is_rule_enabled(Rule::WeakCryptographicKey) {
-        flake8_bandit::rules::weak_cryptographic_key(checker, call);
+        flake8_bandit::rules::weak_cryptographic_key(checker, &call_fields);
     }
     if checker.any_rule_enabled(&[
         Rule::SubprocessWithoutShellEqualsTrue,
@@ -1836,7 +1836,7 @@ fn call_rules(call: ExprCall<'_>, checker: &Checker) {
         flake8_pytest_style::rules::unittest_assertion(checker, &expr, func, args, keywords);
     }
     if checker.is_rule_enabled(Rule::PytestUnittestRaisesAssertion) {
-        flake8_pytest_style::rules::unittest_raises_assertion_call(checker, call);
+        flake8_pytest_style::rules::unittest_raises_assertion_call(checker, &call_fields);
     }
     if checker.is_rule_enabled(Rule::SubprocessPopenPreexecFn) {
         pylint::rules::subprocess_popen_preexec_fn(checker, &call_fields);
@@ -1912,7 +1912,7 @@ fn call_rules(call: ExprCall<'_>, checker: &Checker) {
         Rule::LoggingExcInfo,
         Rule::LoggingRedundantExcInfo,
     ]) {
-        flake8_logging_format::rules::logging_call(checker, call);
+        flake8_logging_format::rules::logging_call(checker, &call_fields);
     }
     if checker.any_rule_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs]) {
         pylint::rules::logging_call(checker, &call_fields);
@@ -2044,7 +2044,7 @@ fn call_rules(call: ExprCall<'_>, checker: &Checker) {
         refurb::rules::fromisoformat_replace_z(checker, &call_fields);
     }
     if checker.is_rule_enabled(Rule::NonOctalPermissions) {
-        ruff::rules::non_octal_permissions(checker, call);
+        ruff::rules::non_octal_permissions(checker, &call_fields);
     }
     if checker.is_rule_enabled(Rule::AssertRaisesException) {
         flake8_bugbear::rules::assert_raises_exception_call(checker, &call_fields);

@@ -7,7 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Number, StringFlags};
+use ruff_python_ast::{self as ast, Expr, ExprCallFields, ExprKind, Number, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -70,11 +70,11 @@ struct FormatSummaryValues<'a> {
 }
 
 impl<'a> FormatSummaryValues<'a> {
-    fn try_from_call(call: ExprCall<'a>, locator: &'a Locator) -> Option<Self> {
+    fn try_from_arguments(arguments: ast::Arguments<'a>, locator: &'a Locator) -> Option<Self> {
         let mut extracted_args: Vec<Expr<'_>> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, Expr<'_>> = FxHashMap::default();
 
-        for arg in call.arguments().args() {
+        for arg in arguments.args() {
             if matches!(arg.classify(), ExprKind::Starred(..))
                 || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
@@ -83,7 +83,7 @@ impl<'a> FormatSummaryValues<'a> {
             }
             extracted_args.push(arg);
         }
-        for keyword in call.arguments().keywords() {
+        for keyword in arguments.keywords() {
             let arg = keyword.arg();
             let value = keyword.value();
             let key = arg?;
@@ -422,7 +422,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatSummary) {
+pub(crate) fn f_strings(checker: &Checker, call: &ExprCallFields<'_>, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }
@@ -432,7 +432,7 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
         return;
     }
 
-    let ExprKind::Attribute(attribute_node) = call.func().classify() else {
+    let ExprKind::Attribute(attribute_node) = call.func.classify() else {
         return;
     };
     let value = attribute_node.value();
@@ -441,12 +441,14 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
         return;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
+    let Some(mut summary) =
+        FormatSummaryValues::try_from_arguments(call.arguments, checker.locator())
+    else {
         return;
     };
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
-    let mut tokens = checker.tokens().in_range(call.func().range()).iter();
+    let mut tokens = checker.tokens().in_range(call.func.range()).iter();
     let end = loop {
         let Some(token) = tokens.next() else {
             unreachable!("Should break from the `Tok::Dot` arm");
@@ -486,8 +488,8 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
         return;
     }
 
-    let mut contents = String::with_capacity(checker.locator().slice(call).len());
-    let mut prev_end = call.start();
+    let mut contents = String::with_capacity(checker.locator().slice(call.range).len());
+    let mut prev_end = call.range.start();
     for (range, conversion) in patches {
         let fstring = match conversion {
             FStringConversion::Convert(fstring) => fstring,
@@ -518,7 +520,9 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
-    let existing = checker.locator().slice(TextRange::up_to(call.start()));
+    let existing = checker
+        .locator()
+        .slice(TextRange::up_to(call.range.start()));
     if existing
         .chars()
         .last()
@@ -546,7 +550,7 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(FString, call.range);
 
     // Avoid fix if there are comments within the call:
     // ```
@@ -554,21 +558,18 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
     //     0,  # 0
     // )
     // ```
-    let has_comments = checker
-        .comment_ranges()
-        .intersects(call.arguments().range());
+    let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
         if contents.is_empty() {
             // Ex) `''.format(self.project)`
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 checker.locator().slice(literal).to_string(),
-                call.range(),
+                call.range,
             )));
         } else {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                contents,
-                call.range(),
+                contents, call.range,
             )));
         }
     }
