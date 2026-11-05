@@ -95,6 +95,71 @@ def compare_integers(left: Literal[1, 2], right: Literal[3, 4]):
     reveal_type(left != right)  # revealed: Literal[True]
 ```
 
+## Comparing wide literal unions
+
+For two wide unions of integers, ty can infer `bool` without determining the ordering of each pair.
+Comparisons against a single literal still narrow precisely.
+
+```py
+from typing import Literal
+
+Digit = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+def _(tens: Digit, ones: Digit, other_ones: Digit, missing: bool):
+    low = 10 * tens + ones  # 0 through 99
+    high = 100 + low  # 100 through 199
+    reveal_type(low < high)  # revealed: bool
+
+    if low == 42:
+        reveal_type(low)  # revealed: Literal[42]
+```
+
+If the overlap is itself wide, narrowing by builtin type can retain values outside it.
+
+```py
+    shifted = 10 * tens + other_ones + 1  # 1 through 100
+    if low == shifted:
+        reveal_type(low == 0)  # revealed: bool
+```
+
+A possible `None` makes ordering unsupported. In a tuple comparison, an unsupported pair matters
+only when the preceding elements can be equal.
+
+```py
+    maybe_low = None if missing else low
+    reveal_type(maybe_low == low)  # revealed: bool
+    maybe_low < high  # error: [unsupported-operator]
+    if maybe_low == low:
+        maybe_low.bit_length()  # ok
+    if maybe_low is low:
+        maybe_low.bit_length()  # ok
+
+    maybe_high = None if missing else high
+    if maybe_low == maybe_high:
+        reveal_type(maybe_low)  # revealed: None
+
+    true_or_high = True if missing else high  # True compares equal to 1 in low.
+    reveal_type(true_or_high == low)  # revealed: bool
+    reveal_type(true_or_high is low)  # revealed: Literal[False]
+
+    reveal_type((low,) == (high,))  # revealed: Literal[False]
+    (low, None) < (high, 1)  # ok
+    (low, None) < (low, 1)  # error: [unsupported-operator]
+```
+
+A custom reflected comparison can contribute its own return type alongside the literal alternatives.
+
+```py
+class Reflected:
+    def __gt__(self, other: int) -> bytes:
+        return b""
+
+def _(tens: Digit, ones: Digit, use_custom: bool, custom: Reflected):
+    value = 10 * tens + ones
+    other = custom if use_custom else value
+    reveal_type(value < other)  # revealed: bytes | bool
+```
+
 ## Unsupported operations
 
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall

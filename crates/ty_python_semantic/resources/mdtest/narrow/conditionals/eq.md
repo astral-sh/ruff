@@ -1872,8 +1872,9 @@ def _(x: Literal[1, 2], y: Literal[2, 3]):
 
 ## Narrowing overlapping string, bytes, and integer literal unions
 
-Equality narrows each operand to the shared values. For inequality, each value on either side can
-differ from some value on the other side.
+Equality narrows each operand to the shared values. With very wide unions, applying that constraint
+can itself require comparing many pairs. In that case ty narrows to the builtin types of the shared
+values. For inequality, each value on either side can differ from some value on the other side.
 
 ```py
 from typing import Literal

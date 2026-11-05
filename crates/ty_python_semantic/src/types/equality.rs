@@ -15,11 +15,11 @@ use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers}
 use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
-    set_theoretic::matching_literal_union_arms,
+    literal::{LiteralComparisonKind, WideLiteralComparison},
 };
 
 mod enums;
@@ -325,6 +325,11 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
+        if let Some(comparison) = WideLiteralComparison::new(db, &self.evaluator.env, left, right) {
+            // Builtin literal equality is reflexive and returns a boolean, so neither identity
+            // nor a rich-comparison method call can add an outcome here.
+            return Ok(comparison.truthiness(db, LiteralComparisonKind::Equality));
+        }
         let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
@@ -611,6 +616,26 @@ fn evaluate_comparison_once<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if let Some(comparison) = WideLiteralComparison::new(evaluator.db, &evaluator.env, left, right)
+    {
+        if comparison
+            .truthiness(evaluator.db, LiteralComparisonKind::Equality)
+            .is_always_false()
+        {
+            return operator.result_from_equality(false);
+        }
+        return if evaluator.goal == ComparisonGoal::Constraint
+            && operator.condition_expects_equality(branch)
+            && let Some(constraint) = comparison.positive_constraint(
+                evaluator.db,
+                &evaluator.env,
+                LiteralComparisonKind::Equality,
+            ) {
+            ComparisonResult::CanNarrow(constraint)
+        } else {
+            ComparisonResult::Ambiguous
+        };
+    }
     evaluate_enum_comparison(evaluator, left, right, branch, operator)
         .or_else(|| evaluate_dynamic_comparison(evaluator, left, right, branch, operator))
         .or_else(|| evaluate_finite_comparison(evaluator, left, right, branch, operator))
@@ -769,25 +794,6 @@ fn evaluate_structural_comparison<'db>(
             .evaluate(other, newtype.concrete_base_type(db), branch, operator)
             .discard_narrowing(),
 
-        // Truthiness evaluation can stop at the first disagreement, before inspecting both unions.
-        (Type::Union(_), Type::Union(_))
-            if evaluator.goal == ComparisonGoal::Constraint
-                && let Some(pairs) = matching_literal_union_arms(db, right, left) =>
-        {
-            let mut pairs = pairs.peekable();
-            if pairs.peek().is_none() {
-                operator.result_from_equality(false)
-            } else if operator.condition_expects_equality(branch) {
-                ComparisonResult::CanNarrow(UnionType::from_elements(
-                    db,
-                    env,
-                    pairs.map(|(_, left)| left),
-                ))
-            } else {
-                // Every left value can differ from at least one of the right values.
-                ComparisonResult::Ambiguous
-            }
-        }
         (Type::Union(union), other) => {
             evaluate_union_left(evaluator, union.elements(db), other, branch, operator)
         }

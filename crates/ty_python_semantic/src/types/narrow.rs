@@ -52,6 +52,7 @@ use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
 };
+use super::literal::{LiteralComparisonKind, WideLiteralComparison};
 use super::match_pattern::is_typed_dict_runtime_domain;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -3920,6 +3921,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let op = if is_positive { op } else { op.negate() };
 
         match op {
+            ast::CmpOp::Is
+                if let Some(comparison) =
+                    WideLiteralComparison::new(db, &self.env, lhs_ty, rhs_ty) =>
+            {
+                comparison.positive_constraint(db, &self.env, LiteralComparisonKind::Identity)
+            }
+            // Testing each possible substring against each possible haystack is quadratic.
+            ast::CmpOp::In | ast::CmpOp::NotIn
+                if WideLiteralComparison::new(db, &self.env, lhs_ty, rhs_ty).is_some() =>
+            {
+                None
+            }
             ast::CmpOp::IsNot => {
                 let rhs_identity_ty = rhs_ty.identity_comparison_type(db, &self.env);
                 let rhs_constraint = if rhs_identity_ty.is_singleton(db, &self.env) {

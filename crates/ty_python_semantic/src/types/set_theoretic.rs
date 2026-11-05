@@ -1,6 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 use std::convert::Infallible;
@@ -11,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueTypeKind, PromotionKind,
-    PromotionMode, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
+    TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -21,62 +21,6 @@ pub(crate) mod builder;
 mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
-
-/// Match exact string, bytes, or integer literals in the order of the right union.
-///
-/// Indexing the left union by value avoids the quadratic cross-product of the two unions' arms.
-/// Both operands must be unions with one arm per value and at least two distinct values.
-pub(super) fn matching_literal_union_arms<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Option<impl Iterator<Item = (Type<'db>, Type<'db>)> + 'db> {
-    let (left, right) = match (left, right) {
-        (Type::Union(left), Type::Union(right)) => (left, right),
-        // Resolve aliases only when both operands could be unions. Leave bare recursive binders
-        // to the caller's usual unfolding path.
-        (Type::TypeAlias(_), Type::Union(_) | Type::TypeAlias(_))
-        | (Type::Union(_), Type::TypeAlias(_)) => (
-            left.resolve_type_alias(db).as_union()?,
-            right.resolve_type_alias(db).as_union()?,
-        ),
-        _ => return None,
-    };
-    // Python equality agrees with matching kind and value for these literals.
-    // Boolean literals require separate handling because `True == 1`.
-    let literal_key = |ty: Type<'db>| {
-        ty.as_literal_value_kind().filter(|kind| {
-            matches!(
-                kind,
-                LiteralValueTypeKind::String(_)
-                    | LiteralValueTypeKind::Bytes(_)
-                    | LiteralValueTypeKind::Int(_)
-            )
-        })
-    };
-    let right = right.elements(db);
-    let mut right_values = FxHashSet::default();
-    if right.len() < 2
-        || !right
-            .iter()
-            .all(|&ty| literal_key(ty).is_some_and(|value| right_values.insert(value)))
-    {
-        return None;
-    }
-    let left = left.elements(db);
-    let by_value = left
-        .iter()
-        .map(|&ty| Some((literal_key(ty)?, ty)))
-        .collect::<Option<FxHashMap<_, _>>>()?;
-    if by_value.len() < 2 || by_value.len() != left.len() {
-        return None;
-    }
-
-    Some(right.iter().filter_map(move |&ty| {
-        let left = *by_value.get(&literal_key(ty)?)?;
-        Some((left, ty))
-    }))
-}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -1191,25 +1135,8 @@ impl<'db> IntersectionType<'db> {
         )]
         fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
             let env = ProgramEnvironment::from_program(types.program(db));
-            let left = types.first(db);
-            let right = types.second(db);
-            if let Some(pairs) = matching_literal_union_arms(db, left, right) {
-                // Only matching values survive distribution. Simplify those pairs as usual
-                // when the literal flags differ.
-                return UnionType::from_elements(
-                    db,
-                    &env,
-                    pairs.map(|(left, right)| {
-                        if left == right {
-                            left
-                        } else {
-                            IntersectionType::from_elements(db, &env, [left, right])
-                        }
-                    }),
-                );
-            }
             IntersectionBuilder::new(db, &env)
-                .positive_elements([left, right])
+                .positive_elements([types.first(db), types.second(db)])
                 .build()
         }
 

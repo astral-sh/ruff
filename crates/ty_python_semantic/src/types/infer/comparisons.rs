@@ -17,7 +17,7 @@ use crate::types::equality::{
 };
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
-use crate::types::set_theoretic::matching_literal_union_arms;
+use crate::types::literal::{LiteralComparisonKind, WideLiteralComparison};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
@@ -556,6 +556,9 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> Truthiness {
+        if let Some(comparison) = WideLiteralComparison::new(db, env, self, other) {
+            return comparison.truthiness(db, LiteralComparisonKind::Identity);
+        }
         let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
             ty.is_singleton(db, env)
                 || ty
@@ -845,17 +848,19 @@ fn infer_binary_type_comparison_inner<'db>(
     let db = context.db();
     let env = &context.program_environment();
 
-    if let NonIdentityOperator::Rich(rich @ (RichCompareOperator::Eq | RichCompareOperator::Ne)) =
-        op
-        && let Some(mut pairs) = matching_literal_union_arms(db, left, right)
-    {
-        // These literals compare with a builtin boolean result. An overlap permits
-        // both results because each union has multiple values.
-        return Ok(if pairs.next().is_some() {
-            KnownClass::Bool.to_instance(db, env)
-        } else {
-            Type::bool_literal(rich == RichCompareOperator::Ne)
-        });
+    if let Some(comparison) = WideLiteralComparison::new(db, env, left, right) {
+        if let NonIdentityOperator::Rich(
+            rich @ (RichCompareOperator::Eq | RichCompareOperator::Ne),
+        ) = op
+        {
+            let truthiness = comparison
+                .truthiness(db, LiteralComparisonKind::Equality)
+                .negate_if(rich == RichCompareOperator::Ne);
+            return Ok(Type::from_truthiness(db, env, truthiness));
+        }
+
+        let (left, right) = comparison.widened_operands(db, env);
+        return infer_binary_type_comparison_inner(context, left, op, right, range, visitor);
     }
 
     let try_dunder = |policy: MemberLookupPolicy| {
