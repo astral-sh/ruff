@@ -18,9 +18,10 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
-    definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType,
+    RecursiveTypeNormalization, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder,
+    VarianceInferable, VarianceTerm, definition_expression_annotation, definition_expression_type,
+    visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -148,19 +149,22 @@ impl<'db> TypedDictOpenness<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::ImplicitlyOpen | Self::Closed => Some(self),
             Self::Extra(extra_items) => {
-                let declared_ty = extra_items
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, env, div, true);
+                let declared_ty = extra_items.declared_ty.recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    true,
+                );
                 let declared_ty = if nested {
                     declared_ty?
                 } else {
-                    declared_ty.unwrap_or(div)
+                    declared_ty.unwrap_or(normalization.replacement)
                 };
                 Some(Self::extra(db, declared_ty, extra_items.is_read_only))
             }
@@ -234,23 +238,32 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
+            Self::Class(class) => Some(Self::Class(class.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
             Self::Synthesized(typed_dict) => {
                 Some(Self::Synthesized(SynthesizedTypedDictType::new(
                     db,
-                    typed_dict
-                        .items(db)
-                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    typed_dict.items(db).recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?,
                     typed_dict.kind(db),
-                    typed_dict
-                        .openness(db)
-                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    typed_dict.openness(db).recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?,
                 )))
             }
         }
@@ -3189,18 +3202,19 @@ impl<'db> TypedDictSchema<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         self.iter()
             .map(|(name, field)| {
-                let declared_ty = field
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, env, div, true);
+                let declared_ty =
+                    field
+                        .declared_ty
+                        .recursive_type_normalized_impl(db, env, normalization, true);
                 let declared_ty = if nested {
                     declared_ty?
                 } else {
-                    declared_ty.unwrap_or(div)
+                    declared_ty.unwrap_or(normalization.replacement)
                 };
                 let mut field = field.clone();
                 field.declared_ty = declared_ty;

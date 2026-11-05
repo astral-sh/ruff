@@ -11,8 +11,8 @@ use crate::{
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
-        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-        TypeVarBoundOrConstraints, UnionBuilder,
+        MemberLookupResult, RecursiveTypeNormalization, SpecialFormType, SubclassOfInner,
+        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -283,16 +283,22 @@ impl<'db> ResolvedSuperOwner<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
-            owner_type: self
-                .owner_type
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            lookup_anchor: self
-                .lookup_anchor
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+            owner_type: self.owner_type.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?,
+            lookup_anchor: self.lookup_anchor.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?,
             receiver: self.receiver,
         })
     }
@@ -323,7 +329,7 @@ impl<'db> SuperOwnerKind<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
@@ -332,7 +338,7 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Divergent(_) => Some(*self),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
-                resolved_owner.recursive_type_normalized_impl(db, env, div, nested)?,
+                resolved_owner.recursive_type_normalized_impl(db, env, normalization, nested)?,
             )),
         }
     }
@@ -1008,15 +1014,15 @@ impl<'db> BoundSuperType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.pivot_class(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             self.owner(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
         ))
     }
 }

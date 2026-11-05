@@ -38,8 +38,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
-    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
-    VarianceTerm,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, RecursiveTypeNormalization, TypeContext,
+    TypeMapping, VarianceInferable, VarianceTerm,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -409,13 +409,13 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Some(Self(NominalInstanceInner::ExactTuple(
-                    tuple.recursive_type_normalized_impl(db, env, div, nested)?,
+                    tuple.recursive_type_normalized_impl(db, env, normalization, nested)?,
                 )))
             }
             NominalInstanceInner::SysVersionInfo => {
@@ -423,9 +423,12 @@ impl<'db> NominalInstanceType<'db> {
             }
             NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
             NominalInstanceInner::NonTuple(class) => {
-                let transformed = class
-                    .class(db)
-                    .recursive_type_normalized_impl(db, env, div, nested)?;
+                let transformed = class.class(db).recursive_type_normalized_impl(
+                    db,
+                    env,
+                    normalization,
+                    nested,
+                )?;
                 Some(Self(NominalInstanceInner::NonTuple(
                     class.with_class(db, transformed),
                 )))
@@ -1942,13 +1945,13 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
             inner: self
                 .inner
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
             _phantom: PhantomData,
         })
     }
@@ -2129,22 +2132,28 @@ impl<'db> Protocol<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::FromClass(class) => Some(Self::FromClass(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
+            Self::FromClass(class) => Some(Self::FromClass(class.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?)),
             Self::Synthesized(synthesized) => Some(Self::Synthesized(
-                synthesized.recursive_type_normalized_impl(db, env, div, nested)?,
+                synthesized.recursive_type_normalized_impl(db, env, normalization, nested)?,
             )),
             Self::Materialized(materialized) => {
                 Some(Self::Materialized(MaterializedProtocolType::new(
                     db,
-                    materialized
-                        .origin(db)
-                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    materialized.origin(db).recursive_type_normalized_impl(
+                        db,
+                        env,
+                        normalization,
+                        nested,
+                    )?,
                     materialized.materialization_kind(db),
                 )))
             }
@@ -2176,7 +2185,8 @@ mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
-        FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, VarianceInferable, VarianceTerm,
+        FindLegacyTypeVarsVisitor, RecursiveTypeNormalization, TypeContext, TypeMapping,
+        VarianceInferable, VarianceTerm,
     };
     use crate::{Db, FxOrderSet, ProgramEnvironment};
     use ty_python_core::definition::Definition;
@@ -2223,13 +2233,15 @@ mod synthesized_protocol {
             self,
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
-            div: Type<'db>,
+            normalization: RecursiveTypeNormalization<'_, 'db>,
             nested: bool,
         ) -> Option<Self> {
-            Some(Self(
-                self.0
-                    .recursive_type_normalized_impl(db, env, div, nested)?,
-            ))
+            Some(Self(self.0.recursive_type_normalized_impl(
+                db,
+                env,
+                normalization,
+                nested,
+            )?))
         }
     }
 

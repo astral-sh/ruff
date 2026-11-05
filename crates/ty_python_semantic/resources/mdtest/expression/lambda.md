@@ -97,6 +97,34 @@ expression.
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 ```
 
+## Type variables in defaults of immediately called lambdas
+
+An immediately called lambda does not introduce bindings for type variables in its defaults:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+def generic(value: T, callback=(lambda item=list[T]: item)()) -> T:
+    return value
+```
+
+## Defaults in annotation metadata
+
+Defaults in `Annotated` metadata retain the annotation's type-variable context. A generic `Callable`
+can bind type variables that would be unbound in an ordinary annotation:
+
+```py
+from typing import Annotated, Callable, TypeVar
+
+T = TypeVar("T")
+
+plain: Annotated[int, lambda value=list[T]: value]  # error: [unbound-type-variable]
+callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]  # ok
+```
+
 ## Defaults in string annotations
 
 `Annotated` metadata can contain lambdas. Names in their default values must still be resolved in
@@ -174,4 +202,251 @@ reveal_type(x.__doc__)  # revealed: str | None
 reveal_type(x.__kwdefaults__)  # revealed: dict[str, Any] | None
 reveal_type(x.__module__)  # revealed: str
 reveal_type(x.__qualname__)  # revealed: str
+```
+
+## Recursive return types
+
+Inference preserves the finite part of a recursive lambda's return type. The recursive reference
+itself is currently approximated with `Divergent`:
+
+```py
+node = lambda: (1, node)
+
+reveal_type(node()[0])  # revealed: Literal[1]
+reveal_type(node()[1])  # revealed: Divergent
+```
+
+## Recursive lambdas with default parameters
+
+A recursive lambda can use a default argument while taking its parameter and return types from a
+callable annotation:
+
+```py
+from typing import Callable
+
+recursive: Callable[[int], int] = lambda value=0: value if value == 0 else recursive(value - 1)
+
+reveal_type(recursive)  # revealed: (value: int = 0) -> int
+reveal_type(recursive())  # revealed: int
+recursive("no")  # error: [invalid-argument-type]
+```
+
+## Recursive defaults in a list of lambdas
+
+A lambda stored in a list can return another lambda whose default refers to the selected callback.
+The default is evaluated only when the outer lambda is called, after `callback` has been assigned.
+
+```py
+callback = [lambda: lambda x=callback: x, lambda: callback][0]  # ok
+```
+
+## Bound recursive lambdas
+
+Access through an instance binds the receiver of a recursive lambda:
+
+```py
+class C:
+    method = lambda self: (1, C.method)
+
+c = C()
+reveal_type(c.method()[0])  # revealed: int
+c.method(c)  # error: [too-many-positional-arguments]
+```
+
+## Displaying bound recursive lambdas
+
+A lambda can return a bound method referring to itself:
+
+```py
+class C:
+    method = lambda self: (1, C().method)
+
+reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
+```
+
+## Recursive decorators with an unresolved default
+
+An unresolved default does not prevent us from reporting an invalid decorator call or inferring the
+dictionary returned by the inner decorator. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4613>.
+
+```py
+while previous := Decorated:  # error: [possibly-unresolved-reference]
+    @lambda value=missing: value  # error: [unresolved-reference]
+    @lambda: {key: 0}  # error: [too-many-positional-arguments]
+    class Decorated:
+        pass
+
+    reveal_type(Decorated)  # revealed: dict[Divergent, int]
+
+key = previous
+```
+
+## Body diagnostics in invalid annotations
+
+An invalid annotation still reports errors inside its lambda body, even though the annotation's
+inferred type is `Unknown`.
+
+```py
+# error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: lambda: missing = 1
+```
+
+## Recursive decorator with a lambda default
+
+A decorator's default can refer to the decorated class while its return value refers to another
+binding that later becomes a type alias. Inference converges and preserves the outer tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+@lambda func, fallback=lambda: Result: (build,)
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result)  # revealed: tuple[Divergent]
+
+type build = int
+```
+
+## Recursive decorator returning a collection
+
+The cycle can also pass through a promoted collection element. The finite part of the decorator's
+return type remains available.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+values = [1]
+
+@lambda func, fallback=lambda: Result: (0, {build: 0 for _ in values})
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result[0])  # revealed: Literal[0]
+
+type build = int
+```
+
+## Recursive lambda diagnostics in a condition
+
+Unused lambda bodies are checked even when they refer to conditionally defined names. Diagnostics in
+the condition can display another recursive lambda without preventing inference from converging.
+
+```py
+lambda: value  # ok
+callbacks: 0 = {lambda: callbacks}  # error: [invalid-type-form]
+target: int
+if target := callbacks:  # error: [invalid-assignment]
+    value = 0
+
+    def callbacks() -> callbacks:
+        pass
+```
+
+## Recursive lambda returns with an annotated binding
+
+A lambda decorator can return a tuple referring back to the decorated name. Inference converges even
+when a later annotation and assertion affect which value that name refers to.
+
+```py
+from typing import Any
+
+C = 0
+
+@lambda item=0: (item, C)
+class C:
+    pass
+
+try:
+    C: Any
+finally:
+    pass
+
+assert [lambda: C]  # ok
+C = 0
+```
+
+## Recursive lambda returns after reassignment
+
+Inference also converges when the decorated name is reassigned before its annotation.
+
+```py
+from typing import Any
+
+def unknown() -> Any:
+    return 0
+
+C = 0
+
+@lambda item=0: (item, C)
+class C:
+    pass
+
+C = unknown()
+try:
+    C: int
+finally:
+    pass
+
+assert [lambda: C]  # ok
+C = 0
+```
+
+## Recursive lambda dictionaries in diagnostics
+
+Invalid annotations and iteration still produce diagnostics when the inferred value is a dictionary
+returned by a recursive lambda decorator.
+
+```py
+@lambda item=0, /: {item: C}
+class C:
+    pass
+
+try:
+    C: 0  # error: [invalid-type-form]
+except:
+    pass
+
+assert {0 for _ in (lambda: C)}  # error: [not-iterable]
+(C := 0)
+```
+
+## Recursive lambdas in invalid annotations
+
+Rebinding names shared by a lambda and a variadic parameter annotation still produces normal
+annotation diagnostics.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def unknown(value):
+    return value
+
+lambda: f
+f = unknown(0)
+type A = list[A]  # error: [invalid-type-form]
+f = lambda: f
+while unknown(0):
+    def f(*args: A):
+        pass
+
+def A(f: f):  # error: [invalid-type-form]
+    pass
 ```

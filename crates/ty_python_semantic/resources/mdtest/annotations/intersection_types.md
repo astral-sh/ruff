@@ -279,7 +279,8 @@ type Container = list[A | ~A]
 type A = Container | list[~A]
 
 def _(value: A):
-    reveal_type(value)  # revealed: list[Divergent]
+    # TODO: Preserve the recursive alias structure.
+    reveal_type(value)  # revealed: list[Divergent] | list[Divergent]
 ```
 
 ## Intersections inside `type[...]`

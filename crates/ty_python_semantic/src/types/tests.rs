@@ -400,6 +400,10 @@ fn divergent_type() {
     let db = &db;
     let env = db.program_environment();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let normalization = RecursiveTypeNormalization {
+        replacement: div,
+        is_cycle_marker: &|ty| ty.same_divergent_marker(div),
+    };
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
@@ -464,11 +468,11 @@ fn divergent_type() {
             .is_err()
     );
     assert_eq!(
-        top_div.recursive_type_normalized_impl(db, &env, div, true),
+        top_div.recursive_type_normalized_impl(db, &env, normalization, true),
         None
     );
     assert_eq!(
-        bottom_div.recursive_type_normalized_impl(db, &env, div, true),
+        bottom_div.recursive_type_normalized_impl(db, &env, normalization, true),
         None
     );
 
@@ -554,7 +558,7 @@ fn divergent_type() {
         "list[list[Divergent] | None]"
     );
     let normalized = nested_rec
-        .recursive_type_normalized_impl(db, &env, div, false)
+        .recursive_type_normalized_impl(db, &env, normalization, false)
         .unwrap();
     assert_eq!(
         normalized
@@ -590,7 +594,7 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_tuple
-        .recursive_type_normalized_impl(db, &env, div, false)
+        .recursive_type_normalized_impl(db, &env, normalization, false)
         .unwrap();
     assert_eq!(
         normalized
@@ -626,7 +630,7 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_dict
-        .recursive_type_normalized_impl(db, &env, div, false)
+        .recursive_type_normalized_impl(db, &env, normalization, false)
         .unwrap();
     assert_eq!(
         normalized
@@ -645,7 +649,7 @@ fn divergent_type() {
         assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union
-        .recursive_type_normalized_impl(db, &env, div, false)
+        .recursive_type_normalized_impl(db, &env, normalization, false)
         .unwrap();
     assert_eq!(
         normalized
@@ -706,26 +710,90 @@ fn recursive_annotated_normalization() {
     let db = setup_db();
     let env = db.program_environment();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let normalization = RecursiveTypeNormalization {
+        replacement: div,
+        is_cycle_marker: &|ty| ty.same_divergent_marker(div),
+    };
     let list_of = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
     let annotated =
         |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
 
     let recursive = annotated(div);
     assert_eq!(
-        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, false),
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, normalization, false),
         Some(recursive)
     );
     assert_eq!(
-        annotated(list_of(list_of(div))).recursive_type_normalized_impl(&db, &env, div, false),
+        annotated(list_of(list_of(div))).recursive_type_normalized_impl(
+            &db,
+            &env,
+            normalization,
+            false
+        ),
         Some(recursive)
     );
     assert_eq!(
-        annotated(recursive).recursive_type_normalized_impl(&db, &env, div, false),
+        annotated(recursive).recursive_type_normalized_impl(&db, &env, normalization, false),
         Some(recursive)
     );
     assert_eq!(
-        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, true),
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, normalization, true),
         None
+    );
+}
+
+#[test]
+fn recursive_normalization_retains_the_current_query_marker() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let own = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let callable =
+        |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
+    let expected = callable(own);
+    let normalization = RecursiveTypeNormalization {
+        replacement: own,
+        is_cycle_marker: &|ty| ty.same_divergent_marker(own) || ty.same_divergent_marker(foreign),
+    };
+    let remaining = RecursiveTypeNormalization {
+        replacement: own,
+        is_cycle_marker: &|ty| ty.same_divergent_marker(own),
+    };
+
+    for return_ty in [
+        foreign,
+        UnionType::from_elements(&db, &env, [callable(own), foreign]),
+        UnionType::from_elements(&db, &env, [foreign, callable(own)]),
+    ] {
+        let normalized =
+            callable(return_ty).recursive_type_normalized_impl(&db, &env, normalization, false);
+        assert_eq!(normalized, Some(expected));
+
+        // Once the other query leaves the cycle, another recursive step still has a
+        // back-reference to the surviving query, so it cannot grow another callable layer.
+        assert_eq!(
+            normalized.and_then(|normalized| {
+                callable(normalized).recursive_type_normalized_impl(&db, &env, remaining, false)
+            }),
+            Some(expected)
+        );
+    }
+
+    // A marker for a query outside the active cycle is an independent recursive value.
+    assert_eq!(
+        callable(foreign).recursive_type_normalized_impl(&db, &env, remaining, false),
+        Some(callable(foreign))
+    );
+
+    let scalar = KnownClass::Int.to_instance(&db, &env);
+    assert_eq!(
+        UnionType::from_elements(&db, &env, [foreign, own, scalar]).recursive_type_normalized_impl(
+            &db,
+            &env,
+            normalization,
+            false
+        ),
+        Some(scalar)
     );
 }
 

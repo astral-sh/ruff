@@ -5877,6 +5877,8 @@ if next(sys.platform == "linux" for _ in range(1)):  # ok
 
 if (lambda: sys.platform)():  # ok
     pass
+if (lambda: (lambda: sys.platform)())():  # ok
+    pass
 if next(sys.version_info for _ in range(1)):  # ok
     pass
 ```

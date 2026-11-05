@@ -2,7 +2,9 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
+use crate::types::{
+    ClassType, KnownUnion, RecursiveTypeNormalization, Type, definition_expression_type, visitor,
+};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
@@ -193,11 +195,13 @@ impl<'db> NewType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let eager_base = match self.eager_base(db) {
-            Some(base) => Some(base.recursive_type_normalized_impl(db, env, div, nested)?),
+            Some(base) => {
+                Some(base.recursive_type_normalized_impl(db, env, normalization, nested)?)
+            }
             None => None,
         };
 
@@ -313,15 +317,15 @@ impl<'db> NewTypeBase<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             NewTypeBase::ClassType(class_type) => class_type
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(NewTypeBase::ClassType),
             NewTypeBase::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env, normalization, nested)
                 .map(NewTypeBase::NewType),
             NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }

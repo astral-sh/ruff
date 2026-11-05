@@ -9,8 +9,8 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, SelfTypeVarOrigin, Signature, SubclassOfType, Type, TypeContext,
-        TypeMapping,
+        PropertyInstanceType, RecursiveTypeNormalization, SelfTypeVarOrigin, Signature,
+        SubclassOfType, Type, TypeContext, TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
@@ -179,14 +179,14 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
+                .recursive_type_normalized_impl(db, env, normalization, nested)?,
         ))
     }
 }
@@ -549,13 +549,13 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, env, normalization, nested)?,
             }),
             Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
             Self::ScopeOffset {
@@ -565,7 +565,7 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, env, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, env, normalization, nested)?,
             }),
         }
     }
@@ -597,22 +597,28 @@ impl<'db> NamedTupleSpec<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let fields = self
             .fields(db)
             .iter()
             .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let ty =
+                    f.ty.recursive_type_normalized_impl(db, env, normalization, true);
+                let ty = if nested {
+                    ty?
+                } else {
+                    ty.unwrap_or(normalization.replacement)
+                };
                 let default = match f.default {
                     Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, env, div, true);
+                        let default =
+                            default.recursive_type_normalized_impl(db, env, normalization, true);
                         Some(if nested {
                             default?
                         } else {
-                            default.unwrap_or(div)
+                            default.unwrap_or(normalization.replacement)
                         })
                     }
                     None => None,

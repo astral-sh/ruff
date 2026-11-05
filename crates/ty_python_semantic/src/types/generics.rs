@@ -41,10 +41,10 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
-    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalization,
+    SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -421,7 +421,7 @@ impl<'db> GenericContext<'db> {
     ///
     /// For functions, this retains type variables that are moved to a returned callable in the
     /// externally visible signature. Other scope kinds have identical lexical and public contexts.
-    fn lexical_of_node(
+    pub(super) fn lexical_of_node(
         db: &'db dyn Db,
         node: &NodeWithScopeKind,
         index: &SemanticIndex<'db>,
@@ -1533,25 +1533,27 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalization: RecursiveTypeNormalization<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let types = if nested {
             self.types(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
+                .map(|ty| ty.recursive_type_normalized_impl(db, env, normalization, true))
                 .collect::<Option<Box<[_]>>>()?
         } else {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
+                    ty.recursive_type_normalized_impl(db, env, normalization, true)
+                        .unwrap_or(normalization.replacement)
                 })
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, env, div, nested)?),
+            Some(tuple) => {
+                Some(tuple.recursive_type_normalized_impl(db, env, normalization, nested)?)
+            }
             None => None,
         };
         let context = self.generic_context(db);
