@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use crate::registry::Rule;
+
 /// Returns the redirect target for a rule code, prefix, or name.
 pub(crate) fn get_redirect_target(selector: &str) -> Option<&'static str> {
     REDIRECTS.get(selector).copied()
@@ -134,6 +136,10 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("TCH006", "TC010"),
         ("TCH010", "TC010"),
         ("RUF035", "S704"),
+        (
+            "missing-return-type-undocumented-public-function",
+            Rule::MissingReturnTypePublicFunction.name().as_str(),
+        ),
     ])
 });
 
