@@ -1,0 +1,4 @@
+interface:
+  display_name: "Triage ty Issue"
+  short_description: "Classify ty issues, duplicates, and root causes"
+  default_prompt: "Use $triage-ty-issue to triage this ty issue and recommend labels, related issues, and a fix direction."

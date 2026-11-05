@@ -156,6 +156,23 @@ impl ParsedModule {
         }
     }
 
+    /// Loads the parsed module and simultaneously notes whether the underlying
+    /// file is closed. If so, we proactively clear its AST from the Salsa cache
+    /// when the returned guard is dropped.
+    ///
+    /// This is intended for use in language server operations that scan all of
+    /// the files in a workspace, thereby often exceeding the LRU cache for parsed
+    /// modules. Clearing ASTs proactively helps mitigate unpredictable pauses
+    /// that would otherwise occur on the next database update, but it can also
+    /// reduce the efficiency of our cache, so we should replace this with a more
+    /// robust solution eventually: <https://github.com/astral-sh/ty/issues/3909>.
+    pub fn load_then_clear_on_drop(&self, db: &dyn Db) -> ParsedModuleGuard {
+        ParsedModuleGuard {
+            module: self.load(db),
+            clear_on_drop: !db.system().is_file_open(self.file.path(db)),
+        }
+    }
+
     /// Clear the parsed module, dropping the AST once all references to it are dropped.
     pub fn clear(&self) {
         self.inner.store(None);
@@ -199,6 +216,11 @@ impl ParsedModuleRef {
         &self.module
     }
 
+    /// Number of indexed nodes in the root AST.
+    pub fn node_count(&self) -> usize {
+        self.indexed.node_count()
+    }
+
     /// Returns a reference to the AST node at the given index.
     pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
         self.indexed.get_by_index(index)
@@ -210,6 +232,28 @@ impl std::ops::Deref for ParsedModuleRef {
 
     fn deref(&self) -> &Self::Target {
         &self.indexed.parsed
+    }
+}
+
+/// A parsed module reference that clears the cached AST on drop if the file was closed when loaded.
+pub struct ParsedModuleGuard {
+    module: ParsedModuleRef,
+    clear_on_drop: bool,
+}
+
+impl std::ops::Deref for ParsedModuleGuard {
+    type Target = ParsedModuleRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.module
+    }
+}
+
+impl Drop for ParsedModuleGuard {
+    fn drop(&mut self) {
+        if self.clear_on_drop {
+            self.module.module().clear();
+        }
     }
 }
 
@@ -396,7 +440,7 @@ mod indexed {
                                 aligned && address.is_multiple_of(Self::ALIGNMENT),
                             )
                         });
-                let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
+                let offset_bits = ((max - base) / Self::ALIGNMENT).bit_width();
                 let relative_bits = u8::try_from(offset_bits)
                     .expect("an address offset cannot require more than u8::MAX bits")
                     + Self::KIND_BITS;
@@ -488,12 +532,10 @@ mod indexed {
             }
         }
 
-        #[cfg(test)]
         fn len(&self) -> usize {
-            self.chunks
-                .iter()
-                .map(|chunk| usize::from(chunk.entry_count))
-                .sum()
+            self.chunks.split_last().map_or(0, |(last, full)| {
+                full.len() * Self::CHUNK_LEN + usize::from(last.entry_count)
+            })
         }
 
         fn get(&self, index: usize) -> (usize, RootNodeKind) {
@@ -595,6 +637,10 @@ mod indexed {
                 .index = index;
 
             inner
+        }
+
+        pub(super) fn node_count(&self) -> usize {
+            self.index.len()
         }
 
         /// Returns the node at the given index.

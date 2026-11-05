@@ -105,7 +105,7 @@ pub(crate) enum StripKind {
 }
 
 impl StripKind {
-    fn from_str(s: &str) -> Option<Self> {
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
         match s {
             "strip" => Some(Self::Strip),
             "lstrip" => Some(Self::LStrip),

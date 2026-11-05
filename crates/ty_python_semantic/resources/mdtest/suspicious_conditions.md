@@ -20,7 +20,7 @@ from typing import Callable
 def check(predicate: Callable[[], bool]):
     if predicate:  # snapshot: truthiness-test-of-callable
         pass
-    if predicate():  # no diagnostic
+    if predicate():  # ok
         pass
 ```
 
@@ -65,7 +65,7 @@ help: Replace with `predicate(...)`
 9  +     if predicate(...):  # snapshot: truthiness-test-of-callable
 10 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Unions of callable values
@@ -82,7 +82,7 @@ def check_union(
 ):
     if predicate:  # error: [truthiness-test-of-callable]
         pass
-    if optional:  # no diagnostic
+    if optional:  # ok
         optional()
 ```
 
@@ -110,7 +110,7 @@ help: Replace with `predicate(...)`
 12 +     if predicate(...):  # snapshot: truthiness-test-of-callable
 13 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 and the same is currently true for callables with the gradual parameter list (`...`), though
@@ -141,7 +141,7 @@ help: Replace with `predicate1(...)`
 16 +     if predicate1(...):  # snapshot: truthiness-test-of-callable
 17 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-callable]: Suspicious boolean test of a `Callable`
@@ -158,7 +158,7 @@ help: Replace with `predicate2(...)`
 19 +     if predicate2(...):  # snapshot: truthiness-test-of-callable
 20 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Unions with functions and bound methods
@@ -245,7 +245,7 @@ help: Replace with `callback(...)`
 8 +     if callback(...):  # snapshot: truthiness-test-of-callable
 9 |         pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Callable type aliases
@@ -374,7 +374,7 @@ protocol can only be inhabited by objects that define `__len__`, so we emit no d
 from typing import Collection
 
 def check2(items: Collection[int]):
-    if items:  # no diagnostic
+    if items:  # ok
         pass
 ```
 
@@ -410,7 +410,7 @@ help: Test the length of the iterable instead of its truthiness
 19 +     if len(tuple(iterator)):  # snapshot: truthiness-test-of-iterable
 20 |         next(iterator)
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-iterable]: Suspicious boolean test of an `Iterable`
@@ -430,7 +430,7 @@ help: Test the length of the iterable instead of its truthiness
 21 +     if len(tuple(iterator2)):  # snapshot: truthiness-test-of-iterable
 22 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 as can `Generator`:
@@ -462,7 +462,7 @@ help: Test the length of the iterable instead of its truthiness
 27 +     if len(tuple(generator)):  # snapshot: truthiness-test-of-iterable
 28 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[truthiness-test-of-iterable]: Suspicious boolean test of an `Iterable`
@@ -482,7 +482,7 @@ help: Test the length of the iterable instead of its truthiness
 29 +     if len(tuple(generator2)):  # snapshot: truthiness-test-of-iterable
 30 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 So can custom protocols that are subtypes of `Iterable[object]` but supertypes of all
@@ -518,7 +518,7 @@ help: Test the length of the iterable instead of its truthiness
 39 +     if len(tuple(x)):  # snapshot: truthiness-test-of-iterable
 40 |         print(x.gi_running)
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 and some intersection types:
@@ -856,7 +856,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 5 +     if len(tuple(items)):  # snapshot: truthiness-test-of-iterable
 6 |         pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Collection fixes before Python 3.9
@@ -1007,7 +1007,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 3 + if len(tuple(values)):  # snapshot: truthiness-test-of-iterable
 4 |     pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Iterable annotations in dependencies
@@ -1056,7 +1056,7 @@ help: Test the length of the iterable instead of its truthiness
 3 + if len(tuple(items.values)):  # snapshot: truthiness-test-of-iterable
 4 |     pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Iterable values without variable annotations
@@ -1088,7 +1088,7 @@ help: Test the length of the iterable instead of its truthiness
 6 + if len(tuple(get_items())):  # snapshot: truthiness-test-of-iterable
 7 |     pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ## Nested boolean tests
@@ -1362,7 +1362,7 @@ Explicit `bool()` calls indicate an intentional truthiness test:
 
 ```py
 def take_explicit(items: list[str], limit: int | None = None) -> list[str]:
-    if not bool(limit):  # no diagnostic
+    if not bool(limit):  # ok
         return items
     return items[:limit]
 ```
@@ -1377,55 +1377,55 @@ from typing import Any, Literal
 def check(flag: bool | None):
     if flag:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(flag):  # no diagnostic
+    if bool(flag):  # ok
         pass
 
 def check(integer: int | None):
     if integer:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(integer):  # no diagnostic
+    if bool(integer):  # ok
         pass
 
 def check(text: str | None):
     if text:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(text):  # no diagnostic
+    if bool(text):  # ok
         pass
 
 def check(data: bytes | None):
     if data:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(data):  # no diagnostic
+    if bool(data):  # ok
         pass
 
 def check(number: float | None):
     if number:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(number):  # no diagnostic
+    if bool(number):  # ok
         pass
 
 def check(number: complex | None):
     if number:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(number):  # no diagnostic
+    if bool(number):  # ok
         pass
 
 def check(items: list[int] | None):
     if items:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(items):  # no diagnostic
+    if bool(items):  # ok
         pass
 
 def check(items: list[Any] | None):
     if items:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(items):  # no diagnostic
+    if bool(items):  # ok
         pass
 
 def check(mapping: dict[str, int] | None):
     if mapping:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(mapping):  # no diagnostic
+    if bool(mapping):  # ok
         pass
 ```
 
@@ -1435,7 +1435,7 @@ It also triggers if multiple other types could be falsy:
 def check(value: int | str | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1445,7 +1445,7 @@ It also triggers if there are (additional) types in the union that are always tr
 def check(value: str | Literal[True] | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1459,9 +1459,9 @@ def re_match_is_always_truthy(match: re.Match[str]):
     reveal_type(bool(match))  # revealed: Literal[True]
 
 def check(match: re.Match[str] | None):
-    if match:  # no diagnostic
+    if match:  # ok
         pass
-    if bool(match):  # no diagnostic
+    if bool(match):  # ok
         pass
 ```
 
@@ -1471,9 +1471,9 @@ does not trigger here:
 
 ```py
 def check(value: Any | None):
-    if value:  # no diagnostic
+    if value:  # ok
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1485,7 +1485,7 @@ def check(value: int | Any | None):
     # snapshot: truthiness-test-of-none-union
     if value:
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1510,7 +1510,7 @@ from typing import final
 class Custom: ...
 
 def check(value: Custom | None):
-    if value:  # no diagnostic
+    if value:  # ok
         pass
 ```
 
@@ -1525,7 +1525,7 @@ class AmbiguousTruthiness:
 def check(value: AmbiguousTruthiness | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 
 class AmbiguousLength:
@@ -1535,7 +1535,7 @@ class AmbiguousLength:
 def check(value: AmbiguousLength | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 
 class ChildOfAmbiguousTruthiness(AmbiguousTruthiness):
@@ -1544,7 +1544,7 @@ class ChildOfAmbiguousTruthiness(AmbiguousTruthiness):
 def check(value: ChildOfAmbiguousTruthiness | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 
 class AlwaysTruthy:
@@ -1552,7 +1552,7 @@ class AlwaysTruthy:
         return True
 
 def check(value: AlwaysTruthy | None):
-    if value:  # no diagnostic
+    if value:  # ok
         pass
 
 class AlwaysFalsy:
@@ -1563,7 +1563,7 @@ class AlwaysFalsy:
 def check(value: AlwaysFalsy | AlwaysTruthy | None):
     if value:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1581,7 +1581,7 @@ def check(integer: int | None):
     # snapshot: truthiness-test-of-none-union
     if integer:
         pass
-    if bool(integer):  # no diagnostic
+    if bool(integer):  # ok
         pass
 ```
 
@@ -1600,7 +1600,7 @@ def check(flag: bool | None):
     # snapshot: truthiness-test-of-none-union
     if flag:
         pass
-    if bool(flag):  # no diagnostic
+    if bool(flag):  # ok
         pass
 ```
 
@@ -1619,7 +1619,7 @@ def check(text: str | None):
     # snapshot: truthiness-test-of-none-union
     if text:
         pass
-    if bool(text):  # no diagnostic
+    if bool(text):  # ok
         pass
 ```
 
@@ -1638,7 +1638,7 @@ def check(data: bytes | None):
     # snapshot: truthiness-test-of-none-union
     if data:
         pass
-    if bool(data):  # no diagnostic
+    if bool(data):  # ok
         pass
 ```
 
@@ -1657,7 +1657,7 @@ def check(number: float | None):
     # snapshot: truthiness-test-of-none-union
     if number:
         pass
-    if bool(number):  # no diagnostic
+    if bool(number):  # ok
         pass
 ```
 
@@ -1676,7 +1676,7 @@ def check(items: list[int] | None):
     # snapshot: truthiness-test-of-none-union
     if items:
         pass
-    if bool(items):  # no diagnostic
+    if bool(items):  # ok
         pass
 ```
 
@@ -1695,7 +1695,7 @@ def check(mapping: dict[str, int] | None):
     # snapshot: truthiness-test-of-none-union
     if mapping:
         pass
-    if bool(mapping):  # no diagnostic
+    if bool(mapping):  # ok
         pass
 ```
 
@@ -1716,7 +1716,7 @@ def check(value: str | int | None):
     # snapshot: truthiness-test-of-none-union
     if value:
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1739,7 +1739,7 @@ def check(value: Custom | None):
     # snapshot: truthiness-test-of-none-union
     if value:
         pass
-    if bool(value):  # no diagnostic
+    if bool(value):  # ok
         pass
 ```
 
@@ -1761,7 +1761,7 @@ The rule triggers in all of these Boolean contexts:
 def check(limit: int | None, items: list[int | None]):
     if limit:  # error: [truthiness-test-of-none-union]
         pass
-    if bool(limit):  # no diagnostic
+    if bool(limit):  # ok
         pass
     elif limit:  # error: [truthiness-test-of-none-union]
         pass
@@ -1827,21 +1827,21 @@ from typing import final
 class Match: ...
 
 def check(enabled: bool, match: Match | None, title=None):
-    if enabled and match:  # no diagnostic
+    if enabled and match:  # ok
         pass
-    if match or enabled:  # no diagnostic
+    if match or enabled:  # ok
         pass
-    if not (enabled and match):  # no diagnostic
+    if not (enabled and match):  # ok
         pass
-    if result := enabled and match:  # no diagnostic
+    if result := enabled and match:  # ok
         pass
-    if result := (inner := match or enabled):  # no diagnostic
+    if result := (inner := match or enabled):  # ok
         pass
-    if enabled and title:  # no diagnostic
+    if enabled and title:  # ok
         pass
-    if result := enabled and title:  # no diagnostic
+    if result := enabled and title:  # ok
         pass
-    if result := (match if enabled else False):  # no diagnostic
+    if result := (match if enabled else False):  # ok
         pass
 ```
 

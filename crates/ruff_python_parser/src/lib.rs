@@ -76,7 +76,7 @@ use ruff_python_ast::{
     AtomicNodeIndex, Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral,
     Suite,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -302,9 +302,14 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 /// Parses each `range` of `source` as an independent module and concatenates the results into a
 /// single [`Parsed<ModModule>`] whose nodes keep their offsets into `source`.
 ///
+/// As with [`parse_unchecked`], the returned module's range spans all of `source`, including any
+/// text after the last range (such as a notebook's trailing newline). Consumers can therefore look
+/// up any offset into `source` in the module, like they can for a module parsed as a whole.
+///
 /// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
 /// its own while later cells can still reference earlier definitions.
-/// The `ranges` must be ordered and non-overlapping.
+/// The `ranges` must be ordered and non-overlapping, and the first range, if any, must start at
+/// offset zero.
 ///
 /// Consecutive ranges must be separated by a single-byte `\n`: each range ends just before the
 /// separator and the next range starts just after it, as Ruff's notebook cells are. A syntax error
@@ -316,15 +321,21 @@ pub fn parse_cells_unchecked(
     options: &ParseOptions,
 ) -> Parsed<ModModule> {
     let mut ranges = ranges.into_iter().peekable();
+    let first_range = ranges.peek();
+    debug_assert!(
+        first_range.is_none_or(|range| range.start() == TextSize::new(0)),
+        "the first cell range must start at offset zero",
+    );
+
     let mut body = Suite::new();
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
     let mut unsupported_syntax_errors = Vec::new();
-    let mut module_range: Option<TextRange> = None;
+    let mut previous_end: Option<TextSize> = None;
 
     while let Some(range) = ranges.next() {
-        if let Some(previous) = module_range {
-            assert!(previous.end() <= range.start());
+        if let Some(previous_end) = previous_end {
+            assert!(previous_end <= range.start());
         }
 
         // The cell is lexed from `range.start()`, so the slice must keep the leading text to
@@ -359,10 +370,7 @@ pub fn parse_cells_unchecked(
             ));
         }
 
-        module_range = Some(match module_range {
-            Some(previous) => TextRange::new(previous.start(), range.end()),
-            None => range,
-        });
+        previous_end = Some(range.end());
     }
 
     body.shrink_to_fit();
@@ -373,7 +381,7 @@ pub fn parse_cells_unchecked(
     Parsed {
         syntax: ModModule {
             node_index: AtomicNodeIndex::NONE,
-            range: module_range.unwrap_or_default(),
+            range: TextRange::up_to(source.text_len()),
             body,
         },
         tokens: Tokens::new(tokens),

@@ -552,7 +552,7 @@ def _(result: Result[str]) -> None:
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
-from typing import Callable, Generic, TypeVarTuple, ParamSpec
+from typing import Callable, Generic, ParamSpec, TypeVar, TypeVarTuple, Unpack
 
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
@@ -569,6 +569,64 @@ reveal_type(TypeVarTupleWithParamSpec[str, int]().fn)  # revealed: (...) -> tupl
 
 reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str, int]
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
+```
+
+An empty tuple unpack leaves the preceding arguments in their original slots.
+
+```py
+T = TypeVar("T")
+
+class WithSuffix(Generic[*Ts, P, T]):
+    fn: Callable[P, tuple[*Ts, T]]
+
+def shifted(x: WithSuffix[int, [str], bytes, Unpack[tuple[()]]]) -> None:
+    reveal_type(x.fn)  # revealed: (str, /) -> tuple[int, bytes]
+```
+
+### Defaulted `ParamSpec` after a `TypeVarTuple`
+
+Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
+default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+P = ParamSpec("P", default=[bool])
+
+class Callback(Generic[*Ts, P]):
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
+reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
+reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[int, [str], *tuple[()]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
+
+Q = ParamSpec("Q")
+
+def forward(a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
+    reveal_type(a.fn)  # revealed: (**Q@forward) -> tuple[int]
+    reveal_type(b.fn)  # revealed: (int, /, *args: Q@forward.args, **kwargs: Q@forward.kwargs) -> tuple[str]
+```
+
+After an explicit parameter list, `Any` supplies a gradual signature for the next `ParamSpec`.
+
+```py
+R = ParamSpec("R", default=[bytes])
+
+class Callbacks(Generic[*Ts, P, R]):
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[R, None]
+
+def gradual(x: Callbacks[[str], Any]) -> None:
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (...) -> None
 ```
 
 ### Inferred specialization from construction
@@ -645,6 +703,14 @@ reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ```
 
+A legacy pack can also use another unpacked pack as its default. Neither pack has to be bound to a
+class or function when it is declared.
+
+```py
+OtherTs = TypeVarTuple("OtherTs")
+CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])  # ok
+```
+
 ### Backported default type arguments
 
 `typing_extensions.TypeVarTuple` backports the `default` parameter to older Python versions.
@@ -694,6 +760,112 @@ class Array(Generic[*Ts]):
 ```
 
 ## Functions
+
+### Immediate list arguments
+
+The elements of a list constructed in the call retain their individual positions when inferring a
+variadic return. Elements consumed by an earlier parameter are excluded from the return.
+
+```py
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def tail(head: int, *args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
+    return args
+
+reveal_type(tail(*[1, "two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1]))  # revealed: tuple[()]
+```
+
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect(*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded(*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
+```
+
+### Fixed boundaries in starred variadic parameters
+
+A fixed trailing type in a starred parameter is excluded from the inferred pack, including when the
+arguments come from an unpacked tuple.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def bounded(head: int, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
+    reveal_type(bounded(1, *suffix))
+    raise NotImplementedError
+```
+
+### Starred variadic methods on specialized classes
+
+TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred
+parameters. Both unpacked tuples and direct arguments can then infer the wrong pack.
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class C(Generic[T]):
+    def f(self, marker: T, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def check(c: C[int], suffix: tuple[bool, str]) -> None:
+    # TODO: Should reveal `tuple[bool]`.
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, *suffix))
+
+    # TODO: Should reveal `tuple[bool, bool]` without an argument error.
+    # error: [invalid-argument-type]
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, suffix[0], suffix[0], suffix[1]))
+```
+
+### Union splatted arguments
+
+Unpacking a union of tuples with different lengths into a `TypeVarTuple` preserves the minimum
+length of the union members.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def collect(*args: *Ts) -> tuple[*Ts]:
+    return args
+
+def _(values: tuple[int] | tuple[str, bytes]) -> None:
+    # revealed: tuple[int | str | bytes, *tuple[int | str | bytes, ...]]
+    reveal_type(collect(*values))
+```
 
 ### Partials with bound variadic arguments
 

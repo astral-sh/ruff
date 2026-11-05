@@ -449,7 +449,7 @@ def _():
     type X[T: (yield 1)] = int
 
 def _():
-    # error: [invalid-type-form] "`yield` expressions are not allowed in type alias values"
+    # error: [invalid-type-form] "`yield` expressions are not allowed in type alias definitions"
     # error: [invalid-syntax] "yield expression cannot be used within a type alias"
     type Y = (yield 1)
 

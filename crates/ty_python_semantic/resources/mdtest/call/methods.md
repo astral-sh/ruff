@@ -212,13 +212,9 @@ intersection:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: (bound method U@generic_bounds.f() -> list[U@generic_bounds]) | (bound method U@generic_bounds.f() -> list[U@generic_bounds])
+    # revealed: (bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]) | (bound method (U@generic_bounds & E2).f() -> list[U@generic_bounds & E2])
     reveal_type(union.f)
-    # TODO: This call should be accepted without errors. Pyright and mypy reveal `list[E1] | list[E2]` here, but
-    # `list[U@generic_bounds]` seems more accurate.
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E2` of type variable `Self`"
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1] | list[U@generic_bounds & E2]
 
     # revealed: (bound method I@generic_bounds.f() -> list[I@generic_bounds]) & (bound method I@generic_bounds.f() -> list[I@generic_bounds])
     reveal_type(intersection.f)
@@ -258,14 +254,11 @@ def _(
 
     # revealed: (bound method (type[E1] & type[E2]).f() -> list[E1 & E2]) & (bound method (type[E1] & type[E2]).f() -> list[E1 & E2])
     reveal_type(intersection_external.f)
-    # TODO: this should be `list[E1 & E2]`
-    reveal_type(intersection_external.f())  # revealed: Never
+    reveal_type(intersection_external.f())  # revealed: list[E1 & E2]
 
-    # TODO: this should reveal the same type as `intersection_external.f` above
-    # revealed: Never
+    # revealed: (bound method (type[E1] & type[E2]).f() -> list[E1 & E2]) & (bound method (type[E1] & type[E2]).f() -> list[E1 & E2])
     reveal_type(intersection_internal.f)
-    # TODO: this should be `list[E1 & E2]`
-    reveal_type(intersection_internal.f())  # revealed: Never
+    reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
 This also works with protocols:
@@ -350,13 +343,11 @@ intersection:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: bound method U@generic_bounds.f() -> list[U@generic_bounds]
+    # revealed: bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]
     # error: [unresolved-attribute]
     reveal_type(union.f)
-    # TODO: Ideally, this would not emit the `invalid-argument-type` error and reveal `list[U@generic_bounds]`
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
     # error: [unresolved-attribute]
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1]
 
     # revealed: bound method I@generic_bounds.f() -> list[I@generic_bounds]
     reveal_type(intersection.f)
@@ -395,13 +386,11 @@ def _(
 
     # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
     reveal_type(intersection_external.f)
-    # TODO: This should be list[E1 & E2]
-    reveal_type(intersection_external.f())  # revealed: list[E1]
+    reveal_type(intersection_external.f())  # revealed: list[E1 & E2]
 
     # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
     reveal_type(intersection_internal.f)
-    # TODO: This should be list[E1 & E2]
-    reveal_type(intersection_internal.f())  # revealed: list[E1]
+    reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
 This also works with protocols:
@@ -496,6 +485,170 @@ def check_variadic(value: Variadic) -> None:
     value.method()  # error: [invalid-argument-type]
 ```
 
+## Bound methods without a positional receiver
+
+A method can be retrieved from an instance even when it cannot accept the implicit receiver (has
+zero parameters):
+
+```py
+from typing import Callable, Protocol
+
+class NoReceiver:
+    def method() -> int:
+        return 1
+
+bound_method = NoReceiver().method
+```
+
+However, this method cannot be called:
+
+```py
+bound_method()  # error: [too-many-positional-arguments]
+```
+
+This method also cannot be assigned to a callable that expects no positional arguments:
+
+```py
+c1: Callable[[], int] = bound_method  # error: [invalid-assignment]
+```
+
+When accessed on the class, `method` can be called and can be assigned to a callable that expects no
+positional arguments:
+
+```py
+NoReceiver.method()
+c2: Callable[[], int] = NoReceiver.method
+```
+
+The bound method cannot be assigned to a protocol with a method that expects a receiver in this
+position, so this assignment fails:
+
+```py
+class HasMethod(Protocol):
+    def method(self) -> int: ...
+
+# snapshot: invalid-assignment
+m: HasMethod = NoReceiver()
+```
+
+Our error message here could be better:
+
+```snapshot
+error[invalid-assignment]: Object of type `NoReceiver` is not assignable to `HasMethod`
+  --> src/mdtest_snippet.py:16:16
+   |
+16 | m: HasMethod = NoReceiver()
+   |    ---------   ^^^^^^^^^^^^ Incompatible value of type `NoReceiver`
+   |    |
+   |    Declared type
+info: type `NoReceiver` is not assignable to protocol `HasMethod`
+info: └── protocol member `method` is incompatible
+```
+
+## Bound methods with various shapes of receivers
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+All of these are valid ways to define a receiver for a method:
+
+```py
+from typing import Callable, Protocol, Self
+
+class Valid:
+    def named(self) -> int:
+        return 1
+
+    def differently_named(receiver) -> int:
+        return 1
+
+    def positional_only(self, /) -> int:
+        return 1
+
+    def variadic(*args) -> int:
+        return 1
+
+    def unpacked(*args: *tuple[Self]) -> int:
+        return 1
+
+reveal_type(Valid().named())  # revealed: int
+reveal_type(Valid().differently_named())  # revealed: int
+reveal_type(Valid().positional_only())  # revealed: int
+reveal_type(Valid().variadic())  # revealed: int
+reveal_type(Valid().unpacked())  # revealed: int
+```
+
+On the other hand, these are all invalid:
+
+```py
+from typing import Protocol
+
+class Invalid:
+    def wrong_type(self: int) -> int:
+        return 1
+
+    def keyword_only(*, self) -> int:
+        return 1
+
+    def keyword_variadic(**kwargs: int) -> int:
+        return 1
+
+    def variadic_wrong_type(*args: int) -> int:
+        return 1
+
+    def unpacked_wrong_type(*args: *tuple[int]) -> int:
+        return 1
+
+    def unpacked_empty(*args: *tuple[()]) -> int:
+        return 1
+
+# error: [invalid-argument-type]
+Invalid().wrong_type()
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Invalid().keyword_only()
+
+# error: [too-many-positional-arguments]
+Invalid().keyword_variadic()
+
+# error: [invalid-argument-type]
+Invalid().variadic_wrong_type()
+
+# error: [invalid-argument-type]
+Invalid().unpacked_wrong_type()
+
+# error: [too-many-positional-arguments]
+Invalid().unpacked_empty()
+```
+
+## `Self` in unpacked bound-method parameters
+
+Binding a receiver consumes the first element of a fixed unpacked tuple:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class C:
+    def method(*args: *tuple[Self, int, Self]) -> None: ...
+    @classmethod
+    def class_method(*args: *tuple[type[Self], int, Self]) -> None: ...
+
+C().method(1, C())
+C.class_method(1, C())
+
+base: Callable[[int, C], None] = C().method
+class_base: Callable[[int, C], None] = C.class_method
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml
@@ -553,6 +706,284 @@ assert_type(a.method(), int)
 value: str = a.method()  # error: [invalid-assignment]
 
 assert_type(a.non_existing_method(), Any)
+```
+
+## Shadowing methods
+
+### Explanation and basic examples
+
+Consider the following example where a `method` on a class can be dynamically `swap`ped with another
+method:
+
+```py
+class C:
+    def method(self, x: int) -> str:
+        print("original")
+        return str(x)
+
+    def some_compatible_method(self, x: int) -> str:
+        print("replaced")
+        return str(x)
+
+    def swap(self) -> None:
+        self.method = self.some_compatible_method
+
+c = C()
+c.swap()
+```
+
+When `swap` is called, `self.some_compatible_method` creates a bound method object which is assigned
+to the *instance attribute* `self.method`, i.e. it shadows the function defined on the class itself
+(`C.method`). At runtime, when `c.method` is accessed, Python first looks up `method` on the class
+itself. It finds the original function `C.method`, but since it is a non-data descriptor, attribute
+lookup continues to check if there is an attribute on the instance itself (see
+`descriptor_protocol.md` for details). In this case, it finds the bound method object referring to
+`self.some_compatible_method` and returns it *without calling `__get__`*, i.e. the function is not
+bound to the instance "again".
+
+In summary, calling `c.method(42)` works, returns a string, and prints "replaced":
+
+```py
+reveal_type(c.method(42))  # revealed: str
+```
+
+We can see that `C.method` is not actually replaced, though. Calling `C.method(c, 42)` directly
+still invokes the original function on the class. It prints "original" and returns a string.
+
+```py
+reveal_type(C.method(c, 42))  # revealed: str
+```
+
+Since this is a common pattern, ty does support it. We generally allow this replacement if the
+callable being assigned has a signature that is compatible with the original method:
+
+```py
+from typing import Callable
+
+class Correct:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def compatible_method(self, x: int, /) -> str:
+        return str(x)
+
+    def swap(self, replacement: Callable[[int], str]) -> None:
+        self.method = self.compatible_method
+
+        self.method = replacement
+
+        self.method = lambda x: str(x)
+
+        class CompatibleCallable:
+            def __call__(self, x: int) -> str:
+                return str(x)
+
+        self.method = CompatibleCallable()
+```
+
+We emit diagnostics if the signature is not compatible:
+
+```py
+class Wrong:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def incompatible_method1(self, x: str, /) -> str:
+        return x
+
+    def incompatible_method2(self, /) -> str:
+        return ""
+
+    def swap(self, wrong_replacement: Callable[[str], str]) -> None:
+        self.method = self.incompatible_method1  # error: [invalid-assignment]
+        self.method = self.incompatible_method2  # error: [invalid-assignment]
+        self.method = wrong_replacement  # error: [invalid-assignment]
+        self.method = lambda: ""  # error: [invalid-assignment]
+        self.method = lambda self, x: ""  # error: [invalid-assignment]
+        self.method = lambda x: x  # error: [invalid-assignment]
+        self.method = Wrong.method  # error: [invalid-assignment]
+```
+
+### Keyword arguments
+
+If callers can pass `x` by keyword, the shadowing callable must also accept that keyword. Both
+lambdas below accept a positional argument, but only the first accepts `x=42`.
+
+```py
+class C:
+    def method(self, x: int) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        self.method = lambda x: str(x)
+
+    def swap_with_different_keyword(self) -> None:
+        self.method = lambda y: str(y)  # error: [invalid-assignment]
+
+c = C()
+c.swap()
+c.method(x=42)
+```
+
+When a method accepts arguments only by keyword, a shadowing lambda can list those parameters in
+either order. Here, callers pass `y` by name, so the lambda's `y` should be inferred as `int`.
+
+```py
+class D:
+    def method(self, *, x: str, y: int) -> int:
+        return y
+
+    def swap(self) -> None:
+        self.method = lambda x, y: y + 1
+        # TODO: Infer the lambda's parameter types by name for keyword-only arguments.
+        # See https://github.com/astral-sh/ty/issues/4935
+        # error: [invalid-assignment]
+        # error: [unsupported-operator]
+        self.method = lambda y, x: y + 1
+```
+
+### Classmethods and static methods
+
+The same reasoning applies to classmethods and static methods:
+
+```py
+class C:
+    @classmethod
+    def class_method(cls, x: int) -> str:
+        return str(x)
+
+    @staticmethod
+    def static_method(x: int) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        self.class_method = lambda x: str(x)
+        self.static_method = lambda x: str(x)
+
+        reveal_type(self.class_method(42))  # revealed: str
+        reveal_type(self.static_method(42))  # revealed: str
+```
+
+Replacing with an invalid signature is an error:
+
+```py
+        self.class_method = lambda x: x  # error: [invalid-assignment]
+        self.static_method = lambda x: x  # error: [invalid-assignment]
+```
+
+### Unsoundness
+
+Shadowing a method in the way described above is actually unsound. For one, since we allow
+replacement with arbitrary callables, we cannot guarantee that the replacement will have all
+attributes that the original bound method had. Consider:
+
+```py
+from typing import Callable
+
+class Problematic:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        class CompatibleCallable:
+            def __call__(self, x: int) -> str:
+                return str(x)
+
+        self.method = CompatibleCallable()
+
+p = Problematic()
+```
+
+Attributes like `__self__` are usually present on bound methods (demonstrating with `p.swap` here):
+
+```py
+p.swap.__self__  # ok
+```
+
+However, after we call `swap()`, the `method` attribute is replaced with a callable that is not a
+bound method, and thus lacks the `__self__` attribute. ty does not aim to track this, and therefore
+does not emit an error for the missing `__self__` attribute:
+
+```py
+p.swap()
+p.method.__self__
+```
+
+Maybe more importantly, consider what happens if the class is subclassed. Since we only checked the
+replacement against the base class method's signature, shadowing the method in the subclass may lead
+to inconsistencies:
+
+```py
+class C:
+    def method(self, x: int) -> object:
+        return x
+
+    def seemingly_compatible(self, x: int) -> object:
+        return x
+
+    def swap(self) -> None:
+        # TODO: with a proposed strict rule, this should be an error
+        self.method = self.seemingly_compatible
+
+class D(C):
+    def method(self, x: int) -> str:
+        return str(x)
+```
+
+If we call `swap()` on a `D` instance, `method` promises to return a `str`, but returns an `int`
+instead:
+
+```py
+d = D()
+d.swap()
+
+reveal_type(d.method(42))  # revealed: str
+```
+
+We might therefore consider implementing a stricter check that emits a diagnostic on the problematic
+`self.method = self.seemingly_compatible` assignment above.
+
+### Explicitly annotated instance attributes
+
+When the instance attribute assignment is explicitly annotated with a type that is incompatible with
+the method it shadows, we assume that shadowing is intentional, and prefer the annotation over the
+method's type:
+
+```py
+class C:
+    def f(self) -> int:
+        return 1
+
+    def __init__(self) -> None:
+        self.f: str = "foo"
+
+# TODO: The explicit annotation should make this a `str`.
+reveal_type(C().f)  # revealed: bound method C.f() -> int
+# TODO: This should emit `call-non-callable`.
+C().f()
+```
+
+### Identity of a shadowed static method
+
+A static method that can optionally be replaced should not retain its identity as a singleton type
+that refers to `def format`:
+
+```py
+from typing import Callable
+
+class Formatter:
+    @staticmethod
+    def format(text: str, /) -> str:
+        return text
+
+    def __init__(self, custom: Callable[[str], str] | None = None) -> None:
+        if custom is not None:
+            self.format = custom
+
+def check(formatter: Formatter) -> None:
+    reveal_type(formatter.format("hello"))  # revealed: str
+    # TODO: This should be `bool` because the instance may hold the custom callable.
+    reveal_type(formatter.format is Formatter.format)  # revealed: Literal[True]
 ```
 
 ## Error cases: Calling `__get__` for methods
@@ -817,13 +1248,13 @@ on a derived class.
 
 ```py
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Generator
 from typing_extensions import Self
 
 class Base:
     @classmethod
     @contextmanager
-    def create(cls) -> Iterator[Self]:
+    def create(cls) -> Generator[Self, None, None]:
         yield cls()
 
 class Child(Base): ...
@@ -1361,12 +1792,12 @@ bind `self`:
 
 ```py
 from contextlib import contextmanager
-from collections.abc import Iterator
+from collections.abc import Generator
 
 class D:
     @staticmethod
     @contextmanager
-    def ctx(num: int) -> Iterator[int]:
+    def ctx(num: int) -> Generator[int, None, None]:
         yield num
 
     def use_ctx(self) -> None:

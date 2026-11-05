@@ -1,0 +1,34 @@
+{% extends "fuzz_reproducers.md.jinja" %}
+
+{% block introduction %}
+Run listed here: {{ run_url }}
+
+{% if not reproducers %}
+Test executable: {{ executable }} at commit `{{ executable_revision }}`.
+
+{% else %}
+{{ failure_description }}
+
+Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run:
+
+```
+{{ reproduction_command }}
+```
+
+{% endif %}
+{% endblock %}
+
+{% block omitted_notice %}
+Some reproducers were omitted to fit the issue body. The workflow logs list all failing seeds; run py-fuzzer from Ruff commit `{{ fuzzer_revision }}` with a seed to regenerate its input.
+{% endblock %}
+
+{% block rerun %}
+{% if seed_rerun_command %}
+
+To check all seeds that failed or were left unchecked, check out Ruff commit `{{ fuzzer_revision }}` and run from the repository root:
+
+```shell
+{{ seed_rerun_command }}
+```
+{% endif %}
+{% endblock %}

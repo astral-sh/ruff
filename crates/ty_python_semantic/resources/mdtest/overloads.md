@@ -37,6 +37,31 @@ reveal_type(add(1))  # revealed: int
 reveal_type(add(1, 2))  # revealed: int
 ```
 
+## Local functions in a loop
+
+A previous iteration can bind the same local function. An overloaded local function still sees the
+overloads defined earlier in the loop body.
+
+```py
+from typing import overload
+
+def outer(values: list[int]):
+    for value in values:
+        def plain() -> int:
+            return value
+
+        reveal_type(plain)  # revealed: def plain() -> int
+
+        @overload
+        def convert(x: int) -> int: ...
+        @overload
+        def convert(x: str) -> str: ...
+        def convert(x: int | str) -> int | str:
+            return x
+
+        reveal_type(convert)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
 ## Overriding
 
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
@@ -245,6 +270,28 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
     reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
     reveal_type(base.g())  # revealed: int
     accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+```
+
+## Overloads without a positional receiver
+
+An overload without a positional receiver cannot be called as a bound method:
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Mixed:
+    @overload
+    def method() -> str: ...
+    @overload
+    def method(self) -> int: ...
+    def method(self: object = None) -> int | str:
+        return 1
+
+reveal_type(Mixed().method())  # revealed: int
+
+valid: Callable[[], int] = Mixed().method
+invalid: Callable[[], str] = Mixed().method  # error: [invalid-assignment]
 ```
 
 ## No matching explicit receiver

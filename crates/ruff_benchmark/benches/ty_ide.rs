@@ -491,7 +491,6 @@ BENCHMARK_CONSTANT_{index:03} = {index}
     #[divan::bench(
         name = "auto_imports",
         args = MODES.map(|mode| Scenario { layout: Layout::NamespaceSplit, mode }),
-        ignore = true, // TODO: Remove this after namespace enumeration lands: https://github.com/astral-sh/ty/issues/2273
         sample_size = 1,
         sample_count = 10
     )]

@@ -409,17 +409,7 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
 #[cfg(feature = "test-uv")]
 #[test]
 fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> {
-    // uv's formatting of resolution failures varies by version; retain the missing dependency.
-    let case = workspace_case()?
-        .with_filter(r"exit code: 1", "exit status: 1")
-        .with_filter(
-            concat!(
-                r"(?s)[ \t]*(?:×|error:) No solution found when resolving dependencies:?",
-                r".*?missing-workspace-dependency==99\.0\.0",
-                r".*?hint: Packages were unavailable because the network was disabled\.[^\n]*",
-            ),
-            " <missing-workspace-dependency==99.0.0 unavailable offline>",
-        );
+    let case = workspace_case()?;
     case.write_file(
         "packages/member/pyproject.toml",
         r#"
@@ -440,8 +430,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
-    pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 1: <missing-workspace-dependency==99.0.0 unavailable offline>
-
+    pyproject.toml: warning[uv-metadata] Failed to load uv metadata: No solution found when resolving dependencies
     Found 2 diagnostics
 
     ----- stderr -----
@@ -468,7 +457,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:5:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:5:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
     Found 2 diagnostics
 
@@ -724,7 +713,7 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:1:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
     Found 2 diagnostics
 
@@ -754,7 +743,7 @@ fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> member.py:1:8
       |
     1 | import shared
@@ -919,7 +908,7 @@ members = ["packages/*"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `typing` has no member `override`
+    error[import-not-found]: Module `typing` has no member `override`
      --> member.py:1:20
       |
     1 | from typing import override

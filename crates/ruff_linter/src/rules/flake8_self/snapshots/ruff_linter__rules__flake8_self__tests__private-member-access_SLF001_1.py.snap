@@ -8,3 +8,22 @@ SLF001 Private member accessed: `_x`
 69 |         alias = self
 70 |         print(alias._x)  # error (self is not an instance parameter)
    |               ^^^^^^^^
+
+SLF001 Private member accessed: `_value`
+  --> SLF001_1.py:91:9
+   |
+89 |     def __new__(cls):
+90 |         instance = object(1).__new__(cls)
+91 |         instance._value = 1  # error (not a bare `object()`)
+   |         ^^^^^^^^^^^^^^^
+92 |
+93 |     def __new__(cls):
+   |
+
+SLF001 Private member accessed: `_value`
+  --> SLF001_1.py:96:9
+   |
+94 |         object = Lorem
+95 |         instance = object.__new__(cls)
+96 |         instance._value = 1  # error (`object` is not the builtin)
+   |         ^^^^^^^^^^^^^^^

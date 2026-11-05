@@ -58,3 +58,32 @@ class BaseCache:
     def get(self, key: str) -> None:
         print(f"{key} not found")
         return None
+
+
+# https://github.com/astral-sh/ruff/issues/28861
+def print_python_version():
+    print(sys.version)
+
+    return  # trailing comment is preserved
+
+
+class SomeClass:
+    def print_python_version(self):
+        print(sys.version)
+        return None  # trailing comment is preserved
+
+
+def print_python_version():
+    print(sys.version)
+    return; # comment after a semicolon is preserved
+
+
+def print_python_version():
+    print(sys.version); return  # comment after a same-line `return` is preserved
+
+
+def print_python_version():
+    print(sys.version)
+    return (  # comment inside the `return` makes the fix unsafe
+        None
+    )

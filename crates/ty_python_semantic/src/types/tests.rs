@@ -2,7 +2,9 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
@@ -21,6 +23,31 @@ fn member_lookup_result_size() {
         size_of::<MemberLookupResult<'_>>(),
         size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
     );
+}
+
+#[test]
+fn sparse_and_shadowed_inherited_names_skip_base_pair_queries() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/example.py",
+        "
+        class Base:
+            value: int
+        class Mixin: ...
+        class Child(Base, Mixin):
+            value: int
+
+        class Other:
+            other: int
+        class Sparse(Base, Mixin, Other): ...
+        ",
+    )?;
+    let file = system_path_to_file(&db, "/src/example.py")?;
+    let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+    assert!(check_types(&db, file).is_empty());
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, "shared_inherited_names", None, &events);
+    Ok(())
 }
 
 #[test]
@@ -615,7 +642,7 @@ fn divergent_type() {
     );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
         let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union
         .recursive_type_normalized_impl(db, &env, div, false)
@@ -675,6 +702,61 @@ fn pending_narrowing_intersections_are_order_independent() {
 }
 
 #[test]
+fn recursive_annotated_normalization() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+
+    let recursive = annotated(div);
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(list_of(div))).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(recursive).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, true),
+        None
+    );
+}
+
+#[test]
+fn recursive_annotated_relations() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+    let recursive = annotated(div);
+    let integer = annotated(KnownClass::Int.to_instance(&db, &env));
+    let object = annotated(Type::object());
+
+    for concrete in [integer, object, annotated(recursive)] {
+        assert!(concrete.is_assignable_to(&db, &env, recursive));
+        assert!(recursive.is_assignable_to(&db, &env, concrete));
+        assert!(!concrete.is_subtype_of(&db, &env, recursive));
+        assert!(!recursive.is_subtype_of(&db, &env, concrete));
+        assert!(!concrete.is_disjoint_from(&db, &env, recursive));
+        assert!(!recursive.is_disjoint_from(&db, &env, concrete));
+    }
+    assert!(!integer.is_assignable_to(&db, &env, object));
+    assert!(!object.is_assignable_to(&db, &env, integer));
+    assert!(integer.is_disjoint_from(&db, &env, object));
+    assert!(object.is_disjoint_from(&db, &env, integer));
+    assert!(!Type::int_literal(1).is_assignable_to(&db, &env, recursive));
+    assert!(!recursive.is_assignable_to(&db, &env, KnownClass::Int.to_instance(&db, &env)));
+}
+
+#[test]
 fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let db = setup_db();
     let env = db.program_environment();
@@ -719,6 +801,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     // Pending narrowing in an opaque bound invalidates the enclosing type argument.
     let pending_typevar = BoundTypeVarInstance::synthetic_self(
         &db,
+        SelfTypeVarOrigin::ReceiverPlaceholder,
         pending,
         BindingContext::Synthetic(env.program(&db)),
     );

@@ -266,6 +266,10 @@ impl WritableSystem for OsSystem {
         std::fs::write(path.as_std_path(), content)
     }
 
+    fn remove_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::remove_file(path.as_std_path())
+    }
+
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
     }

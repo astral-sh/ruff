@@ -22,10 +22,6 @@ impl<K, V> FrozenMap<K, V> {
         self.into_iter()
     }
 
-    pub(crate) fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
-        self.0.iter().map(|(key, _)| key)
-    }
-
     pub fn values(&self) -> impl DoubleEndedIterator<Item = &V> + ExactSizeIterator {
         self.0.iter().map(|(_, value)| value)
     }

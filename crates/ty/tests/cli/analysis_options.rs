@@ -200,3 +200,37 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn overrides_report_each_invalid_module_glob_once() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [[overrides]]
+            include = ["*.py"]
+            [overrides.analysis]
+            allowed-unresolved-imports = ["foo**", "bar**"]
+
+            [[overrides]]
+            include = ["main.py"]
+            [overrides.analysis]
+            allowed-unresolved-imports = ["foo**"]
+            "#,
+        ),
+        ("main.py", "pass"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format=concise", "main.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ty.toml:5:31: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    ty.toml:5:40: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `bar**``
+    ty.toml:10:31: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 3 diagnostics
+
+    ----- stderr -----
+    ");
+    Ok(())
+}

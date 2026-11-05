@@ -4,12 +4,13 @@ version = "0.0.1"
 description = "Package for running end-to-end ty benchmarks"
 requires-python = ">=3.14"
 dependencies = [
-    # mypy is missing here because we need to install it into the project's virtual environment
-    # for plugins to work. See `Venv.install`.
+    # mypy is installed into each project's virtual environment. See `Venv.install`.
     # Pyright is missing because we install it with `npm` to avoid measuring the overhead
     # of the Python wrapper script (that lazily installs Pyright).
     "mslex>=1.3.0",
-    "pyrefly==1.2.0",
+    "pyrefly==1.4.0",
+    "zuban==0.10.2",
+    "tomlkit>=0.13.3",
     "pytest-benchmark>=4.0.0",
     "pytest>=8.0.0",
     "pygls>=2.0.0",
@@ -20,7 +21,7 @@ dependencies = [
 benchmark = "benchmark.run:main"
 
 [build-system]
-requires = ["uv_build>=0.12.3,<0.13"]
+requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"
 
 [tool.ruff.lint]
@@ -28,7 +29,20 @@ ignore = [
     "E501", # We use ruff format
 ]
 
+[tool.ty.analysis]
+return-type-inference = "always"
+
 [tool.ty.rules]
+blanket-ignore-comment = "error"
+missing-type-argument = "error"
+unsound-return-statement = "error"
+unsound-yield = "error"
+unsupported-dynamic-base = "error"
+dynamic-function-decorator-return = "error"
+unsound-assignment = "error"
+redundant-condition-strict = "error"
+disjoint-cast = "error"
+missing-direct-dependency = "error"
 truthiness-test-of-none-union = "error"
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
@@ -36,10 +50,38 @@ unused-ignore-comment = "error"
 
 [tool.uv]
 no-build = true
+require-build-hashes = true
 no-binary-package = ["ty-benchmark"]
 # Pin the isolated build environment for source-build exceptions.
-build-constraint-dependencies = ["uv-build==0.12.3"]
-exclude-newer = "P7D"
+build-constraint-dependencies = [
+    { requirement = "uv-build==0.13.5", hashes = [
+        "sha256:21b9a3a0c3d3149ae69b00763181b57f64f57e93c90babaacc50e1c8fcd52373",
+        "sha256:2f54c5db98d6a2ffe068bafdbe808a8f05c3e8a438bdc97372c72ec0d9f76ca6",
+        "sha256:3b28bf2621439b5b610501bd6f1b69e7df22429bb4b1c7d70984cbef0ab42bb1",
+        "sha256:4aeacc231382ee53758eb0e36a0ac959289dc91135417ef51a77a4054f504f86",
+        "sha256:57399f778f42185ee92ec0648566ee5d7fa6e5a1ce393a5f28945f64430c140d",
+        "sha256:7f76eda736ef61d1eea933fd8738daed037185ea15a77bd830f4a8f0b92cc62f",
+        "sha256:88f1e4db3643bf3ef0b01d73e4713852cc309eb42cd2888040b11211e228daf6",
+        "sha256:ac96c9d47b9362e28b4cb449d94deddc6dd17066aec8ef1365d2e025b77ab6b5",
+        "sha256:b9d93d71dded1334608050653f276fa92e9f52bdc6665851fbec9e4bd4e69790",
+        "sha256:bcc4ff9554a670c8a9bc7c7cb20bd9d9d8a800015a47ad85e094d80c57d403c4",
+        "sha256:beae1ddc2e342292d87c7eb9438941b77af0375d44aa49b19e0d080d67e12199",
+        "sha256:c41ce4e20e2132ecb6b8cadeffc579dec0054fd460cccd6134ddd3a627a8f3a6",
+        "sha256:c480dc7e8a0c8920cf44860406d424f99c6d301e2e47b5927181b50c7c3ea6fd",
+        "sha256:c95a3d092cb8880b37f35013f9f7339f3867bc422abed36776255f34e22bc62c",
+        "sha256:cf846dbf229aec735d2952cc5c7c8754e5456ab7dfea4e93f9d394f20bed2a4e",
+        "sha256:cfb36db3ae5bdad9e76a2c68896477ceea954b5293db4647bfabd0916fd19cec",
+        "sha256:e0a22c1a0f42ddde37e02ec9d0472178054275f0da3801bc7907979b431b6235",
+        "sha256:e99d81ad7821e916448546c53323835cc927c06ee5f4c6c8e9584f8813478f00",
+        "sha256:ecc732a8e79b677b72d67dcf8c367ca0a35e952330ff9b1037371dca0cf69e0e",
+    ] },
+]
+exclude-newer = "2026-10-24T19:50:00Z"
+preview-features = ["build-dependency-hashes"]
+
+[tool.uv.exclude-newer-package]
+# Zuban was released after the cutoff used by the other benchmark dependencies.
+zuban = "2026-10-30T00:00:00Z"
 
 [tool.uv.build-backend]
 module-name = "benchmark"

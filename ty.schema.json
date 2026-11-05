@@ -13,6 +13,17 @@
         }
       ]
     },
+    "baseline": {
+      "description": "Path to the JSON file that records existing lint diagnostics for this project.\nRelative paths are resolved against the project root. Use `ty check --update-baseline`\nto create or update the file.\n\nDiagnostic baselines are in preview. The file format may change between ty releases.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RelativePathBuf"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -36,7 +47,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -73,7 +84,7 @@
       "type": "object",
       "properties": {
         "allowed-unresolved-imports": {
-          "description": "A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "description": "A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
           "type": [
             "array",
             "null"
@@ -97,6 +108,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "return-type-inference": {
+          "description": "This setting controls when ty infers return types for functions without an explicit\nreturn type annotation.\n\n- `\"never\"`: Do not infer return types from function bodies. Unannotated functions\n  will have an inferred return type of `Unknown`.\n- `\"always\"`: Infer return types for unannotated functions and methods.\n\nEnabling return type inference will never override explicit return type annotations.\nLambda functions are not affected by this setting and their return type will always\nbe inferred.\n\nReturn types for generator functions and asynchronous functions are currently not\ninferred, but we plan to change this soon.\n\nFunctions in stubs and `if TYPE_CHECKING` blocks are never considered for return type\ninference.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReturnTypeInference"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "strict-equality-semantics": {
@@ -136,7 +158,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. Otherwise, ty looks for an\nactivated child Conda or Pixi environment, a `.venv` directory in the project root, then\nan activated base Conda environment, in that order. ty skips Conda and Pixi environments\nthat contain no Python interpreter. If none of these environments are found, ty looks for\na `python3` or `python` binary in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -158,7 +180,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nScripts with inline metadata use their `requires-python` field instead of\n`project.requires-python`. They do not inherit the Python version of the enclosing project.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nA script uses its inline `environment.python-version` first, then `requires-python`.\nIt falls back to the project's version if it has no inline `[tool.ty]` table.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/SupportedPythonVersion"
@@ -169,7 +191,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` to allow importing local modules.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` in the script's `[tool.ty.environment]` table\nto import sibling modules.",
           "type": [
             "array",
             "null"
@@ -241,6 +263,11 @@
           "description": "Print diagnostics as a JUnit-style XML report.",
           "type": "string",
           "const": "junit"
+        },
+        {
+          "description": "Print diagnostics as a [SARIF] report.\n\n[SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html",
+          "type": "string",
+          "const": "sarif"
         }
       ]
     },
@@ -329,6 +356,21 @@
       "allOf": [
         {
           "$ref": "#/definitions/SystemPathBuf"
+        }
+      ]
+    },
+    "ReturnTypeInference": {
+      "description": "Controls return type inference for functions without explicit return annotations.",
+      "oneOf": [
+        {
+          "description": "Do not infer return types from function bodies. Unannotated functions\nwill have an inferred return type of `Unknown`.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Infer return types for unannotated functions and methods.",
+          "type": "string",
+          "const": "always"
         }
       ]
     },
@@ -526,7 +568,7 @@
         },
         "dynamic-function-decorator-return": {
           "title": "detects decorators that replace a function with a dynamic type such as `Any`",
-          "description": "## What it does\n\nDetects decorator applications that replace a function with `Any` or another [dynamic type].\n\n## Why is this bad?\n\nA decorator can replace the function it receives with any object. Type checkers therefore use the\ndecorator's return type as the type of the decorated function. If the decorator returns `Any` or\n`Unknown` (explicitly or implicitly), the original type is lost, along with the type checker's\nability to catch invalid calls and attribute accesses:\n\n```py\nfrom collections.abc import Callable\n\n\ndef untyped_decorator(function: Callable[..., object]):\n    return function\n\n\n# error: \"Decorator returns `Unknown`\"\n@untyped_decorator\ndef stringify(value: int) -> str:\n    return str(value)\n\n\n# No type error is reported, even though `stringify` expects an integer.\nstringify(\"not an integer\")\n```\n\nThis rule identifies the point where a decorator erases useful type information, before that\nimprecision spreads to every use of the decorated function. It can be especially useful in cases\nwhere the decorator is defined in a third-party library. Whereas linter rules such as\n[`ANN201`][ann201] and [`ANN202`][ann202] can complain about missing annotations in your first-party\ncode, they cannot identify instances where unsound types leak into your code due to missing type\nannotations in third-party code installed into `site-packages`.\n\n## Examples\n\n`third_party_library.py`:\n\n```py\nfrom collections.abc import Callable\n\n\ndef untyped_decorator(function: Callable[..., object]):\n    return function\n```\n\n`first_party.py`:\n\n```py\nfrom third_party_library import untyped_decorator\n\n\n# error: \"Decorator returns `Unknown`\"\n@untyped_decorator\ndef greet(name: str) -> str:\n    return f\"Hello, {name}!\"\n```\n\nIf making a PR to the third-party library to improve their annotations is not possible, fixes for\nthis diagnostic could include writing your own decorator or introducing a type-safe wrapper:\n\n```py\nfrom collections.abc import Callable\nfrom typing import TypeVar\n\nfrom third_party_library import untyped_decorator\n\n\nFunctionT = TypeVar(\"FunctionT\", bound=Callable[..., object])\n\n\ndef typed_wrapper(f: FunctionT) -> FunctionT:\n    decorated = untyped_decorator(f)\n    assert decorated is f\n    return decorated\n\n\n@typed_wrapper\ndef greet(name: str) -> str:\n    return f\"Hello, {name}!\"\n```\n\n## Default level\n\nThis rule is disabled by default. It is intended for advanced users wanting additional soundness\nchecks from their type checker, not for users who have just started to use type checkers on their\nPython code.\n\n[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/\n[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/\n[dynamic type]: https://typing.python.org/en/latest/spec/glossary.html#term-dynamic-type",
+          "description": "## What it does\n\nDetects decorator applications that replace a function with `Any` or another [dynamic type].\n\n## Why is this bad?\n\nA decorator can replace the function it receives with any object. Type checkers therefore use the\ndecorator's return type as the type of the decorated function. If the decorator returns `Any` or\n`Unknown` (explicitly or implicitly), the original type is lost, along with the type checker's\nability to catch invalid calls and attribute accesses:\n\n```py\ndef untyped_decorator(function):\n    return function\n\n\n# error: \"Decorator returns `Unknown`\"\n@untyped_decorator\ndef stringify(value: int) -> str:\n    return str(value)\n\n\n# No type error is reported, even though `stringify` expects an integer.\nstringify(\"not an integer\")\n```\n\nThis rule identifies the point where a decorator erases useful type information, before that\nimprecision spreads to every use of the decorated function. It can be especially useful in cases\nwhere the decorator is defined in a third-party library. Whereas linter rules such as\n[`ANN201`][ann201] and [`ANN202`][ann202] can complain about missing annotations in your first-party\ncode, they cannot identify instances where unsound types leak into your code due to missing type\nannotations in third-party code installed into `site-packages`.\n\n## Examples\n\n`third_party_library.py`:\n\n```py\ndef untyped_decorator(function):\n    return function\n```\n\n`first_party.py`:\n\n```py\nfrom third_party_library import untyped_decorator\n\n\n# error: \"Decorator returns `Unknown`\"\n@untyped_decorator\ndef greet(name: str) -> str:\n    return f\"Hello, {name}!\"\n```\n\nIf making a PR to the third-party library to improve their annotations is not possible, fixes for\nthis diagnostic could include writing your own decorator or introducing a type-safe wrapper:\n\n```py\nfrom collections.abc import Callable\nfrom typing import TypeVar\n\nfrom third_party_library import untyped_decorator\n\n\nFunctionT = TypeVar(\"FunctionT\", bound=Callable[..., object])\n\n\ndef typed_wrapper(f: FunctionT) -> FunctionT:\n    decorated = untyped_decorator(f)\n    assert decorated is f\n    return decorated\n\n\n@typed_wrapper\ndef greet(name: str) -> str:\n    return f\"Hello, {name}!\"\n```\n\n## Default level\n\nThis rule is disabled by default. It is intended for advanced users wanting additional soundness\nchecks from their type checker, not for users who have just started to use type checkers on their\nPython code.\n\n[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/\n[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/\n[dynamic type]: https://typing.python.org/en/latest/spec/glossary.html#term-dynamic-type",
           "default": "ignore",
           "oneOf": [
             {
@@ -597,6 +639,16 @@
         "implicit-concatenated-string-type-annotation": {
           "title": "detects implicit concatenated strings in type annotations",
           "description": "## What it does\n\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "import-not-found": {
+          "title": "detects unresolved imports",
+          "description": "## What it does\n\nChecks for imports where ty cannot find the module or a member named in a `from` import.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from\nan existing module raises `ImportError`.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n\n# ImportError: cannot import name 'sine' from 'math'\nfrom math import sine  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.",
           "default": "error",
           "oneOf": [
             {
@@ -675,8 +727,8 @@
           ]
         },
         "invalid-attribute-override": {
-          "title": "detects attribute overrides that change class-variable or instance-variable behavior",
-          "description": "## What it does\n\nDetects attribute overrides that change whether an inherited attribute is a class variable or an\ninstance variable.\n\nThis rule currently only covers class-variable and instance-variable category changes.\n\n## Why is this bad?\n\nPure class variables and instance variables have different access and assignment behavior.\nOverriding one with the other violates the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\"), because code that is valid\nfor the superclass may no longer be valid for the subclass.\n\n## Example\n\n```python\nfrom typing import ClassVar\n\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [invalid-attribute-override]\n    class_attr: int  # error: [invalid-attribute-override]\n```\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+          "title": "detects attribute overrides that violate inherited type or access requirements",
+          "description": "## What it does\n\nDetects attribute overrides that change whether an inherited attribute is a class variable or an\ninstance variable, expose an incompatible value type, or make a writable attribute read-only.\n\nNarrowing a mutable attribute's type is checked separately by the `invalid-mutable-override` rule.\nOverrides involving properties are checked by `invalid-property-type-override`.\n\n## Why is this bad?\n\nPure class variables and instance variables have different access and assignment behavior.\nOverriding one with the other violates the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\"), because code that is valid\nfor the superclass may no longer be valid for the subclass.\n\n## Example\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n    name: str\n    count: int\n\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [invalid-attribute-override]\n    class_attr: int  # error: [invalid-attribute-override]\n    name: bytes  # error: [invalid-attribute-override]\n    count: Final[int] = 0  # error: [invalid-attribute-override]\n```\n\nCode that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also\nassign to `count`; making it final in the subclass removes that operation.\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
           "default": "error",
           "oneOf": [
             {
@@ -894,6 +946,16 @@
             }
           ]
         },
+        "invalid-mutable-override": {
+          "title": "detects overrides that narrow writable attribute types",
+          "description": "## What it does\n\nDetects overrides that narrow the type of a writable attribute.\n\n## Why is this bad?\n\nA subclass must accept every write allowed by the superclass. Narrowing a mutable attribute's type\nallows code using the superclass interface to invalidate the subclass's attribute type.\n\n## Example\n\n```python\nclass Base:\n    value: int\n\n\nclass Child(Base):\n    value: bool  # error: [invalid-mutable-override]\n\n\ndef reset(obj: Base) -> None:\n    obj.value = 42\n\n\nreset(Child())  # The value is no longer a bool.\n```\n\nUse the same annotation in both classes, or expose a read-only property if callers do not need to\nwrite the attribute.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-named-tuple": {
           "title": "detects invalid `NamedTuple` class definitions",
           "description": "## What it does\n\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\n\nAn invalidly defined `NamedTuple` class may lead to the type checker drawing incorrect conclusions.\nIt may also lead to `TypeError`s or `AttributeError`s at runtime.\n\n## Examples\n\nA class definition cannot combine `NamedTuple` with other base classes in multiple inheritance;\ndoing so raises a `TypeError` at runtime. The sole exception to this rule is `Generic[]`, which can\nbe used alongside `NamedTuple` in a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`, `_replace`,\netc.) that cannot be overwritten. Attempting to assign to these attributes without a type annotation\nwill raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```\n\nFinally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type qualifiers. These\nqualifiers also cause a runtime error when annotations are evaluated eagerly:\n\n```pycon\n>>> from typing import ClassVar, NamedTuple\n>>> class Foo(NamedTuple):\n...     x: ClassVar[int]\nTypeError: typing.ClassVar[int] is not valid as type argument\n```",
@@ -947,6 +1009,16 @@
         "invalid-paramspec": {
           "title": "detects invalid ParamSpec usage",
           "description": "## What it does\n\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\n# ParamSpec requires a name\nP2 = ParamSpec()  # error\n```\n\n## References\n\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-property-type-override": {
+          "title": "detects incompatible overrides involving properties",
+          "description": "## What it does\n\nDetects overrides that change the readable type of an inherited property incompatibly, restrict the\nvalues accepted by its setter, or remove a required write operation.\n\n## Why is this bad?\n\nCode using the superclass interface must continue to work on subclass instances. A getter can return\na more specific type, but a setter must accept every value accepted by the superclass. A writable\nattribute cannot be replaced by a read-only property.\n\n## Example\n\n```python\nclass Base:\n    @property\n    def value(self) -> int:\n        return 0\n\n\nclass Child(Base):\n    @property\n    def value(self) -> str:  # error: [invalid-property-type-override]\n        return \"\"\n```\n\nAn override returning `bool` would be valid because `bool` is a subtype of `int`.",
           "default": "error",
           "oneOf": [
             {
@@ -1154,9 +1226,19 @@
             }
           ]
         },
+        "mismatched-sentinel-name": {
+          "title": "detects sentinel definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\n\nChecks for `builtins.sentinel` and `typing_extensions.Sentinel` definitions whose name argument does\nnot match the variable they are assigned to. In class scope, the name can be unqualified or include\nthe full enclosing class path.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a sentinel's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because sentinel names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent sentinel naming.\n\nThis rule is similar to `mismatched-type-name`, but is a distinct rule because the default severity\ndiffers.\n\n## Examples\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"OTHER\")  # error: [mismatched-sentinel-name]\n```\n\nUse a matching name instead:\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"MISSING\")\n\n\nclass Container:\n    UNSET = Sentinel(\"Container.UNSET\")\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## What it does\n\nChecks for functional typing definitions whose declared name does not match the variable they are\nassigned to.\n\n## Why is this bad?\n\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`\nall take a name argument that is normally expected to match the assigned variable. A mismatch is\nusually a typo and makes later diagnostics harder to understand.\n\n## Default level\n\nThis rule is a warning by default because ty can usually recover and continue understanding the\nresulting type.\n\n## Examples\n\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "description": "## What it does\n\nChecks for functional typing definitions whose declared name does not match the variable they are\nassigned to.\n\n## Why is this bad?\n\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`\nall take a name argument that is normally expected to match the assigned variable. A mismatch is\nusually a typo and makes later diagnostics harder to understand.\n\n`mismatched-sentinel-name` is a similar but distinct rule, disabled by default.\n\n## Default level\n\nThis rule is a warning by default because ty can usually recover and continue understanding the\nresulting type.\n\n## Examples\n\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1414,6 +1496,16 @@
             }
           ]
         },
+        "renamed-rule-in-ignore-comment": {
+          "title": "detects ignore comments that use a rule's old name",
+          "description": "## What it does\n\nChecks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.\n\n## Why is this bad?\n\nWhen ty renames a rule, the old name still works in ignore comments. Prefer the current name to keep\nignore comments consistent across your codebase.\n\n## Examples\n\nIf ty renames `old-rule-name` to `new-rule-name`, the automatic fix changes\n`# ty: ignore[old-rule-name]` to `# ty: ignore[new-rule-name]`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "shadowed-type-variable": {
           "title": "detects type variables that shadow type variables from outer scopes",
           "description": "## What it does\n\nChecks for type variables in nested generic classes or functions that shadow type variables from an\nenclosing scope.\n\n## Why is this bad?\n\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Outer[T]:\n    # `T` is already used by `Outer`\n    class Inner[T]: ...  # error\n\n    # `T` is already used by `Outer`\n    def method[T](self, x: T) -> T:  # error\n        return x\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
@@ -1574,16 +1666,6 @@
             }
           ]
         },
-        "unresolved-import": {
-          "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'foo'\nimport foo  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "unresolved-reference": {
           "title": "detects references to names that are not defined",
           "description": "## What it does\n\nChecks for references to names that are not defined.\n\n## Why is this bad?\n\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\n# NameError: name 'x' is not defined\nprint(x)  # error\n```",
@@ -1676,7 +1758,7 @@
         },
         "unused-ignore-comment": {
           "title": "detects unused `ty: ignore` comments",
-          "description": "## What it does\n\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nSet\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false` to prevent this rule from reporting unused `type: ignore` comments.",
+          "description": "## What it does\n\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1686,7 +1768,7 @@
         },
         "unused-type-ignore-comment": {
           "title": "detects unused `type: ignore` comments",
-          "description": "## What it does\n\nChecks for `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `type: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # type: ignore\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nThis rule is skipped if\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false`.",
+          "description": "## What it does\n\nChecks for `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `type: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # type: ignore\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nThis rule is skipped if\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nis set to `false`.",
           "default": "warn",
           "oneOf": [
             {

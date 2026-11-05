@@ -392,6 +392,119 @@ info: Method defined here
   |         ^^^^^^^^       ------ Parameter declared here
 ```
 
+## Repeated invalid tuple elements
+
+Repeated incompatible elements in one starred argument produce one diagnostic when they match the
+same variadic parameter.
+
+```py
+def accept_ints(*args: int) -> None: ...
+def fixed(args: tuple[None, None]) -> None:
+    accept_ints(*args)  # error: [invalid-argument-type] "Expected `int`, found `None`"
+```
+
+The same applies when the tuple has a variable-length tail.
+
+```py
+def nonempty(args: tuple[None, *tuple[None, ...]]) -> None:
+    accept_ints(*args)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accept_ints` is incorrect
+ --> src/mdtest_snippet.py:5:17
+  |
+5 |     accept_ints(*args)  # snapshot: invalid-argument-type
+  |                 ^^^^^ Expected `int`, found `None`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def accept_ints(*args: int) -> None: ...
+  |     ^^^^^^^^^^^ ---------- Parameter declared here
+```
+
+A union of tuple lengths also reports the mismatch once.
+
+```py
+def union(args: tuple[None, None] | tuple[None]) -> None:
+    accept_ints(*args)  # error: [invalid-argument-type] "Expected `int`, found `None`"
+```
+
+## Different incompatible tuple element types
+
+Distinct incompatible types each produce a diagnostic, even when a repeated type follows another
+incompatible type.
+
+```py
+def accept_ints(*args: int) -> None: ...
+def call(args: tuple[None, str, None]) -> None:
+    # error: [invalid-argument-type] "Expected `int`, found `None`"
+    # error: [invalid-argument-type] "Expected `int`, found `str`"
+    accept_ints(*args)
+```
+
+## Different parameters receiving the same invalid type
+
+Each parameter gets its own diagnostic, with an annotation pointing to its declaration.
+
+```py
+def pair(first: int, second: int) -> None: ...
+def call(args: tuple[None, None]) -> None:
+    # snapshot: invalid-argument-type
+    # snapshot: invalid-argument-type
+    pair(*args)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+ --> src/mdtest_snippet.py:5:10
+  |
+5 |     pair(*args)
+  |          ^^^^^ Expected `int`, found `None`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(first: int, second: int) -> None: ...
+  |     ^^^^ ---------- Parameter declared here
+
+
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+ --> src/mdtest_snippet.py:5:10
+  |
+5 |     pair(*args)
+  |          ^^^^^ Expected `int`, found `None`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(first: int, second: int) -> None: ...
+  |     ^^^^             ----------- Parameter declared here
+```
+
+## Different expected tuple element types
+
+A single variadic parameter can require different types at different positions. Each distinct type
+mismatch is reported.
+
+```py
+def pair(*args: *tuple[int, str]) -> None: ...
+def call(args: tuple[None, None]) -> None:
+    # error: [invalid-argument-type] "Expected `int`, found `None`"
+    # error: [invalid-argument-type] "Expected `str`, found `None`"
+    pair(*args)
+```
+
+## Different starred arguments with the same invalid type
+
+Each starred argument gets its own diagnostic, even when they unpack the same tuple.
+
+```py
+def accept_ints(*args: int) -> None: ...
+def call(args: tuple[None, None]) -> None:
+    # error: 17 [invalid-argument-type] "Expected `int`, found `None`"
+    # error: 24 [invalid-argument-type] "Expected `int`, found `None`"
+    accept_ints(*args, *args)
+```
+
 ## Calls to methods
 
 Tests that we also see a reference to a function if the callable is a bound method.
@@ -594,7 +707,7 @@ help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ## Invariant generic classes
 
 We show a special diagnostic hint for invariant generic classes. For more details, see the
-[`invalid_assignment_details.md`](./invalid_assignment_details.md) test.
+[`error_context.md`](./error_context.md#invariant-generic-classes) test.
 
 ```py
 def modify(xs: list[int]):

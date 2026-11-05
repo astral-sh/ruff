@@ -1195,6 +1195,16 @@ Person(name=None, id=1)  # error: [invalid-argument-type]
 Person(id=1)  # error: [missing-argument]
 ```
 
+Quoting the annotation preserves the field's alias.
+
+```py
+class Quoted(BaseModel):
+    x: "Annotated[int, Field(alias='y')]"
+
+Quoted(y=1)  # no diagnostic
+Quoted(x=1)  # error: [missing-argument] "No argument provided for required parameter `y`"
+```
+
 Multiple `Field(...)` calls in `Annotated[...]` are merged:
 
 ```py
@@ -1228,8 +1238,9 @@ AliasField = Annotated[int, Field(default=0)]
 
 class ModelWithAliasField(BaseModel):
     value: AliasField
+    quoted: "AliasField"
 
-ModelWithAliasField()
+ModelWithAliasField()  # no diagnostic
 ```
 
 Field metadata is also collected through a generic alias, where the `Field(...)` default is carried
@@ -1284,9 +1295,17 @@ class PersonFrozenName3(BaseModel):
     age: int
 
 person = PersonFrozenName3(name="Alice", age=20)
-# TODO: this should be an error
-person.name = "Bob"
+person.name = "Bob"  # snapshot: invalid-assignment
 person.age += 1
+person.name += "!"  # error: [invalid-assignment]
+```
+
+```snapshot
+error[invalid-assignment]: Property `name` defined in `PersonFrozenName3` is read-only
+  --> src/mdtest_snippet.py:20:1
+   |
+20 | person.name = "Bob"  # snapshot: invalid-assignment
+   | ^^^^^^^^^^^
 ```
 
 No error is raised when a frozen model is subclassed. The child model is also frozen:
@@ -1382,6 +1401,104 @@ person._private_with_default = 2
 person._explicit_private = 2
 ```
 
+A field can also be frozen using `Field(...)` in an `Annotated` annotation. A `Field(...)` on the
+right-hand side takes precedence over one in the annotation, and a later `Field(...)` in the
+annotation takes precedence over an earlier one. Pydantic treats an explicit `frozen=None` as a
+mutable setting that also overrides an earlier `frozen=True`:
+
+```py
+from typing import Annotated
+
+class AnnotatedFrozenFields(BaseModel):
+    annotated: Annotated[int, Field(frozen=True)] = 0
+    unfrozen_by_assignment: Annotated[int, Field(frozen=True)] = Field(default=0, frozen=False)
+    frozen_by_assignment: Annotated[int, Field(frozen=False)] = Field(default=0, frozen=True)
+    unfrozen_by_none_assignment: Annotated[int, Field(frozen=True)] = Field(default=0, frozen=None)
+    unfrozen_by_none_annotation: Annotated[int, Field(frozen=True), Field(frozen=None)] = 0
+
+fields = AnnotatedFrozenFields()
+fields.annotated = 1  # error: [invalid-assignment]
+fields.unfrozen_by_assignment = 1  # ok
+fields.frozen_by_assignment = 1  # error: [invalid-assignment]
+fields.unfrozen_by_none_assignment = 1  # ok
+fields.unfrozen_by_none_annotation = 1  # ok
+```
+
+This also works through a type alias:
+
+```py
+FrozenInt = Annotated[int, Field(frozen=True)]
+
+class AliasFrozenField(BaseModel):
+    value: FrozenInt = 0
+
+AliasFrozenField().value = 1  # error: [invalid-assignment]
+```
+
+`Field(frozen=False)` and `Field(frozen=None)` leave a field mutable. We also allow assignments if
+the `frozen` argument cannot be resolved statically:
+
+```py
+import os
+
+class MutableFields(BaseModel):
+    disabled: int = Field(default=0, frozen=False)
+    none: int = Field(default=0, frozen=None)
+    unknown: int = Field(default=0, frozen=os.environ.get("FROZEN") == "1")
+
+fields = MutableFields()
+fields.disabled = 1  # ok
+fields.none = 1  # ok
+fields.unknown = 1  # ok
+```
+
+Pydantic checks whether the model is frozen before checking the field, so `Field(frozen=False)` does
+not make a field of a frozen model mutable:
+
+```py
+class FrozenModelWithMutableField(BaseModel, frozen=True):
+    value: int = Field(frozen=False)
+
+FrozenModelWithMutableField(value=1).value = 2  # error: [invalid-assignment]
+```
+
+A frozen field remains frozen in subclasses, unless the subclass declares the field again:
+
+```py
+class FrozenFieldBase(BaseModel):
+    value: int = Field(frozen=True)
+
+class InheritsFrozenField(FrozenFieldBase):
+    pass
+
+class RedeclaresFrozenField(FrozenFieldBase):
+    value: int
+
+InheritsFrozenField(value=1).value = 2  # error: [invalid-assignment]
+RedeclaresFrozenField(value=1).value = 2  # ok
+```
+
+Frozen fields are also supported on generic models:
+
+```py
+class GenericFrozenField[T](BaseModel):
+    value: T = Field(frozen=True)
+
+GenericFrozenField[int](value=1).value = 2  # error: [invalid-assignment]
+```
+
+Like a frozen model, a frozen field can be mutated if the model has a custom `__setattr__` method:
+
+```py
+class FrozenFieldWithCustomSetattr(BaseModel):
+    value: int = Field(frozen=True)
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+FrozenFieldWithCustomSetattr(value=1).value = 2  # ok
+```
+
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
@@ -1414,6 +1531,18 @@ update(Frozen(value=1))  # error: [invalid-argument-type]
 update(Mutable(value=1))
 read(Frozen(value=1))
 read(Mutable(value=1))
+```
+
+The same applies to models with an individual frozen field:
+
+```py
+from pydantic import Field
+
+class FrozenField(BaseModel):
+    value: int = Field(frozen=True)
+
+update(FrozenField(value=1))  # error: [invalid-argument-type]
+read(FrozenField(value=1))  # ok
 ```
 
 ## Validation of default values
@@ -1515,6 +1644,70 @@ DerivedSettings(1)
 
 # `CustomInit.__init__` overrides the constructor, so `_secrets_dir` is not accepted.
 DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
+```
+
+## BaseSettings extra fields
+
+Settings models forbid extra fields by default, but can allow them through `SettingsConfigDict`.
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(extra="allow")
+    name: str
+
+Settings(name="app", debug=True)
+Settings(debug=True, _secrets_dir="./secrets")
+```
+
+Declared fields and settings control parameters are still checked against their expected types:
+
+```py
+Settings(name=None, debug=True)  # error: [invalid-argument-type]
+Settings(debug=True, _secrets_dir=1)  # error: [invalid-argument-type]
+```
+
+With `extra="forbid"`, unknown arguments are rejected:
+
+```py
+class ForbidSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="forbid")
+
+ForbidSettings(debug=True)  # error: [unknown-argument]
+```
+
+Settings control parameters are still accepted when extra fields are forbidden:
+
+```py
+ForbidSettings(_secrets_dir="./secrets")  # ok
+```
+
+With `extra="ignore"`, extra arguments are accepted but discarded, so ty warns about them:
+
+```py
+class IgnoreSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+IgnoreSettings(debug=True)  # error: [pydantic-discarded-extra-argument]
+IgnoreSettings(_secrets_dir="./secrets")  # ok
+```
+
+## SettingsConfigDict subclasses
+
+Subclasses of `SettingsConfigDict` can add application-specific configuration keys while retaining
+Pydantic's model options:
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class AppConfig(SettingsConfigDict, total=False):
+    deployment: str
+
+class Settings(BaseSettings):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+Settings(debug=True)  # error: [unknown-argument]
 ```
 
 ## Root models
@@ -1685,6 +1878,18 @@ class AliasedConfigDict(BaseModel):
 AliasedConfigDict(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
+Subclasses of `ConfigDict` are also recognized:
+
+```py
+class AppConfig(ConfigDict, total=False):
+    deployment: str
+
+class CustomConfigModel(BaseModel):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+CustomConfigModel(something_else=7)  # error: [unknown-argument]
+```
+
 Pydantic also accepts a plain dictionary as `model_config`:
 
 ```py
@@ -1720,6 +1925,80 @@ class MyModel(BaseModel, Mixin):
 # revealed: (self: MyModel, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
 reveal_type(MyModel.__init__)
 MyModel(model_field=True, mixin_field=False)
+```
+
+## Class variables overriding model fields
+
+Redeclaring an inherited model field as a `ClassVar` removes it from the synthesized constructor,
+even though the override itself is invalid. Other inherited fields remain constructor parameters.
+
+```py
+from typing import ClassVar
+from pydantic import BaseModel
+
+class Parent(BaseModel):
+    params: int
+    name: str
+
+class Child(Parent):
+    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
+Child(name="child")  # ok
+Child()  # error: [missing-argument] "No argument provided for required parameter `name`"
+```
+
+The field stays excluded in subclasses, including their synthesized `__replace__` methods.
+
+```py
+class Grandchild(Child):
+    pass
+
+reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, *, name: LaxStr, **extra: Any) -> None
+reveal_type(Grandchild.__replace__)  # revealed: (self: Grandchild, *, name: str = ...) -> Grandchild
+Grandchild(name="grandchild")  # ok
+```
+
+A `ClassVar` declaration without a value also excludes the inherited field.
+
+```py
+class AnnotationOnly(Parent):
+    params: ClassVar[int]  # error: [invalid-attribute-override]
+
+reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
+AnnotationOnly(name="child")  # ok
+```
+
+## Class variables overriding mixin attributes
+
+The same exclusion applies to attributes inherited from ordinary classes.
+
+```py
+from typing import ClassVar
+from pydantic import BaseModel
+
+class Parent:
+    params: int
+
+class Child(BaseModel, Parent):
+    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+
+reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
+child = Child()  # ok
+reveal_type(child.params)  # revealed: int
+```
+
+The overriding `ClassVar` can itself be inherited from an ordinary class.
+
+```py
+class Mixin(Parent):
+    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+
+class Model(BaseModel, Mixin):
+    pass
+
+reveal_type(Model.__init__)  # revealed: (self: Model, **extra: Any) -> None
+Model()  # ok
 ```
 
 ## Differences from dataclasses

@@ -321,6 +321,7 @@ impl<'db> SameEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(db, operator)? {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
@@ -938,6 +939,7 @@ impl<'db> ProjectedEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(operator) {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
@@ -1165,6 +1167,16 @@ struct SameEnumComparisonProfile {
     members_are_exhaustive: bool,
     members_compare_by_identity: bool,
     comparison_keys: Option<SameEnumComparisonKeys>,
+}
+
+/// Whether equality between values of this enum is equivalent to canonical member identity.
+pub(in crate::types) fn enum_has_distinct_member_equality(
+    db: &dyn Db,
+    enum_class: EnumClassLiteral<'_>,
+) -> bool {
+    let profile = same_enum_comparison_profile(db, enum_class, ComparisonOperator::Equality);
+    profile.members_are_exhaustive
+        && profile.comparison_keys == Some(SameEnumComparisonKeys::Distinct)
 }
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]

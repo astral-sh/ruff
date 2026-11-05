@@ -1,6 +1,6 @@
 [package]
 name = "ruff_command_line"
-version = "0.0.15"
+version = "0.0.21"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -11,7 +11,10 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ty_static = { workspace = true }
+
 argfile = { workspace = true }
+clap = { workspace = true }
 
 [lints]
 workspace = true

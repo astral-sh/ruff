@@ -154,7 +154,7 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the implicit alias, including for qualified references.
+    /// The defining symbol of the legacy type alias, including for qualified references.
     #[returns(copy)]
     pub(super) definition: Definition<'db>,
     /// Names the binder and distinguishes provisional types of different alias queries.
@@ -317,7 +317,7 @@ impl<'db> RecursiveType<'db> {
         reason = "Keep alias metadata optional for inferred recursive types"
     )]
     pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
-        // Only implicit alias inference constructs recursive types at present.
+        // Only legacy type alias inference constructs recursive types at present.
         Some((self.definition(db), self.name(db)))
     }
 

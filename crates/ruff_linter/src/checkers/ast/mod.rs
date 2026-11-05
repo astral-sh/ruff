@@ -37,6 +37,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_ast::traversal::{self, EnclosingSuite};
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
@@ -687,6 +688,50 @@ impl<'a> Checker<'a> {
     /// Return the current [`DocstringState`].
     pub(crate) fn docstring_state(&self) -> DocstringState {
         self.docstring_state
+    }
+
+    /// Returns `true` if the expression spanning `range` sits in a docstring position: it makes
+    /// up the whole of the current expression statement, and that statement is either the first
+    /// in a module, class or function body, or follows a simple assignment at module level or
+    /// in class scope (an attribute docstring).
+    ///
+    /// This only checks the position. Whether the expression is of a type that Python treats as
+    /// a docstring (a plain string literal) is up to the caller.
+    pub(crate) fn in_docstring_position(&self, range: TextRange) -> bool {
+        let stmt = self.semantic.current_statement();
+        let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+            return false;
+        };
+        if value.range() != range {
+            return false;
+        }
+
+        let parent = self.semantic.current_statement_parent();
+        let suite = match parent {
+            Some(parent) => traversal::suite(stmt, parent),
+            // No parent statement: the statement is at module level.
+            None => EnclosingSuite::new(self.module.python_ast, stmt.into()),
+        };
+        let Some(suite) = suite else {
+            return false;
+        };
+
+        // Attribute docstrings are also recognized in conditional suites within a class.
+        let allows_attribute_docstring =
+            self.semantic.at_top_level() || self.semantic.current_scope().kind.is_class();
+        match suite.previous_sibling() {
+            None => matches!(
+                parent,
+                None | Some(Stmt::FunctionDef(_) | Stmt::ClassDef(_))
+            ),
+            Some(Stmt::Assign(ast::StmtAssign { targets, .. })) => {
+                allows_attribute_docstring && matches!(targets.as_slice(), [Expr::Name(_)])
+            }
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })) => {
+                allows_attribute_docstring && target.is_name_expr()
+            }
+            Some(_) => false,
+        }
     }
 }
 
@@ -1372,6 +1417,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 AnnotationContext::RuntimeRequired => {
                                     self.visit_runtime_required_annotation(expr);
                                 }
+                                AnnotationContext::RuntimeAmbiguous => {
+                                    self.visit_runtime_ambiguous_annotation(expr);
+                                }
                                 AnnotationContext::RuntimeEvaluated => {
                                     self.visit_runtime_evaluated_annotation(expr);
                                 }
@@ -1389,6 +1437,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         match annotation {
                             AnnotationContext::RuntimeRequired => {
                                 self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeAmbiguous => {
+                                self.visit_runtime_ambiguous_annotation(expr);
                             }
                             AnnotationContext::RuntimeEvaluated => {
                                 self.visit_runtime_evaluated_annotation(expr);
@@ -1562,6 +1613,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ) {
                     AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
+                    }
+                    AnnotationContext::RuntimeAmbiguous => {
+                        self.visit_runtime_ambiguous_annotation(annotation);
                     }
                     AnnotationContext::RuntimeEvaluated
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
@@ -2691,6 +2745,14 @@ impl<'a> Checker<'a> {
     fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a runtime-ambiguous type annotation.
+    fn visit_runtime_ambiguous_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_AMBIGUOUS_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }

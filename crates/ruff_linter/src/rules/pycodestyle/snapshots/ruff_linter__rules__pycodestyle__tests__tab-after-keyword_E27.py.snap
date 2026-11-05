@@ -20,24 +20,6 @@ help: Replace with single space
    |
 
 E273 [*] Tab after keyword
-  --> E27.py:13:5
-   |
-11 | True and        False
-12 | #: E273 E274
-13 | True        and    False
-   |     ^^^^^^^^
-14 | #: E271
-15 | a and  b
-   |
-help: Replace with single space
-   |
-12 | #: E273 E274
-   - True		and	False
-13 + True and	False
-14 | #: E271
-   |
-
-E273 [*] Tab after keyword
   --> E27.py:13:10
    |
 11 | True and        False
@@ -107,3 +89,21 @@ help: Replace with single space
 74 + type Number = int
 75 |
    |
+
+E273 [*] Tab after keyword
+   --> E27.py:105:9
+    |
+103 | x = None  if y else 1
+104 | #: E273
+105 | x = a is    None
+    |         ^^^^
+106 | #: E274
+107 | x = None    if y else 1
+    |
+help: Replace with single space
+    |
+104 | #: E273
+    - x = a is	None
+105 + x = a is None
+106 | #: E274
+    |

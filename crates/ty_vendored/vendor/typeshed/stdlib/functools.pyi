@@ -7,6 +7,7 @@ from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
 from typing import (
     Any,
+    Concatenate,
     Final,
     Generic,
     Literal,
@@ -45,6 +46,9 @@ _PWrapped = ParamSpec("_PWrapped")
 _RWrapped = TypeVar("_RWrapped")
 _PWrapper = ParamSpec("_PWrapper")
 _RWrapper = TypeVar("_RWrapper")
+_WrapperSelfT = TypeVar("_WrapperSelfT")
+_PBound = ParamSpec("_PBound")
+_CacheArgT_contra = TypeVar("_CacheArgT_contra", contravariant=True, default=Hashable)
 
 if sys.version_info >= (3, 14):
     @overload
@@ -95,11 +99,11 @@ class _CacheInfo(NamedTuple):
 
 @type_check_only
 class _CacheParameters(TypedDict):
-    maxsize: int
+    maxsize: int | None
     typed: bool
 
 @final
-class _lru_cache_wrapper(Generic[_T_co]):
+class _lru_cache_wrapper(Generic[_T_co, _CacheArgT_contra]):
     """Create a cached callable that wraps another function.
 
     user_function:      the function being cached
@@ -116,7 +120,7 @@ class _lru_cache_wrapper(Generic[_T_co]):
     """
 
     __wrapped__: Callable[..., _T_co]
-    def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T_co:
+    def __call__(self, /, *args: _CacheArgT_contra, **kwargs: _CacheArgT_contra) -> _T_co:
         """Call self as a function."""
 
     def cache_info(self) -> _CacheInfo:
@@ -126,15 +130,15 @@ class _lru_cache_wrapper(Generic[_T_co]):
         """Clear the cache and cache statistics"""
 
     def cache_parameters(self) -> _CacheParameters: ...
-    def __copy__(self) -> _lru_cache_wrapper[_T_co]: ...
-    def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T_co]: ...
+    def __copy__(self) -> Self: ...
+    def __deepcopy__(self, memo: Any, /) -> Self: ...
 
     # as with ``Callable``, we'll assume that these attributes exist
     __name__: str
     __qualname__: str
 
 @overload
-def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]:
+def lru_cache(maxsize: Literal[0, False], typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T, object]]:
     """Least-recently-used cache decorator.
 
     If *maxsize* is set to None, the LRU features are disabled and the cache
@@ -154,6 +158,8 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
 
     """
+@overload
+def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]: ...
 @overload
 def lru_cache(maxsize: Callable[..., _T], typed: bool = False) -> _lru_cache_wrapper[_T]: ...
 
@@ -190,9 +196,16 @@ WRAPPER_UPDATES: Final[tuple[Literal["__dict__"]]]
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
     __wrapped__: Callable[_PWrapped, _RWrapped]
     def __call__(self, *args: _PWrapper.args, **kwargs: _PWrapper.kwargs) -> _RWrapper: ...
-    # as with ``Callable``, we'll assume that these attributes exist
+    # as with ``Callable``, we'll assume that these attributes/methods exist
     __name__: str
     __qualname__: str
+
+    @overload
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
+    @overload
+    def __get__(
+        self: Callable[Concatenate[_WrapperSelfT, _PBound], _RWrapper], instance: _WrapperSelfT, owner: type | None = None, /
+    ) -> Callable[_PBound, _RWrapper]: ...
 
 @type_check_only
 class _Wrapper(Generic[_PWrapped, _RWrapped]):
@@ -409,6 +422,20 @@ def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]:
     generic function.
     """
 
+@type_check_only
+class _SingleDispatchMethodCallable(Generic[_T]):
+    __name__: str
+    __qualname__: str
+    __wrapped__: Callable[..., _T]
+    def __call__(self, /, *args: Any, **kwargs: Any) -> _T: ...
+
+    @overload
+    def register(self, cls: _RegType, method: None = None) -> Callable[[Callable[..., _T]], Callable[..., _T]]: ...
+    @overload
+    def register(self, cls: Callable[..., _T], method: None = None) -> Callable[..., _T]: ...
+    @overload
+    def register(self, cls: _RegType, method: Callable[..., _T]) -> Callable[..., _T]: ...
+
 class singledispatchmethod(Generic[_T]):
     """Single-dispatch generic method descriptor.
 
@@ -433,7 +460,7 @@ class singledispatchmethod(Generic[_T]):
     @overload
     def register(self, cls: _RegType, method: Callable[..., _T]) -> Callable[..., _T]: ...
 
-    def __get__(self, obj: _S, cls: type[_S] | None = None) -> Callable[..., _T]: ...
+    def __get__(self, obj: _S, cls: type[_S] | None = None) -> _SingleDispatchMethodCallable[_T]: ...
 
 class cached_property(Generic[_T_co]):
     func: Callable[[Any], _T_co]

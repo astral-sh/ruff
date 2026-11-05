@@ -65,7 +65,6 @@ OtherBase()  # error: [lazy-import-immediately-resolved]
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
 
@@ -131,7 +130,6 @@ json.dumps({})
 target-version = "py39"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
 

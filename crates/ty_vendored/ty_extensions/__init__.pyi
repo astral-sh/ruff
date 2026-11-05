@@ -20,12 +20,18 @@ def static_assert(condition: object, msg: LiteralString | None = None) -> None: 
 # -------------
 
 Not: _SpecialForm
-"""`Not[T]` represents the set of all objects that do not inhabit the type `T`."""
+"""
+`Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
+
+In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
+negation types. Note that either spelling will fail in runtime contexts or in cases where an
+annotation expression could be evaluated.
+"""
 
 Intersection: _SpecialForm
 """
-`Intersection[T1, T2, ..., Tn]` represents an intersection type: the set of all objects that inhabit
-all of the types `T1`, `T2`, ..., `Tn`.
+`Intersection[T1, T2, ..., Tn]`, also spelled as `T1 & T2 & ... & Tn`, represents an intersection
+type: the set of all objects that inhabit all of the types `T1`, `T2`, ..., `Tn`.
 
 For any two fully static types `T1` and `T2`, `Intersection[T1, T2]` is a subtype of both `T1` and
 `T2`. For any type `T3` that is a subtype of both `T1` and `T2`, `Intersection[T1, T2]` is a
@@ -41,6 +47,10 @@ class S(P, Q): ...
 
 s: Intersection[P, Q] = S()
 ```
+
+In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
+when displaying intersection types. Note that either spelling will fail in runtime contexts or in
+cases where an annotation expression could be evaluated.
 """
 
 Top: _SpecialForm

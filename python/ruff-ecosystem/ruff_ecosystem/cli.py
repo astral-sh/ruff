@@ -99,6 +99,8 @@ def entrypoint():
                 project_dir=Path(cache),
                 raise_on_failure=args.pdb,
                 format_comparison=format_comparison,
+                html_output=args.html_output,
+                html_title=f"{'Linter' if args.ruff_command == 'check' else 'Formatter'} ({'preview' if args.force_preview else 'stable'})",
             )
         )
         # https://stackoverflow.com/a/58840987/3549270
@@ -134,6 +136,11 @@ def parse_args() -> argparse.Namespace:
         choices=[option.value for option in OutputFormat],
         default="markdown",
         help="Location for caching cloned repositories",
+    )
+    parser.add_argument(
+        "--html-output",
+        type=Path,
+        help="Also write the complete HTML report to this path",
     )
     parser.add_argument(
         "-v",

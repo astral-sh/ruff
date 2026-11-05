@@ -37,7 +37,7 @@ class Foo:
 ```
 
 ```python
-# error: [unresolved-import]
+# error: [import-not-found]
 from a import Foo
 ```
 
@@ -100,13 +100,13 @@ Imports where some segments are incorrectly cased should fail.
 `incorrectly_cased.py`:
 
 ```python
-# error: [unresolved-import]
+# error: [import-not-found]
 from DB.a import Foo
 
-# error: [unresolved-import]
+# error: [import-not-found]
 from DB.A import Foo
 
-# error: [unresolved-import]
+# error: [import-not-found]
 from db.A import Foo
 ```
 
@@ -123,6 +123,6 @@ class Foo:
 ```
 
 ```python
-# error: [unresolved-import]
+# error: [import-not-found]
 from a import Foo
 ```

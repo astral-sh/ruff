@@ -76,7 +76,7 @@ reveal_type(x)  # revealed: Unknown
 `module.py`:
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from module import x
 ```
 

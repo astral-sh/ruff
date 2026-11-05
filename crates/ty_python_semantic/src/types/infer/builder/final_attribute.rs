@@ -323,24 +323,44 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         target: &ast::ExprAttribute,
         object_ty: Type<'db>,
         attribute: &str,
-    ) {
+    ) -> bool {
         let db = self.db();
+        // Check each possible receiver type separately. If one of them makes the
+        // attribute `Final`, another type must not make it writable.
+        match object_ty {
+            Type::TypeAlias(alias) => {
+                return self.validate_final_attribute_assignment(
+                    target,
+                    alias.value_type(db),
+                    attribute,
+                );
+            }
+            Type::Union(union) => {
+                return union.elements(db).iter().any(|element| {
+                    self.validate_final_attribute_assignment(target, *element, attribute)
+                });
+            }
+            Type::Intersection(intersection) => {
+                return intersection.positive(db).iter().any(|element| {
+                    self.validate_final_attribute_assignment(target, *element, attribute)
+                });
+            }
+            _ => {}
+        }
         let Some(members) =
             assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {
-            return;
+            return false;
         };
 
-        for member in members.effective_members() {
-            if self.invalid_assignment_to_final_attribute(
+        members.effective_members().any(|member| {
+            self.invalid_assignment_to_final_attribute(
                 object_ty,
                 target,
                 attribute,
                 member.qualifiers,
-            ) {
-                break;
-            }
-        }
+            )
+        })
     }
 
     pub(super) fn validate_final_attribute_deletion(
@@ -351,6 +371,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
+        match object_ty {
+            Type::Union(union) => {
+                return union.elements(db).iter().any(|element| {
+                    self.validate_final_attribute_deletion(
+                        target,
+                        *element,
+                        attribute,
+                        emit_diagnostics,
+                    )
+                });
+            }
+            Type::Intersection(intersection) => {
+                return intersection.positive(db).iter().any(|element| {
+                    self.validate_final_attribute_deletion(
+                        target,
+                        *element,
+                        attribute,
+                        emit_diagnostics,
+                    )
+                });
+            }
+            _ => {}
+        }
         let Some(members) =
             assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {

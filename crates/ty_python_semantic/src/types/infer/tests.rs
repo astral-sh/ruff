@@ -123,7 +123,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     settings.python_version.version = PythonVersion::PY312;
     let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
-    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+    let check = |file, expected_type, expect_invalid_syntax, expect_import_not_found| {
         let diagnostics = crate::check_file_unwrap(&db, file);
 
         assert_eq!(
@@ -137,7 +137,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
             diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.headline_message().contains("zipfile._path")),
-            expect_unresolved_import,
+            expect_import_not_found,
             "{diagnostics:#?}"
         );
 
@@ -149,7 +149,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
         assert_eq!(
             diagnostics.len(),
-            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_import_not_found),
             "{diagnostics:#?}"
         );
     };
@@ -353,6 +353,28 @@ fn multiplied_literal_string() -> anyhow::Result<()> {
 }
 
 #[test]
+fn concatenated_bytes_literal_size_limit() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let limit = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE;
+    let content = format!(
+        r#"
+            from typing_extensions import Literal, assert_type
+
+            value = b"{prefix}" + b"x"
+            assert_type(len(value), Literal[{limit}])
+            value += b"x"
+            assert_type(value, bytes)
+            "#,
+        prefix = "x".repeat(limit - 1),
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
 fn truncated_string_literals_become_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
@@ -482,6 +504,70 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
             .collect::<Vec<_>>()
     });
     assert_eq!(cycles, Vec::<String>::new());
+}
+
+/// Mutually dependent loop conditions must not select different fixed points depending on which
+/// imported variable is inferred first. Both inputs are `Never`, so neither conditional assignment
+/// can execute. Regression test for <https://github.com/astral-sh/ty/issues/4577>.
+#[test]
+fn loop_variable_types_are_independent_of_file_order() -> anyhow::Result<()> {
+    for (x_condition, y_condition) in [
+        ("x", "y"),
+        ("bool(x)", "bool(y)"),
+        ("bool(x or False)", "bool(y or False)"),
+        ("bool(bool(x) or False)", "bool(bool(y) or False)"),
+        ("x not in (False,)", "y not in (False,)"),
+    ] {
+        for order in [["x", "y"], ["y", "x"]] {
+            let mut db = TestDbBuilder::new()
+                .with_python_version(PythonVersion::PY313)
+                .build()?;
+            db.write_dedented(
+                "src/initial.pyi",
+                r#"
+                from typing import Never
+
+                a: Never
+                b: Never
+                stop: bool
+                "#,
+            )?;
+            db.write_dedented(
+                "src/loop.py",
+                &format!(
+                    r#"
+                    from initial import a, b, stop
+
+                    while True:
+                        x = a
+                        y = b
+                        if {y_condition}:
+                            pass
+                        else:
+                            a = "large"
+                        if {x_condition}:
+                            pass
+                        else:
+                            b = True
+                        if stop:
+                            break
+                    "#
+                ),
+            )?;
+            for name in ["x", "y"] {
+                db.write_file(
+                    format!("src/check_{name}.py"),
+                    format!(
+                        "from typing import reveal_type\nfrom loop import {name}\nreveal_type({name})\n"
+                    ),
+                )?;
+            }
+            for name in order {
+                assert_revealed_type(&db, &format!("src/check_{name}.py"), "Never");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Comparison truthiness widens consistently in expression, statement, and definition inference
@@ -1371,6 +1457,60 @@ class Model(ModelBase):
 }
 
 #[test]
+fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
+    // Changing an imported type must invalidate the cached proof even when the protocol and its
+    // consumer are unchanged. Cover both direct inspection and the type-parameter proof needed
+    // for growing specializations.
+    const STATIC: &str = "Payload = int\n";
+    const GRADUAL: &str = "from typing import Any\nPayload = Any\n";
+    const FAILURE: &str =
+        "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy";
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/node.py",
+        r#"
+        from __future__ import annotations
+        from typing import Protocol, TypeVar
+        from other import Payload
+
+        class Node(Protocol):
+            def payload(self) -> Payload: ...
+            def edit(self, nodes: list[Node]) -> list[Node]: ...
+
+        T = TypeVar("T", covariant=True)
+
+        class GenericNode(Protocol[T]):
+            def child(self) -> GenericNode[tuple[T, T]]: ...
+            def read(self: GenericNode[int]) -> int: ...
+            def payload(self) -> Payload: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from node import GenericNode, Node
+        from ty_extensions import Top, static_assert
+        from ty_extensions._internal import is_subtype_of
+
+        static_assert(is_subtype_of(Top[Node], Node))
+        static_assert(is_subtype_of(Top[GenericNode[int]], GenericNode[int]))
+        "#,
+    )?;
+
+    for (payload, diagnostics) in [
+        (STATIC, &[][..]),
+        (GRADUAL, &[FAILURE, FAILURE][..]),
+        (STATIC, &[][..]),
+    ] {
+        db.write_file("/src/other.py", payload)?;
+        assert_file_diagnostics(&db, "/src/main.py", diagnostics);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
@@ -1450,6 +1590,118 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
         first_public_binding(&db, a, "x"),
         &events,
     );
+    Ok(())
+}
+
+#[test]
+fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "from aliases import Alias\nvalue: Alias = []",
+    )?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+
+    for (alias, unrelated, should_run) in [
+        ("list[int]", 1, true),
+        // The alias's meaning is unchanged by edits elsewhere in its defining module.
+        ("list[int]", 2, false),
+        ("list[str]", 2, true),
+    ] {
+        let source = format!("Alias = {alias}\ndef unrelated(): return {unrelated}");
+        db.write_file("/src/aliases.py", source)?;
+        db.clear_salsa_events();
+
+        let value = global_symbol(&db, main, "value").place.expect_type();
+        assert_eq!(
+            value.display(&db, &db.program_environment()).to_string(),
+            alias
+        );
+
+        let events = db.take_salsa_events();
+        let definition = first_public_binding(&db, main, "value");
+        if should_run {
+            assert_function_query_was_run(&db, infer_definition_types, definition, &events);
+        } else {
+            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 42")?;
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        class Model:
+            value: int
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from model import Model
+
+        def read(model: Model):
+            return model.value
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+
+    // The declaration determines the result. Looking up `Model.value` should not even
+    // index modules that are only used by assignments to it in method bodies.
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
+
+    Ok(())
+}
+
+#[test]
+fn inherited_class_defaults_avoid_inferring_instance_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 'updated'")?;
+    db.write_dedented(
+        "/src/bases.py",
+        r#"
+        class First:
+            value: int = 0
+
+        class Second:
+            value: str = ""
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from bases import First, Second
+
+        class Child(First, Second): ...
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Incompatible inherited attribute `value`"],
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
     Ok(())
 }
 
