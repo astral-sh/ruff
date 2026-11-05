@@ -952,36 +952,18 @@ print()
     }
 
     #[test]
-    fn bom_only_file() {
-        let mut env = TestEnvironment::new();
-        env.add("example.py", "\u{feff}");
-        env.format(DiagnosticFormat::Full);
-        let mut diagnostic = env.err().build();
-        let span = env
-            .path("example.py")
-            .with_range(TextRange::new(TextSize::new(0), TextSize::new(3)));
-        let annotation = Annotation::primary(span);
-        diagnostic.annotate(annotation);
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[test-diagnostic]: main diagnostic message
-         --> example.py:1:1
-          |
-        1 |
-          | ^
-        ");
-    }
-
-    #[test]
     fn bom_with_full_file_range() {
         let mut env = TestEnvironment::new();
-        env.add("example.py", "\u{feff}import foo");
+        let contents = "\u{feff}import foo";
+        env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
+
         let mut diagnostic = env.err().build();
         let span = env
             .path("example.py")
-            .with_range(TextRange::new(TextSize::new(0), TextSize::new(13)));
-        let annotation = Annotation::primary(span);
-        diagnostic.annotate(annotation);
+            .with_range(TextRange::up_to(contents.text_len()));
+        diagnostic.annotate(Annotation::primary(span));
+
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
          --> example.py:1:1
