@@ -40,9 +40,9 @@ impl Violation for InvalidAssertMessageLiteralArgument {
 /// RUF040
 pub(crate) fn invalid_assert_message_literal_argument(
     checker: &Checker,
-    stmt: ast::StmtAssert<'_>,
+    stmt: &ast::StmtAssertFields<'_>,
 ) {
-    let Some(message) = stmt.msg() else {
+    let Some(message) = stmt.msg else {
         return;
     };
 

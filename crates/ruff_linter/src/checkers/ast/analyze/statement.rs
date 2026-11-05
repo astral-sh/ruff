@@ -714,9 +714,10 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
             }
         }
         StmtKind::ImportFrom(import_from) => {
-            let names = import_from.names();
-            let module = import_from.module();
-            let level = import_from.level();
+            let fields = import_from.fields();
+            let names = fields.names;
+            let module = fields.module;
+            let level = fields.level;
 
             if checker.is_rule_enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
@@ -963,7 +964,7 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::ByteStringUsage) {
-                flake8_pyi::rules::bytestring_import(checker, import_from);
+                flake8_pyi::rules::bytestring_import(checker, &fields);
             }
         }
         StmtKind::Raise(raise) => {
@@ -1185,8 +1186,9 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
             }
         }
         StmtKind::Assert(assert_stmt) => {
-            let test = assert_stmt.test();
-            let msg = assert_stmt.msg();
+            let fields = assert_stmt.fields();
+            let test = fields.test;
+            let msg = fields.msg;
 
             if !checker.semantic.in_type_checking_block() {
                 if checker.is_rule_enabled(Rule::Assert) {
@@ -1215,12 +1217,13 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
             if checker.is_rule_enabled(Rule::InvalidAssertMessageLiteralArgument) {
-                ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
+                ruff::rules::invalid_assert_message_literal_argument(checker, &fields);
             }
         }
         StmtKind::With(with_stmt) => {
-            let items = with_stmt.items();
-            let body = with_stmt.body();
+            let fields = with_stmt.fields();
+            let items = fields.items;
+            let body = fields.body;
 
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
@@ -1251,15 +1254,16 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                     .push(checker.semantic.snapshot());
             }
             if checker.is_rule_enabled(Rule::UselessWithLock) {
-                pylint::rules::useless_with_lock(checker, with_stmt);
+                pylint::rules::useless_with_lock(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::CancelScopeNoCheckpoint) {
-                flake8_async::rules::cancel_scope_no_checkpoint(checker, with_stmt, items);
+                flake8_async::rules::cancel_scope_no_checkpoint(checker, &fields);
             }
         }
         StmtKind::While(while_stmt) => {
-            let body = while_stmt.body();
-            let orelse = while_stmt.orelse();
+            let fields = while_stmt.fields();
+            let body = fields.body;
+            let orelse = fields.orelse;
 
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
@@ -1274,13 +1278,13 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
             if checker.is_rule_enabled(Rule::AsyncBusyWait) {
-                flake8_async::rules::async_busy_wait(checker, while_stmt);
+                flake8_async::rules::async_busy_wait(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, while_stmt.into());
             }
             if checker.is_rule_enabled(Rule::WhileOne) {
-                pyupgrade::rules::while_one(checker, while_stmt);
+                pyupgrade::rules::while_one(checker, &fields);
             }
         }
         StmtKind::For(for_stmt) => {
@@ -1452,8 +1456,9 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
             }
         }
         StmtKind::Assign(assign) => {
-            let targets = assign.targets();
-            let value = assign.value();
+            let fields = assign.fields();
+            let targets = fields.targets;
+            let value = fields.value;
 
             if checker.is_rule_enabled(Rule::SelfOrClsAssignment) {
                 for target in targets {
@@ -1502,7 +1507,7 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 airflow::rules::variable_name_task_id(checker, targets, value);
             }
             if checker.is_rule_enabled(Rule::SelfAssigningVariable) {
-                pylint::rules::self_assignment(checker, assign);
+                pylint::rules::self_assignment(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
@@ -1514,13 +1519,13 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 pylint::rules::type_bivariance(checker, value);
             }
             if checker.is_rule_enabled(Rule::NonAugmentedAssignment) {
-                pylint::rules::non_augmented_assignment(checker, assign);
+                pylint::rules::non_augmented_assignment(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
-                ruff::rules::sort_dunder_all_assign(checker, assign);
+                ruff::rules::sort_dunder_all_assign(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
-                ruff::rules::duplicate_entry_in_dunder_all_assign(checker, assign);
+                ruff::rules::duplicate_entry_in_dunder_all_assign(checker, &fields);
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
@@ -1548,7 +1553,7 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                             );
                         }
                         if checker.is_rule_enabled(Rule::ComplexAssignmentInStub) {
-                            flake8_pyi::rules::complex_assignment_in_stub(checker, assign);
+                            flake8_pyi::rules::complex_assignment_in_stub(checker, &fields);
                         }
                         if checker.is_rule_enabled(Rule::TypeAliasWithoutAnnotation) {
                             flake8_pyi::rules::type_alias_without_annotation(
@@ -1559,16 +1564,17 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::ListReverseCopy) {
-                refurb::rules::list_assign_reversed(checker, assign);
+                refurb::rules::list_assign_reversed(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
             }
         }
         StmtKind::AnnAssign(assign_stmt) => {
-            let target = assign_stmt.target();
-            let value = assign_stmt.value();
-            let annotation = assign_stmt.annotation();
+            let fields = assign_stmt.fields();
+            let target = fields.target;
+            let value = fields.value;
+            let annotation = fields.annotation;
 
             if let Some(value) = value {
                 if checker.is_rule_enabled(Rule::LambdaAssignment) {
@@ -1585,7 +1591,7 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 pylint::rules::self_or_cls_assignment(checker, target);
             }
             if checker.is_rule_enabled(Rule::SelfAssigningVariable) {
-                pylint::rules::self_annotated_assignment(checker, assign_stmt);
+                pylint::rules::self_annotated_assignment(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::UnintentionalTypeAnnotation) {
                 flake8_bugbear::rules::unintentional_type_annotation(checker, target, value, stmt);
@@ -1603,10 +1609,10 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
-                ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
+                ruff::rules::sort_dunder_all_ann_assign(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
-                ruff::rules::duplicate_entry_in_dunder_all_ann_assign(checker, assign_stmt);
+                ruff::rules::duplicate_entry_in_dunder_all_ann_assign(checker, &fields);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
@@ -1642,7 +1648,7 @@ pub(crate) fn statement(kind: StmtKind<'_>, checker: &mut Checker) {
                 .match_typing_expr(helpers::map_subscript(annotation), "Final")
             {
                 if checker.is_rule_enabled(Rule::RedundantFinalLiteral) {
-                    flake8_pyi::rules::redundant_final_literal(checker, assign_stmt);
+                    flake8_pyi::rules::redundant_final_literal(checker, &fields);
                 }
             }
         }

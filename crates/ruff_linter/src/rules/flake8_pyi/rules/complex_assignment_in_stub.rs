@@ -1,5 +1,4 @@
 use ruff_python_ast::{self as ast, ExprKind};
-use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -55,14 +54,14 @@ impl Violation for ComplexAssignmentInStub {
 }
 
 /// PYI017
-pub(crate) fn complex_assignment_in_stub(checker: &Checker, stmt: ast::StmtAssign<'_>) {
+pub(crate) fn complex_assignment_in_stub(checker: &Checker, stmt: &ast::StmtAssignFields<'_>) {
     if matches!(
-        stmt.targets()
+        stmt.targets
             .as_array()
             .map(|items| items.map(ruff_python_ast::Expr::classify)),
         Some([ExprKind::Name(_)])
     ) {
         return;
     }
-    checker.report_diagnostic(ComplexAssignmentInStub, stmt.range());
+    checker.report_diagnostic(ComplexAssignmentInStub, stmt.range);
 }
