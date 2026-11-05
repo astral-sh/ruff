@@ -28,6 +28,24 @@ def _(value: Any):
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
 ```
 
+## Recursive calls returning a generic alias
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Chain = TypeAliasType("Chain", "tuple[T, Chain[T] | None]", type_params=(T,))
+
+def chain(value: T, recurse: bool) -> Chain[T]:
+    if recurse:
+        _, tail = chain(1, False)
+        if tail is not None:
+            # revealed: Literal[1]
+            reveal_type(tail[0])
+    return value, (value, None)
+```
+
 ## Negation after specializing a recursive alias
 
 Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is
