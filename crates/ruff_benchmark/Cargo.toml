@@ -138,7 +138,9 @@ workspace = true
 # We use optional dependencies even for dev dependencies for faster CI compile times.
 # This is fine because this crate is "dev-only".
 ignored = [
+    "clap",
     "divan",
+    "ruff",
     "ruff_linter",
     "ruff_python_formatter",
     # Also enables stack growth when only ty benchmarks are selected.

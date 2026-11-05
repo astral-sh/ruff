@@ -1402,7 +1402,7 @@ jobs:
     name: "benchmarks instrumented (ruff)"
     runs-on: depot-ubuntu-24.04
     needs: determine_changes
-    if: &run-ruff-benchmarks |
+    if: |
       github.repository == 'astral-sh/ruff' &&
       (
         github.ref == 'refs/heads/main' ||
@@ -1581,7 +1581,15 @@ jobs:
     name: "benchmarks walltime ruff (build)"
     runs-on: depot-ubuntu-24.04-4
     needs: determine_changes
-    if: *run-ruff-benchmarks
+    if: |
+      github.repository == 'astral-sh/ruff' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        needs.determine_changes.outputs.formatter == 'true' ||
+        needs.determine_changes.outputs.linter == 'true' ||
+        needs.determine_changes.outputs.parser == 'true' ||
+        needs.determine_changes.outputs.benchmarks == 'true'
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
