@@ -73,3 +73,13 @@ async def foo():
 async def foo():
     async with httpx.AsyncClient() as client:
         await client.get()  # Ok
+
+
+import httpx2
+
+
+async def foo():
+    client = httpx2.Client()
+    client.get()  # ASYNC212
+    client.post()  # ASYNC212
+
