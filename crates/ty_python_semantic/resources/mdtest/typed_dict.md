@@ -1492,7 +1492,7 @@ def copy_person_positional(p: PersonBase) -> PersonAlias:
     return PersonAlias(p)
 ```
 
-Optional source keys should not satisfy required constructor keys when unpacking:
+A `MaybeName` can omit `name`, so unpacking it can leave a required field missing.
 
 ```py
 from typing import TypedDict
@@ -1506,6 +1506,13 @@ class NeedsName(TypedDict):
 def f(maybe: MaybeName) -> NeedsName:
     # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `NeedsName` constructor"
     return NeedsName(**maybe)
+```
+
+When the unpacked value is a constructor call, ty can see whether it supplied `name`.
+
+```py
+NeedsName(**MaybeName(name="Ada"))
+NeedsName(**MaybeName())  # error: [missing-typed-dict-key]
 ```
 
 Guaranteed duplicate keys from unpacking should be rejected, matching runtime `TypeError`s:
@@ -1528,6 +1535,12 @@ def duplicate_name_keys(
 
     # error: [parameter-already-assigned]
     return DuplicateNeedsName(**left, **right)
+```
+
+An unpacked constructor can also supply the same key as an explicit keyword.
+
+```py
+NeedsName(**MaybeName(name="Ada"), name="Grace")  # error: [parameter-already-assigned]
 ```
 
 Merged unpacked dict literals should preserve dict overwrite semantics within a single `**{...}`:

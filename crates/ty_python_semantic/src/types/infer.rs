@@ -47,11 +47,13 @@ use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
+use std::sync::Arc;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::context::InferContextResult;
@@ -1547,6 +1549,8 @@ enum DefinitionInferenceExtra<'db> {
 
     DiscardsDictKeyAssignments,
 
+    InitialTypedDictKeys(Arc<[Name]>),
+
     Other(Box<OtherDefinitionInferenceExtra<'db>>),
 }
 
@@ -1564,6 +1568,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
+    /// Optional keys supplied by the constructor that bound this definition.
+    initial_typed_dict_keys: Option<Arc<[Name]>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1651,6 +1658,10 @@ impl<'db> DefinitionInferenceExtra<'db> {
             },
             Self::StringAnnotations(string_annotations) => OtherDefinitionInferenceExtra {
                 string_annotations,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::InitialTypedDictKeys(keys) => OtherDefinitionInferenceExtra {
+                initial_typed_dict_keys: Some(keys),
                 ..OtherDefinitionInferenceExtra::default()
             },
             Self::DiscardsDictKeyAssignments => OtherDefinitionInferenceExtra {
@@ -1868,6 +1879,14 @@ impl<'db> DefinitionInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    fn initial_typed_dict_keys(&self) -> Option<&Arc<[Name]>> {
+        match self.extra.as_deref()? {
+            DefinitionInferenceExtra::InitialTypedDictKeys(keys) => Some(keys),
+            DefinitionInferenceExtra::Other(extra) => extra.initial_typed_dict_keys.as_ref(),
+            _ => None,
+        }
     }
 
     /// Returns whether inference parsed this expression as a string annotation.
@@ -2106,6 +2125,9 @@ struct ExpressionInferenceExtra<'db> {
     /// Inference normally stores only differences from the truthiness of the chain's value type.
     /// Cycle recovery also retains earlier overrides to keep widening monotonic.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
+    /// Optional keys known to be present when a constructor call returns.
+    typed_dict_constructor_keys: FrozenMap<ExpressionNodeKey, Arc<[Name]>>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
