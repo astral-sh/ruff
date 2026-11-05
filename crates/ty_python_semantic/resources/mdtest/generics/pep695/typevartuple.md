@@ -1037,6 +1037,27 @@ info: Type variable defined here
    |                                 ^^^^^^
 ```
 
+### Starred variadic methods on specialized classes
+
+TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred
+parameters. Both unpacked tuples and direct arguments can then infer the wrong pack.
+
+```py
+class C[T]:
+    def f[*Ts](self, marker: T, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def check(c: C[int], suffix: tuple[bool, str]) -> None:
+    # TODO: Should reveal `tuple[bool]`.
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, *suffix))
+
+    # TODO: Should reveal `tuple[bool, bool]` without an argument error.
+    # error: [invalid-argument-type]
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, suffix[0], suffix[0], suffix[1]))
+```
+
 ### Union splatted arguments
 
 Equal-length tuple unions preserve their length and combine the types at each position. Different
@@ -1118,6 +1139,31 @@ accept_strings(collect("valid"))
 accept_strings(collect(1))
 ```
 
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect[*Ts](*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded[*Ts](*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
+```
+
 ### Fixed boundaries around variadic type variable tuples
 
 Fixed values before or after a type variable tuple do not become part of its inferred shape. Open
@@ -1128,6 +1174,9 @@ def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
     raise NotImplementedError
 
 def suffixed[*Ts](*args: *tuple[*Ts, str]) -> tuple[*Ts]:
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
+    reveal_type(suffixed(*suffix))
     raise NotImplementedError
 
 def bounded[*Ts](*args: *tuple[int, *Ts, int]) -> tuple[*Ts]:

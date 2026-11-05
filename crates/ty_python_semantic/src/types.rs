@@ -11666,17 +11666,20 @@ impl<'db> TypeMapping<'_, 'db> {
     fn update_signature_generic_context(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<GenericContext<'db>> {
+        let env = visitor.env;
         match self {
             TypeMapping::FreshenBoundTypeVars { .. } => {
+                // A default can refer back to this signature, so keep the enclosing
+                // traversal's recursion guard when mapping its generic context.
                 Some(GenericContext::from_typevar_instances(
                     db,
                     env,
                     context.variables(db).map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
-                            .apply_type_mapping(db, env, self, TypeContext::default())
+                            .apply_type_mapping_impl(db, self, TypeContext::default(), visitor)
                             .as_typevar()
                             .unwrap_or(bound_typevar)
                     }),

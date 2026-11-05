@@ -1592,6 +1592,24 @@ reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
 ```
 
+## Fixed-length starred parameters on generic methods
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Base:
+    def run(self, value: T, *args: *tuple[int, str]) -> None: ...
+
+class A(Base): ...
+class B(Base): ...
+
+def check(receiver: A | B, ints: list[int]) -> None:
+    receiver.run(0, 1, "ok")  # ok
+    receiver.run(0, *ints)  # error: [invalid-argument-type]
+```
+
 ## Independent specializations during overload argument expansion
 
 Expanding a union can evaluate the same generic overload with different type arguments.
@@ -2847,6 +2865,28 @@ reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
 ```
 
+## Nested overloads capture enclosing type variables
+
+Overload signatures and their implementation refer to the same type variables captured from an
+enclosing function.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+def outer(value: T) -> None:
+    @overload
+    def inner(value: T) -> T: ...
+    @overload
+    def inner(value: T, count: int) -> T: ...
+    def inner(value: T, count: int = 1) -> T:
+        return value
+
+    first: T = inner(value)  # ok
+    second: T = inner(value, 2)  # ok
+```
+
 ## `~T` is never assignable to `T`
 
 ```py
@@ -2859,6 +2899,22 @@ def f(x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
     y = x  # error: [invalid-assignment]
     return x
+```
+
+## Invalid assignments preserve type variable bindings
+
+After an invalid assignment, a local variable retains its declared type, including references to the
+enclosing function's type variables.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def recover(value: list[T]) -> list[T]:
+    result: list[T] = value
+    result = None  # error: [invalid-assignment]
+    return result  # ok
 ```
 
 ## Prefer exact matches for constrained typevars
@@ -5427,4 +5483,85 @@ class BoundedSetter(Base):
 
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
+```
+
+## Recursive calls preserve captured type variables
+
+A recursive call can infer a new specialization of the function's type parameter. A nested function
+that captures that parameter still refers to the original argument's type. Comparing a generic
+callback with that captured type also leaves the original parameter unchanged.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def recursive(value: T) -> T:
+    def captured(other: T) -> T:
+        return other
+
+    def generic(other: U) -> U:
+        return other
+
+    def accepts(callback: Callable[[T], T]) -> None: ...
+
+    accepts(generic)  # ok
+    captured(1)  # error: [invalid-argument-type]
+    # revealed: Literal[1]
+    reveal_type(recursive(1))
+    # revealed: T@recursive
+    reveal_type(captured(value))
+    return recursive(value)  # ok
+```
+
+## Type parameter defaults referring to other parameters
+
+Defaults use the type arguments inferred for the same call, including when the argument's type is
+fixed by an enclosing generic function.
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=list[T])
+V = TypeVar("V", default=tuple[U, T])
+
+def defaults(value: T) -> tuple[U, V]:
+    raise NotImplementedError
+
+def check(value: T) -> tuple[list[T], tuple[list[T], T]]:
+    result = defaults(value)
+    return result  # ok
+
+def concrete(value: int):
+    # revealed: tuple[list[int], tuple[list[int], int]]
+    reveal_type(defaults(value))
+```
+
+The default also uses the recursive call's type argument inside a recursive alias.
+
+```py
+A = TypeVar("A")
+Node = tuple[A, "Node[A] | None"]
+R = TypeVar("R", default=Node[T])
+
+def make(value: T) -> R:
+    result: Node[int] = make(1)  # ok
+    raise NotImplementedError
+```
+
+## Type arguments in annotation metadata
+
+Expressions in `Annotated` metadata can call constructors specialized with the enclosing function's
+type parameters.
+
+```py
+from typing import Annotated, TypeVar
+
+T = TypeVar("T")
+
+def metadata(value: T) -> None:
+    annotated: Annotated[int, list[T]([value])]  # ok
 ```

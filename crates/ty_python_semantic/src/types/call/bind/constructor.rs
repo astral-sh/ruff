@@ -385,7 +385,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         constructed_instance_type
-            .apply_optional_specialization(db, self.instance_return_specialization(db, env))
+            .apply_optional_specialization(db, self.instance_return_specialization(db, env, None))
     }
 
     fn first_matching_overload(&self) -> Option<&Binding<'db>> {
@@ -403,22 +403,21 @@ impl<'db> ConstructorBinding<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        explicit_return: Option<&Binding<'db>>,
     ) -> Option<Specialization<'db>> {
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
-        let static_class_literal = self
-            .constructed_class_literal(db, env)
-            .and_then(ClassLiteral::as_static);
+        let (class_literal, class_specialization) =
+            constructed_instance_type.class_specialization(db, env)?;
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Vec<Option<Type<'db>>>> = None;
-        let mut combine_binding_types = |binding: &ConstructorBinding<'db>| {
-            let Some(overload) = binding
-                .first_matching_overload()
+        let mut combine_binding_types = |binding: &Self, explicit_return: Option<&Binding<'db>>| {
+            let Some(overload) = explicit_return
+                .or_else(|| binding.first_matching_overload())
                 .or_else(|| binding.callable().unambiguous_failing_overload())
             else {
                 return;
@@ -458,15 +457,26 @@ impl<'db> ConstructorBinding<'db> {
             };
             let project_class_arguments =
                 |ty: Type<'db>, resolved_ty: Type<'db>| -> Option<Vec<Option<Type<'db>>>> {
-                    let class = static_class_literal?;
                     let partial = ty
                         .apply_optional_specialization(db, partial_specialization)
-                        .specialization_of(db, env, class)?;
-                    let resolved = resolved_ty.specialization_of(db, env, class)?;
+                        .specialization_of(db, env, class_literal)?;
+                    let resolved = resolved_ty.specialization_of(db, env, class_literal)?;
                     Some(inferred_types(partial, resolved))
                 };
-            let return_types =
-                project_class_arguments(overload.unspecialized_return_type(db), overload.return_ty);
+            let return_types = if explicit_return.is_some() {
+                // The caller applies these bindings to the return annotation. Infer them in
+                // declaration order so an annotation like `Pair[U, T]` swaps the arguments once.
+                let instance = overload
+                    .constructor_context
+                    .unwrap_or(binding.context())
+                    .instance_type();
+                project_class_arguments(
+                    instance,
+                    instance.apply_optional_specialization(db, overload.merged_specialization(db)),
+                )
+            } else {
+                project_class_arguments(overload.unspecialized_return_type(db), overload.return_ty)
+            };
 
             // TODO All this handling of return-specialization vs self-specialization is a hacky
             // work-around to a situation that can occur with a case like `def __init__(self:
@@ -528,14 +538,14 @@ impl<'db> ConstructorBinding<'db> {
             }
         };
 
-        combine_binding_types(self);
+        combine_binding_types(self, explicit_return);
 
         if let Some(downstream) = self.downstream_constructor() {
             for downstream_binding in downstream
                 .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
             {
-                combine_binding_types(downstream_binding);
+                combine_binding_types(downstream_binding, None);
             }
         }
 
@@ -645,7 +655,7 @@ impl<'db> ConstructorBinding<'db> {
             .apply_optional_specialization(
                 db,
                 overload.merged_specialization(db).map(|specialization| {
-                    self.unspecialize_class_type_variables(db, env, specialization)
+                    Self::unspecialize_class_type_variables(db, env, overload, specialization)
                 }),
             );
         if self
@@ -657,7 +667,7 @@ impl<'db> ConstructorBinding<'db> {
             return (
                 return_ty.apply_optional_specialization(
                     db,
-                    self.instance_return_specialization(db, env),
+                    self.instance_return_specialization(db, env, Some(overload)),
                 ),
                 true,
             );
@@ -673,40 +683,40 @@ impl<'db> ConstructorBinding<'db> {
     /// inferring a type for a constructed instance, we need to also consider other sources of
     /// specialization, such as downstream constructors, but we lose the class type variables
     /// before the constructor-wide specialization can refine them. To avoid that, this helper
-    /// identity-specializes any type variables belonging to the constructed class, while
-    /// preserving specializations of method-level type parameters.
+    /// maps the call's class type variables back to their declaration occurrences, where the
+    /// constructor-wide specialization can replace them, while preserving specializations of
+    /// method-level type parameters.
     ///
     /// TODO: This could be made simpler if we more clearly marked unsolved typevars in a
     /// specialization; we could probably avoid this entirely and just combine the specializations.
     fn unspecialize_class_type_variables(
-        &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        overload: &Binding<'db>,
         specialization: Specialization<'db>,
     ) -> Specialization<'db> {
-        let Some(class_context) = self
-            .constructed_instance_type()
-            .class_specialization(db, env)
-            .map(|(_, specialization)| specialization.generic_context(db))
+        let Some((_, class_specialization)) = overload
+            .constructor_context
+            .and_then(|context| context.instance_type().class_specialization(db, env))
         else {
             return specialization;
         };
 
-        let class_variables: Vec<_> = class_context
-            .variables(db)
-            .map(|typevar| typevar.identity(db))
-            .collect();
         let types: Box<[_]> = specialization
             .types(db)
             .iter()
             .copied()
             .zip(specialization.generic_context(db).variables(db))
             .map(|(mapped_ty, typevar)| {
-                if class_variables.contains(&typevar.identity(db)) {
-                    Type::TypeVar(typevar)
-                } else {
-                    mapped_ty
-                }
+                class_specialization
+                    .types(db)
+                    .iter()
+                    .zip(class_specialization.generic_context(db).variables(db))
+                    .find_map(|(argument, parameter)| {
+                        (argument.as_typevar()?.identity(db) == typevar.identity(db))
+                            .then_some(Type::TypeVar(parameter))
+                    })
+                    .unwrap_or(mapped_ty)
             })
             .collect();
 
