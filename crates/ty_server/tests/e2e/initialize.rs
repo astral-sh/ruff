@@ -1,8 +1,11 @@
-use anyhow::Result;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use anyhow::{Context, Result, bail};
 use lsp_types::{
-    Code, HoverParams, HoverRequest, Position, PublishDiagnosticsNotification, RegistrationRequest,
-    ShowMessageNotification, TextDocumentIdentifier, TextDocumentPositionParams,
-    WorkDoneProgressParams,
+    Code, DiagnosticSeverity, HoverParams, HoverRequest, Position, PublishDiagnosticsNotification,
+    RegistrationRequest, ShowMessageNotification, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkDoneProgressParams, WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
@@ -65,6 +68,51 @@ fn empty_workspace_folders() -> Result<()> {
     let initialization_result = server.initialization_result().unwrap();
 
     insta::assert_json_snapshot!("initialization", initialization_result);
+
+    Ok(())
+}
+
+#[test]
+fn folderless_startup_checks_external_file_without_indexing() -> Result<()> {
+    let external = tempfile::tempdir()?;
+    let path = SystemPath::from_std_path(external.path())
+        .context("Expected a UTF-8 temporary directory path")?
+        .join("main.py");
+    let directory_walk_count = Arc::new(AtomicUsize::new(0));
+    let mut server = TestServerBuilder::new()?
+        .with_file(
+            "ty.toml",
+            "[rules]\nunresolved-reference = 'warn'\n[src]\nexclude = ['generated/']",
+        )?
+        .with_file("closed.py", "also_missing")?
+        .with_file("generated/excluded.py", "ignored_missing")?
+        .with_file(&path, "value = 1")?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_directory_walk_count(directory_walk_count.clone())
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document("generated/excluded.py", "ignored_missing", 1);
+    server.open_text_document(&path, "missing", 1);
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+
+    assert_eq!(directory_walk_count.load(Ordering::Relaxed), 0);
+    let [WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)] =
+        diagnostics.items.as_slice()
+    else {
+        bail!("Expected one full diagnostic report, got {diagnostics:?}");
+    };
+    assert_eq!(report.uri, server.file_uri(&path));
+    let [diagnostic] = report.full_document_diagnostic_report.items.as_slice() else {
+        bail!("Expected one diagnostic, got {report:?}");
+    };
+    assert_eq!(diagnostic.severity, Some(DiagnosticSeverity::Warning));
+    assert_eq!(
+        diagnostic.code,
+        Some(Code::String("unresolved-reference".to_string()))
+    );
 
     Ok(())
 }

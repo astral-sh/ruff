@@ -3,6 +3,7 @@ use insta::assert_snapshot;
 use lsp_types::{
     Contents, DocumentDiagnosticReport, Position, RegistrationRequest,
     TextDocumentContentChangeEvent, UnregistrationRequest, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticRequest, WorkspaceSymbolParams, WorkspaceSymbolRequest,
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
@@ -107,6 +108,67 @@ fn add_workspace_folder_after_init() -> Result<()> {
     	0:0..0:14[ERROR]: Name `does_not_exist` used when not defined
     "
     );
+
+    Ok(())
+}
+
+#[test]
+fn adding_fallback_directory_enables_indexing_and_preserves_open_files() -> Result<()> {
+    let root = SystemPath::new("");
+    let open = SystemPath::new("open.py");
+    let external = TestServerBuilder::new()?.with_file("outside.py", "missing")?;
+    let outside = external.file_path("outside.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_file(open, "value = 1")?
+        .with_file("closed.py", "class ClosedSymbol: pass")?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(open, "missing", 1);
+    server.open_text_document(&outside, "missing", 1);
+    let outside_uri = server.file_uri(&outside);
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+    assert_eq!(diagnostics[&outside_uri].len(), 1);
+
+    server.add_workspace_folder(root, None)?;
+    server.change_workspace_folders([root], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let symbols = server.send_request_await::<WorkspaceSymbolRequest>(WorkspaceSymbolParams {
+        query: "ClosedSymbol".to_string(),
+        ..Default::default()
+    });
+    assert!(symbols.is_some());
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+    assert_eq!(diagnostics[&server.file_uri(open)].len(), 1);
+    assert_eq!(diagnostics[&outside_uri], []);
+
+    Ok(())
+}
+
+#[test]
+fn adding_fallback_directory_resumes_workspace_diagnostics() -> Result<()> {
+    let root = SystemPath::new("");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_file("closed.py", "missing")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let request_id = send_workspace_diagnostic_request(&mut server);
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+
+    server.add_workspace_folder(root, None)?;
+    server.change_workspace_folders([root], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
+    assert_eq!(diagnostics.items.len(), 1);
 
     Ok(())
 }

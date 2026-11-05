@@ -1,6 +1,7 @@
 use ruff_notebook::{Notebook, NotebookError};
 use std::panic::RefUnwindSafe;
 use std::process::Output;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
@@ -26,6 +27,7 @@ pub struct TestSystem {
     inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
     /// Environment changes shared by system lookups and cloned command executors.
     environment: Arc<Mutex<CommandEnv>>,
+    directory_walk_count: Option<Arc<AtomicUsize>>,
 }
 
 impl Clone for TestSystem {
@@ -33,6 +35,7 @@ impl Clone for TestSystem {
         Self {
             inner: self.inner.clone(),
             environment: self.environment.clone(),
+            directory_walk_count: self.directory_walk_count.clone(),
         }
     }
 }
@@ -42,12 +45,18 @@ impl TestSystem {
         Self {
             inner: Arc::new(inner),
             environment: Arc::new(Mutex::new(CommandEnv::default())),
+            directory_walk_count: None,
         }
     }
 
     /// Clears the inherited environment and any previously set variables.
     pub fn clear_env_vars(&self) {
         self.environment.lock().unwrap().clear();
+    }
+
+    /// Counts calls to [`System::walk_directory`] on this system and subsequent clones.
+    pub fn count_directory_walks(&mut self, count: Arc<AtomicUsize>) {
+        self.directory_walk_count = Some(count);
     }
 
     /// Sets an environment variable override. This takes precedence over the inner system.
@@ -180,6 +189,9 @@ impl System for TestSystem {
     }
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
+        if let Some(count) = &self.directory_walk_count {
+            count.fetch_add(1, Ordering::Relaxed);
+        }
         self.system().walk_directory(path)
     }
 

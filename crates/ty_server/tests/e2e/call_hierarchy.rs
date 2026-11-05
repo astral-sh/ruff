@@ -8,6 +8,7 @@ use lsp_types::{
     CallHierarchyIncomingCallsRequest, CallHierarchyOutgoingCallsRequest,
     CallHierarchyPrepareRequest,
 };
+use ruff_db::system::SystemPath;
 
 use crate::TestServerBuilder;
 
@@ -190,6 +191,7 @@ def use_b():
         .with_file("lib.py", lib)?
         .with_file("caller_a.py", caller_a)?
         .with_file("caller_b.py", caller_b)?
+        .with_workspace(SystemPath::new(""), None)?
         .build()
         .wait_until_workspaces_are_initialized();
     server.open_text_document("lib.py", lib, 1);

@@ -914,6 +914,32 @@ def foo() -> str:
 }
 
 #[test]
+fn on_did_close_in_folderless_workspace_mode() -> Result<()> {
+    let path = SystemPath::new("main.py");
+    let content = "missing";
+    let mut server = TestServerBuilder::new()?
+        .with_file(path, content)?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Workspace),
+        )
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(path, content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(diagnostics.uri, server.file_uri(path));
+    assert_eq!(diagnostics.diagnostics.len(), 1);
+
+    server.close_text_document(path);
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(diagnostics.uri, server.file_uri(path));
+    assert_eq!(diagnostics.diagnostics, []);
+
+    Ok(())
+}
+
+#[test]
 fn invalid_syntax_with_syntax_errors_disabled() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
