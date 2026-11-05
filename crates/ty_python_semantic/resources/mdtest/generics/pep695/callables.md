@@ -323,6 +323,20 @@ def tagged_factory[T](tag: TypeOf[Tag[T]]) -> Callable[[T], T]:
 reveal_type(generic_context(tagged_factory))
 ```
 
+We also keep `T` in the function's generic context when its parameter annotation is a recursive
+alias. Here, expanding `Recursive[T]` keeps nesting another `list`, so we cannot rule out a use of
+`T` in the parameter:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def f[T](value: Recursive[T]) -> Callable[[], T]:
+    raise NotImplementedError
+
+# revealed: ty_extensions._internal.GenericContext[T@f]
+reveal_type(generic_context(f))
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
 The same pattern holds if the callable involves a paramspec.
