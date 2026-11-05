@@ -14,7 +14,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    ConstructorKeys, TypedDictArgument, TypedDictOpenness, TypedDictSchema,
+    ConstructorKeys, TypedDictArgument, TypedDictOpenness, TypedDictSchema, UnpackedTypedDict,
     functional_typed_dict_field, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
     validate_typed_dict_constructor_keywords, validate_typed_dict_dict_literal,
 };
@@ -24,7 +24,10 @@ use crate::types::{
     TypingModule, any_over_type,
 };
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
+use ty_python_core::narrowing_constraints::ConstraintKey;
+use ty_python_core::place::PlaceExprRef;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a `TypedDict(name, fields)` call expression.
@@ -477,6 +480,56 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Marks the optional keys that `**movie` will supply at this call. A write or deletion
+    /// of `movie["year"]` can change what its constructor or a membership test established.
+    fn narrow_typed_dict_kwargs(
+        &self,
+        keyword: &ast::Keyword,
+        unpacked: &mut UnpackedTypedDict<'db>,
+    ) {
+        // Only a load has bindings for both the receiver and its subscripts at this unpack.
+        if self.in_string_annotation()
+            || unpacked.keys.values().all(|field| field.is_required)
+            || self
+                .index
+                .try_expression_use_id(ast::ExprRef::from(&keyword.value))
+                .is_none()
+        {
+            return;
+        }
+
+        let db = self.db();
+        let scope = self.scope().file_scope_id(db);
+        let places = self.index.place_table(scope);
+        let use_def = self.index.use_def_map(scope);
+        let members: FxHashMap<_, _> = use_def
+            .member_snapshots_at_use(keyword.scoped_use_id(db, self.program_file()))
+            .iter()
+            .filter_map(|&(id, snapshot)| {
+                let member = places.member(id);
+                Some((
+                    member.string_subscript_key()?,
+                    (
+                        PlaceExprRef::Member(member),
+                        [(scope, ConstraintKey::Snapshot(snapshot))],
+                    ),
+                ))
+            })
+            .collect();
+
+        let receiver_presence = self.typed_dict_receiver_key_presence(&keyword.value);
+        for (name, field) in &mut unpacked.keys {
+            if field.is_required {
+                continue;
+            }
+            let item = members
+                .get(name.as_str())
+                .map(|(place, constraints)| (*place, constraints.as_slice()));
+            field.is_required =
+                self.typed_dict_key_is_present(receiver_presence(name.as_str()), item);
+        }
+    }
+
     /// Returns the supplied keys when ordinary call binding can infer a generic `TypedDict`.
     ///
     /// Mapping arguments, unresolved nested `TypedDict` fields, and gradual expected types remain
@@ -609,6 +662,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             arguments,
             error_node,
             |expr| self.typed_dict_argument(expr),
+            |keyword, unpacked| self.narrow_typed_dict_kwargs(keyword, unpacked),
         );
         if let [positional] = &*arguments.args {
             if let ast::Expr::Dict(dict) = positional {

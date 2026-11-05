@@ -109,8 +109,8 @@ use crate::types::infer::{
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::member::inherited_class_body_declaration;
-use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
+use crate::types::narrow::{NarrowingEvaluatorExtension, NarrowingTarget};
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{
@@ -156,7 +156,7 @@ use ty_python_core::definition::{
 use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
@@ -2695,7 +2695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let place = loop_header_kind.place();
+        let place = NarrowingTarget::from(loop_header_kind.place());
         let env = self.program_environment();
         let mut union = UnionBuilder::new(db, env).or_recursively_defined(RecursivelyDefined::Yes);
 
@@ -2758,7 +2758,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         db,
                         env,
                         ty,
-                        source.place(db),
+                        NarrowingTarget::from(source.place(db)),
                     ));
                 }
                 continue;
@@ -9218,13 +9218,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
-        for bindings in
-            use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
+        for &(_, snapshot) in
+            use_def.member_snapshots_at_use(keyword.scoped_use_id(db, self.program_file()))
         {
             let place = place_from_bindings_with_reachability_cache(
                 db,
                 env,
-                bindings.clone(),
+                use_def.bindings_at_snapshot(snapshot),
                 self.reachability_cache(),
             );
             let Some(key) = place.first_definition.and_then(definition_key) else {
@@ -10444,6 +10444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn narrow_place_with_applicable_constraints(
         &self,
         expr: PlaceExprRef,
+        target: impl Fn(ScopedPlaceId) -> NarrowingTarget<'db>,
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
@@ -10452,7 +10453,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
-            let place = place_table.place_id(expr).unwrap();
+            let place = target(place_table.place_id(expr).unwrap());
 
             match use_def.applicable_constraints(
                 *constraint_key,
@@ -10498,27 +10499,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
-                                let mut binding_ty = binding_type(db, definition);
-                                if definition.kind(db).is_loop_header() {
-                                    let fallback_ty = self.loop_header_fallback_type(
-                                        definition,
-                                        ty,
-                                        &mut loop_header_fallbacks,
-                                    );
-                                    binding_ty = UnionType::from_elements(
-                                        db,
-                                        env,
-                                        [binding_ty, fallback_ty],
-                                    );
-                                }
+                                let binding_ty = match place {
+                                    NarrowingTarget::KeyPresence(_)
+                                        if definition.kind(db).is_loop_header() =>
+                                    {
+                                        // A deletion can reach the next iteration. Apply any
+                                        // membership checks made after it on that path.
+                                        let after_delete = self.loop_header_fallback_type(
+                                            definition,
+                                            place,
+                                            KnownClass::Bool.to_instance(db, env),
+                                            &mut loop_header_fallbacks,
+                                        );
+                                        UnionType::from_elements(db, env, [ty, after_delete])
+                                    }
+                                    NarrowingTarget::KeyPresence(_) => Type::bool_literal(true),
+                                    NarrowingTarget::ContainsKey(_, key) => self
+                                        .typed_dict_key_presence_at_definition(
+                                            definition,
+                                            key.value(db),
+                                        ),
+                                    NarrowingTarget::Value(_)
+                                        if definition.kind(db).is_loop_header() =>
+                                    {
+                                        let fallback_ty = self.loop_header_fallback_type(
+                                            definition,
+                                            place,
+                                            ty,
+                                            &mut loop_header_fallbacks,
+                                        );
+                                        UnionType::from_elements(
+                                            db,
+                                            env,
+                                            [binding_type(db, definition), fallback_ty],
+                                        )
+                                    }
+                                    NarrowingTarget::Value(_) => binding_type(db, definition),
+                                };
                                 union.add_in_place(
                                     binding
                                         .narrowing_constraint
                                         .narrow(db, env, binding_ty, place),
                                 );
                             }
+                            DefinitionState::Deleted
+                                if matches!(place, NarrowingTarget::KeyPresence(_)) =>
+                            {
+                                union.add_in_place(binding.narrowing_constraint.narrow(
+                                    db,
+                                    env,
+                                    KnownClass::Bool.to_instance(db, env),
+                                    place,
+                                ));
+                            }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
+                            | DefinitionState::Invalidated
                             | DefinitionState::Deleted => {
                                 union.add_in_place(
                                     binding.narrowing_constraint.narrow(db, env, ty, place),
@@ -10537,8 +10573,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    /// Compute the type for reads such as `box.value` or `items[0]` in loop iterations after
-    /// `box` or `items` has been assigned a new object.
+    /// Apply checks made after a loop iteration deletes a member or replaces its receiver.
     ///
     /// A check on `box.value` before `box = Box()` describes the old box, not the new one.
     /// We start again from the type given by attribute lookup, then apply any checks made
@@ -10568,6 +10603,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn loop_header_fallback_type(
         &self,
         definition: Definition<'db>,
+        place: NarrowingTarget<'db>,
         fallback_ty: Type<'db>,
         cache: &mut FxHashMap<Definition<'db>, Type<'db>>,
     ) -> Type<'db> {
@@ -10581,7 +10617,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let header = loop_header_reachability(db, definition);
         let use_def = self.index.use_def_map(definition.file_scope(db));
-        let place = definition.place(db);
         let mut union = UnionBuilder::new(db, env);
 
         for constraint in &header.deleted_narrowing_constraints {
@@ -10594,7 +10629,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         for binding in &header.reachable_bindings {
             if binding.definition.kind(db).is_loop_header() {
-                let ty = self.loop_header_fallback_type(binding.definition, fallback_ty, cache);
+                let ty =
+                    self.loop_header_fallback_type(binding.definition, place, fallback_ty, cache);
                 union.add_in_place(
                     use_def
                         .narrowing_evaluator(binding.narrowing_constraint)
@@ -10991,7 +11027,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         } else {
             place.map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
+                self.narrow_place_with_applicable_constraints(
+                    place_expr,
+                    NarrowingTarget::Value,
+                    ty,
+                    narrowing_constraints,
+                )
             })
         }
     }
@@ -11155,6 +11196,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(place_expr) = PlaceExpr::try_from_expr(target) {
             self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
+                NarrowingTarget::Value,
                 target_ty,
                 constraint_keys,
             )
@@ -12451,15 +12493,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut self,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
-        // An enclosing call can unpack the value of `(movie := Movie(year=1979))`.
-        let initial_typed_dict_keys = if !self.typed_dict_constructor_keys.is_empty()
-            && let DefinitionKind::NamedExpression(named) = definition.kind(self.db())
-        {
-            let value = &named.node(self.module()).value;
-            self.typed_dict_constructor_keys
-                .remove(&ExpressionNodeKey::from(value))
-        } else {
+        // Only the value bound to this definition can establish keys for a later read.
+        let initial_typed_dict_keys = if self.typed_dict_constructor_keys.is_empty() {
             None
+        } else {
+            let value = match definition.kind(self.db()) {
+                DefinitionKind::NamedExpression(named) => {
+                    Some(named.node(self.module()).value.as_ref())
+                }
+                DefinitionKind::Assignment(assignment) if assignment.unpack().is_some() => None,
+                kind => kind.value(self.module()),
+            };
+            value.and_then(|value| {
+                self.typed_dict_constructor_keys
+                    .remove(&ExpressionNodeKey::from(value))
+            })
         };
         let Self {
             legacy_aliases,

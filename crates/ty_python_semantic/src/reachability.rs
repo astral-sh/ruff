@@ -202,8 +202,8 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
-        class_pattern_coverage_target, definite_match_pattern_type,
+        KnownInstanceType, NarrowingConstraint, NarrowingTarget, SpecialFormType, Type,
+        TypeContext, UnionType, class_pattern_coverage_target, definite_match_pattern_type,
         definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
         infer_narrowing_constraints, infer_predicate_truthiness, infer_same_file_expression_type,
         mapping_pattern_type, pattern_binding_fallthrough_type, same_enum_or_pattern_type,
@@ -222,7 +222,6 @@ use ty_python_core::{
     definition::{DefinitionKind, DefinitionState},
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
-    place::ScopedPlaceId,
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -975,7 +974,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     env: &ProgramEnvironment<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
     base_ty: Type<'db>,
-    place: ScopedPlaceId,
+    place: NarrowingTarget<'db>,
 ) -> Type<'db> {
     let id = evaluator.constraint();
     match id {
@@ -1119,7 +1118,7 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
 fn evaluate_projected_narrowing_checkpoint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    place: ScopedPlaceId,
+    place: NarrowingTarget<'db>,
     constraint: ScopedNarrowingConstraint,
     base_ty: Type<'db>,
 ) -> ProjectedNarrowingCheckpoint<'db> {
@@ -1150,7 +1149,7 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
-    place: ScopedPlaceId,
+    place: NarrowingTarget<'db>,
     base_ty: Type<'db>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
     project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
@@ -1166,7 +1165,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         predicate_narrowing_targets: &'a PredicateNarrowingTargets,
-        place: ScopedPlaceId,
+        place: NarrowingTarget<'db>,
         base_ty: Type<'db>,
     ) -> Self {
         Self {
@@ -1198,7 +1197,10 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
         // Reachability gates can mention predicates that do not narrow this place.
         // Avoid evaluating unrelated expressions, which can introduce inference cycles.
-        if !self.predicate_narrowing_targets.contains_place(self.place) {
+        if !self
+            .predicate_narrowing_targets
+            .contains_place(self.place.place())
+        {
             return base_ty;
         }
 
@@ -1249,7 +1251,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     ) {
         if !self
             .predicate_narrowing_targets
-            .contains(predicate_id, self.place)
+            .contains(predicate_id, self.place.place())
         {
             return (None, None);
         }
@@ -1460,7 +1462,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             .is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
                         && (self
                             .predicate_narrowing_targets
-                            .contains(node.atom, self.place)
+                            .contains(node.atom, self.place.place())
                             || matches!(
                                 predicate.node,
                                 PredicateNode::ContextManagerSuppresses { .. }
@@ -2296,6 +2298,7 @@ mod tests {
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
     use ty_python_core::narrowing_constraints::InteriorNode;
+    use ty_python_core::place::ScopedPlaceId;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
 
@@ -2446,7 +2449,7 @@ class TargetB:
                     &constraints,
                     &predicates,
                     evaluator.predicate_narrowing_targets(),
-                    ScopedPlaceId::Symbol(x),
+                    NarrowingTarget::from(ScopedPlaceId::Symbol(x)),
                     Type::unknown(),
                 );
 

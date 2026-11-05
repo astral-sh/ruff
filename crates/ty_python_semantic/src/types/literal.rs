@@ -350,6 +350,7 @@ impl std::cmp::PartialOrd for IntLiteralType {
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: CompactString,

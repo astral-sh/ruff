@@ -1553,7 +1553,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .iter()
             .copied()
         {
-            self.use_def_maps[scope].delete_binding(associated_place.into());
+            self.use_def_maps[scope].invalidate_binding(ScopedPlaceId::from(associated_place));
         }
     }
 
@@ -3694,6 +3694,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ast::CmpOp::Is | ast::CmpOp::IsNot
                     ));
                 }
+                if let Some(item) = PlaceExpr::from_key_membership(compare) {
+                    self.add_place(item);
+                }
             }
             ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),
             ast::Expr::StringLiteral(_) => {
@@ -5696,7 +5699,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         let member_places = PlaceExpr::try_from_expr(&keyword.value)
             .and_then(|value_place_expr| {
                 self.current_place_table()
-                    .place_id((&value_place_expr).into())
+                    .place_id(PlaceExprRef::from(&value_place_expr))
             })
             .map(|value_place_id| {
                 let place_table = &self.place_tables[current_scope];
@@ -5717,7 +5720,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }
                         }
                     })
-                    .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
+                    .copied()
             });
 
         let use_id = self.ast_ids[current_scope].record_use(keyword);

@@ -1515,6 +1515,35 @@ NeedsName(**MaybeName(name="Ada"))
 NeedsName(**MaybeName())  # error: [missing-typed-dict-key]
 ```
 
+Unpacking `maybe` supplies `name` until we delete it.
+
+```py
+maybe = MaybeName(name="Ada")
+NeedsName(**maybe)  # ok
+del maybe["name"]
+NeedsName(**maybe)  # error: [missing-typed-dict-key]
+```
+
+A membership check or a later assignment can also establish that the unpack supplies `name`.
+
+```py
+def copy_name(maybe: MaybeName):
+    if "name" in maybe:
+        NeedsName(**maybe)  # ok
+    maybe["name"] = "Ada"
+    NeedsName(**maybe, name="Grace")  # error: [parameter-already-assigned]
+```
+
+A membership check before a loop only protects the first iteration if the loop deletes the key.
+
+```py
+def copy_twice(maybe: MaybeName):
+    if "name" in maybe:
+        for _ in range(2):
+            NeedsName(**maybe)  # error: [missing-typed-dict-key]
+            del maybe["name"]
+```
+
 Guaranteed duplicate keys from unpacking should be rejected, matching runtime `TypeError`s:
 
 ```py

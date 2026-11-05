@@ -22,6 +22,7 @@ use super::diagnostic::{
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
+use super::typed_dict::TypedDictField;
 use super::{
     ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
     TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
@@ -644,6 +645,36 @@ fn typed_dict_subscript<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Returns the requiredness of a declared `TypedDict` key across the receiver's alternatives.
+    /// Any intersection member can guarantee the key, while every union member that declares it
+    /// must require it for the lookup to be safe.
+    pub(super) fn typed_dict_key_required(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: &str,
+    ) -> Option<bool> {
+        match self.resolve_type_alias(db) {
+            Type::TypedDict(td) => td.items(db).get(key).map(TypedDictField::is_required),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .filter_map(|element| element.typed_dict_key_required(db, env, key))
+                .reduce(|a, b| a && b),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .filter_map(|element| element.typed_dict_key_required(db, env, key))
+                .reduce(|a, b| a || b),
+            Type::TypeVar(typevar) => typevar
+                .typevar(db)
+                .bound_or_constraints(db, env)?
+                .as_type(db, env)
+                .typed_dict_key_required(db, env, key),
+            _ => None,
+        }
+    }
+
     pub(super) fn subscript(
         self,
         db: &'db dyn Db,

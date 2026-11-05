@@ -323,7 +323,7 @@ pub struct LoopHeaderId;
 struct InternedBindingsId;
 
 /// A retained set of bindings and constraints at a point in one scope's control flow.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct BindingsSnapshotId(InternedBindingsId);
 
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
@@ -741,6 +741,7 @@ enum DefinitionEntry<'db> {
     Used(Definition<'db>),
     Undefined,
     Deleted,
+    Invalidated,
 }
 
 impl<'db> DefinitionEntry<'db> {
@@ -751,6 +752,7 @@ impl<'db> DefinitionEntry<'db> {
             | Self::Used(definition) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
             Self::Deleted => DefinitionState::Deleted,
+            Self::Invalidated => DefinitionState::Invalidated,
         }
     }
 }
@@ -913,21 +915,34 @@ impl Default for RangeInfo {
     }
 }
 
+type MemberSnapshot = (ScopedMemberId, BindingsSnapshotId);
+
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
+struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[MemberSnapshot]>)>);
 
 impl MultiBindingsByUse {
-    fn from_map(map: FxHashMap<ScopedUseId, Vec<Bindings>>) -> Self {
+    fn from_map(
+        map: FxHashMap<ScopedUseId, Vec<(ScopedMemberId, Bindings)>>,
+        interner: &mut PlaceStateInterner,
+    ) -> Self {
         let mut entries = ThinVec::with_capacity(map.len());
-        entries.extend(
-            map.into_iter()
-                .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice())),
-        );
+        entries.extend(map.into_iter().map(|(use_id, members)| {
+            let snapshots = members
+                .into_iter()
+                .map(|(member, bindings)| {
+                    (
+                        member,
+                        BindingsSnapshotId(interner.intern_bindings(&bindings)),
+                    )
+                })
+                .collect();
+            (use_id, snapshots)
+        }));
         entries.sort_unstable_by_key(|(use_id, _)| *use_id);
         Self(entries)
     }
 
-    fn get(&self, use_id: ScopedUseId) -> Option<&[Bindings]> {
+    fn get(&self, use_id: ScopedUseId) -> Option<&[MemberSnapshot]> {
         self.0
             .binary_search_by_key(&use_id, |(candidate, _)| *candidate)
             .ok()
@@ -991,7 +1006,8 @@ impl<'db> UseDefMap<'db> {
                 DefinitionEntry::Used(definition) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
                 | DefinitionEntry::Undefined
-                | DefinitionEntry::Deleted => None,
+                | DefinitionEntry::Deleted
+                | DefinitionEntry::Invalidated => None,
             })
     }
 
@@ -1024,23 +1040,15 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub fn multi_bindings_at_use(
+    /// Returns the tracked members of a `**kwargs` argument and their bindings at the unpack.
+    pub fn member_snapshots_at_use(
         &self,
         use_id: ScopedUseId,
-    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
+    ) -> &[(ScopedMemberId, BindingsSnapshotId)] {
         self.extra
             .as_deref()
             .and_then(|extra| extra.multi_bindings_by_use.get(use_id))
-            .map(|member_bindings| {
-                member_bindings.iter().map(|bindings| {
-                    self.bindings_iterator(
-                        bindings.as_slice(),
-                        BoundnessAnalysis::BasedOnUnboundVisibility,
-                    )
-                })
-            })
-            .into_iter()
-            .flatten()
+            .unwrap_or_default()
     }
 
     pub fn applicable_constraints(
@@ -2111,7 +2119,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Unlike `bindings_by_use`, this field supports associating multiple bindings with a
     /// single use. This is only used for kwargs expressions, whose corresponding `bindings_by_use`
     /// entry is empty.
-    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<(ScopedMemberId, Bindings)>>,
 
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
@@ -2787,7 +2795,15 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
-        let def_id = self.push_definition(DefinitionEntry::Deleted);
+        self.remove_binding(place, DefinitionEntry::Deleted);
+    }
+
+    pub(super) fn invalidate_binding(&mut self, place: ScopedPlaceId) {
+        self.remove_binding(place, DefinitionEntry::Invalidated);
+    }
+
+    fn remove_binding(&mut self, place: ScopedPlaceId, entry: DefinitionEntry<'db>) {
+        let def_id = self.push_definition(entry);
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -2849,13 +2865,12 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn record_multi_use(
         &mut self,
-        places: impl Iterator<Item = ScopedPlaceId>,
+        members: impl Iterator<Item = ScopedMemberId>,
         use_id: ScopedUseId,
     ) {
         let pending = self.pending_reachability.current;
-        for place in places {
-            let place_state =
-                pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        for member in members {
+            let place_state = &mut self.member_states[member];
             let place_state = self.pending_reachability.materialize_ref_at_use(
                 place_state,
                 pending,
@@ -2869,7 +2884,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.multi_bindings_by_use
                 .entry(use_id)
                 .or_default()
-                .push(bindings);
+                .push((member, bindings));
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
@@ -3259,6 +3274,8 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let enclosing_snapshots =
             Self::intern_enclosing_snapshots(self.enclosing_snapshots, &mut place_state_interner);
+        let multi_bindings_by_use =
+            MultiBindingsByUse::from_map(self.multi_bindings_by_use, &mut place_state_interner);
         let PlaceStateInterner {
             interned_bindings,
             interned_declarations,
@@ -3273,12 +3290,6 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let interned_declarations =
             interned_declarations.finish(&mut self.reachability_constraints);
-        for bindings in self.multi_bindings_by_use.values_mut().flatten() {
-            bindings.finish(
-                &mut self.narrowing_constraints,
-                &mut self.reachability_constraints,
-            );
-        }
         // Keep default entries while building so they remain barriers between non-contiguous
         // ranges with the same metadata. Once construction is complete, absence represents the
         // default of reachable code outside a `TYPE_CHECKING` block.
@@ -3294,7 +3305,6 @@ impl<'db> UseDefMapBuilder<'db> {
             }
         }
         self.reachability_constraints.mark_used(self.reachability);
-        let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
         let mut boolean_test_roots = self.boolean_test_roots;
         // In `body if test else other`, we visit `test` before `body`, but node indices follow

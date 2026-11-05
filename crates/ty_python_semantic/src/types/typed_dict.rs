@@ -2302,7 +2302,7 @@ struct TypedDictAssignmentNodes<'ast> {
     ///
     /// Example: this is the `2` in `Target(source, b=2)`, or the `source` expression when the
     /// positional argument provides both the key and value type information.
-    value: AnyNodeRef<'ast>,
+    value: &'ast ast::Expr,
 }
 
 /// Validates a set of extracted `TypedDict`-like keys against a constructor target.
@@ -2336,7 +2336,7 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
             value_ty: unpacked_key.value_ty,
             typed_dict_node: nodes.typed_dict,
             key_node: nodes.key,
-            value_node: nodes.value,
+            value_node: AnyNodeRef::from(nodes.value),
             assignment_kind: TypedDictAssignmentKind::Constructor,
             emit_diagnostic: true,
         }
@@ -2452,7 +2452,7 @@ fn validate_positional_typed_dict<'db, 'ast>(
     let nodes = TypedDictAssignmentNodes {
         typed_dict: typed_dict_node,
         key: AnyNodeRef::from(arg),
-        value: AnyNodeRef::from(arg),
+        value: arg,
     };
     let provided_keys = validate_extracted_typed_dict_keys(
         context,
@@ -2520,11 +2520,7 @@ pub(super) fn validate_typed_dict_constructor<'a, 'db, 'ast>(
                 context,
                 typed_dict,
                 dict,
-                TypedDictAssignmentNodes {
-                    typed_dict: error_node,
-                    key: AnyNodeRef::from(dict),
-                    value: AnyNodeRef::from(dict),
-                },
+                error_node,
                 &mut keys,
                 &mut overriding_keys,
                 &argument,
@@ -2592,6 +2588,7 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
     argument: impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
+    narrow_unpack: impl Fn(&ast::Keyword, &mut UnpackedTypedDict<'db>),
 ) -> ConstructorKeys<'ast> {
     let mut keys = ConstructorKeys::default();
 
@@ -2629,15 +2626,15 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
             validate_merged_unpacked_keyword_argument(
                 context,
                 typed_dict,
-                &keyword.value,
                 TypedDictAssignmentNodes {
                     typed_dict: typed_dict_node,
                     key: keyword_node,
-                    value: (&keyword.value).into(),
+                    value: &keyword.value,
                 },
                 &mut unpacked,
                 &mut shadowed_keys,
                 &argument,
+                |unpacked| narrow_unpack(keyword, unpacked),
             );
 
             keys.has_gradual_unpack |= unpacked.has_gradual_unpack;
@@ -2654,7 +2651,7 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
     context: &InferContext<'db, '_>,
     typed_dict: TypedDictType<'db>,
     dict_expr: &'ast ast::ExprDict,
-    nodes: TypedDictAssignmentNodes<'ast>,
+    typed_dict_node: AnyNodeRef<'ast>,
     keys: &mut ConstructorKeys<'ast>,
     shadowed_keys: &mut OrderSet<Name>,
     argument: &impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
@@ -2718,7 +2715,7 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
                     full_object_ty: None,
                     key: key.as_str(),
                     value_ty,
-                    typed_dict_node: nodes.typed_dict,
+                    typed_dict_node,
                     key_node: key_expr.into(),
                     value_node: (&item.value).into(),
                     assignment_kind: TypedDictAssignmentKind::Constructor,
@@ -2734,15 +2731,15 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
             valid &= validate_merged_unpacked_keyword_argument(
                 context,
                 typed_dict,
-                &item.value,
                 TypedDictAssignmentNodes {
-                    typed_dict: nodes.typed_dict,
-                    key: (&item.value).into(),
-                    value: (&item.value).into(),
+                    typed_dict: typed_dict_node,
+                    key: AnyNodeRef::from(&item.value),
+                    value: &item.value,
                 },
                 keys,
                 shadowed_keys,
                 argument,
+                |_| {},
             );
         }
     }
@@ -2755,36 +2752,37 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
 fn validate_merged_unpacked_keyword_argument<'a, 'db, 'ast>(
     context: &InferContext<'db, '_>,
     typed_dict: TypedDictType<'db>,
-    expr: &'ast ast::Expr,
     nodes: TypedDictAssignmentNodes<'ast>,
     keys: &mut ConstructorKeys<'ast>,
     shadowed_keys: &mut OrderSet<Name>,
     argument: &impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
+    narrow_unpack: impl FnOnce(&mut UnpackedTypedDict<'db>),
 ) -> bool {
     let db = context.db();
     let env = context.program_environment();
     let items = typed_dict.items(db);
 
-    if let ast::Expr::Dict(dict_expr) = expr {
+    if let ast::Expr::Dict(dict_expr) = nodes.value {
         return validate_merged_dict_literal(
             context,
             typed_dict,
             dict_expr,
-            nodes,
+            nodes.typed_dict,
             keys,
             shadowed_keys,
             argument,
         );
     }
 
-    let source = argument(expr);
+    let source = argument(nodes.value);
     if unpacked_keyword_is_gradual(db, source.ty) {
         keys.has_gradual_unpack = true;
         shadowed_keys.extend(items.keys().cloned());
         return true;
     }
 
-    if let Some(unpacked) = source.unpacked(db, env) {
+    if let Some(mut unpacked) = source.unpacked(db, env) {
+        narrow_unpack(&mut unpacked);
         let (present_keys, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
             typed_dict,
@@ -2852,11 +2850,7 @@ pub(super) fn validate_typed_dict_dict_literal<'a, 'db, 'ast>(
         context,
         typed_dict,
         dict_expr,
-        TypedDictAssignmentNodes {
-            typed_dict: typed_dict_node,
-            key: typed_dict_node,
-            value: typed_dict_node,
-        },
+        typed_dict_node,
         &mut provided_keys,
         &mut shadowed_keys,
         &argument,
