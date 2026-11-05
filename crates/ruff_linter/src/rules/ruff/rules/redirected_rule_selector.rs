@@ -8,7 +8,7 @@ use crate::codes::Category;
 
 /// ## What it does
 ///
-/// Checks Ruff configuration files for rule selectors that redirect to another code or prefix.
+/// Checks Ruff configuration files for redirected rule names, codes, and prefixes.
 ///
 /// ## Why is this bad?
 ///

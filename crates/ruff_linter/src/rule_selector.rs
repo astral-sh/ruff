@@ -25,8 +25,9 @@ pub struct UnresolvedRuleSelector(RangedValue<String>);
 impl UnresolvedRuleSelector {
     pub fn resolve(&self, preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
         let selector = self.0.as_str();
+        let selector = get_redirect_target(selector).unwrap_or(selector);
 
-        RuleSelector::from_str(selector).or_else(|_| {
+        RuleSelector::parse_no_redirect(selector).or_else(|_| {
             let kind = if let Ok(category) = Category::from_str(selector) {
                 if is_rule_categories_enabled(preview) {
                     return Ok(RuleSelector::Category(category));

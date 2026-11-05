@@ -10,18 +10,17 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## What it does
 /// Checks for `noqa` directives that use redirected rule codes.
 ///
-/// In [`preview`] mode, also checks `ruff: ignore`, `ruff: file-ignore`,
-/// `ruff: disable`, and `ruff: enable` comments.
+/// In [`preview`] mode, also checks for redirected rule codes and names in
+/// `ruff: ignore`, `ruff: file-ignore`, `ruff: disable`, and `ruff: enable` comments.
 ///
 /// ## Why is this bad?
-/// When one of Ruff's rule codes has been redirected, the implication is that the rule has
-/// been deprecated in favor of another rule or code. To keep your codebase
-/// consistent and up-to-date, prefer the canonical rule code over the deprecated
-/// code.
+/// When one of Ruff's rule codes or names has been redirected, the implication is that the rule has
+/// been deprecated in favor of another rule, code, or name. To keep your codebase
+/// consistent and up-to-date, prefer the canonical rule code or name over the deprecated one.
 ///
 /// ## Fix safety
 /// The fix is marked unsafe for range suppressions because replacing a redirected
-/// code can change which `ruff: enable` directive matches a `ruff: disable` directive.
+/// code or name can change which `ruff: enable` directive matches a `ruff: disable` directive.
 ///
 /// ## Example
 /// ```python
