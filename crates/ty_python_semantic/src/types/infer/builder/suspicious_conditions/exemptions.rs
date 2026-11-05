@@ -25,7 +25,7 @@ use ty_python_core::{
 use crate::{
     Db, Program, ProgramEnvironment,
     place::{
-        ConsideredDefinitions, Provenance, RequiresExplicitReExport, place_by_id,
+        ConsideredDefinitions, Provenance, RequiresExplicitReExport, has_bound_prefix, place_by_id,
         place_from_bindings,
     },
     place_load::{
@@ -422,7 +422,7 @@ fn place_condition_definition_info<'db>(
                             PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
                             PlaceExprPrefixLoad::DefinitelyBound => return true,
                         };
-                        !place_from_bindings(db, &env, bindings).place.is_undefined()
+                        has_bound_prefix(db, &env, bindings, None)
                     }) {
                         break;
                     }
