@@ -337,7 +337,7 @@ mod tests {
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some(expected_docstring.to_string())
         );
 
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(
             documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some("Factory method documentation.\n".to_string())
         );
     }
@@ -1080,7 +1080,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some(expected_docstring.to_string())
         );
     }
@@ -1266,7 +1266,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             None
         );
     }
@@ -1590,7 +1590,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some(expected_docstring.to_string())
         );
     }
@@ -1621,7 +1621,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some(expected_docstring.to_string())
         );
     }
@@ -1660,7 +1660,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some("The int overload\n".to_string())
         );
     }
@@ -1699,7 +1699,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
             Some("The real implementation\n".to_string())
         );
     }
@@ -1738,7 +1738,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(|docstring| docstring.render(MarkupKind::PlainText))
+                        .map(|docstring| docstring.render(MarkupKind::PlainText, &[]))
                         .unwrap_or_default(),
                 )
                 .unwrap();
@@ -1776,7 +1776,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(|docstring| docstring.render(MarkupKind::PlainText))
+                        .map(|docstring| docstring.render(MarkupKind::PlainText, &[]))
                         .unwrap_or_default(),
                 )
                 .unwrap();

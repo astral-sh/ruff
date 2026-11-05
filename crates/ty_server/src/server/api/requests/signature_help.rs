@@ -130,7 +130,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                 SignatureInformation {
                     label: sig.label,
                     documentation: sig.documentation.map(|docstring| {
-                        Documentation::String(docstring.render(MarkupKind::PlainText))
+                        Documentation::String(docstring.render(MarkupKind::PlainText, &[]))
                     }),
                     parameters: Some(parameters),
                     active_parameter,

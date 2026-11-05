@@ -6,15 +6,20 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::PositionEncoding;
 
+/// The client capabilities resolved during initialization.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ResolvedClientCapabilities {
+    flags: ClientCapabilityFlags,
+    allowed_html_tags: Arc<[String]>,
+}
+
 bitflags::bitflags! {
-    /// Represents the resolved client capabilities for the language server.
-    ///
-    /// This tracks various capabilities that the client supports.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-    pub(crate) struct ResolvedClientCapabilities: u32 {
+    struct ClientCapabilityFlags: u32 {
         const WORKSPACE_DIAGNOSTIC_REFRESH = 1 << 0;
         const INLAY_HINT_REFRESH = 1 << 1;
         const PULL_DIAGNOSTICS = 1 << 2;
@@ -45,7 +50,7 @@ bitflags::bitflags! {
 impl std::fmt::Display for ResolvedClientCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_list();
-        for (name, _) in self.iter_names() {
+        for (name, _) in self.flags.iter_names() {
             f.entry(&name);
         }
         f.finish()
@@ -90,131 +95,159 @@ fn preferred_markup_kind(formats: &[MarkupKind]) -> Option<&MarkupKind> {
 }
 
 impl ResolvedClientCapabilities {
+    /// Returns the HTML tags that the client allows in Markdown.
+    pub(crate) fn allowed_html_tags(&self) -> &[String] {
+        &self.allowed_html_tags
+    }
+
     /// Returns `true` if the client supports workspace diagnostic refresh.
-    pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
-        self.contains(Self::WORKSPACE_DIAGNOSTIC_REFRESH)
+    pub(crate) const fn supports_workspace_diagnostic_refresh(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::WORKSPACE_DIAGNOSTIC_REFRESH)
     }
 
     /// Returns `true` if the client supports workspace configuration.
-    pub(crate) const fn supports_workspace_configuration(self) -> bool {
-        self.contains(Self::WORKSPACE_CONFIGURATION)
+    pub(crate) const fn supports_workspace_configuration(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::WORKSPACE_CONFIGURATION)
     }
 
     /// Returns `true` if the client supports inlay hint refresh.
-    pub(crate) const fn supports_inlay_hint_refresh(self) -> bool {
-        self.contains(Self::INLAY_HINT_REFRESH)
+    pub(crate) const fn supports_inlay_hint_refresh(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::INLAY_HINT_REFRESH)
     }
 
     /// Returns `true` if the client supports refreshing semantic tokens.
-    pub(crate) const fn supports_semantic_tokens_refresh(self) -> bool {
-        self.contains(Self::SEMANTIC_TOKENS_REFRESH)
+    pub(crate) const fn supports_semantic_tokens_refresh(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::SEMANTIC_TOKENS_REFRESH)
     }
 
     /// Returns `true` if the client supports pull diagnostics.
-    pub(crate) const fn supports_pull_diagnostics(self) -> bool {
-        self.contains(Self::PULL_DIAGNOSTICS)
+    pub(crate) const fn supports_pull_diagnostics(&self) -> bool {
+        self.flags.contains(ClientCapabilityFlags::PULL_DIAGNOSTICS)
     }
 
     /// Returns `true` if the client supports definition links in goto type definition.
-    pub(crate) const fn supports_type_definition_link(self) -> bool {
-        self.contains(Self::TYPE_DEFINITION_LINK_SUPPORT)
+    pub(crate) const fn supports_type_definition_link(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::TYPE_DEFINITION_LINK_SUPPORT)
     }
 
     /// Returns `true` if the client supports definition links in goto definition.
-    pub(crate) const fn supports_definition_link(self) -> bool {
-        self.contains(Self::DEFINITION_LINK_SUPPORT)
+    pub(crate) const fn supports_definition_link(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::DEFINITION_LINK_SUPPORT)
     }
 
     /// Returns `true` if the client supports definition links in goto declaration.
-    pub(crate) const fn supports_declaration_link(self) -> bool {
-        self.contains(Self::DECLARATION_LINK_SUPPORT)
+    pub(crate) const fn supports_declaration_link(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::DECLARATION_LINK_SUPPORT)
     }
 
     /// Returns `true` if the client supports location links in goto implementation.
-    pub(crate) const fn supports_implementation_link(self) -> bool {
-        self.contains(Self::IMPLEMENTATION_LINK_SUPPORT)
+    pub(crate) const fn supports_implementation_link(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::IMPLEMENTATION_LINK_SUPPORT)
     }
 
     /// Returns `true` if the client prefers markdown in hover responses.
-    pub(crate) const fn prefers_markdown_in_hover(self) -> bool {
-        self.contains(Self::PREFER_MARKDOWN_IN_HOVER)
+    pub(crate) const fn prefers_markdown_in_hover(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::PREFER_MARKDOWN_IN_HOVER)
     }
 
     /// Returns `true` if the client supports multiline semantic tokens.
-    pub(crate) const fn supports_multiline_semantic_tokens(self) -> bool {
-        self.contains(Self::MULTILINE_SEMANTIC_TOKENS)
+    pub(crate) const fn supports_multiline_semantic_tokens(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::MULTILINE_SEMANTIC_TOKENS)
     }
 
     /// Returns `true` if the client supports signature label offsets in signature help.
-    pub(crate) const fn supports_signature_label_offset(self) -> bool {
-        self.contains(Self::SIGNATURE_LABEL_OFFSET_SUPPORT)
+    pub(crate) const fn supports_signature_label_offset(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::SIGNATURE_LABEL_OFFSET_SUPPORT)
     }
 
     /// Returns `true` if the client supports per-signature active parameter in signature help.
-    pub(crate) const fn supports_signature_active_parameter(self) -> bool {
-        self.contains(Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
+    pub(crate) const fn supports_signature_active_parameter(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
     }
 
     /// Returns `true` if the client supports hierarchical document symbols.
-    pub(crate) const fn supports_hierarchical_document_symbols(self) -> bool {
-        self.contains(Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
+    pub(crate) const fn supports_hierarchical_document_symbols(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
     }
 
     /// Returns `true` if the client supports work done progress.
-    pub(crate) const fn supports_work_done_progress(self) -> bool {
-        self.contains(Self::WORK_DONE_PROGRESS)
+    pub(crate) const fn supports_work_done_progress(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::WORK_DONE_PROGRESS)
     }
 
     /// Returns `true` if the client supports file watcher capabilities.
-    pub(crate) const fn supports_file_watcher(self) -> bool {
-        self.contains(Self::FILE_WATCHER_SUPPORT)
+    pub(crate) const fn supports_file_watcher(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::FILE_WATCHER_SUPPORT)
     }
 
     /// Returns `true` if the client supports relative file watcher capabilities.
     ///
     /// This permits specifying a "base uri" that a glob is interpreted
     /// relative to.
-    pub(crate) const fn supports_relative_file_watcher(self) -> bool {
-        self.contains(Self::RELATIVE_FILE_WATCHER_SUPPORT)
+    pub(crate) const fn supports_relative_file_watcher(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::RELATIVE_FILE_WATCHER_SUPPORT)
     }
 
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
-    pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
-        self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    pub(crate) const fn supports_diagnostic_dynamic_registration(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }
 
     /// Returns `true` if the client has related information support for diagnostics.
-    pub(crate) const fn supports_diagnostic_related_information(self) -> bool {
-        self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
+    pub(crate) const fn supports_diagnostic_related_information(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::DIAGNOSTIC_RELATED_INFORMATION)
     }
 
     /// Returns `true` if the client supports opening fully rendered diagnostics.
-    pub(crate) const fn supports_full_diagnostic_output(self) -> bool {
-        self.contains(Self::FULL_DIAGNOSTIC_OUTPUT)
+    pub(crate) const fn supports_full_diagnostic_output(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::FULL_DIAGNOSTIC_OUTPUT)
     }
 
     /// Returns `true` if the client supports "label details" in completion items.
-    pub(crate) const fn supports_completion_item_label_details(self) -> bool {
-        self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
+    pub(crate) const fn supports_completion_item_label_details(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
     }
 
     /// Returns `true` if the client supports snippets in completion items.
-    pub(crate) const fn supports_completion_item_snippets(self) -> bool {
-        self.contains(Self::COMPLETION_ITEM_SNIPPET_SUPPORT)
+    pub(crate) const fn supports_completion_item_snippets(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::COMPLETION_ITEM_SNIPPET_SUPPORT)
     }
 
     /// Returns `true` if the client prefers Markdown over plain text in completion items.
-    pub(crate) const fn prefers_markdown_in_completion(self) -> bool {
-        self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
+    pub(crate) const fn prefers_markdown_in_completion(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
     /// Returns `true` if the client supports the `ty.triggerParameterHints` completion command.
-    pub(crate) const fn supports_trigger_parameter_hints_command(self) -> bool {
-        self.contains(Self::TRIGGER_SIGNATURE_HELP_COMMAND)
+    pub(crate) const fn supports_trigger_parameter_hints_command(&self) -> bool {
+        self.flags
+            .contains(ClientCapabilityFlags::TRIGGER_SIGNATURE_HELP_COMMAND)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
-        let mut flags = Self::empty();
+        let mut flags = ClientCapabilityFlags::empty();
 
         let workspace = client_capabilities.workspace.as_ref();
         let text_document = client_capabilities.text_document.as_ref();
@@ -223,48 +256,48 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace| workspace.diagnostics.as_ref()?.refresh_support)
             .unwrap_or_default()
         {
-            flags |= Self::WORKSPACE_DIAGNOSTIC_REFRESH;
+            flags |= ClientCapabilityFlags::WORKSPACE_DIAGNOSTIC_REFRESH;
         }
 
         if workspace
             .and_then(|workspace| workspace.configuration)
             .unwrap_or_default()
         {
-            flags |= Self::WORKSPACE_CONFIGURATION;
+            flags |= ClientCapabilityFlags::WORKSPACE_CONFIGURATION;
         }
 
         if workspace
             .and_then(|workspace| workspace.inlay_hint.as_ref()?.refresh_support)
             .unwrap_or_default()
         {
-            flags |= Self::INLAY_HINT_REFRESH;
+            flags |= ClientCapabilityFlags::INLAY_HINT_REFRESH;
         }
 
         if workspace
             .and_then(|workspace| workspace.semantic_tokens.as_ref()?.refresh_support)
             .unwrap_or_default()
         {
-            flags |= Self::SEMANTIC_TOKENS_REFRESH;
+            flags |= ClientCapabilityFlags::SEMANTIC_TOKENS_REFRESH;
         }
 
         if let Some(capabilities) =
             workspace.and_then(|workspace| workspace.did_change_watched_files.as_ref())
         {
             if capabilities.dynamic_registration == Some(true) {
-                flags |= Self::FILE_WATCHER_SUPPORT;
+                flags |= ClientCapabilityFlags::FILE_WATCHER_SUPPORT;
             }
             if capabilities.relative_pattern_support == Some(true) {
-                flags |= Self::RELATIVE_FILE_WATCHER_SUPPORT;
+                flags |= ClientCapabilityFlags::RELATIVE_FILE_WATCHER_SUPPORT;
             }
         }
 
         if let Some(diagnostic) =
             text_document.and_then(|text_document| text_document.diagnostic.as_ref())
         {
-            flags |= Self::PULL_DIAGNOSTICS;
+            flags |= ClientCapabilityFlags::PULL_DIAGNOSTICS;
 
             if diagnostic.dynamic_registration == Some(true) {
-                flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+                flags |= ClientCapabilityFlags::DIAGNOSTIC_DYNAMIC_REGISTRATION;
             }
         }
 
@@ -276,7 +309,7 @@ impl ResolvedClientCapabilities {
                 .related_information
                 == Some(true)
             {
-                flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
+                flags |= ClientCapabilityFlags::DIAGNOSTIC_RELATED_INFORMATION;
             }
         }
 
@@ -288,7 +321,7 @@ impl ResolvedClientCapabilities {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or_default()
         {
-            flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+            flags |= ClientCapabilityFlags::FULL_DIAGNOSTIC_OUTPUT;
         }
 
         if client_capabilities
@@ -301,35 +334,35 @@ impl ResolvedClientCapabilities {
                     .any(|command| command.as_str() == Some("ty.triggerParameterHints"))
             })
         {
-            flags |= Self::TRIGGER_SIGNATURE_HELP_COMMAND;
+            flags |= ClientCapabilityFlags::TRIGGER_SIGNATURE_HELP_COMMAND;
         }
 
         if text_document
             .and_then(|text_document| text_document.type_definition?.link_support)
             .unwrap_or_default()
         {
-            flags |= Self::TYPE_DEFINITION_LINK_SUPPORT;
+            flags |= ClientCapabilityFlags::TYPE_DEFINITION_LINK_SUPPORT;
         }
 
         if text_document
             .and_then(|text_document| text_document.definition?.link_support)
             .unwrap_or_default()
         {
-            flags |= Self::DEFINITION_LINK_SUPPORT;
+            flags |= ClientCapabilityFlags::DEFINITION_LINK_SUPPORT;
         }
 
         if text_document
             .and_then(|text_document| text_document.declaration?.link_support)
             .unwrap_or_default()
         {
-            flags |= Self::DECLARATION_LINK_SUPPORT;
+            flags |= ClientCapabilityFlags::DECLARATION_LINK_SUPPORT;
         }
 
         if text_document
             .and_then(|text_document| text_document.implementation?.link_support)
             .unwrap_or_default()
         {
-            flags |= Self::IMPLEMENTATION_LINK_SUPPORT;
+            flags |= ClientCapabilityFlags::IMPLEMENTATION_LINK_SUPPORT;
         }
 
         if text_document
@@ -337,7 +370,7 @@ impl ResolvedClientCapabilities {
             .and_then(|hover| preferred_markup_kind(hover.content_format.as_deref()?))
             == Some(&MarkupKind::Markdown)
         {
-            flags |= Self::PREFER_MARKDOWN_IN_HOVER;
+            flags |= ClientCapabilityFlags::PREFER_MARKDOWN_IN_HOVER;
         }
 
         if text_document
@@ -348,7 +381,7 @@ impl ResolvedClientCapabilities {
             })
             == Some(&MarkupKind::Markdown)
         {
-            flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
+            flags |= ClientCapabilityFlags::PREFER_MARKDOWN_IN_COMPLETION;
         }
 
         if text_document
@@ -360,7 +393,7 @@ impl ResolvedClientCapabilities {
             })
             .unwrap_or_default()
         {
-            flags |= Self::MULTILINE_SEMANTIC_TOKENS;
+            flags |= ClientCapabilityFlags::MULTILINE_SEMANTIC_TOKENS;
         }
 
         if text_document
@@ -376,7 +409,7 @@ impl ResolvedClientCapabilities {
             })
             .unwrap_or_default()
         {
-            flags |= Self::SIGNATURE_LABEL_OFFSET_SUPPORT;
+            flags |= ClientCapabilityFlags::SIGNATURE_LABEL_OFFSET_SUPPORT;
         }
 
         if text_document
@@ -390,7 +423,7 @@ impl ResolvedClientCapabilities {
             })
             .unwrap_or_default()
         {
-            flags |= Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT;
+            flags |= ClientCapabilityFlags::SIGNATURE_ACTIVE_PARAMETER_SUPPORT;
         }
 
         if text_document
@@ -402,7 +435,7 @@ impl ResolvedClientCapabilities {
             })
             .unwrap_or_default()
         {
-            flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
+            flags |= ClientCapabilityFlags::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
         if client_capabilities
@@ -411,7 +444,7 @@ impl ResolvedClientCapabilities {
             .and_then(|window| window.work_done_progress)
             .unwrap_or_default()
         {
-            flags |= Self::WORK_DONE_PROGRESS;
+            flags |= ClientCapabilityFlags::WORK_DONE_PROGRESS;
         }
 
         if text_document
@@ -420,7 +453,7 @@ impl ResolvedClientCapabilities {
             .and_then(|completion_item| completion_item.label_details_support)
             .unwrap_or_default()
         {
-            flags |= Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
+            flags |= ClientCapabilityFlags::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
         }
 
         if text_document
@@ -429,10 +462,22 @@ impl ResolvedClientCapabilities {
             .and_then(|completion_item| completion_item.snippet_support)
             .unwrap_or_default()
         {
-            flags |= Self::COMPLETION_ITEM_SNIPPET_SUPPORT;
+            flags |= ClientCapabilityFlags::COMPLETION_ITEM_SNIPPET_SUPPORT;
         }
 
-        flags
+        let allowed_html_tags = client_capabilities
+            .general
+            .as_ref()
+            .and_then(|general| general.markdown.as_ref())
+            .and_then(|markdown| markdown.allowed_tags.as_ref())
+            .cloned()
+            .unwrap_or_default()
+            .into();
+
+        Self {
+            flags,
+            allowed_html_tags,
+        }
     }
 }
 
@@ -440,7 +485,7 @@ impl ResolvedClientCapabilities {
 /// settings from the initialization options.
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
-    resolved_client_capabilities: ResolvedClientCapabilities,
+    resolved_client_capabilities: &ResolvedClientCapabilities,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -573,5 +618,39 @@ fn server_rename_options() -> RenameOptions {
     RenameOptions {
         prepare_provider: Some(true),
         work_done_progress_options: WorkDoneProgressOptions::default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::ClientCapabilities;
+    use serde_json::{Value, json};
+
+    use super::ResolvedClientCapabilities;
+
+    #[test]
+    fn resolves_allowed_html_tags() -> Result<(), serde_json::Error> {
+        assert!(
+            resolve_capabilities(json!({}))?
+                .allowed_html_tags()
+                .is_empty()
+        );
+
+        assert!(
+            resolve_capabilities(json!({"general": {"markdown": {"parser": "test"}}}))?
+                .allowed_html_tags()
+                .is_empty()
+        );
+
+        let resolved = resolve_capabilities(json!({
+            "general": {"markdown": {"parser": "test", "allowedTags": ["p", "code"]}}
+        }))?;
+        assert_eq!(resolved.allowed_html_tags(), ["p", "code"]);
+        Ok(())
+    }
+
+    fn resolve_capabilities(value: Value) -> Result<ResolvedClientCapabilities, serde_json::Error> {
+        let client: ClientCapabilities = serde_json::from_value(value)?;
+        Ok(ResolvedClientCapabilities::new(&client))
     }
 }
