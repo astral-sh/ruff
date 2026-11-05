@@ -34,8 +34,67 @@ reveal_type(x[0].__name__)  # revealed: str
 ## Mixed list
 
 ```py
+reveal_type([1, "a"])  # revealed: list[int | str]
 # revealed: list[int | tuple[int, ...]]
 reveal_type([1, (1, 2), (1, 2, 3)])
+```
+
+## Gradual list inference
+
+Disabling strict list inference uses `Unknown` for heterogeneous elements. Homogeneous lists and the
+other collection types retain their usual inferred types.
+
+```toml
+[analysis]
+strict-list-inference = false
+```
+
+```py
+reveal_type([1, "a"])  # revealed: list[Unknown]
+reveal_type(["a", 1])  # revealed: list[Unknown]
+reveal_type([1, 2])  # revealed: list[int]
+reveal_type([])  # revealed: list[Unknown]
+reveal_type([None])  # revealed: list[None | Unknown]
+reveal_type([[1], ["a"]])  # revealed: list[Unknown]
+reveal_type({1, "a"})  # revealed: set[int | str]
+reveal_type({"a": 1, "b": "two"})  # revealed: dict[str, int | str]
+```
+
+The comparison uses individual element types, so a single union-typed element retains its type.
+Unpacked elements participate in the comparison.
+
+```py
+def unions(value: int | str, values: list[int | str]):
+    reveal_type([value])  # revealed: list[int | str]
+    reveal_type([value, value])  # revealed: list[int | str]
+    reveal_type([*values])  # revealed: list[int | str]
+    reveal_type([*values, 1])  # revealed: list[Unknown]
+    reveal_type([item for item in values])  # revealed: list[int | str]
+
+reveal_type([*[1, 2], "a"])  # revealed: list[Unknown]
+```
+
+Different types remain heterogeneous even when their union would simplify to a common superclass.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+reveal_type([Base(), Derived()])  # revealed: list[Unknown]
+```
+
+Expected types from annotations and calls still constrain the elements and report incompatible
+values. Constructor calls continue to infer their type arguments from their signatures.
+
+```py
+items: list[int | str] = [1, "a"]
+reveal_type(items)  # revealed: list[int | str]
+invalid: list[int] = [1, "a"]  # error: [invalid-assignment]
+
+def accepts_ints(items: list[int]) -> None: ...
+
+accepts_ints([1, "a"])  # error: [invalid-argument-type]
+reveal_type(list((1, "a")))  # revealed: list[int | str]
 ```
 
 ## None promotion
