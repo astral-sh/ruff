@@ -281,6 +281,18 @@ impl<'db> Place<'db> {
         matches!(self, Place::Undefined)
     }
 
+    /// Returns the type if the place has a declaration on every reaching path.
+    pub(crate) fn definite_declared_type(self) -> Option<Type<'db>> {
+        match self {
+            Place::Defined(place)
+                if place.origin.is_declared() && place.is_definitely_defined() =>
+            {
+                Some(place.ty)
+            }
+            _ => None,
+        }
+    }
+
     /// Returns the type of the place, ignoring possible undefinedness.
     ///
     /// If the place is *definitely* undefined, this function will return `None`. Otherwise,

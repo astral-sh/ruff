@@ -334,7 +334,7 @@ fn referenced_name_definition<'db>(
     let env = ProgramEnvironment::from_file(file);
     while let Some(PlaceLoadResolutionStep::Source(source)) = procedure.next() {
         let (bindings, declarations) = match source.kind {
-            PlaceLoadSourceKind::Bindings(bindings) => (bindings, None),
+            PlaceLoadSourceKind::Bindings(_, bindings) => (bindings, None),
             PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
                 from_owning_scope(scope, id)
             }

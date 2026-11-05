@@ -431,7 +431,7 @@ fn place_condition_definition_info<'db>(
                 PlaceLoadResolutionStep::Exhausted(_) => break,
             };
             let (source_info, definitely_bound) = match source.kind {
-                PlaceLoadSourceKind::Bindings(bindings) => {
+                PlaceLoadSourceKind::Bindings(_, bindings) => {
                     let definitely_bound = place_from_bindings(db, &env, bindings.clone())
                         .place
                         .is_definitely_bound();
