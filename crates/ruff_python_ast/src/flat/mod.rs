@@ -198,6 +198,13 @@ impl<T> BuildId<T> {
     }
 }
 
+// Share one failure path across the inlined child lookups.
+#[cold]
+#[inline(never)]
+fn invalid_child() -> ! {
+    panic!("invalid AST child slot")
+}
+
 /// A syntax node and the arena that owns its row.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -282,7 +289,7 @@ impl<'ast> SyntaxNode<'ast> {
         debug_assert_ne!(slot, 0);
         Self {
             ast,
-            row: &ast.rows[slot],
+            row: ast.rows.get(slot).unwrap_or_else(|| invalid_child()),
         }
     }
 
