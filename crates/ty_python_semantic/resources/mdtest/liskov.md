@@ -3329,6 +3329,38 @@ class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
 ```
 
+## Callable attributes overriding class methods
+
+Both `@classmethod` and `classmethod(impl)` expose the same bound signature. A subclass callable
+attribute that narrows the return type should pass the override check in both cases.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+from collections.abc import Callable
+
+class DecoratedBase:
+    @classmethod
+    def f(cls) -> object:
+        return object()
+
+class DecoratedChild(DecoratedBase):
+    f: Callable[[], str]  # ok
+
+def impl(cls: type) -> object:
+    return object()
+
+class WrappedBase:
+    f = classmethod(impl)
+
+class WrappedChild(WrappedBase):
+    # TODO: Apply the same exemption from the write check as for the decorator form.
+    f: Callable[[], str]  # error: [invalid-mutable-override]
+```
+
 ## Methods replacing inferred callable defaults
 
 A class assigned to an unannotated attribute is callable without binding a receiver. An overriding
