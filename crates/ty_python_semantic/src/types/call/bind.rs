@@ -8870,21 +8870,14 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         delta: u32,
     ) {
-        let Some(generic_context) = self.signature.generic_context else {
+        // Only regular callables reach this method. Constructors use `freshen_class_typevars` to
+        // update each overload's instance type alongside its signature.
+        // TODO: Express the distinction between regular and constructor bindings in the type system.
+        debug_assert!(self.constructor_context.is_none());
+        if self.signature.generic_context.is_none() {
             return;
-        };
-        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
-        if let Some(context) = self.constructor_context {
-            self.set_constructor_context(
-                db,
-                context.with_instance_type(context.instance_type().resolve_typevars(
-                    db,
-                    env,
-                    generic_context,
-                    delta,
-                )),
-            );
         }
+        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
         self.return_ty = self.initial_return_type(db);
     }
 

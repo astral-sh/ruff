@@ -764,14 +764,14 @@ impl<'db> ConstructorContext<'db> {
         }
     }
 
-    pub(super) fn with_instance_type(self, instance_type: Type<'db>) -> Self {
+    fn with_instance_type(self, instance_type: Type<'db>) -> Self {
         Self {
             instance_type,
             ..self
         }
     }
 
-    pub(super) fn instance_type(self) -> Type<'db> {
+    fn instance_type(self) -> Type<'db> {
         self.instance_type
     }
 
