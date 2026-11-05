@@ -165,7 +165,6 @@ node_payloads! {
     ExprCompare(expr_compare) {
         operands: u64 at 0 => expr_compare_operands, set_expr_compare_operands;
         ops: u32 at 8 => expr_compare_ops, set_expr_compare_ops;
-        single_op: u8 at 12 => expr_compare_single_op, set_expr_compare_single_op;
     }
     ExprCall(expr_call) {
         func: u32 at 0 => expr_call_func, set_expr_call_func;
