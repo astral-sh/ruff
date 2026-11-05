@@ -1139,6 +1139,31 @@ accept_strings(collect("valid"))
 accept_strings(collect(1))
 ```
 
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect[*Ts](*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded[*Ts](*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
+```
+
 ### Fixed boundaries around variadic type variable tuples
 
 Fixed values before or after a type variable tuple do not become part of its inferred shape. Open

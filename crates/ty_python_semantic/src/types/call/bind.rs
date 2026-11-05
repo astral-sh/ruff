@@ -15,6 +15,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
+use std::ops::Range;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
@@ -8532,42 +8533,64 @@ impl<'db> Binding<'db> {
             return None;
         };
         let parameter = &self.signature.parameters()[matched_parameter.index];
-        let Type::TypeVar(typevartuple) = parameter.annotated_type() else {
-            return None;
-        };
-        if !parameter.is_variadic()
-            || !parameter.has_starred_annotation()
-            || !typevartuple.is_typevartuple(db)
-        {
+        if !parameter.is_variadic() || !parameter.has_starred_annotation() {
             return None;
         }
+        let (typevartuple, prefix, suffix) = match parameter.annotated_type() {
+            Type::TypeVar(ts) if ts.is_typevartuple(db) => (ts, 0, 0),
+            annotation => {
+                let tuple = annotation.exact_tuple_instance_spec(db)?;
+                let TupleSpec::Variable(tuple) = tuple.as_ref() else {
+                    return None;
+                };
+                (
+                    tuple.variable().typevartuple()?,
+                    tuple.prefix_elements().len(),
+                    tuple.suffix_elements().len(),
+                )
+            }
+        };
 
         let return_tuple = self.signature.return_ty.exact_tuple_instance_spec(db)?;
         let TupleSpec::Variable(return_tuple) = return_tuple.as_ref() else {
             return None;
         };
-        if return_tuple.variable().typevartuple()?.identity(db) != typevartuple.identity(db)
-            || arguments_types
-                .iter()
-                .take(argument_index)
-                .any(|argument| {
-                    matches!(argument, CallArgument::Variadic(variadic)
-                        if variadic.sequence(db, env).is_none_or(|sequence| sequence.len().maximum().is_none()))
-                })
-        {
+        if return_tuple.variable().typevartuple()?.identity(db) != typevartuple.identity(db) {
             return None;
         }
 
-        let tuple_index = return_tuple.prefix_elements().len().checked_add(
-            (0..argument_index)
-                .filter_map(|index| self.matched_argument_for_call_argument(binding, index))
-                .flat_map(MatchedArgument::iter)
-                .filter(|matched| matched.index == matched_parameter.index)
-                .count(),
-        )?;
-        expected_return_ty
-            .exact_tuple_instance_spec(db)?
-            .as_ref()
+        let matched_elements = |indices: Range<usize>| {
+            let mut count = 0usize;
+            for index in indices {
+                if let CallArgument::Variadic(variadic) = arguments_types.get(index)?
+                    && variadic
+                        .sequence(db, env)
+                        .is_none_or(|sequence| sequence.len().maximum().is_none())
+                {
+                    return None;
+                }
+                let matches = self.matched_argument_for_call_argument(binding, index)?;
+                count += matches
+                    .iter()
+                    .filter(|matched| matched.index == matched_parameter.index)
+                    .count();
+            }
+            Some(count)
+        };
+        let pack_index = matched_elements(0..argument_index)?.checked_sub(prefix)?;
+        if suffix > 0 && matched_elements(argument_index + 1..arguments_types.len())? < suffix {
+            return None;
+        }
+        let tuple_index = return_tuple.prefix_elements().len() + pack_index;
+        let expected = expected_return_ty.exact_tuple_instance_spec(db)?;
+        if expected
+            .len()
+            .maximum()
+            .is_some_and(|length| tuple_index + return_tuple.suffix_elements().len() >= length)
+        {
+            return None;
+        }
+        expected
             .py_index(db, env, i32::try_from(tuple_index).ok()?)
             .ok()
     }

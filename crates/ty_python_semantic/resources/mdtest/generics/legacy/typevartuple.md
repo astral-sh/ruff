@@ -779,6 +779,33 @@ reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], L
 reveal_type(tail(*[1]))  # revealed: tuple[()]
 ```
 
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect(*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded(*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
+```
+
 ### Fixed boundaries in starred variadic parameters
 
 A fixed trailing type in a starred parameter is excluded from the inferred pack, including when the
