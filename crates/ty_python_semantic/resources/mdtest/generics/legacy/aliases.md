@@ -1,5 +1,126 @@
 # Generic type aliases: legacy syntax
 
+## Solving generics with type alias parameters
+
+A sibling argument can supply the element type for a list literal passed to an aliased parameter.
+Here, `value` widens the element type of `[n]` to `int | str`.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+MyList = TypeAliasType("MyList", list[T], type_params=(T,))
+
+def append(items: MyList[T], value: T) -> None:
+    items.append(value)
+
+def _(n: int, value: int | str):
+    append([n], value)  # no diagnostic
+```
+
+The list literal also receives this context through a recursive alias.
+
+```py
+Nested = list[T] | tuple["Nested[T]"]
+
+def accept_nested(items: Nested[T], value: T) -> None: ...
+def _(n: int, value: int | str):
+    accept_nested([n], value)  # no diagnostic
+```
+
+## Repeated type variables in an alias body
+
+Both occurrences of `T` participate in inference for the callback, whether the parameter uses
+`Pair[T]` or `tuple[T, T]`.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Pair = TypeAliasType("Pair", tuple[T, T], type_params=(T,))
+
+class First(Generic[T]):
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply_to_pair(fn: Callable[[T], T], pair: Pair[T]) -> None: ...
+def apply_to_tuple(fn: Callable[[T], T], pair: tuple[T, T]) -> None: ...
+
+items = [["text"]]
+apply_to_pair(First(), (items, items))  # no diagnostic
+apply_to_tuple(First(), (items, items))  # no diagnostic
+```
+
+## Unused alias parameters in call inference
+
+An argument of type `Ignore[T]` supplies no information about `T`. Passing `None` explicitly
+therefore has the same effect on inference for the callback as omitting the argument.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Ignore = TypeAliasType("Ignore", None, type_params=(T,))
+
+class First(Generic[T]):
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply(fn: Callable[[T], T], x: T, y: T, unused: Ignore[T] = None) -> None: ...
+
+values = [["text"]]
+apply(First(), values, values)  # no diagnostic
+apply(First(), values, values, None)  # no diagnostic
+```
+
+A recursive alias can pass `T` to itself without ever using it as an element type. Its argument
+supplies no information about `T` either.
+
+```py
+RecursiveIgnore = None | tuple["RecursiveIgnore[list[T]]"]
+
+def apply_recursive(fn: Callable[[T], T], x: T, y: T, unused: RecursiveIgnore[T] = None) -> None: ...
+
+apply_recursive(First(), values, values, None)  # no diagnostic
+```
+
+Specializing an alias can also erase a parameter. Here `object` absorbs every other member of the
+union, so `Wrapped[T]` cannot constrain the callback.
+
+```py
+U = TypeVar("U")
+V = TypeVar("V")
+Growing = T | U | tuple["Growing[T, U, list[V]]"]
+Wrapped = TypeAliasType("Wrapped", Growing[T, object, int], type_params=(T,))
+
+def apply_wrapped(fn: Callable[[T], T], x: T, y: T, unused: Wrapped[T] = None) -> None: ...
+
+apply_wrapped(First(), values, values, None)  # no diagnostic
+```
+
+## An alias parameter used through a recursive reference
+
+The tuple branch of `Layer[int, T]` contains `Layer[T, list[int]]`, whose list branch is `list[T]`.
+The sibling argument supplies `int | str` as the element type of `[n]`.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+Layer = list[A] | tuple["Layer[B, list[A]]"]
+
+def accept(value: Layer[int, T], sibling: T) -> None: ...
+def _(n: int, sibling: int | str):
+    accept(([n],), sibling)  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases

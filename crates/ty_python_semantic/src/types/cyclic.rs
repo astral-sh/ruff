@@ -1247,6 +1247,29 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
     }
 }
 
+impl<'db> ActiveRecursionDetector<TypeIdentity<'db>> {
+    /// An exact cycle adds nothing to a type traversal. When the identity represents a
+    /// definition, however, a recursive reference can introduce different type arguments.
+    pub(super) fn visit_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        on_recursive_reference: impl FnOnce(),
+        visit: impl FnOnce(),
+    ) {
+        let identity = ty.to_type_identity(db);
+        self.visit(
+            &identity,
+            || {
+                if !matches!(identity, TypeIdentity::Other(_)) {
+                    on_recursive_reference();
+                }
+            },
+            visit,
+        );
+    }
+}
+
 struct ActiveRecursionGuard<'a, T: Hash + Eq> {
     seen: &'a RefCell<FxHashSet<T>>,
     item: &'a T,
