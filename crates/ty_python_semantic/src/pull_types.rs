@@ -45,7 +45,8 @@ impl<'db> PullTypesVisitor<'db> {
 
 impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(function) => {
                 let _ty = function.inferred_type(&self.model);
             }
@@ -99,13 +100,13 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             | StmtKind::IpyEscapeCommand(_) => {}
         }
 
-        source_order::walk_stmt(self, stmt);
+        source_order::walk_stmt(self, kind);
     }
 
     fn visit_expr(&mut self, expr: Expr<'_>) {
         let _ty = expr.inferred_type(&self.model);
 
-        source_order::walk_expr(self, expr);
+        source_order::walk_expr(self, expr.classify());
     }
 
     fn visit_comprehension(&mut self, comprehension: Comprehension<'_>) {

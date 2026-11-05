@@ -8,7 +8,7 @@
 //! have a `target` field, which is the name of the module the message appears in — in this case,
 //! `ty_python_semantic::types::call::bind`.
 
-use ruff_python_ast::{AnyKind, AstNode};
+use ruff_python_ast::{AnyNode, AstNode};
 mod constructor;
 mod property;
 
@@ -10963,7 +10963,7 @@ impl<'db> BindingError<'db> {
         ) {
             (Some(ast::ArgOrKeyword::Arg(expr)), _) => expr.into(),
             (Some(ast::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
-            (None, AnyKind::StmtClassDef(class_def)) => class_def
+            (None, AnyNode::StmtClassDef(class_def)) => class_def
                 .arguments()
                 .map(AstNode::syntax_node)
                 .unwrap_or(node),
@@ -10976,7 +10976,7 @@ impl<'db> BindingError<'db> {
         argument_index: Option<usize>,
     ) -> Option<ArgOrKeyword<'_>> {
         match (node.classify(), argument_index) {
-            (AnyKind::ExprCall(call_node), Some(argument_index)) => Some(
+            (AnyNode::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node
                     .arguments()
                     .iter_source_order()
@@ -10988,7 +10988,7 @@ impl<'db> BindingError<'db> {
             // or `__new__`/`__prepare__` on the metaclass -- but positional arguments are not, and neither
             // is the special keyword argument `metaclass`. These need to be excluded from the
             // argument index when looking up the relevant keyword-argument node.
-            (AnyKind::StmtClassDef(class_def), Some(argument_index)) => {
+            (AnyNode::StmtClassDef(class_def), Some(argument_index)) => {
                 class_def.arguments().and_then(|args| {
                     args.iter_source_order()
                         .filter_map(ArgOrKeyword::as_keyword)

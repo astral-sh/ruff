@@ -2,7 +2,7 @@ use crate::goto::find_goto_target;
 use crate::references::{FixtureReferenceTarget, ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::AnyKind;
+use ruff_python_ast::AnyNode;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
@@ -62,7 +62,7 @@ fn explicit_fixture_name_at_offset<'db>(
         .at_offset(offset)
         .find(|token| token.kind() == TokenKind::String)?;
     let covering = covering_node(module.syntax().into(), token.range());
-    let AnyKind::StringLiteral(literal) = covering.node().classify() else {
+    let AnyNode::StringLiteral(literal) = covering.node().classify() else {
         return None;
     };
 
@@ -77,24 +77,24 @@ fn explicit_fixture_name_at_offset<'db>(
     let function = loop {
         match ancestors.next()?.classify() {
             // The literal must be the value of `name`, not another keyword.
-            AnyKind::Keyword(keyword)
+            AnyNode::Keyword(keyword)
                 if keyword.arg().map(ruff_python_ast::Identifier::as_str) == Some("name")
                     && keyword.value().is_string_literal_expr() =>
             {
                 in_name_argument = true;
             }
             // The decorator must belong directly to a function, not a class.
-            AnyKind::Decorator(_) if in_name_argument => {
-                let AnyKind::StmtFunctionDef(function) = ancestors.next()?.classify() else {
+            AnyNode::Decorator(_) if in_name_argument => {
+                let AnyNode::StmtFunctionDef(function) = ancestors.next()?.classify() else {
                     return None;
                 };
                 break function;
             }
             // Skip over intermediate nodes that connect the literal, keyword, and decorator.
-            AnyKind::StringLiteral(_)
-            | AnyKind::ExprStringLiteral(_)
-            | AnyKind::Arguments(_)
-            | AnyKind::ExprCall(_) => {}
+            AnyNode::StringLiteral(_)
+            | AnyNode::ExprStringLiteral(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::ExprCall(_) => {}
             // Reject unrelated syntax, such as return annotations, and failed guards.
             _ => return None,
         }

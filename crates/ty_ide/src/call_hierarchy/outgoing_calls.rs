@@ -10,7 +10,7 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_body, walk_decorator, walk_expr,
     walk_parameters, walk_type_params,
 };
-use ruff_python_ast::{self as ast, AnyKind, NodeList, SyntaxNode};
+use ruff_python_ast::{self as ast, AnyNode, NodeList, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_python_core::ProgramFile;
@@ -196,7 +196,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
             walk_parameters(self, parameters);
         }
         if let Some(returns) = returns {
-            walk_expr(self, returns);
+            walk_expr(self, returns.classify());
         }
     }
 
@@ -222,16 +222,17 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.ancestors.push(node);
 
-        match node.classify() {
-            AnyKind::ExprCall(call) => {
+        match kind {
+            AnyNode::ExprCall(call) => {
                 if let Some(leaf) = CalleeLeaf::from_expr(call.func()) {
                     self.record_callee(leaf);
                 }
             }
-            AnyKind::Decorator(decorator) => {
+            AnyNode::Decorator(decorator) => {
                 // A bare `@foo` decorator with no parens is a runtime call. If
                 // the user wrote `@foo()` we'll pick it up via the `ExprCall`
                 // arm above instead.
@@ -243,7 +244,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
             // surrounding scope runs (decorators, defaults, bases, ...). The
             // body belongs to the nested item itself and is reached by
             // expanding that item separately in the call hierarchy tree.
-            AnyKind::StmtFunctionDef(func) => {
+            AnyNode::StmtFunctionDef(func) => {
                 self.walk_callable_signature(
                     func.decorator_list(),
                     func.type_params(),
@@ -252,7 +253,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 );
                 return TraversalSignal::Skip;
             }
-            AnyKind::StmtClassDef(class) => {
+            AnyNode::StmtClassDef(class) => {
                 self.walk_class_signature(
                     class.decorator_list(),
                     class.type_params(),
@@ -260,7 +261,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 );
                 return TraversalSignal::Skip;
             }
-            AnyKind::ExprLambda(lambda) => {
+            AnyNode::ExprLambda(lambda) => {
                 self.walk_callable_signature(NodeList::default(), None, lambda.parameters(), None);
                 return TraversalSignal::Skip;
             }
@@ -270,8 +271,8 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
-        debug_assert_eq!(self.ancestors.last(), Some(&node));
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        debug_assert_eq!(self.ancestors.last(), Some(&node.syntax_node()));
         self.ancestors.pop();
     }
 }

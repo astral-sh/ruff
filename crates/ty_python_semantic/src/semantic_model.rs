@@ -403,41 +403,41 @@ impl<'db> SemanticModel<'db> {
     pub fn scope(&self, node: ast::SyntaxNode<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.program_file());
         match self.node_in_ast(node).classify() {
-            ast::AnyKind::Identifier(identifier) => index.try_expression_scope_id(&identifier),
+            ast::AnyNode::Identifier(identifier) => index.try_expression_scope_id(&identifier),
 
             // Nodes implementing `HasDefinition`
-            ast::AnyKind::StmtFunctionDef(function) => Some(
+            ast::AnyNode::StmtFunctionDef(function) => Some(
                 function
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyKind::StmtClassDef(class) => {
+            ast::AnyNode::StmtClassDef(class) => {
                 Some(class.definition(self).scope(self.db).file_scope_id(self.db))
             }
-            ast::AnyKind::Parameter(parameter) => Some(
+            ast::AnyNode::Parameter(parameter) => Some(
                 parameter
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyKind::ParameterWithDefault(parameter) => Some(
+            ast::AnyNode::ParameterWithDefault(parameter) => Some(
                 parameter
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyKind::ExceptHandlerExceptHandler(handler) => handler
+            ast::AnyNode::ExceptHandlerExceptHandler(handler) => handler
                 .optional_definition(self)
                 .map(|definition| definition.scope(self.db).file_scope_id(self.db))
                 .or_else(|| index.try_expression_scope_id(&handler.type_()?))
                 .or(Some(FileScopeId::global())),
-            ast::AnyKind::TypeParamTypeVar(var) => {
+            ast::AnyNode::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
 
             // Fallback
-            node => match node.view().cast::<Expr>() {
+            node => match node.syntax_node().cast::<Expr>() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
                 // fall back to the global scope.

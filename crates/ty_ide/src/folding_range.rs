@@ -3,10 +3,10 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
+    SourceOrderVisitor, TraversalSignal, walk_body, walk_module,
 };
 use ruff_python_ast::{
-    AnyKind, Expr, ExprAttribute, ExprCall, ExprGenerator, ExprSubscript, NodeList, NodeType,
+    AnyNode, Expr, ExprAttribute, ExprCall, ExprGenerator, ExprSubscript, NodeList, NodeType,
     StmtKind, Suite, SyntaxNode,
 };
 use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
@@ -71,7 +71,10 @@ pub fn folding_ranges(
         tokens: parsed.tokens(),
         range_filter,
     };
-    walk_node(&mut visitor, SyntaxNode::from(parsed.syntax()));
+    walk_module(
+        &mut visitor,
+        ruff_python_ast::ModKind::Module(parsed.syntax()),
+    );
     debug_assert!(
         visitor.active_block_fold_start_lines.is_empty(),
         "all active block fold start lines should be cleared after traversal"
@@ -453,7 +456,7 @@ impl<'a> FoldingRangeVisitor<'a> {
     /// The second offset marks where we start scanning for the newline that begins the body fold.
     fn block_range_starts(&self, parent: SyntaxNode<'a>) -> (TextSize, TextSize) {
         match parent.classify() {
-            AnyKind::StmtFunctionDef(func) => {
+            AnyNode::StmtFunctionDef(func) => {
                 let keyword = if func.is_async() {
                     TokenKind::Async
                 } else {
@@ -469,7 +472,7 @@ impl<'a> FoldingRangeVisitor<'a> {
                     func.name().end(),
                 )
             }
-            AnyKind::StmtClassDef(class) => (
+            AnyNode::StmtClassDef(class) => (
                 self.definition_header_start(
                     TokenKind::Class,
                     class.start(),
@@ -593,17 +596,18 @@ impl<'a> FoldingRangeVisitor<'a> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         if !self.intersects_range_filter(node.range()) {
             return TraversalSignal::Skip;
         }
 
-        match node.classify() {
-            AnyKind::ModModule(module) => {
+        match kind {
+            AnyNode::ModModule(module) => {
                 self.add_docstring_range(module.body());
             }
             // Compound statements that create folding regions
-            AnyKind::StmtFunctionDef(func) => {
+            AnyNode::StmtFunctionDef(func) => {
                 self.add_block_ranges(node, func.body());
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
@@ -614,22 +618,22 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 // corresponding range for the literal.
                 self.add_docstring_range(func.body());
             }
-            AnyKind::StmtClassDef(class) => {
+            AnyNode::StmtClassDef(class) => {
                 self.add_block_ranges(node, class.body());
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
                 self.add_docstring_range(class.body());
             }
-            AnyKind::StmtIf(if_stmt) => {
+            AnyNode::StmtIf(if_stmt) => {
                 // Fold each branch individually rather than the entire if block.
                 self.add_block_ranges(node, if_stmt.body());
             }
-            AnyKind::ElifElseClause(clause) => {
+            AnyNode::ElifElseClause(clause) => {
                 // Each elif/else clause has its own range.
                 self.add_block_ranges(node, clause.body());
             }
-            AnyKind::StmtFor(for_stmt) => {
+            AnyNode::StmtFor(for_stmt) => {
                 // Fold the for body separately from the else block.
                 self.add_block_ranges(node, for_stmt.body());
                 if let Some(body_last) = for_stmt.body().last() {
@@ -641,7 +645,7 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     );
                 }
             }
-            AnyKind::StmtWhile(while_stmt) => {
+            AnyNode::StmtWhile(while_stmt) => {
                 // Fold the while body separately from the else block.
                 self.add_block_ranges(node, while_stmt.body());
                 if let Some(body_last) = while_stmt.body().last() {
@@ -653,10 +657,10 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     );
                 }
             }
-            AnyKind::StmtWith(with_stmt) => {
+            AnyNode::StmtWith(with_stmt) => {
                 self.add_block_ranges(node, with_stmt.body());
             }
-            AnyKind::StmtTry(try_stmt) => {
+            AnyNode::StmtTry(try_stmt) => {
                 // Fold the try body separately from handlers, else, and finally.
                 self.add_block_ranges(node, try_stmt.body());
                 // Exception handlers are folded via ExceptHandlerExceptHandler.
@@ -690,54 +694,54 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                     );
                 }
             }
-            AnyKind::StmtMatch(match_stmt) => {
+            AnyNode::StmtMatch(match_stmt) => {
                 self.add_block_ranges(node, match_stmt.cases());
             }
 
             // Match cases within match statements
-            AnyKind::MatchCase(case) => {
+            AnyNode::MatchCase(case) => {
                 self.add_block_ranges(node, case.body());
             }
 
             // Exception handlers
-            AnyKind::ExceptHandlerExceptHandler(handler) => {
+            AnyNode::ExceptHandlerExceptHandler(handler) => {
                 self.add_block_ranges(node, handler.body());
             }
 
             // Multiline expressions
-            AnyKind::ExprList(_) | AnyKind::ExprListComp(_) | AnyKind::TypeParams(_) => {
+            AnyNode::ExprList(_) | AnyNode::ExprListComp(_) | AnyNode::TypeParams(_) => {
                 self.add_delimited_expression_range(node.range(), BRACKETS);
             }
             // Only fold parenthesized tuples.
-            AnyKind::ExprTuple(tuple) if tuple.parenthesized() => {
+            AnyNode::ExprTuple(tuple) if tuple.parenthesized() => {
                 self.add_delimited_expression_range(node.range(), PARENTHESES);
             }
-            AnyKind::ExprDict(_)
-            | AnyKind::ExprSet(_)
-            | AnyKind::ExprSetComp(_)
-            | AnyKind::ExprDictComp(_) => {
+            AnyNode::ExprDict(_)
+            | AnyNode::ExprSet(_)
+            | AnyNode::ExprSetComp(_)
+            | AnyNode::ExprDictComp(_) => {
                 self.add_delimited_expression_range(node.range(), BRACES);
             }
-            AnyKind::ExprGenerator(generator) => {
+            AnyNode::ExprGenerator(generator) => {
                 self.add_generator_expression_range(generator, node);
             }
-            AnyKind::ExprAttribute(attribute) => {
+            AnyNode::ExprAttribute(attribute) => {
                 self.add_attribute_expression_range(attribute, node);
             }
-            AnyKind::ExprSubscript(subscript) => {
+            AnyNode::ExprSubscript(subscript) => {
                 self.add_subscript_expression_ranges(subscript, node);
             }
 
             // Function calls with foldable callables or arguments.
-            AnyKind::ExprCall(call) => {
+            AnyNode::ExprCall(call) => {
                 self.add_call_expression_ranges(call, node);
             }
 
             // String and bytes literals
-            AnyKind::ExprStringLiteral(_)
-            | AnyKind::ExprBytesLiteral(_)
-            | AnyKind::ExprFString(_)
-            | AnyKind::ExprTString(_) => {
+            AnyNode::ExprStringLiteral(_)
+            | AnyNode::ExprBytesLiteral(_)
+            | AnyNode::ExprFString(_)
+            | AnyNode::ExprTString(_) => {
                 self.add_expression_range(node.range());
             }
 
@@ -747,11 +751,11 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
+    fn leave_node(&mut self, node: AnyNode<'a>) {
         while self
             .active_block_fold_start_lines
             .last()
-            .is_some_and(|block_fold| block_fold.parent.ptr_eq(node))
+            .is_some_and(|block_fold| block_fold.parent.ptr_eq(node.syntax_node()))
         {
             self.active_block_fold_start_lines.pop();
         }

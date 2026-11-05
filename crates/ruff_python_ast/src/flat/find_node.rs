@@ -18,7 +18,8 @@ pub fn covering_node(root: crate::SyntaxNode<'_>, range: TextRange) -> CoveringN
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-        fn enter_node(&mut self, node: crate::SyntaxNode<'a>) -> TraversalSignal {
+        fn enter_node(&mut self, kind: crate::AnyNode<'a>) -> TraversalSignal {
+            let node = kind.syntax_node();
             // If the node fully contains the range, than it is a possible match but traverse into its children
             // to see if there's a node with a narrower range.
             if !self.found && node.range().contains_range(self.range) {
@@ -29,12 +30,12 @@ pub fn covering_node(root: crate::SyntaxNode<'_>, range: TextRange) -> CoveringN
             }
         }
 
-        fn leave_node(&mut self, node: crate::SyntaxNode<'a>) {
+        fn leave_node(&mut self, node: crate::AnyNode<'a>) {
             if !self.found
                 && self
                     .ancestors
                     .last()
-                    .is_some_and(|last| last.is_same_node(node))
+                    .is_some_and(|last| last.is_same_node(node.syntax_node()))
             {
                 self.found = true;
             }
@@ -52,7 +53,7 @@ pub fn covering_node(root: crate::SyntaxNode<'_>, range: TextRange) -> CoveringN
         ancestors: Vec::new(),
     };
 
-    super::visitor::source_order::walk_node(&mut visitor, root);
+    super::visitor::source_order::walk_node(&mut visitor, root.into());
     CoveringNode::from_ancestors(visitor.ancestors)
 }
 

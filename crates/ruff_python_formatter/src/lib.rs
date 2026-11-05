@@ -166,10 +166,10 @@ fn format_node<'a, N: NodeType>(
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>>
 where
-    N::Borrowed<'a>: AsFormat<PyFormatContext<'a>>,
+    N::Borrowed<'a>: AsFormat<PyFormatContext<'a>> + Into<Mod<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax().syntax_node(), source_code, trivia);
+    let comments = Comments::from_ast(parsed.syntax().into(), source_code, trivia);
 
     let formatted = format!(
         PyFormatContext::new(options, source, comments, trivia, parsed.tokens()),

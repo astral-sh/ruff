@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{self as ast, AnyKind, SyntaxNode};
+use ruff_python_ast::{self as ast, AnyNode, SyntaxNode};
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
@@ -189,7 +189,7 @@ fn call_sites_for_file(
         sites: &mut sites,
         ancestors: Vec::new(),
     };
-    SyntaxNode::from(module.syntax()).visit_source_order(&mut finder);
+    module.syntax().visit_source_order(&mut finder);
 
     sites
 }
@@ -215,23 +215,24 @@ struct CallSitesFinder<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.ancestors.push(node);
 
-        match node.classify() {
+        match kind {
             // Walk by call site rather than by identifier. This is structurally
             // faster (call sites are much rarer than identifier occurrences)
             // and — critically — it makes alias-routed calls work: `bar()`
             // where `bar` is a local rebinding/alias of the target resolves
             // semantically without needing the alias name in the text needle.
-            AnyKind::ExprCall(call) => {
+            AnyNode::ExprCall(call) => {
                 if let Some(leaf) = CalleeLeaf::from_expr(call.func())
                     && self.leaf_matches_needle(leaf)
                 {
                     self.check_call_site(leaf, SyntaxNode::from(call));
                 }
             }
-            AnyKind::Decorator(decorator) => {
+            AnyNode::Decorator(decorator) => {
                 // `@foo` without parens is a runtime call; `@foo()` is handled
                 // by the `ExprCall` arm above.
                 if let Some(leaf) = CalleeLeaf::from_expr(decorator.expression())
@@ -243,7 +244,7 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
             // A property access is an implicit invocation of its matching
             // accessor. Skip attributes used as explicit callees because the
             // `ExprCall` / `Decorator` arms already record those sites.
-            AnyKind::ExprAttribute(attribute) => {
+            AnyNode::ExprAttribute(attribute) => {
                 if !attribute_is_callee_of_parent(&self.ancestors, attribute)
                     && self.attribute_name_could_match(attribute.attr().as_str())
                 {
@@ -256,8 +257,8 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
-        debug_assert_eq!(self.ancestors.last(), Some(&node));
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        debug_assert_eq!(self.ancestors.last(), Some(&node.syntax_node()));
         self.ancestors.pop();
     }
 }
@@ -494,8 +495,8 @@ fn attribute_is_callee_of_parent<'a>(
     };
     let attribute_range = attribute.range();
     match ancestors[parent_idx].classify() {
-        AnyKind::ExprCall(call) => call.func().range() == attribute_range,
-        AnyKind::Decorator(decorator) => decorator.expression().range() == attribute_range,
+        AnyNode::ExprCall(call) => call.func().range() == attribute_range,
+        AnyNode::Decorator(decorator) => decorator.expression().range() == attribute_range,
         _ => false,
     }
 }

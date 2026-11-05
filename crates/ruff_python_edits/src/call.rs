@@ -104,7 +104,7 @@ pub fn unwrapped_call_argument(
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::AnyKind;
+    use ruff_python_ast::AnyNode;
     use std::error::Error;
 
     use ruff_python_ast::find_node::covering_node;
@@ -129,9 +129,9 @@ mod tests {
                 parsed.syntax().into(),
                 TextRange::at(start, "wrap".text_len()),
             )
-            .find_first(|node| matches!(node.classify(), AnyKind::ExprCall(_)))
+            .find_first(|node| matches!(node.classify(), AnyNode::ExprCall(_)))
             .map_err(|_| "missing enclosing call")?;
-            let AnyKind::ExprCall(call) = covering.node().classify() else {
+            let AnyNode::ExprCall(call) = covering.node().classify() else {
                 return Err("expected a call expression".into());
             };
             let argument = call.arguments().args().first().ok_or("missing argument")?;

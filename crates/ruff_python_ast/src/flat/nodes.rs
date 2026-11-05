@@ -824,32 +824,32 @@ impl crate::SyntaxNode<'_> {
     /// The last child of the last branch of a compound statement or clause.
     pub fn last_child_in_body(self) -> Option<Self> {
         match self.classify() {
-            super::AnyKind::StmtFunctionDef(node) => node.body().last().map(AstNode::syntax_node),
-            super::AnyKind::StmtClassDef(node) => node.body().last().map(AstNode::syntax_node),
-            super::AnyKind::StmtWith(node) => node.body().last().map(AstNode::syntax_node),
-            super::AnyKind::MatchCase(node) => node.body().last().map(AstNode::syntax_node),
-            super::AnyKind::ExceptHandlerExceptHandler(node) => {
+            super::AnyNode::StmtFunctionDef(node) => node.body().last().map(AstNode::syntax_node),
+            super::AnyNode::StmtClassDef(node) => node.body().last().map(AstNode::syntax_node),
+            super::AnyNode::StmtWith(node) => node.body().last().map(AstNode::syntax_node),
+            super::AnyNode::MatchCase(node) => node.body().last().map(AstNode::syntax_node),
+            super::AnyNode::ExceptHandlerExceptHandler(node) => {
                 node.body().last().map(AstNode::syntax_node)
             }
-            super::AnyKind::ElifElseClause(node) => node.body().last().map(AstNode::syntax_node),
-            super::AnyKind::StmtIf(node) => node
+            super::AnyNode::ElifElseClause(node) => node.body().last().map(AstNode::syntax_node),
+            super::AnyNode::StmtIf(node) => node
                 .elif_else_clauses()
                 .last()
                 .map_or_else(|| node.body(), crate::ElifElseClause::body)
                 .last()
                 .map(AstNode::syntax_node),
-            super::AnyKind::StmtFor(node) => node
+            super::AnyNode::StmtFor(node) => node
                 .orelse()
                 .last()
                 .or_else(|| node.body().last())
                 .map(AstNode::syntax_node),
-            super::AnyKind::StmtWhile(node) => node
+            super::AnyNode::StmtWhile(node) => node
                 .orelse()
                 .last()
                 .or_else(|| node.body().last())
                 .map(AstNode::syntax_node),
-            super::AnyKind::StmtMatch(node) => node.cases().last().map(AstNode::syntax_node),
-            super::AnyKind::StmtTry(node) => node
+            super::AnyNode::StmtMatch(node) => node.cases().last().map(AstNode::syntax_node),
+            super::AnyNode::StmtTry(node) => node
                 .finalbody()
                 .last()
                 .map(AstNode::syntax_node)

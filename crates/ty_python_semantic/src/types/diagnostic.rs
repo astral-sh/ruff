@@ -51,7 +51,7 @@ use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{
-    self as ast, AnyKind, AstNode, NodeList, PythonVersion, StringFlags, SyntaxNode,
+    self as ast, AnyNode, AstNode, NodeList, PythonVersion, StringFlags, SyntaxNode,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -1770,7 +1770,7 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
     target_ty: Type<'db>,
     source: SyntaxNode<'_>,
 ) -> bool {
-    matches!(source.classify(), AnyKind::ExprDict(_))
+    matches!(source.classify(), AnyNode::ExprDict(_))
         && target_ty
             .filter_union(db, env, Type::is_typed_dict)
             .as_typed_dict()
@@ -2258,7 +2258,7 @@ pub(super) fn report_invalid_assignment<'db>(
         target_ty.display_with(db, env, settings.clone())
     ));
 
-    if matches!(target_node.classify(), AnyKind::ExprName(_)) {
+    if matches!(target_node.classify(), AnyNode::ExprName(_)) {
         match target_ty {
             Type::ClassLiteral(class) => {
                 diag.info(format_args!(
@@ -4611,7 +4611,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
                     && let Some(suggestion) = did_you_mean(existing_keys, key)
                 {
-                    if let AnyKind::ExprStringLiteral(literal) = key_node.classify() {
+                    if let AnyNode::ExprStringLiteral(literal) = key_node.classify() {
                         let quoted_suggestion = format!(
                             "{quote}{suggestion}{quote}",
                             quote = literal.value().first_literal_flags().quote_str()

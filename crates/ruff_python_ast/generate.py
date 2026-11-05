@@ -671,7 +671,7 @@ def walk_fields(node: Node, nodes: set[str]) -> str:
             method = "visit_annotation"
         if (node.name, field.name) == ("InterpolatedElement", "format_spec"):
             statements.append(
-                f"if let Some(spec) = {get} {{ spec.syntax_node().visit_source_order(visitor); }}"
+                f"if let Some(spec) = {get} {{ spec.visit_source_order(visitor); }}"
             )
         elif inner == "FStringValue":
             statements.append(
@@ -749,7 +749,7 @@ def generate_flat_patterns(ast: Ast, nodes: set[str]) -> list[str]:
     """Generate field projections for destructuring a node in a match."""
     groups = ", ".join(f"{group.name}Kind" for group in ast.groups)
     out = [
-        f"pub(crate) mod fields {{ use super::{{AstNode, SyntaxNode, List, NodeList, Ranged, NodeKind, AnyKind, {groups}}};"
+        f"pub(crate) mod fields {{ use super::{{AstNode, SyntaxNode, List, NodeList, Ranged, NodeKind, AnyNode, {groups}}};"
     ]
     for node in ast.all_nodes:
         ty = node.name
@@ -824,7 +824,7 @@ def generate_flat_patterns(ast: Ast, nodes: set[str]) -> list[str]:
     )
     for node in ast.all_nodes:
         out.append(
-            f"AnyKind::{node.name}(node) => AnyFields::{node.name}(node.fields()),"
+            f"AnyNode::{node.name}(node) => AnyFields::{node.name}(node.fields()),"
         )
     out.append("} } }")
     out.append("}")
@@ -833,15 +833,15 @@ def generate_flat_patterns(ast: Ast, nodes: set[str]) -> list[str]:
 
 def generate_flat_any(ast: Ast) -> list[str]:
     """Classify an untyped view without decoding its payload."""
-    out = ["#[derive(Clone, Copy, Debug)] pub enum AnyKind<'a> {"]
+    out = ["#[derive(Clone, Copy, Debug)] pub enum AnyNode<'a> {"]
     for node in ast.all_nodes:
         out.append(f"{node.name}(crate::{node.name}<'a>),")
     out.append("}")
     out.append(
-        "impl<'a> SyntaxNode<'a> { #[inline] pub fn classify(self) -> AnyKind<'a> { match self.node_kind() {"
+        "impl<'a> SyntaxNode<'a> { #[inline] pub fn classify(self) -> AnyNode<'a> { match self.node_kind() {"
     )
     for node in ast.all_nodes:
-        out.append(f"NodeKind::{node.name} => AnyKind::{node.name}(self.retype()),")
+        out.append(f"NodeKind::{node.name} => AnyNode::{node.name}(self.retype()),")
     out.append("} } }")
     out.append(
         "impl SyntaxNode<'_> { pub(super) fn fmt_fields(self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self.kind() {"
@@ -861,7 +861,7 @@ def generate_flat_any(ast: Ast) -> list[str]:
         )
     out.append("}")
     out.append(
-        "impl<'a> AnyKind<'a> { #[inline] pub fn view(self) -> SyntaxNode<'a> { match self {"
+        "impl<'a> AnyNode<'a> { #[inline] pub fn syntax_node(self) -> SyntaxNode<'a> { match self {"
     )
     for node in ast.all_nodes:
         out.append(f"Self::{node.name}(node) => node.syntax_node(),")
@@ -876,10 +876,10 @@ def generate_flat_any(ast: Ast) -> list[str]:
                 f"left.{f.name}() == right.{f.name}()" for f in fields
             )
             out.append(
-                f"AnyKind::{node.name}(left) => {{ let right = right.retype::<crate::{node.name}>(); {comparisons} }},"
+                f"AnyNode::{node.name}(left) => {{ let right = right.retype::<crate::{node.name}>(); {comparisons} }},"
             )
         else:
-            out.append(f"AnyKind::{node.name}(_) => true,")
+            out.append(f"AnyNode::{node.name}(_) => true,")
     out.append("} }")
     for ty in [n.name for n in ast.all_nodes] + [g.name for g in ast.groups]:
         out.append(
@@ -890,6 +890,31 @@ def generate_flat_any(ast: Ast) -> list[str]:
         out.append(
             f"impl<'a> From<{ty}Kind<'a>> for SyntaxNode<'a> {{ fn from(node: {ty}Kind<'a>) -> Self {{ node.view().syntax_node() }} }}"
         )
+    out.append(
+        "impl<'a> From<SyntaxNode<'a>> for AnyNode<'a> { #[inline] fn from(node: SyntaxNode<'a>) -> Self { node.classify() } }"
+    )
+    for node in ast.all_nodes:
+        out.append(
+            f"impl<'a> From<crate::{node.name}<'a>> for AnyNode<'a> {{ #[inline] fn from(node: crate::{node.name}<'a>) -> Self {{ Self::{node.name}(node) }} }}"
+        )
+    for group in ast.groups:
+        out.append(
+            f"impl<'a> From<crate::{group.name}<'a>> for AnyNode<'a> {{ #[inline] fn from(node: crate::{group.name}<'a>) -> Self {{ node.syntax_node().classify() }} }}"
+        )
+        out.append(
+            f"impl<'a> From<crate::{group.name}Kind<'a>> for AnyNode<'a> {{ #[inline] fn from(kind: crate::{group.name}Kind<'a>) -> Self {{ match kind {{"
+        )
+        for node in group.nodes:
+            out.append(
+                f"crate::{group.name}Kind::{node.variant}(node) => Self::{node.name}(node),"
+            )
+        out.append("} } }")
+    out.append(
+        "impl AnyNode<'_> { #[inline] pub fn node_kind(self) -> NodeKind { match self {"
+    )
+    for node in ast.all_nodes:
+        out.append(f"Self::{node.name}(_) => NodeKind::{node.name},")
+    out.append("} } }")
     return out
 
 
@@ -1203,21 +1228,54 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
     for node in ast.all_nodes:
         fields = [f"{field.name}: {copy_field(field, nodes)}," for field in node.fields]
         out.append(
-            f"AnyKind::{node.name}(node) => build::{node.name} {{ range: node.range(), "
+            f"AnyNode::{node.name}(node) => build::{node.name} {{ range: node.range(), "
             + "".join(fields)
             + "}.emit(self).0.cast(),"
         )
     out.append("} } }")
     out.append(
-        "impl<'a> SyntaxNode<'a> { pub fn visit_source_order(self, visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized)) { match self.node_kind() {"
+        "impl<'a> SyntaxNode<'a> { pub fn visit_source_order(self, visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized)) { self.classify().visit_source_order(visitor); } }"
     )
+    visitor = "impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized"
+    # Every dispatch path calls the same implementation of a concrete node's child order.
+    children = {node.name: walk_fields(node, nodes) for node in ast.all_nodes}
     for node in ast.all_nodes:
-        walk = walk_fields(node, nodes)
-        out.append(f"NodeKind::{node.name} => {{")
-        if walk:
-            out.append(f"let node = self.retype::<crate::{node.name}>(); {walk}")
-        out.append("}")
-    out.append("} } }")
+        if walk := children[node.name]:
+            access = (
+                '#[doc = "Visits the children of the module without entering or leaving the module itself."] pub'
+                if node.name == "ModModule"
+                else "pub(super)"
+            )
+            out.append(
+                f"impl<'a> crate::{node.name}<'a> {{ #[inline] {access} fn visit_source_order("
+                f"self, visitor: &mut ({visitor})) {{ let node = self; {walk} }} }}"
+            )
+
+    def source_order_dispatch(
+        enum: str, variants: list[tuple[str, Node]], visibility: str
+    ) -> None:
+        out.append(
+            f"impl<'a> {enum}<'a> {{ {visibility} fn visit_source_order("
+            f"self, visitor: &mut ({visitor})) {{ match self {{"
+        )
+        leaves = []
+        for variant, node in variants:
+            if children[node.name]:
+                out.append(
+                    f"Self::{variant}(node) => node.visit_source_order(visitor),"
+                )
+            else:
+                leaves.append(f"Self::{variant}(_)")
+        if leaves:
+            out.append(f"{' | '.join(leaves)} => {{}},")
+        out.append("} } }")
+
+    source_order_dispatch("AnyNode", [(n.name, n) for n in ast.all_nodes], "pub")
+    for group in ast.groups:
+        if group.name != "ExceptHandler":
+            source_order_dispatch(
+                f"{group.name}Kind", [(n.variant, n) for n in group.nodes], "pub(super)"
+            )
     out.append(
         "impl<'a> SyntaxNode<'a> { fn dispatch(self, visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized)) { match self.node_kind() {"
     )
@@ -1225,7 +1283,9 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
     for node in ast.all_nodes:
         ty = membership.get(node.name, node.name)
         if ty == "InterpolatedStringFormatSpec":
-            out.append(f"NodeKind::{node.name} => self.visit_source_order(visitor),")
+            out.append(
+                f"NodeKind::{node.name} => self.retype::<crate::{node.name}>().visit_source_order(visitor),"
+            )
         else:
             out.append(
                 f"NodeKind::{node.name} => {{ visitor.visit_{to_snake_case(ty)}(self.retype()); }}"
