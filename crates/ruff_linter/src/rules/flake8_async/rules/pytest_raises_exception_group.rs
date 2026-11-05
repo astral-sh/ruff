@@ -9,13 +9,15 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for `pytest.raises`, `pytest.RaisesExc`, `pytest.RaisesGroup`, and
-/// `pytest.mark.xfail` calls that expect `ExceptionGroup` or `BaseExceptionGroup`.
+/// Checks for `ExceptionGroup` or `BaseExceptionGroup` passed as the expected
+/// exception to `pytest.raises`, `pytest.RaisesExc`, or `pytest.mark.xfail`, or
+/// as a nested group to `pytest.RaisesGroup`.
 ///
 /// ## Why is this bad?
 /// `pytest.raises(ExceptionGroup)` checks the group's type, but not the types
 /// or number of exceptions it contains. A test can therefore pass even if the
-/// group contains unexpected exceptions.
+/// group contains unexpected exceptions. Passing a group type to
+/// `pytest.RaisesGroup` has the same problem for the nested group.
 ///
 /// In pytest 8.4.0 and later, use `pytest.RaisesGroup` to specify the expected
 /// exceptions and any nested groups.
