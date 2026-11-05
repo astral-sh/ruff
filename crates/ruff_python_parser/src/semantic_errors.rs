@@ -81,8 +81,9 @@ impl SemanticSyntaxChecker {
         false
     }
 
-    fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: Stmt<'_>, ctx: &Ctx) {
-        match stmt.classify() {
+    fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, kind: StmtKind<'_>, ctx: &Ctx) {
+        let stmt = kind.view();
+        match kind {
             StmtKind::ImportFrom(stmt_import_from) => {
                 let range = stmt_import_from.range();
                 let module = stmt_import_from.module();
@@ -376,11 +377,11 @@ impl SemanticSyntaxChecker {
         if self.check_debug_shadowing {
             Self::debug_shadowing(stmt, ctx);
         }
-        Self::check_annotation(stmt, ctx);
+        Self::check_annotation(kind, ctx);
     }
 
-    fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: Stmt<'_>, ctx: &Ctx) {
-        match stmt.classify() {
+    fn check_annotation<Ctx: SemanticSyntaxContext>(kind: StmtKind<'_>, ctx: &Ctx) {
+        match kind {
             StmtKind::AnnAssign(stmt_ann_assign) => {
                 let target = stmt_ann_assign.target();
                 let annotation = stmt_ann_assign.annotation();
@@ -886,12 +887,12 @@ impl SemanticSyntaxChecker {
     /// the function itself until the deferred body is visited too. Failing to defer `visit_stmt` in
     /// this case will break any internal state that depends on function scopes, such as `async`
     /// context detection.
-    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: Stmt<'_>, ctx: &Ctx) {
-        self.check_stmt(stmt, ctx);
+    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, kind: StmtKind<'_>, ctx: &Ctx) {
+        self.check_stmt(kind, ctx);
 
         self.augmented_assignment_target = None;
 
-        match stmt.classify() {
+        match kind {
             StmtKind::Expr(stmt_expr)
                 if !self.seen_module_docstring_boundary
                     && stmt_expr.value().is_string_literal_expr() => {}

@@ -773,17 +773,19 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
+        let kind = stmt.classify();
         self.with_semantic_checker(|semantic, context| {
-            semantic.visit_stmt(stmt, context);
+            semantic.visit_stmt(kind, context);
         });
-        match stmt.fields() {
-            ast::StmtFields::ClassDef(ast::StmtClassDefFields {
-                arguments,
-                body,
-                decorator_list,
-                type_params,
-                ..
-            }) => {
+        match kind {
+            ast::StmtKind::ClassDef(class_def) => {
+                let ast::StmtClassDefFields {
+                    arguments,
+                    body,
+                    decorator_list,
+                    type_params,
+                    ..
+                } = class_def.fields();
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -797,18 +799,19 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
-            ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields { is_async, .. }) => {
+            ast::StmtKind::FunctionDef(function_def) => {
+                let is_async = function_def.is_async();
                 self.scopes.push(Scope::Function { is_async });
-                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
+                ruff_python_ast::visitor::walk_stmt(self, kind);
                 self.scopes.pop().unwrap();
             }
-            ast::StmtFields::Try(_) => {
+            ast::StmtKind::Try(_) => {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
-                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
+                ruff_python_ast::visitor::walk_stmt(self, kind);
                 self.in_try = was_in_try;
             }
             _ => {
-                ruff_python_ast::visitor::walk_stmt(self, stmt.classify());
+                ruff_python_ast::visitor::walk_stmt(self, kind);
             }
         }
     }
