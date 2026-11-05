@@ -315,24 +315,26 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             db,
             index,
             scope.program_file(db),
-            scope.file_scope_id(db),
+            scope,
             place_expr.into(),
             mode,
             None,
         )
     }
 
-    /// Starts resolving `place_expr` in `scope`. When supplied, `local_operand` must identify
-    /// this read in that scope because its IDs index the scope's place and use-def tables.
+    /// Resolves an indexed use in the scope that owns its place and use IDs.
+    /// A load resolved from syntax uses `fallback_scope`.
     pub(crate) fn from_source(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
         file: ProgramFile<'db>,
-        scope: FileScopeId,
+        fallback_scope: ScopeId<'db>,
         place_expr: PlaceExprRef<'ast>,
         mode: PlaceLoadMode<'ast>,
         local_operand: Option<PlaceUse>,
     ) -> Self {
+        let scope =
+            local_operand.map_or_else(|| fallback_scope.file_scope_id(db), |operand| operand.scope);
         let context = PlaceLoadResolutionContext {
             db,
             index,

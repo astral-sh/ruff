@@ -10805,17 +10805,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let operand = source_place.operand();
-        let file_scope =
-            operand.map_or_else(|| self.scope().file_scope_id(self.db()), |op| op.scope);
         let mut procedure = PlaceLoadResolutionProcedure::from_source(
             self.db(),
             self.index,
             self.program_file(),
-            file_scope,
+            self.scope(),
             source_place.place(),
             mode,
-            operand,
+            source_place.operand(),
         );
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
