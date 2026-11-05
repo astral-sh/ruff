@@ -1,10 +1,9 @@
 use std::fmt::Write;
 use std::path::PathBuf;
 
+use ruff_benchmark::checkout::get_project_cache_dir;
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{
-    TY_ECOSYSTEM_PIN, get_project_cache_dir, install_dependencies_to_cache,
-};
+use ruff_benchmark::real_world_projects::{TY_ECOSYSTEM_PIN, install_dependencies_to_cache};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use itertools::Itertools;
