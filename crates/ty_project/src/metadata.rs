@@ -11,7 +11,6 @@ use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::PythonEnvironment;
-use ty_static::EnvVars;
 
 use crate::Db;
 use crate::metadata::options::{
@@ -498,32 +497,11 @@ impl ProjectMetadata {
             .chain(self.fallback_options.as_deref())
     }
 
-    /// Paths whose creation or deletion can change environment selection. Without a configured
-    /// Python path or an active `VIRTUAL_ENV`, consider both `CONDA_PREFIX` and the project's
-    /// `.venv`. Classifying a file event should not require searching either for an interpreter.
-    pub(crate) fn python_paths_for_changes(
-        &self,
-        system: &dyn System,
-    ) -> [Option<SystemPathBuf>; 2] {
-        let configured = self
-            .options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+    /// Returns the configured environment or interpreter path, without resolving the full merged options.
+    pub(crate) fn configured_python_path(&self, system: &dyn System) -> Option<SystemPathBuf> {
+        self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
             .find_map(|options| options.environment.as_ref()?.python.as_ref())
-            .map(|path| path.absolute(self.root(), system));
-        let active_path = |name| {
-            system
-                .env_var(name)
-                .ok()
-                .filter(|value| !value.is_empty())
-                .map(|value| SystemPath::absolute(value, system.current_directory()))
-        };
-        if let Some(path) = configured.or_else(|| active_path(EnvVars::VIRTUAL_ENV)) {
-            [Some(path), None]
-        } else {
-            [
-                Some(self.root().join(".venv")),
-                active_path(EnvVars::CONDA_PREFIX),
-            ]
-        }
+            .map(|path| path.absolute(self.root(), system))
     }
 
     /// Loads the lower-precedence options from the user-level configuration file.

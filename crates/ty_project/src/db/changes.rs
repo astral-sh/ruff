@@ -11,6 +11,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::program::FallibleStrategy;
+use ty_python_semantic::PythonEnvironment;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -101,7 +102,18 @@ impl ProjectDatabase {
             .program_settings(self)
             .last_usable_python_environment()
             .map(|environment| environment.sys_prefix().to_path_buf());
-        let python_paths = metadata.python_paths_for_changes(self.system());
+        let system = self.system();
+        let python_paths = if let Some(path) = metadata.configured_python_path(system) {
+            [Some(path), None]
+        } else {
+            let candidates =
+                PythonEnvironment::virtual_environment_candidates(Some(&project_root), system);
+            let active_prefix = candidates.virtual_env_var.or(candidates.conda_prefix);
+            [
+                active_prefix.map(|path| SystemPath::absolute(path, system.current_directory())),
+                candidates.project_venv,
+            ]
+        };
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
