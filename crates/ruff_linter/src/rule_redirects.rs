@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// Returns the redirect target for the given code.
-pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
-    REDIRECTS.get(code).copied()
+/// Returns the redirect target for a rule code, prefix, or name.
+pub(crate) fn get_redirect_target(selector: &str) -> Option<&'static str> {
+    REDIRECTS.get(selector).copied()
 }
 
-/// Returns the code and the redirect target if the given code is a redirect.
-/// (The same code is returned to obtain it with a static lifetime).
-pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
-    REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
+/// Returns the original selector and its redirect target, both with a static lifetime.
+pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str)> {
+    REDIRECTS.get_key_value(selector).map(|(k, v)| (*k, *v))
 }
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
@@ -144,19 +143,23 @@ mod tests {
     use crate::rule_redirects::REDIRECTS;
     use strum::IntoEnumIterator;
 
-    /// Tests for rule codes that overlap with a redirect.
+    /// Tests for rule names and codes that overlap with a redirect.
     #[test]
     fn overshadowing_redirects() {
         for rule in Rule::iter() {
-            let Some(code) = rule.noqa_code() else {
-                continue;
-            };
-
             if matches!(rule.status(), RuleStatus::Removed { .. }) {
                 continue;
             }
 
-            if let Some(redirect_target) = REDIRECTS.get(&*code.to_string()) {
+            let name = rule.name();
+            if let Some(redirect_target) = REDIRECTS.get(name.as_str()) {
+                panic!(
+                    "Rule {name} is overshadowed by a redirect, which points to {redirect_target}."
+                );
+            }
+            if let Some(code) = rule.noqa_code()
+                && let Some(redirect_target) = REDIRECTS.get(&*code.to_string())
+            {
                 panic!(
                     "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
                 );
