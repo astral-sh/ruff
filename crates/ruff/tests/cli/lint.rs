@@ -5507,7 +5507,6 @@ fn fix_redirected_selectors_with_rule_names() -> Result<()> {
     Would fix 3 errors.
 
     ----- stderr -----
-    warning: `TCH002` has been remapped to `TC002`.
     "
     );
 

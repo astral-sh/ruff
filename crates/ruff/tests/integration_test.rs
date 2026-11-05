@@ -1575,7 +1575,6 @@ fn removed_ignore_remapped_direct() {
     All checks passed!
 
     ----- stderr -----
-    warning: `PGH001` has been remapped to `S307`.
     ");
 }
 
@@ -1596,7 +1595,7 @@ fn removed_ignore_indirect() {
 
 #[test]
 fn redirect_direct() {
-    // Selection of a redirected rule directly should use the new rule and warn
+    // Selection of a redirected rule directly should use the new rule
     let mut cmd = RuffCheck::default().args(["--select", "RUF940"]).build();
     assert_cmd_snapshot!(cmd, @"
     success: false
@@ -1608,7 +1607,6 @@ fn redirect_direct() {
     Found 1 error.
 
     ----- stderr -----
-    warning: `RUF940` has been remapped to `RUF950`.
     ");
 }
 
@@ -1642,7 +1640,6 @@ fn redirect_prefix() {
     Found 1 error.
 
     ----- stderr -----
-    warning: `RUF96` has been remapped to `RUF95`.
     ");
 }
 
