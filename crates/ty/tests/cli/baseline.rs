@@ -171,13 +171,22 @@ x: int = 1.5
 #[test]
 fn baseline_accepts_previous_rule_name() {
     let case = CliTest::with_files([
-        ("test.py", "import missing_module"),
+        // Both diagnostics underline `missing`. Renaming the import rule reverses their sort order.
+        (
+            "test.py",
+            "
+            from typing import Final
+            missing: Final = 0
+            import missing
+            ",
+        ),
         (
             "baseline.json",
             r#"{
                 "version": 0,
                 "files": {"test.py": [
-                    {"rule": "unresolved-import", "startColumn": 7, "endColumn": 21, "lineCount": 1}
+                    {"rule": "invalid-assignment", "startColumn": 7, "endColumn": 14, "lineCount": 1},
+                    {"rule": "unresolved-import", "startColumn": 7, "endColumn": 14, "lineCount": 1}
                 ]}
             }"#,
         ),
@@ -196,7 +205,7 @@ fn baseline_accepts_previous_rule_name() {
     success: true
     exit_code: 0
     ----- stdout -----
-    Updated baseline `<temp_dir>/baseline.json` with 1 diagnostic.
+    Updated baseline `<temp_dir>/baseline.json` with 2 diagnostics.
 
     ----- stderr -----
     ");
