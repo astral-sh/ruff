@@ -263,7 +263,7 @@ fn normalize_covered_literal_exclusions<'db>(
 
     let mut changed = false;
     for ty in types {
-        if !unpack_aliases && any_over_type(db, env, *ty, false, Type::is_alias_like) {
+        if !unpack_aliases && any_over_type(db, env, *ty, Type::is_alias_like) {
             continue;
         }
         if let Some(widened) = remove_covered_exclusions(db, env, *ty, |excluded| {
@@ -1233,7 +1233,7 @@ impl<'db> UnionBuilder<'db> {
                 if !self.unpack_aliases
                     && [ty, element_type]
                         .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
+                        .any(|ty| any_over_type(db, &self.env, ty, Type::is_alias_like))
                 {
                     continue;
                 }
