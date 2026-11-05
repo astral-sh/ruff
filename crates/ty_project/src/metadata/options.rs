@@ -994,10 +994,11 @@ pub struct EnvironmentOptions {
     ///
     /// If you're using a project management tool such as uv, you should not generally need to
     /// specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
-    /// variable to point to your project's virtual environment. ty can also infer the location of
-    /// your environment from an activated Conda environment, and will look for a `.venv` directory
-    /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
-    /// or `python` binary available in `PATH`.
+    /// variable to point to your project's virtual environment. Otherwise, ty looks for an
+    /// activated child Conda or Pixi environment, a `.venv` directory in the project root, then
+    /// an activated base Conda environment, in that order. ty skips Conda and Pixi environments
+    /// that contain no Python interpreter. If none of these environments are found, ty looks for
+    /// a `python3` or `python` binary in `PATH`.
     ///
     /// Scripts with inline metadata use their own Python environment. They can use an explicitly
     /// configured environment, an activated environment, or an environment selected by the editor.

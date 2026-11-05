@@ -200,26 +200,30 @@ fn settings_diagnostic_path_from_sys_prefix(
         sys_prefix.join("bin")
     };
 
-    for candidate in [
-        bin_dir.join("python3"),
-        bin_dir.join("python"),
-        bin_dir.join("pypy3"),
-        bin_dir.join("pypy"),
-    ] {
+    find_interpreter_in_directory(&bin_dir, system)
+}
+
+/// Tries common interpreter names such as `python3`, `pypy`, and `graalpy` before scanning for
+/// names that include a minor version, such as `python3.13`.
+fn find_interpreter_in_directory(
+    bin_dir: &SystemPath,
+    system: &dyn System,
+) -> Option<SystemPathBuf> {
+    for name in ["python3", "python", "pypy3", "pypy", "graalpy"] {
+        let candidate = bin_dir.join(name);
+        #[cfg(windows)]
+        let candidate = candidate.with_extension("exe");
         if system.is_file(&candidate) {
             return Some(candidate);
         }
     }
 
-    let entries = system.read_directory(&bin_dir).ok()?;
+    let entries = system.read_directory(bin_dir).ok()?;
     for entry in entries.flatten() {
-        if entry.file_type().is_directory() {
-            continue;
-        }
-
         let path = entry.into_path();
         if let Some(file_name) = path.file_name()
             && is_versioned_interpreter_path(file_name)
+            && system.is_file(&path)
         {
             return Some(path);
         }
@@ -231,6 +235,12 @@ fn settings_diagnostic_path_from_sys_prefix(
 /// Returns `true` if the file name appears to be that of a versioned interpreter
 /// (e.g., `python3.15`).
 fn is_versioned_interpreter_path(file_name: &str) -> bool {
+    #[cfg(windows)]
+    let file_name = &file_name.to_ascii_lowercase();
+
+    if !file_name.ends_with(std::env::consts::EXE_SUFFIX) {
+        return false;
+    }
     matches!(
         PythonInterpreterLayout::from_file_name(file_name),
         Some(PythonInterpreterLayout {
@@ -333,7 +343,7 @@ impl PythonEnvironment {
 
     /// Returns the first virtual environment candidate in the search order used by [`Self::discover`]
     /// and its origin. The project's `.venv` is a candidate even before the directory exists.
-    pub fn virtual_environment_candidate(
+    fn virtual_environment_candidate(
         project_root: Option<&SystemPath>,
         system: &dyn System,
     ) -> Option<(SystemPathBuf, SysPrefixPathOrigin)> {
@@ -1041,16 +1051,16 @@ fn conda_environment_from_env(
     }
 
     // A Conda or Pixi environment can supply tools or native libraries without installing
-    // Python. Look for the same interpreter paths that uv checks during discovery.
-    let interpreters: &[&str] = if cfg!(windows) {
-        &["python.exe", "Scripts/python.exe", "bin/python.exe"]
+    // Python. CPython's `make altinstall` may install only a versioned executable.
+    let bin_dirs: &[&str] = if cfg!(windows) {
+        &["", "Scripts", "bin"]
     } else {
-        &["bin/python", "bin/python3"]
+        &["bin"]
     };
-    interpreters
+    let has_python = bin_dirs
         .iter()
-        .any(|interpreter| system.is_file(&path.join(interpreter)))
-        .then_some(path)
+        .any(|dir| find_interpreter_in_directory(&path.join(dir), system).is_some());
+    has_python.then_some(path)
 }
 
 fn environment_from_binary(system: &dyn System, binary: &str) -> Option<PythonEnvironment> {
@@ -2345,20 +2355,23 @@ mod tests {
         }
     }
 
+    /// Discovery selects the project's `.venv` when an unnamed Conda prefix contains only
+    /// `python3.13-config`. Adding `python3.13` makes the prefix take precedence.
     /// A Conda environment created with `conda create -p` uses its full path as its name.
-    /// It takes precedence over the project's `.venv` only when it contains Python.
     #[test]
     fn unnamed_conda_environment_with_and_without_python() -> Result<(), Box<dyn std::error::Error>>
     {
         let system = TestSystem::default();
         let prefix = SystemPath::new("/custom");
         system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, prefix.as_str());
-        system.memory_file_system().create_directory_all(prefix)?;
-        let python = if cfg!(windows) {
-            "python.exe"
+        let (config_helper, python) = if cfg!(windows) {
+            ("python3.13-config.exe", "python3.13.exe")
         } else {
-            "bin/python"
+            ("bin/python3.13-config", "bin/python3.13")
         };
+        system
+            .memory_file_system()
+            .write_file_all(prefix.join(config_helper), "")?;
         assert_conda_precedence(&system, prefix, python)
     }
 
@@ -4031,6 +4044,8 @@ mod tests {
         }
     }
 
+    /// ty discovers a Conda prefix containing only `bin/graalpy`. Selecting that executable
+    /// explicitly also locates its `lib/pythonX.Y/site-packages`.
     #[cfg(not(windows))]
     #[test]
     fn recognizes_unversioned_graalpy_executable() {
@@ -4044,6 +4059,10 @@ mod tests {
         memory_fs
             .create_directory_all(sys_prefix.join("lib/python3.14/site-packages"))
             .unwrap();
+
+        system.set_env_var(EnvVars::CONDA_PREFIX, sys_prefix.as_str());
+        let discovered = PythonEnvironment::discover(None, &system).unwrap().unwrap();
+        assert_eq!(&**discovered.sys_prefix(), sys_prefix.as_path());
 
         let environment = PythonEnvironment::new(
             sys_prefix.join("bin/graalpy"),

@@ -219,10 +219,13 @@ impl WatchPaths {
 ///
 /// ## Conda and Pixi environments
 ///
-/// We intentionally skip dedicated watches for Python executables under `CONDA_PREFIX`.
-/// Reliably detecting their creation would require watching even a prefix that ty skipped in
-/// favor of the project's `.venv`. If the prefix gains its first interpreter or loses its last,
-/// the language server or `ty check --watch` may need a restart to switch to or from that prefix.
+/// When discovering Python from `CONDA_PREFIX`, we intentionally skip dedicated watches for
+/// interpreter executables. Reliably detecting their creation would require watching even a
+/// prefix that ty skipped in favor of the project's `.venv`. Even when a project watch covers
+/// the prefix, creating or deleting an interpreter alone does not trigger environment discovery.
+/// If the prefix gains its first interpreter or loses its last, the language server or
+/// `ty check --watch` may need a restart to switch to or from that prefix. If an existing watch
+/// reports deletion of the selected prefix directory itself, ty reruns environment discovery.
 ///
 /// ## uv workspace metadata
 ///

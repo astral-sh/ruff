@@ -1338,7 +1338,7 @@ fn write_conda_interpreters(case: &CliTest) -> anyhow::Result<()> {
 }
 
 /// The `site-packages` directory is used by ty for external imports.
-/// ty does the following checks to discover the `site-packages` directory in order:
+/// ty does the following checks to discover the `site-packages` directory in the order:
 /// 1) If the `VIRTUAL_ENV` environment variable is set to a non-empty value
 /// 2) If `CONDA_PREFIX` points to a child environment (e.g. its directory name matches
 ///    `CONDA_DEFAULT_ENV`)
