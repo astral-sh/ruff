@@ -4,17 +4,24 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::LintContext;
 use crate::codes::Category;
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
-use crate::rule_redirects::get_redirect_target;
+use crate::rule_redirects::get_redirect;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `noqa` directives that use redirected rule codes.
+///
+/// In [`preview`] mode, also checks `ruff: ignore`, `ruff: file-ignore`,
+/// `ruff: disable`, and `ruff: enable` comments.
 ///
 /// ## Why is this bad?
 /// When one of Ruff's rule codes has been redirected, the implication is that the rule has
 /// been deprecated in favor of another rule or code. To keep your codebase
 /// consistent and up-to-date, prefer the canonical rule code over the deprecated
 /// code.
+///
+/// ## Fix safety
+/// The fix is marked unsafe for range suppressions because replacing a redirected
+/// code can change which `ruff: enable` directive matches a `ruff: disable` directive.
 ///
 /// ## Example
 /// ```python
@@ -28,8 +35,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct RedirectedNOQA {
-    original: String,
-    target: String,
+    pub(crate) original: &'static str,
+    pub(crate) target: &'static str,
 }
 
 impl AlwaysFixableViolation for RedirectedNOQA {
@@ -70,16 +77,11 @@ pub(crate) fn redirected_file_noqa(context: &LintContext, noqa_directives: &File
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
 fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
     for code in codes.iter() {
-        if let Some(redirected) = get_redirect_target(code.as_str()) {
-            let mut diagnostic = context.report_diagnostic(
-                RedirectedNOQA {
-                    original: code.to_string(),
-                    target: redirected.to_string(),
-                },
-                code.range(),
-            );
+        if let Some((original, target)) = get_redirect(code.as_str()) {
+            let mut diagnostic =
+                context.report_diagnostic(RedirectedNOQA { original, target }, code.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                redirected.to_string(),
+                target.to_string(),
                 code.range(),
             )));
         }
