@@ -1585,6 +1585,7 @@ jobs:
         uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         with:
           mode: ${{ matrix.mode }}
+          disable-memory-capture-stack: true
           run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
 
   benchmarks-walltime-ruff-build:
