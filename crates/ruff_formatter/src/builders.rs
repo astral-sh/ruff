@@ -2713,17 +2713,25 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let variants = self.variants.items();
 
-        let mut buffer = VecBuffer::with_capacity(variants.len() * 8, f.state_mut());
+        let write = |buffer: &mut VecBuffer<'_, Context>| {
+            for variant in variants {
+                buffer.write_element(FormatElement::Tag(StartBestFittingEntry));
+                buffer.write_fmt(Arguments::from(variant))?;
+                buffer.write_element(FormatElement::Tag(EndBestFittingEntry));
+            }
+            Ok(())
+        };
 
-        for variant in variants {
-            buffer.write_element(FormatElement::Tag(StartBestFittingEntry));
-            buffer.write_fmt(Arguments::from(variant))?;
-            buffer.write_element(FormatElement::Tag(EndBestFittingEntry));
-        }
-
+        let elements = if let Some(buffer) = f.plain_vec() {
+            buffer.capture(write, |items| items.collect())?
+        } else {
+            let mut buffer = VecBuffer::with_capacity(variants.len() * 8, f.state_mut());
+            write(&mut buffer)?;
+            buffer.into_vec()
+        };
         // OK because the constructor guarantees that there are always at
         // least two variants.
-        let variants = BestFittingVariants::from_vec_unchecked(buffer.into_vec());
+        let variants = BestFittingVariants::from_vec_unchecked(elements);
         let element = FormatElement::BestFitting {
             variants,
             mode: self.mode,
