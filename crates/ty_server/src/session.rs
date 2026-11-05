@@ -1238,6 +1238,19 @@ impl Session {
         })
     }
 
+    /// Returns whether client settings permit import updates for a rename of `path`.
+    pub(crate) fn allows_file_rename_edits(&self, path: &SystemPath) -> bool {
+        match self.workspaces.for_path(path) {
+            Some(workspace) => !workspace.settings().is_language_services_disabled(),
+            None => !self
+                .initialization_options
+                .options
+                .workspace
+                .disable_language_services
+                .unwrap_or_default(),
+        }
+    }
+
     /// Selects an open document or a supported closed document for a request.
     fn document_target(&self, uri: &Uri) -> Result<DocumentRequestTarget, DocumentError> {
         match self.index().open_document_handle(uri) {

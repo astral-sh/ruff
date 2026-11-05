@@ -5,9 +5,13 @@ mod notebook;
 mod range;
 mod text_document;
 
-use lsp_types::{PositionEncodingKind, Uri};
-use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use std::collections::HashMap;
 
+use lsp_types::{PositionEncodingKind, TextEdit, Uri};
+use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use ty_ide::RangedValue;
+
+use crate::Db;
 use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
@@ -17,6 +21,30 @@ pub(crate) use range::{
 };
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
+
+/// Appends replacements grouped by document URI, skipping edits without an LSP location.
+pub(crate) fn extend_lsp_edits<T: Into<String>>(
+    db: &dyn Db,
+    encoding: PositionEncoding,
+    edits: impl IntoIterator<Item = RangedValue<T>>,
+    changes: &mut HashMap<Uri, Vec<TextEdit>>,
+) {
+    for edit in edits {
+        if let Some(range) = edit.range.to_lsp_range(db, encoding)
+            && let Some(location) = range.into_location()
+        {
+            changes
+                .entry(location.uri)
+                .or_default()
+                .push(TextEdit::new(location.range, edit.value.into()));
+        } else {
+            tracing::debug!(
+                path = %edit.range.file().path(db),
+                "Skipping edit because its LSP location could not be resolved"
+            );
+        }
+    }
+}
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.
