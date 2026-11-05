@@ -19,7 +19,7 @@ use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{self as ast, AnyKind, AstNode, ExprKind, SyntaxNode};
+use ruff_python_ast::{self as ast, AnyNode, AstNode, ExprKind, SyntaxNode};
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -275,7 +275,7 @@ fn references_for_keyword_arguments_in_file(
         ancestors: Vec::new(),
     });
 
-    SyntaxNode::from(module.syntax()).visit_source_order(&mut finder);
+    module.syntax().visit_source_order(&mut finder);
 
     references
 }
@@ -284,14 +284,14 @@ fn references_for_keyword_arguments_in_file(
 /// `__slots__ = (...)` or `__slots__: tuple = (...)`.
 fn is_slots_assignment(node: SyntaxNode<'_>, value: SyntaxNode<'_>) -> bool {
     match node.classify() {
-        AnyKind::StmtAssign(assign) => {
+        AnyNode::StmtAssign(assign) => {
             assign.value().range() == value.range()
                 && matches!(
                     assign.targets().as_array().map(|items| items.map(ast::Expr::classify)),
                     Some([ExprKind::Name(name)]) if name.id().as_str() == "__slots__"
                 )
         }
-        AnyKind::StmtAnnAssign(assign) => {
+        AnyNode::StmtAnnAssign(assign) => {
             assign
                 .value()
                 .is_some_and(|assigned| assigned.range() == value.range())
@@ -329,7 +329,7 @@ fn references_for_file(
         ancestors: Vec::new(),
     };
 
-    SyntaxNode::from(module.syntax()).visit_source_order(&mut finder);
+    module.syntax().visit_source_order(&mut finder);
 
     references
 }
@@ -602,11 +602,12 @@ struct LocalReferencesFinder<'a> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.ancestors.push(node);
 
-        match node.classify() {
-            AnyKind::ExprName(name_expr) => {
+        match kind {
+            AnyNode::ExprName(name_expr) => {
                 // If the name doesn't match our target text, this isn't a match
                 if name_expr.id().as_str() != self.search.target_text {
                     return TraversalSignal::Traverse;
@@ -616,64 +617,64 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
                 self.check_covering_node(&covering_node, kind);
             }
-            AnyKind::ExprAttribute(attr_expr) => {
+            AnyNode::ExprAttribute(attr_expr) => {
                 let kind = OccurrenceKind::from(attr_expr.ctx());
                 self.check_identifier(attr_expr.attr(), kind);
             }
-            AnyKind::StmtFunctionDef(func) => {
+            AnyNode::StmtFunctionDef(func) => {
                 self.check_declaration_identifier(func.name());
             }
-            AnyKind::StmtClassDef(class) => {
+            AnyNode::StmtClassDef(class) => {
                 self.check_declaration_identifier(class.name());
             }
-            AnyKind::Parameter(parameter) => {
+            AnyNode::Parameter(parameter) => {
                 self.check_declaration_identifier(parameter.name());
             }
-            AnyKind::Keyword(keyword) => {
+            AnyNode::Keyword(keyword) => {
                 if let Some(arg) = keyword.arg() {
                     self.check_reference_identifier(arg);
                 }
             }
-            AnyKind::StmtGlobal(global_stmt) => {
+            AnyNode::StmtGlobal(global_stmt) => {
                 for name in global_stmt.names() {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyKind::StmtNonlocal(nonlocal_stmt) => {
+            AnyNode::StmtNonlocal(nonlocal_stmt) => {
                 for name in nonlocal_stmt.names() {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyKind::ExceptHandlerExceptHandler(handler) => {
+            AnyNode::ExceptHandlerExceptHandler(handler) => {
                 if let Some(name) = handler.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyKind::PatternMatchAs(pattern_as) => {
+            AnyNode::PatternMatchAs(pattern_as) => {
                 if let Some(name) = pattern_as.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyKind::PatternMatchStar(pattern_star) => {
+            AnyNode::PatternMatchStar(pattern_star) => {
                 if let Some(name) = pattern_star.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyKind::PatternMatchMapping(pattern_mapping) => {
+            AnyNode::PatternMatchMapping(pattern_mapping) => {
                 if let Some(rest_name) = pattern_mapping.rest() {
                     self.check_binding_identifier(rest_name);
                 }
             }
-            AnyKind::TypeParamParamSpec(param_spec) => {
+            AnyNode::TypeParamParamSpec(param_spec) => {
                 self.check_declaration_identifier(param_spec.name());
             }
-            AnyKind::TypeParamTypeVarTuple(param_tuple) => {
+            AnyNode::TypeParamTypeVarTuple(param_tuple) => {
                 self.check_declaration_identifier(param_tuple.name());
             }
-            AnyKind::TypeParamTypeVar(param_var) => {
+            AnyNode::TypeParamTypeVar(param_var) => {
                 self.check_declaration_identifier(param_var.name());
             }
-            AnyKind::ExprStringLiteral(string_expr) => {
+            AnyNode::ExprStringLiteral(string_expr) => {
                 // A string literal listed in a class's `__slots__` names an
                 // instance attribute, so renaming that attribute should rename
                 // the matching slot string too.
@@ -694,7 +695,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     sub_finder.visit_expr(sub_ast.expr());
                 }
             }
-            AnyKind::Alias(alias) => {
+            AnyNode::Alias(alias) => {
                 // Handle import alias declarations
                 if let Some(asname) = alias.asname() {
                     self.check_declaration_identifier(asname);
@@ -711,8 +712,8 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
-        debug_assert_eq!(self.ancestors.last(), Some(&node));
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        debug_assert_eq!(self.ancestors.last(), Some(&node.syntax_node()));
         self.ancestors.pop();
     }
 }
@@ -721,10 +722,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
 struct KeywordArgumentReferencesFinder<'a>(LocalReferencesFinder<'a>);
 
 impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.0.ancestors.push(node);
 
-        if let AnyKind::Keyword(keyword) = node.classify() {
+        if let AnyNode::Keyword(keyword) = kind {
             if let Some(arg) = keyword.arg() {
                 self.0.check_reference_identifier(arg);
             }
@@ -733,8 +735,8 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
-        debug_assert_eq!(self.0.ancestors.last(), Some(&node));
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        debug_assert_eq!(self.0.ancestors.last(), Some(&node.syntax_node()));
         self.0.ancestors.pop();
     }
 }
@@ -919,8 +921,8 @@ impl<'a> LocalReferencesFinder<'a> {
         let string = ancestors.next()?.cast::<ast::ExprStringLiteral>()?;
         let parent = ancestors.next()?;
         let container = match parent.classify() {
-            AnyKind::ExprTuple(_) | AnyKind::ExprList(_) | AnyKind::ExprSet(_) => parent,
-            AnyKind::DictItem(item) if item.key()?.syntax_node() == string.syntax_node() => {
+            AnyNode::ExprTuple(_) | AnyNode::ExprList(_) | AnyNode::ExprSet(_) => parent,
+            AnyNode::DictItem(item) if item.key()?.syntax_node() == string.syntax_node() => {
                 ancestors.next()?
             }
             _ => return None,
@@ -933,7 +935,7 @@ impl<'a> LocalReferencesFinder<'a> {
 
         // That assignment must live directly in a class body.
         match ancestors.next()?.classify() {
-            AnyKind::StmtClassDef(class) => Some(class),
+            AnyNode::StmtClassDef(class) => Some(class),
             _ => None,
         }
     }

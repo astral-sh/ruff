@@ -6,8 +6,8 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    self as ast, AnyKind, ArgOrKeyword, Arguments, AstNode, Expr, ExprKind, Parameters, Stmt,
-    StmtAssign, StmtKind, SyntaxNode, UnaryOp,
+    self as ast, AnyNode, ArgOrKeyword, Arguments, AstNode, Expr, ExprKind, Parameters, Stmt,
+    StmtAssign, SyntaxNode, UnaryOp,
 };
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -455,6 +455,10 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         }
     }
 
+    fn intersects_requested_range(&self, range: TextRange) -> bool {
+        self.range.intersect(range).is_some()
+    }
+
     fn add_type_hint(&mut self, expr: Expr<'_>) {
         let Some(assignment) = self.assignment else {
             return;
@@ -504,8 +508,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
-    fn leave_node(&mut self, node: SyntaxNode<'a>) {
-        if let AnyKind::Parameters(parameters) = node.classify()
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        if let AnyNode::Parameters(parameters) = node
             && let Some((_, hint)) = self
                 .pending_return_hint
                 .take_if(|(expected, _)| expected.is_same_node(parameters))
@@ -514,8 +518,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
         }
     }
 
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
-        if self.range.intersect(node.range()).is_some() {
+    fn enter_node(&mut self, node: AnyNode<'a>) -> TraversalSignal {
+        if self.intersects_requested_range(node.syntax_node().range()) {
             TraversalSignal::Traverse
         } else {
             TraversalSignal::Skip
@@ -523,14 +527,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
     }
 
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        let node = SyntaxNode::from(stmt);
-
-        if !self.enter_node(node).is_traverse() {
+        if !self.intersects_requested_range(stmt.range()) {
             return;
         }
 
-        match stmt.classify() {
-            StmtKind::Assign(assign) => {
+        let kind = stmt.classify();
+        match kind {
+            ast::StmtKind::Assign(assign) => {
                 if !type_hint_is_excessive_for_expr(assign.value()) {
                     self.assignment = Some(assign);
                 }
@@ -543,11 +546,11 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 return;
             }
-            StmtKind::Expr(expr) => {
+            ast::StmtKind::Expr(expr) => {
                 self.visit_expr(expr.value());
                 return;
             }
-            StmtKind::FunctionDef(function) => {
+            ast::StmtKind::FunctionDef(function) => {
                 let position = function.parameters().end();
                 if self.settings.return_types
                     && self.range.contains_inclusive(position)
@@ -568,23 +571,21 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 }
             }
             // TODO
-            StmtKind::For(_) => {}
+            ast::StmtKind::For(_) => {}
             _ => {}
         }
 
-        source_order::walk_stmt(self, stmt);
+        source_order::walk_stmt(self, kind);
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { ctx, .. })
-            | ast::ExprFields::Attribute(ast::ExprAttributeFields { ctx, .. })
-                if ctx.is_store() =>
-            {
+        let kind = expr.classify();
+        match kind {
+            ExprKind::Name(name) if name.ctx().is_store() => self.add_type_hint(expr),
+            ExprKind::Attribute(attribute) if attribute.ctx().is_store() => {
                 self.add_type_hint(expr);
-                source_order::walk_expr(self, expr);
             }
-            ast::ExprFields::Call(ast::ExprCallFields { node: call, .. }) => {
+            ExprKind::Call(call) => {
                 let details = inlay_hint_call_argument_details(self.db, &self.model, call)
                     .unwrap_or_default();
 
@@ -631,11 +632,11 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                     self.visit_expr(arg_or_keyword.value());
                 }
+                return;
             }
-            _ => {
-                source_order::walk_expr(self, expr);
-            }
+            _ => {}
         }
+        source_order::walk_expr(self, kind);
     }
 }
 

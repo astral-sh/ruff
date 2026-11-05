@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::AnyNode;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
-use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtKind, SyntaxNode};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -61,7 +62,7 @@ struct AsyncExprVisitor {
 /// async-for. Stop traversing after one is found. The bodies of inner-functions and inner-classes
 /// aren't traversed.
 impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
-    fn enter_node(&mut self, _node: SyntaxNode<'a>) -> source_order::TraversalSignal {
+    fn enter_node(&mut self, _node: AnyNode<'a>) -> source_order::TraversalSignal {
         if self.found_await_or_async {
             source_order::TraversalSignal::Skip
         } else {
@@ -69,7 +70,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
         }
     }
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::With(stmt_with) if stmt_with.is_async() => {
                 self.found_await_or_async = true;
             }
@@ -83,15 +85,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
             StmtKind::ClassDef(class_def) => {
                 class_def_visit_preorder_except_body(class_def, self);
             }
-            _ => source_order::walk_stmt(self, stmt),
+            _ => source_order::walk_stmt(self, kind),
         }
     }
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Await(_) => {
                 self.found_await_or_async = true;
             }
-            _ => source_order::walk_expr(self, expr),
+            _ => source_order::walk_expr(self, kind),
         }
     }
     fn visit_comprehension(&mut self, comprehension: ast::Comprehension<'a>) {

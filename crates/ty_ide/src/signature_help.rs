@@ -13,7 +13,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, AnyKind, SyntaxNode};
+use ruff_python_ast::{self as ast, AnyNode, SyntaxNode};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextSize};
@@ -171,7 +171,7 @@ fn get_call_expr<'ast>(
         .ok()?;
 
     // Get the function call expression.
-    let AnyKind::ExprCall(call_expr) = call.node().classify() else {
+    let AnyNode::ExprCall(call_expr) = call.node().classify() else {
         return None;
     };
 

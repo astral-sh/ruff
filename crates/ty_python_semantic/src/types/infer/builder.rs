@@ -1720,7 +1720,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn fallback_member_declared_type(&mut self, node: SyntaxNode<'_>) -> Option<Type<'db>> {
         let db = self.db();
         match node.classify() {
-            ast::AnyKind::ExprAttribute(attribute) => {
+            ast::AnyNode::ExprAttribute(attribute) => {
                 let value = attribute.value();
                 let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                     self.infer_maybe_standalone_expression(value, TypeContext::default())
@@ -1739,7 +1739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     None
                 }
             }
-            ast::AnyKind::ExprSubscript(subscript) => {
+            ast::AnyNode::ExprSubscript(subscript) => {
                 let value_ty =
                     self.get_or_infer_expression(subscript.value(), TypeContext::default());
                 let slice_ty =

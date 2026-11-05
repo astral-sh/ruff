@@ -4,8 +4,10 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyKind, Suite, SyntaxNode};
+use ruff_python_ast::visitor::source_order::{
+    self, SourceOrderVisitor, TraversalSignal, walk_body, walk_module,
+};
+use ruff_python_ast::{AnyNode, Mod, Suite, SyntaxNode};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
     BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
@@ -87,14 +89,14 @@ pub fn format_range(
         parsed.tokens(),
     );
 
-    let (enclosing_node, base_indent) =
-        match find_enclosing_node(range, SyntaxNode::from(parsed.syntax()), &context) {
-            EnclosingNode::Node { node, indent_level } => (node, indent_level),
-            EnclosingNode::Suppressed => {
-                // The entire range falls into a suppressed range. There's nothing to format.
-                return Ok(PrintedRange::empty());
-            }
-        };
+    let (enclosing_node, base_indent) = match find_enclosing_node(range, parsed.syntax(), &context)
+    {
+        EnclosingNode::Node { node, indent_level } => (node, indent_level),
+        EnclosingNode::Suppressed => {
+            // The entire range falls into a suppressed range. There's nothing to format.
+            return Ok(PrintedRange::empty());
+        }
+    };
 
     let narrowed_range = narrow_range(range, enclosing_node, &context);
     assert_valid_char_boundaries(narrowed_range, source);
@@ -153,15 +155,12 @@ pub fn format_range(
 /// correctly detects the suppression comment and returns the statement text as is.
 fn find_enclosing_node<'ast>(
     range: TextRange,
-    root: SyntaxNode<'ast>,
+    root: Mod<'ast>,
     context: &PyFormatContext<'ast>,
 ) -> EnclosingNode<'ast> {
     let mut visitor = FindEnclosingNode::new(range, context);
 
-    if visitor.enter_node(root).is_traverse() {
-        root.visit_source_order(&mut visitor);
-    }
-    visitor.leave_node(root);
+    walk_module(&mut visitor, root.classify());
 
     visitor.closest
 }
@@ -189,7 +188,8 @@ impl<'a, 'ast> FindEnclosingNode<'a, 'ast> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
-    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'ast>) -> TraversalSignal {
+        let node = kind.syntax_node();
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
         }
@@ -237,7 +237,8 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
+    fn leave_node(&mut self, node: AnyNode<'ast>) {
+        let node = node.syntax_node();
         if node.is_statement() {
             let trailing_comments = self.context.comments().trailing(node);
             // Update the suppressed state for the next statement.
@@ -342,11 +343,7 @@ fn narrow_range(
         level: usize::from(!enclosing_node.is_mod_module()),
     };
 
-    if visitor.enter_node(enclosing_node).is_traverse() {
-        enclosing_node.visit_source_order(&mut visitor);
-    }
-
-    visitor.leave_node(enclosing_node);
+    source_order::walk_node(&mut visitor, enclosing_node.classify());
 
     TextRange::new(visitor.narrowed_start, visitor.narrowed_end)
 }
@@ -367,7 +364,8 @@ struct NarrowRange<'a> {
 }
 
 impl SourceOrderVisitor<'_> for NarrowRange<'_> {
-    fn enter_node(&mut self, node: SyntaxNode<'_>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'_>) -> TraversalSignal {
+        let node = kind.syntax_node();
         if !(is_logical_line(node) || node.is_mod_module()) {
             return TraversalSignal::Skip;
         }
@@ -393,8 +391,8 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
         // Handle nodes that have indented child-nodes that aren't a `Body` (which is handled by `visit_body`).
         // Ideally, this would be handled as part of `visit_stmt` but `visit_stmt` doesn't get called for the `enclosing_node`
         // because it's not possible to convert` SyntaxNode` to `&Stmt` :(
-        match node.classify() {
-            AnyKind::StmtMatch(stmt_match) => {
+        match kind {
+            AnyNode::StmtMatch(stmt_match) => {
                 let cases = stmt_match.cases();
 
                 if let Some(saved_state) = self.enter_level(cases.first().map(SyntaxNode::from)) {
@@ -407,7 +405,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 // Already traversed as part of `enter_node`.
                 TraversalSignal::Skip
             }
-            AnyKind::StmtTry(stmt_try) => {
+            AnyNode::StmtTry(stmt_try) => {
                 let body = stmt_try.body();
                 let handlers = stmt_try.handlers();
                 let orelse = stmt_try.orelse();
@@ -432,7 +430,8 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
         }
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'_>) {
+    fn leave_node(&mut self, node: AnyNode<'_>) {
+        let node = node.syntax_node();
         if !(is_logical_line(node) || node.is_mod_module()) {
             return;
         }
@@ -629,102 +628,102 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
         // Note: It's important that this supports formatting all nodes for which `is_logical_line`
         // returns + the root `Mod` nodes.
         match self.root.classify() {
-            AnyKind::ModModule(node) => node.format().fmt(f),
-            AnyKind::ModExpression(node) => node.format().fmt(f),
-            AnyKind::StmtFunctionDef(node) => node.format().fmt(f),
-            AnyKind::StmtClassDef(node) => node.format().fmt(f),
-            AnyKind::StmtReturn(node) => node.format().fmt(f),
-            AnyKind::StmtDelete(node) => node.format().fmt(f),
-            AnyKind::StmtTypeAlias(node) => node.format().fmt(f),
-            AnyKind::StmtAssign(node) => node.format().fmt(f),
-            AnyKind::StmtAugAssign(node) => node.format().fmt(f),
-            AnyKind::StmtAnnAssign(node) => node.format().fmt(f),
-            AnyKind::StmtFor(node) => node.format().fmt(f),
-            AnyKind::StmtWhile(node) => node.format().fmt(f),
-            AnyKind::StmtIf(node) => node.format().fmt(f),
-            AnyKind::StmtWith(node) => node.format().fmt(f),
-            AnyKind::StmtMatch(node) => node.format().fmt(f),
-            AnyKind::StmtRaise(node) => node.format().fmt(f),
-            AnyKind::StmtTry(node) => node.format().fmt(f),
-            AnyKind::StmtAssert(node) => node.format().fmt(f),
-            AnyKind::StmtImport(node) => node.format().fmt(f),
-            AnyKind::StmtImportFrom(node) => node.format().fmt(f),
-            AnyKind::StmtGlobal(node) => node.format().fmt(f),
-            AnyKind::StmtNonlocal(node) => node.format().fmt(f),
-            AnyKind::StmtExpr(node) => node.format().fmt(f),
-            AnyKind::StmtPass(node) => node.format().fmt(f),
-            AnyKind::StmtBreak(node) => node.format().fmt(f),
-            AnyKind::StmtContinue(node) => node.format().fmt(f),
-            AnyKind::StmtIpyEscapeCommand(node) => node.format().fmt(f),
-            AnyKind::ExceptHandlerExceptHandler(node) => node.format().fmt(f),
-            AnyKind::MatchCase(node) => node.format().fmt(f),
-            AnyKind::Decorator(node) => node.format().fmt(f),
-            AnyKind::ElifElseClause(node) => node.format().fmt(f),
+            AnyNode::ModModule(node) => node.format().fmt(f),
+            AnyNode::ModExpression(node) => node.format().fmt(f),
+            AnyNode::StmtFunctionDef(node) => node.format().fmt(f),
+            AnyNode::StmtClassDef(node) => node.format().fmt(f),
+            AnyNode::StmtReturn(node) => node.format().fmt(f),
+            AnyNode::StmtDelete(node) => node.format().fmt(f),
+            AnyNode::StmtTypeAlias(node) => node.format().fmt(f),
+            AnyNode::StmtAssign(node) => node.format().fmt(f),
+            AnyNode::StmtAugAssign(node) => node.format().fmt(f),
+            AnyNode::StmtAnnAssign(node) => node.format().fmt(f),
+            AnyNode::StmtFor(node) => node.format().fmt(f),
+            AnyNode::StmtWhile(node) => node.format().fmt(f),
+            AnyNode::StmtIf(node) => node.format().fmt(f),
+            AnyNode::StmtWith(node) => node.format().fmt(f),
+            AnyNode::StmtMatch(node) => node.format().fmt(f),
+            AnyNode::StmtRaise(node) => node.format().fmt(f),
+            AnyNode::StmtTry(node) => node.format().fmt(f),
+            AnyNode::StmtAssert(node) => node.format().fmt(f),
+            AnyNode::StmtImport(node) => node.format().fmt(f),
+            AnyNode::StmtImportFrom(node) => node.format().fmt(f),
+            AnyNode::StmtGlobal(node) => node.format().fmt(f),
+            AnyNode::StmtNonlocal(node) => node.format().fmt(f),
+            AnyNode::StmtExpr(node) => node.format().fmt(f),
+            AnyNode::StmtPass(node) => node.format().fmt(f),
+            AnyNode::StmtBreak(node) => node.format().fmt(f),
+            AnyNode::StmtContinue(node) => node.format().fmt(f),
+            AnyNode::StmtIpyEscapeCommand(node) => node.format().fmt(f),
+            AnyNode::ExceptHandlerExceptHandler(node) => node.format().fmt(f),
+            AnyNode::MatchCase(node) => node.format().fmt(f),
+            AnyNode::Decorator(node) => node.format().fmt(f),
+            AnyNode::ElifElseClause(node) => node.format().fmt(f),
 
-            AnyKind::ExprBoolOp(_)
-            | AnyKind::ExprNamed(_)
-            | AnyKind::ExprBinOp(_)
-            | AnyKind::ExprUnaryOp(_)
-            | AnyKind::ExprLambda(_)
-            | AnyKind::ExprIf(_)
-            | AnyKind::ExprDict(_)
-            | AnyKind::ExprSet(_)
-            | AnyKind::ExprListComp(_)
-            | AnyKind::ExprSetComp(_)
-            | AnyKind::ExprDictComp(_)
-            | AnyKind::ExprGenerator(_)
-            | AnyKind::ExprAwait(_)
-            | AnyKind::ExprYield(_)
-            | AnyKind::ExprYieldFrom(_)
-            | AnyKind::ExprCompare(_)
-            | AnyKind::ExprCall(_)
-            | AnyKind::InterpolatedElement(_)
-            | AnyKind::InterpolatedStringLiteralElement(_)
-            | AnyKind::InterpolatedStringFormatSpec(_)
-            | AnyKind::ExprFString(_)
-            | AnyKind::ExprTString(_)
-            | AnyKind::ExprStringLiteral(_)
-            | AnyKind::ExprBytesLiteral(_)
-            | AnyKind::ExprNumberLiteral(_)
-            | AnyKind::ExprBooleanLiteral(_)
-            | AnyKind::ExprNoneLiteral(_)
-            | AnyKind::ExprEllipsisLiteral(_)
-            | AnyKind::ExprAttribute(_)
-            | AnyKind::ExprSubscript(_)
-            | AnyKind::ExprStarred(_)
-            | AnyKind::ExprName(_)
-            | AnyKind::ExprList(_)
-            | AnyKind::ExprTuple(_)
-            | AnyKind::ExprSlice(_)
-            | AnyKind::ExprIpyEscapeCommand(_)
-            | AnyKind::FString(_)
-            | AnyKind::StringLiteral(_)
-            | AnyKind::TString(_)
-            | AnyKind::PatternMatchValue(_)
-            | AnyKind::PatternMatchSingleton(_)
-            | AnyKind::PatternMatchSequence(_)
-            | AnyKind::PatternMatchMapping(_)
-            | AnyKind::PatternMatchClass(_)
-            | AnyKind::PatternMatchStar(_)
-            | AnyKind::PatternMatchAs(_)
-            | AnyKind::PatternMatchOr(_)
-            | AnyKind::PatternArguments(_)
-            | AnyKind::PatternKeyword(_)
-            | AnyKind::Comprehension(_)
-            | AnyKind::Arguments(_)
-            | AnyKind::Parameters(_)
-            | AnyKind::Parameter(_)
-            | AnyKind::ParameterWithDefault(_)
-            | AnyKind::DictItem(_)
-            | AnyKind::Keyword(_)
-            | AnyKind::Alias(_)
-            | AnyKind::WithItem(_)
-            | AnyKind::TypeParams(_)
-            | AnyKind::TypeParamTypeVar(_)
-            | AnyKind::TypeParamTypeVarTuple(_)
-            | AnyKind::TypeParamParamSpec(_)
-            | AnyKind::Identifier(_)
-            | AnyKind::BytesLiteral(_) => {
+            AnyNode::ExprBoolOp(_)
+            | AnyNode::ExprNamed(_)
+            | AnyNode::ExprBinOp(_)
+            | AnyNode::ExprUnaryOp(_)
+            | AnyNode::ExprLambda(_)
+            | AnyNode::ExprIf(_)
+            | AnyNode::ExprDict(_)
+            | AnyNode::ExprSet(_)
+            | AnyNode::ExprListComp(_)
+            | AnyNode::ExprSetComp(_)
+            | AnyNode::ExprDictComp(_)
+            | AnyNode::ExprGenerator(_)
+            | AnyNode::ExprAwait(_)
+            | AnyNode::ExprYield(_)
+            | AnyNode::ExprYieldFrom(_)
+            | AnyNode::ExprCompare(_)
+            | AnyNode::ExprCall(_)
+            | AnyNode::InterpolatedElement(_)
+            | AnyNode::InterpolatedStringLiteralElement(_)
+            | AnyNode::InterpolatedStringFormatSpec(_)
+            | AnyNode::ExprFString(_)
+            | AnyNode::ExprTString(_)
+            | AnyNode::ExprStringLiteral(_)
+            | AnyNode::ExprBytesLiteral(_)
+            | AnyNode::ExprNumberLiteral(_)
+            | AnyNode::ExprBooleanLiteral(_)
+            | AnyNode::ExprNoneLiteral(_)
+            | AnyNode::ExprEllipsisLiteral(_)
+            | AnyNode::ExprAttribute(_)
+            | AnyNode::ExprSubscript(_)
+            | AnyNode::ExprStarred(_)
+            | AnyNode::ExprName(_)
+            | AnyNode::ExprList(_)
+            | AnyNode::ExprTuple(_)
+            | AnyNode::ExprSlice(_)
+            | AnyNode::ExprIpyEscapeCommand(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::TString(_)
+            | AnyNode::PatternMatchValue(_)
+            | AnyNode::PatternMatchSingleton(_)
+            | AnyNode::PatternMatchSequence(_)
+            | AnyNode::PatternMatchMapping(_)
+            | AnyNode::PatternMatchClass(_)
+            | AnyNode::PatternMatchStar(_)
+            | AnyNode::PatternMatchAs(_)
+            | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
+            | AnyNode::DictItem(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::WithItem(_)
+            | AnyNode::TypeParams(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::Identifier(_)
+            | AnyNode::BytesLiteral(_) => {
                 panic!("Range formatting only supports formatting logical lines")
             }
         }

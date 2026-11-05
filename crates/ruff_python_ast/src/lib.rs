@@ -3,7 +3,7 @@ use std::path::Path;
 
 pub use flat::fields::*;
 pub use flat::{
-    AnyKind, AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, Ast, AstNode, AstNodeId, BuildId,
+    AnyNode, AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, Ast, AstNode, AstNodeId, BuildId,
     Builder, BytesValue, Checkpoint, Children, Descendants, Emit, EmittedNode, ExceptHandlerKind,
     ExprKind, FStringPartId, FStringPartView, FStringValue, InterpolatedStringElementKind,
     InterpolatedStringElements, List, ListId, ListItem, ListIter, LiteralExpression, LiteralWriter,

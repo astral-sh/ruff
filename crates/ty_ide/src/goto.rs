@@ -2,7 +2,7 @@ use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
-use ruff_python_ast::{AnyKind, AstNode, ExprKind};
+use ruff_python_ast::{AnyNode, AstNode, ExprKind};
 use ty_python_semantic::Db;
 
 use std::borrow::Cow;
@@ -954,7 +954,7 @@ impl GotoTarget<'_> {
 
         let node = covering_node.node();
         let string_annotation = match node.classify() {
-            AnyKind::ExprStringLiteral(string_expr) => model.enter_string_annotation(string_expr),
+            AnyNode::ExprStringLiteral(string_expr) => model.enter_string_annotation(string_expr),
             _ => None,
         };
 
@@ -969,7 +969,7 @@ impl GotoTarget<'_> {
             let enclosing_subscript_with_slice_range =
                 |range: TextRange| -> Option<ast::ExprSubscript<'a>> {
                     covering_node.ancestors().find_map(|node| {
-                        let AnyKind::ExprSubscript(subscript) = node.classify() else {
+                        let AnyNode::ExprSubscript(subscript) = node.classify() else {
                             return None;
                         };
                         (subscript.slice().range() == range).then_some(subscript)
@@ -1014,7 +1014,7 @@ impl GotoTarget<'_> {
             // 3. Cursor on the unary-op operand for `values[-1]` (e.g. `values[-<CURSOR>1]`,
             // covering node is the inner literal and parent is `ExprUnaryOp`).
             if expr.is_literal_expr()
-                && let Some(AnyKind::ExprUnaryOp(unary_op)) =
+                && let Some(AnyNode::ExprUnaryOp(unary_op)) =
                     covering_node.parent().map(SyntaxNode::classify)
                 && matches!(unary_op.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
                 && unary_op.operand().is_literal_expr()
@@ -1031,7 +1031,7 @@ impl GotoTarget<'_> {
                     covering_node
                         .ancestors()
                         .find_map(|node| match node.classify() {
-                            AnyKind::ExprSlice(slice) => Some(slice),
+                            AnyNode::ExprSlice(slice) => Some(slice),
                             _ => None,
                         })
                 && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
@@ -1041,7 +1041,7 @@ impl GotoTarget<'_> {
 
             // 5. Cursor immediately before the `[` (e.g. `values<CURSOR>[0]` or
             // `values<CURSOR>[1:]`).
-            if let Some(AnyKind::ExprSubscript(subscript)) =
+            if let Some(AnyNode::ExprSubscript(subscript)) =
                 covering_node.parent().map(SyntaxNode::classify)
                 && subscript.value().range() == expr.range()
                 && expr.range().end() == offset
@@ -1051,24 +1051,24 @@ impl GotoTarget<'_> {
         }
 
         match node.classify() {
-            AnyKind::Identifier(identifier) => match covering_node
+            AnyNode::Identifier(identifier) => match covering_node
                 .parent()
                 .map(SyntaxNode::classify)
             {
-                Some(AnyKind::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
-                Some(AnyKind::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
-                Some(AnyKind::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
-                Some(AnyKind::Alias(alias)) => {
+                Some(AnyNode::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
+                Some(AnyNode::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
+                Some(AnyNode::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
+                Some(AnyNode::Alias(alias)) => {
                     // Find the containing import statement to determine the type
                     let import_stmt = covering_node.ancestors().find(|node| {
                         matches!(
                             node.classify(),
-                            AnyKind::StmtImport(_) | AnyKind::StmtImportFrom(_)
+                            AnyNode::StmtImport(_) | AnyNode::StmtImportFrom(_)
                         )
                     });
 
                     match import_stmt.map(SyntaxNode::classify) {
-                        Some(AnyKind::StmtImport(_)) => {
+                        Some(AnyNode::StmtImport(_)) => {
                             // Regular import statement like "import x.y as z"
 
                             // Is the offset within the alias name (asname) part?
@@ -1100,7 +1100,7 @@ impl GotoTarget<'_> {
 
                             None
                         }
-                        Some(AnyKind::StmtImportFrom(import_from)) => {
+                        Some(AnyNode::StmtImportFrom(import_from)) => {
                             // From import statement like "from x import y as z"
 
                             // Is the offset within the alias name (asname) part?
@@ -1120,7 +1120,7 @@ impl GotoTarget<'_> {
                         _ => None,
                     }
                 }
-                Some(AnyKind::StmtImportFrom(from)) => {
+                Some(AnyNode::StmtImportFrom(from)) => {
                     // Handle offset within module name in from import statements
                     if let Some(module_expr) = from.module() {
                         let full_module_name = module_expr.to_string();
@@ -1138,11 +1138,11 @@ impl GotoTarget<'_> {
 
                     None
                 }
-                Some(AnyKind::ExceptHandlerExceptHandler(handler)) => handler
+                Some(AnyNode::ExceptHandlerExceptHandler(handler)) => handler
                     .name()
                     .is_some()
                     .then_some(GotoTarget::ExceptVariable(handler)),
-                Some(AnyKind::Keyword(keyword)) => {
+                Some(AnyNode::Keyword(keyword)) => {
                     // Find the containing call expression from the ancestor chain
                     let call_expression = covering_node
                         .ancestors()
@@ -1152,30 +1152,30 @@ impl GotoTarget<'_> {
                         call_expression,
                     })
                 }
-                Some(AnyKind::PatternMatchMapping(mapping)) => {
+                Some(AnyNode::PatternMatchMapping(mapping)) => {
                     Some(GotoTarget::PatternMatchRest(mapping))
                 }
-                Some(AnyKind::PatternKeyword(keyword)) => {
+                Some(AnyNode::PatternKeyword(keyword)) => {
                     Some(GotoTarget::PatternKeywordArgument(keyword))
                 }
-                Some(AnyKind::PatternMatchStar(star)) => {
+                Some(AnyNode::PatternMatchStar(star)) => {
                     Some(GotoTarget::PatternMatchStarName(star))
                 }
-                Some(AnyKind::PatternMatchAs(as_pattern)) => {
+                Some(AnyNode::PatternMatchAs(as_pattern)) => {
                     Some(GotoTarget::PatternMatchAsName(as_pattern))
                 }
-                Some(AnyKind::TypeParamTypeVar(var)) => Some(GotoTarget::TypeParamTypeVarName(var)),
-                Some(AnyKind::TypeParamParamSpec(bound)) => {
+                Some(AnyNode::TypeParamTypeVar(var)) => Some(GotoTarget::TypeParamTypeVarName(var)),
+                Some(AnyNode::TypeParamParamSpec(bound)) => {
                     Some(GotoTarget::TypeParamParamSpecName(bound))
                 }
-                Some(AnyKind::TypeParamTypeVarTuple(var_tuple)) => {
+                Some(AnyNode::TypeParamTypeVarTuple(var_tuple)) => {
                     Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
                 }
-                Some(AnyKind::ExprAttribute(attribute)) => {
+                Some(AnyNode::ExprAttribute(attribute)) => {
                     // Check if this is seemingly a callable being invoked (the `y` in `x.y(...)`)
                     let grandparent_expr = covering_node.ancestors().nth(2);
                     let attribute_expr = attribute.into();
-                    if let Some(AnyKind::ExprCall(call)) =
+                    if let Some(AnyNode::ExprCall(call)) =
                         grandparent_expr.map(SyntaxNode::classify)
                     {
                         if call.func().is_same_node(attribute) {
@@ -1188,19 +1188,19 @@ impl GotoTarget<'_> {
                     }
                     Some(GotoTarget::Expression(attribute_expr))
                 }
-                Some(AnyKind::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
-                Some(AnyKind::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
+                Some(AnyNode::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
+                Some(AnyNode::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
                 None => None,
                 Some(parent) => {
                     tracing::debug!(
                         "Missing `GoToTarget` for identifier with parent {:?}",
-                        parent.view().node_kind()
+                        parent.node_kind()
                     );
                     None
                 }
             },
 
-            AnyKind::ExprBinOp(binary) => {
+            AnyNode::ExprBinOp(binary) => {
                 if offset >= binary.left().end() && offset < binary.right().start() {
                     let between_operands = tokens
                         .in_range(TextRange::new(binary.left().end(), binary.right().start()));
@@ -1219,7 +1219,7 @@ impl GotoTarget<'_> {
                 Some(GotoTarget::Expression(binary.into()))
             }
 
-            AnyKind::ExprUnaryOp(unary) => {
+            AnyNode::ExprUnaryOp(unary) => {
                 if offset >= unary.start() && offset < unary.operand().start() {
                     let before_operand =
                         tokens.in_range(TextRange::new(unary.start(), unary.operand().start()));
@@ -1238,7 +1238,7 @@ impl GotoTarget<'_> {
                 Some(GotoTarget::Expression(unary.into()))
             }
 
-            node @ AnyKind::ExprStringLiteral(string_expr) => {
+            node @ AnyNode::ExprStringLiteral(string_expr) => {
                 // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
                 if let Some((subast, submodel)) = string_annotation
                     && let Some(sub_goto_target) = find_goto_target_impl(
@@ -1274,10 +1274,15 @@ impl GotoTarget<'_> {
                                 name,
                             })
                         }
-                        _ => node.view().cast::<ast::Expr>().map(GotoTarget::Expression),
+                        _ => node
+                            .syntax_node()
+                            .cast::<ast::Expr>()
+                            .map(GotoTarget::Expression),
                     }
                 } else {
-                    node.view().cast::<ast::Expr>().map(GotoTarget::Expression)
+                    node.syntax_node()
+                        .cast::<ast::Expr>()
+                        .map(GotoTarget::Expression)
                 }
             }
 
@@ -1290,9 +1295,9 @@ impl GotoTarget<'_> {
                 for node in covering_node
                     .parent()
                     .into_iter()
-                    .chain(std::iter::once(node.view()))
+                    .chain(std::iter::once(node.syntax_node()))
                 {
-                    if let AnyKind::ExprCall(call) = node.classify()
+                    if let AnyNode::ExprCall(call) = node.classify()
                         && let Some(name) = call.func().as_name_expr()
                     {
                         return Some(GotoTarget::Call {
@@ -1302,7 +1307,9 @@ impl GotoTarget<'_> {
                         });
                     }
                 }
-                node.view().cast::<ast::Expr>().map(GotoTarget::Expression)
+                node.syntax_node()
+                    .cast::<ast::Expr>()
+                    .map(GotoTarget::Expression)
             }
         }
     }

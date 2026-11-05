@@ -1,6 +1,6 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{Argument, Arguments, format_args, write};
-use ruff_python_ast::{AnyKind, SyntaxNode};
+use ruff_python_ast::{AnyNode, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
@@ -41,8 +41,8 @@ pub(crate) trait NeedsParentheses {
 /// i.e. the annotation of a `StmtAnnAssign` or the return annotation of a `StmtFunctionDef`.
 pub(crate) fn is_type_annotation_of(expr_range: TextRange, parent: SyntaxNode) -> bool {
     match parent.classify() {
-        AnyKind::StmtAnnAssign(stmt) => stmt.annotation().range() == expr_range,
-        AnyKind::StmtFunctionDef(stmt) => stmt.returns().is_some_and(|r| r.range() == expr_range),
+        AnyNode::StmtAnnAssign(stmt) => stmt.annotation().range() == expr_range,
+        AnyNode::StmtFunctionDef(stmt) => stmt.returns().is_some_and(|r| r.range() == expr_range),
         _ => false,
     }
 }

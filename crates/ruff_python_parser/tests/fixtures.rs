@@ -11,7 +11,7 @@ use ruff_python_ast::visitor::{
     source_order::{SourceOrderVisitor, TraversalSignal, walk_module},
 };
 use ruff_python_ast::{
-    self as ast, AnyKind, Ast, AstNode, AstNodeId, Builder, Comprehension, Expr, PythonVersion,
+    self as ast, AnyNode, Ast, AstNode, AstNodeId, Builder, Comprehension, Expr, PythonVersion,
     Stmt, SyntaxNode,
 };
 use ruff_python_parser::semantic_errors::{
@@ -441,7 +441,7 @@ fn validate_ast(parsed: &Parsed<ruff_python_ast::kind::Mod>, source_len: TextSiz
     assert_eq!(builder.get(copied), parsed.root());
 
     let mut visitor = ValidateAstVisitor::new(parsed.tokens(), source_len);
-    walk_module(&mut visitor, parsed.root());
+    walk_module(&mut visitor, parsed.root().classify());
     let mut expected_statements = visitor
         .visited
         .iter()
@@ -463,7 +463,8 @@ fn validate_children(node: SyntaxNode<'_>) {
     #[derive(Default)]
     struct ImmediateChildren(Vec<AstNodeId<ruff_python_ast::kind::Any>>);
     impl SourceOrderVisitor<'_> for ImmediateChildren {
-        fn enter_node(&mut self, node: SyntaxNode<'_>) -> TraversalSignal {
+        fn enter_node(&mut self, kind: AnyNode<'_>) -> TraversalSignal {
+            let node = kind.syntax_node();
             self.0.push(node.node_id());
             TraversalSignal::Skip
         }
@@ -555,9 +556,10 @@ Root: {root:#?}",
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
-    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'ast>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.visited.push(node);
-        if let AnyKind::ExprCompare(compare) = node.classify() {
+        if let AnyNode::ExprCompare(compare) = kind {
             assert!(
                 !compare.ops().is_empty(),
                 "Comparison without an operator: {compare:#?}"
@@ -610,7 +612,8 @@ Root: {root:#?}",
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
+    fn leave_node(&mut self, node: AnyNode<'ast>) {
+        let node = node.syntax_node();
         self.assert_end_boundary(node);
 
         self.parents.pop().expect("Expected tree to be balanced");

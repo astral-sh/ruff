@@ -1298,7 +1298,8 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     fn visit_stmt_impl(&mut self, stmt: Stmt<'db>) {
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             ast::StmtKind::FunctionDef(func_def) => {
                 let kind = SymbolKind::function_kind(
                     func_def.name().as_str(),
@@ -1401,11 +1402,11 @@ impl<'db> SymbolVisitor<'db> {
             }
             ast::StmtKind::Assign(assign) => {
                 self.add_all_assignment(assign.targets().first(), Some(assign.value()));
-                source_order::walk_stmt(self, stmt);
+                source_order::walk_stmt(self, kind);
             }
             ast::StmtKind::AnnAssign(ann_assign) => {
                 self.add_all_assignment(Some(ann_assign.target()), ann_assign.value());
-                source_order::walk_stmt(self, stmt);
+                source_order::walk_stmt(self, kind);
             }
             ast::StmtKind::AugAssign(assign) => {
                 let ast::StmtAugAssignFields {
@@ -1440,7 +1441,7 @@ impl<'db> SymbolVisitor<'db> {
                 }
             }
             ast::StmtKind::Expr(expr) => {
-                source_order::walk_stmt(self, stmt);
+                source_order::walk_stmt(self, kind);
 
                 // We don't care about `__all__` unless we're
                 // specifically looking for exported symbols.
@@ -1519,7 +1520,7 @@ impl<'db> SymbolVisitor<'db> {
             // statements. We just assume that all `if` statements are
             // always `True`. This applies to symbols in general but
             // also `__all__`.
-            _ => source_order::walk_stmt(self, stmt),
+            _ => source_order::walk_stmt(self, kind),
         }
     }
 }
@@ -1536,7 +1537,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             return;
         }
 
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Name(name)
                 if name.ctx().is_store()
                     && !self.suppress_store_symbols
@@ -1573,7 +1575,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 self.visit_expr(lambda.body());
                 self.in_function = was_in_function;
             }
-            _ => source_order::walk_expr(self, expr),
+            _ => source_order::walk_expr(self, kind),
         }
     }
 
@@ -1587,11 +1589,12 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     }
 
     fn visit_pattern(&mut self, pattern: Pattern<'db>) {
-        let binding = pattern.classify().capture_name();
+        let kind = pattern.classify();
+        let binding = kind.capture_name();
 
         let previous_binding = self.pattern_binding;
         self.pattern_binding = binding;
-        source_order::walk_pattern(self, pattern);
+        source_order::walk_pattern(self, kind);
         self.pattern_binding = previous_binding;
     }
 
