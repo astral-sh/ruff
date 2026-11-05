@@ -633,7 +633,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
     // Visits a subexpression, ignoring whether it is parenthesized or not
     fn visit_subexpression(&mut self, expr: Expr<'input>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Dict(_)
             | ExprKind::List(_)
             | ExprKind::Set(_)
@@ -759,7 +760,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
         }
 
-        walk_expr(self, expr);
+        walk_expr(self, kind);
     }
 }
 

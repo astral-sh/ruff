@@ -3,7 +3,7 @@
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, walk_expr as walk_source_order_expr, walk_stmt as walk_source_order_stmt,
+    SourceOrderVisitor, walk_expr as walk_source_order_expr, walk_stmt,
 };
 use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier, NodeList, Stmt, StmtKind};
 
@@ -92,12 +92,13 @@ struct UnknownDunderAllUse {
 
 impl<'a> SourceOrderVisitor<'a> for UnknownDunderAllUse {
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if let ExprKind::Name(name) = expr.classify()
+        let kind = expr.classify();
+        if let ExprKind::Name(name) = kind
             && name.id() == "__all__"
         {
             self.found = true;
         } else if !self.found {
-            walk_source_order_expr(self, expr);
+            walk_source_order_expr(self, kind);
         }
     }
 
@@ -108,15 +109,19 @@ impl<'a> SourceOrderVisitor<'a> for UnknownDunderAllUse {
     }
 
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        if self.found {
+            return;
+        }
+        let kind = stmt.classify();
         // A wildcard import can replace an existing `__all__`, but one before the literal
         // assignment is overwritten by that assignment.
         if self.initialized
-            && let StmtKind::ImportFrom(import) = stmt.classify()
+            && let StmtKind::ImportFrom(import) = kind
             && import.names().iter().any(|alias| alias.name() == "*")
         {
             self.found = true;
-        } else if !self.found {
-            walk_source_order_stmt(self, stmt);
+        } else {
+            walk_stmt(self, kind);
         }
     }
 }

@@ -97,7 +97,7 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::SyntaxNode;
+use ruff_python_ast::{Mod, SyntaxNode};
 use ruff_python_trivia::{CommentLinePosition, SuppressionKind, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
@@ -237,27 +237,16 @@ impl<'a> Comments<'a> {
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
-        root: impl Into<SyntaxNode<'a>>,
+        root: Mod<'a>,
         source_code: SourceCode<'a>,
         trivia: &'a TriviaRanges,
     ) -> Self {
-        fn collect_comments<'a>(
-            root: SyntaxNode<'a>,
-            source_code: SourceCode<'a>,
-            trivia: &'a TriviaRanges,
-        ) -> Comments<'a> {
-            let map = if trivia.comments().is_empty() {
-                CommentsMap::new()
-            } else {
-                let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia);
-                CommentsVisitor::new(source_code, trivia.comments(), &mut builder).visit(root);
-                builder.finish()
-            };
-
-            Comments::new(map)
+        if trivia.comments().is_empty() {
+            return Self::new(CommentsMap::new());
         }
-
-        collect_comments(root.into(), source_code, trivia)
+        let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia);
+        CommentsVisitor::new(source_code, trivia.comments(), &mut builder).visit(root);
+        Self::new(builder.finish())
     }
 
     /// Returns whether this node might have leading, dangling, or trailing comments.

@@ -34,22 +34,22 @@ impl<'a> Collector<'a> {
 
     #[must_use]
     pub(crate) fn collect(mut self, module: Mod<'_>) -> Vec<CollectedImport> {
-        walk_module(&mut self, module);
+        walk_module(&mut self, module.classify());
         self.imports
     }
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     fn visit_stmt(&mut self, stmt: Stmt<'ast>) {
-        match stmt.fields() {
-            ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
-                names,
-                module,
-                level,
-                is_lazy: _,
-                range: _,
-                node: _,
-            }) => {
+        let kind = stmt.classify();
+        match kind {
+            ast::StmtKind::ImportFrom(node) => {
+                let ast::StmtImportFromFields {
+                    names,
+                    module,
+                    level,
+                    ..
+                } = node.fields();
                 for alias in names {
                     let mut components = vec![];
 
@@ -86,25 +86,20 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            ast::StmtFields::Import(ast::StmtImportFields {
-                names,
-                is_lazy: _,
-                range: _,
-                node: _,
-            }) => {
-                for alias in names {
+            ast::StmtKind::Import(import) => {
+                for alias in import.names() {
                     if let Some(module_name) = ModuleName::new(alias.name().as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
                     }
                 }
             }
-            ast::StmtFields::If(ast::StmtIfFields {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node: _,
-            }) => {
+            ast::StmtKind::If(node) => {
+                let ast::StmtIfFields {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    ..
+                } = node.fields();
                 // Skip TYPE_CHECKING blocks if not requested
                 if self.type_checking_imports || !is_type_checking_condition(test) {
                     self.visit_body(body);
@@ -114,35 +109,35 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            ast::StmtFields::FunctionDef(_)
-            | ast::StmtFields::ClassDef(_)
-            | ast::StmtFields::While(_)
-            | ast::StmtFields::With(_)
-            | ast::StmtFields::Match(_)
-            | ast::StmtFields::Try(_)
-            | ast::StmtFields::For(_) => {
+            ast::StmtKind::FunctionDef(_)
+            | ast::StmtKind::ClassDef(_)
+            | ast::StmtKind::While(_)
+            | ast::StmtKind::With(_)
+            | ast::StmtKind::Match(_)
+            | ast::StmtKind::Try(_)
+            | ast::StmtKind::For(_) => {
                 // Always traverse into compound statements.
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
 
-            ast::StmtFields::Return(_)
-            | ast::StmtFields::Delete(_)
-            | ast::StmtFields::Assign(_)
-            | ast::StmtFields::AugAssign(_)
-            | ast::StmtFields::AnnAssign(_)
-            | ast::StmtFields::TypeAlias(_)
-            | ast::StmtFields::Raise(_)
-            | ast::StmtFields::Assert(_)
-            | ast::StmtFields::Global(_)
-            | ast::StmtFields::Nonlocal(_)
-            | ast::StmtFields::Expr(_)
-            | ast::StmtFields::Pass(_)
-            | ast::StmtFields::Break(_)
-            | ast::StmtFields::Continue(_)
-            | ast::StmtFields::IpyEscapeCommand(_) => {
+            ast::StmtKind::Return(_)
+            | ast::StmtKind::Delete(_)
+            | ast::StmtKind::Assign(_)
+            | ast::StmtKind::AugAssign(_)
+            | ast::StmtKind::AnnAssign(_)
+            | ast::StmtKind::TypeAlias(_)
+            | ast::StmtKind::Raise(_)
+            | ast::StmtKind::Assert(_)
+            | ast::StmtKind::Global(_)
+            | ast::StmtKind::Nonlocal(_)
+            | ast::StmtKind::Expr(_)
+            | ast::StmtKind::Pass(_)
+            | ast::StmtKind::Break(_)
+            | ast::StmtKind::Continue(_)
+            | ast::StmtKind::IpyEscapeCommand(_) => {
                 // Only traverse simple statements when string imports is enabled.
                 if self.string_imports.enabled {
-                    walk_stmt(self, stmt);
+                    walk_stmt(self, kind);
                 }
             }
         }
@@ -150,13 +145,9 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 
     fn visit_expr(&mut self, expr: Expr<'ast>) {
         if self.string_imports.enabled {
-            if let ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                value,
-                range: _,
-                node: _,
-            }) = expr.fields()
-            {
-                let value = value.to_str();
+            let kind = expr.classify();
+            if let ast::ExprKind::StringLiteral(literal) = kind {
+                let value = literal.value().to_str();
                 // Determine whether the string literal "looks like" an import statement: contains
                 // the requisite number of dots, and consists solely of valid Python identifiers.
                 if self.string_imports.min_dots == 0
@@ -172,7 +163,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 }
             }
 
-            walk_expr(self, expr);
+            walk_expr(self, kind);
         }
     }
 }

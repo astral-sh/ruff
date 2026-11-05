@@ -12,7 +12,7 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{
-    self as ast, AnyKind, Expr, ExprAttribute, ExprStringLiteral, ExprSubscript, Identifier,
+    self as ast, AnyNode, Expr, ExprAttribute, ExprStringLiteral, ExprSubscript, Identifier,
     StmtClassDef, StmtImport, StmtImportFrom, StringFlags, SyntaxNode,
 };
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
@@ -1038,7 +1038,7 @@ impl<'m> ContextCursor<'m> {
             .parent()
             .map(ruff_python_ast::SyntaxNode::classify)
         {
-            Some(AnyKind::ExprStringLiteral(string_expr)) => Some(string_expr),
+            Some(AnyNode::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
         }
     }
@@ -1054,12 +1054,12 @@ impl<'m> ContextCursor<'m> {
             .skip_while(|node| {
                 !matches!(
                     node.classify(),
-                    AnyKind::ExprStringLiteral(expr)
+                    AnyNode::ExprStringLiteral(expr)
                         if expr.range() == string_expr.range()
                 )
             })
             .nth(1)?;
-        let AnyKind::ExprSubscript(subscript) = parent.classify() else {
+        let AnyNode::ExprSubscript(subscript) = parent.classify() else {
             return None;
         };
 
@@ -1106,9 +1106,9 @@ impl<'m> ContextCursor<'m> {
             // We bail if we're specifying arguments as we don't want
             // to suppress suggestions there.
             .take_while(|node| {
-                !matches!(node.classify(), AnyKind::Arguments(_)) && !node.is_statement()
+                !matches!(node.classify(), AnyNode::Arguments(_)) && !node.is_statement()
             })
-            .any(|node| matches!(node.classify(), AnyKind::Decorator(_)))
+            .any(|node| matches!(node.classify(), AnyNode::Decorator(_)))
     }
 
     fn suppress_class_parentheses(&self, model: &SemanticModel<'_>) -> bool {
@@ -1117,7 +1117,7 @@ impl<'m> ContextCursor<'m> {
                 .covering_node
                 .ancestors()
                 .any(|node| match node.classify() {
-                    AnyKind::ExceptHandlerExceptHandler(handler) => handler
+                    AnyNode::ExceptHandlerExceptHandler(handler) => handler
                         .type_()
                         .is_some_and(|expr| expr.range().contains_range(self.range)),
                     _ => false,
@@ -1165,11 +1165,11 @@ impl<'m> ContextCursor<'m> {
         self.covering_node
             .ancestors()
             .any(|node| match node.classify() {
-                AnyKind::Parameter(param) => param.name().range().contains_range(self.range),
-                AnyKind::TypeParamTypeVar(type_param) => {
+                AnyNode::Parameter(param) => param.name().range().contains_range(self.range),
+                AnyNode::TypeParamTypeVar(type_param) => {
                     type_param.name().range().contains_range(self.range)
                 }
-                AnyKind::StmtFor(stmt_for) => stmt_for.target().range().contains_range(self.range),
+                AnyNode::StmtFor(stmt_for) => stmt_for.target().range().contains_range(self.range),
                 // The AST does not produce `ruff_python_ast::SyntaxNode::Parameter` nodes for keywords
                 // or otherwise invalid syntax. Rather they are captured in a
                 // `ruff_python_ast::SyntaxNode::Parameters` node as "empty space". To ensure
@@ -1179,7 +1179,7 @@ impl<'m> ContextCursor<'m> {
                 // that we are still binding variables, just that the current state is
                 // syntactically invalid. Hence we suppress autocomplete suggestions
                 // also in those cases.
-                AnyKind::Parameters(params) => {
+                AnyNode::Parameters(params) => {
                     if !params.range().contains_range(self.range) {
                         return false;
                     }
@@ -1340,10 +1340,10 @@ impl<'m> ContextCursor<'m> {
                 covering_node
                     .ancestors()
                     .find_map(|node| match node.classify() {
-                        AnyKind::StmtFor(stmt) => self
+                        AnyNode::StmtFor(stmt) => self
                             .range_end_position(stmt.target().range(), node, token)
                             .map(|position| position.select_keywords(IN, NONE)),
-                        AnyKind::Comprehension(comprehension) => self
+                        AnyNode::Comprehension(comprehension) => self
                             .range_end_position(comprehension.target().range(), node, token)
                             .map(|position| position.select_keywords(IN, NONE)),
                         _ => None,
@@ -1358,13 +1358,13 @@ impl<'m> ContextCursor<'m> {
                 covering_node
                     .ancestors()
                     .find_map(|node| match node.classify() {
-                        AnyKind::StmtWith(stmt) => stmt.items().iter().find_map(|item| {
+                        AnyNode::StmtWith(stmt) => stmt.items().iter().find_map(|item| {
                             let range = item.context_expr().range();
                             self.range_end_position(range, item.into(), token)
                                 .map(|position| position.select_keywords(AS, NONE))
                                 .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
                         }),
-                        AnyKind::ExceptHandlerExceptHandler(handler) => handler
+                        AnyNode::ExceptHandlerExceptHandler(handler) => handler
                             .type_()
                             .and_then(|type_| self.range_end_position(type_.range(), node, token))
                             .map(|position| position.select_keywords(AS, NONE)),
@@ -1378,7 +1378,7 @@ impl<'m> ContextCursor<'m> {
         // followed by `if`.
         if (matches_as || matches_if)
             && let Some(keywords) = covering_node.ancestors().find_map(|node| {
-                let AnyKind::MatchCase(case) = node.classify() else {
+                let AnyNode::MatchCase(case) = node.classify() else {
                     return None;
                 };
                 match case.pattern().fields() {
@@ -1437,14 +1437,14 @@ impl<'m> ContextCursor<'m> {
 
         for node in self.covering_node.ancestors() {
             match node.classify() {
-                AnyKind::StmtRaise(stmt) => {
+                AnyNode::StmtRaise(stmt) => {
                     if stmt.exc().is_some_and(contains) {
                         return Some(raise_ty);
                     } else if stmt.cause().is_some_and(contains) {
                         return Some(cause_ty);
                     }
                 }
-                AnyKind::ExceptHandlerExceptHandler(handler)
+                AnyNode::ExceptHandlerExceptHandler(handler)
                     if handler.type_().is_some_and(contains) =>
                 {
                     return Some(except_ty);
@@ -1464,7 +1464,7 @@ impl<'m> ContextCursor<'m> {
     /// E.g. `class Foo(Bar<CURSOR>)`
     fn enclosing_class_def(&self) -> Option<StmtClassDef<'m>> {
         for node in self.covering_node.ancestors() {
-            if let AnyKind::StmtClassDef(class_def) = node.classify() {
+            if let AnyNode::StmtClassDef(class_def) = node.classify() {
                 return class_def
                     .arguments()
                     .is_some_and(|args| args.range().contains_range(self.range))
@@ -1513,7 +1513,7 @@ impl<'m> ContextCursor<'m> {
             // the python grammar disallows anything but expressions.
 
             // if_stmt := 'if' named_expression ':' block elif_stmt
-            AnyKind::StmtIf(stmt) => {
+            AnyNode::StmtIf(stmt) => {
                 contains(stmt.test())
                     || stmt
                         .elif_else_clauses()
@@ -1521,59 +1521,59 @@ impl<'m> ContextCursor<'m> {
                         .any(|clause| clause.test().is_some_and(contains))
             }
             // while_stmt := 'while' named_expression ':' block [else_block]
-            AnyKind::StmtWhile(stmt) => contains(stmt.test()),
+            AnyNode::StmtWhile(stmt) => contains(stmt.test()),
 
             // for_stmt := 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
-            AnyKind::StmtFor(stmt) => contains(stmt.iter()),
+            AnyNode::StmtFor(stmt) => contains(stmt.iter()),
             // with_item := expression
-            AnyKind::StmtWith(stmt) => stmt
+            AnyNode::StmtWith(stmt) => stmt
                 .items()
                 .iter()
                 .any(|item| contains(item.context_expr())),
             // match_stmt := "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
-            AnyKind::StmtMatch(stmt) => contains(stmt.subject()),
+            AnyNode::StmtMatch(stmt) => contains(stmt.subject()),
             // case_guard := 'if' named_expression
-            AnyKind::MatchCase(case) => {
+            AnyNode::MatchCase(case) => {
                 case.guard().is_some_and(contains)
                     || case.pattern().range().contains_range(self.range)
             }
             // assert_stmt := 'assert' expression [',' expression ]
-            AnyKind::StmtAssert(stmt) => contains(stmt.test()) || stmt.msg().is_some_and(contains),
+            AnyNode::StmtAssert(stmt) => contains(stmt.test()) || stmt.msg().is_some_and(contains),
             // raise_stmt := 'raise' expression ['from' expression ]
-            AnyKind::StmtRaise(stmt) => {
+            AnyNode::StmtRaise(stmt) => {
                 stmt.exc().is_some_and(contains) || stmt.cause().is_some_and(contains)
             }
             // return_stmt := 'return' [star_expressions]
-            AnyKind::StmtReturn(stmt) => stmt.value().is_some_and(contains),
+            AnyNode::StmtReturn(stmt) => stmt.value().is_some_and(contains),
 
-            AnyKind::StmtAssign(stmt) => contains(stmt.value()),
-            AnyKind::StmtAugAssign(stmt) => contains(stmt.value()),
-            AnyKind::StmtAnnAssign(stmt) => {
+            AnyNode::StmtAssign(stmt) => contains(stmt.value()),
+            AnyNode::StmtAugAssign(stmt) => contains(stmt.value()),
+            AnyNode::StmtAnnAssign(stmt) => {
                 contains(stmt.annotation()) || stmt.value().is_some_and(contains)
             }
             // type_alias := "type" NAME [type_params] '=' expression
-            AnyKind::StmtTypeAlias(stmt) => contains(stmt.value()),
+            AnyNode::StmtTypeAlias(stmt) => contains(stmt.value()),
             // except_clause := 'except' expression ':' block
-            AnyKind::ExceptHandlerExceptHandler(handler) => handler.type_().is_some_and(contains),
+            AnyNode::ExceptHandlerExceptHandler(handler) => handler.type_().is_some_and(contains),
 
-            AnyKind::ExprList(expr) => expr.elts().iter().any(contains),
-            AnyKind::ExprTuple(expr) => expr.elts().iter().any(contains),
-            AnyKind::ExprSet(expr) => expr.elts().iter().any(contains),
-            AnyKind::DictItem(_) => true,
+            AnyNode::ExprList(expr) => expr.elts().iter().any(contains),
+            AnyNode::ExprTuple(expr) => expr.elts().iter().any(contains),
+            AnyNode::ExprSet(expr) => expr.elts().iter().any(contains),
+            AnyNode::DictItem(_) => true,
 
             // with_item := expression
-            AnyKind::WithItem(item) => contains(item.context_expr()),
+            AnyNode::WithItem(item) => contains(item.context_expr()),
 
             // lambdef := 'lambda' [lambda_params] ':' expression
-            AnyKind::ExprLambda(expr) => contains(expr.body()),
+            AnyNode::ExprLambda(expr) => contains(expr.body()),
 
             // arguments := (positional arguments | keyword arguments | "*" expression | "**" expression)*
-            AnyKind::Arguments(args) => {
+            AnyNode::Arguments(args) => {
                 args.args().iter().any(contains)
                     || args.keywords().iter().any(|kw| contains(kw.value()))
             }
-            AnyKind::Parameter(param) => param.annotation().is_some_and(contains),
-            AnyKind::ParameterWithDefault(param) => param.default().is_some_and(contains),
+            AnyNode::Parameter(param) => param.annotation().is_some_and(contains),
+            AnyNode::ParameterWithDefault(param) => param.default().is_some_and(contains),
             _ => false,
         }
     }
@@ -1585,10 +1585,10 @@ impl<'m> ContextCursor<'m> {
     /// typed text.
     fn is_in_for_statement_iterable(&self, node: SyntaxNode) -> bool {
         match node.classify() {
-            AnyKind::StmtFor(stmt_for) => stmt_for.iter().range().contains_range(self.range),
+            AnyNode::StmtFor(stmt_for) => stmt_for.iter().range().contains_range(self.range),
             // Detects `for x in <CURSOR>` statements inside comprehensions.
             // E.g. `[for x in <CURSOR>]`
-            AnyKind::Comprehension(comprehension) => {
+            AnyNode::Comprehension(comprehension) => {
                 comprehension.target().range().contains_range(self.range)
                     || comprehension.iter().range().contains_range(self.range)
                     || comprehension
@@ -1682,7 +1682,7 @@ impl TypeCheckingBlock {
             covering_node(parsed.syntax().into(), self.range)
                 .ancestors()
                 .find_map(|node| {
-                    let AnyKind::StmtIf(statement) = node.classify() else {
+                    let AnyNode::StmtIf(statement) = node.classify() else {
                         return None;
                     };
                     index.try_expression_scope_id(&statement.test())
@@ -2092,21 +2092,21 @@ fn add_argument_completions<'db>(
         match node.classify() {
             // Do not suggest argument completions in value positions for
             // keyword arguments
-            AnyKind::Keyword(kw) => {
+            AnyNode::Keyword(kw) => {
                 if kw.value().range().contains_range(cursor.range) {
                     return;
                 }
             }
-            AnyKind::Arguments(_) => {
+            AnyNode::Arguments(_) => {
                 in_arguments = true;
             }
-            AnyKind::ExprCall(_) => {
+            AnyNode::ExprCall(_) => {
                 if in_arguments {
                     add_function_arg_completions(db, file, cursor, completions);
                 }
                 return;
             }
-            AnyKind::StmtClassDef(class_def) => {
+            AnyNode::StmtClassDef(class_def) => {
                 if let Some(arguments) = class_def.arguments()
                     && arguments.range().contains_range(cursor.range)
                 {
@@ -2115,7 +2115,7 @@ fn add_argument_completions<'db>(
                 return;
             }
             node => {
-                if node.view().is_statement() {
+                if node.syntax_node().is_statement() {
                     return;
                 }
             }
@@ -2230,7 +2230,7 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
         .covering_node
         .parent()
         .and_then(|node| match node.classify() {
-            AnyKind::Arguments(args) => Some(args),
+            AnyNode::Arguments(args) => Some(args),
             _ => None,
         })
         .map(|args| {
@@ -2569,7 +2569,7 @@ impl<'t> CompletionTargetTokens<'t> {
                     })
                     .ok()?;
                 match covering_node.node().classify() {
-                    AnyKind::ExprAttribute(expr) => Some(CompletionTargetAst::ObjectDot { expr }),
+                    AnyNode::ExprAttribute(expr) => Some(CompletionTargetAst::ObjectDot { expr }),
                     _ => None,
                 }
             }
@@ -3220,7 +3220,7 @@ fn find_ast_for_from_import<'p>(
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find_first(ruff_python_ast::SyntaxNode::is_stmt_import_from)
         .ok()?;
-    let AnyKind::StmtImportFrom(from_import) = covering_node.node().classify() else {
+    let AnyNode::StmtImportFrom(from_import) = covering_node.node().classify() else {
         return None;
     };
     Some(from_import)
@@ -3234,7 +3234,7 @@ fn find_ast_for_import<'p>(parsed: &'p ParsedModuleRef, token: &Token) -> Option
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find_first(ruff_python_ast::SyntaxNode::is_stmt_import)
         .ok()?;
-    let AnyKind::StmtImport(import) = covering_node.node().classify() else {
+    let AnyNode::StmtImport(import) = covering_node.node().classify() else {
         return None;
     };
     Some(import)

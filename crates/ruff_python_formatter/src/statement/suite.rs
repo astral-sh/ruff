@@ -1,7 +1,7 @@
 use ruff_formatter::{FormatContext, FormatOwnedWithRule, FormatRuleWithOptions, write};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{
-    self as ast, AnyKind, ExprKind, PySourceType, Stmt, StmtExpr, StmtKind, Suite, SyntaxNode,
+    self as ast, AnyNode, ExprKind, PySourceType, Stmt, StmtExpr, StmtKind, Suite, SyntaxNode,
 };
 use ruff_python_trivia::{
     SimpleTokenKind, SimpleTokenizer, lines_after, lines_after_ignoring_end_of_line_trivia,
@@ -555,7 +555,7 @@ fn trailing_function_or_class_def<'a>(
     .find(|last_child| {
         matches!(
             last_child.classify(),
-            AnyKind::StmtFunctionDef(_) | AnyKind::StmtClassDef(_)
+            AnyNode::StmtFunctionDef(_) | AnyNode::StmtClassDef(_)
         )
     })
 }

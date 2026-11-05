@@ -5033,21 +5033,21 @@ impl Builder {
         rewriter: &mut R,
     ) -> BuildId<crate::kind::Any> {
         match node.classify() {
-            AnyKind::ModModule(node) => build::ModModule {
+            AnyNode::ModModule(node) => build::ModModule {
                 range: node.range(),
                 body: self.map_list(node.body(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ModExpression(node) => build::ModExpression {
+            AnyNode::ModExpression(node) => build::ModExpression {
                 range: node.range(),
                 body: self.copy_with(node.body(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtFunctionDef(node) => build::StmtFunctionDef {
+            AnyNode::StmtFunctionDef(node) => build::StmtFunctionDef {
                 range: node.range(),
                 is_async: node.is_async(),
                 decorator_list: self.map_list(node.decorator_list(), |b, child| {
@@ -5064,7 +5064,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtClassDef(node) => build::StmtClassDef {
+            AnyNode::StmtClassDef(node) => build::StmtClassDef {
                 range: node.range(),
                 decorator_list: self.map_list(node.decorator_list(), |b, child| {
                     b.copy_with(child, rewriter)
@@ -5081,21 +5081,21 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtReturn(node) => build::StmtReturn {
+            AnyNode::StmtReturn(node) => build::StmtReturn {
                 range: node.range(),
                 value: node.value().map(|child| self.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtDelete(node) => build::StmtDelete {
+            AnyNode::StmtDelete(node) => build::StmtDelete {
                 range: node.range(),
                 targets: self.map_list(node.targets(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtTypeAlias(node) => build::StmtTypeAlias {
+            AnyNode::StmtTypeAlias(node) => build::StmtTypeAlias {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 type_params: node
@@ -5106,7 +5106,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtAssign(node) => build::StmtAssign {
+            AnyNode::StmtAssign(node) => build::StmtAssign {
                 range: node.range(),
                 targets: self.map_list(node.targets(), |b, child| b.copy_with(child, rewriter)),
                 value: self.copy_with(node.value(), rewriter),
@@ -5114,7 +5114,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtAugAssign(node) => build::StmtAugAssign {
+            AnyNode::StmtAugAssign(node) => build::StmtAugAssign {
                 range: node.range(),
                 target: self.copy_with(node.target(), rewriter),
                 op: node.op(),
@@ -5123,7 +5123,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtAnnAssign(node) => build::StmtAnnAssign {
+            AnyNode::StmtAnnAssign(node) => build::StmtAnnAssign {
                 range: node.range(),
                 target: self.copy_with(node.target(), rewriter),
                 annotation: self.copy_with(node.annotation(), rewriter),
@@ -5133,7 +5133,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtFor(node) => build::StmtFor {
+            AnyNode::StmtFor(node) => build::StmtFor {
                 range: node.range(),
                 is_async: node.is_async(),
                 target: self.copy_with(node.target(), rewriter),
@@ -5144,7 +5144,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtWhile(node) => build::StmtWhile {
+            AnyNode::StmtWhile(node) => build::StmtWhile {
                 range: node.range(),
                 test: self.copy_with(node.test(), rewriter),
                 body: self.map_list(node.body(), |b, child| b.copy_with(child, rewriter)),
@@ -5153,7 +5153,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtIf(node) => build::StmtIf {
+            AnyNode::StmtIf(node) => build::StmtIf {
                 range: node.range(),
                 test: self.copy_with(node.test(), rewriter),
                 body: self.map_list(node.body(), |b, child| b.copy_with(child, rewriter)),
@@ -5164,7 +5164,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtWith(node) => build::StmtWith {
+            AnyNode::StmtWith(node) => build::StmtWith {
                 range: node.range(),
                 is_async: node.is_async(),
                 items: self.map_list(node.items(), |b, child| b.copy_with(child, rewriter)),
@@ -5173,7 +5173,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtMatch(node) => build::StmtMatch {
+            AnyNode::StmtMatch(node) => build::StmtMatch {
                 range: node.range(),
                 subject: self.copy_with(node.subject(), rewriter),
                 cases: self.map_list(node.cases(), |b, child| b.copy_with(child, rewriter)),
@@ -5181,7 +5181,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtRaise(node) => build::StmtRaise {
+            AnyNode::StmtRaise(node) => build::StmtRaise {
                 range: node.range(),
                 exc: node.exc().map(|child| self.copy_with(child, rewriter)),
                 cause: node.cause().map(|child| self.copy_with(child, rewriter)),
@@ -5189,7 +5189,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtTry(node) => build::StmtTry {
+            AnyNode::StmtTry(node) => build::StmtTry {
                 range: node.range(),
                 body: self.map_list(node.body(), |b, child| b.copy_with(child, rewriter)),
                 handlers: self.map_list(node.handlers(), |b, child| b.copy_with(child, rewriter)),
@@ -5200,7 +5200,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtAssert(node) => build::StmtAssert {
+            AnyNode::StmtAssert(node) => build::StmtAssert {
                 range: node.range(),
                 test: self.copy_with(node.test(), rewriter),
                 msg: node.msg().map(|child| self.copy_with(child, rewriter)),
@@ -5208,7 +5208,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtImport(node) => build::StmtImport {
+            AnyNode::StmtImport(node) => build::StmtImport {
                 range: node.range(),
                 names: self.map_list(node.names(), |b, child| b.copy_with(child, rewriter)),
                 is_lazy: node.is_lazy(),
@@ -5216,7 +5216,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtImportFrom(node) => build::StmtImportFrom {
+            AnyNode::StmtImportFrom(node) => build::StmtImportFrom {
                 range: node.range(),
                 module: node.module().map(|child| self.copy_with(child, rewriter)),
                 names: self.map_list(node.names(), |b, child| b.copy_with(child, rewriter)),
@@ -5226,46 +5226,46 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtGlobal(node) => build::StmtGlobal {
+            AnyNode::StmtGlobal(node) => build::StmtGlobal {
                 range: node.range(),
                 names: self.map_list(node.names(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtNonlocal(node) => build::StmtNonlocal {
+            AnyNode::StmtNonlocal(node) => build::StmtNonlocal {
                 range: node.range(),
                 names: self.map_list(node.names(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtExpr(node) => build::StmtExpr {
+            AnyNode::StmtExpr(node) => build::StmtExpr {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtPass(node) => build::StmtPass {
+            AnyNode::StmtPass(node) => build::StmtPass {
                 range: node.range(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtBreak(node) => build::StmtBreak {
+            AnyNode::StmtBreak(node) => build::StmtBreak {
                 range: node.range(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtContinue(node) => build::StmtContinue {
+            AnyNode::StmtContinue(node) => build::StmtContinue {
                 range: node.range(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::StmtIpyEscapeCommand(node) => build::StmtIpyEscapeCommand {
+            AnyNode::StmtIpyEscapeCommand(node) => build::StmtIpyEscapeCommand {
                 range: node.range(),
                 kind: node.kind(),
                 value: node.value().into(),
@@ -5273,7 +5273,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprBoolOp(node) => build::ExprBoolOp {
+            AnyNode::ExprBoolOp(node) => build::ExprBoolOp {
                 range: node.range(),
                 op: node.op(),
                 values: self.map_list(node.values(), |b, child| b.copy_with(child, rewriter)),
@@ -5281,7 +5281,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprNamed(node) => build::ExprNamed {
+            AnyNode::ExprNamed(node) => build::ExprNamed {
                 range: node.range(),
                 target: self.copy_with(node.target(), rewriter),
                 value: self.copy_with(node.value(), rewriter),
@@ -5289,7 +5289,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprBinOp(node) => build::ExprBinOp {
+            AnyNode::ExprBinOp(node) => build::ExprBinOp {
                 range: node.range(),
                 left: self.copy_with(node.left(), rewriter),
                 op: node.op(),
@@ -5298,7 +5298,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprUnaryOp(node) => build::ExprUnaryOp {
+            AnyNode::ExprUnaryOp(node) => build::ExprUnaryOp {
                 range: node.range(),
                 op: node.op(),
                 operand: self.copy_with(node.operand(), rewriter),
@@ -5306,7 +5306,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprLambda(node) => build::ExprLambda {
+            AnyNode::ExprLambda(node) => build::ExprLambda {
                 range: node.range(),
                 parameters: node
                     .parameters()
@@ -5316,7 +5316,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprIf(node) => build::ExprIf {
+            AnyNode::ExprIf(node) => build::ExprIf {
                 range: node.range(),
                 test: self.copy_with(node.test(), rewriter),
                 body: self.copy_with(node.body(), rewriter),
@@ -5325,21 +5325,21 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprDict(node) => build::ExprDict {
+            AnyNode::ExprDict(node) => build::ExprDict {
                 range: node.range(),
                 items: self.map_list(node.items(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprSet(node) => build::ExprSet {
+            AnyNode::ExprSet(node) => build::ExprSet {
                 range: node.range(),
                 elts: self.map_list(node.elts(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprListComp(node) => build::ExprListComp {
+            AnyNode::ExprListComp(node) => build::ExprListComp {
                 range: node.range(),
                 elt: self.copy_with(node.elt(), rewriter),
                 generators: self
@@ -5348,7 +5348,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprSetComp(node) => build::ExprSetComp {
+            AnyNode::ExprSetComp(node) => build::ExprSetComp {
                 range: node.range(),
                 elt: self.copy_with(node.elt(), rewriter),
                 generators: self
@@ -5357,7 +5357,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprDictComp(node) => build::ExprDictComp {
+            AnyNode::ExprDictComp(node) => build::ExprDictComp {
                 range: node.range(),
                 key: node.key().map(|child| self.copy_with(child, rewriter)),
                 value: self.copy_with(node.value(), rewriter),
@@ -5367,7 +5367,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprGenerator(node) => build::ExprGenerator {
+            AnyNode::ExprGenerator(node) => build::ExprGenerator {
                 range: node.range(),
                 elt: self.copy_with(node.elt(), rewriter),
                 generators: self
@@ -5377,28 +5377,28 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprAwait(node) => build::ExprAwait {
+            AnyNode::ExprAwait(node) => build::ExprAwait {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprYield(node) => build::ExprYield {
+            AnyNode::ExprYield(node) => build::ExprYield {
                 range: node.range(),
                 value: node.value().map(|child| self.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprYieldFrom(node) => build::ExprYieldFrom {
+            AnyNode::ExprYieldFrom(node) => build::ExprYieldFrom {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprCompare(node) => build::ExprCompare {
+            AnyNode::ExprCompare(node) => build::ExprCompare {
                 range: node.range(),
                 ops: self.list(node.ops()),
                 operands: self.map_list(node.operands(), |b, child| b.copy_with(child, rewriter)),
@@ -5406,7 +5406,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprCall(node) => build::ExprCall {
+            AnyNode::ExprCall(node) => build::ExprCall {
                 range: node.range(),
                 func: self.copy_with(node.func(), rewriter),
                 arguments: self.copy_with(node.arguments(), rewriter),
@@ -5414,7 +5414,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprFString(node) => build::ExprFString {
+            AnyNode::ExprFString(node) => build::ExprFString {
                 range: node.range(),
                 value: self.map_list(node.value(), |b, part| match part {
                     super::FStringPartView::Literal(v) => {
@@ -5428,54 +5428,54 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprTString(node) => build::ExprTString {
+            AnyNode::ExprTString(node) => build::ExprTString {
                 range: node.range(),
                 value: self.map_list(node.value(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprStringLiteral(node) => build::ExprStringLiteral {
+            AnyNode::ExprStringLiteral(node) => build::ExprStringLiteral {
                 range: node.range(),
                 value: self.map_list(node.value(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprBytesLiteral(node) => build::ExprBytesLiteral {
+            AnyNode::ExprBytesLiteral(node) => build::ExprBytesLiteral {
                 range: node.range(),
                 value: self.map_list(node.value(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprNumberLiteral(node) => build::ExprNumberLiteral {
+            AnyNode::ExprNumberLiteral(node) => build::ExprNumberLiteral {
                 range: node.range(),
                 value: node.value().clone(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprBooleanLiteral(node) => build::ExprBooleanLiteral {
+            AnyNode::ExprBooleanLiteral(node) => build::ExprBooleanLiteral {
                 range: node.range(),
                 value: node.value(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprNoneLiteral(node) => build::ExprNoneLiteral {
+            AnyNode::ExprNoneLiteral(node) => build::ExprNoneLiteral {
                 range: node.range(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprEllipsisLiteral(node) => build::ExprEllipsisLiteral {
+            AnyNode::ExprEllipsisLiteral(node) => build::ExprEllipsisLiteral {
                 range: node.range(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprAttribute(node) => build::ExprAttribute {
+            AnyNode::ExprAttribute(node) => build::ExprAttribute {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
                 attr: self.copy_with(node.attr(), rewriter),
@@ -5484,7 +5484,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprSubscript(node) => build::ExprSubscript {
+            AnyNode::ExprSubscript(node) => build::ExprSubscript {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
                 slice: self.copy_with(node.slice(), rewriter),
@@ -5493,7 +5493,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprStarred(node) => build::ExprStarred {
+            AnyNode::ExprStarred(node) => build::ExprStarred {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
                 ctx: node.ctx(),
@@ -5501,7 +5501,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprName(node) => build::ExprName {
+            AnyNode::ExprName(node) => build::ExprName {
                 range: node.range(),
                 id: self.intern_name(node.id().as_str()),
                 ctx: node.ctx(),
@@ -5509,7 +5509,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprList(node) => build::ExprList {
+            AnyNode::ExprList(node) => build::ExprList {
                 range: node.range(),
                 elts: self.map_list(node.elts(), |b, child| b.copy_with(child, rewriter)),
                 ctx: node.ctx(),
@@ -5517,7 +5517,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprTuple(node) => build::ExprTuple {
+            AnyNode::ExprTuple(node) => build::ExprTuple {
                 range: node.range(),
                 elts: self.map_list(node.elts(), |b, child| b.copy_with(child, rewriter)),
                 ctx: node.ctx(),
@@ -5526,7 +5526,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprSlice(node) => build::ExprSlice {
+            AnyNode::ExprSlice(node) => build::ExprSlice {
                 range: node.range(),
                 lower: node.lower().map(|child| self.copy_with(child, rewriter)),
                 upper: node.upper().map(|child| self.copy_with(child, rewriter)),
@@ -5535,7 +5535,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExprIpyEscapeCommand(node) => build::ExprIpyEscapeCommand {
+            AnyNode::ExprIpyEscapeCommand(node) => build::ExprIpyEscapeCommand {
                 range: node.range(),
                 kind: node.kind(),
                 value: node.value().into(),
@@ -5543,7 +5543,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ExceptHandlerExceptHandler(node) => build::ExceptHandlerExceptHandler {
+            AnyNode::ExceptHandlerExceptHandler(node) => build::ExceptHandlerExceptHandler {
                 range: node.range(),
                 type_: node.type_().map(|child| self.copy_with(child, rewriter)),
                 name: node.name().map(|child| self.copy_with(child, rewriter)),
@@ -5552,7 +5552,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::InterpolatedElement(node) => build::InterpolatedElement {
+            AnyNode::InterpolatedElement(node) => build::InterpolatedElement {
                 range: node.range(),
                 expression: self.copy_with(node.expression(), rewriter),
                 debug_text: node.debug_text().cloned(),
@@ -5564,7 +5564,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::InterpolatedStringLiteralElement(node) => {
+            AnyNode::InterpolatedStringLiteralElement(node) => {
                 build::InterpolatedStringLiteralElement {
                     range: node.range(),
                     value: node.value(),
@@ -5573,35 +5573,35 @@ impl Builder {
                 .0
                 .cast()
             }
-            AnyKind::PatternMatchValue(node) => build::PatternMatchValue {
+            AnyNode::PatternMatchValue(node) => build::PatternMatchValue {
                 range: node.range(),
                 value: self.copy_with(node.value(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchSingleton(node) => build::PatternMatchSingleton {
+            AnyNode::PatternMatchSingleton(node) => build::PatternMatchSingleton {
                 range: node.range(),
                 value: node.value(),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchSequence(node) => build::PatternMatchSequence {
+            AnyNode::PatternMatchSequence(node) => build::PatternMatchSequence {
                 range: node.range(),
                 patterns: self.map_list(node.patterns(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchMapping(node) => build::PatternMatchMapping {
+            AnyNode::PatternMatchMapping(node) => build::PatternMatchMapping {
                 range: node.range(),
                 items: node.items().copy_to(self, rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchClass(node) => build::PatternMatchClass {
+            AnyNode::PatternMatchClass(node) => build::PatternMatchClass {
                 range: node.range(),
                 cls: self.copy_with(node.cls(), rewriter),
                 arguments: self.copy_with(node.arguments(), rewriter),
@@ -5609,14 +5609,14 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchStar(node) => build::PatternMatchStar {
+            AnyNode::PatternMatchStar(node) => build::PatternMatchStar {
                 range: node.range(),
                 name: node.name().map(|child| self.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchAs(node) => build::PatternMatchAs {
+            AnyNode::PatternMatchAs(node) => build::PatternMatchAs {
                 range: node.range(),
                 pattern: node.pattern().map(|child| self.copy_with(child, rewriter)),
                 name: node.name().map(|child| self.copy_with(child, rewriter)),
@@ -5624,14 +5624,14 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternMatchOr(node) => build::PatternMatchOr {
+            AnyNode::PatternMatchOr(node) => build::PatternMatchOr {
                 range: node.range(),
                 patterns: self.map_list(node.patterns(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::TypeParamTypeVar(node) => build::TypeParamTypeVar {
+            AnyNode::TypeParamTypeVar(node) => build::TypeParamTypeVar {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 bound: node.bound().map(|child| self.copy_with(child, rewriter)),
@@ -5640,7 +5640,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::TypeParamTypeVarTuple(node) => build::TypeParamTypeVarTuple {
+            AnyNode::TypeParamTypeVarTuple(node) => build::TypeParamTypeVarTuple {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 default: node.default().map(|child| self.copy_with(child, rewriter)),
@@ -5648,7 +5648,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::TypeParamParamSpec(node) => build::TypeParamParamSpec {
+            AnyNode::TypeParamParamSpec(node) => build::TypeParamParamSpec {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 default: node.default().map(|child| self.copy_with(child, rewriter)),
@@ -5656,14 +5656,14 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::InterpolatedStringFormatSpec(node) => build::InterpolatedStringFormatSpec {
+            AnyNode::InterpolatedStringFormatSpec(node) => build::InterpolatedStringFormatSpec {
                 range: node.range(),
                 elements: self.map_list(node.elements(), |b, child| b.copy_with(child, rewriter)),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternArguments(node) => {
+            AnyNode::PatternArguments(node) => {
                 let first = self.map_list(node.patterns(), |b, child| b.copy_with(child, rewriter));
                 let second =
                     self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter));
@@ -5678,7 +5678,7 @@ impl Builder {
                 self.push_pattern_arguments_parts(node.range(), groups)
                     .cast()
             }
-            AnyKind::PatternKeyword(node) => build::PatternKeyword {
+            AnyNode::PatternKeyword(node) => build::PatternKeyword {
                 range: node.range(),
                 attr: self.copy_with(node.attr(), rewriter),
                 pattern: self.copy_with(node.pattern(), rewriter),
@@ -5686,7 +5686,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Comprehension(node) => build::Comprehension {
+            AnyNode::Comprehension(node) => build::Comprehension {
                 range: node.range(),
                 target: self.copy_with(node.target(), rewriter),
                 iter: self.copy_with(node.iter(), rewriter),
@@ -5696,7 +5696,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Arguments(node) => {
+            AnyNode::Arguments(node) => {
                 let first = self.map_list(node.args(), |b, child| b.copy_with(child, rewriter));
                 let second =
                     self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter));
@@ -5710,7 +5710,7 @@ impl Builder {
                 );
                 self.push_arguments_parts(node.range(), groups).cast()
             }
-            AnyKind::Parameters(node) => build::Parameters {
+            AnyNode::Parameters(node) => build::Parameters {
                 range: node.range(),
                 posonlyargs: self
                     .map_list(node.posonlyargs(), |b, child| b.copy_with(child, rewriter)),
@@ -5723,7 +5723,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Parameter(node) => build::Parameter {
+            AnyNode::Parameter(node) => build::Parameter {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 annotation: node
@@ -5733,7 +5733,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::ParameterWithDefault(node) => build::ParameterWithDefault {
+            AnyNode::ParameterWithDefault(node) => build::ParameterWithDefault {
                 range: node.range(),
                 parameter: self.copy_with(node.parameter(), rewriter),
                 default: node.default().map(|child| self.copy_with(child, rewriter)),
@@ -5741,7 +5741,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::DictItem(node) => build::DictItem {
+            AnyNode::DictItem(node) => build::DictItem {
                 range: node.range(),
                 key: node.key().map(|child| self.copy_with(child, rewriter)),
                 value: self.copy_with(node.value(), rewriter),
@@ -5749,7 +5749,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Keyword(node) => build::Keyword {
+            AnyNode::Keyword(node) => build::Keyword {
                 range: node.range(),
                 arg: node.arg().map(|child| self.copy_with(child, rewriter)),
                 value: self.copy_with(node.value(), rewriter),
@@ -5757,7 +5757,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Alias(node) => build::Alias {
+            AnyNode::Alias(node) => build::Alias {
                 range: node.range(),
                 name: self.copy_with(node.name(), rewriter),
                 asname: node.asname().map(|child| self.copy_with(child, rewriter)),
@@ -5765,7 +5765,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::WithItem(node) => build::WithItem {
+            AnyNode::WithItem(node) => build::WithItem {
                 range: node.range(),
                 context_expr: self.copy_with(node.context_expr(), rewriter),
                 optional_vars: node
@@ -5775,7 +5775,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::MatchCase(node) => build::MatchCase {
+            AnyNode::MatchCase(node) => build::MatchCase {
                 range: node.range(),
                 pattern: self.copy_with(node.pattern(), rewriter),
                 guard: node.guard().map(|child| self.copy_with(child, rewriter)),
@@ -5784,14 +5784,14 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Decorator(node) => build::Decorator {
+            AnyNode::Decorator(node) => build::Decorator {
                 range: node.range(),
                 expression: self.copy_with(node.expression(), rewriter),
             }
             .emit(self)
             .0
             .cast(),
-            AnyKind::ElifElseClause(node) => build::ElifElseClause {
+            AnyNode::ElifElseClause(node) => build::ElifElseClause {
                 range: node.range(),
                 test: node.test().map(|child| self.copy_with(child, rewriter)),
                 body: self.map_list(node.body(), |b, child| b.copy_with(child, rewriter)),
@@ -5799,7 +5799,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::TypeParams(node) => build::TypeParams {
+            AnyNode::TypeParams(node) => build::TypeParams {
                 range: node.range(),
                 type_params: self
                     .map_list(node.type_params(), |b, child| b.copy_with(child, rewriter)),
@@ -5807,7 +5807,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::FString(node) => build::FString {
+            AnyNode::FString(node) => build::FString {
                 range: node.range(),
                 elements: self.map_list(node.elements(), |b, child| b.copy_with(child, rewriter)),
                 flags: node.flags(),
@@ -5815,7 +5815,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::TString(node) => build::TString {
+            AnyNode::TString(node) => build::TString {
                 range: node.range(),
                 elements: self.map_list(node.elements(), |b, child| b.copy_with(child, rewriter)),
                 flags: node.flags(),
@@ -5823,7 +5823,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::StringLiteral(node) => build::StringLiteral {
+            AnyNode::StringLiteral(node) => build::StringLiteral {
                 range: node.range(),
                 value: node.value(),
                 flags: node.flags(),
@@ -5831,7 +5831,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::BytesLiteral(node) => build::BytesLiteral {
+            AnyNode::BytesLiteral(node) => build::BytesLiteral {
                 range: node.range(),
                 value: node.value(),
                 flags: node.flags(),
@@ -5839,7 +5839,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Identifier(node) => build::Identifier {
+            AnyNode::Identifier(node) => build::Identifier {
                 range: node.range(),
                 id: self.intern_name(node.id().as_str()),
             }
@@ -5854,593 +5854,1293 @@ impl<'a> SyntaxNode<'a> {
         self,
         visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
     ) {
-        match self.node_kind() {
-            NodeKind::ModModule => {
-                let node = self.retype::<crate::ModModule>();
-                visitor.visit_body(node.body());
+        self.classify().visit_source_order(visitor);
+    }
+}
+impl<'a> crate::ModModule<'a> {
+    #[inline]
+    #[doc = "Visits the children of the module without entering or leaving the module itself."]
+    pub fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::ModExpression<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.body());
+    }
+}
+impl<'a> crate::StmtFunctionDef<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.decorator_list() {
+            visitor.visit_decorator(item);
+        }
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.type_params() {
+            visitor.visit_type_params(item);
+        }
+        visitor.visit_parameters(node.parameters());
+        if let Some(item) = node.returns() {
+            visitor.visit_annotation(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::StmtClassDef<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.decorator_list() {
+            visitor.visit_decorator(item);
+        }
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.type_params() {
+            visitor.visit_type_params(item);
+        }
+        if let Some(item) = node.arguments() {
+            visitor.visit_arguments(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::StmtReturn<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.value() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::StmtDelete<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.targets() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::StmtTypeAlias<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.name());
+        if let Some(item) = node.type_params() {
+            visitor.visit_type_params(item);
+        }
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::StmtAssign<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.targets() {
+            visitor.visit_expr(item);
+        }
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::StmtAugAssign<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.target());
+        visitor.visit_operator(node.op());
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::StmtAnnAssign<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.target());
+        visitor.visit_annotation(node.annotation());
+        if let Some(item) = node.value() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::StmtFor<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.target());
+        visitor.visit_expr(node.iter());
+        visitor.visit_body(node.body());
+        visitor.visit_body(node.orelse());
+    }
+}
+impl<'a> crate::StmtWhile<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.test());
+        visitor.visit_body(node.body());
+        visitor.visit_body(node.orelse());
+    }
+}
+impl<'a> crate::StmtIf<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.test());
+        visitor.visit_body(node.body());
+        for item in node.elif_else_clauses() {
+            visitor.visit_elif_else_clause(item);
+        }
+    }
+}
+impl<'a> crate::StmtWith<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.items() {
+            visitor.visit_with_item(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::StmtMatch<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.subject());
+        for item in node.cases() {
+            visitor.visit_match_case(item);
+        }
+    }
+}
+impl<'a> crate::StmtRaise<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.exc() {
+            visitor.visit_expr(item);
+        }
+        if let Some(item) = node.cause() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::StmtTry<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_body(node.body());
+        for item in node.handlers() {
+            visitor.visit_except_handler(item);
+        }
+        visitor.visit_body(node.orelse());
+        visitor.visit_body(node.finalbody());
+    }
+}
+impl<'a> crate::StmtAssert<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.test());
+        if let Some(item) = node.msg() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::StmtImport<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.names() {
+            visitor.visit_alias(item);
+        }
+    }
+}
+impl<'a> crate::StmtImportFrom<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.module() {
+            visitor.visit_identifier(item);
+        }
+        for item in node.names() {
+            visitor.visit_alias(item);
+        }
+    }
+}
+impl<'a> crate::StmtGlobal<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.names() {
+            visitor.visit_identifier(item);
+        }
+    }
+}
+impl<'a> crate::StmtNonlocal<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.names() {
+            visitor.visit_identifier(item);
+        }
+    }
+}
+impl<'a> crate::StmtExpr<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::ExprBoolOp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        let mut values = node.values().iter();
+        if let Some(left) = values.next() {
+            visitor.visit_expr(left);
+        }
+        visitor.visit_bool_op(node.op());
+        for value in values {
+            visitor.visit_expr(value);
+        }
+    }
+}
+impl<'a> crate::ExprNamed<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.target());
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::ExprBinOp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.left());
+        visitor.visit_operator(node.op());
+        visitor.visit_expr(node.right());
+    }
+}
+impl<'a> crate::ExprUnaryOp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_unary_op(node.op());
+        visitor.visit_expr(node.operand());
+    }
+}
+impl<'a> crate::ExprLambda<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.parameters() {
+            visitor.visit_parameters(item);
+        }
+        visitor.visit_expr(node.body());
+    }
+}
+impl<'a> crate::ExprIf<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.body());
+        visitor.visit_expr(node.test());
+        visitor.visit_expr(node.orelse());
+    }
+}
+impl<'a> crate::ExprDict<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.items() {
+            visitor.visit_dict_item(item);
+        }
+    }
+}
+impl<'a> crate::ExprSet<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elts() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::ExprListComp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.elt());
+        for item in node.generators() {
+            visitor.visit_comprehension(item);
+        }
+    }
+}
+impl<'a> crate::ExprSetComp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.elt());
+        for item in node.generators() {
+            visitor.visit_comprehension(item);
+        }
+    }
+}
+impl<'a> crate::ExprDictComp<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.key() {
+            visitor.visit_expr(item);
+        }
+        visitor.visit_expr(node.value());
+        for item in node.generators() {
+            visitor.visit_comprehension(item);
+        }
+    }
+}
+impl<'a> crate::ExprGenerator<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.elt());
+        for item in node.generators() {
+            visitor.visit_comprehension(item);
+        }
+    }
+}
+impl<'a> crate::ExprAwait<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::ExprYield<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.value() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::ExprYieldFrom<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::ExprCompare<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.first_operand());
+        for (_, op, right) in node.iter() {
+            visitor.visit_cmp_op(op);
+            visitor.visit_expr(right);
+        }
+    }
+}
+impl<'a> crate::ExprCall<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.func());
+        visitor.visit_arguments(node.arguments());
+    }
+}
+impl<'a> crate::ExprFString<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for part in node.value() {
+            match part {
+                super::FStringPartView::Literal(v) => visitor.visit_string_literal(v),
+                super::FStringPartView::FString(v) => visitor.visit_f_string(v),
             }
-            NodeKind::ModExpression => {
-                let node = self.retype::<crate::ModExpression>();
-                visitor.visit_expr(node.body());
+        }
+    }
+}
+impl<'a> crate::ExprTString<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.value() {
+            visitor.visit_t_string(item);
+        }
+    }
+}
+impl<'a> crate::ExprStringLiteral<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.value() {
+            visitor.visit_string_literal(item);
+        }
+    }
+}
+impl<'a> crate::ExprBytesLiteral<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.value() {
+            visitor.visit_bytes_literal(item);
+        }
+    }
+}
+impl<'a> crate::ExprAttribute<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+        visitor.visit_identifier(node.attr());
+    }
+}
+impl<'a> crate::ExprSubscript<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+        visitor.visit_expr(node.slice());
+    }
+}
+impl<'a> crate::ExprStarred<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::ExprList<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elts() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::ExprTuple<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elts() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::ExprSlice<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.lower() {
+            visitor.visit_expr(item);
+        }
+        if let Some(item) = node.upper() {
+            visitor.visit_expr(item);
+        }
+        if let Some(item) = node.step() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::ExceptHandlerExceptHandler<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.type_() {
+            visitor.visit_expr(item);
+        }
+        if let Some(item) = node.name() {
+            visitor.visit_identifier(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::InterpolatedElement<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.expression());
+        if let Some(spec) = node.format_spec() {
+            spec.visit_source_order(visitor);
+        }
+    }
+}
+impl<'a> crate::PatternMatchValue<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::PatternMatchSingleton<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_singleton(node.value());
+    }
+}
+impl<'a> crate::PatternMatchSequence<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.patterns() {
+            visitor.visit_pattern(item);
+        }
+    }
+}
+impl<'a> crate::PatternMatchMapping<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for child in node.children() {
+            child.dispatch(visitor);
+        }
+    }
+}
+impl<'a> crate::PatternMatchClass<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.cls());
+        visitor.visit_pattern_arguments(node.arguments());
+    }
+}
+impl<'a> crate::PatternMatchStar<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.name() {
+            visitor.visit_identifier(item);
+        }
+    }
+}
+impl<'a> crate::PatternMatchAs<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.pattern() {
+            visitor.visit_pattern(item);
+        }
+        if let Some(item) = node.name() {
+            visitor.visit_identifier(item);
+        }
+    }
+}
+impl<'a> crate::PatternMatchOr<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.patterns() {
+            visitor.visit_pattern(item);
+        }
+    }
+}
+impl<'a> crate::TypeParamTypeVar<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.bound() {
+            visitor.visit_expr(item);
+        }
+        if let Some(item) = node.default() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::TypeParamTypeVarTuple<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.default() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::TypeParamParamSpec<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.default() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::InterpolatedStringFormatSpec<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elements() {
+            visitor.visit_interpolated_string_element(item);
+        }
+    }
+}
+impl<'a> crate::PatternArguments<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for child in node.children() {
+            child.dispatch(visitor);
+        }
+    }
+}
+impl<'a> crate::PatternKeyword<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.attr());
+        visitor.visit_pattern(node.pattern());
+    }
+}
+impl<'a> crate::Comprehension<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.target());
+        visitor.visit_expr(node.iter());
+        for item in node.ifs() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::Arguments<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if node.keywords().is_empty() {
+            for arg in node.args() {
+                visitor.visit_expr(arg);
             }
-            NodeKind::StmtFunctionDef => {
-                let node = self.retype::<crate::StmtFunctionDef>();
-                for item in node.decorator_list() {
-                    visitor.visit_decorator(item);
+        } else if node.args().is_empty() {
+            for keyword in node.keywords() {
+                visitor.visit_keyword(keyword);
+            }
+        } else {
+            for argument in node.iter_source_order() {
+                match argument {
+                    super::ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
+                    super::ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
                 }
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.type_params() {
-                    visitor.visit_type_params(item);
-                }
-                visitor.visit_parameters(node.parameters());
-                if let Some(item) = node.returns() {
-                    visitor.visit_annotation(item);
-                }
-                visitor.visit_body(node.body());
             }
-            NodeKind::StmtClassDef => {
-                let node = self.retype::<crate::StmtClassDef>();
-                for item in node.decorator_list() {
-                    visitor.visit_decorator(item);
-                }
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.type_params() {
-                    visitor.visit_type_params(item);
-                }
-                if let Some(item) = node.arguments() {
-                    visitor.visit_arguments(item);
-                }
-                visitor.visit_body(node.body());
+        }
+    }
+}
+impl<'a> crate::Parameters<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if node.has_only_regular_args() {
+            for parameter in node.ordered_items() {
+                let parameter = parameter.retype::<crate::ParameterWithDefault>();
+                visitor.visit_parameter_with_default(parameter);
             }
-            NodeKind::StmtReturn => {
-                let node = self.retype::<crate::StmtReturn>();
-                if let Some(item) = node.value() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::StmtDelete => {
-                let node = self.retype::<crate::StmtDelete>();
-                for item in node.targets() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::StmtTypeAlias => {
-                let node = self.retype::<crate::StmtTypeAlias>();
-                visitor.visit_expr(node.name());
-                if let Some(item) = node.type_params() {
-                    visitor.visit_type_params(item);
-                }
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::StmtAssign => {
-                let node = self.retype::<crate::StmtAssign>();
-                for item in node.targets() {
-                    visitor.visit_expr(item);
-                }
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::StmtAugAssign => {
-                let node = self.retype::<crate::StmtAugAssign>();
-                visitor.visit_expr(node.target());
-                visitor.visit_operator(node.op());
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::StmtAnnAssign => {
-                let node = self.retype::<crate::StmtAnnAssign>();
-                visitor.visit_expr(node.target());
-                visitor.visit_annotation(node.annotation());
-                if let Some(item) = node.value() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::StmtFor => {
-                let node = self.retype::<crate::StmtFor>();
-                visitor.visit_expr(node.target());
-                visitor.visit_expr(node.iter());
-                visitor.visit_body(node.body());
-                visitor.visit_body(node.orelse());
-            }
-            NodeKind::StmtWhile => {
-                let node = self.retype::<crate::StmtWhile>();
-                visitor.visit_expr(node.test());
-                visitor.visit_body(node.body());
-                visitor.visit_body(node.orelse());
-            }
-            NodeKind::StmtIf => {
-                let node = self.retype::<crate::StmtIf>();
-                visitor.visit_expr(node.test());
-                visitor.visit_body(node.body());
-                for item in node.elif_else_clauses() {
-                    visitor.visit_elif_else_clause(item);
-                }
-            }
-            NodeKind::StmtWith => {
-                let node = self.retype::<crate::StmtWith>();
-                for item in node.items() {
-                    visitor.visit_with_item(item);
-                }
-                visitor.visit_body(node.body());
-            }
-            NodeKind::StmtMatch => {
-                let node = self.retype::<crate::StmtMatch>();
-                visitor.visit_expr(node.subject());
-                for item in node.cases() {
-                    visitor.visit_match_case(item);
-                }
-            }
-            NodeKind::StmtRaise => {
-                let node = self.retype::<crate::StmtRaise>();
-                if let Some(item) = node.exc() {
-                    visitor.visit_expr(item);
-                }
-                if let Some(item) = node.cause() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::StmtTry => {
-                let node = self.retype::<crate::StmtTry>();
-                visitor.visit_body(node.body());
-                for item in node.handlers() {
-                    visitor.visit_except_handler(item);
-                }
-                visitor.visit_body(node.orelse());
-                visitor.visit_body(node.finalbody());
-            }
-            NodeKind::StmtAssert => {
-                let node = self.retype::<crate::StmtAssert>();
-                visitor.visit_expr(node.test());
-                if let Some(item) = node.msg() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::StmtImport => {
-                let node = self.retype::<crate::StmtImport>();
-                for item in node.names() {
-                    visitor.visit_alias(item);
-                }
-            }
-            NodeKind::StmtImportFrom => {
-                let node = self.retype::<crate::StmtImportFrom>();
-                if let Some(item) = node.module() {
-                    visitor.visit_identifier(item);
-                }
-                for item in node.names() {
-                    visitor.visit_alias(item);
-                }
-            }
-            NodeKind::StmtGlobal => {
-                let node = self.retype::<crate::StmtGlobal>();
-                for item in node.names() {
-                    visitor.visit_identifier(item);
-                }
-            }
-            NodeKind::StmtNonlocal => {
-                let node = self.retype::<crate::StmtNonlocal>();
-                for item in node.names() {
-                    visitor.visit_identifier(item);
-                }
-            }
-            NodeKind::StmtExpr => {
-                let node = self.retype::<crate::StmtExpr>();
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::StmtPass => {}
-            NodeKind::StmtBreak => {}
-            NodeKind::StmtContinue => {}
-            NodeKind::StmtIpyEscapeCommand => {}
-            NodeKind::ExprBoolOp => {
-                let node = self.retype::<crate::ExprBoolOp>();
-                let mut values = node.values().iter();
-                if let Some(left) = values.next() {
-                    visitor.visit_expr(left);
-                }
-                visitor.visit_bool_op(node.op());
-                for value in values {
-                    visitor.visit_expr(value);
-                }
-            }
-            NodeKind::ExprNamed => {
-                let node = self.retype::<crate::ExprNamed>();
-                visitor.visit_expr(node.target());
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::ExprBinOp => {
-                let node = self.retype::<crate::ExprBinOp>();
-                visitor.visit_expr(node.left());
-                visitor.visit_operator(node.op());
-                visitor.visit_expr(node.right());
-            }
-            NodeKind::ExprUnaryOp => {
-                let node = self.retype::<crate::ExprUnaryOp>();
-                visitor.visit_unary_op(node.op());
-                visitor.visit_expr(node.operand());
-            }
-            NodeKind::ExprLambda => {
-                let node = self.retype::<crate::ExprLambda>();
-                if let Some(item) = node.parameters() {
-                    visitor.visit_parameters(item);
-                }
-                visitor.visit_expr(node.body());
-            }
-            NodeKind::ExprIf => {
-                let node = self.retype::<crate::ExprIf>();
-                visitor.visit_expr(node.body());
-                visitor.visit_expr(node.test());
-                visitor.visit_expr(node.orelse());
-            }
-            NodeKind::ExprDict => {
-                let node = self.retype::<crate::ExprDict>();
-                for item in node.items() {
-                    visitor.visit_dict_item(item);
-                }
-            }
-            NodeKind::ExprSet => {
-                let node = self.retype::<crate::ExprSet>();
-                for item in node.elts() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::ExprListComp => {
-                let node = self.retype::<crate::ExprListComp>();
-                visitor.visit_expr(node.elt());
-                for item in node.generators() {
-                    visitor.visit_comprehension(item);
-                }
-            }
-            NodeKind::ExprSetComp => {
-                let node = self.retype::<crate::ExprSetComp>();
-                visitor.visit_expr(node.elt());
-                for item in node.generators() {
-                    visitor.visit_comprehension(item);
-                }
-            }
-            NodeKind::ExprDictComp => {
-                let node = self.retype::<crate::ExprDictComp>();
-                if let Some(item) = node.key() {
-                    visitor.visit_expr(item);
-                }
-                visitor.visit_expr(node.value());
-                for item in node.generators() {
-                    visitor.visit_comprehension(item);
-                }
-            }
-            NodeKind::ExprGenerator => {
-                let node = self.retype::<crate::ExprGenerator>();
-                visitor.visit_expr(node.elt());
-                for item in node.generators() {
-                    visitor.visit_comprehension(item);
-                }
-            }
-            NodeKind::ExprAwait => {
-                let node = self.retype::<crate::ExprAwait>();
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::ExprYield => {
-                let node = self.retype::<crate::ExprYield>();
-                if let Some(item) = node.value() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::ExprYieldFrom => {
-                let node = self.retype::<crate::ExprYieldFrom>();
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::ExprCompare => {
-                let node = self.retype::<crate::ExprCompare>();
-                visitor.visit_expr(node.first_operand());
-                for (_, op, right) in node.iter() {
-                    visitor.visit_cmp_op(op);
-                    visitor.visit_expr(right);
-                }
-            }
-            NodeKind::ExprCall => {
-                let node = self.retype::<crate::ExprCall>();
-                visitor.visit_expr(node.func());
-                visitor.visit_arguments(node.arguments());
-            }
-            NodeKind::ExprFString => {
-                let node = self.retype::<crate::ExprFString>();
-                for part in node.value() {
-                    match part {
-                        super::FStringPartView::Literal(v) => visitor.visit_string_literal(v),
-                        super::FStringPartView::FString(v) => visitor.visit_f_string(v),
+        } else {
+            for parameter in node.iter_source_order() {
+                match parameter {
+                    super::AnyParameter::NonVariadic(node) => {
+                        visitor.visit_parameter_with_default(node);
                     }
+                    super::AnyParameter::Variadic(node) => visitor.visit_parameter(node),
                 }
             }
-            NodeKind::ExprTString => {
-                let node = self.retype::<crate::ExprTString>();
-                for item in node.value() {
-                    visitor.visit_t_string(item);
-                }
-            }
-            NodeKind::ExprStringLiteral => {
-                let node = self.retype::<crate::ExprStringLiteral>();
-                for item in node.value() {
-                    visitor.visit_string_literal(item);
-                }
-            }
-            NodeKind::ExprBytesLiteral => {
-                let node = self.retype::<crate::ExprBytesLiteral>();
-                for item in node.value() {
-                    visitor.visit_bytes_literal(item);
-                }
-            }
-            NodeKind::ExprNumberLiteral => {}
-            NodeKind::ExprBooleanLiteral => {}
-            NodeKind::ExprNoneLiteral => {}
-            NodeKind::ExprEllipsisLiteral => {}
-            NodeKind::ExprAttribute => {
-                let node = self.retype::<crate::ExprAttribute>();
-                visitor.visit_expr(node.value());
-                visitor.visit_identifier(node.attr());
-            }
-            NodeKind::ExprSubscript => {
-                let node = self.retype::<crate::ExprSubscript>();
-                visitor.visit_expr(node.value());
-                visitor.visit_expr(node.slice());
-            }
-            NodeKind::ExprStarred => {
-                let node = self.retype::<crate::ExprStarred>();
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::ExprName => {}
-            NodeKind::ExprList => {
-                let node = self.retype::<crate::ExprList>();
-                for item in node.elts() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::ExprTuple => {
-                let node = self.retype::<crate::ExprTuple>();
-                for item in node.elts() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::ExprSlice => {
-                let node = self.retype::<crate::ExprSlice>();
-                if let Some(item) = node.lower() {
-                    visitor.visit_expr(item);
-                }
-                if let Some(item) = node.upper() {
-                    visitor.visit_expr(item);
-                }
-                if let Some(item) = node.step() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::ExprIpyEscapeCommand => {}
-            NodeKind::ExceptHandlerExceptHandler => {
-                let node = self.retype::<crate::ExceptHandlerExceptHandler>();
-                if let Some(item) = node.type_() {
-                    visitor.visit_expr(item);
-                }
-                if let Some(item) = node.name() {
-                    visitor.visit_identifier(item);
-                }
-                visitor.visit_body(node.body());
-            }
-            NodeKind::InterpolatedElement => {
-                let node = self.retype::<crate::InterpolatedElement>();
-                visitor.visit_expr(node.expression());
-                if let Some(spec) = node.format_spec() {
-                    spec.syntax_node().visit_source_order(visitor);
-                }
-            }
-            NodeKind::InterpolatedStringLiteralElement => {}
-            NodeKind::PatternMatchValue => {
-                let node = self.retype::<crate::PatternMatchValue>();
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::PatternMatchSingleton => {
-                let node = self.retype::<crate::PatternMatchSingleton>();
-                visitor.visit_singleton(node.value());
-            }
-            NodeKind::PatternMatchSequence => {
-                let node = self.retype::<crate::PatternMatchSequence>();
-                for item in node.patterns() {
-                    visitor.visit_pattern(item);
-                }
-            }
-            NodeKind::PatternMatchMapping => {
-                let node = self.retype::<crate::PatternMatchMapping>();
-                for child in node.children() {
-                    child.dispatch(visitor);
-                }
-            }
-            NodeKind::PatternMatchClass => {
-                let node = self.retype::<crate::PatternMatchClass>();
-                visitor.visit_expr(node.cls());
-                visitor.visit_pattern_arguments(node.arguments());
-            }
-            NodeKind::PatternMatchStar => {
-                let node = self.retype::<crate::PatternMatchStar>();
-                if let Some(item) = node.name() {
-                    visitor.visit_identifier(item);
-                }
-            }
-            NodeKind::PatternMatchAs => {
-                let node = self.retype::<crate::PatternMatchAs>();
-                if let Some(item) = node.pattern() {
-                    visitor.visit_pattern(item);
-                }
-                if let Some(item) = node.name() {
-                    visitor.visit_identifier(item);
-                }
-            }
-            NodeKind::PatternMatchOr => {
-                let node = self.retype::<crate::PatternMatchOr>();
-                for item in node.patterns() {
-                    visitor.visit_pattern(item);
-                }
-            }
-            NodeKind::TypeParamTypeVar => {
-                let node = self.retype::<crate::TypeParamTypeVar>();
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.bound() {
-                    visitor.visit_expr(item);
-                }
-                if let Some(item) = node.default() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::TypeParamTypeVarTuple => {
-                let node = self.retype::<crate::TypeParamTypeVarTuple>();
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.default() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::TypeParamParamSpec => {
-                let node = self.retype::<crate::TypeParamParamSpec>();
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.default() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::InterpolatedStringFormatSpec => {
-                let node = self.retype::<crate::InterpolatedStringFormatSpec>();
-                for item in node.elements() {
-                    visitor.visit_interpolated_string_element(item);
-                }
-            }
-            NodeKind::PatternArguments => {
-                let node = self.retype::<crate::PatternArguments>();
-                for child in node.children() {
-                    child.dispatch(visitor);
-                }
-            }
-            NodeKind::PatternKeyword => {
-                let node = self.retype::<crate::PatternKeyword>();
-                visitor.visit_identifier(node.attr());
-                visitor.visit_pattern(node.pattern());
-            }
-            NodeKind::Comprehension => {
-                let node = self.retype::<crate::Comprehension>();
-                visitor.visit_expr(node.target());
-                visitor.visit_expr(node.iter());
-                for item in node.ifs() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::Arguments => {
-                let node = self.retype::<crate::Arguments>();
-                if node.keywords().is_empty() {
-                    for arg in node.args() {
-                        visitor.visit_expr(arg);
-                    }
-                } else if node.args().is_empty() {
-                    for keyword in node.keywords() {
-                        visitor.visit_keyword(keyword);
-                    }
-                } else {
-                    for argument in node.iter_source_order() {
-                        match argument {
-                            super::ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
-                            super::ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
-                        }
-                    }
-                }
-            }
-            NodeKind::Parameters => {
-                let node = self.retype::<crate::Parameters>();
-                if node.has_only_regular_args() {
-                    for parameter in node.ordered_items() {
-                        let parameter = parameter.retype::<crate::ParameterWithDefault>();
-                        visitor.visit_parameter_with_default(parameter);
-                    }
-                } else {
-                    for parameter in node.iter_source_order() {
-                        match parameter {
-                            super::AnyParameter::NonVariadic(node) => {
-                                visitor.visit_parameter_with_default(node);
-                            }
-                            super::AnyParameter::Variadic(node) => visitor.visit_parameter(node),
-                        }
-                    }
-                }
-            }
-            NodeKind::Parameter => {
-                let node = self.retype::<crate::Parameter>();
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.annotation() {
-                    visitor.visit_annotation(item);
-                }
-            }
-            NodeKind::ParameterWithDefault => {
-                let node = self.retype::<crate::ParameterWithDefault>();
-                visitor.visit_parameter(node.parameter());
-                if let Some(item) = node.default() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::DictItem => {
-                let node = self.retype::<crate::DictItem>();
-                if let Some(item) = node.key() {
-                    visitor.visit_expr(item);
-                }
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::Keyword => {
-                let node = self.retype::<crate::Keyword>();
-                if let Some(item) = node.arg() {
-                    visitor.visit_identifier(item);
-                }
-                visitor.visit_expr(node.value());
-            }
-            NodeKind::Alias => {
-                let node = self.retype::<crate::Alias>();
-                visitor.visit_identifier(node.name());
-                if let Some(item) = node.asname() {
-                    visitor.visit_identifier(item);
-                }
-            }
-            NodeKind::WithItem => {
-                let node = self.retype::<crate::WithItem>();
-                visitor.visit_expr(node.context_expr());
-                if let Some(item) = node.optional_vars() {
-                    visitor.visit_expr(item);
-                }
-            }
-            NodeKind::MatchCase => {
-                let node = self.retype::<crate::MatchCase>();
-                visitor.visit_pattern(node.pattern());
-                if let Some(item) = node.guard() {
-                    visitor.visit_expr(item);
-                }
-                visitor.visit_body(node.body());
-            }
-            NodeKind::Decorator => {
-                let node = self.retype::<crate::Decorator>();
-                visitor.visit_expr(node.expression());
-            }
-            NodeKind::ElifElseClause => {
-                let node = self.retype::<crate::ElifElseClause>();
-                if let Some(item) = node.test() {
-                    visitor.visit_expr(item);
-                }
-                visitor.visit_body(node.body());
-            }
-            NodeKind::TypeParams => {
-                let node = self.retype::<crate::TypeParams>();
-                for item in node.type_params() {
-                    visitor.visit_type_param(item);
-                }
-            }
-            NodeKind::FString => {
-                let node = self.retype::<crate::FString>();
-                for item in node.elements() {
-                    visitor.visit_interpolated_string_element(item);
-                }
-            }
-            NodeKind::TString => {
-                let node = self.retype::<crate::TString>();
-                for item in node.elements() {
-                    visitor.visit_interpolated_string_element(item);
-                }
-            }
-            NodeKind::StringLiteral => {}
-            NodeKind::BytesLiteral => {}
-            NodeKind::Identifier => {}
+        }
+    }
+}
+impl<'a> crate::Parameter<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.annotation() {
+            visitor.visit_annotation(item);
+        }
+    }
+}
+impl<'a> crate::ParameterWithDefault<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_parameter(node.parameter());
+        if let Some(item) = node.default() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::DictItem<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.key() {
+            visitor.visit_expr(item);
+        }
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::Keyword<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.arg() {
+            visitor.visit_identifier(item);
+        }
+        visitor.visit_expr(node.value());
+    }
+}
+impl<'a> crate::Alias<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_identifier(node.name());
+        if let Some(item) = node.asname() {
+            visitor.visit_identifier(item);
+        }
+    }
+}
+impl<'a> crate::WithItem<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.context_expr());
+        if let Some(item) = node.optional_vars() {
+            visitor.visit_expr(item);
+        }
+    }
+}
+impl<'a> crate::MatchCase<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_pattern(node.pattern());
+        if let Some(item) = node.guard() {
+            visitor.visit_expr(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::Decorator<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        visitor.visit_expr(node.expression());
+    }
+}
+impl<'a> crate::ElifElseClause<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        if let Some(item) = node.test() {
+            visitor.visit_expr(item);
+        }
+        visitor.visit_body(node.body());
+    }
+}
+impl<'a> crate::TypeParams<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.type_params() {
+            visitor.visit_type_param(item);
+        }
+    }
+}
+impl<'a> crate::FString<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elements() {
+            visitor.visit_interpolated_string_element(item);
+        }
+    }
+}
+impl<'a> crate::TString<'a> {
+    #[inline]
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        let node = self;
+        for item in node.elements() {
+            visitor.visit_interpolated_string_element(item);
+        }
+    }
+}
+impl<'a> AnyNode<'a> {
+    pub fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::ModModule(node) => node.visit_source_order(visitor),
+            Self::ModExpression(node) => node.visit_source_order(visitor),
+            Self::StmtFunctionDef(node) => node.visit_source_order(visitor),
+            Self::StmtClassDef(node) => node.visit_source_order(visitor),
+            Self::StmtReturn(node) => node.visit_source_order(visitor),
+            Self::StmtDelete(node) => node.visit_source_order(visitor),
+            Self::StmtTypeAlias(node) => node.visit_source_order(visitor),
+            Self::StmtAssign(node) => node.visit_source_order(visitor),
+            Self::StmtAugAssign(node) => node.visit_source_order(visitor),
+            Self::StmtAnnAssign(node) => node.visit_source_order(visitor),
+            Self::StmtFor(node) => node.visit_source_order(visitor),
+            Self::StmtWhile(node) => node.visit_source_order(visitor),
+            Self::StmtIf(node) => node.visit_source_order(visitor),
+            Self::StmtWith(node) => node.visit_source_order(visitor),
+            Self::StmtMatch(node) => node.visit_source_order(visitor),
+            Self::StmtRaise(node) => node.visit_source_order(visitor),
+            Self::StmtTry(node) => node.visit_source_order(visitor),
+            Self::StmtAssert(node) => node.visit_source_order(visitor),
+            Self::StmtImport(node) => node.visit_source_order(visitor),
+            Self::StmtImportFrom(node) => node.visit_source_order(visitor),
+            Self::StmtGlobal(node) => node.visit_source_order(visitor),
+            Self::StmtNonlocal(node) => node.visit_source_order(visitor),
+            Self::StmtExpr(node) => node.visit_source_order(visitor),
+            Self::ExprBoolOp(node) => node.visit_source_order(visitor),
+            Self::ExprNamed(node) => node.visit_source_order(visitor),
+            Self::ExprBinOp(node) => node.visit_source_order(visitor),
+            Self::ExprUnaryOp(node) => node.visit_source_order(visitor),
+            Self::ExprLambda(node) => node.visit_source_order(visitor),
+            Self::ExprIf(node) => node.visit_source_order(visitor),
+            Self::ExprDict(node) => node.visit_source_order(visitor),
+            Self::ExprSet(node) => node.visit_source_order(visitor),
+            Self::ExprListComp(node) => node.visit_source_order(visitor),
+            Self::ExprSetComp(node) => node.visit_source_order(visitor),
+            Self::ExprDictComp(node) => node.visit_source_order(visitor),
+            Self::ExprGenerator(node) => node.visit_source_order(visitor),
+            Self::ExprAwait(node) => node.visit_source_order(visitor),
+            Self::ExprYield(node) => node.visit_source_order(visitor),
+            Self::ExprYieldFrom(node) => node.visit_source_order(visitor),
+            Self::ExprCompare(node) => node.visit_source_order(visitor),
+            Self::ExprCall(node) => node.visit_source_order(visitor),
+            Self::ExprFString(node) => node.visit_source_order(visitor),
+            Self::ExprTString(node) => node.visit_source_order(visitor),
+            Self::ExprStringLiteral(node) => node.visit_source_order(visitor),
+            Self::ExprBytesLiteral(node) => node.visit_source_order(visitor),
+            Self::ExprAttribute(node) => node.visit_source_order(visitor),
+            Self::ExprSubscript(node) => node.visit_source_order(visitor),
+            Self::ExprStarred(node) => node.visit_source_order(visitor),
+            Self::ExprList(node) => node.visit_source_order(visitor),
+            Self::ExprTuple(node) => node.visit_source_order(visitor),
+            Self::ExprSlice(node) => node.visit_source_order(visitor),
+            Self::ExceptHandlerExceptHandler(node) => node.visit_source_order(visitor),
+            Self::InterpolatedElement(node) => node.visit_source_order(visitor),
+            Self::PatternMatchValue(node) => node.visit_source_order(visitor),
+            Self::PatternMatchSingleton(node) => node.visit_source_order(visitor),
+            Self::PatternMatchSequence(node) => node.visit_source_order(visitor),
+            Self::PatternMatchMapping(node) => node.visit_source_order(visitor),
+            Self::PatternMatchClass(node) => node.visit_source_order(visitor),
+            Self::PatternMatchStar(node) => node.visit_source_order(visitor),
+            Self::PatternMatchAs(node) => node.visit_source_order(visitor),
+            Self::PatternMatchOr(node) => node.visit_source_order(visitor),
+            Self::TypeParamTypeVar(node) => node.visit_source_order(visitor),
+            Self::TypeParamTypeVarTuple(node) => node.visit_source_order(visitor),
+            Self::TypeParamParamSpec(node) => node.visit_source_order(visitor),
+            Self::InterpolatedStringFormatSpec(node) => node.visit_source_order(visitor),
+            Self::PatternArguments(node) => node.visit_source_order(visitor),
+            Self::PatternKeyword(node) => node.visit_source_order(visitor),
+            Self::Comprehension(node) => node.visit_source_order(visitor),
+            Self::Arguments(node) => node.visit_source_order(visitor),
+            Self::Parameters(node) => node.visit_source_order(visitor),
+            Self::Parameter(node) => node.visit_source_order(visitor),
+            Self::ParameterWithDefault(node) => node.visit_source_order(visitor),
+            Self::DictItem(node) => node.visit_source_order(visitor),
+            Self::Keyword(node) => node.visit_source_order(visitor),
+            Self::Alias(node) => node.visit_source_order(visitor),
+            Self::WithItem(node) => node.visit_source_order(visitor),
+            Self::MatchCase(node) => node.visit_source_order(visitor),
+            Self::Decorator(node) => node.visit_source_order(visitor),
+            Self::ElifElseClause(node) => node.visit_source_order(visitor),
+            Self::TypeParams(node) => node.visit_source_order(visitor),
+            Self::FString(node) => node.visit_source_order(visitor),
+            Self::TString(node) => node.visit_source_order(visitor),
+            Self::StmtPass(_)
+            | Self::StmtBreak(_)
+            | Self::StmtContinue(_)
+            | Self::StmtIpyEscapeCommand(_)
+            | Self::ExprNumberLiteral(_)
+            | Self::ExprBooleanLiteral(_)
+            | Self::ExprNoneLiteral(_)
+            | Self::ExprEllipsisLiteral(_)
+            | Self::ExprName(_)
+            | Self::ExprIpyEscapeCommand(_)
+            | Self::InterpolatedStringLiteralElement(_)
+            | Self::StringLiteral(_)
+            | Self::BytesLiteral(_)
+            | Self::Identifier(_) => {}
+        }
+    }
+}
+impl<'a> ModKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::Module(node) => node.visit_source_order(visitor),
+            Self::Expression(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+impl<'a> StmtKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::FunctionDef(node) => node.visit_source_order(visitor),
+            Self::ClassDef(node) => node.visit_source_order(visitor),
+            Self::Return(node) => node.visit_source_order(visitor),
+            Self::Delete(node) => node.visit_source_order(visitor),
+            Self::TypeAlias(node) => node.visit_source_order(visitor),
+            Self::Assign(node) => node.visit_source_order(visitor),
+            Self::AugAssign(node) => node.visit_source_order(visitor),
+            Self::AnnAssign(node) => node.visit_source_order(visitor),
+            Self::For(node) => node.visit_source_order(visitor),
+            Self::While(node) => node.visit_source_order(visitor),
+            Self::If(node) => node.visit_source_order(visitor),
+            Self::With(node) => node.visit_source_order(visitor),
+            Self::Match(node) => node.visit_source_order(visitor),
+            Self::Raise(node) => node.visit_source_order(visitor),
+            Self::Try(node) => node.visit_source_order(visitor),
+            Self::Assert(node) => node.visit_source_order(visitor),
+            Self::Import(node) => node.visit_source_order(visitor),
+            Self::ImportFrom(node) => node.visit_source_order(visitor),
+            Self::Global(node) => node.visit_source_order(visitor),
+            Self::Nonlocal(node) => node.visit_source_order(visitor),
+            Self::Expr(node) => node.visit_source_order(visitor),
+            Self::Pass(_) | Self::Break(_) | Self::Continue(_) | Self::IpyEscapeCommand(_) => {}
+        }
+    }
+}
+impl<'a> ExprKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::BoolOp(node) => node.visit_source_order(visitor),
+            Self::Named(node) => node.visit_source_order(visitor),
+            Self::BinOp(node) => node.visit_source_order(visitor),
+            Self::UnaryOp(node) => node.visit_source_order(visitor),
+            Self::Lambda(node) => node.visit_source_order(visitor),
+            Self::If(node) => node.visit_source_order(visitor),
+            Self::Dict(node) => node.visit_source_order(visitor),
+            Self::Set(node) => node.visit_source_order(visitor),
+            Self::ListComp(node) => node.visit_source_order(visitor),
+            Self::SetComp(node) => node.visit_source_order(visitor),
+            Self::DictComp(node) => node.visit_source_order(visitor),
+            Self::Generator(node) => node.visit_source_order(visitor),
+            Self::Await(node) => node.visit_source_order(visitor),
+            Self::Yield(node) => node.visit_source_order(visitor),
+            Self::YieldFrom(node) => node.visit_source_order(visitor),
+            Self::Compare(node) => node.visit_source_order(visitor),
+            Self::Call(node) => node.visit_source_order(visitor),
+            Self::FString(node) => node.visit_source_order(visitor),
+            Self::TString(node) => node.visit_source_order(visitor),
+            Self::StringLiteral(node) => node.visit_source_order(visitor),
+            Self::BytesLiteral(node) => node.visit_source_order(visitor),
+            Self::Attribute(node) => node.visit_source_order(visitor),
+            Self::Subscript(node) => node.visit_source_order(visitor),
+            Self::Starred(node) => node.visit_source_order(visitor),
+            Self::List(node) => node.visit_source_order(visitor),
+            Self::Tuple(node) => node.visit_source_order(visitor),
+            Self::Slice(node) => node.visit_source_order(visitor),
+            Self::NumberLiteral(_)
+            | Self::BooleanLiteral(_)
+            | Self::NoneLiteral(_)
+            | Self::EllipsisLiteral(_)
+            | Self::Name(_)
+            | Self::IpyEscapeCommand(_) => {}
+        }
+    }
+}
+impl<'a> InterpolatedStringElementKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::Interpolation(node) => node.visit_source_order(visitor),
+            Self::Literal(_) => {}
+        }
+    }
+}
+impl<'a> PatternKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::MatchValue(node) => node.visit_source_order(visitor),
+            Self::MatchSingleton(node) => node.visit_source_order(visitor),
+            Self::MatchSequence(node) => node.visit_source_order(visitor),
+            Self::MatchMapping(node) => node.visit_source_order(visitor),
+            Self::MatchClass(node) => node.visit_source_order(visitor),
+            Self::MatchStar(node) => node.visit_source_order(visitor),
+            Self::MatchAs(node) => node.visit_source_order(visitor),
+            Self::MatchOr(node) => node.visit_source_order(visitor),
+        }
+    }
+}
+impl<'a> TypeParamKind<'a> {
+    pub(super) fn visit_source_order(
+        self,
+        visitor: &mut (impl super::visitor::source_order::SourceOrderVisitor<'a> + ?Sized),
+    ) {
+        match self {
+            Self::TypeVar(node) => node.visit_source_order(visitor),
+            Self::TypeVarTuple(node) => node.visit_source_order(visitor),
+            Self::ParamSpec(node) => node.visit_source_order(visitor),
         }
     }
 }
@@ -6672,7 +7372,9 @@ impl<'a> SyntaxNode<'a> {
             NodeKind::TypeParamParamSpec => {
                 visitor.visit_type_param(self.retype());
             }
-            NodeKind::InterpolatedStringFormatSpec => self.visit_source_order(visitor),
+            NodeKind::InterpolatedStringFormatSpec => self
+                .retype::<crate::InterpolatedStringFormatSpec>()
+                .visit_source_order(visitor),
             NodeKind::PatternArguments => {
                 visitor.visit_pattern_arguments(self.retype());
             }
@@ -9328,7 +10030,7 @@ pub mod build {
 }
 pub(crate) mod fields {
     use super::{
-        AnyKind, AstNode, ExceptHandlerKind, ExprKind, InterpolatedStringElementKind, List,
+        AnyNode, AstNode, ExceptHandlerKind, ExprKind, InterpolatedStringElementKind, List,
         ModKind, NodeKind, NodeList, PatternKind, Ranged, StmtKind, SyntaxNode, TypeParamKind,
     };
     #[derive(Clone, Copy)]
@@ -12658,125 +13360,125 @@ pub(crate) mod fields {
         #[inline]
         pub fn fields(self) -> AnyFields<'a> {
             match self.classify() {
-                AnyKind::ModModule(node) => AnyFields::ModModule(node.fields()),
-                AnyKind::ModExpression(node) => AnyFields::ModExpression(node.fields()),
-                AnyKind::StmtFunctionDef(node) => AnyFields::StmtFunctionDef(node.fields()),
-                AnyKind::StmtClassDef(node) => AnyFields::StmtClassDef(node.fields()),
-                AnyKind::StmtReturn(node) => AnyFields::StmtReturn(node.fields()),
-                AnyKind::StmtDelete(node) => AnyFields::StmtDelete(node.fields()),
-                AnyKind::StmtTypeAlias(node) => AnyFields::StmtTypeAlias(node.fields()),
-                AnyKind::StmtAssign(node) => AnyFields::StmtAssign(node.fields()),
-                AnyKind::StmtAugAssign(node) => AnyFields::StmtAugAssign(node.fields()),
-                AnyKind::StmtAnnAssign(node) => AnyFields::StmtAnnAssign(node.fields()),
-                AnyKind::StmtFor(node) => AnyFields::StmtFor(node.fields()),
-                AnyKind::StmtWhile(node) => AnyFields::StmtWhile(node.fields()),
-                AnyKind::StmtIf(node) => AnyFields::StmtIf(node.fields()),
-                AnyKind::StmtWith(node) => AnyFields::StmtWith(node.fields()),
-                AnyKind::StmtMatch(node) => AnyFields::StmtMatch(node.fields()),
-                AnyKind::StmtRaise(node) => AnyFields::StmtRaise(node.fields()),
-                AnyKind::StmtTry(node) => AnyFields::StmtTry(node.fields()),
-                AnyKind::StmtAssert(node) => AnyFields::StmtAssert(node.fields()),
-                AnyKind::StmtImport(node) => AnyFields::StmtImport(node.fields()),
-                AnyKind::StmtImportFrom(node) => AnyFields::StmtImportFrom(node.fields()),
-                AnyKind::StmtGlobal(node) => AnyFields::StmtGlobal(node.fields()),
-                AnyKind::StmtNonlocal(node) => AnyFields::StmtNonlocal(node.fields()),
-                AnyKind::StmtExpr(node) => AnyFields::StmtExpr(node.fields()),
-                AnyKind::StmtPass(node) => AnyFields::StmtPass(node.fields()),
-                AnyKind::StmtBreak(node) => AnyFields::StmtBreak(node.fields()),
-                AnyKind::StmtContinue(node) => AnyFields::StmtContinue(node.fields()),
-                AnyKind::StmtIpyEscapeCommand(node) => {
+                AnyNode::ModModule(node) => AnyFields::ModModule(node.fields()),
+                AnyNode::ModExpression(node) => AnyFields::ModExpression(node.fields()),
+                AnyNode::StmtFunctionDef(node) => AnyFields::StmtFunctionDef(node.fields()),
+                AnyNode::StmtClassDef(node) => AnyFields::StmtClassDef(node.fields()),
+                AnyNode::StmtReturn(node) => AnyFields::StmtReturn(node.fields()),
+                AnyNode::StmtDelete(node) => AnyFields::StmtDelete(node.fields()),
+                AnyNode::StmtTypeAlias(node) => AnyFields::StmtTypeAlias(node.fields()),
+                AnyNode::StmtAssign(node) => AnyFields::StmtAssign(node.fields()),
+                AnyNode::StmtAugAssign(node) => AnyFields::StmtAugAssign(node.fields()),
+                AnyNode::StmtAnnAssign(node) => AnyFields::StmtAnnAssign(node.fields()),
+                AnyNode::StmtFor(node) => AnyFields::StmtFor(node.fields()),
+                AnyNode::StmtWhile(node) => AnyFields::StmtWhile(node.fields()),
+                AnyNode::StmtIf(node) => AnyFields::StmtIf(node.fields()),
+                AnyNode::StmtWith(node) => AnyFields::StmtWith(node.fields()),
+                AnyNode::StmtMatch(node) => AnyFields::StmtMatch(node.fields()),
+                AnyNode::StmtRaise(node) => AnyFields::StmtRaise(node.fields()),
+                AnyNode::StmtTry(node) => AnyFields::StmtTry(node.fields()),
+                AnyNode::StmtAssert(node) => AnyFields::StmtAssert(node.fields()),
+                AnyNode::StmtImport(node) => AnyFields::StmtImport(node.fields()),
+                AnyNode::StmtImportFrom(node) => AnyFields::StmtImportFrom(node.fields()),
+                AnyNode::StmtGlobal(node) => AnyFields::StmtGlobal(node.fields()),
+                AnyNode::StmtNonlocal(node) => AnyFields::StmtNonlocal(node.fields()),
+                AnyNode::StmtExpr(node) => AnyFields::StmtExpr(node.fields()),
+                AnyNode::StmtPass(node) => AnyFields::StmtPass(node.fields()),
+                AnyNode::StmtBreak(node) => AnyFields::StmtBreak(node.fields()),
+                AnyNode::StmtContinue(node) => AnyFields::StmtContinue(node.fields()),
+                AnyNode::StmtIpyEscapeCommand(node) => {
                     AnyFields::StmtIpyEscapeCommand(node.fields())
                 }
-                AnyKind::ExprBoolOp(node) => AnyFields::ExprBoolOp(node.fields()),
-                AnyKind::ExprNamed(node) => AnyFields::ExprNamed(node.fields()),
-                AnyKind::ExprBinOp(node) => AnyFields::ExprBinOp(node.fields()),
-                AnyKind::ExprUnaryOp(node) => AnyFields::ExprUnaryOp(node.fields()),
-                AnyKind::ExprLambda(node) => AnyFields::ExprLambda(node.fields()),
-                AnyKind::ExprIf(node) => AnyFields::ExprIf(node.fields()),
-                AnyKind::ExprDict(node) => AnyFields::ExprDict(node.fields()),
-                AnyKind::ExprSet(node) => AnyFields::ExprSet(node.fields()),
-                AnyKind::ExprListComp(node) => AnyFields::ExprListComp(node.fields()),
-                AnyKind::ExprSetComp(node) => AnyFields::ExprSetComp(node.fields()),
-                AnyKind::ExprDictComp(node) => AnyFields::ExprDictComp(node.fields()),
-                AnyKind::ExprGenerator(node) => AnyFields::ExprGenerator(node.fields()),
-                AnyKind::ExprAwait(node) => AnyFields::ExprAwait(node.fields()),
-                AnyKind::ExprYield(node) => AnyFields::ExprYield(node.fields()),
-                AnyKind::ExprYieldFrom(node) => AnyFields::ExprYieldFrom(node.fields()),
-                AnyKind::ExprCompare(node) => AnyFields::ExprCompare(node.fields()),
-                AnyKind::ExprCall(node) => AnyFields::ExprCall(node.fields()),
-                AnyKind::ExprFString(node) => AnyFields::ExprFString(node.fields()),
-                AnyKind::ExprTString(node) => AnyFields::ExprTString(node.fields()),
-                AnyKind::ExprStringLiteral(node) => AnyFields::ExprStringLiteral(node.fields()),
-                AnyKind::ExprBytesLiteral(node) => AnyFields::ExprBytesLiteral(node.fields()),
-                AnyKind::ExprNumberLiteral(node) => AnyFields::ExprNumberLiteral(node.fields()),
-                AnyKind::ExprBooleanLiteral(node) => AnyFields::ExprBooleanLiteral(node.fields()),
-                AnyKind::ExprNoneLiteral(node) => AnyFields::ExprNoneLiteral(node.fields()),
-                AnyKind::ExprEllipsisLiteral(node) => AnyFields::ExprEllipsisLiteral(node.fields()),
-                AnyKind::ExprAttribute(node) => AnyFields::ExprAttribute(node.fields()),
-                AnyKind::ExprSubscript(node) => AnyFields::ExprSubscript(node.fields()),
-                AnyKind::ExprStarred(node) => AnyFields::ExprStarred(node.fields()),
-                AnyKind::ExprName(node) => AnyFields::ExprName(node.fields()),
-                AnyKind::ExprList(node) => AnyFields::ExprList(node.fields()),
-                AnyKind::ExprTuple(node) => AnyFields::ExprTuple(node.fields()),
-                AnyKind::ExprSlice(node) => AnyFields::ExprSlice(node.fields()),
-                AnyKind::ExprIpyEscapeCommand(node) => {
+                AnyNode::ExprBoolOp(node) => AnyFields::ExprBoolOp(node.fields()),
+                AnyNode::ExprNamed(node) => AnyFields::ExprNamed(node.fields()),
+                AnyNode::ExprBinOp(node) => AnyFields::ExprBinOp(node.fields()),
+                AnyNode::ExprUnaryOp(node) => AnyFields::ExprUnaryOp(node.fields()),
+                AnyNode::ExprLambda(node) => AnyFields::ExprLambda(node.fields()),
+                AnyNode::ExprIf(node) => AnyFields::ExprIf(node.fields()),
+                AnyNode::ExprDict(node) => AnyFields::ExprDict(node.fields()),
+                AnyNode::ExprSet(node) => AnyFields::ExprSet(node.fields()),
+                AnyNode::ExprListComp(node) => AnyFields::ExprListComp(node.fields()),
+                AnyNode::ExprSetComp(node) => AnyFields::ExprSetComp(node.fields()),
+                AnyNode::ExprDictComp(node) => AnyFields::ExprDictComp(node.fields()),
+                AnyNode::ExprGenerator(node) => AnyFields::ExprGenerator(node.fields()),
+                AnyNode::ExprAwait(node) => AnyFields::ExprAwait(node.fields()),
+                AnyNode::ExprYield(node) => AnyFields::ExprYield(node.fields()),
+                AnyNode::ExprYieldFrom(node) => AnyFields::ExprYieldFrom(node.fields()),
+                AnyNode::ExprCompare(node) => AnyFields::ExprCompare(node.fields()),
+                AnyNode::ExprCall(node) => AnyFields::ExprCall(node.fields()),
+                AnyNode::ExprFString(node) => AnyFields::ExprFString(node.fields()),
+                AnyNode::ExprTString(node) => AnyFields::ExprTString(node.fields()),
+                AnyNode::ExprStringLiteral(node) => AnyFields::ExprStringLiteral(node.fields()),
+                AnyNode::ExprBytesLiteral(node) => AnyFields::ExprBytesLiteral(node.fields()),
+                AnyNode::ExprNumberLiteral(node) => AnyFields::ExprNumberLiteral(node.fields()),
+                AnyNode::ExprBooleanLiteral(node) => AnyFields::ExprBooleanLiteral(node.fields()),
+                AnyNode::ExprNoneLiteral(node) => AnyFields::ExprNoneLiteral(node.fields()),
+                AnyNode::ExprEllipsisLiteral(node) => AnyFields::ExprEllipsisLiteral(node.fields()),
+                AnyNode::ExprAttribute(node) => AnyFields::ExprAttribute(node.fields()),
+                AnyNode::ExprSubscript(node) => AnyFields::ExprSubscript(node.fields()),
+                AnyNode::ExprStarred(node) => AnyFields::ExprStarred(node.fields()),
+                AnyNode::ExprName(node) => AnyFields::ExprName(node.fields()),
+                AnyNode::ExprList(node) => AnyFields::ExprList(node.fields()),
+                AnyNode::ExprTuple(node) => AnyFields::ExprTuple(node.fields()),
+                AnyNode::ExprSlice(node) => AnyFields::ExprSlice(node.fields()),
+                AnyNode::ExprIpyEscapeCommand(node) => {
                     AnyFields::ExprIpyEscapeCommand(node.fields())
                 }
-                AnyKind::ExceptHandlerExceptHandler(node) => {
+                AnyNode::ExceptHandlerExceptHandler(node) => {
                     AnyFields::ExceptHandlerExceptHandler(node.fields())
                 }
-                AnyKind::InterpolatedElement(node) => AnyFields::InterpolatedElement(node.fields()),
-                AnyKind::InterpolatedStringLiteralElement(node) => {
+                AnyNode::InterpolatedElement(node) => AnyFields::InterpolatedElement(node.fields()),
+                AnyNode::InterpolatedStringLiteralElement(node) => {
                     AnyFields::InterpolatedStringLiteralElement(node.fields())
                 }
-                AnyKind::PatternMatchValue(node) => AnyFields::PatternMatchValue(node.fields()),
-                AnyKind::PatternMatchSingleton(node) => {
+                AnyNode::PatternMatchValue(node) => AnyFields::PatternMatchValue(node.fields()),
+                AnyNode::PatternMatchSingleton(node) => {
                     AnyFields::PatternMatchSingleton(node.fields())
                 }
-                AnyKind::PatternMatchSequence(node) => {
+                AnyNode::PatternMatchSequence(node) => {
                     AnyFields::PatternMatchSequence(node.fields())
                 }
-                AnyKind::PatternMatchMapping(node) => AnyFields::PatternMatchMapping(node.fields()),
-                AnyKind::PatternMatchClass(node) => AnyFields::PatternMatchClass(node.fields()),
-                AnyKind::PatternMatchStar(node) => AnyFields::PatternMatchStar(node.fields()),
-                AnyKind::PatternMatchAs(node) => AnyFields::PatternMatchAs(node.fields()),
-                AnyKind::PatternMatchOr(node) => AnyFields::PatternMatchOr(node.fields()),
-                AnyKind::TypeParamTypeVar(node) => AnyFields::TypeParamTypeVar(node.fields()),
-                AnyKind::TypeParamTypeVarTuple(node) => {
+                AnyNode::PatternMatchMapping(node) => AnyFields::PatternMatchMapping(node.fields()),
+                AnyNode::PatternMatchClass(node) => AnyFields::PatternMatchClass(node.fields()),
+                AnyNode::PatternMatchStar(node) => AnyFields::PatternMatchStar(node.fields()),
+                AnyNode::PatternMatchAs(node) => AnyFields::PatternMatchAs(node.fields()),
+                AnyNode::PatternMatchOr(node) => AnyFields::PatternMatchOr(node.fields()),
+                AnyNode::TypeParamTypeVar(node) => AnyFields::TypeParamTypeVar(node.fields()),
+                AnyNode::TypeParamTypeVarTuple(node) => {
                     AnyFields::TypeParamTypeVarTuple(node.fields())
                 }
-                AnyKind::TypeParamParamSpec(node) => AnyFields::TypeParamParamSpec(node.fields()),
-                AnyKind::InterpolatedStringFormatSpec(node) => {
+                AnyNode::TypeParamParamSpec(node) => AnyFields::TypeParamParamSpec(node.fields()),
+                AnyNode::InterpolatedStringFormatSpec(node) => {
                     AnyFields::InterpolatedStringFormatSpec(node.fields())
                 }
-                AnyKind::PatternArguments(node) => AnyFields::PatternArguments(node.fields()),
-                AnyKind::PatternKeyword(node) => AnyFields::PatternKeyword(node.fields()),
-                AnyKind::Comprehension(node) => AnyFields::Comprehension(node.fields()),
-                AnyKind::Arguments(node) => AnyFields::Arguments(node.fields()),
-                AnyKind::Parameters(node) => AnyFields::Parameters(node.fields()),
-                AnyKind::Parameter(node) => AnyFields::Parameter(node.fields()),
-                AnyKind::ParameterWithDefault(node) => {
+                AnyNode::PatternArguments(node) => AnyFields::PatternArguments(node.fields()),
+                AnyNode::PatternKeyword(node) => AnyFields::PatternKeyword(node.fields()),
+                AnyNode::Comprehension(node) => AnyFields::Comprehension(node.fields()),
+                AnyNode::Arguments(node) => AnyFields::Arguments(node.fields()),
+                AnyNode::Parameters(node) => AnyFields::Parameters(node.fields()),
+                AnyNode::Parameter(node) => AnyFields::Parameter(node.fields()),
+                AnyNode::ParameterWithDefault(node) => {
                     AnyFields::ParameterWithDefault(node.fields())
                 }
-                AnyKind::DictItem(node) => AnyFields::DictItem(node.fields()),
-                AnyKind::Keyword(node) => AnyFields::Keyword(node.fields()),
-                AnyKind::Alias(node) => AnyFields::Alias(node.fields()),
-                AnyKind::WithItem(node) => AnyFields::WithItem(node.fields()),
-                AnyKind::MatchCase(node) => AnyFields::MatchCase(node.fields()),
-                AnyKind::Decorator(node) => AnyFields::Decorator(node.fields()),
-                AnyKind::ElifElseClause(node) => AnyFields::ElifElseClause(node.fields()),
-                AnyKind::TypeParams(node) => AnyFields::TypeParams(node.fields()),
-                AnyKind::FString(node) => AnyFields::FString(node.fields()),
-                AnyKind::TString(node) => AnyFields::TString(node.fields()),
-                AnyKind::StringLiteral(node) => AnyFields::StringLiteral(node.fields()),
-                AnyKind::BytesLiteral(node) => AnyFields::BytesLiteral(node.fields()),
-                AnyKind::Identifier(node) => AnyFields::Identifier(node.fields()),
+                AnyNode::DictItem(node) => AnyFields::DictItem(node.fields()),
+                AnyNode::Keyword(node) => AnyFields::Keyword(node.fields()),
+                AnyNode::Alias(node) => AnyFields::Alias(node.fields()),
+                AnyNode::WithItem(node) => AnyFields::WithItem(node.fields()),
+                AnyNode::MatchCase(node) => AnyFields::MatchCase(node.fields()),
+                AnyNode::Decorator(node) => AnyFields::Decorator(node.fields()),
+                AnyNode::ElifElseClause(node) => AnyFields::ElifElseClause(node.fields()),
+                AnyNode::TypeParams(node) => AnyFields::TypeParams(node.fields()),
+                AnyNode::FString(node) => AnyFields::FString(node.fields()),
+                AnyNode::TString(node) => AnyFields::TString(node.fields()),
+                AnyNode::StringLiteral(node) => AnyFields::StringLiteral(node.fields()),
+                AnyNode::BytesLiteral(node) => AnyFields::BytesLiteral(node.fields()),
+                AnyNode::Identifier(node) => AnyFields::Identifier(node.fields()),
             }
         }
     }
 }
 #[derive(Clone, Copy, Debug)]
-pub enum AnyKind<'a> {
+pub enum AnyNode<'a> {
     ModModule(crate::ModModule<'a>),
     ModExpression(crate::ModExpression<'a>),
     StmtFunctionDef(crate::StmtFunctionDef<'a>),
@@ -12875,109 +13577,109 @@ pub enum AnyKind<'a> {
 }
 impl<'a> SyntaxNode<'a> {
     #[inline]
-    pub fn classify(self) -> AnyKind<'a> {
+    pub fn classify(self) -> AnyNode<'a> {
         match self.node_kind() {
-            NodeKind::ModModule => AnyKind::ModModule(self.retype()),
-            NodeKind::ModExpression => AnyKind::ModExpression(self.retype()),
-            NodeKind::StmtFunctionDef => AnyKind::StmtFunctionDef(self.retype()),
-            NodeKind::StmtClassDef => AnyKind::StmtClassDef(self.retype()),
-            NodeKind::StmtReturn => AnyKind::StmtReturn(self.retype()),
-            NodeKind::StmtDelete => AnyKind::StmtDelete(self.retype()),
-            NodeKind::StmtTypeAlias => AnyKind::StmtTypeAlias(self.retype()),
-            NodeKind::StmtAssign => AnyKind::StmtAssign(self.retype()),
-            NodeKind::StmtAugAssign => AnyKind::StmtAugAssign(self.retype()),
-            NodeKind::StmtAnnAssign => AnyKind::StmtAnnAssign(self.retype()),
-            NodeKind::StmtFor => AnyKind::StmtFor(self.retype()),
-            NodeKind::StmtWhile => AnyKind::StmtWhile(self.retype()),
-            NodeKind::StmtIf => AnyKind::StmtIf(self.retype()),
-            NodeKind::StmtWith => AnyKind::StmtWith(self.retype()),
-            NodeKind::StmtMatch => AnyKind::StmtMatch(self.retype()),
-            NodeKind::StmtRaise => AnyKind::StmtRaise(self.retype()),
-            NodeKind::StmtTry => AnyKind::StmtTry(self.retype()),
-            NodeKind::StmtAssert => AnyKind::StmtAssert(self.retype()),
-            NodeKind::StmtImport => AnyKind::StmtImport(self.retype()),
-            NodeKind::StmtImportFrom => AnyKind::StmtImportFrom(self.retype()),
-            NodeKind::StmtGlobal => AnyKind::StmtGlobal(self.retype()),
-            NodeKind::StmtNonlocal => AnyKind::StmtNonlocal(self.retype()),
-            NodeKind::StmtExpr => AnyKind::StmtExpr(self.retype()),
-            NodeKind::StmtPass => AnyKind::StmtPass(self.retype()),
-            NodeKind::StmtBreak => AnyKind::StmtBreak(self.retype()),
-            NodeKind::StmtContinue => AnyKind::StmtContinue(self.retype()),
-            NodeKind::StmtIpyEscapeCommand => AnyKind::StmtIpyEscapeCommand(self.retype()),
-            NodeKind::ExprBoolOp => AnyKind::ExprBoolOp(self.retype()),
-            NodeKind::ExprNamed => AnyKind::ExprNamed(self.retype()),
-            NodeKind::ExprBinOp => AnyKind::ExprBinOp(self.retype()),
-            NodeKind::ExprUnaryOp => AnyKind::ExprUnaryOp(self.retype()),
-            NodeKind::ExprLambda => AnyKind::ExprLambda(self.retype()),
-            NodeKind::ExprIf => AnyKind::ExprIf(self.retype()),
-            NodeKind::ExprDict => AnyKind::ExprDict(self.retype()),
-            NodeKind::ExprSet => AnyKind::ExprSet(self.retype()),
-            NodeKind::ExprListComp => AnyKind::ExprListComp(self.retype()),
-            NodeKind::ExprSetComp => AnyKind::ExprSetComp(self.retype()),
-            NodeKind::ExprDictComp => AnyKind::ExprDictComp(self.retype()),
-            NodeKind::ExprGenerator => AnyKind::ExprGenerator(self.retype()),
-            NodeKind::ExprAwait => AnyKind::ExprAwait(self.retype()),
-            NodeKind::ExprYield => AnyKind::ExprYield(self.retype()),
-            NodeKind::ExprYieldFrom => AnyKind::ExprYieldFrom(self.retype()),
-            NodeKind::ExprCompare => AnyKind::ExprCompare(self.retype()),
-            NodeKind::ExprCall => AnyKind::ExprCall(self.retype()),
-            NodeKind::ExprFString => AnyKind::ExprFString(self.retype()),
-            NodeKind::ExprTString => AnyKind::ExprTString(self.retype()),
-            NodeKind::ExprStringLiteral => AnyKind::ExprStringLiteral(self.retype()),
-            NodeKind::ExprBytesLiteral => AnyKind::ExprBytesLiteral(self.retype()),
-            NodeKind::ExprNumberLiteral => AnyKind::ExprNumberLiteral(self.retype()),
-            NodeKind::ExprBooleanLiteral => AnyKind::ExprBooleanLiteral(self.retype()),
-            NodeKind::ExprNoneLiteral => AnyKind::ExprNoneLiteral(self.retype()),
-            NodeKind::ExprEllipsisLiteral => AnyKind::ExprEllipsisLiteral(self.retype()),
-            NodeKind::ExprAttribute => AnyKind::ExprAttribute(self.retype()),
-            NodeKind::ExprSubscript => AnyKind::ExprSubscript(self.retype()),
-            NodeKind::ExprStarred => AnyKind::ExprStarred(self.retype()),
-            NodeKind::ExprName => AnyKind::ExprName(self.retype()),
-            NodeKind::ExprList => AnyKind::ExprList(self.retype()),
-            NodeKind::ExprTuple => AnyKind::ExprTuple(self.retype()),
-            NodeKind::ExprSlice => AnyKind::ExprSlice(self.retype()),
-            NodeKind::ExprIpyEscapeCommand => AnyKind::ExprIpyEscapeCommand(self.retype()),
+            NodeKind::ModModule => AnyNode::ModModule(self.retype()),
+            NodeKind::ModExpression => AnyNode::ModExpression(self.retype()),
+            NodeKind::StmtFunctionDef => AnyNode::StmtFunctionDef(self.retype()),
+            NodeKind::StmtClassDef => AnyNode::StmtClassDef(self.retype()),
+            NodeKind::StmtReturn => AnyNode::StmtReturn(self.retype()),
+            NodeKind::StmtDelete => AnyNode::StmtDelete(self.retype()),
+            NodeKind::StmtTypeAlias => AnyNode::StmtTypeAlias(self.retype()),
+            NodeKind::StmtAssign => AnyNode::StmtAssign(self.retype()),
+            NodeKind::StmtAugAssign => AnyNode::StmtAugAssign(self.retype()),
+            NodeKind::StmtAnnAssign => AnyNode::StmtAnnAssign(self.retype()),
+            NodeKind::StmtFor => AnyNode::StmtFor(self.retype()),
+            NodeKind::StmtWhile => AnyNode::StmtWhile(self.retype()),
+            NodeKind::StmtIf => AnyNode::StmtIf(self.retype()),
+            NodeKind::StmtWith => AnyNode::StmtWith(self.retype()),
+            NodeKind::StmtMatch => AnyNode::StmtMatch(self.retype()),
+            NodeKind::StmtRaise => AnyNode::StmtRaise(self.retype()),
+            NodeKind::StmtTry => AnyNode::StmtTry(self.retype()),
+            NodeKind::StmtAssert => AnyNode::StmtAssert(self.retype()),
+            NodeKind::StmtImport => AnyNode::StmtImport(self.retype()),
+            NodeKind::StmtImportFrom => AnyNode::StmtImportFrom(self.retype()),
+            NodeKind::StmtGlobal => AnyNode::StmtGlobal(self.retype()),
+            NodeKind::StmtNonlocal => AnyNode::StmtNonlocal(self.retype()),
+            NodeKind::StmtExpr => AnyNode::StmtExpr(self.retype()),
+            NodeKind::StmtPass => AnyNode::StmtPass(self.retype()),
+            NodeKind::StmtBreak => AnyNode::StmtBreak(self.retype()),
+            NodeKind::StmtContinue => AnyNode::StmtContinue(self.retype()),
+            NodeKind::StmtIpyEscapeCommand => AnyNode::StmtIpyEscapeCommand(self.retype()),
+            NodeKind::ExprBoolOp => AnyNode::ExprBoolOp(self.retype()),
+            NodeKind::ExprNamed => AnyNode::ExprNamed(self.retype()),
+            NodeKind::ExprBinOp => AnyNode::ExprBinOp(self.retype()),
+            NodeKind::ExprUnaryOp => AnyNode::ExprUnaryOp(self.retype()),
+            NodeKind::ExprLambda => AnyNode::ExprLambda(self.retype()),
+            NodeKind::ExprIf => AnyNode::ExprIf(self.retype()),
+            NodeKind::ExprDict => AnyNode::ExprDict(self.retype()),
+            NodeKind::ExprSet => AnyNode::ExprSet(self.retype()),
+            NodeKind::ExprListComp => AnyNode::ExprListComp(self.retype()),
+            NodeKind::ExprSetComp => AnyNode::ExprSetComp(self.retype()),
+            NodeKind::ExprDictComp => AnyNode::ExprDictComp(self.retype()),
+            NodeKind::ExprGenerator => AnyNode::ExprGenerator(self.retype()),
+            NodeKind::ExprAwait => AnyNode::ExprAwait(self.retype()),
+            NodeKind::ExprYield => AnyNode::ExprYield(self.retype()),
+            NodeKind::ExprYieldFrom => AnyNode::ExprYieldFrom(self.retype()),
+            NodeKind::ExprCompare => AnyNode::ExprCompare(self.retype()),
+            NodeKind::ExprCall => AnyNode::ExprCall(self.retype()),
+            NodeKind::ExprFString => AnyNode::ExprFString(self.retype()),
+            NodeKind::ExprTString => AnyNode::ExprTString(self.retype()),
+            NodeKind::ExprStringLiteral => AnyNode::ExprStringLiteral(self.retype()),
+            NodeKind::ExprBytesLiteral => AnyNode::ExprBytesLiteral(self.retype()),
+            NodeKind::ExprNumberLiteral => AnyNode::ExprNumberLiteral(self.retype()),
+            NodeKind::ExprBooleanLiteral => AnyNode::ExprBooleanLiteral(self.retype()),
+            NodeKind::ExprNoneLiteral => AnyNode::ExprNoneLiteral(self.retype()),
+            NodeKind::ExprEllipsisLiteral => AnyNode::ExprEllipsisLiteral(self.retype()),
+            NodeKind::ExprAttribute => AnyNode::ExprAttribute(self.retype()),
+            NodeKind::ExprSubscript => AnyNode::ExprSubscript(self.retype()),
+            NodeKind::ExprStarred => AnyNode::ExprStarred(self.retype()),
+            NodeKind::ExprName => AnyNode::ExprName(self.retype()),
+            NodeKind::ExprList => AnyNode::ExprList(self.retype()),
+            NodeKind::ExprTuple => AnyNode::ExprTuple(self.retype()),
+            NodeKind::ExprSlice => AnyNode::ExprSlice(self.retype()),
+            NodeKind::ExprIpyEscapeCommand => AnyNode::ExprIpyEscapeCommand(self.retype()),
             NodeKind::ExceptHandlerExceptHandler => {
-                AnyKind::ExceptHandlerExceptHandler(self.retype())
+                AnyNode::ExceptHandlerExceptHandler(self.retype())
             }
-            NodeKind::InterpolatedElement => AnyKind::InterpolatedElement(self.retype()),
+            NodeKind::InterpolatedElement => AnyNode::InterpolatedElement(self.retype()),
             NodeKind::InterpolatedStringLiteralElement => {
-                AnyKind::InterpolatedStringLiteralElement(self.retype())
+                AnyNode::InterpolatedStringLiteralElement(self.retype())
             }
-            NodeKind::PatternMatchValue => AnyKind::PatternMatchValue(self.retype()),
-            NodeKind::PatternMatchSingleton => AnyKind::PatternMatchSingleton(self.retype()),
-            NodeKind::PatternMatchSequence => AnyKind::PatternMatchSequence(self.retype()),
-            NodeKind::PatternMatchMapping => AnyKind::PatternMatchMapping(self.retype()),
-            NodeKind::PatternMatchClass => AnyKind::PatternMatchClass(self.retype()),
-            NodeKind::PatternMatchStar => AnyKind::PatternMatchStar(self.retype()),
-            NodeKind::PatternMatchAs => AnyKind::PatternMatchAs(self.retype()),
-            NodeKind::PatternMatchOr => AnyKind::PatternMatchOr(self.retype()),
-            NodeKind::TypeParamTypeVar => AnyKind::TypeParamTypeVar(self.retype()),
-            NodeKind::TypeParamTypeVarTuple => AnyKind::TypeParamTypeVarTuple(self.retype()),
-            NodeKind::TypeParamParamSpec => AnyKind::TypeParamParamSpec(self.retype()),
+            NodeKind::PatternMatchValue => AnyNode::PatternMatchValue(self.retype()),
+            NodeKind::PatternMatchSingleton => AnyNode::PatternMatchSingleton(self.retype()),
+            NodeKind::PatternMatchSequence => AnyNode::PatternMatchSequence(self.retype()),
+            NodeKind::PatternMatchMapping => AnyNode::PatternMatchMapping(self.retype()),
+            NodeKind::PatternMatchClass => AnyNode::PatternMatchClass(self.retype()),
+            NodeKind::PatternMatchStar => AnyNode::PatternMatchStar(self.retype()),
+            NodeKind::PatternMatchAs => AnyNode::PatternMatchAs(self.retype()),
+            NodeKind::PatternMatchOr => AnyNode::PatternMatchOr(self.retype()),
+            NodeKind::TypeParamTypeVar => AnyNode::TypeParamTypeVar(self.retype()),
+            NodeKind::TypeParamTypeVarTuple => AnyNode::TypeParamTypeVarTuple(self.retype()),
+            NodeKind::TypeParamParamSpec => AnyNode::TypeParamParamSpec(self.retype()),
             NodeKind::InterpolatedStringFormatSpec => {
-                AnyKind::InterpolatedStringFormatSpec(self.retype())
+                AnyNode::InterpolatedStringFormatSpec(self.retype())
             }
-            NodeKind::PatternArguments => AnyKind::PatternArguments(self.retype()),
-            NodeKind::PatternKeyword => AnyKind::PatternKeyword(self.retype()),
-            NodeKind::Comprehension => AnyKind::Comprehension(self.retype()),
-            NodeKind::Arguments => AnyKind::Arguments(self.retype()),
-            NodeKind::Parameters => AnyKind::Parameters(self.retype()),
-            NodeKind::Parameter => AnyKind::Parameter(self.retype()),
-            NodeKind::ParameterWithDefault => AnyKind::ParameterWithDefault(self.retype()),
-            NodeKind::DictItem => AnyKind::DictItem(self.retype()),
-            NodeKind::Keyword => AnyKind::Keyword(self.retype()),
-            NodeKind::Alias => AnyKind::Alias(self.retype()),
-            NodeKind::WithItem => AnyKind::WithItem(self.retype()),
-            NodeKind::MatchCase => AnyKind::MatchCase(self.retype()),
-            NodeKind::Decorator => AnyKind::Decorator(self.retype()),
-            NodeKind::ElifElseClause => AnyKind::ElifElseClause(self.retype()),
-            NodeKind::TypeParams => AnyKind::TypeParams(self.retype()),
-            NodeKind::FString => AnyKind::FString(self.retype()),
-            NodeKind::TString => AnyKind::TString(self.retype()),
-            NodeKind::StringLiteral => AnyKind::StringLiteral(self.retype()),
-            NodeKind::BytesLiteral => AnyKind::BytesLiteral(self.retype()),
-            NodeKind::Identifier => AnyKind::Identifier(self.retype()),
+            NodeKind::PatternArguments => AnyNode::PatternArguments(self.retype()),
+            NodeKind::PatternKeyword => AnyNode::PatternKeyword(self.retype()),
+            NodeKind::Comprehension => AnyNode::Comprehension(self.retype()),
+            NodeKind::Arguments => AnyNode::Arguments(self.retype()),
+            NodeKind::Parameters => AnyNode::Parameters(self.retype()),
+            NodeKind::Parameter => AnyNode::Parameter(self.retype()),
+            NodeKind::ParameterWithDefault => AnyNode::ParameterWithDefault(self.retype()),
+            NodeKind::DictItem => AnyNode::DictItem(self.retype()),
+            NodeKind::Keyword => AnyNode::Keyword(self.retype()),
+            NodeKind::Alias => AnyNode::Alias(self.retype()),
+            NodeKind::WithItem => AnyNode::WithItem(self.retype()),
+            NodeKind::MatchCase => AnyNode::MatchCase(self.retype()),
+            NodeKind::Decorator => AnyNode::Decorator(self.retype()),
+            NodeKind::ElifElseClause => AnyNode::ElifElseClause(self.retype()),
+            NodeKind::TypeParams => AnyNode::TypeParams(self.retype()),
+            NodeKind::FString => AnyNode::FString(self.retype()),
+            NodeKind::TString => AnyNode::TString(self.retype()),
+            NodeKind::StringLiteral => AnyNode::StringLiteral(self.retype()),
+            NodeKind::BytesLiteral => AnyNode::BytesLiteral(self.retype()),
+            NodeKind::Identifier => AnyNode::Identifier(self.retype()),
         }
     }
 }
@@ -13748,9 +14450,9 @@ impl<'a> SyntaxNode<'a> {
         self.node_kind() == NodeKind::Identifier
     }
 }
-impl<'a> AnyKind<'a> {
+impl<'a> AnyNode<'a> {
     #[inline]
-    pub fn view(self) -> SyntaxNode<'a> {
+    pub fn syntax_node(self) -> SyntaxNode<'a> {
         match self {
             Self::ModModule(node) => node.syntax_node(),
             Self::ModExpression(node) => node.syntax_node(),
@@ -13852,15 +14554,15 @@ impl<'a> AnyKind<'a> {
 }
 pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
     match left.classify() {
-        AnyKind::ModModule(left) => {
+        AnyNode::ModModule(left) => {
             let right = right.retype::<crate::ModModule>();
             left.body() == right.body()
         }
-        AnyKind::ModExpression(left) => {
+        AnyNode::ModExpression(left) => {
             let right = right.retype::<crate::ModExpression>();
             left.body() == right.body()
         }
-        AnyKind::StmtFunctionDef(left) => {
+        AnyNode::StmtFunctionDef(left) => {
             let right = right.retype::<crate::StmtFunctionDef>();
             left.is_async() == right.is_async()
                 && left.decorator_list() == right.decorator_list()
@@ -13870,7 +14572,7 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
                 && left.returns() == right.returns()
                 && left.body() == right.body()
         }
-        AnyKind::StmtClassDef(left) => {
+        AnyNode::StmtClassDef(left) => {
             let right = right.retype::<crate::StmtClassDef>();
             left.decorator_list() == right.decorator_list()
                 && left.name() == right.name()
@@ -13878,38 +14580,38 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
                 && left.arguments() == right.arguments()
                 && left.body() == right.body()
         }
-        AnyKind::StmtReturn(left) => {
+        AnyNode::StmtReturn(left) => {
             let right = right.retype::<crate::StmtReturn>();
             left.value() == right.value()
         }
-        AnyKind::StmtDelete(left) => {
+        AnyNode::StmtDelete(left) => {
             let right = right.retype::<crate::StmtDelete>();
             left.targets() == right.targets()
         }
-        AnyKind::StmtTypeAlias(left) => {
+        AnyNode::StmtTypeAlias(left) => {
             let right = right.retype::<crate::StmtTypeAlias>();
             left.name() == right.name()
                 && left.type_params() == right.type_params()
                 && left.value() == right.value()
         }
-        AnyKind::StmtAssign(left) => {
+        AnyNode::StmtAssign(left) => {
             let right = right.retype::<crate::StmtAssign>();
             left.targets() == right.targets() && left.value() == right.value()
         }
-        AnyKind::StmtAugAssign(left) => {
+        AnyNode::StmtAugAssign(left) => {
             let right = right.retype::<crate::StmtAugAssign>();
             left.target() == right.target()
                 && left.op() == right.op()
                 && left.value() == right.value()
         }
-        AnyKind::StmtAnnAssign(left) => {
+        AnyNode::StmtAnnAssign(left) => {
             let right = right.retype::<crate::StmtAnnAssign>();
             left.target() == right.target()
                 && left.annotation() == right.annotation()
                 && left.value() == right.value()
                 && left.simple() == right.simple()
         }
-        AnyKind::StmtFor(left) => {
+        AnyNode::StmtFor(left) => {
             let right = right.retype::<crate::StmtFor>();
             left.is_async() == right.is_async()
                 && left.target() == right.target()
@@ -13917,33 +14619,33 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
                 && left.body() == right.body()
                 && left.orelse() == right.orelse()
         }
-        AnyKind::StmtWhile(left) => {
+        AnyNode::StmtWhile(left) => {
             let right = right.retype::<crate::StmtWhile>();
             left.test() == right.test()
                 && left.body() == right.body()
                 && left.orelse() == right.orelse()
         }
-        AnyKind::StmtIf(left) => {
+        AnyNode::StmtIf(left) => {
             let right = right.retype::<crate::StmtIf>();
             left.test() == right.test()
                 && left.body() == right.body()
                 && left.elif_else_clauses() == right.elif_else_clauses()
         }
-        AnyKind::StmtWith(left) => {
+        AnyNode::StmtWith(left) => {
             let right = right.retype::<crate::StmtWith>();
             left.is_async() == right.is_async()
                 && left.items() == right.items()
                 && left.body() == right.body()
         }
-        AnyKind::StmtMatch(left) => {
+        AnyNode::StmtMatch(left) => {
             let right = right.retype::<crate::StmtMatch>();
             left.subject() == right.subject() && left.cases() == right.cases()
         }
-        AnyKind::StmtRaise(left) => {
+        AnyNode::StmtRaise(left) => {
             let right = right.retype::<crate::StmtRaise>();
             left.exc() == right.exc() && left.cause() == right.cause()
         }
-        AnyKind::StmtTry(left) => {
+        AnyNode::StmtTry(left) => {
             let right = right.retype::<crate::StmtTry>();
             left.body() == right.body()
                 && left.handlers() == right.handlers()
@@ -13951,267 +14653,267 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
                 && left.finalbody() == right.finalbody()
                 && left.is_star() == right.is_star()
         }
-        AnyKind::StmtAssert(left) => {
+        AnyNode::StmtAssert(left) => {
             let right = right.retype::<crate::StmtAssert>();
             left.test() == right.test() && left.msg() == right.msg()
         }
-        AnyKind::StmtImport(left) => {
+        AnyNode::StmtImport(left) => {
             let right = right.retype::<crate::StmtImport>();
             left.names() == right.names() && left.is_lazy() == right.is_lazy()
         }
-        AnyKind::StmtImportFrom(left) => {
+        AnyNode::StmtImportFrom(left) => {
             let right = right.retype::<crate::StmtImportFrom>();
             left.module() == right.module()
                 && left.names() == right.names()
                 && left.level() == right.level()
                 && left.is_lazy() == right.is_lazy()
         }
-        AnyKind::StmtGlobal(left) => {
+        AnyNode::StmtGlobal(left) => {
             let right = right.retype::<crate::StmtGlobal>();
             left.names() == right.names()
         }
-        AnyKind::StmtNonlocal(left) => {
+        AnyNode::StmtNonlocal(left) => {
             let right = right.retype::<crate::StmtNonlocal>();
             left.names() == right.names()
         }
-        AnyKind::StmtExpr(left) => {
+        AnyNode::StmtExpr(left) => {
             let right = right.retype::<crate::StmtExpr>();
             left.value() == right.value()
         }
-        AnyKind::StmtPass(_) => true,
-        AnyKind::StmtBreak(_) => true,
-        AnyKind::StmtContinue(_) => true,
-        AnyKind::StmtIpyEscapeCommand(left) => {
+        AnyNode::StmtPass(_) => true,
+        AnyNode::StmtBreak(_) => true,
+        AnyNode::StmtContinue(_) => true,
+        AnyNode::StmtIpyEscapeCommand(left) => {
             let right = right.retype::<crate::StmtIpyEscapeCommand>();
             left.kind() == right.kind() && left.value() == right.value()
         }
-        AnyKind::ExprBoolOp(left) => {
+        AnyNode::ExprBoolOp(left) => {
             let right = right.retype::<crate::ExprBoolOp>();
             left.op() == right.op() && left.values() == right.values()
         }
-        AnyKind::ExprNamed(left) => {
+        AnyNode::ExprNamed(left) => {
             let right = right.retype::<crate::ExprNamed>();
             left.target() == right.target() && left.value() == right.value()
         }
-        AnyKind::ExprBinOp(left) => {
+        AnyNode::ExprBinOp(left) => {
             let right = right.retype::<crate::ExprBinOp>();
             left.left() == right.left() && left.op() == right.op() && left.right() == right.right()
         }
-        AnyKind::ExprUnaryOp(left) => {
+        AnyNode::ExprUnaryOp(left) => {
             let right = right.retype::<crate::ExprUnaryOp>();
             left.op() == right.op() && left.operand() == right.operand()
         }
-        AnyKind::ExprLambda(left) => {
+        AnyNode::ExprLambda(left) => {
             let right = right.retype::<crate::ExprLambda>();
             left.parameters() == right.parameters() && left.body() == right.body()
         }
-        AnyKind::ExprIf(left) => {
+        AnyNode::ExprIf(left) => {
             let right = right.retype::<crate::ExprIf>();
             left.test() == right.test()
                 && left.body() == right.body()
                 && left.orelse() == right.orelse()
         }
-        AnyKind::ExprDict(left) => {
+        AnyNode::ExprDict(left) => {
             let right = right.retype::<crate::ExprDict>();
             left.items() == right.items()
         }
-        AnyKind::ExprSet(left) => {
+        AnyNode::ExprSet(left) => {
             let right = right.retype::<crate::ExprSet>();
             left.elts() == right.elts()
         }
-        AnyKind::ExprListComp(left) => {
+        AnyNode::ExprListComp(left) => {
             let right = right.retype::<crate::ExprListComp>();
             left.elt() == right.elt() && left.generators() == right.generators()
         }
-        AnyKind::ExprSetComp(left) => {
+        AnyNode::ExprSetComp(left) => {
             let right = right.retype::<crate::ExprSetComp>();
             left.elt() == right.elt() && left.generators() == right.generators()
         }
-        AnyKind::ExprDictComp(left) => {
+        AnyNode::ExprDictComp(left) => {
             let right = right.retype::<crate::ExprDictComp>();
             left.key() == right.key()
                 && left.value() == right.value()
                 && left.generators() == right.generators()
         }
-        AnyKind::ExprGenerator(left) => {
+        AnyNode::ExprGenerator(left) => {
             let right = right.retype::<crate::ExprGenerator>();
             left.elt() == right.elt()
                 && left.generators() == right.generators()
                 && left.parenthesized() == right.parenthesized()
         }
-        AnyKind::ExprAwait(left) => {
+        AnyNode::ExprAwait(left) => {
             let right = right.retype::<crate::ExprAwait>();
             left.value() == right.value()
         }
-        AnyKind::ExprYield(left) => {
+        AnyNode::ExprYield(left) => {
             let right = right.retype::<crate::ExprYield>();
             left.value() == right.value()
         }
-        AnyKind::ExprYieldFrom(left) => {
+        AnyNode::ExprYieldFrom(left) => {
             let right = right.retype::<crate::ExprYieldFrom>();
             left.value() == right.value()
         }
-        AnyKind::ExprCompare(left) => {
+        AnyNode::ExprCompare(left) => {
             let right = right.retype::<crate::ExprCompare>();
             left.ops() == right.ops() && left.operands() == right.operands()
         }
-        AnyKind::ExprCall(left) => {
+        AnyNode::ExprCall(left) => {
             let right = right.retype::<crate::ExprCall>();
             left.func() == right.func() && left.arguments() == right.arguments()
         }
-        AnyKind::ExprFString(left) => {
+        AnyNode::ExprFString(left) => {
             let right = right.retype::<crate::ExprFString>();
             left.value() == right.value()
         }
-        AnyKind::ExprTString(left) => {
+        AnyNode::ExprTString(left) => {
             let right = right.retype::<crate::ExprTString>();
             left.value() == right.value()
         }
-        AnyKind::ExprStringLiteral(left) => {
+        AnyNode::ExprStringLiteral(left) => {
             let right = right.retype::<crate::ExprStringLiteral>();
             left.value() == right.value()
         }
-        AnyKind::ExprBytesLiteral(left) => {
+        AnyNode::ExprBytesLiteral(left) => {
             let right = right.retype::<crate::ExprBytesLiteral>();
             left.value() == right.value()
         }
-        AnyKind::ExprNumberLiteral(left) => {
+        AnyNode::ExprNumberLiteral(left) => {
             let right = right.retype::<crate::ExprNumberLiteral>();
             left.value() == right.value()
         }
-        AnyKind::ExprBooleanLiteral(left) => {
+        AnyNode::ExprBooleanLiteral(left) => {
             let right = right.retype::<crate::ExprBooleanLiteral>();
             left.value() == right.value()
         }
-        AnyKind::ExprNoneLiteral(_) => true,
-        AnyKind::ExprEllipsisLiteral(_) => true,
-        AnyKind::ExprAttribute(left) => {
+        AnyNode::ExprNoneLiteral(_) => true,
+        AnyNode::ExprEllipsisLiteral(_) => true,
+        AnyNode::ExprAttribute(left) => {
             let right = right.retype::<crate::ExprAttribute>();
             left.value() == right.value()
                 && left.attr() == right.attr()
                 && left.ctx() == right.ctx()
         }
-        AnyKind::ExprSubscript(left) => {
+        AnyNode::ExprSubscript(left) => {
             let right = right.retype::<crate::ExprSubscript>();
             left.value() == right.value()
                 && left.slice() == right.slice()
                 && left.ctx() == right.ctx()
         }
-        AnyKind::ExprStarred(left) => {
+        AnyNode::ExprStarred(left) => {
             let right = right.retype::<crate::ExprStarred>();
             left.value() == right.value() && left.ctx() == right.ctx()
         }
-        AnyKind::ExprName(left) => {
+        AnyNode::ExprName(left) => {
             let right = right.retype::<crate::ExprName>();
             left.id() == right.id() && left.ctx() == right.ctx()
         }
-        AnyKind::ExprList(left) => {
+        AnyNode::ExprList(left) => {
             let right = right.retype::<crate::ExprList>();
             left.elts() == right.elts() && left.ctx() == right.ctx()
         }
-        AnyKind::ExprTuple(left) => {
+        AnyNode::ExprTuple(left) => {
             let right = right.retype::<crate::ExprTuple>();
             left.elts() == right.elts()
                 && left.ctx() == right.ctx()
                 && left.parenthesized() == right.parenthesized()
         }
-        AnyKind::ExprSlice(left) => {
+        AnyNode::ExprSlice(left) => {
             let right = right.retype::<crate::ExprSlice>();
             left.lower() == right.lower()
                 && left.upper() == right.upper()
                 && left.step() == right.step()
         }
-        AnyKind::ExprIpyEscapeCommand(left) => {
+        AnyNode::ExprIpyEscapeCommand(left) => {
             let right = right.retype::<crate::ExprIpyEscapeCommand>();
             left.kind() == right.kind() && left.value() == right.value()
         }
-        AnyKind::ExceptHandlerExceptHandler(left) => {
+        AnyNode::ExceptHandlerExceptHandler(left) => {
             let right = right.retype::<crate::ExceptHandlerExceptHandler>();
             left.type_() == right.type_()
                 && left.name() == right.name()
                 && left.body() == right.body()
         }
-        AnyKind::InterpolatedElement(left) => {
+        AnyNode::InterpolatedElement(left) => {
             let right = right.retype::<crate::InterpolatedElement>();
             left.expression() == right.expression()
                 && left.debug_text() == right.debug_text()
                 && left.conversion() == right.conversion()
                 && left.format_spec() == right.format_spec()
         }
-        AnyKind::InterpolatedStringLiteralElement(left) => {
+        AnyNode::InterpolatedStringLiteralElement(left) => {
             let right = right.retype::<crate::InterpolatedStringLiteralElement>();
             left.value() == right.value()
         }
-        AnyKind::PatternMatchValue(left) => {
+        AnyNode::PatternMatchValue(left) => {
             let right = right.retype::<crate::PatternMatchValue>();
             left.value() == right.value()
         }
-        AnyKind::PatternMatchSingleton(left) => {
+        AnyNode::PatternMatchSingleton(left) => {
             let right = right.retype::<crate::PatternMatchSingleton>();
             left.value() == right.value()
         }
-        AnyKind::PatternMatchSequence(left) => {
+        AnyNode::PatternMatchSequence(left) => {
             let right = right.retype::<crate::PatternMatchSequence>();
             left.patterns() == right.patterns()
         }
-        AnyKind::PatternMatchMapping(left) => {
+        AnyNode::PatternMatchMapping(left) => {
             let right = right.retype::<crate::PatternMatchMapping>();
             left.items() == right.items()
         }
-        AnyKind::PatternMatchClass(left) => {
+        AnyNode::PatternMatchClass(left) => {
             let right = right.retype::<crate::PatternMatchClass>();
             left.cls() == right.cls() && left.arguments() == right.arguments()
         }
-        AnyKind::PatternMatchStar(left) => {
+        AnyNode::PatternMatchStar(left) => {
             let right = right.retype::<crate::PatternMatchStar>();
             left.name() == right.name()
         }
-        AnyKind::PatternMatchAs(left) => {
+        AnyNode::PatternMatchAs(left) => {
             let right = right.retype::<crate::PatternMatchAs>();
             left.pattern() == right.pattern() && left.name() == right.name()
         }
-        AnyKind::PatternMatchOr(left) => {
+        AnyNode::PatternMatchOr(left) => {
             let right = right.retype::<crate::PatternMatchOr>();
             left.patterns() == right.patterns()
         }
-        AnyKind::TypeParamTypeVar(left) => {
+        AnyNode::TypeParamTypeVar(left) => {
             let right = right.retype::<crate::TypeParamTypeVar>();
             left.name() == right.name()
                 && left.bound() == right.bound()
                 && left.default() == right.default()
         }
-        AnyKind::TypeParamTypeVarTuple(left) => {
+        AnyNode::TypeParamTypeVarTuple(left) => {
             let right = right.retype::<crate::TypeParamTypeVarTuple>();
             left.name() == right.name() && left.default() == right.default()
         }
-        AnyKind::TypeParamParamSpec(left) => {
+        AnyNode::TypeParamParamSpec(left) => {
             let right = right.retype::<crate::TypeParamParamSpec>();
             left.name() == right.name() && left.default() == right.default()
         }
-        AnyKind::InterpolatedStringFormatSpec(left) => {
+        AnyNode::InterpolatedStringFormatSpec(left) => {
             let right = right.retype::<crate::InterpolatedStringFormatSpec>();
             left.elements() == right.elements()
         }
-        AnyKind::PatternArguments(left) => {
+        AnyNode::PatternArguments(left) => {
             let right = right.retype::<crate::PatternArguments>();
             left.patterns() == right.patterns() && left.keywords() == right.keywords()
         }
-        AnyKind::PatternKeyword(left) => {
+        AnyNode::PatternKeyword(left) => {
             let right = right.retype::<crate::PatternKeyword>();
             left.attr() == right.attr() && left.pattern() == right.pattern()
         }
-        AnyKind::Comprehension(left) => {
+        AnyNode::Comprehension(left) => {
             let right = right.retype::<crate::Comprehension>();
             left.target() == right.target()
                 && left.iter() == right.iter()
                 && left.ifs() == right.ifs()
                 && left.is_async() == right.is_async()
         }
-        AnyKind::Arguments(left) => {
+        AnyNode::Arguments(left) => {
             let right = right.retype::<crate::Arguments>();
             left.args() == right.args() && left.keywords() == right.keywords()
         }
-        AnyKind::Parameters(left) => {
+        AnyNode::Parameters(left) => {
             let right = right.retype::<crate::Parameters>();
             left.posonlyargs() == right.posonlyargs()
                 && left.args() == right.args()
@@ -14219,66 +14921,66 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
                 && left.kwonlyargs() == right.kwonlyargs()
                 && left.kwarg() == right.kwarg()
         }
-        AnyKind::Parameter(left) => {
+        AnyNode::Parameter(left) => {
             let right = right.retype::<crate::Parameter>();
             left.name() == right.name() && left.annotation() == right.annotation()
         }
-        AnyKind::ParameterWithDefault(left) => {
+        AnyNode::ParameterWithDefault(left) => {
             let right = right.retype::<crate::ParameterWithDefault>();
             left.parameter() == right.parameter() && left.default() == right.default()
         }
-        AnyKind::DictItem(left) => {
+        AnyNode::DictItem(left) => {
             let right = right.retype::<crate::DictItem>();
             left.key() == right.key() && left.value() == right.value()
         }
-        AnyKind::Keyword(left) => {
+        AnyNode::Keyword(left) => {
             let right = right.retype::<crate::Keyword>();
             left.arg() == right.arg() && left.value() == right.value()
         }
-        AnyKind::Alias(left) => {
+        AnyNode::Alias(left) => {
             let right = right.retype::<crate::Alias>();
             left.name() == right.name() && left.asname() == right.asname()
         }
-        AnyKind::WithItem(left) => {
+        AnyNode::WithItem(left) => {
             let right = right.retype::<crate::WithItem>();
             left.context_expr() == right.context_expr()
                 && left.optional_vars() == right.optional_vars()
         }
-        AnyKind::MatchCase(left) => {
+        AnyNode::MatchCase(left) => {
             let right = right.retype::<crate::MatchCase>();
             left.pattern() == right.pattern()
                 && left.guard() == right.guard()
                 && left.body() == right.body()
         }
-        AnyKind::Decorator(left) => {
+        AnyNode::Decorator(left) => {
             let right = right.retype::<crate::Decorator>();
             left.expression() == right.expression()
         }
-        AnyKind::ElifElseClause(left) => {
+        AnyNode::ElifElseClause(left) => {
             let right = right.retype::<crate::ElifElseClause>();
             left.test() == right.test() && left.body() == right.body()
         }
-        AnyKind::TypeParams(left) => {
+        AnyNode::TypeParams(left) => {
             let right = right.retype::<crate::TypeParams>();
             left.type_params() == right.type_params()
         }
-        AnyKind::FString(left) => {
+        AnyNode::FString(left) => {
             let right = right.retype::<crate::FString>();
             left.elements() == right.elements() && left.flags() == right.flags()
         }
-        AnyKind::TString(left) => {
+        AnyNode::TString(left) => {
             let right = right.retype::<crate::TString>();
             left.elements() == right.elements() && left.flags() == right.flags()
         }
-        AnyKind::StringLiteral(left) => {
+        AnyNode::StringLiteral(left) => {
             let right = right.retype::<crate::StringLiteral>();
             left.value() == right.value() && left.flags() == right.flags()
         }
-        AnyKind::BytesLiteral(left) => {
+        AnyNode::BytesLiteral(left) => {
             let right = right.retype::<crate::BytesLiteral>();
             left.value() == right.value() && left.flags() == right.flags()
         }
-        AnyKind::Identifier(left) => {
+        AnyNode::Identifier(left) => {
             let right = right.retype::<crate::Identifier>();
             left.id() == right.id()
         }
@@ -14827,5 +15529,852 @@ impl<'a> From<PatternKind<'a>> for SyntaxNode<'a> {
 impl<'a> From<TypeParamKind<'a>> for SyntaxNode<'a> {
     fn from(node: TypeParamKind<'a>) -> Self {
         node.view().syntax_node()
+    }
+}
+impl<'a> From<SyntaxNode<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: SyntaxNode<'a>) -> Self {
+        node.classify()
+    }
+}
+impl<'a> From<crate::ModModule<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ModModule<'a>) -> Self {
+        Self::ModModule(node)
+    }
+}
+impl<'a> From<crate::ModExpression<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ModExpression<'a>) -> Self {
+        Self::ModExpression(node)
+    }
+}
+impl<'a> From<crate::StmtFunctionDef<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtFunctionDef<'a>) -> Self {
+        Self::StmtFunctionDef(node)
+    }
+}
+impl<'a> From<crate::StmtClassDef<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtClassDef<'a>) -> Self {
+        Self::StmtClassDef(node)
+    }
+}
+impl<'a> From<crate::StmtReturn<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtReturn<'a>) -> Self {
+        Self::StmtReturn(node)
+    }
+}
+impl<'a> From<crate::StmtDelete<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtDelete<'a>) -> Self {
+        Self::StmtDelete(node)
+    }
+}
+impl<'a> From<crate::StmtTypeAlias<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtTypeAlias<'a>) -> Self {
+        Self::StmtTypeAlias(node)
+    }
+}
+impl<'a> From<crate::StmtAssign<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtAssign<'a>) -> Self {
+        Self::StmtAssign(node)
+    }
+}
+impl<'a> From<crate::StmtAugAssign<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtAugAssign<'a>) -> Self {
+        Self::StmtAugAssign(node)
+    }
+}
+impl<'a> From<crate::StmtAnnAssign<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtAnnAssign<'a>) -> Self {
+        Self::StmtAnnAssign(node)
+    }
+}
+impl<'a> From<crate::StmtFor<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtFor<'a>) -> Self {
+        Self::StmtFor(node)
+    }
+}
+impl<'a> From<crate::StmtWhile<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtWhile<'a>) -> Self {
+        Self::StmtWhile(node)
+    }
+}
+impl<'a> From<crate::StmtIf<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtIf<'a>) -> Self {
+        Self::StmtIf(node)
+    }
+}
+impl<'a> From<crate::StmtWith<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtWith<'a>) -> Self {
+        Self::StmtWith(node)
+    }
+}
+impl<'a> From<crate::StmtMatch<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtMatch<'a>) -> Self {
+        Self::StmtMatch(node)
+    }
+}
+impl<'a> From<crate::StmtRaise<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtRaise<'a>) -> Self {
+        Self::StmtRaise(node)
+    }
+}
+impl<'a> From<crate::StmtTry<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtTry<'a>) -> Self {
+        Self::StmtTry(node)
+    }
+}
+impl<'a> From<crate::StmtAssert<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtAssert<'a>) -> Self {
+        Self::StmtAssert(node)
+    }
+}
+impl<'a> From<crate::StmtImport<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtImport<'a>) -> Self {
+        Self::StmtImport(node)
+    }
+}
+impl<'a> From<crate::StmtImportFrom<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtImportFrom<'a>) -> Self {
+        Self::StmtImportFrom(node)
+    }
+}
+impl<'a> From<crate::StmtGlobal<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtGlobal<'a>) -> Self {
+        Self::StmtGlobal(node)
+    }
+}
+impl<'a> From<crate::StmtNonlocal<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtNonlocal<'a>) -> Self {
+        Self::StmtNonlocal(node)
+    }
+}
+impl<'a> From<crate::StmtExpr<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtExpr<'a>) -> Self {
+        Self::StmtExpr(node)
+    }
+}
+impl<'a> From<crate::StmtPass<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtPass<'a>) -> Self {
+        Self::StmtPass(node)
+    }
+}
+impl<'a> From<crate::StmtBreak<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtBreak<'a>) -> Self {
+        Self::StmtBreak(node)
+    }
+}
+impl<'a> From<crate::StmtContinue<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtContinue<'a>) -> Self {
+        Self::StmtContinue(node)
+    }
+}
+impl<'a> From<crate::StmtIpyEscapeCommand<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StmtIpyEscapeCommand<'a>) -> Self {
+        Self::StmtIpyEscapeCommand(node)
+    }
+}
+impl<'a> From<crate::ExprBoolOp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprBoolOp<'a>) -> Self {
+        Self::ExprBoolOp(node)
+    }
+}
+impl<'a> From<crate::ExprNamed<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprNamed<'a>) -> Self {
+        Self::ExprNamed(node)
+    }
+}
+impl<'a> From<crate::ExprBinOp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprBinOp<'a>) -> Self {
+        Self::ExprBinOp(node)
+    }
+}
+impl<'a> From<crate::ExprUnaryOp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprUnaryOp<'a>) -> Self {
+        Self::ExprUnaryOp(node)
+    }
+}
+impl<'a> From<crate::ExprLambda<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprLambda<'a>) -> Self {
+        Self::ExprLambda(node)
+    }
+}
+impl<'a> From<crate::ExprIf<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprIf<'a>) -> Self {
+        Self::ExprIf(node)
+    }
+}
+impl<'a> From<crate::ExprDict<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprDict<'a>) -> Self {
+        Self::ExprDict(node)
+    }
+}
+impl<'a> From<crate::ExprSet<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprSet<'a>) -> Self {
+        Self::ExprSet(node)
+    }
+}
+impl<'a> From<crate::ExprListComp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprListComp<'a>) -> Self {
+        Self::ExprListComp(node)
+    }
+}
+impl<'a> From<crate::ExprSetComp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprSetComp<'a>) -> Self {
+        Self::ExprSetComp(node)
+    }
+}
+impl<'a> From<crate::ExprDictComp<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprDictComp<'a>) -> Self {
+        Self::ExprDictComp(node)
+    }
+}
+impl<'a> From<crate::ExprGenerator<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprGenerator<'a>) -> Self {
+        Self::ExprGenerator(node)
+    }
+}
+impl<'a> From<crate::ExprAwait<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprAwait<'a>) -> Self {
+        Self::ExprAwait(node)
+    }
+}
+impl<'a> From<crate::ExprYield<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprYield<'a>) -> Self {
+        Self::ExprYield(node)
+    }
+}
+impl<'a> From<crate::ExprYieldFrom<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprYieldFrom<'a>) -> Self {
+        Self::ExprYieldFrom(node)
+    }
+}
+impl<'a> From<crate::ExprCompare<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprCompare<'a>) -> Self {
+        Self::ExprCompare(node)
+    }
+}
+impl<'a> From<crate::ExprCall<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprCall<'a>) -> Self {
+        Self::ExprCall(node)
+    }
+}
+impl<'a> From<crate::ExprFString<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprFString<'a>) -> Self {
+        Self::ExprFString(node)
+    }
+}
+impl<'a> From<crate::ExprTString<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprTString<'a>) -> Self {
+        Self::ExprTString(node)
+    }
+}
+impl<'a> From<crate::ExprStringLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprStringLiteral<'a>) -> Self {
+        Self::ExprStringLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprBytesLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprBytesLiteral<'a>) -> Self {
+        Self::ExprBytesLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprNumberLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprNumberLiteral<'a>) -> Self {
+        Self::ExprNumberLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprBooleanLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprBooleanLiteral<'a>) -> Self {
+        Self::ExprBooleanLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprNoneLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprNoneLiteral<'a>) -> Self {
+        Self::ExprNoneLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprEllipsisLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprEllipsisLiteral<'a>) -> Self {
+        Self::ExprEllipsisLiteral(node)
+    }
+}
+impl<'a> From<crate::ExprAttribute<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprAttribute<'a>) -> Self {
+        Self::ExprAttribute(node)
+    }
+}
+impl<'a> From<crate::ExprSubscript<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprSubscript<'a>) -> Self {
+        Self::ExprSubscript(node)
+    }
+}
+impl<'a> From<crate::ExprStarred<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprStarred<'a>) -> Self {
+        Self::ExprStarred(node)
+    }
+}
+impl<'a> From<crate::ExprName<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprName<'a>) -> Self {
+        Self::ExprName(node)
+    }
+}
+impl<'a> From<crate::ExprList<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprList<'a>) -> Self {
+        Self::ExprList(node)
+    }
+}
+impl<'a> From<crate::ExprTuple<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprTuple<'a>) -> Self {
+        Self::ExprTuple(node)
+    }
+}
+impl<'a> From<crate::ExprSlice<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprSlice<'a>) -> Self {
+        Self::ExprSlice(node)
+    }
+}
+impl<'a> From<crate::ExprIpyEscapeCommand<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExprIpyEscapeCommand<'a>) -> Self {
+        Self::ExprIpyEscapeCommand(node)
+    }
+}
+impl<'a> From<crate::ExceptHandlerExceptHandler<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExceptHandlerExceptHandler<'a>) -> Self {
+        Self::ExceptHandlerExceptHandler(node)
+    }
+}
+impl<'a> From<crate::InterpolatedElement<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::InterpolatedElement<'a>) -> Self {
+        Self::InterpolatedElement(node)
+    }
+}
+impl<'a> From<crate::InterpolatedStringLiteralElement<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::InterpolatedStringLiteralElement<'a>) -> Self {
+        Self::InterpolatedStringLiteralElement(node)
+    }
+}
+impl<'a> From<crate::PatternMatchValue<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchValue<'a>) -> Self {
+        Self::PatternMatchValue(node)
+    }
+}
+impl<'a> From<crate::PatternMatchSingleton<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchSingleton<'a>) -> Self {
+        Self::PatternMatchSingleton(node)
+    }
+}
+impl<'a> From<crate::PatternMatchSequence<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchSequence<'a>) -> Self {
+        Self::PatternMatchSequence(node)
+    }
+}
+impl<'a> From<crate::PatternMatchMapping<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchMapping<'a>) -> Self {
+        Self::PatternMatchMapping(node)
+    }
+}
+impl<'a> From<crate::PatternMatchClass<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchClass<'a>) -> Self {
+        Self::PatternMatchClass(node)
+    }
+}
+impl<'a> From<crate::PatternMatchStar<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchStar<'a>) -> Self {
+        Self::PatternMatchStar(node)
+    }
+}
+impl<'a> From<crate::PatternMatchAs<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchAs<'a>) -> Self {
+        Self::PatternMatchAs(node)
+    }
+}
+impl<'a> From<crate::PatternMatchOr<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternMatchOr<'a>) -> Self {
+        Self::PatternMatchOr(node)
+    }
+}
+impl<'a> From<crate::TypeParamTypeVar<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TypeParamTypeVar<'a>) -> Self {
+        Self::TypeParamTypeVar(node)
+    }
+}
+impl<'a> From<crate::TypeParamTypeVarTuple<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TypeParamTypeVarTuple<'a>) -> Self {
+        Self::TypeParamTypeVarTuple(node)
+    }
+}
+impl<'a> From<crate::TypeParamParamSpec<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TypeParamParamSpec<'a>) -> Self {
+        Self::TypeParamParamSpec(node)
+    }
+}
+impl<'a> From<crate::InterpolatedStringFormatSpec<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::InterpolatedStringFormatSpec<'a>) -> Self {
+        Self::InterpolatedStringFormatSpec(node)
+    }
+}
+impl<'a> From<crate::PatternArguments<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternArguments<'a>) -> Self {
+        Self::PatternArguments(node)
+    }
+}
+impl<'a> From<crate::PatternKeyword<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::PatternKeyword<'a>) -> Self {
+        Self::PatternKeyword(node)
+    }
+}
+impl<'a> From<crate::Comprehension<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Comprehension<'a>) -> Self {
+        Self::Comprehension(node)
+    }
+}
+impl<'a> From<crate::Arguments<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Arguments<'a>) -> Self {
+        Self::Arguments(node)
+    }
+}
+impl<'a> From<crate::Parameters<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Parameters<'a>) -> Self {
+        Self::Parameters(node)
+    }
+}
+impl<'a> From<crate::Parameter<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Parameter<'a>) -> Self {
+        Self::Parameter(node)
+    }
+}
+impl<'a> From<crate::ParameterWithDefault<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ParameterWithDefault<'a>) -> Self {
+        Self::ParameterWithDefault(node)
+    }
+}
+impl<'a> From<crate::DictItem<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::DictItem<'a>) -> Self {
+        Self::DictItem(node)
+    }
+}
+impl<'a> From<crate::Keyword<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Keyword<'a>) -> Self {
+        Self::Keyword(node)
+    }
+}
+impl<'a> From<crate::Alias<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Alias<'a>) -> Self {
+        Self::Alias(node)
+    }
+}
+impl<'a> From<crate::WithItem<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::WithItem<'a>) -> Self {
+        Self::WithItem(node)
+    }
+}
+impl<'a> From<crate::MatchCase<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::MatchCase<'a>) -> Self {
+        Self::MatchCase(node)
+    }
+}
+impl<'a> From<crate::Decorator<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Decorator<'a>) -> Self {
+        Self::Decorator(node)
+    }
+}
+impl<'a> From<crate::ElifElseClause<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ElifElseClause<'a>) -> Self {
+        Self::ElifElseClause(node)
+    }
+}
+impl<'a> From<crate::TypeParams<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TypeParams<'a>) -> Self {
+        Self::TypeParams(node)
+    }
+}
+impl<'a> From<crate::FString<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::FString<'a>) -> Self {
+        Self::FString(node)
+    }
+}
+impl<'a> From<crate::TString<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TString<'a>) -> Self {
+        Self::TString(node)
+    }
+}
+impl<'a> From<crate::StringLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::StringLiteral<'a>) -> Self {
+        Self::StringLiteral(node)
+    }
+}
+impl<'a> From<crate::BytesLiteral<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::BytesLiteral<'a>) -> Self {
+        Self::BytesLiteral(node)
+    }
+}
+impl<'a> From<crate::Identifier<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Identifier<'a>) -> Self {
+        Self::Identifier(node)
+    }
+}
+impl<'a> From<crate::Mod<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Mod<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::ModKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::ModKind<'a>) -> Self {
+        match kind {
+            crate::ModKind::Module(node) => Self::ModModule(node),
+            crate::ModKind::Expression(node) => Self::ModExpression(node),
+        }
+    }
+}
+impl<'a> From<crate::Stmt<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Stmt<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::StmtKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::StmtKind<'a>) -> Self {
+        match kind {
+            crate::StmtKind::FunctionDef(node) => Self::StmtFunctionDef(node),
+            crate::StmtKind::ClassDef(node) => Self::StmtClassDef(node),
+            crate::StmtKind::Return(node) => Self::StmtReturn(node),
+            crate::StmtKind::Delete(node) => Self::StmtDelete(node),
+            crate::StmtKind::TypeAlias(node) => Self::StmtTypeAlias(node),
+            crate::StmtKind::Assign(node) => Self::StmtAssign(node),
+            crate::StmtKind::AugAssign(node) => Self::StmtAugAssign(node),
+            crate::StmtKind::AnnAssign(node) => Self::StmtAnnAssign(node),
+            crate::StmtKind::For(node) => Self::StmtFor(node),
+            crate::StmtKind::While(node) => Self::StmtWhile(node),
+            crate::StmtKind::If(node) => Self::StmtIf(node),
+            crate::StmtKind::With(node) => Self::StmtWith(node),
+            crate::StmtKind::Match(node) => Self::StmtMatch(node),
+            crate::StmtKind::Raise(node) => Self::StmtRaise(node),
+            crate::StmtKind::Try(node) => Self::StmtTry(node),
+            crate::StmtKind::Assert(node) => Self::StmtAssert(node),
+            crate::StmtKind::Import(node) => Self::StmtImport(node),
+            crate::StmtKind::ImportFrom(node) => Self::StmtImportFrom(node),
+            crate::StmtKind::Global(node) => Self::StmtGlobal(node),
+            crate::StmtKind::Nonlocal(node) => Self::StmtNonlocal(node),
+            crate::StmtKind::Expr(node) => Self::StmtExpr(node),
+            crate::StmtKind::Pass(node) => Self::StmtPass(node),
+            crate::StmtKind::Break(node) => Self::StmtBreak(node),
+            crate::StmtKind::Continue(node) => Self::StmtContinue(node),
+            crate::StmtKind::IpyEscapeCommand(node) => Self::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+impl<'a> From<crate::Expr<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Expr<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::ExprKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::ExprKind<'a>) -> Self {
+        match kind {
+            crate::ExprKind::BoolOp(node) => Self::ExprBoolOp(node),
+            crate::ExprKind::Named(node) => Self::ExprNamed(node),
+            crate::ExprKind::BinOp(node) => Self::ExprBinOp(node),
+            crate::ExprKind::UnaryOp(node) => Self::ExprUnaryOp(node),
+            crate::ExprKind::Lambda(node) => Self::ExprLambda(node),
+            crate::ExprKind::If(node) => Self::ExprIf(node),
+            crate::ExprKind::Dict(node) => Self::ExprDict(node),
+            crate::ExprKind::Set(node) => Self::ExprSet(node),
+            crate::ExprKind::ListComp(node) => Self::ExprListComp(node),
+            crate::ExprKind::SetComp(node) => Self::ExprSetComp(node),
+            crate::ExprKind::DictComp(node) => Self::ExprDictComp(node),
+            crate::ExprKind::Generator(node) => Self::ExprGenerator(node),
+            crate::ExprKind::Await(node) => Self::ExprAwait(node),
+            crate::ExprKind::Yield(node) => Self::ExprYield(node),
+            crate::ExprKind::YieldFrom(node) => Self::ExprYieldFrom(node),
+            crate::ExprKind::Compare(node) => Self::ExprCompare(node),
+            crate::ExprKind::Call(node) => Self::ExprCall(node),
+            crate::ExprKind::FString(node) => Self::ExprFString(node),
+            crate::ExprKind::TString(node) => Self::ExprTString(node),
+            crate::ExprKind::StringLiteral(node) => Self::ExprStringLiteral(node),
+            crate::ExprKind::BytesLiteral(node) => Self::ExprBytesLiteral(node),
+            crate::ExprKind::NumberLiteral(node) => Self::ExprNumberLiteral(node),
+            crate::ExprKind::BooleanLiteral(node) => Self::ExprBooleanLiteral(node),
+            crate::ExprKind::NoneLiteral(node) => Self::ExprNoneLiteral(node),
+            crate::ExprKind::EllipsisLiteral(node) => Self::ExprEllipsisLiteral(node),
+            crate::ExprKind::Attribute(node) => Self::ExprAttribute(node),
+            crate::ExprKind::Subscript(node) => Self::ExprSubscript(node),
+            crate::ExprKind::Starred(node) => Self::ExprStarred(node),
+            crate::ExprKind::Name(node) => Self::ExprName(node),
+            crate::ExprKind::List(node) => Self::ExprList(node),
+            crate::ExprKind::Tuple(node) => Self::ExprTuple(node),
+            crate::ExprKind::Slice(node) => Self::ExprSlice(node),
+            crate::ExprKind::IpyEscapeCommand(node) => Self::ExprIpyEscapeCommand(node),
+        }
+    }
+}
+impl<'a> From<crate::ExceptHandler<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::ExceptHandler<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::ExceptHandlerKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::ExceptHandlerKind<'a>) -> Self {
+        match kind {
+            crate::ExceptHandlerKind::ExceptHandler(node) => Self::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+impl<'a> From<crate::InterpolatedStringElement<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::InterpolatedStringElement<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::InterpolatedStringElementKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::InterpolatedStringElementKind<'a>) -> Self {
+        match kind {
+            crate::InterpolatedStringElementKind::Interpolation(node) => {
+                Self::InterpolatedElement(node)
+            }
+            crate::InterpolatedStringElementKind::Literal(node) => {
+                Self::InterpolatedStringLiteralElement(node)
+            }
+        }
+    }
+}
+impl<'a> From<crate::Pattern<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::Pattern<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::PatternKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::PatternKind<'a>) -> Self {
+        match kind {
+            crate::PatternKind::MatchValue(node) => Self::PatternMatchValue(node),
+            crate::PatternKind::MatchSingleton(node) => Self::PatternMatchSingleton(node),
+            crate::PatternKind::MatchSequence(node) => Self::PatternMatchSequence(node),
+            crate::PatternKind::MatchMapping(node) => Self::PatternMatchMapping(node),
+            crate::PatternKind::MatchClass(node) => Self::PatternMatchClass(node),
+            crate::PatternKind::MatchStar(node) => Self::PatternMatchStar(node),
+            crate::PatternKind::MatchAs(node) => Self::PatternMatchAs(node),
+            crate::PatternKind::MatchOr(node) => Self::PatternMatchOr(node),
+        }
+    }
+}
+impl<'a> From<crate::TypeParam<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(node: crate::TypeParam<'a>) -> Self {
+        node.syntax_node().classify()
+    }
+}
+impl<'a> From<crate::TypeParamKind<'a>> for AnyNode<'a> {
+    #[inline]
+    fn from(kind: crate::TypeParamKind<'a>) -> Self {
+        match kind {
+            crate::TypeParamKind::TypeVar(node) => Self::TypeParamTypeVar(node),
+            crate::TypeParamKind::TypeVarTuple(node) => Self::TypeParamTypeVarTuple(node),
+            crate::TypeParamKind::ParamSpec(node) => Self::TypeParamParamSpec(node),
+        }
+    }
+}
+impl AnyNode<'_> {
+    #[inline]
+    pub fn node_kind(self) -> NodeKind {
+        match self {
+            Self::ModModule(_) => NodeKind::ModModule,
+            Self::ModExpression(_) => NodeKind::ModExpression,
+            Self::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
+            Self::StmtClassDef(_) => NodeKind::StmtClassDef,
+            Self::StmtReturn(_) => NodeKind::StmtReturn,
+            Self::StmtDelete(_) => NodeKind::StmtDelete,
+            Self::StmtTypeAlias(_) => NodeKind::StmtTypeAlias,
+            Self::StmtAssign(_) => NodeKind::StmtAssign,
+            Self::StmtAugAssign(_) => NodeKind::StmtAugAssign,
+            Self::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
+            Self::StmtFor(_) => NodeKind::StmtFor,
+            Self::StmtWhile(_) => NodeKind::StmtWhile,
+            Self::StmtIf(_) => NodeKind::StmtIf,
+            Self::StmtWith(_) => NodeKind::StmtWith,
+            Self::StmtMatch(_) => NodeKind::StmtMatch,
+            Self::StmtRaise(_) => NodeKind::StmtRaise,
+            Self::StmtTry(_) => NodeKind::StmtTry,
+            Self::StmtAssert(_) => NodeKind::StmtAssert,
+            Self::StmtImport(_) => NodeKind::StmtImport,
+            Self::StmtImportFrom(_) => NodeKind::StmtImportFrom,
+            Self::StmtGlobal(_) => NodeKind::StmtGlobal,
+            Self::StmtNonlocal(_) => NodeKind::StmtNonlocal,
+            Self::StmtExpr(_) => NodeKind::StmtExpr,
+            Self::StmtPass(_) => NodeKind::StmtPass,
+            Self::StmtBreak(_) => NodeKind::StmtBreak,
+            Self::StmtContinue(_) => NodeKind::StmtContinue,
+            Self::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
+            Self::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            Self::ExprNamed(_) => NodeKind::ExprNamed,
+            Self::ExprBinOp(_) => NodeKind::ExprBinOp,
+            Self::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            Self::ExprLambda(_) => NodeKind::ExprLambda,
+            Self::ExprIf(_) => NodeKind::ExprIf,
+            Self::ExprDict(_) => NodeKind::ExprDict,
+            Self::ExprSet(_) => NodeKind::ExprSet,
+            Self::ExprListComp(_) => NodeKind::ExprListComp,
+            Self::ExprSetComp(_) => NodeKind::ExprSetComp,
+            Self::ExprDictComp(_) => NodeKind::ExprDictComp,
+            Self::ExprGenerator(_) => NodeKind::ExprGenerator,
+            Self::ExprAwait(_) => NodeKind::ExprAwait,
+            Self::ExprYield(_) => NodeKind::ExprYield,
+            Self::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
+            Self::ExprCompare(_) => NodeKind::ExprCompare,
+            Self::ExprCall(_) => NodeKind::ExprCall,
+            Self::ExprFString(_) => NodeKind::ExprFString,
+            Self::ExprTString(_) => NodeKind::ExprTString,
+            Self::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
+            Self::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
+            Self::ExprNumberLiteral(_) => NodeKind::ExprNumberLiteral,
+            Self::ExprBooleanLiteral(_) => NodeKind::ExprBooleanLiteral,
+            Self::ExprNoneLiteral(_) => NodeKind::ExprNoneLiteral,
+            Self::ExprEllipsisLiteral(_) => NodeKind::ExprEllipsisLiteral,
+            Self::ExprAttribute(_) => NodeKind::ExprAttribute,
+            Self::ExprSubscript(_) => NodeKind::ExprSubscript,
+            Self::ExprStarred(_) => NodeKind::ExprStarred,
+            Self::ExprName(_) => NodeKind::ExprName,
+            Self::ExprList(_) => NodeKind::ExprList,
+            Self::ExprTuple(_) => NodeKind::ExprTuple,
+            Self::ExprSlice(_) => NodeKind::ExprSlice,
+            Self::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
+            Self::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
+            Self::InterpolatedElement(_) => NodeKind::InterpolatedElement,
+            Self::InterpolatedStringLiteralElement(_) => NodeKind::InterpolatedStringLiteralElement,
+            Self::PatternMatchValue(_) => NodeKind::PatternMatchValue,
+            Self::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
+            Self::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
+            Self::PatternMatchMapping(_) => NodeKind::PatternMatchMapping,
+            Self::PatternMatchClass(_) => NodeKind::PatternMatchClass,
+            Self::PatternMatchStar(_) => NodeKind::PatternMatchStar,
+            Self::PatternMatchAs(_) => NodeKind::PatternMatchAs,
+            Self::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            Self::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
+            Self::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
+            Self::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            Self::InterpolatedStringFormatSpec(_) => NodeKind::InterpolatedStringFormatSpec,
+            Self::PatternArguments(_) => NodeKind::PatternArguments,
+            Self::PatternKeyword(_) => NodeKind::PatternKeyword,
+            Self::Comprehension(_) => NodeKind::Comprehension,
+            Self::Arguments(_) => NodeKind::Arguments,
+            Self::Parameters(_) => NodeKind::Parameters,
+            Self::Parameter(_) => NodeKind::Parameter,
+            Self::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
+            Self::DictItem(_) => NodeKind::DictItem,
+            Self::Keyword(_) => NodeKind::Keyword,
+            Self::Alias(_) => NodeKind::Alias,
+            Self::WithItem(_) => NodeKind::WithItem,
+            Self::MatchCase(_) => NodeKind::MatchCase,
+            Self::Decorator(_) => NodeKind::Decorator,
+            Self::ElifElseClause(_) => NodeKind::ElifElseClause,
+            Self::TypeParams(_) => NodeKind::TypeParams,
+            Self::FString(_) => NodeKind::FString,
+            Self::TString(_) => NodeKind::TString,
+            Self::StringLiteral(_) => NodeKind::StringLiteral,
+            Self::BytesLiteral(_) => NodeKind::BytesLiteral,
+            Self::Identifier(_) => NodeKind::Identifier,
+        }
     }
 }

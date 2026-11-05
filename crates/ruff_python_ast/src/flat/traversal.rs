@@ -1,4 +1,4 @@
-use super::{AnyKind, AstNode, Suite};
+use super::{AnyNode, AstNode, Suite};
 use crate::Stmt;
 
 pub fn suite<'a>(
@@ -8,31 +8,31 @@ pub fn suite<'a>(
     // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
     let stmt = stmt.into();
     match parent.into().classify() {
-        AnyKind::ModModule(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::StmtFunctionDef(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::StmtClassDef(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::StmtWith(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::StmtIf(node) => std::iter::once(node.body())
+        AnyNode::ModModule(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::StmtFunctionDef(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::StmtClassDef(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::StmtWith(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::StmtIf(node) => std::iter::once(node.body())
             .chain(
                 node.elif_else_clauses()
                     .iter()
                     .map(crate::ElifElseClause::body),
             )
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        AnyKind::StmtMatch(node) => node
+        AnyNode::StmtMatch(node) => node
             .cases()
             .iter()
             .find_map(|case| EnclosingSuite::new(case.body(), stmt)),
-        AnyKind::ElifElseClause(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::MatchCase(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::ExceptHandlerExceptHandler(node) => EnclosingSuite::new(node.body(), stmt),
-        AnyKind::StmtFor(node) => [node.body(), node.orelse()]
+        AnyNode::ElifElseClause(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::MatchCase(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::ExceptHandlerExceptHandler(node) => EnclosingSuite::new(node.body(), stmt),
+        AnyNode::StmtFor(node) => [node.body(), node.orelse()]
             .into_iter()
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        AnyKind::StmtWhile(node) => [node.body(), node.orelse()]
+        AnyNode::StmtWhile(node) => [node.body(), node.orelse()]
             .into_iter()
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        AnyKind::StmtTry(node) => [node.body(), node.orelse(), node.finalbody()]
+        AnyNode::StmtTry(node) => [node.body(), node.orelse(), node.finalbody()]
             .into_iter()
             .chain(
                 node.handlers()

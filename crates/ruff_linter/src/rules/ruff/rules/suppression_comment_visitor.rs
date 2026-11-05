@@ -1,5 +1,6 @@
 use std::iter::Peekable;
 
+use ruff_python_ast::AnyNode;
 use ruff_python_ast::{
     Suite, SyntaxNode,
     helpers::comment_indentation_after,
@@ -67,7 +68,8 @@ impl<'ast, I> SourceOrderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_, I
 where
     I: Iterator<Item = SuppressionComment> + 'ast,
 {
-    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'ast>) -> TraversalSignal {
+        let node = kind.syntax_node();
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied();
@@ -107,7 +109,8 @@ where
         }
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
+    fn leave_node(&mut self, node: AnyNode<'ast>) {
+        let node = node.syntax_node();
         self.parents.pop();
 
         let node_end = node.end();

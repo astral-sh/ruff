@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
+use ruff_python_ast::AnyNode;
 use ruff_python_ast::{Identifier, Mod, Suite, SyntaxNode};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
@@ -22,7 +23,7 @@ pub(crate) fn collect_comments<'a>(
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
     let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(SyntaxNode::from(root));
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(root);
     collector.comments
 }
 
@@ -50,12 +51,8 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
         }
     }
 
-    pub(super) fn visit(mut self, root: SyntaxNode<'a>) {
-        if self.enter_node(root).is_traverse() {
-            root.visit_source_order(&mut self);
-        }
-
-        self.leave_node(root);
+    pub(super) fn visit(mut self, root: Mod<'a>) {
+        walk_module(&mut self, root.classify());
     }
 
     // Try to skip the subtree if
@@ -69,7 +66,8 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
-    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'ast>) -> TraversalSignal {
+        let node = kind.syntax_node();
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied().unwrap_or(node);
@@ -110,7 +108,8 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         }
     }
 
-    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
+    fn leave_node(&mut self, node: AnyNode<'ast>) {
+        let node = node.syntax_node();
         // We are leaving this node, pop it from the parent stack.
         self.parents.pop();
 

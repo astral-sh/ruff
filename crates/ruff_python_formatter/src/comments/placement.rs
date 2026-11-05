@@ -1,7 +1,7 @@
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, AnyKind, Comprehension, ExprKind, ModModule, Parameter, Parameters, StringLike,
+    self as ast, AnyNode, Comprehension, ExprKind, ModModule, Parameter, Parameters, StringLike,
     SyntaxNode,
 };
 use ruff_python_trivia::{
@@ -196,7 +196,7 @@ fn handle_enclosed_comment<'a>(
     source: &str,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node().classify() {
-        AnyKind::Parameters(parameters) => {
+        AnyNode::Parameters(parameters) => {
             handle_parameters_separator_comment(comment, parameters, source).or_else(|comment| {
                 if are_parameters_parenthesized(parameters, source) {
                     handle_bracketed_end_of_line_comment(comment, source)
@@ -205,46 +205,46 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
-        AnyKind::Parameter(parameter) => handle_parameter_comment(comment, parameter, source),
-        AnyKind::Arguments(_) | AnyKind::TypeParams(_) | AnyKind::PatternArguments(_) => {
+        AnyNode::Parameter(parameter) => handle_parameter_comment(comment, parameter, source),
+        AnyNode::Arguments(_) | AnyNode::TypeParams(_) | AnyNode::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
-        AnyKind::Comprehension(comprehension) => {
+        AnyNode::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, source)
         }
 
-        AnyKind::ExprAttribute(attribute) => handle_attribute_comment(comment, attribute, source),
-        AnyKind::ExprBinOp(binary_expression) => {
+        AnyNode::ExprAttribute(attribute) => handle_attribute_comment(comment, attribute, source),
+        AnyNode::ExprBinOp(binary_expression) => {
             handle_trailing_binary_expression_left_or_operator_comment(
                 comment,
                 binary_expression,
                 source,
             )
         }
-        AnyKind::ExprBoolOp(_) | AnyKind::ExprCompare(_) => {
+        AnyNode::ExprBoolOp(_) | AnyNode::ExprCompare(_) => {
             handle_trailing_binary_like_comment(comment, source)
         }
-        AnyKind::Keyword(keyword) => handle_keyword_comment(comment, keyword, source),
-        AnyKind::PatternKeyword(pattern_keyword) => {
+        AnyNode::Keyword(keyword) => handle_keyword_comment(comment, keyword, source),
+        AnyNode::PatternKeyword(pattern_keyword) => {
             handle_pattern_keyword_comment(comment, pattern_keyword, source)
         }
-        AnyKind::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
-        AnyKind::ExprNamed(_) => handle_named_expr_comment(comment, source),
-        AnyKind::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
-        AnyKind::ExprDict(_) => handle_bracketed_end_of_line_comment(comment, source),
-        AnyKind::DictItem(_) => handle_dict_unpacking_comment(comment, source)
+        AnyNode::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
+        AnyNode::ExprNamed(_) => handle_named_expr_comment(comment, source),
+        AnyNode::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
+        AnyNode::ExprDict(_) => handle_bracketed_end_of_line_comment(comment, source),
+        AnyNode::DictItem(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source)),
-        AnyKind::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
+        AnyNode::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source))
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
-        AnyKind::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, source),
-        AnyKind::ExprSlice(expr_slice) => {
+        AnyNode::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, source),
+        AnyNode::ExprSlice(expr_slice) => {
             handle_slice_comments(comment, expr_slice, trivia, source)
         }
-        AnyKind::ExprStarred(starred) => {
+        AnyNode::ExprStarred(starred) => {
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, source)
         }
-        AnyKind::ExprSubscript(expr_subscript) => {
+        AnyNode::ExprSubscript(expr_subscript) => {
             if let ExprKind::Slice(expr_slice) = expr_subscript.slice().classify() {
                 return handle_slice_comments(comment, expr_slice, trivia, source);
             }
@@ -285,48 +285,48 @@ fn handle_enclosed_comment<'a>(
 
             CommentPlacement::Default(comment)
         }
-        AnyKind::ModModule(module) => {
+        AnyNode::ModModule(module) => {
             handle_trailing_module_comment(module, comment).or_else(|comment| {
                 handle_module_level_own_line_comment_before_class_or_function_comment(
                     comment, source,
                 )
             })
         }
-        AnyKind::WithItem(_) => handle_with_item_comment(comment, source),
-        AnyKind::PatternMatchSequence(pattern_match_sequence) => {
+        AnyNode::WithItem(_) => handle_with_item_comment(comment, source),
+        AnyNode::PatternMatchSequence(pattern_match_sequence) => {
             if SequenceType::from_pattern(pattern_match_sequence, source).is_parenthesized() {
                 handle_bracketed_end_of_line_comment(comment, source)
             } else {
                 CommentPlacement::Default(comment)
             }
         }
-        AnyKind::PatternMatchClass(class) => handle_pattern_match_class_comment(comment, class),
-        AnyKind::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, source),
-        AnyKind::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
-        AnyKind::PatternMatchMapping(pattern) => {
+        AnyNode::PatternMatchClass(class) => handle_pattern_match_class_comment(comment, class),
+        AnyNode::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, source),
+        AnyNode::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
+        AnyNode::PatternMatchMapping(pattern) => {
             handle_bracketed_end_of_line_comment(comment, source)
                 .or_else(|comment| handle_pattern_match_mapping_comment(comment, pattern, source))
         }
-        AnyKind::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
-        AnyKind::StmtClassDef(class_def) => {
+        AnyNode::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
+        AnyNode::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
-        AnyKind::StmtImportFrom(import_from) => {
+        AnyNode::StmtImportFrom(import_from) => {
             handle_import_from_comment(comment, import_from, source)
         }
-        AnyKind::Alias(alias) => handle_alias_comment(comment, alias, source),
-        AnyKind::StmtWith(with_) => handle_with_comment(comment, with_),
-        AnyKind::ExprCall(_) => handle_call_comment(comment),
-        AnyKind::ExprStringLiteral(_) => {
+        AnyNode::Alias(alias) => handle_alias_comment(comment, alias, source),
+        AnyNode::StmtWith(with_) => handle_with_comment(comment, with_),
+        AnyNode::ExprCall(_) => handle_call_comment(comment),
+        AnyNode::ExprStringLiteral(_) => {
             match comment.enclosing_parent().map(ast::SyntaxNode::classify) {
-                Some(AnyKind::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
-                Some(AnyKind::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
+                Some(AnyNode::FString(fstring)) => CommentPlacement::dangling(fstring, comment),
+                Some(AnyNode::TString(tstring)) => CommentPlacement::dangling(tstring, comment),
                 _ => CommentPlacement::Default(comment),
             }
         }
-        AnyKind::FString(fstring) => CommentPlacement::dangling(fstring, comment),
-        AnyKind::TString(tstring) => CommentPlacement::dangling(tstring, comment),
-        AnyKind::InterpolatedElement(element) => {
+        AnyNode::FString(fstring) => CommentPlacement::dangling(fstring, comment),
+        AnyNode::TString(tstring) => CommentPlacement::dangling(tstring, comment),
+        AnyNode::InterpolatedElement(element) => {
             if let Some(preceding) = comment.preceding_node() {
                 // Own line comment before format specifier
                 // ```py
@@ -346,27 +346,27 @@ fn handle_enclosed_comment<'a>(
             handle_bracketed_end_of_line_comment(comment, source)
         }
 
-        AnyKind::ExprList(_)
-        | AnyKind::ExprSet(_)
-        | AnyKind::ExprListComp(_)
-        | AnyKind::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, source),
-        AnyKind::ExprTuple(expr_tuple) if expr_tuple.parenthesized() => {
+        AnyNode::ExprList(_)
+        | AnyNode::ExprSet(_)
+        | AnyNode::ExprListComp(_)
+        | AnyNode::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, source),
+        AnyNode::ExprTuple(expr_tuple) if expr_tuple.parenthesized() => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
-        AnyKind::ExprGenerator(generator) if generator.parenthesized() => {
+        AnyNode::ExprGenerator(generator) if generator.parenthesized() => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
-        AnyKind::StmtReturn(_) => {
+        AnyNode::StmtReturn(_) => {
             handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
-        AnyKind::StmtAssign(assignment)
+        AnyNode::StmtAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(SyntaxNode::from(assignment.value()))
             }) =>
         {
             handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
-        AnyKind::StmtAnnAssign(assignment)
+        AnyNode::StmtAnnAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 assignment
                     .value()
@@ -375,14 +375,14 @@ fn handle_enclosed_comment<'a>(
         {
             handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
-        AnyKind::StmtAugAssign(assignment)
+        AnyNode::StmtAugAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(SyntaxNode::from(assignment.value()))
             }) =>
         {
             handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
-        AnyKind::StmtTypeAlias(assignment)
+        AnyNode::StmtTypeAlias(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(SyntaxNode::from(assignment.value()))
             }) =>
@@ -877,7 +877,7 @@ fn handle_parameter_comment<'a>(
         //
         // Note that this check is not needed above because lambda parameters cannot have
         // annotations.
-        if let Some(AnyKind::Parameters(parameters)) =
+        if let Some(AnyNode::Parameters(parameters)) =
             comment.enclosing_parent().map(ast::SyntaxNode::classify)
             && parameters.start() == parameter.start()
         {
@@ -1107,7 +1107,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     // ... where the following is a function or class statement.
     if !matches!(
         following.classify(),
-        AnyKind::StmtFunctionDef(_) | AnyKind::StmtClassDef(_)
+        AnyNode::StmtFunctionDef(_) | AnyNode::StmtClassDef(_)
     ) {
         return CommentPlacement::Default(comment);
     }
@@ -1160,7 +1160,7 @@ fn handle_slice_comments<'a>(
         // ```
         debug_assert_matches!(
             comment.enclosing_node().classify(),
-            AnyKind::ExprSubscript(_)
+            AnyNode::ExprSubscript(_)
         );
         return CommentPlacement::dangling(comment.enclosing_node(), comment);
     }
@@ -1320,7 +1320,7 @@ fn handle_dict_unpacking_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node().classify(),
-        AnyKind::DictItem(_) | AnyKind::ExprDictComp(_)
+        AnyNode::DictItem(_) | AnyNode::ExprDictComp(_)
     );
 
     // no node after our comment so we can't be between `**` and the name (node)
@@ -1363,7 +1363,7 @@ fn handle_key_value_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node().classify(),
-        AnyKind::DictItem(_) | AnyKind::ExprDictComp(_)
+        AnyNode::DictItem(_) | AnyNode::ExprDictComp(_)
     );
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())
@@ -2089,7 +2089,7 @@ fn handle_import_from_comment<'a>(
             .next()
         {
             // Treat comments before the comma as dangling, after as trailing (default)
-            if let Some(AnyKind::Alias(alias)) =
+            if let Some(AnyNode::Alias(alias)) =
                 comment.preceding_node().map(ast::SyntaxNode::classify)
             {
                 CommentPlacement::dangling(alias, comment)

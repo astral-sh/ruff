@@ -4,10 +4,11 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AnyKind, AstNode, BoolOp, CmpOp, DictItem, Expr, Operator, Singleton, Suite, SyntaxNode,
-    UnaryOp,
+    AnyNode, BoolOp, CmpOp, DictItem, Expr, NodeKind, Operator, Singleton, Suite, UnaryOp,
 };
-use ruff_python_parser::{Mode, ParseOptions, parse, parse_expression, parse_unchecked};
+use ruff_python_parser::{
+    Mode, ParseOptions, parse, parse_expression, parse_module, parse_unchecked,
+};
 use ruff_text_size::Ranged;
 
 #[test]
@@ -70,8 +71,8 @@ fn dictionary_entry_ranges() {
     struct Entries<'a>(Vec<DictItem<'a>>);
 
     impl<'a> SourceOrderVisitor<'a> for Entries<'a> {
-        fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
-            if let AnyKind::DictItem(entry) = node.classify() {
+        fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+            if let AnyNode::DictItem(entry) = kind {
                 self.0.push(entry);
             }
             TraversalSignal::Traverse
@@ -271,6 +272,81 @@ fn suites_and_annotations() {
     assert_eq!(roles.annotations, ["A", "B", "C"]);
 }
 
+#[test]
+fn skipped_statement_leaves_before_its_sibling() {
+    #[derive(Default)]
+    struct Trace(Vec<(&'static str, NodeKind)>);
+
+    impl<'a> SourceOrderVisitor<'a> for Trace {
+        fn enter_node(&mut self, node: AnyNode<'a>) -> TraversalSignal {
+            self.0.push(("enter", node.node_kind()));
+            if matches!(node, AnyNode::StmtIf(_)) {
+                TraversalSignal::Skip
+            } else {
+                TraversalSignal::Traverse
+            }
+        }
+
+        fn leave_node(&mut self, node: AnyNode<'a>) {
+            self.0.push(("leave", node.node_kind()));
+        }
+    }
+
+    let parsed = parse_module("if condition:\n    pass\npass\n").unwrap();
+    let mut trace = Trace::default();
+    trace.visit_body(parsed.syntax().body());
+    assert_eq!(
+        trace.0,
+        [
+            ("enter", NodeKind::StmtIf),
+            ("leave", NodeKind::StmtIf),
+            ("enter", NodeKind::StmtPass),
+            ("leave", NodeKind::StmtPass),
+        ],
+    );
+}
+
+#[test]
+fn typed_and_erased_argument_walks_skip_the_same_children() {
+    #[derive(Default)]
+    struct Trace(Vec<(&'static str, NodeKind)>);
+
+    impl<'a> SourceOrderVisitor<'a> for Trace {
+        fn enter_node(&mut self, node: AnyNode<'a>) -> TraversalSignal {
+            self.0.push(("enter", node.node_kind()));
+            match node {
+                AnyNode::ExprBinOp(_) | AnyNode::Keyword(_) => TraversalSignal::Skip,
+                _ => TraversalSignal::Traverse,
+            }
+        }
+
+        fn leave_node(&mut self, node: AnyNode<'a>) {
+            self.0.push(("leave", node.node_kind()));
+        }
+    }
+
+    let parsed = parse_expression("f(a + b, c, k=d)").unwrap();
+    let arguments = parsed.expr().as_call_expr().unwrap().arguments();
+    let mut typed = Trace::default();
+    source_order::walk_arguments(&mut typed, arguments);
+    let mut erased = Trace::default();
+    source_order::walk_node(&mut erased, arguments.into());
+    assert_eq!(typed.0, erased.0);
+    assert_eq!(
+        typed.0,
+        [
+            ("enter", NodeKind::Arguments),
+            ("enter", NodeKind::ExprBinOp),
+            ("leave", NodeKind::ExprBinOp),
+            ("enter", NodeKind::ExprName),
+            ("leave", NodeKind::ExprName),
+            ("enter", NodeKind::Keyword),
+            ("leave", NodeKind::Keyword),
+            ("leave", NodeKind::Arguments),
+        ],
+    );
+}
+
 /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
 /// and leaves for attributes.
 #[derive(Default)]
@@ -290,14 +366,14 @@ impl RecordVisitor {
 }
 
 impl<'a> SourceOrderVisitor<'a> for RecordVisitor {
-    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
-        self.emit(&node.node_kind());
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        self.emit(&kind.node_kind());
         self.depth += 1;
 
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, _node: SyntaxNode<'a>) {
+    fn leave_node(&mut self, _node: AnyNode<'a>) {
         self.depth -= 1;
     }
 

@@ -29,6 +29,7 @@
 use crate::Db;
 use bitflags::bitflags;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::AnyNode;
 use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
@@ -37,7 +38,7 @@ use ruff_python_ast::visitor::source_order::{
 use ruff_python_ast::{
     self as ast, AnyParameter, ArgOrKeyword, BytesLiteral, ExceptHandlerKind, Expr, ExprKind,
     InterpolatedStringElement, InterpolatedStringElementKind, PatternKind, Stmt, StmtKind,
-    StringLiteral, SyntaxNode, TypeParam, TypeParamKind,
+    StringLiteral, TypeParam, TypeParamKind,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
@@ -816,7 +817,8 @@ impl<'db> SemanticTokenVisitor<'db> {
 }
 
 impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
-    fn enter_node(&mut self, node: SyntaxNode<'_>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'_>) -> TraversalSignal {
+        let node = kind.syntax_node();
         // If we have a range filter and this node doesn't intersect, skip it
         // and all its children as an optimization
         if let Some(range_filter) = self.range_filter {
@@ -830,7 +832,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
         let expecting_docstring = self.expecting_docstring;
         self.expecting_docstring = false;
-        match stmt.classify() {
+        let kind = stmt.classify();
+        match kind {
             StmtKind::FunctionDef(func) => {
                 // Visit decorator expressions
                 for decorator in func.decorator_list() {
@@ -1061,12 +1064,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if expecting_docstring && expr.value().is_string_literal_expr() {
                     self.in_docstring = true;
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
                 self.in_docstring = false;
             }
             _ => {
                 // For all other statement types, let the default visitor handle them
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
         }
     }
@@ -1077,7 +1080,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        match expr.classify() {
+        let kind = expr.classify();
+        match kind {
             ExprKind::Name(name) => {
                 if let Some((token_type, mut modifiers)) = self.classify_name(name) {
                     if self.in_target_creating_definition && name.ctx().is_store() {
@@ -1085,7 +1089,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     }
                     self.add_token(name, token_type, modifiers);
                 }
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
             ExprKind::Attribute(attr) => {
                 // Visit the base expression first (e.g., 'os' in 'os.path')
@@ -1154,7 +1158,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     sub_visitor.visit_expr(sub_ast.expr());
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
-                    walk_expr(self, expr);
+                    walk_expr(self, kind);
                 }
             }
             ExprKind::Subscript(subscript)
@@ -1184,7 +1188,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
             _ => {
                 // For all other expression types, let the default visitor handle them
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
         }
     }
@@ -1221,9 +1225,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     SemanticTokenModifier::empty(),
                 );
             }
-            InterpolatedStringElementKind::Interpolation(_) => {
+            kind @ InterpolatedStringElementKind::Interpolation(_) => {
                 // The default walker handles visiting the expression and format spec
-                walk_interpolated_string_element(self, interpolated_string_element);
+                walk_interpolated_string_element(self, kind);
             }
         }
     }
@@ -1345,9 +1349,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     );
                 }
             }
-            _ => {
+            kind => {
                 // For all other pattern types, use the default walker
-                ruff_python_ast::visitor::source_order::walk_pattern(self, pattern);
+                ruff_python_ast::visitor::source_order::walk_pattern(self, kind);
             }
         }
     }
