@@ -6,19 +6,19 @@ use itertools::Itertools;
 
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{SourceType, TomlSourceType};
-use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, project_files_in_path};
+use ruff_workspace::resolver::{PyprojectDiscovery, ResolvedFile, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
 /// Show the list of files to be checked based on current settings.
 pub(crate) fn show_files(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
     config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (mut paths, _resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, _resolver) = project_files_in_path(files, project_config, config_arguments)?;
 
     // Filter out paths for file types not supported for linting
     paths.retain(|path| {

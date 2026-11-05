@@ -208,11 +208,16 @@ impl Index {
     ) -> Option<DocumentQuery> {
         let uri = self.uri_for_key(&key)?.clone();
 
+        let controller = self.documents.get(&uri)?;
+        let file_path = uri.to_file_path().ok();
+        let document_path = file_path
+            .as_deref()
+            .unwrap_or_else(|| Path::new(uri.path()));
         let document_settings = self
             .settings_for_uri(&uri)
             .map(|settings| {
-                if let Ok(file_path) = uri.to_file_path() {
-                    settings.ruff_settings.get(&file_path)
+                let project = if let Some(file_path) = &file_path {
+                    settings.ruff_settings.get(file_path)
                 } else {
                     // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
                     // but only IF:
@@ -226,7 +231,12 @@ impl Index {
                         tracing::debug!("Use the fallback settings for the new document '{uri}'.");
                         settings.ruff_settings.fallback()
                     }
-                }
+                };
+                project.for_document(
+                    document_path,
+                    controller.as_text(),
+                    &settings.ruff_settings.overrides,
+                )
             })
             .unwrap_or_else(|| {
                 tracing::warn!(
@@ -235,15 +245,18 @@ impl Index {
                 );
                 // The path here is only for completeness, it's okay to use a non-existing path
                 // in case this is an unsaved (untitled) document.
-                let path = Path::new(uri.path());
-                let root = path.parent().unwrap_or(path);
-                Arc::new(RuffSettings::fallback(
+                let root = document_path.parent().unwrap_or(document_path);
+                let overrides = ruff_settings::EditorConfigurationTransformer::new(
                     global.to_settings().editor_settings(),
                     root,
-                ))
+                );
+                Arc::new(RuffSettings::fallback(&overrides, root)).for_document(
+                    document_path,
+                    controller.as_text(),
+                    &overrides,
+                )
             });
 
-        let controller = self.documents.get(&uri)?;
         let cell_uri = match key {
             DocumentKey::NotebookCell(cell_uri) => Some(cell_uri),
             _ => None,
