@@ -1592,6 +1592,24 @@ reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
 ```
 
+## Fixed-length starred parameters on generic methods
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Base:
+    def run(self, value: T, *args: *tuple[int, str]) -> None: ...
+
+class A(Base): ...
+class B(Base): ...
+
+def check(receiver: A | B, ints: list[int]) -> None:
+    receiver.run(0, 1, "ok")  # ok
+    receiver.run(0, *ints)  # error: [invalid-argument-type]
+```
+
 ## Independent specializations during overload argument expansion
 
 Expanding a union can evaluate the same generic overload with different type arguments.

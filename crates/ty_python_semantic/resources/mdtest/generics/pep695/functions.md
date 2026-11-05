@@ -2844,6 +2844,20 @@ def equal_dictionary_tags[T: (Literal[0], Literal[2])](value: FalseTag | TwoTag,
         value["two_only"]  # error: [invalid-key] "Unknown key "two_only" for TypedDict `FalseTag`"
 ```
 
+## Fixed-length starred parameters on generic methods
+
+```py
+class Base:
+    def run[T](self, value: T, *args: *tuple[int, str]) -> None: ...
+
+class A(Base): ...
+class B(Base): ...
+
+def check(receiver: A | B, ints: list[int]) -> None:
+    receiver.run(0, 1, "ok")  # ok
+    receiver.run(0, *ints)  # error: [invalid-argument-type]
+```
+
 ## Independent specializations during overload argument expansion
 
 Expanding a union can evaluate the same generic overload with different type arguments.

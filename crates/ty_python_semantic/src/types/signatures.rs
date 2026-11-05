@@ -5672,7 +5672,14 @@ impl<'db> Parameters<'db> {
             self.data.kind
         };
         let parameters = Self::new(value, kind);
-        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
+            && let Some((_, variadic)) = parameters.variadic()
+            && variadic.has_starred_annotation()
+            && variadic
+                .annotated_type()
+                .exact_tuple_instance_spec(db)
+                .is_some_and(|tuple| tuple.is_variadic())
+        {
             // Resolving typevar identities does not specialize a pack. Keep its fixed boundaries
             // in the starred annotation so call binding can infer the residual tuple shape.
             parameters
