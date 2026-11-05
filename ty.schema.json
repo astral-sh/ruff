@@ -1288,7 +1288,7 @@
         },
         "missing-return-annotation": {
           "title": "detects functions and methods without return type annotations",
-          "description": "## What it does\n\nChecks for functions and methods without a return type annotation.\n\nThe rule applies even when ty can infer the return type. For overloaded functions, it checks the\noverload signatures and skips the implementation.\n\n## Why is this bad?\n\nA return annotation documents the result callers can expect and lets ty check that the\nimplementation returns a compatible value.\n\n## Examples\n\n```python\ndef double(value: int):  # error: [missing-return-annotation]\n    return value * 2\n```\n\nUse instead:\n\n```python\ndef double(value: int) -> int:\n    return value * 2\n```",
+          "description": "## What it does\n\nChecks for functions and methods without a return type annotation.\n\nThe rule applies even when ty can infer the return type. For overloaded functions, it checks the\noverload signatures and skips the implementation.\n\nWhen ty can infer an annotation from the implementation, it offers an unsafe fix. This works even\nwhen return type inference is disabled for calls.\n\n## Why is this bad?\n\nA return annotation documents the result callers can expect and lets ty check that the\nimplementation returns a compatible value.\n\n## Examples\n\n```python\ndef double(value: int):  # error: [missing-return-annotation]\n    return value * 2\n```\n\nUse instead:\n\n```python\ndef double(value: int) -> int:\n    return value * 2\n```",
           "default": "ignore",
           "oneOf": [
             {

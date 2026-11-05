@@ -313,6 +313,47 @@ pub struct TypeDisplayDetails<'db> {
     pub is_valid_syntax: bool,
 }
 
+impl<'db> TypeDisplayDetails<'db> {
+    /// The non-overlapping type names in display order. A nested type claims its text before
+    /// the surrounding type, so a generic's outer span never replaces its arguments.
+    pub fn type_spans(&self) -> impl Iterator<Item = (TextRange, Type<'db>)> + '_ {
+        let mut end = TextSize::default();
+        self.targets
+            .iter()
+            .zip(&self.details)
+            .filter_map(move |(&range, detail)| {
+                if let TypeDetail::Type(ty) = detail
+                    && range.start() >= end
+                {
+                    end = range.end();
+                    Some((range, *ty))
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Render a writable annotation using the spelling of each type name at the insertion site.
+    /// The caller can decline a name that cannot be referenced there.
+    pub fn annotation_text<'a>(
+        &'a self,
+        mut qualify: impl FnMut(Type<'db>, &'a str) -> Option<Cow<'a, str>>,
+    ) -> Option<String> {
+        if !self.is_valid_syntax {
+            return None;
+        }
+        let mut annotation = String::with_capacity(self.label.len());
+        let mut offset = 0;
+        for (span, ty) in self.type_spans() {
+            annotation.push_str(&self.label[offset..span.start().to_usize()]);
+            annotation.push_str(&qualify(ty, &self.label[span])?);
+            offset = span.end().to_usize();
+        }
+        annotation.push_str(&self.label[offset..]);
+        Some(annotation)
+    }
+}
+
 /// Abstraction over "are we doing normal formatting, or tracking ranges with metadata?"
 enum TypeWriter<'a, 'b, 'db> {
     Formatter(&'a mut Formatter<'b>),

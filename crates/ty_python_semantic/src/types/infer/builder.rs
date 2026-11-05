@@ -72,9 +72,9 @@ use crate::types::diagnostic::{
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD,
-    UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    MISSING_RETURN_ANNOTATION, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
     hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
@@ -12590,15 +12590,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the return type of a function body based on the types of
     /// expressions in reachable `return` statements.
     fn inferred_return_type(&self) -> Option<Type<'db>> {
-        if !self.settings().return_type_inference.is_active() {
-            return None;
-        }
-
         let db = self.db();
         let function = self.scope().node(db).as_function()?.node(self.module());
 
         // We never infer types for functions with an explicit return type annotation
         if function.returns.is_some() {
+            return None;
+        }
+
+        if !self.settings().return_type_inference.is_active()
+            && !self.context.is_lint_enabled(&MISSING_RETURN_ANNOTATION)
+        {
             return None;
         }
 
