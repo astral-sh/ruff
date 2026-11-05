@@ -15,8 +15,7 @@ use crate::{
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
-            INVALID_PARAMSPEC, INVALID_TYPE_FORM, MISSING_TYPE_ARGS,
-            MISSING_TYPE_FUNCTION_ARGUMENT, MISSING_TYPE_KWARGS, REDUNDANT_CAST,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, MISSING_PARAMETER_ANNOTATION, REDUNDANT_CAST,
             STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT,
             USELESS_OVERLOAD_BODY, add_type_expression_reference_link,
             is_invalid_typed_dict_literal, report_bad_argument_to_get_protocol_members,
@@ -526,7 +525,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let is_overload_implementation = function_literal.has_separate_implementation(db);
-        if !is_overload_implementation {
+        if !is_overload_implementation
+            && self.context.is_lint_enabled(&MISSING_PARAMETER_ANNOTATION)
+        {
             self.check_parameter_annotations(definition, function);
         }
         let function_type = FunctionType::new(db, function_literal, None);
@@ -748,17 +749,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let skip_receiver = has_positional_parameters
             && MethodReceiverKind::from_function(self.db(), definition, function).is_some();
         for parameter in parameters.iter().skip(usize::from(skip_receiver)) {
-            if parameter.annotation().is_some() {
-                continue;
-            }
-            let (lint, prefix) = match parameter {
-                AnyParameterRef::NonVariadic(_) => (&MISSING_TYPE_FUNCTION_ARGUMENT, ""),
-                AnyParameterRef::Variadic(arg) if Some(arg) == parameters.vararg.as_deref() => {
-                    (&MISSING_TYPE_ARGS, "*")
-                }
-                AnyParameterRef::Variadic(_) => (&MISSING_TYPE_KWARGS, "**"),
-            };
-            if let Some(builder) = self.context.report_lint(lint, parameter.as_parameter()) {
+            if parameter.annotation().is_none()
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&MISSING_PARAMETER_ANNOTATION, parameter.as_parameter())
+            {
+                let prefix = match parameter {
+                    AnyParameterRef::NonVariadic(_) => "",
+                    AnyParameterRef::Variadic(arg) if Some(arg) == parameters.vararg.as_deref() => {
+                        "*"
+                    }
+                    AnyParameterRef::Variadic(_) => "**",
+                };
                 let name = parameter.name();
                 builder.into_diagnostic(format_args!(
                     "Missing type annotation for parameter `{prefix}{name}`"

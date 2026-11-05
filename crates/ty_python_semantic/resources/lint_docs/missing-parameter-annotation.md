@@ -1,6 +1,6 @@
 ## What it does
 
-Checks for positional and keyword-only parameters without a type annotation.
+Checks for function parameters without a type annotation, including `*args` and `**kwargs`.
 
 For overloaded functions, ty checks the overload signatures and skips the implementation.
 
@@ -11,7 +11,7 @@ Without an annotation, ty cannot use the parameter's intended type to check call
 ## Examples
 
 ```python
-def greet(name):  # error: [missing-type-function-argument]
+def greet(name):  # error: [missing-parameter-annotation]
     return f"Hello, {name}!"
 ```
 
@@ -21,8 +21,3 @@ Use instead:
 def greet(name: str):
     return f"Hello, {name}!"
 ```
-
-## See also
-
-- `missing-type-args` checks variadic positional parameters (`*args`).
-- `missing-type-kwargs` checks variadic keyword parameters (`**kwargs`).
