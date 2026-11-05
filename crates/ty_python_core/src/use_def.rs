@@ -3072,6 +3072,18 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// Get the current binding IDs for a place without materializing pending constraints.
+    pub(super) fn current_binding_ids(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        let pending = match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.member_states[member],
+        };
+        pending.state.bindings().iter().map(LiveBinding::binding)
+    }
+
     /// Get the current live bindings for a place.
     pub(super) fn current_bindings(
         &mut self,

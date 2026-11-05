@@ -38,7 +38,9 @@ use ty_python_core::predicate::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
+use ty_python_core::{
+    ExpressionNodeKey, NarrowingAliasPredicate, NarrowingEvaluator, place_table, semantic_index,
+};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::any_over_expr;
@@ -56,7 +58,7 @@ use super::match_pattern::is_typed_dict_runtime_domain;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 mod containment;
@@ -1749,12 +1751,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let index = semantic_index(db, expression.program_file(db));
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node)
-                    && self.is_valid_alias(
-                        name,
-                        expression,
-                        alias_predicate.expression,
-                        is_positive,
-                    )
+                    && self.is_valid_alias(name, expression, alias_predicate, is_positive)
                 {
                     let aliased_constraints =
                         self.evaluate_expression_predicate(alias_predicate.expression, is_positive);
@@ -1820,21 +1817,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Check that every binding that can produce this outcome evaluates the recorded alias.
-    /// Reachability is not yet known when aliases are recorded in the semantic index.
+    /// Check that the alias still describes the narrowed places and that every binding that can
+    /// produce this outcome evaluates the recorded alias.
     fn is_valid_alias(
         &self,
         name: &ast::ExprName,
         expression: Expression<'db>,
-        alias: Expression<'db>,
+        alias: &NarrowingAliasPredicate<'db>,
         is_positive: bool,
     ) -> bool {
         let db = self.db;
         let scope = expression.scope(db);
         let index = semantic_index(db, expression.program_file(db));
         let use_def = index.use_def_map(scope.file_scope_id(db));
-        let alias_key = ExpressionNodeKey::from(alias.node_ref(db).node(self.module));
 
+        let mut visited_headers = FxHashSet::default();
+        if alias
+            .intervening_loop_headers
+            .iter()
+            .filter_map(|id| use_def.definition(*id).definition())
+            .any(|definition| self.loop_header_rebinds_target(definition, &mut visited_headers))
+        {
+            return false;
+        }
+
+        let alias_key = ExpressionNodeKey::from(alias.expression.node_ref(db).node(self.module));
         // An unbound local raises before the condition is evaluated. Other scopes can fall back
         // to a different binding, such as a global with the same name in a class body.
         let unbound_is_terminal = scope.node(db).scope_kind().is_function_like()
@@ -1869,6 +1876,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     definition.place(db),
                 );
                 !ty.bool(db, &self.env).negate_if(!is_positive).may_be_true()
+            })
+    }
+
+    fn loop_header_rebinds_target(
+        &self,
+        definition: Definition<'db>,
+        visited: &mut FxHashSet<Definition<'db>>,
+    ) -> bool {
+        if !visited.insert(definition) {
+            return false;
+        }
+        let db = self.db;
+        let header = loop_header_reachability(db, definition);
+        !header.deleted_reachability.is_always_false()
+            || header.reachable_bindings.iter().any(|binding| {
+                let definition = binding.definition;
+                // A nested header can reach the back edge even when its own writes cannot.
+                !definition.kind(db).is_loop_header()
+                    || self.loop_header_rebinds_target(definition, visited)
             })
     }
 

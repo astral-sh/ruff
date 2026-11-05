@@ -100,6 +100,8 @@ struct NarrowingAlias<'ast> {
     expression_scope: FileScopeId,
     /// Places that, if reassigned, should invalidate this alias.
     narrowed_places: PossiblyNarrowedPlaces,
+    /// The first definition ID allocated after the alias assignment.
+    first_definition_after_alias: ScopedDefinitionId,
 }
 
 struct ScopeInfo<'ast> {
@@ -1189,6 +1191,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     expression: value,
                     expression_scope: self.current_scope(),
                     narrowed_places,
+                    first_definition_after_alias: self.current_use_def_map().next_definition_id(),
                 },
             );
         }
@@ -1295,6 +1298,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 return;
             }
 
+            // A loop entered after the alias was evaluated can carry a new value to this test.
+            // Record the headers here and check their backedges once reachability is available.
+            let use_def = self.current_use_def_map();
+            let mut loop_headers: SmallVec<[_; 2]> = alias
+                .narrowed_places
+                .iter()
+                .flat_map(|place| use_def.current_binding_ids(*place))
+                .filter(|id| *id >= alias.first_definition_after_alias)
+                .filter(|id| {
+                    use_def
+                        .definition(*id)
+                        .definition()
+                        .is_some_and(|definition| definition.kind(self.db).is_loop_header())
+                })
+                .collect();
+            // Keep the stored order stable across semantic-index rebuilds.
+            loop_headers.sort_unstable();
+
             let aliased_expression = Expression::new(
                 self.db,
                 self.scope_ids_by_scope[alias.expression_scope],
@@ -1306,6 +1327,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ExpressionNodeKey::from(leaf),
                 NarrowingAliasPredicate {
                     expression: aliased_expression,
+                    intervening_loop_headers: loop_headers.into_boxed_slice(),
                 },
             );
         });
