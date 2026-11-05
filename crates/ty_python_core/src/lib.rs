@@ -373,20 +373,7 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the [`PlaceUse`](ast_ids::PlaceUse) for an expression that reads an indexed place.
     pub fn expression_place_use(&self, expr: ast::ExprRef<'_>) -> Option<ast_ids::PlaceUse> {
-        let (scope, use_id) = self.ast_ids.scope_and_use(expr)?;
-        let ordinal = self.use_def_map(scope).place_ordinal_at_use(use_id)?;
-        let place = match expr {
-            ast::ExprRef::Name(_) => ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(ordinal)),
-            ast::ExprRef::Attribute(_) | ast::ExprRef::Subscript(_) => {
-                ScopedPlaceId::Member(member::ScopedMemberId::from_u32(ordinal))
-            }
-            _ => return None,
-        };
-        Some(ast_ids::PlaceUse {
-            scope,
-            use_id,
-            place,
-        })
+        self.ast_ids.place_use(expr)
     }
 
     /// Returns the place table for a specific scope.

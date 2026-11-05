@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
@@ -7,9 +5,12 @@ use ruff_python_ast::ExprRef;
 use crate::Db;
 use crate::HasTrackedScope;
 use crate::ProgramFile;
+use crate::frozen::PackedIds;
+use crate::member::ScopedMemberId;
 use crate::place::ScopedPlaceId;
 use crate::scope::FileScopeId;
 use crate::semantic_index;
+use crate::symbol::ScopedSymbolId;
 
 pub use node_key::ExpressionNodeKey;
 
@@ -18,6 +19,8 @@ pub use node_key::ExpressionNodeKey;
 struct NodeIds {
     scope: Option<FileScopeId>,
     use_id: Option<ScopedUseId>,
+    /// Zero for non-expression uses, such as function names and splatted keywords.
+    place_plus_one: u32,
 }
 
 /// A read of a lexical place in a particular scope.
@@ -40,33 +43,26 @@ pub struct PlaceUse {
 }
 
 /// Indexed by root AST node while the flow builder visits expressions in evaluation order.
-/// String annotations have sparse node indices outside the root tree.
+/// Inference parses quoted annotations separately and resolves their names from syntax.
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
     root: Box<[NodeIds]>,
-    annotations: BTreeMap<ast::NodeIndex, NodeIds>,
 }
 
-fn root_index(node: ast::NodeIndex) -> Option<usize> {
+fn root_index(node: ast::NodeIndex) -> usize {
     node.as_u32()
-        .filter(|&index| index <= ast::MAX_REAL_INDEX)
-        .map(|index| index as usize)
+        .expect("expected an indexed node from the root AST") as usize
 }
 
 impl AstIdsBuilder {
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
             root: vec![NodeIds::default(); node_count].into_boxed_slice(),
-            annotations: BTreeMap::new(),
         }
     }
 
     fn entry(&mut self, node: ast::NodeIndex) -> &mut NodeIds {
-        if let Some(index) = root_index(node) {
-            &mut self.root[index]
-        } else {
-            self.annotations.entry(node).or_default()
-        }
+        &mut self.root[root_index(node)]
     }
 
     pub(super) fn record_expression(&mut self, expr: &impl HasTrackedScope, scope: FileScopeId) {
@@ -88,10 +84,16 @@ impl AstIdsBuilder {
         expr: &ast::Expr,
         scope: FileScopeId,
         use_id: ScopedUseId,
+        place: ScopedPlaceId,
     ) {
+        let ordinal = match place {
+            ScopedPlaceId::Symbol(id) => id.as_u32(),
+            ScopedPlaceId::Member(id) => id.as_u32(),
+        };
         *self.entry(ExpressionNodeKey::from(expr).index()) = NodeIds {
             scope: Some(scope),
             use_id: Some(use_id),
+            place_plus_one: ordinal + 1,
         };
     }
 
@@ -101,24 +103,18 @@ impl AstIdsBuilder {
         key: impl Into<ExpressionNodeKey>,
     ) -> Option<ScopedUseId> {
         let node = key.into().index();
-        let row = if let Some(index) = root_index(node) {
-            self.root.get(index)?
-        } else {
-            self.annotations.get(&node)?
-        };
+        let row = &self.root[root_index(node)];
         row.use_id.filter(|_| row.scope == Some(scope))
     }
 
-    /// Stores use IDs in node-index order, with string-annotation nodes after the root nodes.
+    /// Stores use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
     pub(super) fn finish(self) -> AstIds {
         let mut pages: Vec<UsePage> = Vec::new();
-        let mut uses = Vec::new();
+        let mut use_ids = Vec::new();
+        let mut places_plus_one = Vec::new();
         let mut scopes = Vec::new();
-        let root = (0..=ast::MAX_REAL_INDEX)
-            .map(ast::NodeIndex::from)
-            .zip(self.root);
-        for (node, row) in root.chain(self.annotations) {
+        for (node, row) in (0..).map(ast::NodeIndex::from).zip(self.root) {
             if let Some(scope) = row.scope {
                 ScopeRange::record(&mut scopes, node, scope);
             }
@@ -138,18 +134,20 @@ impl AstIdsBuilder {
                     mask: 1,
                 });
             }
-            uses.push(use_id);
+            use_ids.push(use_id);
+            places_plus_one.push(row.place_plus_one);
         }
         AstIds {
             pages: pages.into_boxed_slice(),
-            uses: uses.into_boxed_slice(),
+            use_ids: use_ids.into(),
+            places_plus_one: places_plus_one.into(),
             scopes: scopes.into_boxed_slice(),
         }
     }
 }
 
 /// The set bits locate uses within 64 node indices of the first use on this page.
-/// Gaps between pages, including the gap before quoted annotations, occupy no storage.
+/// Gaps between pages occupy no storage.
 #[derive(Debug, get_size2::GetSize)]
 struct UsePage {
     first_node: ast::NodeIndex,
@@ -194,14 +192,18 @@ impl ScopeRange {
 #[derive(Debug, get_size2::GetSize)]
 pub(crate) struct AstIds {
     pages: Box<[UsePage]>,
-    uses: Box<[ScopedUseId]>,
+    use_ids: PackedIds<ScopedUseId>,
+    /// Symbol or member ordinals in the same order as `use_ids`. The expression determines
+    /// which table to use. Keeping these in the AST index lets an edit change a read's place
+    /// without invalidating queries that only depend on reaching bindings.
+    places_plus_one: PackedIds<u32>,
     scopes: Box<[ScopeRange]>,
 }
 
 impl AstIds {
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
-    fn source_use(&self, node: ast::NodeIndex) -> Option<ScopedUseId> {
+    fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
         let end = self.pages.partition_point(|page| page.first_node <= node);
         let page = self.pages[..end].last()?;
         let bit = page.bit(node)?;
@@ -209,7 +211,7 @@ impl AstIds {
             return None;
         }
         let preceding = (page.mask & (bit - 1)).count_ones();
-        Some(self.uses[(page.first_use + preceding) as usize])
+        Some((page.first_use + preceding) as usize)
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
@@ -222,13 +224,22 @@ impl AstIds {
         self.scope_at(node.node_index().load())
     }
 
-    pub(super) fn scope_and_use(
-        &self,
-        expr: ast::ExprRef<'_>,
-    ) -> Option<(FileScopeId, ScopedUseId)> {
+    pub(super) fn place_use(&self, expr: ast::ExprRef<'_>) -> Option<PlaceUse> {
         let node = ExpressionNodeKey::from(expr).index();
-        let use_id = self.source_use(node)?;
-        Some((self.scope_at(node)?, use_id))
+        let index = self.use_index(node)?;
+        let ordinal = self.places_plus_one.get(index).checked_sub(1)?;
+        let place = match expr {
+            ast::ExprRef::Name(_) => ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(ordinal)),
+            ast::ExprRef::Attribute(_) | ast::ExprRef::Subscript(_) => {
+                ScopedPlaceId::Member(ScopedMemberId::from_u32(ordinal))
+            }
+            _ => return None,
+        };
+        Some(PlaceUse {
+            scope: self.scope_at(node)?,
+            use_id: self.use_ids.get(index),
+            place,
+        })
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
@@ -237,7 +248,8 @@ impl AstIds {
     }
 
     pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
-        self.source_use(key.into().index())
+        self.use_index(key.into().index())
+            .map(|index| self.use_ids.get(index))
     }
 }
 
@@ -384,7 +396,10 @@ mod tests {
         }
 
         let ids = builder.finish();
-        let lookup = |node: u32| ids.source_use(node.into()).map(ScopedUseId::as_u32);
+        let lookup = |node: u32| {
+            ids.use_index(node.into())
+                .map(|index| ids.use_ids.get(index).as_u32())
+        };
         assert_eq!(lookup(0), Some(1));
         assert_eq!(lookup(62), None);
         assert_eq!(lookup(63), Some(2));

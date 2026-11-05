@@ -1402,7 +1402,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let scope = self.current_scope();
         let use_id = self.use_def_maps[scope].record_use(place_id);
-        self.ast_ids.record_place_use(expr, scope, use_id);
+        self.ast_ids.record_place_use(expr, scope, use_id, place_id);
         use_id
     }
 
