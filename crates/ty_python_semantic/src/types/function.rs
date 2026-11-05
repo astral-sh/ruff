@@ -79,6 +79,7 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
+use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1325,23 +1326,34 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let updated_signature = self
-            .signature(db)
-            .with_inherited_generic_context(db, inherited_generic_context);
+        self.map_signatures(db, |signature| {
+            signature.with_inherited_generic_context(db, inherited_generic_context)
+        })
+    }
+
+    /// Transforms the public overloads and any separate implementation signatures.
+    pub(super) fn map_signatures(
+        self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableSignature<'db>) -> CallableSignature<'db>,
+    ) -> Self {
+        let signature = self.signature(db);
+        let updated_signature = map(signature);
+        let mut changed = updated_signature != *signature;
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
             self.implementation_callables(db)
                 .iter()
                 .map(|callable| {
-                    callable.with_signatures(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, inherited_generic_context),
-                    )
+                    let mapped = callable.with_signatures(db, map(callable.signatures(db)));
+                    changed |= mapped != *callable;
+                    mapped
                 })
                 .collect()
         });
+        if !changed {
+            return self;
+        }
         Self::new_internal(
             db,
             literal,
@@ -1754,7 +1766,29 @@ impl<'db> FunctionType<'db> {
             return Cow::Borrowed(signature);
         }
         let mut overload = overload.clone();
-        overload.return_ty = self.inferred_return_type(db);
+        // The body refers to the declaration's method typevars. Rename them to this
+        // signature's binders before substituting class arguments, which may themselves
+        // refer to the original occurrences.
+        let method_renaming = overload.generic_context.and_then(|context| {
+            let definition = self.definition(db);
+            let fresh = context.variables(db).filter(|var| {
+                var.freshness(db) != TypeVarNonce::NONE
+                    && var.binding_context(db).definition() == Some(definition)
+            });
+            let env = ProgramEnvironment::from_definition(definition);
+            let declared = GenericContext::try_from_typevar_instances(
+                db,
+                &env,
+                fresh
+                    .clone()
+                    .map(|var| var.typevar(db).with_binding_context(db, definition)),
+            )?;
+            Some(declared.specialize(db, fresh.map(Type::TypeVar).collect::<Vec<_>>()))
+        });
+        overload.return_ty = self
+            .inferred_return_type(db)
+            .apply_optional_specialization(db, method_renaming)
+            .apply_optional_specialization(db, self.class_specialization(db));
         Cow::Owned(CallableSignature::single(overload))
     }
 
@@ -1842,14 +1876,12 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
-        return_type
-            .apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::GeneralizeLocalTypes(scope),
-                TypeContext::default(),
-            )
-            .apply_optional_specialization(db, self.class_specialization(db))
+        return_type.apply_type_mapping(
+            db,
+            &env,
+            &TypeMapping::GeneralizeLocalTypes(scope),
+            TypeContext::default(),
+        )
     }
 
     #[salsa::tracked(

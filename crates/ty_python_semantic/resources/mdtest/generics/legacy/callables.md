@@ -1590,6 +1590,226 @@ class IPolys(Protocol[T]):
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
 ```
 
+## Specializing generic methods
+
+A method can use its own type parameter as the class argument of another instance. That class
+argument stays fixed whether the method is called directly or saved as a bound method.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self) -> None:
+        self.callback = self.method
+
+    def method(self, value: T) -> tuple[C, T]:
+        def check(other: Box[T], arg: int) -> None:
+            result = other.method(arg)
+            # revealed: tuple[T@method, int]
+            reveal_type(result)
+            pair: tuple[T, int] = result  # no diagnostic
+            # revealed: tuple[T@method, int]
+            reveal_type(other.callback(arg))
+
+        raise NotImplementedError
+```
+
+The same applies when the class argument comes from a separate generic function.
+
+```py
+def check(other: Box[T], arg: int) -> None:
+    result = other.method(arg)
+    # revealed: tuple[T@check, int]
+    reveal_type(result)
+    pair: tuple[T, int] = result  # no diagnostic
+```
+
+## Aliases in the owner of a generic method
+
+Calling a generic method leaves the enclosing method's type parameter fixed, whether an alias
+receives it as an argument or captures it in its definition.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+A = TypeVar("A")
+C = TypeVar("C")
+T = TypeVar("T")
+Items = TypeAliasType("Items", list[A], type_params=(A,))
+Nested = TypeAliasType("Nested", "A | list[Nested[tuple[A]]]", type_params=(A,))
+
+class Box(Generic[C]):
+    @staticmethod
+    def get(value: T) -> C:
+        LocalItems = TypeAliasType("LocalItems", list[T])
+
+        def check(explicit: "Box[Items[T]]", captured: "Box[LocalItems]", n: int) -> None:
+            from_argument = explicit.get(n)
+            ok: list[T] = from_argument
+            wrong: list[int] = from_argument  # error: [invalid-assignment]
+
+            from_definition = captured.get(n)
+            ok_again: list[T] = from_definition
+            wrong_again: list[int] = from_definition  # error: [invalid-assignment]
+
+        def recursive(other: "Box[Nested[T]]", n: int) -> None:
+            result = other.get(n)
+            ok: Nested[T] = result
+            wrong: Nested[int] = result  # error: [invalid-assignment]
+
+        raise NotImplementedError
+```
+
+## `Self` as a protocol's type argument
+
+When a method takes its owner's type argument and returns `Self`, binding the method fixes its
+return type to the receiver. The argument keeps the type supplied when specializing the protocol.
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import Self
+
+C = TypeVar("C")
+
+class P(Protocol[C]):
+    def method(self, value: C) -> tuple[C, Self]:
+        def check(other: "P[Self]", value: Self) -> None:
+            # revealed: tuple[Self@method, P[Self@method]]
+            reveal_type(other.method(value))
+            callback: Callable[[Self], tuple[Self, P[Self]]] = other.method  # ok
+            other.method(object())  # error: [invalid-argument-type]
+
+        raise NotImplementedError
+```
+
+## Inferred returns of specialized generic methods
+
+An inferred return can refer to both the owner's type argument and the called method's type
+argument. Only the latter is inferred from the call.
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from typing import Generic, TypeVar, final
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+@final
+class Box(Generic[C]):
+    value: C
+
+    def pair(self, arg: T):
+        def check(other: Box[T], n: int) -> tuple[T, T]:
+            result = other.pair(n)
+            # revealed: tuple[T@pair, int]
+            reveal_type(result)
+            return result  # error: [invalid-return-type]
+
+        return self.value, arg
+```
+
+## Specializing generic constructors
+
+A constructor's method type parameter is independent of an explicitly supplied class argument, even
+when that argument is the type parameter of an enclosing call to the same constructor.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self, value: tuple[C, T]) -> None:
+        def check(arg: tuple[T, int]) -> None:
+            # revealed: Box[T@__init__]
+            reveal_type(Box[T](arg))
+
+        def check_class_parameter(arg: tuple[C, int]) -> None:
+            # revealed: Box[C@Box]
+            reveal_type(Box[C](arg))
+```
+
+## Specializing generic protocol methods
+
+A method can use its own type parameter as the class argument of another instance of its protocol.
+That class argument stays fixed while the other instance's method accepts independently chosen
+argument types. An implementation that always returns `int` in the first tuple element therefore
+satisfies `Required[int]`, but cannot satisfy `Required[T]` for an arbitrary `T`. The local `accept`
+function captures `method`'s `T`, so passing an argument cannot infer a new value for it.
+
+```py
+from typing import Protocol, TypeVar
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    def method(self, value: T) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## Specializing overloaded generic protocol methods
+
+Each overload's type parameter is independent of the class argument. The local `accept` function
+captures the first overload's type parameter. The second overload's return type places no
+restriction on the class argument.
+
+```toml
+[rules]
+useless-overload-body = "ignore"
+```
+
+```py
+from typing import Literal, Protocol, TypeVar, overload
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U, flag: bool) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    @overload
+    def method(self, value: T, flag: Literal[False]) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+    @overload
+    def method(self, value: T, flag: Literal[True]) -> object: ...
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
 ## Returned callables with recursive parameter aliases
 
 A type variable used by a recursive parameter alias belongs to the function. The returned callable

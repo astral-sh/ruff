@@ -39,16 +39,13 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{
-    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
-};
+use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
     MaterializationKind, ParamSpecAttrKind, ParamSpecValue, ParameterDescription, SelfBinding,
-    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types,
-    todo_type,
+    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypedDictType,
+    UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -245,6 +242,19 @@ impl<'db> CallableSignature<'db> {
                 .clone()
                 .with_inherited_generic_context(db, inherited_generic_context)
         }))
+    }
+
+    pub(super) fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads.iter().map(|signature| {
+                signature.freshen_for_owner_specialization(db, env, specialization)
+            }),
+        )
     }
 
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
@@ -1265,11 +1275,44 @@ impl<'db> Signature<'db> {
         )
     }
 
-    fn max_typevar_freshness_matching_generic_context(
+    /// Keep incoming class arguments separate from this method's own type parameters.
+    fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+        let arguments = specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .filter_map(|(parameter, &argument)| {
+                (argument
+                    .as_typevar()
+                    .is_none_or(|var| !var.is_same_typevar_as(db, parameter)))
+                .then_some(argument)
+            });
+        if let Some(delta) = freshening_delta(db, arguments, generic_context) {
+            // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
+            // from the projected method's local T. Rename the method's binders before
+            // substituting the class arguments, while those occurrences are distinguishable.
+            self.freshen_bound_typevars(db, env, delta)
+        } else {
+            // Identity substitutions introduce no new occurrences. A different nonce already
+            // distinguishes two occurrences; freshening just because they share a declaration
+            // would introduce unbounded new identities during recursive member projection.
+            self.clone()
+        }
+    }
+
+    fn freshening_delta_for(
         &self,
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
-    ) -> Option<TypeVarNonce> {
+    ) -> Option<u32> {
         let typevars = self
             .generic_context
             .into_iter()
@@ -1283,7 +1326,7 @@ impl<'db> Signature<'db> {
             .chain(parameters)
             .chain(std::iter::once(self.return_ty));
 
-        max_typevar_freshness_matching_generic_context(db, types, generic_context)
+        freshening_delta(db, types, generic_context)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1495,6 +1538,20 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
+        let self_mapping = |self_type| {
+            // In `P[Self].method`, the owner argument and the method's own `Self` can have
+            // the same declaration. Only the occurrence bound by this signature is the receiver.
+            if let Some(context) = self.generic_context
+                && let Some(typevar) = context.variables(db).find(|typevar| {
+                    Some(typevar.binding_context(db)) == binding_context
+                        && typevar.typevar(db).is_self(db)
+                })
+            {
+                TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, self_type))
+            } else {
+                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
+            }
+        };
         let receiver_constraint = if impossible_receiver {
             // Keep the signature for bound-method diagnostics, but make it incompatible with
             // callable contracts: no parameter can receive the implicit positional argument.
@@ -1510,12 +1567,7 @@ impl<'db> Signature<'db> {
                     ))
                 });
                 let annotation = if let Some(typing_self_type) = typing_self_type {
-                    let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                        db,
-                        env,
-                        typing_self_type,
-                        binding_context,
-                    ));
+                    let mapping = self_mapping(typing_self_type);
                     parameter.annotated_type().apply_type_mapping(
                         db,
                         env,
@@ -1554,8 +1606,7 @@ impl<'db> Signature<'db> {
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, env, parameters.as_slice())
         {
-            let self_mapping =
-                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
+            let self_mapping = self_mapping(self_type);
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -2863,9 +2914,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let freshened_source;
         let source = if signature_context(source) != signature_context(target)
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = target.freshening_delta_for(db, generic_context)
         {
             freshened_source = source.freshen_bound_typevars(db, env, delta);
             &freshened_source
@@ -2875,9 +2924,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = source.freshening_delta_for(db, generic_context)
         {
             freshened_target = target.freshen_bound_typevars(db, env, delta);
             &freshened_target

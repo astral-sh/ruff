@@ -2342,7 +2342,8 @@ impl<'db> ClassType<'db> {
                     .origin(db)
                     .own_instance_member(db, env, name)
                     .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                        ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+                            .apply_optional_owner_specialization_to_member(db, Some(specialization))
                     })
             }
         }
