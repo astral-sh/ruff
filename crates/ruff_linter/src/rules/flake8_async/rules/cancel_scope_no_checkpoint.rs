@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
 use ruff_python_ast::helpers::{AwaitVisitor, any_over_body};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, NodeList};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -63,12 +62,9 @@ impl Violation for CancelScopeNoCheckpoint {
 }
 
 /// ASYNC100
-pub(crate) fn cancel_scope_no_checkpoint(
-    checker: &Checker,
-    with_stmt: ast::StmtWith<'_>,
-    with_items: NodeList<'_, ruff_python_ast::kind::WithItem>,
-) {
-    let Some((with_item_pos, method_name)) = with_items
+pub(crate) fn cancel_scope_no_checkpoint(checker: &Checker, with_stmt: &ast::StmtWithFields<'_>) {
+    let Some((with_item_pos, method_name)) = with_stmt
+        .items
         .iter()
         .enumerate()
         .filter_map(|(pos, item)| {
@@ -88,7 +84,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
 
     // If this is an `async with` and the timeout has items after it, then the
     // further items are checkpoints.
-    if with_stmt.is_async() && with_item_pos < with_items.len() - 1 {
+    if with_stmt.is_async && with_item_pos < with_stmt.items.len() - 1 {
         return;
     }
 
@@ -96,16 +92,16 @@ pub(crate) fn cancel_scope_no_checkpoint(
     // in the caller yielded to.
     // See: https://flake8-async.readthedocs.io/en/latest/rules.html#async100
     // See: https://github.com/astral-sh/ruff/issues/12873
-    if any_over_body(with_stmt.body(), ruff_python_ast::Expr::is_yield_expr) {
+    if any_over_body(with_stmt.body, ruff_python_ast::Expr::is_yield_expr) {
         return;
     }
 
     // If the body contains an `await` statement, the context manager is used correctly.
     let mut visitor = AwaitVisitor::default();
-    visitor.visit_body(with_stmt.body());
+    visitor.visit_body(with_stmt.body);
     if visitor.seen_await {
         return;
     }
 
-    checker.report_diagnostic(CancelScopeNoCheckpoint { method_name }, with_stmt.range());
+    checker.report_diagnostic(CancelScopeNoCheckpoint { method_name }, with_stmt.range);
 }

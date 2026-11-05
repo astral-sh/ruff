@@ -592,7 +592,10 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                                         Rule::StringDotFormatExtraPositionalArguments,
                                     ) {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
-                                            checker, &call_fields, &summary, args,
+                                            checker,
+                                            &call_fields,
+                                            &summary,
+                                            args,
                                         );
                                     }
                                     if checker
@@ -741,7 +744,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, &expr, func, args);
             }
-            if arguments.keywords().next().is_none() {
+            if keywords.is_empty() {
                 if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
                     flake8_bugbear::rules::getattr_with_constant(checker, &expr, func, args);
                 }
@@ -753,7 +756,9 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::StarArgUnpackingAfterKeywordArg) {
-                flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(checker, arguments);
+                flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(
+                    checker, args, keywords,
+                );
             }
             if checker.is_rule_enabled(Rule::ZipWithoutExplicitStrict) {
                 if checker.target_version() >= PythonVersion::PY310 {
@@ -778,7 +783,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
-                flake8_bandit::rules::hardcoded_password_func_arg(checker, arguments);
+                flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
             }
             if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, &expr);
@@ -830,9 +835,10 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 Rule::UnnecessaryLiteralSet,
                 Rule::UnnecessaryLiteralDict,
                 Rule::UnnecessaryLiteralWithinTupleCall,
-            ]) && arguments.len() == 1
+            ]) && args.len() == 1
+                && keywords.is_empty()
                 && let Some(name) = func.as_name_expr()
-                && let Some(argument) = arguments.args().next()
+                && let Some(argument) = args.first()
             {
                 match (name.id().as_str(), argument.node_kind()) {
                     ("list", NodeKind::ExprGenerator)
@@ -1014,13 +1020,13 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 &checker.settings().flake8_gettext.function_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
-                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, arguments);
+                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::FormatInGetTextFuncCall) {
-                    flake8_gettext::rules::format_in_gettext_func_call(checker, func, arguments);
+                    flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::PrintfInGetTextFuncCall) {
-                    flake8_gettext::rules::printf_in_gettext_func_call(checker, func, arguments);
+                    flake8_gettext::rules::printf_in_gettext_func_call(checker, func, args);
                 }
             }
             if checker.is_rule_enabled(Rule::UncapitalizedEnvironmentVariables) {
@@ -1221,10 +1227,11 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::FString(f_string_expr) => {
-            let value = f_string_expr.value();
+            let fields = f_string_expr.fields();
+            let value = fields.value;
 
             if checker.is_rule_enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(checker, f_string_expr);
+                pyflakes::rules::f_string_missing_placeholders(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::ExplicitFStringTypeConversion) {
                 for f_string in value.f_strings() {
@@ -1504,7 +1511,8 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::StringLiteral(string_like) => {
-            let value = string_like.value();
+            let fields = string_like.fields();
+            let value = fields.value;
 
             if checker.is_rule_enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
@@ -1517,13 +1525,14 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::HardcodedStringCharset) {
-                refurb::rules::hardcoded_string_charset_literal(checker, string_like);
+                refurb::rules::hardcoded_string_charset_literal(checker, &fields);
             }
         }
         ExprKind::If(if_exp) => {
-            let test = if_exp.test();
-            let body = if_exp.body();
-            let orelse = if_exp.orelse();
+            let fields = if_exp.fields();
+            let test = fields.test;
+            let body = fields.body;
+            let orelse = fields.orelse;
 
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictGet) {
                 flake8_simplify::rules::if_exp_instead_of_dict_get(
@@ -1546,7 +1555,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
             if checker.is_rule_enabled(Rule::UselessIfElse) {
-                ruff::rules::useless_if_else(checker, if_exp);
+                ruff::rules::useless_if_else(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::SliceToRemovePrefixOrSuffix) {
                 refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
@@ -1607,9 +1616,10 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::DictComp(dict_comp) => {
-            let key = dict_comp.key();
-            let value = dict_comp.value();
-            let generators = dict_comp.generators();
+            let fields = dict_comp.fields();
+            let key = fields.key;
+            let value = fields.value;
+            let generators = fields.generators;
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
@@ -1641,7 +1651,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::StaticKeyDictComprehension) {
-                flake8_bugbear::rules::static_key_dict_comprehension(checker, dict_comp);
+                flake8_bugbear::rules::static_key_dict_comprehension(checker, &fields);
             }
         }
         ExprKind::Generator(generator) => {

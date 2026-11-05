@@ -59,13 +59,16 @@ impl Violation for RedundantFinalLiteral {
 }
 
 /// PYI064
-pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: ast::StmtAnnAssign<'_>) {
+pub(crate) fn redundant_final_literal(
+    checker: &Checker,
+    ann_assign: &ast::StmtAnnAssignFields<'_>,
+) {
     if !checker.semantic().seen_typing() {
         return;
     }
 
-    let assign_value = ann_assign.value();
-    let annotation = ann_assign.annotation();
+    let assign_value = ann_assign.value;
+    let annotation = ann_assign.annotation;
 
     let ExprKind::Subscript(annotation) = annotation.classify() else {
         return;
@@ -98,7 +101,7 @@ pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: ast::StmtAn
         RedundantFinalLiteral {
             literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
         },
-        ann_assign.range(),
+        ann_assign.range,
     );
 
     // The literal value and the assignment value being different doesn't make sense, so we skip
