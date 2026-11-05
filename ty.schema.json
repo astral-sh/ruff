@@ -1426,6 +1426,16 @@
             }
           ]
         },
+        "possibly-missing-typed-dict-key": {
+          "title": "detects reads of potentially missing TypedDict keys",
+          "description": "## What it does\n\nChecks for subscript reads of non-required `TypedDict` keys. A key can be non-required because it is\nannotated with `NotRequired` or because its `TypedDict` declares `total=False`.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError` at runtime. Check for the key with `in` before reading it,\nor use `get` to supply a default.\n\n## Example\n\n```python\nfrom typing import NotRequired, TypedDict\n\n\nclass Movie(TypedDict):\n    year: NotRequired[int]\n\n\ndef describe(movie: Movie) -> None:\n    print(movie[\"year\"])  # error\n\n    if \"year\" in movie:\n        print(movie[\"year\"])\n\n    print(movie.get(\"year\", \"unknown\"))\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "possibly-unresolved-reference": {
           "title": "detects references to possibly undefined names",
           "description": "## What it does\n\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\n\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Rule status\n\nThis rule is currently disabled by default because of the number of false positives it can produce.\n\n## Example\n\n```python\nfor i in range(int(input())):\n    x = i\n\n# NameError: name 'x' is not defined\nprint(x)  # error\n```",

@@ -1813,9 +1813,17 @@ david = OptionalPerson(name="David")
 emily = OptionalPerson(age=30)
 frank = OptionalPerson(name="Frank", age=25)
 
-# TODO: we could emit an error here, because these fields are not guaranteed to exist
+# error: [possibly-missing-typed-dict-key]
 reveal_type(charlie["name"])  # revealed: str
-reveal_type(david["age"])  # revealed: int | None
+reveal_type(emily["age"])  # revealed: int | None
+```
+
+A nonempty `OptionalPerson` can contain just `age`, so reading `name` can still raise `KeyError`.
+
+```py
+def read_name(person: OptionalPerson):
+    if person:
+        person["name"]  # error: [possibly-missing-typed-dict-key]
 ```
 
 Type validation still applies to provided fields:
@@ -1870,9 +1878,9 @@ user1 = User(name="Alice", email="alice@example.com")  # required fields
 user2 = User(name="Bob", email="bob@example.com", bio="Developer")  # with optional bio
 
 reveal_type(msg1["id"])  # revealed: int
-reveal_type(msg1["content"])  # revealed: str
+reveal_type(msg2["content"])  # revealed: str
 reveal_type(user1["name"])  # revealed: str
-reveal_type(user1["bio"])  # revealed: str
+reveal_type(user2["bio"])  # revealed: str
 ```
 
 Constructor validation respects `Required`/`NotRequired` overrides:
@@ -2639,6 +2647,179 @@ def _(
     # error: [invalid-key]
     # error: [invalid-key]
     reveal_type(being["legs"])  # revealed: Unknown
+```
+
+### Reading non-required keys
+
+Reading a non-required key can raise `KeyError`. Enable `possibly-missing-typed-dict-key` to report
+reads where the key might be missing.
+
+```py
+from typing import Literal, NotRequired, TypedDict
+
+class Movie(TypedDict):
+    title: str
+    year: NotRequired[int]
+
+def read_year(movie: Movie):
+    movie["year"]  # snapshot: possibly-missing-typed-dict-key
+```
+
+```snapshot
+info[possibly-missing-typed-dict-key]: Key "year" may be missing from `Movie`
+ --> src/mdtest_snippet.py:8:11
+  |
+8 |     movie["year"]  # snapshot: possibly-missing-typed-dict-key
+  |           ^^^^^^
+```
+
+If `"year" in movie` is true, the read is safe even when the subscript uses a variable of type
+`Literal["year"]`.
+
+```py
+def guarded(movie: Movie, key: Literal["year"]):
+    if "year" in movie:
+        movie[key]  # ok
+    movie[key]  # error: [possibly-missing-typed-dict-key]
+```
+
+The membership check can also use the variable. In the `not in` branch the key is missing.
+
+```py
+def check_absence(movie: Movie, key: Literal["year"]):
+    if key not in movie:
+        movie["year"]  # error: [possibly-missing-typed-dict-key]
+    else:
+        movie["year"]  # ok
+```
+
+If the key can be either `"title"` or `"year"`, only `"year"` can make the read fail.
+
+```py
+def read_field(movie: Movie, key: Literal["title", "year"]):
+    movie[key]  # error: [possibly-missing-typed-dict-key] "Key "year" may be missing"
+```
+
+In a union of two `TypedDict` types, the key can be missing even if one type requires it.
+
+```py
+class DatedMovie(TypedDict):
+    year: int
+
+def read_union(movie: Movie | DatedMovie):
+    movie["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+A function that accepts any subtype of `Movie` can receive one without `"year"`.
+
+```py
+from typing import TypeVar
+
+M = TypeVar("M", bound=Movie)
+
+def read_bounded(movie: M) -> M:
+    movie["year"]  # error: [possibly-missing-typed-dict-key]
+    return movie
+```
+
+### Reading after a write or deletion
+
+If the assignment runs only inside an `if` block, the key can still be missing afterward.
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict, total=False):
+    year: int
+
+def set_year(movie: Movie, year: int | None):
+    if year is not None:
+        movie["year"] = year
+        movie["year"]  # ok
+    movie["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+A key found by a membership check can be missing after a conditional deletion.
+
+```py
+def remove_year(movie: Movie, remove: bool):
+    if "year" in movie:
+        if remove:
+            del movie["year"]
+        movie["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+An augmented assignment reads the previous value before writing the new one.
+
+```py
+def increment_year(movie: Movie):
+    movie["year"] += 1  # error: [possibly-missing-typed-dict-key]
+```
+
+### Reading keys supplied to a constructor
+
+When a variable is assigned a new `Movie`, the new constructor determines whether `"year"` is
+present.
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict, total=False):
+    year: int
+
+movie = Movie(year=1979)
+del movie["year"]
+movie = Movie(year=1986)
+movie["year"]  # ok
+movie = Movie()
+movie["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+A dict literal supplies the same keys whether it is passed as the first argument or unpacked with
+`**`.
+
+```py
+Movie({"year": 1979})["year"]  # ok
+Movie(**{"year": 1979})["year"]  # ok
+Movie({})["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+Unpacking another `TypedDict` supplies its required keys. If the source makes `"year"` optional, the
+new movie can omit it too.
+
+```py
+class Release(TypedDict):
+    year: int
+
+def copy_year(release: Release, movie: Movie):
+    Movie(**release)["year"]  # ok
+    Movie(**movie)["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+A mapping typed as `Any` can be empty. In a dict literal, unpacking it can overwrite an earlier
+value but cannot remove a key.
+
+```py
+from typing import Any
+
+def from_dynamic(release: Release, fields: Any):
+    Movie(**fields)["year"]  # error: [possibly-missing-typed-dict-key]
+    movie = Movie({**release, **fields})
+    movie["year"]  # ok
+    del movie["year"]
+    movie["year"]  # error: [possibly-missing-typed-dict-key]
+```
+
+Unpacking a fresh `Movie` copies the keys its constructor supplied.
+
+```py
+Movie(**Movie(year=1979))["year"]  # ok
+```
+
+An immediate read from an assignment expression also warns if the constructor omitted the key.
+
+```py
+(movie := Movie())["year"]  # error: [possibly-missing-typed-dict-key]
 ```
 
 ### Writing
@@ -3976,7 +4157,7 @@ class Child(Base):
 child1 = Child(b="hello", c=[1, 2, 3])
 child2 = Child(a=1, b="world", c=[])
 
-reveal_type(child1["a"])  # revealed: int
+reveal_type(child2["a"])  # revealed: int
 reveal_type(child1["b"])  # revealed: str
 reveal_type(child1["c"])  # revealed: list[int]
 
@@ -5226,6 +5407,7 @@ empty_movie = MovieWithOptional()
 movie_no_year = MovieWithOptional(name="The Matrix")
 reveal_type(movie_no_year)  # revealed: MovieWithOptional
 reveal_type(movie_no_year["name"])  # revealed: str
+# error: [possibly-missing-typed-dict-key]
 reveal_type(movie_no_year["year"])  # revealed: int
 ```
 
@@ -5375,6 +5557,7 @@ td1: TD = {"required": "hello"}  # Valid - optional is not required
 td2: TD = {"required": "hello", "optional": 42}  # Valid - all keys provided
 reveal_type(td1)  # revealed: TD
 reveal_type(td1["required"])  # revealed: Literal["hello"]
+# error: [possibly-missing-typed-dict-key]
 reveal_type(td1["optional"])  # revealed: int
 
 # error: [missing-typed-dict-key] "Missing required key 'required' in TypedDict `TD` constructor"
@@ -8170,6 +8353,7 @@ class Child(Base):
 # Child inherits extra_items=int from Base
 def _(child: Child) -> None:
     reveal_type(child["name"])  # revealed: str
+    # error: [possibly-missing-typed-dict-key]
     reveal_type(child["age"])  # revealed: int
     reveal_type(child["other"])  # revealed: int
 ```
