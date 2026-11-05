@@ -33,7 +33,7 @@ pub fn lint_toml(
 
     let document = DeTable::parse(contents);
 
-    if context.is_rule_enabled(Rule::RuleCodesInSelectors)
+    if context.any_rule_enabled(&[Rule::RuleCodesInSelectors, Rule::RedirectedRuleSelector])
         && let Ok(document) = &document
     {
         rule_selectors::check_rule_selectors(&context, document.get_ref(), source_type);
