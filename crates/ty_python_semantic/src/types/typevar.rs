@@ -945,7 +945,10 @@ impl<'db> TypeVarNonceGenerator<'db> {
                 && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
                     .any(|enclosing| enclosing == first)
         });
-        matches_enclosing || !self.seen.borrow_mut().insert(generic_context)
+        // Repeated union members share one parameter list when inferring a lambda's type.
+        matches_enclosing
+            || (!self.seen.borrow_mut().insert(generic_context)
+                && !generic_context.has_paramspec(db))
     }
 
     pub(crate) fn next(&self) -> TypeVarNonce {

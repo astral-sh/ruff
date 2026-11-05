@@ -1536,6 +1536,25 @@ def f(*, x: int) -> int:
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
+### Keyword-only parameter after an empty unpacked tuple
+
+`register` accepts no positional arguments after the callback. Passing `register` itself as the
+callback is valid, and the keyword-only argument `enabled` still requires a `bool`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+
+def register[**P](callback: Callable[P, None], *args: *tuple[()], enabled: bool) -> None: ...
+
+register(register, enabled=True)  # ok
+register(register, enabled="wrong")  # error: 20 [invalid-argument-type] "Expected `bool`"
+```
+
 ### Keyword argument, keywords parameter
 
 ```py

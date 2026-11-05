@@ -1347,6 +1347,35 @@ c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 ```
 
+`run_previous` takes one argument, a `C` whose stored callback takes none. Constructing a new `C`
+from `run_previous` preserves that one-argument signature.
+
+```py
+def run_previous(previous: C[[]]) -> int:
+    return previous.f()
+
+reveal_type(C(run_previous).f)  # revealed: (previous: C[()]) -> int
+```
+
+### Passing a class to its own constructor
+
+When `Box` takes itself as the callback, the second argument still determines the class type
+parameter `T`.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Box[T]:
+    @overload
+    def __init__[**P](self, callback: Callable[P, object], value: T) -> None: ...
+    @overload
+    def __init__(self, callback: object, value: T) -> None: ...
+    def __init__(self, callback, value): ...
+
+reveal_type(Box(Box, 1))  # revealed: Box[Literal[1]]
+```
+
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
@@ -1744,6 +1773,44 @@ def forward[**P](function: Callable[P, Any], /, *args: P.args, **kwargs: P.kwarg
 def target(name: str, callback: Callable[[int], Any]): ...
 
 forward(target, callback=lambda value: value)  # error: [missing-argument]
+```
+
+### Selecting a generic callback from a list
+
+The list of callbacks can contain `first` itself. Calling the result with `[fetch]` preserves
+`fetch`'s `key` parameter and `bytes` return type.
+
+```py
+from collections.abc import Callable
+
+def first[**P, R](callbacks: list[Callable[P, R]]) -> Callable[P, R]:
+    return callbacks[0]
+
+def fetch(key: str) -> bytes:
+    return key.encode()
+
+select = first([first])
+reveal_type(select([fetch]))  # revealed: (key: str) -> bytes
+```
+
+### Forwarding arguments to an overloaded callback in a list
+
+`invoke` passes its extra arguments to each callback in the list. In `invoke([invoke], 1)`, the
+inner call would receive `1` where both overloads require a list.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+@overload
+def invoke[**P](callbacks: list[Callable[P, object]], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+@overload
+def invoke(callbacks: list[object], /, flag: None) -> None: ...
+def invoke(callbacks, /, *args, **kwargs):
+    for callback in callbacks:
+        callback(*args, **kwargs)
+
+invoke([invoke], 1)  # error: [no-matching-overload]
 ```
 
 ### Specializing `ParamSpec` with another `ParamSpec`
@@ -2653,7 +2720,19 @@ reveal_type(t1(x=1))  # revealed: str
 reveal_type(t1("a"))  # revealed: Unknown
 # error: [no-matching-overload]
 reveal_type(t1(y=1))  # revealed: Unknown
+```
 
+`Task` can also wrap its own constructor. Calling the wrapped constructor with `returns_str` builds
+a task that returns `str`.
+
+```py
+build_task = Task(Task)
+reveal_type(build_task(returns_str)(1))  # revealed: str
+```
+
+If the callback never returns, calling the task also has type `Never`.
+
+```py
 t2 = Task(never_returns)
 reveal_type(t2)  # revealed: Task[(x: int), Never]
 reveal_type(t2(1))  # revealed: Never
@@ -2767,6 +2846,72 @@ reveal_type(identity("hello"))  # revealed: Literal["hello"]
 
 reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
+```
+
+### Passing a decorator to itself
+
+`identity` returns the function it receives. When it receives itself, the result is still generic
+over the callback's parameters and return type.
+
+```py
+from collections.abc import Callable
+
+def identity[**P, R](callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+reveal_type(identity(identity))  # revealed: [**P, R](callback: (**P) -> R) -> ((**P) -> R)
+```
+
+The decorator can also take extra arguments through `*Ts`. It can take itself as the callback
+without any extra arguments.
+
+```py
+def tag[**P, R, *Ts](callback: Callable[P, R], *tags: *Ts) -> Callable[P, R]:
+    return callback
+
+tag(tag)  # ok
+```
+
+### A decorator with a parameter list fixed by its class
+
+A `Decorator[[int]]` accepts a function that takes one `int`. The decorator itself takes a function
+as its argument, so passing it to itself is an error.
+
+```py
+from collections.abc import Callable
+
+class Decorator[**P]:
+    def __call__[R](self, callback: Callable[P, R]) -> Callable[P, R]:
+        return callback
+
+def check(decorator: Decorator[[int]]):
+    decorator(decorator)  # error: [invalid-argument-type]
+```
+
+### A nested callback in a recursive call
+
+`wrap` uses `P` and `R` from the enclosing call to `decorate`. When `decorate` calls itself with
+`wrap` as the callback, the inner call infers its own `P` and `R`.
+
+```py
+from collections.abc import Callable
+
+def decorate[**P, R](callback: Callable[P, R], repeat: bool = False) -> Callable[P, R]:
+    def wrap(other: Callable[P, R]) -> Callable[P, R]:
+        return other
+    if repeat:
+        return decorate(wrap)(callback)
+    return callback
+```
+
+After the recursive call, the decorated function accepts the same named argument and returns the
+same type as `size`.
+
+```py
+def size(text: str) -> int:
+    return len(text)
+
+reveal_type(decorate(size, repeat=True))  # revealed: (text: str) -> int
 ```
 
 ### Chained decorators with generic functions
@@ -3118,4 +3263,25 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     # error: [missing-argument]
     # error: [missing-argument]
     box.invoke(callback, 1)
+```
+
+## Passing a union of receivers to a callback
+
+`pipe` passes its receiver to the callback. If the receiver can be either `Ok` or `Err`, a lambda
+that only handles `Ok` is too narrow.
+
+```py
+from collections.abc import Callable
+from typing import Concatenate, Self
+
+class Result:
+    def pipe[**P](self, callback: Callable[Concatenate[Self, P], None], *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(self, *args, **kwargs)
+
+class Ok(Result): ...
+class Err(Result): ...
+
+def handle_ok(result: Ok) -> None: ...
+def check(result: Ok | Err):
+    result.pipe(lambda value: handle_ok(value))  # error: [invalid-argument-type]
 ```

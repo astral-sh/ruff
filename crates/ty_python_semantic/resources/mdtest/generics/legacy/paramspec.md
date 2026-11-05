@@ -1899,6 +1899,52 @@ def identity(value: T) -> T:
 forward(identity, b"text")  # ok
 ```
 
+### Passing a decorator to itself
+
+A decorator defined with `ParamSpec` and `TypeVar` can take itself as its argument.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def identity(callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+identity(identity)  # ok
+```
+
+### Registering a callback on another exit stack
+
+An `ExitStack` can register another stack's `callback` method. When `inner` closes, it registers
+`cleanup` on `outer`. The outer stack then runs `cleanup` when it closes.
+
+```py
+from contextlib import ExitStack
+
+def cleanup() -> None: ...
+
+inner = ExitStack()
+outer = ExitStack()
+inner.callback(outer.callback, cleanup)  # ok
+```
+
+The outer stack still needs a function to register.
+
+```py
+inner.callback(outer.callback)  # error: [missing-argument]
+```
+
+Wrapping the outer method in `partial` preserves its parameters.
+
+```py
+from functools import partial
+
+inner.callback(partial(outer.callback), cleanup)  # ok
+```
+
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor

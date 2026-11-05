@@ -285,15 +285,6 @@ enum CallErrorPriority {
     BindingError = 2,
 }
 
-fn generic_context_has_paramspec<'db>(
-    db: &'db dyn Db,
-    generic_context: GenericContext<'db>,
-) -> bool {
-    generic_context
-        .variables(db)
-        .any(|typevar| typevar.is_paramspec(db))
-}
-
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
@@ -3652,17 +3643,6 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .all(|overload| overload.signature.generic_context.is_none())
         {
-            return;
-        }
-
-        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
-        // quantify away `P` before call specialization can use it.
-        if self.overloads.iter().any(|overload| {
-            overload
-                .signature
-                .generic_context
-                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
-        }) {
             return;
         }
 
@@ -7424,7 +7404,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut expected_ty = declared_type;
         if let Some(specialization) = self.merged_specialization() {
             if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(db, specialization);
+                argument_type = argument_type.apply_argument_specialization(db, specialization);
             }
             expected_ty = expected_ty.apply_specialization(db, specialization);
         }

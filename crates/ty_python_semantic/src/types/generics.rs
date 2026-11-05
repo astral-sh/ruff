@@ -568,6 +568,11 @@ impl<'db> GenericContext<'db> {
         };
         self.variables_inner(db).contains_key(&bound_typevar)
     }
+    /// Returns whether this context binds a parameter specification.
+    pub(crate) fn has_paramspec(self, db: &'db dyn Db) -> bool {
+        self.variables(db).any(|typevar| typevar.is_paramspec(db))
+    }
+
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
     ///
