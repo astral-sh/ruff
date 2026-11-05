@@ -145,6 +145,7 @@ use crate::types::{
     is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
+use ty_python_core::ast_ids::PlaceUse;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
@@ -224,6 +225,26 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
+
+enum SourcePlace<'db> {
+    Indexed(PlaceExprRef<'db>, PlaceUse),
+    Syntax(PlaceExpr),
+}
+
+impl SourcePlace<'_> {
+    fn place(&self) -> PlaceExprRef<'_> {
+        match self {
+            Self::Indexed(place, _) => *place,
+            Self::Syntax(place) => place.into(),
+        }
+    }
+    fn operand(&self) -> Option<PlaceUse> {
+        match self {
+            Self::Indexed(_, use_) => Some(*use_),
+            Self::Syntax(_) => None,
+        }
+    }
+}
 
 /// Builder to infer all types in a region.
 ///
@@ -10462,6 +10483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn narrow_place_with_applicable_constraints(
         &self,
         expr: PlaceExprRef,
+        operand: Option<PlaceUse>,
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
@@ -10470,7 +10492,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
-            let place = place_table.place_id(expr).unwrap();
+            let place = operand
+                .filter(|op| op.scope == *enclosing_scope_file_id)
+                .map_or_else(|| place_table.place_id(expr).unwrap(), |op| op.place);
 
             match use_def.applicable_constraints(
                 *constraint_key,
@@ -10823,6 +10847,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
+    /// Retrieve the lexical operand produced for this expression in the current scope.
+    fn indexed_source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+        if !self.in_string_annotation()
+            && let Some(operand) = self.index.expression_place_use(expr)
+            && self.index.scope_id(operand.scope) == self.scope()
+        {
+            let place = self.index.place_table(operand.scope).place(operand.place);
+            Some(SourcePlace::Indexed(place, operand))
+        } else {
+            None
+        }
+    }
+
+    /// Separately parsed annotations and synthetic references resolve from their syntax.
+    fn source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+        self.indexed_source_place(expr)
+            .or_else(|| PlaceExpr::try_from_expr(expr).map(SourcePlace::Syntax))
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         self.infer_name_load_with_definition(name_node).0
     }
@@ -10833,9 +10876,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         name_node: &ast::ExprName,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
-        let place_expr = PlaceExpr::from_expr_name(name_node);
+        let expr = ast::ExprRef::Name(name_node);
+        let place_expr = self
+            .indexed_source_place(expr)
+            .unwrap_or_else(|| SourcePlace::Syntax(PlaceExpr::from_expr_name(name_node)));
 
-        let (resolved, _) = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(&place_expr, expr);
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,
@@ -10861,7 +10907,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
         &self,
-        place_expr: &PlaceExpr,
+        source_place: &SourcePlace,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
@@ -10872,12 +10918,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let mut procedure = PlaceLoadResolutionProcedure::new(
+        let mut procedure = PlaceLoadResolutionProcedure::from_source(
             self.db(),
             self.index,
+            self.program_file(),
             self.scope(),
-            place_expr,
+            source_place.place(),
             mode,
+            source_place.operand(),
         );
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
@@ -10901,6 +10949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     place = place.or_fall_back_to(self.db(), env, || {
                         self.infer_place_load_source(
                             procedure.place_expr(),
+                            source_place.operand(),
                             source,
                             narrowing_constraints,
                         )
@@ -10942,6 +10991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_place_load_source(
         &self,
         place_expr: PlaceExprRef,
+        operand: Option<PlaceUse>,
         source: PlaceLoadSource<'db>,
         narrowing_constraints: &[(FileScopeId, ConstraintKey)],
     ) -> PlaceAndQualifiers<'db> {
@@ -11009,7 +11059,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         } else {
             place.map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
+                self.narrow_place_with_applicable_constraints(
+                    place_expr,
+                    operand,
+                    ty,
+                    narrowing_constraints,
+                )
             })
         }
     }
@@ -11162,23 +11217,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn narrow_expr_with_applicable_constraints<'r>(
-        &mut self,
-        target: impl Into<ast::ExprRef<'r>>,
-        target_ty: Type<'db>,
+    fn narrow_source_place(
+        &self,
+        place: Option<&SourcePlace>,
+        ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
-        let target = target.into();
-
-        if let Some(place_expr) = PlaceExpr::try_from_expr(target) {
+        place.map_or(ty, |p| {
             self.narrow_place_with_applicable_constraints(
-                PlaceExprRef::from(&place_expr),
-                target_ty,
+                p.place(),
+                p.operand(),
+                ty,
                 constraint_keys,
             )
-        } else {
-            target_ty
-        }
+        })
     }
 
     /// Infer an attribute load, returning its recovery type if lookup fails.
@@ -11261,9 +11313,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
-        if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
+        let place_expr = self.source_place(ast::ExprRef::Attribute(attribute));
+        if let Some(place_expr) = &place_expr {
             let (resolved, keys) =
-                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
+                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
             if let Place::Defined(
                 place @ DefinedPlace {
@@ -11289,9 +11342,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 error.fallback_member(db)
             });
-        let fallback_place = member_lookup.member(db).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+        let fallback_place = member_lookup
+            .member(db)
+            .map_type(|ty| self.narrow_source_place(place_expr.as_ref(), ty, &constraint_keys));
 
         // An augmented assignment also loads its target, but its write validation reports this
         // error. Avoid reporting the same invalid access twice.

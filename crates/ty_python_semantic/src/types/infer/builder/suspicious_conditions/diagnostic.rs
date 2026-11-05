@@ -1554,7 +1554,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         while let Some(PlaceLoadResolutionStep::Source(source)) = procedure.next() {
             let constraints = procedure.narrowing_constraints_for(&source);
             place = place.or_fall_back_to(db, env, || {
-                self.infer_place_load_source(procedure.place_expr(), source, constraints)
+                self.infer_place_load_source(procedure.place_expr(), None, source, constraints)
             });
             if place.place.is_definitely_bound() {
                 break;

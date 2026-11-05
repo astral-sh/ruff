@@ -216,6 +216,11 @@ impl ParsedModuleRef {
         &self.module
     }
 
+    /// Number of indexed nodes in the root AST.
+    pub fn node_count(&self) -> usize {
+        self.indexed.node_count()
+    }
+
     /// Returns a reference to the AST node at the given index.
     pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
         self.indexed.get_by_index(index)
@@ -527,12 +532,10 @@ mod indexed {
             }
         }
 
-        #[cfg(test)]
         fn len(&self) -> usize {
-            self.chunks
-                .iter()
-                .map(|chunk| usize::from(chunk.entry_count))
-                .sum()
+            self.chunks.split_last().map_or(0, |(last, full)| {
+                full.len() * Self::CHUNK_LEN + usize::from(last.entry_count)
+            })
         }
 
         fn get(&self, index: usize) -> (usize, RootNodeKind) {
@@ -634,6 +637,10 @@ mod indexed {
                 .index = index;
 
             inner
+        }
+
+        pub(super) fn node_count(&self) -> usize {
+            self.index.len()
         }
 
         /// Returns the node at the given index.

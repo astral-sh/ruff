@@ -83,7 +83,7 @@
 
 use ruff_python_ast::{self as ast, name::Name};
 use smallvec::SmallVec;
-use ty_python_core::ast_ids::{HasScopedUseId, ScopedUseId};
+use ty_python_core::ast_ids::{HasScopedUseId, PlaceUse, ScopedUseId};
 use ty_python_core::definition::Definition;
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
@@ -131,7 +131,7 @@ pub(crate) enum PlaceLoadMode<'ast> {
 /// Exposes an iterator over the steps that resolve the value for a place load.
 pub(crate) struct PlaceLoadResolutionProcedure<'db, 'ast> {
     /// The place expression whose loaded value is being resolved.
-    place_expr: &'ast PlaceExpr,
+    place_expr: PlaceExprRef<'ast>,
     /// Read-only context shared by every source-selection phase.
     context: PlaceLoadResolutionContext<'db, 'ast>,
     /// The next node to visit in the resolution graph, or `None` after reaching a leaf.
@@ -249,9 +249,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                         PlaceLoadSourceRole::Ordinary,
                         Some((
                             enclosing_scope,
-                            ConstraintKey::NestedScope(
-                                self.context.scope.file_scope_id(self.context.db),
-                            ),
+                            ConstraintKey::NestedScope(self.context.scope),
                         )),
                     );
                     return Some(PlaceLoadResolutionStep::Source(source));
@@ -313,15 +311,39 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         place_expr: &'ast PlaceExpr,
         mode: PlaceLoadMode<'ast>,
     ) -> Self {
+        Self::from_source(
+            db,
+            index,
+            scope.program_file(db),
+            scope,
+            place_expr.into(),
+            mode,
+            None,
+        )
+    }
+
+    /// Resolves an indexed use in the scope that owns its place and use IDs.
+    /// A load resolved from syntax uses `fallback_scope`.
+    pub(crate) fn from_source(
+        db: &'db dyn Db,
+        index: &'db SemanticIndex<'db>,
+        file: ProgramFile<'db>,
+        fallback_scope: ScopeId<'db>,
+        place_expr: PlaceExprRef<'ast>,
+        mode: PlaceLoadMode<'ast>,
+        local_operand: Option<PlaceUse>,
+    ) -> Self {
+        let scope =
+            local_operand.map_or_else(|| fallback_scope.file_scope_id(db), |operand| operand.scope);
         let context = PlaceLoadResolutionContext {
             db,
             index,
             scope,
-            file: scope.program_file(db),
+            file,
             mode,
+            local_operand,
         };
-        let crosses_scope_declaration =
-            context.symbol_has_scope_declaration(PlaceExprRef::from(place_expr));
+        let crosses_scope_declaration = context.symbol_has_scope_declaration(place_expr);
         Self {
             context,
             place_expr,
@@ -332,15 +354,13 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
     }
 
     fn decide_resolution_path(&mut self) -> PlaceLoadResolutionNode<'db> {
-        let db = self.context.db;
-        let scope = self.context.scope;
-        let file_scope = scope.file_scope_id(db);
+        let file_scope = self.context.scope;
         let place_table = self.context.index.place_table(file_scope);
 
         let mut symbol_is_local = false;
-        let place_expr = PlaceExprRef::from(self.place_expr);
+        let place_expr = self.place_expr;
         if let Some(symbol) = place_expr.as_symbol()
-            && let Some(symbol_id) = place_table.symbol_id(symbol.name())
+            && let Some(symbol_id) = self.context.local_symbol(symbol.name())
         {
             let indexed_symbol = place_table.symbol(symbol_id);
             symbol_is_local = indexed_symbol.is_local();
@@ -358,7 +378,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         }
 
         if symbol_is_local {
-            return if scope.node(db).scope_kind().is_module() {
+            return if self.context.index.scope(file_scope).kind().is_module() {
                 PlaceLoadResolutionNode::ImplicitGlobalSource
             } else {
                 PlaceLoadResolutionNode::Failure(PlaceLoadFailure::UnboundLocal)
@@ -378,9 +398,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
     fn resolve_enclosing_scopes(
         &mut self,
     ) -> (PlaceLoadResolutionNode<'db>, Option<PlaceLoadSource<'db>>) {
-        let db = self.context.db;
-        let scope = self.context.scope;
-        let file_scope = scope.file_scope_id(db);
+        let file_scope = self.context.scope;
 
         for AncestorScope {
             id: enclosing_file_scope,
@@ -398,7 +416,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             }
 
             let enclosing_place_table = self.context.index.place_table(enclosing_file_scope);
-            let place_expr = PlaceExprRef::from(self.place_expr);
+            let place_expr = self.place_expr;
             let enclosing_place_id = enclosing_place_table.place_id(place_expr);
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
             // A `global` declaration forwards the place to the module instead of making this
@@ -424,7 +442,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                             enclosing_file_scope,
                             ConstraintKey::NarrowingConstraint(constraint),
                         );
-                        if scope.scope(db).is_eager() {
+                        if self.context.index.scope(file_scope).is_eager() {
                             eagerly_undefined = true;
                         }
                     }
@@ -504,7 +522,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 (!eagerly_undefined).then(|| {
                     self.constraints.source(
                         PlaceLoadSourceKind::DefinitionsFromOwningScope {
-                            scope: enclosing_file_scope.to_scope_id(db, self.context.file),
+                            scope: self.context.index.scope_id(enclosing_file_scope),
                             id: enclosing_place_id,
                         },
                         PlaceLoadSourceRole::Ordinary,
@@ -522,7 +540,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
     /// An eager nested scope uses the global snapshot captured when it began, so a class body
     /// cannot see a module binding created only after that body finishes.
     fn resolve_global(&mut self, role: PlaceLoadSourceRole) -> Option<PlaceLoadSource<'db>> {
-        let current_scope = self.context.scope.file_scope_id(self.context.db);
+        let current_scope = self.context.scope;
         if current_scope.is_global() {
             return None;
         }
@@ -530,7 +548,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         if self.context.uses_enclosing_snapshots() {
             match self.context.index.enclosing_snapshot(
                 FileScopeId::global(),
-                PlaceExprRef::from(self.place_expr),
+                self.place_expr,
                 current_scope,
             ) {
                 EnclosingSnapshotResult::FoundConstraint(constraint) => {
@@ -586,7 +604,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
     }
 
     pub(crate) fn place_expr(&self) -> PlaceExprRef<'_> {
-        PlaceExprRef::from(self.place_expr)
+        self.place_expr
     }
 
     /// Returns the loaded symbol's name, or `None` when the loaded place is a member.
@@ -862,19 +880,30 @@ pub(crate) enum PlaceExprPrefixLoad {
 struct PlaceLoadResolutionContext<'db, 'ast> {
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
-    scope: ScopeId<'db>,
+    scope: FileScopeId,
     file: ProgramFile<'db>,
     mode: PlaceLoadMode<'ast>,
+    local_operand: Option<PlaceUse>,
 }
 
 impl<'db> PlaceLoadResolutionContext<'db, '_> {
+    fn local_symbol(self, name: &str) -> Option<ScopedSymbolId> {
+        if let Some(PlaceUse {
+            place: ScopedPlaceId::Symbol(id),
+            ..
+        }) = self.local_operand
+        {
+            return Some(id);
+        }
+        self.index.place_table(self.scope).symbol_id(name)
+    }
+
     fn symbol_has_scope_declaration(self, place_expr: PlaceExprRef) -> bool {
         let Some(symbol) = place_expr.as_symbol() else {
             return false;
         };
-        let scope = self.scope.file_scope_id(self.db);
-        let table = self.index.place_table(scope);
-        let Some(symbol_id) = table.symbol_id(symbol.name()) else {
+        let table = self.index.place_table(self.scope);
+        let Some(symbol_id) = self.local_symbol(symbol.name()) else {
             return false;
         };
         let symbol = table.symbol(symbol_id);
@@ -882,7 +911,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
     }
 
     fn is_class_body_scope(self) -> bool {
-        self.scope.node(self.db).scope_kind().is_class()
+        self.index.scope(self.scope).kind().is_class()
     }
 
     fn uses_enclosing_snapshots(self) -> bool {
@@ -899,7 +928,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         PlaceLoadSourceKind<'db>,
         Option<(FileScopeId, ConstraintKey)>,
     )> {
-        let scope = self.scope.file_scope_id(self.db);
+        let scope = self.scope;
         let table = self.index.place_table(scope);
         let use_def = self.index.use_def_map(scope);
 
@@ -912,7 +941,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     return None;
                 }
 
-                let use_id = expr_ref.scoped_use_id(self.db, self.file);
+                let use_id = self.local_operand.map_or_else(
+                    || expr_ref.scoped_use_id(self.db, self.file),
+                    |operand| operand.use_id,
+                );
                 Some((
                     PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),
@@ -923,8 +955,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 Some((scope, ConstraintKey::Snapshot(snapshot))),
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
-                let source = table
-                    .place_id(place_expr)
+                let source = self
+                    .local_operand
+                    .map(|op| op.place)
+                    .or_else(|| table.place_id(place_expr))
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
@@ -940,10 +974,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         self,
         place_expr: PlaceExprRef,
     ) -> Option<PlaceExprPrefixLoads<'db>> {
-        let table = self.index.place_table(self.scope.file_scope_id(self.db));
+        let table = self.index.place_table(self.scope);
 
         PlaceExprPrefixLoads::from_iter(
-            self.scope,
+            self.index.scope_id(self.scope),
             table
                 .parents(place_expr)
                 .filter_map(|prefix_id| match self.mode {
@@ -990,12 +1024,11 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
     }
 
     fn skips_non_global_scopes(self, symbol: ScopedSymbolId) -> bool {
-        let scope = self.scope.file_scope_id(self.db);
-        !scope.is_global() && self.index.symbol_is_global_in_scope(symbol, scope)
+        !self.scope.is_global() && self.index.symbol_is_global_in_scope(symbol, self.scope)
     }
 
     fn dunder_class_cell_definition(self) -> Option<Definition<'db>> {
-        let current_scope = self.scope.file_scope_id(self.db);
+        let current_scope = self.scope;
         if let Some(definition) = self.index.class_definition_of_method(current_scope) {
             return Some(definition);
         }

@@ -291,9 +291,6 @@ pub struct SemanticIndex<'db> {
     /// List of all scopes in this file.
     scopes: FrozenIndexVec<FileScopeId, Scope>,
 
-    /// Map expressions to their corresponding scope.
-    scopes_by_expression: ExpressionsScopeMap,
-
     /// Map from a node creating a definition to its definition.
     definitions_by_node: DefinitionsByNode<'db>,
 
@@ -324,7 +321,7 @@ pub struct SemanticIndex<'db> {
     /// Use-def map for each scope in this file.
     use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
-    /// Lookup table to map between node ids and ast nodes.
+    /// Lexical scopes and scope-local use IDs recorded at source occurrences.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
@@ -350,7 +347,7 @@ pub struct SemanticIndex<'db> {
 
     /// Node indices of syntactic annotation roots, sorted in source order. Annotations cannot
     /// contain other syntactic annotations, so their ranges do not overlap. Storing only indices
-    /// avoids duplicating ranges and scopes already available from the AST and expression scope map.
+    /// avoids duplicating ranges and scopes already available from the AST and the recorded expression scopes.
     annotations: Box<[NodeIndex]>,
 
     /// Narrowing alias metadata for predicate leaf names.
@@ -372,6 +369,24 @@ impl<'db> SemanticIndex<'db> {
         expression: ast::ExprRef<'_>,
     ) -> Option<ast_ids::ScopedUseId> {
         self.ast_ids.try_use_id(expression)
+    }
+
+    /// Returns the [`PlaceUse`](ast_ids::PlaceUse) for an expression that reads an indexed place.
+    pub fn expression_place_use(&self, expr: ast::ExprRef<'_>) -> Option<ast_ids::PlaceUse> {
+        let (scope, use_id) = self.ast_ids.scope_and_use(expr)?;
+        let ordinal = self.use_def_map(scope).place_ordinal_at_use(use_id)?;
+        let place = match expr {
+            ast::ExprRef::Name(_) => ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(ordinal)),
+            ast::ExprRef::Attribute(_) | ast::ExprRef::Subscript(_) => {
+                ScopedPlaceId::Member(member::ScopedMemberId::from_u32(ordinal))
+            }
+            _ => return None,
+        };
+        Some(ast_ids::PlaceUse {
+            scope,
+            use_id,
+            place,
+        })
     }
 
     /// Returns the place table for a specific scope.
@@ -434,7 +449,7 @@ impl<'db> SemanticIndex<'db> {
     where
         E: HasTrackedScope,
     {
-        self.scopes_by_expression.try_get(expression)
+        self.ast_ids.expression_scope(expression)
     }
 
     /// Returns the scope enclosing the syntactic annotation containing `expression`, if any.
@@ -482,6 +497,11 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn scope(&self, id: FileScopeId) -> &Scope {
         &self.scopes[id]
+    }
+
+    /// Returns the tracked scope for an ID assigned by this index.
+    pub fn scope_id(&self, id: FileScopeId) -> ScopeId<'db> {
+        self.scope_ids_by_scope[id]
     }
 
     pub fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
@@ -967,38 +987,6 @@ impl<'a> Iterator for ChildrenIter<'a> {
 
 impl FusedIterator for ChildrenIter<'_> {}
 
-/// Interval map that maps a range of expression node ids to their corresponding scopes.
-///
-/// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
-/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
-struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
-
-impl ExpressionsScopeMap {
-    fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
-    where
-        E: HasTrackedScope,
-    {
-        let node_index = node.node_index().load();
-
-        let entry = self
-            .0
-            .binary_search_by_key(&node_index, |(range, _)| *range.start());
-
-        let index = match entry {
-            Ok(index) => index,
-            Err(index) => index.checked_sub(1)?,
-        };
-
-        let (range, scope) = &self.0[index];
-        if range.contains(&node_index) {
-            Some(*scope)
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
@@ -1185,10 +1173,7 @@ impl HasTrackedScope for ast::Expr {}
 impl HasTrackedScope for ast::ExprRef<'_> {}
 impl HasTrackedScope for &ast::ExprRef<'_> {}
 
-// We never explicitly register the scope of an `Identifier`.
-// However, `ExpressionsScopeMap` stores the text ranges of each scope.
-// That allows us to look up the identifier's scope for as long as it's
-// inside an expression (because the ranges overlap).
+// An identifier between expressions in the same scope inherits that scope.
 impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
