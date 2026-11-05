@@ -56,7 +56,6 @@ pytest.raises(ExceptionGroup)  # error: [pytest-raises-exception-group]
 pytest.raises(expected_exception=BaseExceptionGroup)  # error: [pytest-raises-exception-group]
 pytest.raises((ValueError, ExceptionGroup))  # error: [pytest-raises-exception-group]
 pytest.raises((ExceptionGroup, BaseExceptionGroup))  # error: [pytest-raises-exception-group]
-pytest.raises((ValueError, (TypeError, BaseExceptionGroup)))  # error: [pytest-raises-exception-group]
 pytest.raises(expected_exception=(ExceptionGroup, ValueError))  # error: [pytest-raises-exception-group]
 pytest.raises(ExceptionGroup[Exception])  # error: [pytest-raises-exception-group]
 pytest.raises(expected_exception=ExceptionGroup[Exception])  # error: [pytest-raises-exception-group]
@@ -181,6 +180,7 @@ help: Use `pytest.RaisesGroup` to specify the expected exceptions
 ```py
 pytest.mark.xfail(raises=BaseExceptionGroup)  # error: [pytest-raises-exception-group]
 pytest.mark.xfail(raises=(ValueError, ExceptionGroup))  # error: [pytest-raises-exception-group]
+pytest.mark.xfail(raises=(ValueError, (TypeError, ExceptionGroup)))  # error: [pytest-raises-exception-group]
 pytest.mark.xfail(True, raises=ExceptionGroup[Exception])  # error: [pytest-raises-exception-group]
 pytest.param(1, marks=pytest.mark.xfail(raises=ExceptionGroup))  # error: [pytest-raises-exception-group]
 
