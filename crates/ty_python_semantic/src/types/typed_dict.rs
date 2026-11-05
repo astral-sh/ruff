@@ -1767,9 +1767,51 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     }
 }
 
-/// A definite key has a source node. A gradual unpack such as `**fields` where
-/// `fields: Any` can satisfy a required field, but cannot establish that a later read is safe.
-pub(super) type ConstructorKeys<'ast> = BTreeMap<Name, Option<AnyNodeRef<'ast>>>;
+/// Keys supplied by a `TypedDict` constructor.
+#[derive(Default)]
+pub(super) struct ConstructorKeys<'ast> {
+    /// `Movie(year=1979)` supplies `year`. Keep its source to highlight duplicate keywords.
+    pub(super) known: BTreeMap<Name, AnyNodeRef<'ast>>,
+    /// `Movie(**fields)` with `fields: Any` can satisfy a required field even when its keys are unknown.
+    has_gradual_unpack: bool,
+}
+
+impl<'ast> ConstructorKeys<'ast> {
+    /// Keys that can override an entry in a positional mapping, as in `Movie(source, year=1979)`.
+    pub(super) fn overriding_keys<'db>(
+        &self,
+        db: &'db dyn Db,
+        typed_dict: TypedDictType<'db>,
+    ) -> OrderSet<Name> {
+        let mut names: OrderSet<_> = self.known.keys().cloned().collect();
+        if self.has_gradual_unpack {
+            names.extend(typed_dict.items(db).keys().cloned());
+        }
+        names
+    }
+
+    /// Reports a duplicate when two keyword arguments supply the same key, including through `**`.
+    fn add_keyword<'db>(
+        &mut self,
+        context: &InferContext<'db, '_>,
+        typed_dict: TypedDictType<'db>,
+        name: Name,
+        node: AnyNodeRef<'ast>,
+    ) {
+        match self.known.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(node);
+            }
+            Entry::Occupied(entry) => report_duplicate_typed_dict_constructor_key(
+                context,
+                typed_dict,
+                entry.key(),
+                node,
+                *entry.get(),
+            ),
+        }
+    }
+}
 
 /// Reports each required field that the constructor arguments cannot supply.
 fn validate_typed_dict_required_keys<'db, 'ast>(
@@ -1778,9 +1820,13 @@ fn validate_typed_dict_required_keys<'db, 'ast>(
     provided_keys: &ConstructorKeys<'ast>,
     error_node: AnyNodeRef<'ast>,
 ) -> bool {
+    if provided_keys.has_gradual_unpack {
+        return true;
+    }
+
     let mut valid = true;
     for (name, field) in typed_dict.items(context.db()) {
-        if field.is_required() && !provided_keys.contains_key(name) {
+        if field.is_required() && !provided_keys.known.contains_key(name) {
             report_missing_typed_dict_key(
                 context,
                 error_node,
@@ -2453,34 +2499,6 @@ fn report_duplicate_typed_dict_constructor_key<'db, 'ast>(
     );
 }
 
-fn record_guaranteed_typed_dict_constructor_key<'db, 'ast>(
-    context: &InferContext<'db, '_>,
-    typed_dict: TypedDictType<'db>,
-    guaranteed_keys: &mut ConstructorKeys<'ast>,
-    key: Name,
-    duplicate_node: AnyNodeRef<'ast>,
-) {
-    match guaranteed_keys.entry(key) {
-        Entry::Vacant(entry) => {
-            entry.insert(Some(duplicate_node));
-        }
-        Entry::Occupied(mut entry) => match *entry.get() {
-            Some(original_node) => {
-                report_duplicate_typed_dict_constructor_key(
-                    context,
-                    typed_dict,
-                    entry.key().as_str(),
-                    duplicate_node,
-                    original_node,
-                );
-            }
-            None => {
-                entry.insert(Some(duplicate_node));
-            }
-        },
-    }
-}
-
 /// Validates the positional mapping and required fields after checking the keyword arguments.
 /// Keeps the sources of definite keys so later reads can distinguish them from gradual unpacks.
 pub(super) fn validate_typed_dict_constructor<'a, 'db, 'ast>(
@@ -2495,7 +2513,7 @@ pub(super) fn validate_typed_dict_constructor<'a, 'db, 'ast>(
     let env = context.program_environment();
 
     if let Some(arg) = arguments.args.first() {
-        let mut overriding_keys = keys.keys().cloned().collect();
+        let mut overriding_keys = keys.overriding_keys(db, typed_dict);
         if let ast::Expr::Dict(dict) = arg {
             // Keywords and later dictionary entries can overwrite values, but cannot remove keys.
             validate_merged_dict_literal(
@@ -2531,7 +2549,7 @@ pub(super) fn validate_typed_dict_constructor<'a, 'db, 'ast>(
                         &overriding_keys,
                     );
                     for name in present {
-                        keys.entry(name).or_default().get_or_insert(node);
+                        keys.known.entry(name).or_insert(node);
                     }
                 }
                 unpacked => {
@@ -2551,9 +2569,11 @@ pub(super) fn validate_typed_dict_constructor<'a, 'db, 'ast>(
                         ));
                     }
                     if let Some(unpacked) = unpacked {
-                        keys.extend(unpacked.keys.into_iter().filter_map(|(name, field)| {
-                            field.is_required.then_some((name, Some(node)))
-                        }));
+                        keys.known.extend(
+                            unpacked.keys.into_iter().filter_map(|(name, field)| {
+                                field.is_required.then_some((name, node))
+                            }),
+                        );
                     }
                     return keys;
                 }
@@ -2573,7 +2593,7 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
     typed_dict_node: AnyNodeRef<'ast>,
     argument: impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
 ) -> ConstructorKeys<'ast> {
-    let mut guaranteed_keys = BTreeMap::new();
+    let mut keys = ConstructorKeys::default();
 
     // Validate that each key is assigned a type that is compatible with the key's value type
     for keyword in &arguments.keywords {
@@ -2581,13 +2601,7 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
 
         if let Some(arg_name) = &keyword.arg {
             // Explicit keyword argument: e.g., `name="Alice"`
-            record_guaranteed_typed_dict_constructor_key(
-                context,
-                typed_dict,
-                &mut guaranteed_keys,
-                arg_name.id.clone(),
-                keyword_node,
-            );
+            keys.add_keyword(context, typed_dict, arg_name.id.clone(), keyword_node);
 
             let value_ty = argument(&keyword.value).ty;
             TypedDictKeyAssignment {
@@ -2610,7 +2624,7 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
             // explicitly providing those keys).
             // Keep one unpack local while applying merged-dict overwrite semantics, then compare
             // the resulting keys against neighboring constructor keywords.
-            let mut unpacked_guaranteed_keys = BTreeMap::new();
+            let mut unpacked = ConstructorKeys::default();
             let mut shadowed_keys = OrderSet::new();
             validate_merged_unpacked_keyword_argument(
                 context,
@@ -2621,28 +2635,19 @@ pub(super) fn validate_typed_dict_constructor_keywords<'a, 'db, 'ast>(
                     key: keyword_node,
                     value: (&keyword.value).into(),
                 },
-                &mut unpacked_guaranteed_keys,
+                &mut unpacked,
                 &mut shadowed_keys,
                 &argument,
             );
 
-            for (key_name, key_node) in unpacked_guaranteed_keys {
-                if let Some(key_node) = key_node {
-                    record_guaranteed_typed_dict_constructor_key(
-                        context,
-                        typed_dict,
-                        &mut guaranteed_keys,
-                        key_name,
-                        key_node,
-                    );
-                } else {
-                    guaranteed_keys.entry(key_name).or_insert(None);
-                }
+            keys.has_gradual_unpack |= unpacked.has_gradual_unpack;
+            for (name, node) in unpacked.known {
+                keys.add_keyword(context, typed_dict, name, node);
             }
         }
     }
 
-    guaranteed_keys
+    keys
 }
 
 fn validate_merged_dict_literal<'a, 'db, 'ast>(
@@ -2650,7 +2655,7 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &'ast ast::ExprDict,
     nodes: TypedDictAssignmentNodes<'ast>,
-    guaranteed_keys: &mut ConstructorKeys<'ast>,
+    keys: &mut ConstructorKeys<'ast>,
     shadowed_keys: &mut OrderSet<Name>,
     argument: &impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
 ) -> bool {
@@ -2721,10 +2726,9 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
                 }
                 .validate();
             }
-            guaranteed_keys
+            keys.known
                 .entry(key.clone())
-                .or_default()
-                .get_or_insert(AnyNodeRef::from(key_expr));
+                .or_insert(AnyNodeRef::from(key_expr));
             shadowed_keys.insert(key);
         } else {
             valid &= validate_merged_unpacked_keyword_argument(
@@ -2736,7 +2740,7 @@ fn validate_merged_dict_literal<'a, 'db, 'ast>(
                     key: (&item.value).into(),
                     value: (&item.value).into(),
                 },
-                guaranteed_keys,
+                keys,
                 shadowed_keys,
                 argument,
             );
@@ -2753,7 +2757,7 @@ fn validate_merged_unpacked_keyword_argument<'a, 'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     expr: &'ast ast::Expr,
     nodes: TypedDictAssignmentNodes<'ast>,
-    guaranteed_keys: &mut ConstructorKeys<'ast>,
+    keys: &mut ConstructorKeys<'ast>,
     shadowed_keys: &mut OrderSet<Name>,
     argument: &impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
 ) -> bool {
@@ -2767,20 +2771,16 @@ fn validate_merged_unpacked_keyword_argument<'a, 'db, 'ast>(
             typed_dict,
             dict_expr,
             nodes,
-            guaranteed_keys,
+            keys,
             shadowed_keys,
             argument,
         );
     }
 
-    // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
-    // all target keys as provided.
     let source = argument(expr);
     if unpacked_keyword_is_gradual(db, source.ty) {
+        keys.has_gradual_unpack = true;
         shadowed_keys.extend(items.keys().cloned());
-        for key_name in items.keys() {
-            guaranteed_keys.entry(key_name.clone()).or_insert(None);
-        }
         return true;
     }
 
@@ -2803,10 +2803,7 @@ fn validate_merged_unpacked_keyword_argument<'a, 'db, 'ast>(
         );
 
         for name in present_keys {
-            guaranteed_keys
-                .entry(name.clone())
-                .or_default()
-                .get_or_insert(nodes.key);
+            keys.known.entry(name.clone()).or_insert(nodes.key);
             shadowed_keys.insert(name);
         }
 
@@ -2848,7 +2845,7 @@ pub(super) fn validate_typed_dict_dict_literal<'a, 'db, 'ast>(
     typed_dict_node: AnyNodeRef<'ast>,
     argument: impl Fn(&ast::Expr) -> TypedDictArgument<'a, 'db>,
 ) -> (bool, ConstructorKeys<'ast>) {
-    let mut provided_keys = BTreeMap::new();
+    let mut provided_keys = ConstructorKeys::default();
     let mut shadowed_keys = OrderSet::new();
 
     let mut valid = validate_merged_dict_literal(

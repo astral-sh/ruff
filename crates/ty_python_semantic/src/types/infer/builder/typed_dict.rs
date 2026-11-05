@@ -451,18 +451,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         typed_dict: TypedDictType<'db>,
         call: &ast::ExprCall,
-        mut keys: ConstructorKeys<'_>,
+        keys: ConstructorKeys<'_>,
     ) {
         let db = self.db();
-        keys.retain(|name, source| {
-            source.is_some()
-                && typed_dict
-                    .item(db, name)
-                    .is_some_and(|field| !field.is_required())
+        let mut known = keys.known;
+        known.retain(|name, _| {
+            typed_dict
+                .item(db, name)
+                .is_some_and(|field| !field.is_required())
         });
-        if !keys.is_empty() {
+        if !known.is_empty() {
             self.typed_dict_constructor_keys
-                .insert(ExpressionNodeKey::from(call), keys.into_keys().collect());
+                .insert(ExpressionNodeKey::from(call), known.into_keys().collect());
         }
     }
 
@@ -527,13 +527,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             })
         };
 
-        let mut keys = ConstructorKeys::new();
+        let mut keys = ConstructorKeys::default();
         for keyword in &arguments.keywords {
             if let Some(name) = &keyword.arg {
                 if !permits_field_inference(name.as_str()) {
                     return None;
                 }
-                keys.insert(name.id.clone(), Some(AnyNodeRef::from(keyword)));
+                keys.known
+                    .insert(name.id.clone(), AnyNodeRef::from(keyword));
             } else {
                 let unpacked = self
                     .try_expression_type(&keyword.value)?
@@ -543,7 +544,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if !field.is_required() || !permits_field_inference(name.as_str()) {
                         return None;
                     }
-                    keys.insert(name.clone(), Some(AnyNodeRef::from(keyword)));
+                    keys.known.insert(name.clone(), AnyNodeRef::from(keyword));
                 }
             }
         }
@@ -599,7 +600,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::TypedDict(typed_dict).display(db, self.program_environment()), arguments.args.len(),
                 ));
             }
-            return ConstructorKeys::new();
+            return ConstructorKeys::default();
         }
 
         let keyword_keys = validate_typed_dict_constructor_keywords(
@@ -614,7 +615,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict);
                 self.store_expression_type(positional, Type::unknown());
             } else if !positional.is_starred_expr() {
-                let overriding_keys = keyword_keys.keys().cloned().collect();
+                let overriding_keys = keyword_keys.overriding_keys(db, typed_dict);
                 let target = typed_dict_with_relaxed_keys(db, typed_dict, &overriding_keys);
                 self.get_or_infer_expression(
                     positional,
