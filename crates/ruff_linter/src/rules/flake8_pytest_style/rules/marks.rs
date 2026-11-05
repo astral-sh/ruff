@@ -205,12 +205,11 @@ fn check_useless_usefixtures(checker: &Checker, decorator: Decorator<'_>, marker
         return;
     }
 
-    match decorator.expression().classify() {
+    match decorator.expression().fields() {
         // @pytest.mark.usefixtures
-        ast::ExprKind::Attribute(_) => {}
+        ast::ExprFields::Attribute(..) => {}
         // @pytest.mark.usefixtures(...)
-        ast::ExprKind::Call(call) => {
-            let arguments = call.arguments();
+        ast::ExprFields::Call(ast::ExprCallFields { arguments, .. }) => {
             let args = arguments.args();
             let keywords = arguments.keywords();
             if !args.is_empty() || !keywords.is_empty() {

@@ -63,9 +63,10 @@ fn detect_blind_exception(
     func: Expr<'_>,
     arguments: Arguments<'_>,
 ) -> Option<ExceptionKind> {
-    let is_assert_raises = func
-        .as_attribute_expr()
-        .is_some_and(|attribute| attribute.attr().as_str() == "assertRaises");
+    let is_assert_raises = matches!(
+        func.fields(),
+        ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. }) if attr.as_str() == "assertRaises"
+    );
 
     let is_pytest_raises = semantic
         .resolve_qualified_name(func)

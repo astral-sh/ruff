@@ -193,11 +193,9 @@ fn could_be_short_circuit(function: StmtFunctionDef<'_>) -> bool {
     let non_empty_list_count = returns
         .iter()
         .filter(|ret| {
-            ret.value().is_some_and(|value| {
-                value
-                    .as_list_expr()
-                    .is_some_and(|list| !list.elts().is_empty())
-            })
+            ret.value().is_some_and(
+                |value| matches!(value.fields(), ast::ExprFields::List(ast::ExprListFields { elts, .. }) if !elts.is_empty()),
+            )
         })
         .count();
 

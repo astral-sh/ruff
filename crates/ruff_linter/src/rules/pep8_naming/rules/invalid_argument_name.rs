@@ -78,8 +78,8 @@ pub(crate) fn invalid_argument_name_function(
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: ast::ExprLambda<'_>) {
-    let Some(parameters) = lambda.parameters() else {
+pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ast::ExprLambdaFields<'_>) {
+    let Some(parameters) = lambda.parameters else {
         return;
     };
 

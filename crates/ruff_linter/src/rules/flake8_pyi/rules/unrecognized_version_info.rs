@@ -223,7 +223,11 @@ impl ExpectedComparator {
                 step: None,
                 ..
             }) => {
-                if let Some(upper) = upper.as_int_literal() {
+                if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                    value: ast::Number::Int(upper),
+                    ..
+                }) = upper.fields()
+                {
                     if *upper == 1 {
                         return Some(ExpectedComparator::MajorTuple);
                     }
@@ -247,5 +251,11 @@ impl ExpectedComparator {
 
 /// Returns `true` if the given expression is an integer constant.
 fn is_int_constant(expr: Expr<'_>) -> bool {
-    expr.as_int_literal().is_some()
+    matches!(
+        expr.fields(),
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: ast::Number::Int(_),
+            ..
+        })
+    )
 }

@@ -1,4 +1,6 @@
-use ruff_python_ast::{Builder, CmpOp, Expr, ExprKind, Stmt, StmtKind, UnaryOp};
+use ruff_python_ast::{
+    Builder, CmpOp, Expr, ExprKind, Stmt, StmtFunctionDefFields, StmtKind, UnaryOp,
+};
 use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -173,9 +175,11 @@ pub(crate) fn negation_with_equal_op(
 
     // Avoid flagging issues in dunder implementations.
     if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
-        && is_dunder_method(stmt_function_def.name().as_str())
+        && let StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
     {
-        return;
+        if is_dunder_method(name.as_str()) {
+            return;
+        }
     }
 
     let mut diagnostic = checker.report_diagnostic(
@@ -215,9 +219,11 @@ pub(crate) fn negation_with_not_equal_op(
 
     // Avoid flagging issues in dunder implementations.
     if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
-        && is_dunder_method(stmt_function_def.name().as_str())
+        && let StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
     {
-        return;
+        if is_dunder_method(name.as_str()) {
+            return;
+        }
     }
 
     let mut diagnostic = checker.report_diagnostic(

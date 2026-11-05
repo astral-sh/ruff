@@ -82,7 +82,11 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
         return;
     };
 
-    let Some(int) = lower.as_int_literal() else {
+    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+        value: Number::Int(int),
+        ..
+    }) = lower.fields()
+    else {
         return;
     };
 
@@ -114,10 +118,13 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     // float and complex numbers are false positives, ignore them.
-    if arg
-        .as_number_literal_expr()
-        .is_some_and(|number| matches!(number.value(), Number::Float(_) | Number::Complex { .. }))
-    {
+    if matches!(
+        arg.fields(),
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Float(_) | Number::Complex { .. },
+            ..
+        })
+    ) {
         return;
     }
 

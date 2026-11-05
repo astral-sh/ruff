@@ -153,8 +153,9 @@ fn get_complexity_number(stmts: Suite<'_>) -> usize {
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
                     complexity += 1;
-                    let ast::ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
-                    let body = handler.body();
+                    let ast::ExceptHandlerFields::ExceptHandler(
+                        ast::ExceptHandlerExceptHandlerFields { body, .. },
+                    ) = handler.fields();
                     complexity += get_complexity_number(body);
                 }
             }

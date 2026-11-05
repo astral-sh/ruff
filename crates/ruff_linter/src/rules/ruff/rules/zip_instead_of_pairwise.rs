@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprKind, Int};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Int, Number};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -85,14 +85,27 @@ fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
 
     // Avoid false positives for slices with a step.
     if let Some(step) = step {
-        if step.as_int_literal() != Some(&Int::ONE) {
+        if !matches!(
+            step.fields(),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                value: Number::Int(Int::ONE),
+                ..
+            })
+        ) {
             return None;
         }
     }
 
     // If the slice start is a non-constant, we can't be sure that it's successive.
     let slice_start = if let Some(lower) = lower {
-        let int = lower.as_int_literal()?;
+        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Int(int),
+            range: _,
+            node: _,
+        }) = lower.fields()
+        else {
+            return None;
+        };
         Some(int.as_i32()?)
     } else {
         None

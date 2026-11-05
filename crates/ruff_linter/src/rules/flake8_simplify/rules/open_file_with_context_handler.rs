@@ -1,3 +1,4 @@
+use ruff_python_ast as ast;
 use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{ExprCall, ExprKind, StmtKind};
 
@@ -277,9 +278,11 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ExprCallF
 
     // Ex) `def __enter__(self): ...`
     if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
-        && stmt_function_def.name() == "__enter__"
+        && let ast::StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
     {
-        return;
+        if name == "__enter__" {
+            return;
+        }
     }
 
     checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());

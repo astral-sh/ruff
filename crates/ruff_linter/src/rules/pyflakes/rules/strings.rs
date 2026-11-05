@@ -562,7 +562,9 @@ impl Violation for StringDotFormatMixingAutomatic {
 }
 
 fn has_star_star_kwargs(keywords: NodeList<'_, ruff_python_ast::kind::Keyword>) -> bool {
-    keywords.iter().any(|keyword| keyword.arg().is_none())
+    keywords
+        .iter()
+        .any(|keyword| matches!(keyword.fields(), ast::KeywordFields { arg: None, .. }))
 }
 
 fn has_star_args(args: NodeList<'_, ruff_python_ast::kind::Expr>) -> bool {

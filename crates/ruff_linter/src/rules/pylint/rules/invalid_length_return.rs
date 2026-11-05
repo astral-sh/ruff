@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
 use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -105,7 +106,11 @@ pub(crate) fn invalid_length_return(
 
 /// Returns `true` if the given expression is a negative integer.
 fn is_negative_integer(value: Expr<'_>) -> bool {
-    value
-        .as_unary_op_expr()
-        .is_some_and(|unary| unary.op() == UnaryOp::USub)
+    matches!(
+        value.fields(),
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
+            op: UnaryOp::USub,
+            ..
+        })
+    )
 }

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, ExprKind, UnaryOp};
 
 use crate::Violation;
@@ -70,7 +71,11 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
     else {
         return;
     };
-    let Some(val) = operand.as_int_literal() else {
+    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+        value: Number::Int(val),
+        ..
+    }) = operand.fields()
+    else {
         return;
     };
     if *val != 1 {

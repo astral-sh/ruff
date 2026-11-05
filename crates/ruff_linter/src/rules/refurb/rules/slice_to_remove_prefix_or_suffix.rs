@@ -376,7 +376,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 node: _,
                 value: string_val,
             }),
-        ) if let Some(value) = operand.as_int_literal() => {
+        ) if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Int(value),
+            ..
+        }) = operand.fields() =>
+        {
             // Only support prefix removal for size at most `u32::MAX`
             value
                 .as_usize()

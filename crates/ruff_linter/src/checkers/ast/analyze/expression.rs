@@ -380,10 +380,11 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::Attribute(attribute) => {
+            let fields = attribute.fields();
             if checker.is_rule_enabled(Rule::SharedClockMock)
                 && matches!(attribute.ctx(), ExprContext::Store | ExprContext::Del)
             {
-                ruff::rules::shared_clock_attribute(checker, attribute);
+                ruff::rules::shared_clock_attribute(checker, &fields);
             }
             if attribute.ctx() == ExprContext::Load {
                 if checker.any_rule_enabled(&[
@@ -472,7 +473,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 numpy::rules::numpy_2_0_deprecation(checker, &expr);
             }
             if checker.is_rule_enabled(Rule::DeprecatedMockImport) {
-                pyupgrade::rules::deprecated_mock_attribute(checker, attribute);
+                pyupgrade::rules::deprecated_mock_attribute(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, &expr);
@@ -527,6 +528,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::Set(set) => {
+            let fields = set.fields();
             if checker.is_rule_enabled(Rule::ImplicitStringConcatenationInCollectionLiteral) {
                 flake8_implicit_str_concat::rules::implicit_string_concatenation_in_collection_literal(
                     checker,
@@ -535,7 +537,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::DuplicateValue) {
-                flake8_bugbear::rules::duplicate_value(checker, set);
+                flake8_bugbear::rules::duplicate_value(checker, &fields);
             }
         }
         ExprKind::Yield(_) => {
@@ -552,10 +554,11 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::FString(f_string_expr) => {
-            let value = f_string_expr.value();
+            let fields = f_string_expr.fields();
+            let value = fields.value;
 
             if checker.is_rule_enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(checker, f_string_expr);
+                pyflakes::rules::f_string_missing_placeholders(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::ExplicitFStringTypeConversion) {
                 for f_string in value.f_strings() {
@@ -835,7 +838,8 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::StringLiteral(string_like) => {
-            let value = string_like.value();
+            let fields = string_like.fields();
+            let value = fields.value;
 
             if checker.is_rule_enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
@@ -848,13 +852,14 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::HardcodedStringCharset) {
-                refurb::rules::hardcoded_string_charset_literal(checker, string_like);
+                refurb::rules::hardcoded_string_charset_literal(checker, &fields);
             }
         }
         ExprKind::If(if_exp) => {
-            let test = if_exp.test();
-            let body = if_exp.body();
-            let orelse = if_exp.orelse();
+            let fields = if_exp.fields();
+            let test = fields.test;
+            let body = fields.body;
+            let orelse = fields.orelse;
 
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictGet) {
                 flake8_simplify::rules::if_exp_instead_of_dict_get(
@@ -877,7 +882,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
             if checker.is_rule_enabled(Rule::UselessIfElse) {
-                ruff::rules::useless_if_else(checker, if_exp);
+                ruff::rules::useless_if_else(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::SliceToRemovePrefixOrSuffix) {
                 refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
@@ -938,9 +943,10 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::DictComp(dict_comp) => {
-            let key = dict_comp.key();
-            let value = dict_comp.value();
-            let generators = dict_comp.generators();
+            let fields = dict_comp.fields();
+            let key = fields.key;
+            let value = fields.value;
+            let generators = fields.generators;
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
@@ -972,7 +978,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::StaticKeyDictComprehension) {
-                flake8_bugbear::rules::static_key_dict_comprehension(checker, dict_comp);
+                flake8_bugbear::rules::static_key_dict_comprehension(checker, &fields);
             }
         }
         ExprKind::Generator(generator) => {
@@ -997,6 +1003,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::BoolOp(bool_op) => {
+            let fields = bool_op.fields();
             if checker.is_rule_enabled(Rule::BooleanChainedComparison) {
                 pylint::rules::boolean_chained_comparison(checker, bool_op);
             }
@@ -1022,7 +1029,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 flake8_simplify::rules::expr_and_false(checker, &expr);
             }
             if checker.is_rule_enabled(Rule::RepeatedEqualityComparison) {
-                pylint::rules::repeated_equality_comparison(checker, bool_op);
+                pylint::rules::repeated_equality_comparison(checker, &fields);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryKeyCheck) {
                 ruff::rules::unnecessary_key_check(checker, &expr);
@@ -1032,11 +1039,12 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
         }
         ExprKind::Lambda(lambda) => {
+            let fields = lambda.fields();
             if checker.is_rule_enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &lambda.into());
             }
             if checker.is_rule_enabled(Rule::InvalidArgumentName) {
-                pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
+                pep8_naming::rules::invalid_argument_name_lambda(checker, &fields);
             }
         }
         _ => {}

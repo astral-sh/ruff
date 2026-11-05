@@ -268,7 +268,12 @@ fn match_loop(stmt: Stmt<'_>) -> Option<Loop<'_>> {
         return None;
     }
     let [stmt] = nested_body.as_array()?;
-    let value = stmt.as_return_stmt()?.value()?;
+    let StmtFields::Return(StmtReturnFields {
+        value: Some(value), ..
+    }) = stmt.fields()
+    else {
+        return None;
+    };
     let ExprKind::BooleanLiteral(boolean_literal) = value.classify() else {
         return None;
     };
@@ -344,7 +349,14 @@ fn match_sibling_return<'a>(stmt: Stmt<'a>, sibling: Stmt<'a>) -> Option<Termina
     }
 
     // The next statement has to be a `return True` or `return False`.
-    let next_value = sibling.as_return_stmt()?.value()?;
+    let StmtFields::Return(StmtReturnFields {
+        value: Some(next_value),
+        range: _,
+        node: _,
+    }) = sibling.fields()
+    else {
+        return None;
+    };
     let ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };

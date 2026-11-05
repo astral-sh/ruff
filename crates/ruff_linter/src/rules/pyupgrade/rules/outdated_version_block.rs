@@ -437,7 +437,13 @@ fn fix_always_true_branch(
 fn extract_version(elts: NodeList<'_, ast::kind::Expr>) -> Option<Vec<Int>> {
     let mut version: Vec<Int> = vec![];
     for elt in elts {
-        let int = elt.as_int_literal()?;
+        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: ast::Number::Int(int),
+            ..
+        }) = elt.fields()
+        else {
+            return None;
+        };
         version.push(int.clone());
     }
     Some(version)

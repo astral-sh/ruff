@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, Number};
 
 use ruff_text_size::Ranged;
 
@@ -56,7 +56,11 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCallFie
     };
 
     // Verify that the `start` argument is the literal `0`.
-    let Some(value) = start.as_int_literal() else {
+    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+        value: Number::Int(value),
+        ..
+    }) = start.fields()
+    else {
         return;
     };
     if *value != 0 {

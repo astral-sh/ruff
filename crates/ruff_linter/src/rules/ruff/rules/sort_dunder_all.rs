@@ -118,9 +118,9 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Isort;
 
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_assign(checker: &Checker, stmt: ast::StmtAssign<'_>) {
-    let value = stmt.value();
-    if let Some([expr]) = stmt.targets().as_array() {
+pub(crate) fn sort_dunder_all_assign(checker: &Checker, stmt: &ast::StmtAssignFields<'_>) {
+    let value = stmt.value;
+    if let Some([expr]) = stmt.targets.as_array() {
         sort_dunder_all(checker, expr, value);
     }
 }
@@ -151,9 +151,9 @@ pub(crate) fn sort_dunder_all_extend_call(checker: &Checker, call: &ast::ExprCal
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: ast::StmtAnnAssign<'_>) {
-    if let Some(value) = node.value() {
-        sort_dunder_all(checker, node.target(), value);
+pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnAssignFields<'_>) {
+    if let Some(value) = node.value {
+        sort_dunder_all(checker, node.target, value);
     }
 }
 
