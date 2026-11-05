@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.17.4
+
+Released on 2026-11-05.
+
+### Preview features
+
+- \[`flake8-logging-format`\] Avoid behavior changes and syntax errors in fixes (`G004`) ([#27419](https://github.com/astral-sh/ruff/pull/27419))
+- \[`security`\] Implement `tarfile-ignore-zeros-true` ([#28680](https://github.com/astral-sh/ruff/pull/28680))
+
+### Bug fixes
+
+- Accept a bare raise before a semicolon ([#29761](https://github.com/astral-sh/ruff/pull/29761))
+- Allow match identifiers after a semicolon ([#29760](https://github.com/astral-sh/ruff/pull/29760))
+- Fix panic on BOM-prefixed files in diagnostic renderer ([#30017](https://github.com/astral-sh/ruff/pull/30017))
+- \[`flake8-simplify`\] Report collapsible `elif` clauses after a multi-statement `if` branch (`SIM102`) ([#29814](https://github.com/astral-sh/ruff/pull/29814))
+
+### Rule changes
+
+- Show more nonprinting characters in diagnostic fix diffs ([#30062](https://github.com/astral-sh/ruff/pull/30062))
+
+### Performance
+
+- Coalesce source slices when formatting attributes ([#29841](https://github.com/astral-sh/ruff/pull/29841))
+- Collect return statements with a statement-only visitor ([#29911](https://github.com/astral-sh/ruff/pull/29911))
+- Defer value comparisons for repeated dictionary keys (F601, F602) ([#29739](https://github.com/astral-sh/ruff/pull/29739))
+- Format node fields directly when comment handling is unnecessary ([#29853](https://github.com/astral-sh/ruff/pull/29853))
+- Reduce formatter source-slice overhead ([#29855](https://github.com/astral-sh/ruff/pull/29855))
+- Reuse a callee's qualified name across lint rules ([#29916](https://github.com/astral-sh/ruff/pull/29916))
+- Skip invalid string character checks when the source contains none ([#29883](https://github.com/astral-sh/ruff/pull/29883))
+- Use a Bloom filter for formatter comment lookups ([#29852](https://github.com/astral-sh/ruff/pull/29852))
+- Use a concrete buffer for ordinary writes ([#29819](https://github.com/astral-sh/ruff/pull/29819))
+- [ty] Avoid inferring a member prefix's type to check whether it is bound ([#30057](https://github.com/astral-sh/ruff/pull/30057))
+- [ty] Skip previous overload lookup for singly bound local functions ([#30027](https://github.com/astral-sh/ruff/pull/30027))
+
+### CLI
+
+- Give `NO_COLOR` precedence in Ruff and ty diagnostics ([#29898](https://github.com/astral-sh/ruff/pull/29898))
+- Honor `CLICOLOR=0` in Ruff and ty diagnostics ([#29910](https://github.com/astral-sh/ruff/pull/29910))
+
+### Documentation
+
+- Correct the documented `version` and `src` defaults for `ruff-action` ([#29880](https://github.com/astral-sh/ruff/pull/29880))
+- \[`flake8-bugbear`\] Make `B014` example error out-of-the-box ([#29941](https://github.com/astral-sh/ruff/pull/29941))
+- \[`flake8-no-pep420`\] Document preview behavior (`INP001`) ([#29764](https://github.com/astral-sh/ruff/pull/29764))
+- \[`isort`\] Expand `I001` documentation ([#29843](https://github.com/astral-sh/ruff/pull/29843))
+
+### Other changes
+
+- [syntax-errors] Extend `__debug__` write check to attribute targets ([#27908](https://github.com/astral-sh/ruff/pull/27908))
+
+### Contributors
+
+- [@fixfon](https://github.com/fixfon)
+- [@hirehamir](https://github.com/hirehamir)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@saberoueslati](https://github.com/saberoueslati)
+- [@mangod12](https://github.com/mangod12)
+- [@Sacrimento](https://github.com/Sacrimento)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@mulaihonglixihonglixi-web](https://github.com/mulaihonglixihonglixi-web)
+- [@adarrevah](https://github.com/adarrevah)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@shan3520](https://github.com/shan3520)
+- [@halcyon-past](https://github.com/halcyon-past)
+
 ## 0.17.3
 
 Released on 2026-10-26.
