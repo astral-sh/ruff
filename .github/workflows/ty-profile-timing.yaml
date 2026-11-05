@@ -11,55 +11,18 @@ env:
   UV_LOCKED: 1
 
 jobs:
-  benchmarks-instrumented-ty-run:
-    name: "benchmarks instrumented ty (${{ matrix.mode }}: ${{ matrix.name }})"
+  projects:
+    name: "projects (${{ matrix.order }})"
     runs-on: depot-ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
-      actions: read # download the main run’s compiled benchmark artifact
-      contents: read # required for actions/checkout
-      id-token: write # required for OIDC authentication with CodSpeed
+      actions: read
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # The r benchmarks dominate runtime, so group them with a-c to balance both modes.
-          - name: micro-1
-            target: ty
-            filter: 'ty_micro\[[a-cr]'
-            mode: simulation
-          - name: micro-2
-            target: ty
-            filter: 'ty_micro\[[^a-cr]'
-            mode: simulation
-          - name: micro-1
-            target: ty
-            filter: 'ty_micro\[[a-cr]'
-            mode: memory
-          - name: micro-2
-            target: ty
-            filter: 'ty_micro\[[^a-cr]'
-            mode: memory
-          - name: constraint_set
-            target: ty_constraint_set
-            filter: micro
-            mode: simulation
-          - name: constraint_set
-            target: ty_constraint_set
-            filter: micro
-            mode: memory
-          - name: projects
-            target: ty
-            filter: "check_file|anyio|attrs|hydra|datetype"
-            mode: simulation
-          - name: projects
-            target: ty
-            filter: "check_file|anyio|attrs|hydra|datetype"
-            mode: memory
-          - name: module_resolution
-            target: module_resolution
-            filter: ty_module_resolver
-            mode: simulation
+        order: [on-then-off, off-then-on]
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,22 +44,20 @@ jobs:
         # codspeed keeps changing the paths to the executable, so we have to be a bit more flexible
         run: find target/codspeed -type f -exec chmod +x {} +
 
-      - name: "Configure apt mirror fallback"
-        if: matrix.mode == 'simulation'
-        run: |
-          # Let CodSpeed's dependency installation move past unhealthy mirrors quickly.
-          cat /etc/apt/apt-mirrors.txt
-          printf '%s\n' \
-            'Acquire::Retries "0";' \
-            'Acquire::http::Timeout "10";' \
-            'Acquire::https::Timeout "10";' \
-            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
-
-      - name: "Run benchmarks"
+      - name: First projects run
         uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         env:
-          CODSPEED_PROFILER_ENABLED: false
+          CODSPEED_SKIP_UPLOAD: true
         with:
-          mode: ${{ matrix.mode }}
-          disable-memory-capture-stack: true
-          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
+          mode: memory
+          disable-memory-capture-stack: ${{ matrix.order == 'off-then-on' }}
+          run: uv run --only-dev cargo codspeed run --bench ty "check_file|anyio|attrs|hydra|datetype"
+
+      - name: Second projects run
+        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
+        env:
+          CODSPEED_SKIP_UPLOAD: true
+        with:
+          mode: memory
+          disable-memory-capture-stack: ${{ matrix.order == 'on-then-off' }}
+          run: uv run --only-dev cargo codspeed run --bench ty "check_file|anyio|attrs|hydra|datetype"
