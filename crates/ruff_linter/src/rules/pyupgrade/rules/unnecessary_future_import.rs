@@ -5,7 +5,7 @@ use ruff_python_semantic::NodeId;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
-use ruff_python_ast::{self as ast, Alias, Stmt, StmtKind};
+use ruff_python_ast::{Alias, Stmt, StmtKind};
 use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
@@ -88,12 +88,7 @@ pub(crate) fn is_import_required_by_isort(
     alias: Alias<'_>,
 ) -> bool {
     match stmt.classify() {
-        StmtKind::ImportFrom(stmt_import_from)
-            if let ast::StmtImportFromFields {
-                module: Some(module),
-                ..
-            } = stmt_import_from.fields() =>
-        {
+        StmtKind::ImportFrom(stmt_import_from) if let Some(module) = stmt_import_from.module() => {
             let mut builder = QualifiedNameBuilder::with_capacity(module.split('.').count() + 1);
             builder.extend(module.split('.'));
             builder.push(alias.name().as_str());

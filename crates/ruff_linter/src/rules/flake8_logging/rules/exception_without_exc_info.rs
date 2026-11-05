@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{ExprCall, ExprKind};
+use ruff_python_ast::{Arguments, ExprKind};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -81,13 +81,13 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCallField
         _ => return,
     }
 
-    if exc_info_arg_is_falsey(call.node, checker) {
+    if exc_info_arg_is_falsey(call.arguments, checker) {
         checker.report_diagnostic(ExceptionWithoutExcInfo, call.range);
     }
 }
 
-fn exc_info_arg_is_falsey(call: ExprCall<'_>, checker: &Checker) -> bool {
-    call.arguments()
+fn exc_info_arg_is_falsey(arguments: Arguments<'_>, checker: &Checker) -> bool {
+    arguments
         .find_keyword("exc_info")
         .map(ruff_python_ast::Keyword::value)
         .is_some_and(|value| {

@@ -57,7 +57,7 @@ pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCallFields<'_>) {
         return;
     };
 
-    let Some(mode) = extract_mode(call.node, kind) else {
+    let Some(mode) = extract_mode(call.arguments, kind) else {
         return;
     };
 
@@ -110,9 +110,9 @@ fn is_open(func: Expr<'_>, semantic: &SemanticModel) -> Option<Kind> {
 }
 
 /// Returns the mode argument, if present.
-fn extract_mode(call: ast::ExprCall<'_>, kind: Kind) -> Option<Expr<'_>> {
+fn extract_mode(arguments: ast::Arguments<'_>, kind: Kind) -> Option<Expr<'_>> {
     match kind {
-        Kind::Builtin => call.arguments().find_argument_value("mode", 1),
-        Kind::Pathlib => call.arguments().find_argument_value("mode", 0),
+        Kind::Builtin => arguments.find_argument_value("mode", 1),
+        Kind::Pathlib => arguments.find_argument_value("mode", 0),
     }
 }

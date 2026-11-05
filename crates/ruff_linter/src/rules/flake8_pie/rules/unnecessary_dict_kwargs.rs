@@ -142,7 +142,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
         } else {
             // Compute the set of duplicate keywords (lazily).
             if duplicate_keywords.is_none() {
-                duplicate_keywords = Some(duplicates(call.node));
+                duplicate_keywords = Some(duplicates(call.arguments));
             }
 
             // Avoid fixing if doing so could introduce a duplicate keyword argument.
@@ -184,12 +184,11 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
 
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
-fn duplicates(call: ast::ExprCall<'_>) -> FxHashSet<&str> {
-    let mut seen =
-        FxHashSet::with_capacity_and_hasher(call.arguments().keywords().len(), FxBuildHasher);
+fn duplicates(arguments: ast::Arguments<'_>) -> FxHashSet<&str> {
+    let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords().len(), FxBuildHasher);
     let mut duplicates =
-        FxHashSet::with_capacity_and_hasher(call.arguments().keywords().len(), FxBuildHasher);
-    for keyword in call.arguments().keywords() {
+        FxHashSet::with_capacity_and_hasher(arguments.keywords().len(), FxBuildHasher);
+    for keyword in arguments.keywords() {
         if let Some(name) = keyword.arg() {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());

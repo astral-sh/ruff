@@ -1,6 +1,6 @@
 use ruff_python_ast::{
-    ArgumentsFields, BuildId, Builder, ExprBoolOpFields, ExprCallFields, ExprFields, ExprKind,
-    ExprNameFields, ExprUnaryOpFields, build,
+    BuildId, Builder, ExprBoolOpFields, ExprFields, ExprKind, ExprNameFields, ExprUnaryOpFields,
+    build,
 };
 use std::collections::BTreeMap;
 use std::iter;
@@ -379,15 +379,14 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, &expr: &Expr<'_>) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let ExprFields::Call(ExprCallFields { arguments, .. }) =
-                values.at(indices[0]).fields()
-                && let ArgumentsFields { args, .. } = arguments.fields()
-            {
-                args.first()
-                    .expect("`isinstance` should have two arguments")
-            } else {
+            let Some(call) = values.at(indices[0]).as_call_expr() else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
+            let target = call
+                .arguments()
+                .args()
+                .first()
+                .expect("`isinstance` should have two arguments");
             let mut diagnostic = checker.report_diagnostic(
                 DuplicateIsinstanceCall {
                     name: if let ExprKind::Name(name_node_view) = target.classify() {

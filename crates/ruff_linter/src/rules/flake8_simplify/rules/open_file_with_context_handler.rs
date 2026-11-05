@@ -1,5 +1,5 @@
 use ruff_python_ast::ExprCallFields;
-use ruff_python_ast::{ExprCall, ExprKind, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -154,9 +154,7 @@ fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the expression is a call to `open()`,
 /// or a call to some other standard-library function that opens a file.
-fn is_open_call(semantic: &SemanticModel, call: ExprCall<'_>) -> bool {
-    let func = call.func();
-
+fn is_open_call(semantic: &SemanticModel, func: Expr<'_>) -> bool {
     // Ex) `open(...)`
     if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
         return matches!(
@@ -241,7 +239,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
-    if !is_open_call(semantic, call.node) {
+    if !is_open_call(semantic, call.func) {
         return;
     }
 

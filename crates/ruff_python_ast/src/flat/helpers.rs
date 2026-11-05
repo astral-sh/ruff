@@ -115,8 +115,8 @@ impl Truthiness {
             ast::ExprFields::Call(ast::ExprCallFields {
                 func, arguments, ..
             }) => {
-                if let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) = func.fields() {
-                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                if let Some(name) = func.as_name_expr() {
+                    if is_iterable_initializer(name.id().as_str(), |id| is_builtin(id)) {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
