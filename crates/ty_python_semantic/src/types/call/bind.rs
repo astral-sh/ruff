@@ -59,7 +59,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
-    TypeVarInferenceSolutions,
+    TypeVarInferenceSolutions, walk_specialization_types,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -70,6 +70,7 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
@@ -81,9 +82,10 @@ use crate::types::{
     BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, TypeContext,
-    TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
+    TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -6657,7 +6659,7 @@ impl<'db> CallInference<'_, 'db> {
                 .variables(db)
                 .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
 
-        let declared_return_context = match self.call_expression_tcx.annotation {
+        let declared_return_context = match self.call_expression_tcx.declared_type() {
             Some(tcx) if !use_legacy_solver => {
                 let validity = self
                     .return_ty
@@ -8069,7 +8071,7 @@ impl<'db> ArgumentTypeContext<'db> {
             Self::Standard {
                 raw_parameter_type,
                 context,
-            } => context.with_annotation(Some(raw_parameter_type)),
+            } => context.with_declared_type(Some(raw_parameter_type)),
             Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
         }
     }
@@ -8125,7 +8127,7 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 }
 
 /// Returns the number of occurrences of inferable type variables in the provided type.
-fn inferable_typevar_occurrences<'db>(
+pub(crate) fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
@@ -8145,6 +8147,20 @@ fn inferable_typevar_occurrences<'db>(
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
+        }
+
+        fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            if let Some(arguments) = recursive.arguments(db) {
+                walk_specialization_types(db, arguments, self);
+            }
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -8327,38 +8343,6 @@ impl<'db> Binding<'db> {
     ) -> Option<&MatchedArgument<'db>> {
         self.argument_matches
             .get(argument_index + usize::from(binding.bound_type.is_some()))
-    }
-
-    /// Returns the number of occurrences of inferable type variables in the parameter(s) matching the
-    /// provided argument index.
-    pub(crate) fn typevar_occurrences_for_parameter(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        binding: &CallableBinding<'db>,
-        argument_index: usize,
-    ) -> usize {
-        let Some(generic_context) = self.signature.generic_context else {
-            return 0;
-        };
-        let Some(argument) = self.matched_argument_for_call_argument(binding, argument_index)
-        else {
-            return 0;
-        };
-
-        let inferable_typevars = generic_context.inferable_typevars(db);
-        argument
-            .parameters
-            .iter()
-            .map(|parameter| {
-                inferable_typevar_occurrences(
-                    db,
-                    env,
-                    self.signature.parameters()[parameter.index].annotated_type(),
-                    inferable_typevars,
-                )
-            })
-            .sum()
     }
 
     /// Returns source argument indices matched to the `ParamSpec` component.
@@ -8638,7 +8622,7 @@ impl<'db> Binding<'db> {
             }
 
             parameter_type = parameter_type.apply_optional_specialization(db, specialization());
-            if let Some(expected_return_ty) = call_expression_tcx.annotation
+            if let Some(expected_return_ty) = call_expression_tcx.declared_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
                     env,
@@ -8723,7 +8707,7 @@ impl<'db> Binding<'db> {
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
-        if let Some(declared_return_ty) = call_expression_tcx.annotation {
+        if let Some(declared_return_ty) = call_expression_tcx.declared_type() {
             let inferable = generic_context.inferable_typevars(db);
             let normalized_return_ty = self
                 .normalized_constructor_return(db)

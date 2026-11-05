@@ -516,7 +516,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `Node(child=...)` cannot infer through the recursive field.
         let has_gradual_class_context = class_literal
             .as_static()
-            .zip(call_expression_tcx.annotation)
+            .zip(call_expression_tcx.declared_type())
             .is_some_and(|(class_literal, annotation)| {
                 any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
                     ty.resolve_type_alias(db)

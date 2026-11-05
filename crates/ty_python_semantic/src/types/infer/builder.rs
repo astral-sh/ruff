@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
-use std::collections::hash_map;
+use std::collections::{HashSet, hash_map};
 use std::convert::Infallible;
 use std::rc::Rc;
 
@@ -55,7 +55,7 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
     ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
-    requires_overload_evaluation,
+    inferable_typevar_occurrences, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -5880,6 +5880,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns the maximum number of fixpoint iterations to perform when inferring this generic call.
+    fn fixpoint_iteration_limit(
+        &self,
+        binding: &CallableBinding<'db>,
+        overload: &Binding<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        generic_arguments: &mut [bool],
+    ) -> Option<usize> {
+        let db = self.db();
+        let env = self.program_environment();
+        let generic_context = overload.signature.generic_context?;
+        let inferable = generic_context.inferable_typevars(db);
+        let receiver_offset = usize::from(binding.bound_type.is_some());
+        let mut occurrences = 0;
+        let mut can_skip_fixpoint = true;
+        let mut seen = HashSet::new();
+
+        for (index, matched) in overload.argument_matches().iter().enumerate() {
+            let argument_index = index.checked_sub(receiver_offset);
+            if argument_index.is_some_and(|index| arguments.is_variadic(index)) {
+                can_skip_fixpoint = false;
+                continue;
+            }
+
+            for parameter in &matched.parameters {
+                let ty = overload.signature.parameters()[parameter.index].annotated_type();
+                let count = inferable_typevar_occurrences(db, env, ty, inferable);
+                if count == 0 {
+                    continue;
+                }
+
+                if let Some(index) = argument_index {
+                    generic_arguments[index] = true;
+                    occurrences += count;
+                }
+
+                // If every type variable is unconstrained and occurs only once, each argument can
+                // be inferred independently, and so we can skip fixpoint iteration.
+                //
+                // Note that even a call with a single `x: list[T]` parameter may require fixpoint
+                // iteration, as a given list element may be influenced by its siblings, hence we
+                // limit this optimization to bare type variable occurrences.
+                can_skip_fixpoint = can_skip_fixpoint
+                    && ty.as_typevar().is_some_and(|var| {
+                        var.typevar(db).is_simple(db) && seen.insert(var.identity(db))
+                    });
+            }
+        }
+
+        Some(if can_skip_fixpoint { 0 } else { occurrences })
+    }
+
     fn infer_and_check_argument_types<'args, 'call>(
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
@@ -5899,7 +5951,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(argument_types.len());
         generic_arguments.resize(argument_types.len(), false);
 
-        let mut max_typevar_occurrences = 0;
+        let mut fixpoint_iteration_limit = 0;
         let mut has_generic_context = false;
         let mut overload_candidates = OverloadSet::new();
 
@@ -5910,36 +5962,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let candidate_overload_indices =
                 binding.candidate_overload_indices(db, env, argument_types);
 
-            has_generic_context |= candidate_overload_indices.iter().any(|&overload_index| {
-                binding.overloads()[overload_index]
-                    .signature
-                    .generic_context
-                    .is_some()
-            });
-
             for overload_index in &candidate_overload_indices {
                 let overload = &binding.overloads()[*overload_index];
-                if overload.signature.generic_context.is_none() {
-                    continue;
+                if let Some(limit) = self.fixpoint_iteration_limit(
+                    binding,
+                    overload,
+                    argument_types,
+                    &mut generic_arguments,
+                ) {
+                    has_generic_context = true;
+                    fixpoint_iteration_limit = fixpoint_iteration_limit.max(limit);
                 }
-
-                let mut overload_typevar_occurrences = 0;
-                for (argument_index, is_generic) in generic_arguments.iter_mut().enumerate() {
-                    if argument_types.is_variadic(argument_index) {
-                        continue;
-                    }
-
-                    let typevar_occurrences = overload.typevar_occurrences_for_parameter(
-                        db,
-                        env,
-                        binding,
-                        argument_index,
-                    );
-                    *is_generic |= typevar_occurrences > 0;
-                    overload_typevar_occurrences += typevar_occurrences;
-                }
-
-                max_typevar_occurrences = max_typevar_occurrences.max(overload_typevar_occurrences);
             }
 
             overload_candidates.push(candidate_overload_indices);
@@ -5969,7 +6002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let should_group_literals = literal_count > MAX_LITERAL_NARROWING_TARGETS;
 
         // Enable the expression cache if we are going to perform multi-inference.
-        let teardown_expression_cache = if !generic_arguments.is_empty()
+        let teardown_expression_cache = if fixpoint_iteration_limit > 0
             || requires_overload_evaluation(&overload_candidates)
             || narrow_targets.len() > 1
         {
@@ -5983,10 +6016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
              arguments: &mut CallArguments<'call, 'db>,
              bindings: &mut Bindings<'db>,
              tcx| {
-                // If there are matching generic parameters on any overload, we perform fixpoint
-                // iteration to allow call arguments to contribute type context constraints to
-                // other siblings.
-                if generic_arguments.is_empty() {
+                if fixpoint_iteration_limit == 0 {
                     builder.infer_and_check_argument_types_simple(
                         ast_arguments.clone(),
                         arguments,
@@ -6006,7 +6036,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &constraints,
                         tcx,
                         &generic_arguments,
-                        max_typevar_occurrences,
+                        fixpoint_iteration_limit,
                         &overload_candidates,
                     )
                 }
@@ -6029,7 +6059,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
-            let narrowed_tcx = call_expression_tcx.with_annotation(Some(narrowed_ty));
+            let narrowed_tcx = call_expression_tcx.with_declared_type(Some(narrowed_ty));
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();
@@ -6242,7 +6272,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
         generic_arguments: &SmallVec<[usize; 4]>,
-        typevar_occurrences: usize,
+        fixpoint_iteration_limit: usize,
         candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
@@ -6304,7 +6334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // The number of occurrences of inferable typevars forms an upper bound for the number
             // of fixpoint iterations, and so if the types have converged, or we have reached the
             // upper bound, we are done.
-            if inferred_types_converged || iteration == typevar_occurrences {
+            if inferred_types_converged || iteration == fixpoint_iteration_limit {
                 break (speculative_builder, next_argument_types);
             }
 
@@ -6828,7 +6858,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(target) = tcx.annotation
+        if let Some(target) = tcx.declared_type()
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
@@ -6876,13 +6906,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
             ast::Expr::Name(name) => {
                 let ty = self.infer_name_expression(name);
-                tcx.annotation.map_or(ty, |target| {
+                tcx.declared_type().map_or(ty, |target| {
                     self.specialize_generic_class_from_context(ty, target)
                 })
             }
             ast::Expr::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
-                tcx.annotation.map_or(ty, |target| {
+                tcx.declared_type().map_or(ty, |target| {
                     self.specialize_generic_class_from_context(ty, target)
                 })
             }
@@ -6935,7 +6965,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
-            && let Some(tcx) = tcx.annotation
+            && let Some(tcx) = tcx.declared_type()
             && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(db)
                 .filter_union(db, env, |ty| ty.as_literal_value().is_some())
@@ -6944,7 +6974,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
-        if let Some(tcx) = tcx.annotation
+        if let Some(tcx) = tcx.declared_type()
             && let Some(collection_def) = self.index.unannotated_collection_initializer(expression)
         {
             self.collection_use_constraints
@@ -7261,7 +7291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         literal: &ast::ExprStringLiteral,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(expected) = tcx.annotation {
+        if let Some(expected) = tcx.declared_type() {
             self.store_maybe_expected_type(ast::ExprRef::from(literal), expected);
         }
 
@@ -7416,7 +7446,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_builder = self.speculate();
 
             let inferred_ty = speculative_builder
-                .infer_tuple_expression_impl(tuple, tcx.with_annotation(Some(*narrowed_ty)));
+                .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)));
             if inferred_ty.is_assignable_to(db, env, *narrowed_ty) {
                 narrowed.push((inferred_ty, speculative_builder));
             }
@@ -7516,7 +7546,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     annotated_elt_ty
                 };
-                tcx.with_annotation(expected)
+                tcx.with_declared_type(expected)
             } else {
                 TypeContext::default()
             };
@@ -7620,7 +7650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fallback_tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let inference_tcx = if elt_tcx.annotation.is_some() {
+        let inference_tcx = if elt_tcx.declared_type().is_some() {
             elt_tcx
         } else {
             fallback_tcx
@@ -7630,7 +7660,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `expected_types` is IDE completion metadata. If normal set inference already has a
         // string-literal context, preserve that semantic context for inference while also offering
         // the transient `TypedDict` key fallback as a completion candidate.
-        if let (Some(elt_ty), Some(fallback_ty)) = (elt_tcx.annotation, fallback_tcx.annotation) {
+        if let (Some(elt_ty), Some(fallback_ty)) =
+            (elt_tcx.declared_type(), fallback_tcx.declared_type())
+        {
             self.store_expected_type(
                 elt,
                 UnionType::from_two_elements(db, self.program_environment(), elt_ty, fallback_ty),
@@ -7657,8 +7689,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeContext::default();
         }
 
-        tcx.with_annotation(
-            tcx.annotation
+        tcx.with_declared_type(
+            tcx.declared_type()
                 .and_then(|annotation| self.typed_dict_key_expected_type(annotation)),
         )
     }
@@ -7675,7 +7707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut item_types = FxHashMap::default();
 
         // Validate `TypedDict` dictionary literal assignments.
-        if let Some(annotation) = tcx.annotation {
+        if let Some(annotation) = tcx.declared_type() {
             let annotation = annotation.expand_top_level_aliases(db, env);
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly. Expanding
@@ -7701,7 +7733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // the non-`TypedDict` arm of the union.
                         let mut speculative_builder = self.speculate();
                         has_dict_compatible_fallback = speculative_builder
-                            .infer_dict_expression(dict, tcx.with_annotation(Some(element)))
+                            .infer_dict_expression(dict, tcx.with_declared_type(Some(element)))
                             .is_assignable_to(db, env, element);
                     }
                 }
@@ -7828,7 +7860,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Attempt to infer the collection using the narrowed type context.
             let inferred_ty = infer(
                 &mut speculative_builder,
-                tcx.with_annotation(Some(narrowed_ty)),
+                tcx.with_declared_type(Some(narrowed_ty)),
             )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
@@ -7938,7 +7970,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(db))
+            if let Some(tcx) = tcx.declared_type().map(|tcx| tcx.resolve_type_alias(db))
                 && matches!(tcx, Type::NominalInstance(_))
                 && let Some(specialization) = tcx.known_specialization(db, env, collection_class)
                 && specialization.generic_context(self.db()) == generic_context
@@ -7971,7 +8003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
                     elt_tcx_variance.insert(identity, typevar.variance(db));
                 }
-            } else if let Some(tcx) = tcx.annotation
+            } else if let Some(tcx) = tcx.declared_type()
                 && tcx.class_specialization(db, env).is_some()
             {
                 let db = self.db();
@@ -8060,7 +8092,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid projecting and solving a constraint set when contextual inference has already
         // provided the complete specialization and every literal element is compatible with it.
         if !has_dict_unpack
-            && tcx.annotation.is_some()
+            && tcx.declared_type().is_some()
             && let Some(specialization) = generic_context
                 .variables(self.db())
                 .map(|typevar| {
@@ -8097,7 +8129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         elt_tcx
                     };
                     let inferred_elt_ty =
-                        infer_elt_expression(self, (i, elt, tcx.with_annotation(Some(elt_tcx))));
+                        infer_elt_expression(self, (i, elt, tcx.with_declared_type(Some(elt_tcx))));
                     inferred_elt_tys[i] = Some(inferred_elt_ty);
 
                     if !inferred_elt_ty.is_assignable_to(db, env, elt_tcx) {
@@ -8161,7 +8193,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if tcx.annotation.is_none()
+        if tcx.declared_type().is_none()
             && let Some(collection_expr) = collection_expr
             && let InferenceRegion::Expression(current_expr, _) = self.region
             && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
@@ -8284,7 +8316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_ref()
                     .and_then(|inferred_elts| inferred_elts[elts_index][i])
                     .unwrap_or_else(|| {
-                        infer_elt_expression(self, (i, elt, tcx.with_annotation(elt_tcx)))
+                        infer_elt_expression(self, (i, elt, tcx.with_declared_type(elt_tcx)))
                     });
 
                 // Simplify the inference based on a non-covariant declared type.
@@ -8342,7 +8374,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         db,
                         env,
                         tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                        is_empty_collection_type_context(tcx),
+                        tcx.declared_type().is_none(),
                     );
 
                     Some(lower)
@@ -8376,7 +8408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> TypeContext<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let Some(annotation) = tcx.annotation else {
+        let Some(annotation) = tcx.declared_type() else {
             return TypeContext::default();
         };
 
@@ -8418,7 +8450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        tcx.with_annotation(yield_tcx.map(|accumulator| accumulator.into_type(db, env)))
+        tcx.with_declared_type(yield_tcx.map(|accumulator| accumulator.into_type(db, env)))
     }
 
     fn infer_generator_expression(
@@ -9007,7 +9039,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
-        let callable_tcx = if let Some(tcx) = tcx.annotation
+        let callable_tcx = if let Some(tcx) = tcx.declared_type()
             && let Some(callable) = tcx
                 .filter_union(db, env, Type::is_callable_type)
                 .resolve_type_alias(db)
@@ -9117,7 +9149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_tcx = if let Some(signature) = callable_tcx {
             match signature.return_ty {
                 Type::Dynamic(DynamicType::Unknown) => TypeContext::declared(None),
-                _ => tcx.with_annotation(Some(signature.return_ty)),
+                _ => tcx.with_declared_type(Some(signature.return_ty)),
             }
         } else {
             // TODO: Useful inference of a lambda's return type will require a different approach,
@@ -13175,35 +13207,16 @@ fn is_nonempty_collection_literal_with_empty_peer(
     }
 }
 
-/// Returns `true` if `tcx` cannot provide useful type context for a collection literal.
-///
-/// During generic call argument inference, type variables that cannot yet be specialized are
-/// replaced by `UnspecializedTypeVar`. This marker intentionally carries neither type-variable
-/// identity nor a concrete expected type, and collection literal inference ignores it rather than
-/// using it as a constraint.
-///
-/// A bare generic parameter, such as the parameter to `reveal_type`, therefore provides an exact
-/// `UnspecializedTypeVar` context that should not prevent a peer expression from providing context
-/// instead.
-///
-/// This deliberately matches only the bare marker: a partially specialized context such as
-/// `list[UnspecializedTypeVar | int]` still carries useful collection structure and concrete type
-/// information.
-fn is_empty_collection_type_context(tcx: TypeContext<'_>) -> bool {
-    tcx.annotation
-        .is_none_or(|annotation| annotation == Type::Dynamic(DynamicType::UnspecializedTypeVar))
-}
-
 fn prefer_collection_literal_peer_context<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     tcx: TypeContext<'db>,
 ) -> bool {
-    is_empty_collection_type_context(tcx)
+    tcx.declared_type().is_none()
         // Peer type context should be preferred over `list[UnspecializedTypeVar]`, which
         // provides no useful element type.
         || tcx
-            .annotation
+            .declared_type()
             .and_then(|annotation| annotation.class_specialization(db, env))
             .is_some_and(|(_, specialization)| {
                 specialization
