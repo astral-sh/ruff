@@ -8,18 +8,14 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::preview::is_human_readable_names_enabled;
-use crate::rule_redirects::get_redirect_target;
-use crate::rules::ruff::rules::rule_codes_in_selectors;
+use crate::rule_redirects::get_redirect;
+use crate::rules::ruff::rules::{redirected_rule_selector, rule_codes_in_selectors};
 
 pub(super) fn check_rule_selectors(
     context: &LintContext,
     document: &DeTable<'_>,
     source_type: TomlSourceType,
 ) {
-    if !is_human_readable_names_enabled(context.settings().preview) {
-        return;
-    }
-
     let ruff = match source_type {
         TomlSourceType::Pyproject => document
             .get("tool")
@@ -99,29 +95,46 @@ fn check_selectors(context: &LintContext, table: &DeTable<'_>, in_lint_table: bo
 fn check_selector_array(
     context: &LintContext,
     values: &DeArray<'_>,
-    selector: &'static str,
+    setting: &'static str,
     in_lint_table: bool,
 ) {
     let source = context.source_file().source_text();
 
     for value in values {
-        let Some(RuleCode { name, range }) = RuleCode::from_spanned(value, source) else {
+        let Some(selector) = Selector::from_spanned(value, source) else {
             continue;
         };
-
-        rule_codes_in_selectors(context, name, range, selector, in_lint_table);
+        if context.is_rule_enabled(Rule::RedirectedRuleSelector)
+            && let Some((original, target)) = selector.redirect
+        {
+            redirected_rule_selector(
+                context,
+                original,
+                target,
+                selector.range,
+                setting,
+                in_lint_table,
+            );
+        }
+        if context.is_rule_enabled(Rule::RuleCodesInSelectors)
+            && is_human_readable_names_enabled(context.settings().preview)
+            && let Some(name) = selector.name
+        {
+            rule_codes_in_selectors(context, name, selector.range, setting, in_lint_table);
+        }
     }
 }
 
-struct RuleCode {
-    name: LintName,
+struct Selector {
+    name: Option<LintName>,
+    redirect: Option<(&'static str, &'static str)>,
     range: TextRange,
 }
 
-impl RuleCode {
-    /// Extract a rule code and its range from a spanned TOML string.
+impl Selector {
+    /// Extract a rule selector and its range from a spanned TOML string.
     ///
-    /// The range corresponds to the code itself rather than the surrounding string:
+    /// The range corresponds to the selector itself rather than the surrounding string:
     ///
     /// ```toml
     /// [lint]
@@ -129,9 +142,13 @@ impl RuleCode {
     ///            ^^^^
     /// ```
     fn from_spanned(spanned: &Spanned<DeValue<'_>>, source: &str) -> Option<Self> {
-        let code = spanned.get_ref().as_str()?;
-        let code = get_redirect_target(code).unwrap_or(code);
-        let rule = Rule::from_code(code).ok()?;
+        let selector = spanned.get_ref().as_str()?;
+        let redirect = get_redirect(selector);
+        let code = redirect.map_or(selector, |(_, target)| target);
+        let name = Rule::from_code(code).ok().map(|rule| rule.name());
+        if name.is_none() && redirect.is_none() {
+            return None;
+        }
 
         let span = spanned.span();
         let range = TextRange::new(
@@ -140,7 +157,7 @@ impl RuleCode {
         );
 
         // Note that this should be infallible because the parsed TOML string is surrounded by valid
-        // quotes, and `Rule::from_code` above guarantees that its content is a valid rule code. This
+        // quotes, and its content was recognized above as a rule code or a redirect. This
         // means that we don't have to worry about stripping nested quotes like `"'F401'"` or similar.
         let range = {
             let string = &source[range];
@@ -152,7 +169,8 @@ impl RuleCode {
         };
 
         Some(Self {
-            name: rule.name(),
+            name,
+            redirect,
             range,
         })
     }

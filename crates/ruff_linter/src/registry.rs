@@ -249,7 +249,9 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::InvalidPyprojectToml | Rule::RuleCodesInSelectors => LintSource::Toml,
+            Rule::InvalidPyprojectToml
+            | Rule::RedirectedRuleSelector
+            | Rule::RuleCodesInSelectors => LintSource::Toml,
             Rule::BlanketNOQA
             | Rule::NoqaComments
             | Rule::RedirectedNOQA

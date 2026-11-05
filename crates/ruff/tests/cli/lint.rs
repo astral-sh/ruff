@@ -5464,3 +5464,30 @@ fn ruff_toml_is_linted() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn fix_redirected_selectors_with_rule_names() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "lint.select = ['TCH002', 'TCH']\n")?;
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--extend-select", "RUF201,RUF202", "--diff", "ruff.toml"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- ruff.toml
+    +++ ruff.toml
+    @@ -1 +1 @@
+    -lint.select = ['TCH002', 'TCH']
+    +lint.select = ['typing-only-third-party-import', 'TC']
+
+    Would fix 3 errors.
+
+    ----- stderr -----
+    warning: `TCH002` has been remapped to `TC002`.
+    "
+    );
+
+    Ok(())
+}
