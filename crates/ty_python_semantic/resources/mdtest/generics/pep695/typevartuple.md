@@ -1174,6 +1174,9 @@ def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
     raise NotImplementedError
 
 def suffixed[*Ts](*args: *tuple[*Ts, str]) -> tuple[*Ts]:
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
+    reveal_type(suffixed(*suffix))
     raise NotImplementedError
 
 def bounded[*Ts](*args: *tuple[int, *Ts, int]) -> tuple[*Ts]:

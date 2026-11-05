@@ -817,11 +817,10 @@ from typing import TypeVarTuple
 Ts = TypeVarTuple("Ts")
 
 def bounded(head: int, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
-    raise NotImplementedError
-
-def check(suffix: tuple[bool, str]) -> None:
-    # revealed: tuple[bool]
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
     reveal_type(bounded(1, *suffix))
+    raise NotImplementedError
 ```
 
 ### Starred variadic methods on specialized classes
