@@ -344,6 +344,16 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
+    /// A simple type variable has no bound, constraints, or default.
+    pub(super) fn is_simple(self, db: &'db dyn Db) -> bool {
+        match self.kind(db) {
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar => {
+                self._bound_or_constraints(db).is_none() && self._default(db).is_none()
+            }
+            _ => false,
+        }
+    }
+
     /// Returns whether this type variable has constraints without evaluating a lazy bound.
     pub(super) fn is_constrained(self, db: &'db dyn Db) -> bool {
         matches!(

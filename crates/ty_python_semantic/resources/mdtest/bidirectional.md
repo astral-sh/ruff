@@ -2303,7 +2303,7 @@ def from_or(values: list[str] | None) -> None:
 
 def constructor_fallback(values: list[int] | None) -> None:
     # TODO: This should reveal `list[int]` based on the peer type context.
-    reveal_type(values or list())  # revealed: list[int] | list[Unknown]
+    reveal_type(values or list())  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
 def from_and(values: list[str]) -> None:
     reveal_type(values and [])  # revealed: list[str]
@@ -2669,11 +2669,12 @@ def f[T](x: T, y: T) -> T:
     return x
 
 def _(td: TD):
-    # revealed: TD
-    x = reveal_type(f(td, reveal_type({"x": 1})))  # revealed: TD
-
     # TODO: The initial type of the dictionary literal pollutes later
     # iterations, meaning we fail to narrow to `TD` here.
+    # revealed: TD | dict[str, int]
+    x = reveal_type(f(td, reveal_type({"x": 1})))  # revealed: TD | dict[str, int]
+
+    # TODO: This should also be `TD`.
     x = f(td, reveal_type({"x": 1}))  # revealed: TD | dict[str, int]
     reveal_type(x)  # revealed: TD | dict[str, int]
 ```
