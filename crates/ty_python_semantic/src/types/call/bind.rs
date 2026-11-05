@@ -6110,6 +6110,60 @@ impl<'a, 'db> CallInference<'a, 'db> {
     }
 }
 
+/// The argument evidence available when inferring type arguments. A source call also supplies
+/// the argument locations for diagnostics and the argument packs for variadic parameters.
+enum InferenceArguments<'a, 'db> {
+    Call(&'a CallInference<'a, 'db>),
+    Types(&'a [(Type<'db>, Type<'db>)]),
+}
+
+struct GenericCallInference<'a, 'db> {
+    db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
+    generic_context: GenericContext<'db>,
+    arguments: InferenceArguments<'a, 'db>,
+    call_expression_tcx: TypeContext<'db>,
+    return_ty: Type<'db>,
+    inferable_typevars: TypeVarSet<'db>,
+}
+
+/// Shares successful inference across calls that supply the same evidence in the same order.
+/// Returning `None` on failure or during a cycle lets the caller use its own argument locations
+/// and constraint builder for recovery.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _, _, _, _| None,
+    heap_size = ruff_memory_usage::heap_size,
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa owns the ordered argument pairs in the query key"
+)]
+fn shared_call_type_arguments<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    context: GenericContext<'db>,
+    call_expression_tcx: TypeContext<'db>,
+    return_ty: Type<'db>,
+    relations: Box<[(Type<'db>, Type<'db>)]>,
+) -> Option<TypeVarInference<'db>> {
+    let inferred = GenericCallInference {
+        db,
+        env: &ProgramEnvironment::from_program(program),
+        generic_context: context,
+        arguments: InferenceArguments::Types(&relations),
+        call_expression_tcx,
+        return_ty,
+        inferable_typevars: context.inferable_typevars(db),
+    }
+    .infer(&ConstraintSetBuilder::new());
+    if inferred.errors.is_empty() {
+        inferred.inference
+    } else {
+        None
+    }
+}
+
 impl<'db> ArgumentTypeChecker<'_, 'db> {
     /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
     ///
@@ -6635,17 +6689,107 @@ impl<'db> CallInference<'_, 'db> {
         }
     }
 
-    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
-        let db = self.db;
-        let mut constraint_set_errors = vec![false; self.arguments.len()];
+    fn infer(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        shared: Option<TypeVarInference<'db>>,
+    ) -> InferredCall<'db> {
+        let empty = |inference| InferredCall {
+            inferable_typevars: self.inferable_typevars,
+            inference,
+            refined_return_ty: None,
+            errors: Vec::new(),
+            constraint_set_errors: vec![false; self.arguments.len()],
+        };
         let Some(generic_context) = self.signature.generic_context else {
-            return InferredCall {
+            return empty(None);
+        };
+        let mut inferred = if let Some(inference) = shared {
+            empty(Some(inference))
+        } else {
+            GenericCallInference {
+                db: self.db,
+                env: self.env,
+                generic_context,
+                arguments: InferenceArguments::Call(self),
+                call_expression_tcx: self.call_expression_tcx,
+                return_ty: self.return_ty,
                 inferable_typevars: self.inferable_typevars,
-                inference: None,
-                refined_return_ty: None,
-                errors: Vec::new(),
-                constraint_set_errors,
-            };
+            }
+            .infer(constraints)
+        };
+        inferred.refined_return_ty = inferred
+            .inference
+            .and_then(|inference| self.refined_return_type(inference));
+        inferred
+    }
+
+    /// Reuse the type arguments of ordinary calls with the same inference evidence.
+    /// Argument validation and return refinement still use the complete original call.
+    fn shared_type_arguments(&self) -> Option<TypeVarInference<'db>> {
+        let context = self.signature.generic_context?;
+        // Constructor return types can distinguish subclasses that inherit the same signature.
+        if self.is_constructor
+            || self.is_partial_application
+            || (0..self.arguments.len()).any(|index| self.arguments.is_variadic(index))
+            || self
+                .signature
+                .parameters()
+                .iter()
+                .any(Parameter::has_starred_annotation)
+        {
+            return None;
+        }
+
+        let mut has_explicit_bound = false;
+        for variable in context.variables(self.db) {
+            let typevar = variable.typevar(self.db);
+            let kind = typevar.kind(self.db);
+            if kind.is_paramspec() || kind.is_typevartuple() {
+                return None;
+            }
+            has_explicit_bound |= !matches!(kind, TypeVarKind::TypingSelf { .. })
+                && typevar.has_bound_or_constraints(self.db);
+        }
+
+        let mut relations = Vec::new();
+        for relation in self.argument_relations() {
+            let formal = relation.declared_type;
+            let actual = relation.argument_type;
+            // Equal types and pairs of string literals contribute no type-variable mapping.
+            if formal == actual || (formal.is_string_literal() && actual.is_string_literal()) {
+                continue;
+            }
+
+            // Nominal types recur across values, and bool has only two literals. Other literals,
+            // functions, and class objects can each introduce a key for a single value.
+            // Keep bounded inference in the source call's constraint builder unless all the
+            // contributing arguments are nominal instances.
+            if !matches!(actual, Type::NominalInstance(_))
+                && (has_explicit_bound || !actual.is_bool_literal())
+            {
+                return None;
+            }
+            relations.push((formal, actual));
+        }
+        shared_call_type_arguments(
+            self.db,
+            self.env.program(self.db),
+            context,
+            self.call_expression_tcx,
+            self.return_ty,
+            relations.into_boxed_slice(),
+        )
+    }
+}
+
+impl<'db> GenericCallInference<'_, 'db> {
+    fn infer(&self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
+        let db = self.db;
+        let generic_context = self.generic_context;
+        let mut constraint_set_errors = match self.arguments {
+            InferenceArguments::Call(call) => vec![false; call.arguments.len()],
+            InferenceArguments::Types(_) => Vec::new(),
         };
 
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
@@ -6863,7 +7007,6 @@ impl<'db> CallInference<'_, 'db> {
 
         let inference = self.solve(
             constraints,
-            generic_context,
             builder,
             &preferred_type_mappings,
             preferred_solutions_incomplete,
@@ -6871,8 +7014,8 @@ impl<'db> CallInference<'_, 'db> {
         );
         InferredCall {
             inferable_typevars: self.inferable_typevars,
-            inference: Some(inference),
-            refined_return_ty: self.refined_return_type(inference),
+            inference,
+            refined_return_ty: None,
             errors: specialization_errors,
             constraint_set_errors,
         }
@@ -6887,12 +7030,11 @@ impl<'db> CallInference<'_, 'db> {
     fn solve<'c>(
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        generic_context: GenericContext<'db>,
         mut builder: SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
-    ) -> TypeVarInference<'db> {
+    ) -> Option<TypeVarInference<'db>> {
         let db = self.db;
 
         // Attempt to promote any promotable types assigned to the specialization.
@@ -6952,9 +7094,9 @@ impl<'db> CallInference<'_, 'db> {
         };
 
         let preferred_specialization = (!preferred_type_mappings.is_empty()).then(|| {
-            generic_context.specialize(
+            self.generic_context.specialize(
                 db,
-                generic_context
+                self.generic_context
                     .variables(db)
                     .map(|typevar| {
                         preferred_type_mappings
@@ -6997,8 +7139,12 @@ impl<'db> CallInference<'_, 'db> {
         };
 
         match builder.build_inference_with(&mut choose) {
-            Ok(inference) => inference,
+            Ok(inference) => Some(inference),
             Err(errors) => {
+                // Diagnostic recovery uses every original argument and its source location.
+                let InferenceArguments::Call(call) = self.arguments else {
+                    return None;
+                };
                 for error in errors {
                     // Report at-most one failure per type variable to avoid redundant diagnostics.
                     if specialization_errors.iter().any(|existing| {
@@ -7018,15 +7164,58 @@ impl<'db> CallInference<'_, 'db> {
                     });
                 }
 
-                builder.build_diagnostic_inference_with(
-                    self.argument_relations()
-                        .map(|relation| (relation.declared_type, relation.argument_type)),
-                    choose,
+                Some(
+                    builder.build_diagnostic_inference_with(
+                        call.argument_relations()
+                            .map(|relation| (relation.declared_type, relation.argument_type)),
+                        choose,
+                    ),
                 )
             }
         }
     }
 
+    fn infer_argument_constraints<'c>(
+        &self,
+        builder: &mut SpecializationBuilder<'db, 'c>,
+        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
+        specialization_errors: &mut Vec<BindingError<'db>>,
+        constraint_set_errors: &mut [bool],
+    ) -> bool {
+        match self.arguments {
+            InferenceArguments::Call(call) => {
+                if !call.infer_argument_constraints(
+                    builder,
+                    !preferred_type_mappings.is_empty(),
+                    specialization_errors,
+                    constraint_set_errors,
+                ) {
+                    return false;
+                }
+            }
+            InferenceArguments::Types(relations) => {
+                for &(formal, actual) in relations {
+                    if let Err(error) = builder.infer(formal, actual) {
+                        specialization_errors.push(BindingError::SpecializationError {
+                            error,
+                            argument_index: None,
+                            argument: None,
+                        });
+                    }
+                }
+            }
+        }
+        preferred_type_mappings
+            .iter()
+            .all(|(&identity, &preferred_ty)| {
+                partially_specialized_declared_type.contains(&identity)
+                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
+            })
+    }
+}
+
+impl<'db> CallInference<'_, 'db> {
     /// Infers a variadic type variable tuple from every argument matched to `*args`.
     ///
     /// Comparing the complete argument tuple with the declared tuple preserves fixed elements,
@@ -7304,8 +7493,7 @@ impl<'db> CallInference<'_, 'db> {
     fn infer_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
-        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
+        check_type_context: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
         constraint_set_errors: &mut [bool],
     ) -> bool {
@@ -7347,14 +7535,9 @@ impl<'db> CallInference<'_, 'db> {
 
         self.infer_typevartuple_argument_constraints(
             builder,
-            !preferred_type_mappings.is_empty(),
+            check_type_context,
             specialization_errors,
-        ) && preferred_type_mappings
-            .iter()
-            .all(|(&identity, &preferred_ty)| {
-                partially_specialized_declared_type.contains(&identity)
-                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
-            })
+        )
     }
 }
 
@@ -8859,7 +9042,6 @@ impl<'db> Binding<'db> {
         // create multiple instances of a single typevar identity with different
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
-        let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
@@ -8874,11 +9056,11 @@ impl<'db> Binding<'db> {
                 .iter()
                 .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
         {
-            self.check_keyword_unpack_key_types(db, env, constraints, arguments);
+            self.check_keyword_unpack_key_types(db, env, &ConstraintSetBuilder::new(), arguments);
             return;
         }
 
-        let inferred = CallInference {
+        let call = CallInference {
             db,
             env,
             signature: &self.signature,
@@ -8892,25 +9074,52 @@ impl<'db> Binding<'db> {
                 .signature
                 .generic_context
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
-        }
-        .infer(constraints);
+        };
+        let check = |shared,
+                     constraints: &ConstraintSetBuilder<'db>,
+                     errors: &mut Vec<_>,
+                     parameter_tys: &mut [Option<Type<'db>>]| {
+            let inferred = call.infer(constraints, shared);
+            let mut checker = ArgumentTypeChecker::new(
+                db,
+                env,
+                self.signature_type,
+                self.constructor_context.map(ConstructorContext::kind),
+                &self.signature,
+                arguments,
+                &self.argument_matches,
+                parameter_tys,
+                call_expression_tcx,
+                self.return_ty,
+                errors,
+                inferred,
+            );
+            checker.check_argument_types(constraints);
+            checker.finish()
+        };
 
-        let mut checker = ArgumentTypeChecker::new(
-            db,
-            env,
-            self.signature_type,
-            self.constructor_context.map(ConstructorContext::kind),
-            &self.signature,
-            arguments,
-            &self.argument_matches,
-            &mut self.parameter_tys,
-            call_expression_tcx,
-            self.return_ty,
+        if let Some(shared) = call.shared_type_arguments() {
+            let validation = ConstraintSetBuilder::new();
+            let mut errors = self.errors.clone();
+            let mut parameter_tys = self.parameter_tys.clone();
+            let result = check(Some(shared), &validation, &mut errors, &mut parameter_tys);
+            // The source call's solver seeds its builder with the first instance of each
+            // type-variable identity, including specialized bounds. Terminal checks never
+            // consult those entries. Otherwise check this call with its original seeded builder.
+            if validation.is_unused() {
+                (self.inferable_typevars, self.inference, self.return_ty) = result;
+                self.errors = errors;
+                self.parameter_tys = parameter_tys;
+                return;
+            }
+        }
+
+        (self.inferable_typevars, self.inference, self.return_ty) = check(
+            None,
+            &ConstraintSetBuilder::new(),
             &mut self.errors,
-            inferred,
+            &mut self.parameter_tys,
         );
-        checker.check_argument_types(constraints);
-        (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
     }
 
     fn check_keyword_unpack_key_types(
