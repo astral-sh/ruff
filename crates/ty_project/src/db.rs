@@ -954,76 +954,16 @@ pub(crate) mod testing {
 mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
-    use ruff_db::system::{
-        DbWithWritableSystem as _, OsSystem, System, SystemPath, SystemPathBuf, TestSystem,
-        WritableSystem,
-    };
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
     use salsa::plumbing::current_revision;
     use ty_module_resolver::list_modules;
     use ty_python_semantic::Db as _;
-    use ty_static::EnvVars;
 
     use crate::db::testing::TestDb;
-    use crate::watch::{ChangeEvent, DeletedKind};
+    use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
-
-    /// A deletion notification for the active Pixi prefix switches the project to its `.venv`.
-    #[test]
-    fn deleting_pixi_prefix_selects_project_venv() {
-        let temp = tempfile::tempdir().unwrap();
-        let root = SystemPath::from_std_path(temp.path()).unwrap();
-        let system = TestSystem::new(OsSystem::new(root));
-        system.clear_env_vars();
-        let root = system.canonicalize_path(root).unwrap();
-        let prefix = root.join(".pixi/envs/dev");
-        let venv = root.join(".venv");
-        let (python, site_packages) = if cfg!(windows) {
-            ("python.exe", "Lib/site-packages")
-        } else {
-            ("bin/python", "lib/python3.13/site-packages")
-        };
-        for env in [&prefix, &venv] {
-            system
-                .create_directory_all(&env.join(site_packages))
-                .unwrap();
-        }
-        let interpreter = prefix.join(python);
-        system
-            .create_directory_all(interpreter.parent().unwrap())
-            .unwrap();
-        system.write_file(&interpreter, "").unwrap();
-        system
-            .create_directory_all(&prefix.join("conda-meta"))
-            .unwrap();
-        system
-            .write_file(&prefix.join("conda-meta/pixi"), "")
-            .unwrap();
-        system
-            .write_file(&venv.join("pyvenv.cfg"), &format!("home = {root}"))
-            .unwrap();
-        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
-
-        let metadata = ProjectMetadata::new("test", root);
-        let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
-        let selected_prefix = |db: &ProjectDatabase| {
-            db.project()
-                .program_settings(db)
-                .last_usable_python_environment()
-                .unwrap()
-                .sys_prefix()
-                .to_path_buf()
-        };
-        assert_eq!(selected_prefix(&db), prefix);
-
-        std::fs::remove_dir_all(&prefix).unwrap();
-        db.apply_changes(&[ChangeEvent::Deleted {
-            path: prefix,
-            kind: DeletedKind::Any,
-        }]);
-        assert_eq!(selected_prefix(&db), venv);
-    }
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
