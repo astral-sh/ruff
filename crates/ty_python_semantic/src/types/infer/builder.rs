@@ -38,7 +38,7 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
-    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
+    explicit_global_symbol, has_bound_prefix, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
@@ -10990,29 +10990,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         prefix_loads.iter().any(|prefix| {
-            let place = match prefix {
-                PlaceExprPrefixLoad::AtUse(use_id) => {
-                    place_from_bindings_with_reachability_cache(
-                        db,
-                        env,
-                        use_def.bindings_at_use(use_id),
-                        self.reachability_cache(),
-                    )
-                    .place
-                }
-                PlaceExprPrefixLoad::AllReachable(place_id) => {
-                    place_from_bindings_with_reachability_cache(
-                        db,
-                        env,
-                        use_def.reachable_bindings(place_id),
-                        self.reachability_cache(),
-                    )
-                    .place
-                }
+            let bindings = match prefix {
+                PlaceExprPrefixLoad::AtUse(id) => use_def.bindings_at_use(id),
+                PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
                 PlaceExprPrefixLoad::DefinitelyBound => return true,
             };
-
-            !place.is_undefined()
+            has_bound_prefix(db, env, bindings, Some(self.reachability_cache()))
         })
     }
 
