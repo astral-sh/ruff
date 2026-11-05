@@ -1634,6 +1634,30 @@ reveal_type(D(1))  # revealed: D[int]
 wrong_innards: D[int] = D("five")
 ```
 
+### Reordered type arguments in `__new__`
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]):
+    first: T
+
+    def __new__(cls, x: T, y: U) -> "Pair[U, T]":
+        raise NotImplementedError
+
+    def check(self, x: int, y: str) -> int:
+        # revealed: Pair[str, int]
+        reveal_type(Pair(x, y))
+        return Pair(x, y).first  # error: [invalid-return-type]
+
+def check(x: int, y: str) -> None:
+    # revealed: Pair[str, int]
+    reveal_type(Pair(x, y))
+```
+
 ### Type variable defaults across `__new__` and `__init__`
 
 A type variable left unsolved by `__new__` can still be inferred from `__init__`. Its default

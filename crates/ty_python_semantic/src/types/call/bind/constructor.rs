@@ -385,7 +385,7 @@ impl<'db> ConstructorBinding<'db> {
         }
 
         constructed_instance_type
-            .apply_optional_specialization(db, self.instance_return_specialization(db, env))
+            .apply_optional_specialization(db, self.instance_return_specialization(db, env, None))
     }
 
     fn first_matching_overload(&self) -> Option<&Binding<'db>> {
@@ -403,6 +403,7 @@ impl<'db> ConstructorBinding<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        explicit_return: Option<&Binding<'db>>,
     ) -> Option<Specialization<'db>> {
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
@@ -414,9 +415,9 @@ impl<'db> ConstructorBinding<'db> {
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Vec<Option<Type<'db>>>> = None;
-        let mut combine_binding_types = |binding: &ConstructorBinding<'db>| {
-            let Some(overload) = binding
-                .first_matching_overload()
+        let mut combine_binding_types = |binding: &Self, explicit_return: Option<&Binding<'db>>| {
+            let Some(overload) = explicit_return
+                .or_else(|| binding.first_matching_overload())
                 .or_else(|| binding.callable().unambiguous_failing_overload())
             else {
                 return;
@@ -462,8 +463,20 @@ impl<'db> ConstructorBinding<'db> {
                     let resolved = resolved_ty.specialization_of(db, env, class_literal)?;
                     Some(inferred_types(partial, resolved))
                 };
-            let return_types =
-                project_class_arguments(overload.unspecialized_return_type(db), overload.return_ty);
+            let return_types = if explicit_return.is_some() {
+                // The caller applies these bindings to the return annotation. Infer them in
+                // declaration order so an annotation like `Pair[U, T]` swaps the arguments once.
+                let instance = overload
+                    .constructor_context
+                    .unwrap_or(binding.context())
+                    .instance_type();
+                project_class_arguments(
+                    instance,
+                    instance.apply_optional_specialization(db, overload.merged_specialization(db)),
+                )
+            } else {
+                project_class_arguments(overload.unspecialized_return_type(db), overload.return_ty)
+            };
 
             // TODO All this handling of return-specialization vs self-specialization is a hacky
             // work-around to a situation that can occur with a case like `def __init__(self:
@@ -525,14 +538,14 @@ impl<'db> ConstructorBinding<'db> {
             }
         };
 
-        combine_binding_types(self);
+        combine_binding_types(self, explicit_return);
 
         if let Some(downstream) = self.downstream_constructor() {
             for downstream_binding in downstream
                 .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
             {
-                combine_binding_types(downstream_binding);
+                combine_binding_types(downstream_binding, None);
             }
         }
 
@@ -654,7 +667,7 @@ impl<'db> ConstructorBinding<'db> {
             return (
                 return_ty.apply_optional_specialization(
                     db,
-                    self.instance_return_specialization(db, env),
+                    self.instance_return_specialization(db, env, Some(overload)),
                 ),
                 true,
             );
