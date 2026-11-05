@@ -77,6 +77,15 @@ mod tests {
         Rule::InvalidModuleName,
         Path::new("N999/module/invalid_name/import.py")
     )]
+    #[test_case(
+        Rule::InvalidModuleName,
+        Path::new("N999/module/migrations/0001_initial.py")
+    )]
+    #[test_case(
+        Rule::InvalidModuleName,
+        Path::new("N999/module/migrations/0001_Initial.py");
+        "invalid_module_name_mixed_case_migration"
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -84,6 +93,87 @@ mod tests {
             &settings::LinterSettings {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/mod with spaces/__init__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/mod with spaces/file.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/flake9/__init__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/MODULE/__init__.py")
+    )]
+    #[test_case(Rule::NonSnakeCaseModuleName, Path::new("N999/module/MODULE/file.py"))]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/mod-with-dashes/__init__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/__init__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/no_module/test.txt")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/file-with-dashes.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/__main__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/invalid_name/0001_initial.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/__setup__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/file-with-dashes")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/invalid_name/import.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/valid_name/MixedCaseFile.py")
+    )]
+    #[test_case(Rule::NonSnakeCaseModuleName, Path::new("N999/module/valid_name/δ.py"))]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/migrations/__init__.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/migrations/0001_initial.py")
+    )]
+    #[test_case(
+        Rule::NonSnakeCaseModuleName,
+        Path::new("N999/module/migrations/0001_Initial.py");
+        "non_snake_case_module_name_mixed_case_migration"
+    )]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -163,6 +253,9 @@ mod tests {
     #[test_case(Rule::CamelcaseImportedAsAcronym, "N817.py")]
     #[test_case(Rule::ErrorSuffixOnExceptionName, "N818.py")]
     #[test_case(Rule::InvalidModuleName, "N999/badAllowed/__init__.py")]
+    #[test_case(Rule::InvalidModuleName, "N999/bad-allowed/__init__.py")]
+    #[test_case(Rule::NonSnakeCaseModuleName, "N999/badAllowed/__init__.py")]
+    #[test_case(Rule::NonSnakeCaseModuleName, "N999/bad-allowed/__init__.py")]
     fn ignore_names(rule_code: Rule, path: &str) -> Result<()> {
         let snapshot = format!("ignore_names_{}_{path}", rule_code.name());
         let diagnostics = test_path(
@@ -178,7 +271,7 @@ mod tests {
                     .unwrap(),
                     ..Default::default()
                 },
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code).with_preview_mode()
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
