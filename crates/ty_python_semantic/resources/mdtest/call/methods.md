@@ -926,6 +926,25 @@ reveal_type(d.method(42))  # revealed: str
 We might therefore consider implementing a stricter check that emits a diagnostic on the problematic
 `self.method = self.seemingly_compatible` assignment above.
 
+### Explicitly annotated instance attributes
+
+When the instance attribute assignment is explicitly annotated with a type that is incompatible with the method it shadows,
+we assume that shadowing is intentional, and prefer the annotation over the method's type:
+
+```py
+class C:
+    def f(self) -> int:
+        return 1
+
+    def __init__(self) -> None:
+        self.f: str = "foo"
+
+# TODO: The explicit annotation should make this a `str`.
+reveal_type(C().f)  # revealed: bound method C.f() -> int
+# TODO: This should emit `call-non-callable`.
+C().f()
+```
+
 ### Identity of a shadowed static method
 
 A static method that can optionally be replaced should not retain its identity as a singleton type
