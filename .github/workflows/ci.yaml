@@ -1655,8 +1655,8 @@ jobs:
           mode: "walltime,memory"
           run: uv run --locked --only-dev cargo codspeed run --bench ruff_walltime
 
-  benchmarks-walltime-build:
-    name: "benchmarks walltime (build)"
+  benchmarks-walltime-ty-build:
+    name: "benchmarks walltime ty (build)"
     # We only run this job if `github.repository == 'astral-sh/ruff'`,
     # so hardcoding depot here is fine
     runs-on: depot-ubuntu-24.04-4
@@ -1700,10 +1700,10 @@ jobs:
           if-no-files-found: "error"
           retention-days: 1
 
-  benchmarks-walltime-run:
-    name: "benchmarks walltime (x86_64)"
+  benchmarks-walltime-ty-run:
+    name: "benchmarks walltime ty (x86_64)"
     runs-on: codspeed-macro-x64-ryzen-9950x-ubuntu-24-04
-    needs: benchmarks-walltime-build
+    needs: benchmarks-walltime-ty-build
     timeout-minutes: 20
     permissions:
       contents: read # required for actions/checkout
