@@ -10,15 +10,10 @@ pub use module::KnownModule;
 pub use module::Module;
 pub use module_name::{ImportingFile, ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
-#[allow(
-    dead_code,
-    reason = "Package directory renames use this export in the next change."
-)]
-pub use resolve::package_locations;
 pub use resolve::{
-    SearchPaths, editable_search_paths, file_to_module, resolve_module, resolve_module_confident,
-    resolve_module_for_import_from, resolve_real_module, resolve_real_module_confident,
-    resolve_real_shadowable_module, stub_file_to_real_module,
+    SearchPaths, editable_search_paths, file_to_module, package_locations, resolve_module,
+    resolve_module_confident, resolve_module_for_import_from, resolve_real_module,
+    resolve_real_module_confident, resolve_real_shadowable_module, stub_file_to_real_module,
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};

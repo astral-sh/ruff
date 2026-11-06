@@ -4,10 +4,8 @@ use lsp_types::{
     FileRename as LspFileRename, RenameFilesParams, TextEdit, Uri, WillRenameFilesRequest,
     WorkspaceEdit,
 };
-use ruff_db::files::system_path_to_file;
 use ruff_db::system::SystemPathBuf;
 use ty_ide::{FileRename, will_rename_files};
-use ty_project::ProjectDatabase;
 
 use crate::document::extend_lsp_edits;
 use crate::server::api::traits::{
@@ -16,7 +14,7 @@ use crate::server::api::traits::{
 use crate::session::client::Client;
 use crate::session::{Session, SessionSnapshot};
 
-/// Handles `workspace/willRenameFiles` for Python module files.
+/// Handles `workspace/willRenameFiles` for Python module files and package directories.
 pub(crate) struct WillRenameFilesHandler;
 
 impl RequestHandler for WillRenameFilesHandler {
@@ -39,18 +37,13 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
         _client: &Client,
         params: RenameFilesParams,
     ) -> crate::server::Result<Option<WorkspaceEdit>> {
+        let renames: Vec<_> = params.files.iter().filter_map(prepare_rename).collect();
+        if renames.is_empty() {
+            return Ok(None);
+        }
+
         let mut changes = HashMap::new();
-
         for db in snapshot.projects() {
-            let renames: Vec<_> = params
-                .files
-                .iter()
-                .filter_map(|rename| prepare_rename(db, rename))
-                .collect();
-            if renames.is_empty() {
-                continue;
-            }
-
             let result = will_rename_files(db, &renames);
             extend_lsp_edits(db, snapshot.position_encoding(), result, &mut changes);
         }
@@ -68,11 +61,10 @@ impl RetriableRequestHandler for WillRenameFilesHandler {
 }
 
 /// Converts an LSP rename request into our internal representation of the same.
-fn prepare_rename(db: &ProjectDatabase, rename: &LspFileRename) -> Option<FileRename> {
+fn prepare_rename(rename: &LspFileRename) -> Option<FileRename> {
     let old_path = file_uri_to_path(&rename.old_uri)?;
     let new_path = file_uri_to_path(&rename.new_uri)?;
-    let file = system_path_to_file(db, &old_path).ok()?;
-    Some(FileRename { file, new_path })
+    Some(FileRename { old_path, new_path })
 }
 
 /// Deduplicates edits and drops files with overlapping edits.
