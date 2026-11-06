@@ -168,7 +168,13 @@ impl LspFileWatcher {
                 self.cache_key = Some(cache_key);
                 return None;
             }
-            (vec![workspace_watcher()], Vec::new())
+            (
+                vec![FileSystemWatcher {
+                    glob_pattern: GlobPattern::Pattern("**".into()),
+                    kind: None,
+                }],
+                Vec::new(),
+            )
         };
 
         Some(self.registration(watchers, paths, cache_key))
@@ -192,7 +198,14 @@ impl LspFileWatcher {
             .into_iter()
             .map(|(root, _)| root.clone())
             .collect();
-        Some(self.registration(vec![workspace_watcher()], roots, cache_key))
+        Some(self.registration(
+            vec![FileSystemWatcher {
+                glob_pattern: GlobPattern::Pattern("**".into()),
+                kind: None,
+            }],
+            roots,
+            cache_key,
+        ))
     }
 
     fn registration(
@@ -378,13 +391,6 @@ impl FileWatcherCompletion {
                 |_, ()| {},
             );
         }
-    }
-}
-
-fn workspace_watcher() -> FileSystemWatcher {
-    FileSystemWatcher {
-        glob_pattern: GlobPattern::Pattern("**".into()),
-        kind: None,
     }
 }
 
