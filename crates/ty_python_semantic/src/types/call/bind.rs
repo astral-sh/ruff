@@ -5846,14 +5846,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
         call_expression_tcx: TypeContext<'db>,
-        return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
         inferred: InferredCall<'db>,
     ) -> Self {
         let InferredCall {
             inferable_typevars,
             inference,
-            refined_return_ty,
+            return_ty,
+            arguments_validated,
             errors: inference_errors,
             constraint_set_errors,
         } = inferred;
@@ -5869,16 +5869,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             parameter_tys,
             parameter_ty_builders: Vec::new(),
             call_expression_tcx,
-            return_ty: refined_return_ty.unwrap_or_else(|| {
-                return_ty.apply_optional_specialization(
-                    db,
-                    inference.map(|inference| inference.merged_specialization(db)),
-                )
-            }),
+            return_ty,
             errors,
             inferable_typevars,
             inference,
-            arguments_validated: refined_return_ty.is_some(),
+            arguments_validated,
             constraint_set_errors,
         }
     }
@@ -6059,8 +6054,9 @@ struct InferredCall<'db> {
     inferable_typevars: TypeVarSet<'db>,
     /// Inferred type arguments, or `None` when the signature is not generic.
     inference: Option<TypeVarInference<'db>>,
-    /// Return type projected from specializations that each validate the original arguments.
-    refined_return_ty: Option<Type<'db>>,
+    return_ty: Type<'db>,
+    /// Whether inference has checked argument assignability for the selected return type.
+    arguments_validated: bool,
     /// Inference errors retained after any retry without the expected return type.
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
@@ -6423,20 +6419,28 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
-    /// Refines the return using resolved alternatives that each validate every original argument.
+    /// Chooses the return type of a call, potentially correlating multiple compatible specializations.
     ///
-    /// Returns `None` when correlated inference is unavailable or incomplete.
-    fn refined_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
+    /// This method also returns a flag indicating whether the call arguments were validated against
+    /// the relevant specializations. If it is `false`, the caller must validate the arguments
+    /// against the merged specialization and report any relevant diagnostics.
+    fn select_return_type(&self, inference: TypeVarInference<'db>) -> (Type<'db>, bool) {
         let db = self.db;
         let env = self.env;
+
+        let merged_specialization = inference.merged_specialization(db);
+        let specialize_return_ty = |specialization: Specialization<'db>| {
+            self.return_ty.apply_specialization(db, specialization)
+        };
+
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
         // Their remaining parameters and return types must use the same specialization.
         if self.is_partial_application || self.is_constructor {
-            return None;
+            return (specialize_return_ty(merged_specialization), false);
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
             // `Single` already has the same specialization under either projection.
-            return None;
+            return (specialize_return_ty(merged_specialization), false);
         };
         let resolved_type = |binding| match binding {
             SolutionType::Resolved(ty) => Some(ty),
@@ -6449,16 +6453,8 @@ impl<'db> CallInference<'_, 'db> {
             .variables(db)
             .any(|variable| variable.is_paramspec(db) || variable.is_typevartuple(db))
         {
-            return None;
+            return (specialize_return_ty(merged_specialization), false);
         }
-        let mentions_inferable = |ty| {
-            any_over_type_expanding_aliases(
-                db,
-                env,
-                ty,
-                |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
-            )
-        };
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
         // for the whole call rather than silently dropping that sibling.
         // Unresolved bindings can contain cycles, so none may reach recursive specialization.
@@ -6468,7 +6464,7 @@ impl<'db> CallInference<'_, 'db> {
                 .flatten()
                 .any(|binding| matches!(binding, SolutionType::Unresolved(_)))
         }) {
-            return None;
+            return (specialize_return_ty(merged_specialization), false);
         }
         let return_variables: SmallVec<[_; 4]> = generic_context
             .variables(db)
@@ -6479,9 +6475,10 @@ impl<'db> CallInference<'_, 'db> {
                 })
             })
             .collect();
+        let mut can_intersect = true;
         // A return variable missing from every alternative can use its default (or `Unknown`)
         // while other variables refine the return. The resulting specializations must still
-        // validate every argument. Partial bindings still require the merged fallback.
+        // validate every argument. Partial bindings still require the fallback.
         for &(index, variable) in &return_variables {
             if alternatives.iter().all(|types| types[index].is_some()) {
                 continue;
@@ -6489,21 +6486,115 @@ impl<'db> CallInference<'_, 'db> {
             if !matches!(
                 variable.kind(db),
                 TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar
-            ) || alternatives.iter().any(|types| types[index].is_some())
-            {
-                return None;
+            ) {
+                return (specialize_return_ty(merged_specialization), false);
+            }
+
+            if alternatives.iter().any(|types| types[index].is_some()) {
+                can_intersect = false;
             }
         }
 
         // Apply defaults separately in each alternative, preserving dependencies such as
         // `U = list[T]` before validating arguments or projecting the return type.
-        let specializations = alternatives.iter().map(|types| {
+        let specializations = Vec::from_iter(alternatives.iter().map(|types| {
             generic_context.specialize_recursive(
                 db,
                 types.iter().map(|binding| binding.and_then(resolved_type)),
             )
-        });
+        }));
 
+        let is_compatible_return = |ty: Type<'db>| {
+            let expected_return = self
+                .call_expression_tcx
+                .declared_type()
+                .filter(|_| self.call_expression_tcx.kind() == TypeContextKind::Declared);
+
+            expected_return
+                .is_none_or(|expected_return| ty.is_assignable_to(db, env, expected_return))
+        };
+
+        // Prefer the correlated return specialization if it is compatible with the declared
+        // type context.
+        let intersected_return = can_intersect
+            .then(|| self.intersect_specialized_returns(&specializations, &return_variables))
+            .flatten();
+
+        if let Some(intersected_return) = intersected_return
+            && is_compatible_return(intersected_return)
+        {
+            return (intersected_return, true);
+        }
+
+        // Otherwise, infer the merged specialization if it is compatible.
+        let accepts_merged_arguments = self.accepts_arguments(merged_specialization);
+        if accepts_merged_arguments {
+            let merged_return = specialize_return_ty(merged_specialization);
+
+            if is_compatible_return(merged_return) {
+                return (merged_return, true);
+            }
+        }
+
+        // If the merged specialization is incompatible, infer the union of all compatible
+        // return specializations.
+        //
+        // TODO: We could attempt to intersect the alternatives that are compatible with the
+        // declared type. However, generic call narrowing means we do not have access to the full
+        // declared type here.
+        let mut compatible_returns = Vec::new();
+        let mut fallback_returns = Vec::new();
+        let arguments_validated = intersected_return.is_some() || accepts_merged_arguments;
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        for specialization in specializations {
+            if !self.accepts_arguments(specialization) {
+                continue;
+            }
+
+            let ty = specialize_return_ty(specialization);
+            if budget.charge_type(db, ty).is_err() {
+                let fallback = intersected_return
+                    .unwrap_or_else(|| specialize_return_ty(merged_specialization));
+                return (fallback, arguments_validated);
+            }
+
+            if is_compatible_return(ty) {
+                compatible_returns.push(ty);
+            } else if !arguments_validated && compatible_returns.is_empty() {
+                // If no return fits the declared type, fall back to argument-compatible
+                // specializations for diagnostics.
+                fallback_returns.push(ty);
+            }
+        }
+
+        if !compatible_returns.is_empty() {
+            (UnionType::from_elements(db, env, compatible_returns), true)
+        } else if !fallback_returns.is_empty() {
+            (UnionType::from_elements(db, env, fallback_returns), true)
+        } else {
+            let fallback =
+                intersected_return.unwrap_or_else(|| specialize_return_ty(merged_specialization));
+            (fallback, arguments_validated)
+        }
+    }
+
+    /// Intersects the specialized return types when they can hold simultaneously for the same call.
+    fn intersect_specialized_returns(
+        &self,
+        specializations: &[Specialization<'db>],
+        return_variables: &[(usize, BoundTypeVarInstance<'db>)],
+    ) -> Option<Type<'db>> {
+        let db = self.db;
+        let env = self.env;
+
+        let mentions_inferable = |ty| {
+            any_over_type_expanding_aliases(
+                db,
+                env,
+                ty,
+                |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
+            )
+        };
         let relations: Vec<_> = self
             .argument_relations()
             .map(|relation| {
@@ -6515,7 +6606,9 @@ impl<'db> CallInference<'_, 'db> {
             .collect();
 
         let mut validated = Vec::with_capacity(specializations.len());
-        'specializations: for specialization in specializations {
+        let mut returns = Vec::with_capacity(specializations.len());
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        'specializations: for &specialization in specializations {
             // Recheck the original relations, including requirements that recursive protocol
             // inference may omit.
             for (relation, contributes_to_inference) in &relations {
@@ -6544,27 +6637,7 @@ impl<'db> CallInference<'_, 'db> {
                 }
             }
             validated.push(specialization);
-        }
 
-        if validated.is_empty() {
-            return None;
-        }
-        self.specialized_return_type(inference, &validated, &return_variables)
-    }
-
-    /// Projects the return type from specializations that each validate the whole call.
-    fn specialized_return_type(
-        &self,
-        inference: TypeVarInference<'db>,
-        specializations: &[Specialization<'db>],
-        return_variables: &[(usize, BoundTypeVarInstance<'db>)],
-    ) -> Option<Type<'db>> {
-        let db = self.db;
-        let env = self.env;
-
-        let mut returns = Vec::with_capacity(specializations.len());
-        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
-        for &specialization in specializations {
             let return_ty = self.return_ty.apply_specialization(db, specialization);
             budget.charge_type(db, return_ty).ok()?;
             // Expose aliased unions to the intersection constructor's expansion budget.
@@ -6609,7 +6682,7 @@ impl<'db> CallInference<'_, 'db> {
         let invariant_visitor = PairVisitor::new(true);
         let mut remaining_comparisons = SolutionBudget::default().visits;
         let has_invariant_difference = return_variables.iter().any(|&(index, variable)| {
-            let types = specializations
+            let types = validated
                 .iter()
                 .map(|specialization| specialization.types(db)[index])
                 .unique();
@@ -6635,26 +6708,23 @@ impl<'db> CallInference<'_, 'db> {
         });
 
         if has_invariant_difference {
-            let merged = inference.merged_specialization(db);
-            // Preserve the existing merged return when that specialization accepts the call.
-            // Otherwise, use the separate valid returns rather than an invalid merged mapping.
-            if self.argument_relations().all(|relation| {
-                relation
-                    .argument_type
-                    .apply_specialization(db, merged)
-                    .is_assignable_to(
-                        db,
-                        env,
-                        relation.declared_type.apply_specialization(db, merged),
-                    )
-            }) {
-                Some(self.return_ty.apply_specialization(db, merged))
-            } else {
-                Some(UnionType::from_elements(db, env, returns))
-            }
-        } else {
-            IntersectionType::bounded_from_elements(db, env, returns)
+            return None;
         }
+
+        IntersectionType::bounded_from_elements(db, env, returns)
+    }
+
+    fn accepts_arguments(&self, specialization: Specialization<'db>) -> bool {
+        let db = self.db;
+        self.argument_relations().all(|relation| {
+            let actual = relation
+                .argument_type
+                .apply_specialization(db, specialization);
+            let formal = relation
+                .declared_type
+                .apply_specialization(db, specialization);
+            actual.is_assignable_to(db, self.env, formal)
+        })
     }
 
     fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
@@ -6664,7 +6734,8 @@ impl<'db> CallInference<'_, 'db> {
             return InferredCall {
                 inferable_typevars: self.inferable_typevars,
                 inference: None,
-                refined_return_ty: None,
+                return_ty: self.return_ty,
+                arguments_validated: false,
                 errors: Vec::new(),
                 constraint_set_errors,
             };
@@ -6891,10 +6962,13 @@ impl<'db> CallInference<'_, 'db> {
             preferred_solutions_incomplete,
             &mut specialization_errors,
         );
+
+        let (return_ty, arguments_validated) = self.select_return_type(inference);
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
-            refined_return_ty: self.refined_return_type(inference),
+            return_ty,
+            arguments_validated,
             errors: specialization_errors,
             constraint_set_errors,
         }
@@ -8982,7 +9056,6 @@ impl<'db> Binding<'db> {
             &self.argument_matches,
             &mut self.parameter_tys,
             call_expression_tcx,
-            self.return_ty,
             &mut self.errors,
             inferred,
         );
