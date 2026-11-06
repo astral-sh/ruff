@@ -679,8 +679,7 @@ impl<'db> Type<'db> {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
             (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
+                self.materialized_divergent_fallback().is_none() && union.contains_member(db, self)
             }
             (Type::Intersection(intersection), _) => {
                 target.materialized_divergent_fallback().is_none()
@@ -2446,7 +2445,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `T` will always be a subtype of any union containing `T`.
             (_, Type::Union(union))
                 if self.relation.can_safely_assume_reflexivity(source)
-                    && union.elements(db).contains(&source) =>
+                    && union.contains_member(db, source) =>
             {
                 self.always()
             }
@@ -3839,6 +3838,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
+                    // Fast-path: If the type is inhabited and an exact member of the union,
+                    // the types cannot be disjoint.
+                    if self.report_context().is_none()
+                        && union.contains_member(db, other)
+                        && self
+                            .check_type_pair(db, other, other)
+                            .is_trivially_never_satisfied()
+                    {
+                        return self.never();
+                    }
+
                     let mut children = Vec::new();
                     let result = union
                         .elements(db)

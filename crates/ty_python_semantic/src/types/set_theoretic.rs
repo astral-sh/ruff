@@ -189,6 +189,24 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
+    /// Returns `true` if the union contains exactly the provided type as a member.
+    ///
+    /// Note that this method constructs and Salsa-memoizes an index for large unions to avoid
+    /// repeated linear scans.
+    pub(super) fn contains_member(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn element_set<'db>(db: &'db dyn Db, union: UnionType<'db>) -> FxHashSet<Type<'db>> {
+            union.elements(db).iter().copied().collect()
+        }
+
+        let elements = self.elements(db);
+        if elements.len() >= WIDE_UNION {
+            element_set(db, self).contains(&ty)
+        } else {
+            elements.contains(&ty)
+        }
+    }
+
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
         self.elements(db).iter().copied().any(Type::is_alias_like)
