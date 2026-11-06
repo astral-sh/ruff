@@ -1943,6 +1943,12 @@ fn pending_place_state_mut<'a>(
     }
 }
 
+#[derive(Clone, Copy)]
+struct BranchPaths {
+    branch: PendingReachabilityId,
+    joined: PendingReachabilityId,
+}
+
 impl PendingReachability {
     /// Builds the pending path after a branch join. A place shared by both branches has
     /// only seen constraints up to their common ancestor. Keeping the joined suffix on
@@ -1986,8 +1992,7 @@ impl PendingReachability {
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
-        branch: PendingReachabilityId,
-        joined: PendingReachabilityId,
+        BranchPaths { branch, joined }: BranchPaths,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
@@ -3161,11 +3166,11 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
+        let paths = BranchPaths { branch, joined };
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
-            branch,
-            joined,
+            paths,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -3174,8 +3179,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.pending_reachability.merge_place_states(
                 &mut self.member_states,
                 snapshot.member_states,
-                branch,
-                joined,
+                paths,
                 snapshot.reachability,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
