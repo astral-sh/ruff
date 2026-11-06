@@ -1967,60 +1967,30 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic
                         .resolve_qualified_name(func)
                         .and_then(|qualified_name| {
-                            if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "cast")
-                            {
-                                Some(typing::Callable::Cast)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeForm")
-                            {
-                                Some(typing::Callable::TypeForm)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NewType")
-                            {
-                                Some(typing::Callable::NewType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeVar")
-                            {
-                                Some(typing::Callable::TypeVar)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
-                            {
-                                Some(typing::Callable::TypeAliasType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
-                            {
-                                Some(typing::Callable::NamedTuple)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypedDict")
-                            {
-                                Some(typing::Callable::TypedDict)
-                            } else if matches!(
-                                qualified_name.segments(),
-                                [
-                                    "mypy_extensions",
-                                    "Arg"
-                                        | "DefaultArg"
-                                        | "NamedArg"
-                                        | "DefaultNamedArg"
-                                        | "VarArg"
-                                        | "KwArg"
-                                ]
-                            ) {
-                                Some(typing::Callable::MypyExtension)
-                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
-                            {
-                                Some(typing::Callable::Bool)
-                            } else {
-                                None
-                            }
+                            let segments = qualified_name.segments();
+                            let &name = segments.last()?;
+                            let callable = match name {
+                                "cast" => typing::Callable::Cast,
+                                "TypeForm" => typing::Callable::TypeForm,
+                                "NewType" => typing::Callable::NewType,
+                                "TypeVar" => typing::Callable::TypeVar,
+                                "TypeAliasType" => typing::Callable::TypeAliasType,
+                                "NamedTuple" => typing::Callable::NamedTuple,
+                                "TypedDict" => typing::Callable::TypedDict,
+                                "Arg" | "DefaultArg" | "NamedArg" | "DefaultNamedArg"
+                                | "VarArg" | "KwArg"
+                                    if matches!(segments, ["mypy_extensions", _]) =>
+                                {
+                                    return Some(typing::Callable::MypyExtension);
+                                }
+                                "bool" if matches!(segments, ["" | "builtins", _]) => {
+                                    return Some(typing::Callable::Bool);
+                                }
+                                _ => return None,
+                            };
+                            self.semantic
+                                .match_typing_qualified_name(&qualified_name, name)
+                                .then_some(callable)
                         });
                 match callable {
                     Some(typing::Callable::Bool) => {
