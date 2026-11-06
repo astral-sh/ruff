@@ -23,7 +23,8 @@ use ruff_python_parser::semantic_errors::{
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 use ty_module_resolver::{
-    ImportingFile, ModuleName, ResolverEnvironment, resolve_module_for_import_from,
+    ImportingFile, KnownModule, ModuleName, ResolverEnvironment, resolve_module,
+    resolve_module_for_import_from,
 };
 
 use crate::ProgramFile;
@@ -47,6 +48,7 @@ use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
 };
+use crate::platform::PythonPlatform;
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
@@ -2211,6 +2213,143 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (predicate, predicate_id)
     }
 
+    /// Resolve an environment guard in a bundled stub before building its two control-flow paths.
+    fn vendored_environment_guard(&self, expr: &ast::Expr) -> Option<bool> {
+        if !self.source_type.is_stub() {
+            return None;
+        }
+        match expr {
+            ast::Expr::BoolOp(operation) => {
+                let mut result = operation.op.is_and();
+                for operand in &operation.values {
+                    let value = self.vendored_environment_guard(operand)?;
+                    result = if operation.op.is_and() {
+                        result && value
+                    } else {
+                        result || value
+                    };
+                }
+                return Some(result);
+            }
+            ast::Expr::UnaryOp(unary) if unary.op.is_not() => {
+                return Some(!self.vendored_environment_guard(&unary.operand)?);
+            }
+            _ => {}
+        }
+        let cmp = expr.as_compare_expr()?;
+        let [op] = cmp.ops.as_ref() else {
+            return None;
+        };
+        let [left @ ast::Expr::Attribute(attr), right] = cmp.operands.as_ref() else {
+            return None;
+        };
+        let result = match (attr.attr.as_str(), op, right) {
+            ("version_info", ast::CmpOp::GtE | ast::CmpOp::Lt, ast::Expr::Tuple(tuple)) => {
+                let [major, minor] = tuple.elts.as_slice() else {
+                    return None;
+                };
+                let component = |expr: &ast::Expr| {
+                    let ast::Number::Int(value) = &expr.as_number_literal_expr()?.value else {
+                        return None;
+                    };
+                    value.as_u8()
+                };
+                let version = PythonVersion {
+                    major: component(major)?,
+                    minor: component(minor)?,
+                };
+                if *op == ast::CmpOp::GtE {
+                    self.python_version >= version
+                } else {
+                    self.python_version < version
+                }
+            }
+            (
+                "platform",
+                ast::CmpOp::Eq | ast::CmpOp::NotEq,
+                ast::Expr::StringLiteral(platform),
+            ) => {
+                let PythonPlatform::Identifier(target) =
+                    self.file.program(self.db).python_platform(self.db)
+                else {
+                    return None;
+                };
+                if *op == ast::CmpOp::Eq {
+                    target == platform.value.to_str()
+                } else {
+                    target != platform.value.to_str()
+                }
+            }
+            _ => return None,
+        };
+
+        self.vendored_sys_attribute(left, attr).then_some(result)
+    }
+
+    /// Confirm the root name still denotes an explicit import of the standard-library
+    /// module and the attribute has no separate binding at this point.
+    fn vendored_sys_attribute(&self, expr: &ast::Expr, attr: &ast::ExprAttribute) -> bool {
+        let file = self.file.file(self.db);
+        if !file.path(self.db).is_vendored_path() {
+            return false;
+        }
+        let Some(name) = attr.value.as_name_expr() else {
+            return false;
+        };
+        // Eager class bodies can read the module import. Defer to inference in any
+        // other nested scope or when the name or attribute has a local definition.
+        let global = FileScopeId::global();
+        let Some(member) = PlaceExpr::try_from_expr(expr) else {
+            return false;
+        };
+        for scope in &self.scope_stack {
+            let scope = scope.file_scope_id;
+            let table = &self.place_tables[scope];
+            if scope != global
+                && (!self.scopes[scope].kind().is_class()
+                    || table.symbol_id(&name.id).is_some_and(|id| {
+                        let symbol = table.symbol(id);
+                        symbol.is_bound() || symbol.is_declared()
+                    }))
+            {
+                return false;
+            }
+            if table.place_id((&member).into()).is_some_and(|id| {
+                let attr = table.place(id);
+                attr.is_bound() || attr.is_declared()
+            }) {
+                return false;
+            }
+        }
+        let globals = &self.place_tables[global];
+        let Some(symbol) = globals.symbol_id(&name.id) else {
+            return false;
+        };
+        if globals.symbol(symbol).is_declared() {
+            return false;
+        }
+        let defs = &self.use_def_maps[global];
+        let Ok(id) = defs.current_binding_ids(symbol.into()).exactly_one() else {
+            return false;
+        };
+        let Some(DefinitionKind::Import(import)) = defs
+            .definition(id)
+            .definition()
+            .map(|definition| definition.kind(self.db))
+        else {
+            return false;
+        };
+        if import.alias(self.module).name.as_str() != "sys" {
+            return false;
+        }
+        resolve_module(
+            self.db,
+            ImportingFile::File(file, self.resolver_environment),
+            &KnownModule::Sys.name(),
+        )
+        .is_some_and(|module| module.is_known(self.db, KnownModule::Sys))
+    }
+
     fn build_predicate(
         &mut self,
         predicate_node: &'ast ast::Expr,
@@ -2243,7 +2382,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        if let Some(literal) = resolve_to_literal(predicate_node) {
+        if let Some(literal) = resolve_to_literal(predicate_node)
+            .or_else(|| self.vendored_environment_guard(predicate_node))
+        {
             if registered.is_none() {
                 self.add_standalone_expression(predicate_node);
             }
