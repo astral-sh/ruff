@@ -702,7 +702,7 @@ class Child3(Parent):
 ```
 
 ```snapshot
-error[incompatible-method-override]: Invalid override of method `method`
+error[incompatible-keyword-override]: Override of method `method` drops a keyword argument
   --> src/mdtest_snippet.py:23:9
    |
 23 |     def method(self, y: str):

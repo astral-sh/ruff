@@ -269,18 +269,18 @@ class Super2:
     def method2(self, x): ...
 
 class Sub16(Super2):
-    def method2(self, x, /): ...  # snapshot: incompatible-method-override
+    def method2(self, x, /): ...  # snapshot: incompatible-keyword-override
 ```
 
 ```snapshot
-error[incompatible-method-override]: Invalid override of method `method2`
+error[incompatible-keyword-override]: Override of method `method2` drops a keyword argument
   --> src/mdtest_snippet.pyi:46:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: incompatible-method-override
+46 |     def method2(self, x, /): ...  # snapshot: incompatible-keyword-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
 info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -301,7 +301,7 @@ error[incompatible-method-override]: Invalid override of method `method2`
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: incompatible-method-override
+46 |     def method2(self, x, /): ...  # snapshot: incompatible-keyword-override
 47 | class Sub17(Super2):
 48 |     def method2(self, *, x): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
@@ -404,6 +404,183 @@ superclass.
 ```pyi
 class Sub23(Super4):
     def method(self, x, *args, y, **kwargs): ...
+```
+
+## Dropping a positional parameter's keyword name
+
+Renaming a positional-or-keyword parameter or making it positional-only breaks calls that pass it by
+name. Both overrides still accept an integer by position.
+
+```pyi
+class Base:
+    def f(self, value: int) -> int: ...
+
+class Renamed(Base):
+    def f(self, item: object) -> int: ...  # snapshot: incompatible-keyword-override
+
+class PositionalOnly(Base):
+    def f(self, value: int, /) -> int: ...  # error: [incompatible-keyword-override]
+```
+
+```snapshot
+error[incompatible-keyword-override]: Override of method `f` drops a keyword argument
+ --> src/mdtest_snippet.pyi:5:9
+  |
+2 |     def f(self, value: int) -> int: ...
+  |         -------------------------- `Base.f` defined here
+3 |
+4 | class Renamed(Base):
+5 |     def f(self, item: object) -> int: ...  # snapshot: incompatible-keyword-override
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.f`
+info: the parameter named `item` does not match `value` (and can be used as a keyword parameter)
+info: This violates the Liskov Substitution Principle
+```
+
+If there is also an incompatible argument type, a missing argument, or an incompatible return type,
+the general rule applies.
+
+```pyi
+class NarrowArgument(Base):
+    def f(self, item: str) -> int: ...  # error: [incompatible-method-override]
+
+class ExtraArgument(Base):
+    def f(self, value: int, extra: int, /) -> int: ...  # error: [incompatible-method-override]
+
+class WrongReturn(Base):
+    def f(self, item: int) -> str: ...  # error: [incompatible-method-override]
+```
+
+The original keyword may still bind to another parameter or to `**kwargs`. Both overrides below
+accept `value=`, but require its value to be a string.
+
+```pyi
+class DifferentParameter(Base):
+    def f(self, item: int = 0, *, value: str = "") -> int: ...  # error: [incompatible-method-override]
+
+class KeywordArguments(Base):
+    def f(self, item: int = 0, **kwargs: str) -> int: ...  # error: [incompatible-method-override]
+```
+
+## Accepting the argument through typed variadics
+
+Replacing a positional-or-keyword parameter with `*args` keeps the positional call valid if the
+variadic parameter accepts the original argument type.
+
+```pyi
+class Base:
+    def f(self, prefix: str, value: int) -> None: ...
+
+class PositionalVariadic(Base):
+    def f(self, prefix: str, *items: int) -> None: ...  # error: [incompatible-keyword-override]
+
+class NarrowVariadic(Base):
+    def f(self, prefix: str, *items: str) -> None: ...  # error: [incompatible-method-override]
+```
+
+## Overloads that drop the same keyword
+
+The override can use different names across overloads. Every base overload must still be callable by
+position.
+
+```pyi
+from typing import overload
+
+class Base:
+    @overload
+    def f(self, prefix: str, value: int) -> int: ...
+    @overload
+    def f(self, prefix: str, value: str) -> str: ...
+
+class Renamed(Base):
+    @overload
+    def f(self, prefix: str, number: int) -> int: ...
+    @overload
+    def f(self, prefix: str, text: str) -> str: ...  # error: [incompatible-keyword-override]
+
+class MissingOverload(Base):
+    def f(self, prefix: str, number: int) -> int: ...  # error: [incompatible-method-override]
+```
+
+## Keyword and type conflicts against different bases
+
+A keyword mismatch with `Integers.f` does not hide the fact that the selected method cannot accept
+strings as required by `Strings.f`.
+
+```pyi
+class Integers:
+    def f(self, value: int) -> int: ...
+
+class Strings:
+    def f(self, value: str) -> int: ...
+
+class Explicit(Integers, Strings):
+    def f(self, item: int) -> int: ...  # error: [incompatible-method-override]
+
+class Renamed:
+    def f(self, item: int) -> int: ...
+
+class Inherited(Renamed, Integers, Strings): ...  # error: [incompatible-method-override]
+```
+
+## Enabling only the keyword override rule
+
+The keyword rule checks both explicit overrides and inherited methods selected by multiple
+inheritance. A suppression for this rule covers either form.
+
+```toml
+[rules]
+incompatible-method-override = "ignore"
+renamed-rule-in-ignore-comment = "ignore"
+```
+
+```pyi
+class Base:
+    def f(self, value: int) -> None: ...
+
+class Other:
+    def f(self, item: int) -> None: ...
+
+class Explicit(Base):
+    def f(self, item: int) -> None: ...  # error: [incompatible-keyword-override]
+
+class Suppressed(Base):
+    def f(self, item: int) -> None: ...  # ty: ignore[incompatible-keyword-override]
+
+class OldSuppression(Base):
+    # error: [incompatible-keyword-override]
+    # error: [unused-ignore-comment]
+    def f(self, item: int) -> None: ...  # ty: ignore[invalid-method-override]
+
+class WrongType(Base):
+    def f(self, item: str) -> None: ...  # no diagnostic
+
+class Inherited(Other, Base): ...  # error: [incompatible-keyword-override]
+class InheritedSuppressed(Other, Base): ...  # ty: ignore[incompatible-keyword-override]
+```
+
+## Selecting general method overrides with the previous rule name
+
+The original rule name selects the general rule in configuration and ignore comments. The new
+keyword rule can be disabled separately.
+
+```toml
+[rules]
+all = "ignore"
+invalid-method-override = "error"
+```
+
+```pyi
+class Base:
+    def f(self, value: int) -> None: ...
+
+class WrongType(Base):
+    def f(self, item: str) -> None: ...  # error: [incompatible-method-override]
+
+class Suppressed(Base):
+    def f(self, item: str) -> None: ...  # ty: ignore[invalid-method-override]
+
+class Renamed(Base):
+    def f(self, item: int) -> None: ...  # no diagnostic
 ```
 
 ## Variadic keyword parameters cannot replace positional parameters
@@ -1592,7 +1769,7 @@ class A:
     def get(self, default): ...
 
 class B(A):
-    def get(self, default, /): ...  # snapshot: incompatible-method-override
+    def get(self, default, /): ...  # snapshot: incompatible-keyword-override
 
 get = 56
 
@@ -1608,14 +1785,14 @@ class D(C):
 ```
 
 ```snapshot
-error[incompatible-method-override]: Invalid override of method `get`
+error[incompatible-keyword-override]: Override of method `get` drops a keyword argument
  --> src/other_stub.pyi:5:9
   |
 2 |     def get(self, default): ...
   |         ------------------ `A.get` defined here
 3 |
 4 | class B(A):
-5 |     def get(self, default, /): ...  # snapshot: incompatible-method-override
+5 |     def get(self, default, /): ...  # snapshot: incompatible-keyword-override
   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
 info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -1654,13 +1831,13 @@ class Left:
 class Right:
     def method(self, right): ...
 
-class Parent(Left, Right): ...  # error: [incompatible-method-override]
+class Parent(Left, Right): ...  # error: [incompatible-keyword-override]
 
 class Child(Parent):
     def method(self, left): ...
 
 class ChangesSignature(Parent):
-    # error: [incompatible-method-override] "Definition is incompatible with `Left.method`"
+    # error: [incompatible-keyword-override] "Definition is incompatible with `Left.method`"
     def method(self, right): ...
 ```
 
@@ -2171,14 +2348,14 @@ class A:
 import one
 
 class A(one.A):
-    def foo(self, y): ...  # snapshot: incompatible-method-override
+    def foo(self, y): ...  # snapshot: incompatible-keyword-override
 ```
 
 ```snapshot
-error[incompatible-method-override]: Invalid override of method `foo`
+error[incompatible-keyword-override]: Override of method `foo` drops a keyword argument
  --> src/two.pyi:4:9
   |
-4 |     def foo(self, y): ...  # snapshot: incompatible-method-override
+4 |     def foo(self, y): ...  # snapshot: incompatible-keyword-override
   |         ^^^^^^^^^^^^ Definition is incompatible with `one.A.foo`
   |
  ::: src/one.pyi:2:9
