@@ -594,13 +594,13 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+# error: [instantiate-abstract-class] "Cannot instantiate class `MyProtocol`"
 reveal_type(MyProtocol())  # revealed: MyProtocol
 
 class GenericProtocol[T](Protocol):
     x: T
 
-# error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
+# error: [instantiate-abstract-class] "Cannot instantiate class `GenericProtocol`"
 reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
 ```
 
