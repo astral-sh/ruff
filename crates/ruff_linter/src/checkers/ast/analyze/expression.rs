@@ -940,13 +940,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SharedClockMock) {
                 ruff::rules::shared_clock_mock(checker, call);
             }
-            if checker.any_rule_enabled(&[
-                Rule::PytestParametrizeNamesWrongType,
-                Rule::PytestParametrizeValuesWrongType,
-                Rule::PytestDuplicateParametrizeTestCases,
-            ]) {
-                flake8_pytest_style::rules::parametrize(checker, call);
-            }
             if checker.is_rule_enabled(Rule::PytestUnittestAssertion) {
                 flake8_pytest_style::rules::unittest_assertion(checker, expr, func, args, keywords);
             }
@@ -961,23 +954,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnspecifiedEncoding) {
                 pylint::rules::unspecified_encoding(checker, call);
-            }
-            if checker.any_rule_enabled(&[
-                Rule::PytestRaisesWithoutException,
-                Rule::PytestRaisesTooBroad,
-            ]) {
-                flake8_pytest_style::rules::raises_call(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::LegacyFormPytestRaises) {
-                ruff::rules::legacy_raises_warns_deprecated_call(checker, call);
-            }
-            if checker
-                .any_rule_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad])
-            {
-                flake8_pytest_style::rules::warns_call(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::PytestFailWithoutMessage) {
-                flake8_pytest_style::rules::fail_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::ZipInsteadOfPairwise) {
                 if checker.target_version() >= PythonVersion::PY310 {
@@ -1135,9 +1111,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::BatchedWithoutExplicitStrict) {
                 flake8_bugbear::rules::batched_without_explicit_strict(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::PytestRaisesAmbiguousPattern) {
-                ruff::rules::pytest_raises_ambiguous_pattern(checker, call);
             }
             if checker.is_rule_enabled(Rule::FalsyDictGetFallback) {
                 ruff::rules::falsy_dict_get_fallback(checker, expr);
@@ -1816,6 +1789,16 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::UnnecessaryEmptyIterableWithinDequeCall,
         Rule::StarmapZip,
         Rule::TarfileIgnoreZerosTrue,
+        Rule::PytestParametrizeNamesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
+        Rule::PytestDuplicateParametrizeTestCases,
+        Rule::PytestRaisesWithoutException,
+        Rule::PytestRaisesTooBroad,
+        Rule::LegacyFormPytestRaises,
+        Rule::PytestWarnsWithoutWarning,
+        Rule::PytestWarnsTooBroad,
+        Rule::PytestFailWithoutMessage,
+        Rule::PytestRaisesAmbiguousPattern,
     ]);
 
     if !checker.context.rules.any_enabled_in(&QUALIFIED_CALL_RULES) {
@@ -2053,5 +2036,30 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     }
     if checker.is_rule_enabled(Rule::TarfileIgnoreZerosTrue) {
         ruff::rules::tarfile_ignore_zeros_true(checker, call, &qualified_name);
+    }
+    if checker.any_rule_enabled(&[
+        Rule::PytestParametrizeNamesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
+        Rule::PytestDuplicateParametrizeTestCases,
+    ]) {
+        flake8_pytest_style::rules::parametrize(checker, call, &qualified_name);
+    }
+    if checker.any_rule_enabled(&[
+        Rule::PytestRaisesWithoutException,
+        Rule::PytestRaisesTooBroad,
+    ]) {
+        flake8_pytest_style::rules::raises_call(checker, call, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::LegacyFormPytestRaises) {
+        ruff::rules::legacy_raises_warns_deprecated_call(checker, call, &qualified_name);
+    }
+    if checker.any_rule_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad]) {
+        flake8_pytest_style::rules::warns_call(checker, call, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::PytestFailWithoutMessage) {
+        flake8_pytest_style::rules::fail_call(checker, call, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::PytestRaisesAmbiguousPattern) {
+        ruff::rules::pytest_raises_ambiguous_pattern(checker, call, &qualified_name);
     }
 }
