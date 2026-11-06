@@ -561,6 +561,9 @@ impl<'db> GenericAlias<'db> {
     ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
         tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
+        if let Some(mro) = Mro::from_plan(db, self) {
+            return Ok(mro);
+        }
         Mro::of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
     }
 

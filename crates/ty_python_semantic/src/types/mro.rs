@@ -10,10 +10,132 @@ use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
+    ClassLiteral, ClassType, GenericAlias, KnownInstanceType, SpecialFormType, StaticClassLiteral,
+    Type,
 };
 
 use itertools::{Either, Itertools};
+
+fn resolved_bases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class_literal: StaticClassLiteral<'db>,
+    original_bases: &[Type<'db>],
+) -> Result<Vec<ClassBase<'db>>, Box<[(usize, Type<'db>)]>> {
+    /// Possibly add `Generic` to the resolved bases list.
+    ///
+    /// This function is called in two cases:
+    /// - If we encounter a subscripted `Generic` in the original bases list
+    ///   (`Generic[T]` or similar)
+    /// - If the class has PEP-695 type parameters,
+    ///   `Generic` is [implicitly appended] to the bases list at runtime
+    ///
+    /// Whether or not `Generic` is added to the bases list depends on:
+    /// - Whether `Protocol` is present in the original bases list
+    /// - Whether any of the bases yet to be visited in the original bases list
+    ///   is a generic alias (which would therefore have `Generic` in its MRO)
+    ///
+    /// This function emulates the behavior of `typing._GenericAlias.__mro_entries__` at
+    /// <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
+    ///
+    /// [implicitly inherits]: https://docs.python.org/3/reference/compound_stmts.html#generic-classes
+    fn maybe_add_generic<'db>(
+        resolved_bases: &mut Vec<ClassBase<'db>>,
+        original_bases: &[Type<'db>],
+        remaining_bases: &[Type<'db>],
+    ) {
+        if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
+            return;
+        }
+        if remaining_bases.iter().any(Type::is_generic_alias) {
+            return;
+        }
+        resolved_bases.push(ClassBase::Generic);
+    }
+
+    let mut resolved_bases = vec![];
+    let mut invalid_bases = vec![];
+
+    for (i, base) in original_bases.iter().enumerate() {
+        // Note that we emit a diagnostic for inheriting from bare (unsubscripted) `Generic` elsewhere
+        // (see `infer::TypeInferenceBuilder::check_class_definitions`),
+        // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
+        // not `KnownInstanceType::Generic(None)`.
+        if let Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)) = base {
+            maybe_add_generic(
+                &mut resolved_bases,
+                original_bases,
+                &original_bases[i + 1..],
+            );
+        } else {
+            match ClassBase::try_from_explicit_base(
+                db,
+                env,
+                *base,
+                Some(ClassLiteral::Static(class_literal)),
+            ) {
+                Some(valid_base) => resolved_bases.push(valid_base),
+                None => invalid_bases.push((i, *base)),
+            }
+        }
+    }
+
+    if !invalid_bases.is_empty() {
+        return Err(invalid_bases.into_boxed_slice());
+    }
+
+    // `Generic` is implicitly added to the bases list of a class that has PEP-695 type parameters
+    // (documented at https://docs.python.org/3/reference/compound_stmts.html#generic-classes)
+    if class_literal.has_pep_695_type_params(db) {
+        maybe_add_generic(&mut resolved_bases, original_bases, &[]);
+    }
+
+    Ok(resolved_bases)
+}
+
+/// Each parent contributes a subsequence of the C3 order. If several parents supply a
+/// class, C3 takes its specialization from the leftmost one.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct MroPlan<'db> {
+    identities: Box<[Type<'db>]>,
+    parents: Box<[(ClassBase<'db>, Box<[usize]>)]>,
+}
+
+#[salsa::tracked(returns(ref), cycle_initial = |_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn mro_plan<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<MroPlan<'db>> {
+    let mro = class.try_mro(db, None).ok()?;
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let bases = resolved_bases(db, &env, class, class.explicit_bases(db)).ok()?;
+    let order: FxIndexMap<_, _> = mro
+        .iter()
+        .enumerate()
+        .map(|(index, base)| (base.mro_identity(db), index))
+        .collect();
+    if order.len() != mro.len() {
+        return None;
+    }
+    let mut covered = vec![false; order.len()];
+    covered[0] = true;
+    let mut parents = Vec::with_capacity(bases.len());
+    for base in bases {
+        let mut indices = Vec::new();
+        let mut previous = 0;
+        for entry in base.mro(db, &env, None) {
+            let &index = order.get(&entry.mro_identity(db))?;
+            if index <= previous {
+                return None;
+            }
+            previous = index;
+            covered[index] = true;
+            indices.push(index);
+        }
+        parents.push((base, indices.into_boxed_slice()));
+    }
+    covered.iter().all(|included| *included).then(|| MroPlan {
+        identities: order.into_keys().collect(),
+        parents: parents.into_boxed_slice(),
+    })
+}
 
 /// The inferred method resolution order of a given class.
 ///
@@ -38,6 +160,30 @@ use itertools::{Either, Itertools};
 pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
+    pub(super) fn from_plan(db: &'db dyn Db, alias: GenericAlias<'db>) -> Option<Self> {
+        let origin = alias.origin(db);
+        let plan = mro_plan(db, origin).as_ref()?;
+        let env = ProgramEnvironment::from_scope(origin.body_scope(db));
+        let specialization = Some(alias.specialization(db));
+        let mut entries = vec![ClassBase::Class(ClassType::Generic(alias)); plan.identities.len()];
+        for (parent, indices) in plan.parents.iter().rev() {
+            let mut parent_mro = parent.mro(db, &env, specialization);
+            for &index in indices {
+                let entry = parent_mro.next()?;
+                // A cyclic base may still be using its fallback MRO. Only replay the plan
+                // if the specialized parents agree with the original input sequences.
+                if plan.identities[index] != entry.mro_identity(db) {
+                    return None;
+                }
+                entries[index] = entry;
+            }
+            if parent_mro.next().is_some() {
+                return None;
+            }
+        }
+        Some(Self::from(entries))
+    }
+
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
     /// literal][StaticClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
@@ -57,37 +203,6 @@ impl<'db> Mro<'db> {
         class_literal: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, StaticMroError<'db>> {
-        /// Possibly add `Generic` to the resolved bases list.
-        ///
-        /// This function is called in two cases:
-        /// - If we encounter a subscripted `Generic` in the original bases list
-        ///   (`Generic[T]` or similar)
-        /// - If the class has PEP-695 type parameters,
-        ///   `Generic` is [implicitly appended] to the bases list at runtime
-        ///
-        /// Whether or not `Generic` is added to the bases list depends on:
-        /// - Whether `Protocol` is present in the original bases list
-        /// - Whether any of the bases yet to be visited in the original bases list
-        ///   is a generic alias (which would therefore have `Generic` in its MRO)
-        ///
-        /// This function emulates the behavior of `typing._GenericAlias.__mro_entries__` at
-        /// <https://github.com/python/cpython/blob/ad42dc1909bdf8ec775b63fb22ed48ff42797a17/Lib/typing.py#L1487-L1500>.
-        ///
-        /// [implicitly inherits]: https://docs.python.org/3/reference/compound_stmts.html#generic-classes
-        fn maybe_add_generic<'db>(
-            resolved_bases: &mut Vec<ClassBase<'db>>,
-            original_bases: &[Type<'db>],
-            remaining_bases: &[Type<'db>],
-        ) {
-            if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
-                return;
-            }
-            if remaining_bases.iter().any(Type::is_generic_alias) {
-                return;
-            }
-            resolved_bases.push(ClassBase::Generic);
-        }
-
         let env = &ProgramEnvironment::from_scope(class_literal.body_scope(db));
         let class = class_literal.apply_optional_specialization(db, specialization);
 
@@ -178,45 +293,10 @@ impl<'db> Mro<'db> {
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
             _ => {
-                let mut resolved_bases = vec![];
-                let mut invalid_bases = vec![];
-
-                for (i, base) in original_bases.iter().enumerate() {
-                    // Note that we emit a diagnostic for inheriting from bare (unsubscripted) `Generic` elsewhere
-                    // (see `infer::TypeInferenceBuilder::check_class_definitions`),
-                    // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
-                    // not `KnownInstanceType::Generic(None)`.
-                    if let Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)) = base {
-                        maybe_add_generic(
-                            &mut resolved_bases,
-                            original_bases,
-                            &original_bases[i + 1..],
-                        );
-                    } else {
-                        match ClassBase::try_from_explicit_base(
-                            db,
-                            env,
-                            *base,
-                            Some(ClassLiteral::Static(class_literal)),
-                        ) {
-                            Some(valid_base) => resolved_bases.push(valid_base),
-                            None => invalid_bases.push((i, *base)),
-                        }
-                    }
-                }
-
-                if !invalid_bases.is_empty() {
-                    return Err(
-                        StaticMroErrorKind::InvalidBases(invalid_bases.into_boxed_slice())
-                            .into_mro_error(db, env, class),
-                    );
-                }
-
-                // `Generic` is implicitly added to the bases list of a class that has PEP-695 type parameters
-                // (documented at https://docs.python.org/3/reference/compound_stmts.html#generic-classes)
-                if class.has_pep_695_type_params(db) {
-                    maybe_add_generic(&mut resolved_bases, original_bases, &[]);
-                }
+                let resolved_bases = resolved_bases(db, env, class_literal, original_bases)
+                    .map_err(|invalid| {
+                        StaticMroErrorKind::InvalidBases(invalid).into_mro_error(db, env, class)
+                    })?;
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
                 for base in &resolved_bases {

@@ -99,6 +99,18 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited methods on variadic tuple subclasses
+
+A tuple subclass inherits `__reversed__` from `Sequence`. Its type arguments still apply when
+looking up a method on one of the returned elements.
+
+```py
+class Parts[*Ts](tuple[*Ts]): ...
+
+def count_matches(parts: Parts[str, str]) -> int:
+    return next(parts.__reversed__()).count("x")  # no diagnostic
+```
+
 ### Inherited specializations containing `Never`
 
 A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
