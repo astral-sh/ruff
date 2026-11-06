@@ -60,7 +60,7 @@ pub(crate) fn check_overloaded_function<'db>(
 
     let place = definition.place(db);
 
-    let use_def = index.use_def_map(context.scope().file_scope_id(db));
+    let use_def = index.use_def_map(db, context.scope().file_scope_id(db));
 
     let Place::Defined(DefinedPlace {
         ty: Type::FunctionLiteral(function),
@@ -139,6 +139,7 @@ pub(crate) fn check_overloaded_function<'db>(
 
         if function.iter_overloads_and_implementation(db).all(|f| {
             index.is_in_type_checking_block(
+                db,
                 f.body_scope(db).file_scope_id(db),
                 f.node(db, context.file(), context.module()).range(),
             )

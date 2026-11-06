@@ -341,7 +341,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut checked_dependency = false;
             for definition in self.index.definitions(alias) {
                 if let Some(star_import) = definition.kind(db).as_star_import() {
-                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+                    let use_def = self.index.use_def_map(db, self.scope().file_scope_id(db));
                     if let Some(binding) = use_def
                         .reachable_symbol_bindings(star_import.symbol_id())
                         .find(|binding| {

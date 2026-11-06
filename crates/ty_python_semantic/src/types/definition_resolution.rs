@@ -202,7 +202,7 @@ pub(crate) fn scoped_definitions_for_name<'db>(
             continue; // Name not found in this scope, try parent scope
         };
 
-        let use_def_map = index.use_def_map(scope_id);
+        let use_def_map = index.use_def_map(db, scope_id);
 
         // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
@@ -491,7 +491,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .place_table(function_scope_id)
                 .member_id_by_instance_attribute_name(attribute_name)
             {
-                let use_def = index.use_def_map(function_scope_id);
+                let use_def = index.use_def_map(db, function_scope_id);
                 let resolved_in_scope = resolve_reachable_definitions(
                     db,
                     env,
@@ -546,7 +546,7 @@ pub(super) fn user_visible_definitions<'db>(
             DefinitionKind::NestedBindings(nested) => {
                 let index = semantic_index(db, definition.program_file(db));
                 let sources = nested
-                    .visible_binding_sources(index, definition.file_scope(db))
+                    .visible_binding_sources(db, index, definition.file_scope(db))
                     .flatten()
                     .filter_map(|binding| binding.binding.definition());
                 // A lazy function proxy can lead to an eager comprehension proxy. Follow that

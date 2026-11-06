@@ -442,7 +442,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return;
         }
 
-        if !self.index.is_boolean_test_root(test) {
+        if !self.index.is_boolean_test_root(self.db(), test) {
             return;
         }
 
@@ -483,7 +483,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Avoid duplicate diagnostics if we're visiting a nested boolean test.
-        if !self.index.is_boolean_test_root(&unary.operand) {
+        if !self.index.is_boolean_test_root(self.db(), &unary.operand) {
             return;
         }
 

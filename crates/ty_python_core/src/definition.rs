@@ -885,7 +885,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, get_size2::GetSize)]
 pub enum DefinitionCategory {
     /// A Definition which binds a value to a name (e.g. `x = 1`).
     Binding,
@@ -1677,6 +1677,7 @@ impl NestedBindingsDefinitionKind {
     /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
     fn binding_sources<'index, 'db>(
         &'index self,
+        db: &'db dyn crate::Db,
         index: &'index SemanticIndex<'db>,
     ) -> impl Iterator<Item = (bool, BindingWithConstraintsIterator<'index, 'db>)> + 'index {
         self.nested_declarations.iter().filter_map(|declaration| {
@@ -1684,7 +1685,7 @@ impl NestedBindingsDefinitionKind {
             let symbol = index
                 .place_table(declaration.file_scope_id)
                 .symbol_id(&self.name)?;
-            let use_def = index.use_def_map(declaration.file_scope_id);
+            let use_def = index.use_def_map(db, declaration.file_scope_id);
             let bindings = match self.execution {
                 NestedBindingExecution::Lazy => use_def.reachable_bindings(symbol.into()),
                 NestedBindingExecution::Eager => use_def.end_of_scope_bindings(symbol.into()),
@@ -1717,6 +1718,7 @@ impl NestedBindingsDefinitionKind {
     /// own bindings.
     pub fn visible_binding_sources<'index, 'db>(
         &'index self,
+        db: &'db dyn crate::Db,
         index: &'index SemanticIndex<'db>,
         scope: FileScopeId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'index, 'db>> + 'index {
@@ -1729,7 +1731,7 @@ impl NestedBindingsDefinitionKind {
                     && index.place_table(scope).symbol(symbol_id).is_local())
             });
 
-        self.binding_sources(index)
+        self.binding_sources(db, index)
             .filter_map(move |(is_global, bindings)| {
                 (if is_global {
                     sees_global

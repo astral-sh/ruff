@@ -3566,7 +3566,7 @@ impl<'db> StaticClassLiteral<'db> {
         let init_name: &Name = &"__init__".into();
         let new_name: &Name = &"__new__".into();
 
-        let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
+        let use_def_map = index.use_def_map(db, class_body_scope.file_scope_id(db));
         let table = place_table(db, class_body_scope);
         // A declaration in a stub also creates a binding with no qualifiers. Resolve
         // both together so `value: Final[T]` is not also treated as a mutable `T`.

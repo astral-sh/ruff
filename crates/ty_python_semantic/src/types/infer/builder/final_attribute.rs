@@ -69,7 +69,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             };
 
-            let use_def = class_index.use_def_map(class_scope_id);
+            let use_def = class_index.use_def_map(db, class_scope_id);
             let place_and_quals_result = place_from_declarations(
                 db,
                 env,

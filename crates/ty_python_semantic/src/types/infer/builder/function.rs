@@ -1800,6 +1800,7 @@ impl KnownFunction {
                 } else if builder.context.is_lint_enabled(&DISJOINT_CAST)
                     && !builder.file().is_stub(db)
                     && !builder.index.is_in_type_checking_block(
+                        builder.db(),
                         builder.scope().file_scope_id(db),
                         call_expression.range(),
                     )

@@ -1682,7 +1682,7 @@ impl TypeCheckingBlock {
                     };
                     index.try_expression_scope_id(statement.test.as_ref())
                 })
-                .is_some_and(|scope| index.is_in_type_checking_block(scope, self.range))
+                .is_some_and(|scope| index.is_in_type_checking_block(db, scope, self.range))
         })
     }
 }

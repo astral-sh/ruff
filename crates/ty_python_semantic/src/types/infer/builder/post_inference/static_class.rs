@@ -99,7 +99,7 @@ fn check_class_slots<'db>(
 
     let scope_id = class.body_scope(db).file_scope_id(db);
     let table = index.place_table(scope_id);
-    let use_def = index.use_def_map(scope_id);
+    let use_def = index.use_def_map(db, scope_id);
 
     for name in slot_names {
         let Some(symbol) = table.symbol_id(name) else {
@@ -109,6 +109,7 @@ fn check_class_slots<'db>(
         for binding in use_def.end_of_scope_symbol_bindings(symbol) {
             if let Some(definition) = binding.binding.definition()
                 && !index.is_in_type_checking_block(
+                    db,
                     scope_id,
                     definition.kind(db).full_range(context.module()),
                 )
@@ -1076,7 +1077,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         if !field_order_violations.is_empty() {
             let body_scope = class.body_scope(db).file_scope_id(db);
-            let use_def_map = index.use_def_map(body_scope);
+            let use_def_map = index.use_def_map(db, body_scope);
             let place_table = index.place_table(body_scope);
 
             for (default_name, default_field, name, field) in field_order_violations {
@@ -1236,7 +1237,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 
     let scope = class.body_scope(db).file_scope_id(db);
     let table = index.place_table(scope);
-    let use_def = index.use_def_map(scope);
+    let use_def = index.use_def_map(db, scope);
 
     let Some(metaclass) = metaclass.to_class_type(db) else {
         return;
@@ -1255,7 +1256,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         let metaclass_index = semantic_index(db, body_scope.program_file(db));
         let body_scope_id = body_scope.file_scope_id(db);
         let metaclass_table = metaclass_index.place_table(body_scope_id);
-        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
+        let metaclass_use_def = metaclass_index.use_def_map(db, body_scope_id);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
             metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
@@ -1487,7 +1488,7 @@ fn check_class_final_without_value<'db>(
     let env = context.program_environment();
     let body_scope = class.body_scope(db);
     let body_scope_id = body_scope.file_scope_id(db);
-    let use_def = index.use_def_map(body_scope_id);
+    let use_def = index.use_def_map(db, body_scope_id);
     let place_table = index.place_table(body_scope_id);
 
     // In dataclasses (and similar code-generated classes), Final fields without

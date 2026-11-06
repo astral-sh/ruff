@@ -678,6 +678,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             let mut eagerly_undefined = false;
             if self.context.uses_enclosing_snapshots() {
                 match self.context.index.enclosing_snapshot(
+                    self.context.db,
                     enclosing_file_scope,
                     place_expr,
                     file_scope,
@@ -797,6 +798,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
 
         if self.context.uses_enclosing_snapshots() {
             match self.context.index.enclosing_snapshot(
+                self.context.db,
                 FileScopeId::global(),
                 self.place_expr,
                 current_scope,
@@ -1213,7 +1215,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
     )> {
         let scope = self.scope;
         let table = self.index.place_table(scope);
-        let use_def = self.index.use_def_map(scope);
+        let use_def = self.index.use_def_map(self.db, scope);
 
         match self.mode {
             PlaceLoadMode::AtExpression(expr_ref) => {

@@ -99,7 +99,10 @@ pub fn pytest_tests_in_file<'db>(
         ) {
             continue;
         }
-        for (symbol, bindings) in index.use_def_map(scope).all_end_of_scope_symbol_bindings() {
+        for (symbol, bindings) in index
+            .use_def_map(db, scope)
+            .all_end_of_scope_symbol_bindings()
+        {
             let name = index.place_table(scope).symbol(symbol).name();
             if !name.starts_with("test") && name != "runTest" {
                 continue;

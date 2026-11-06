@@ -1829,7 +1829,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let db = self.db;
         let scope = expression.scope(db);
         let index = semantic_index(db, expression.program_file(db));
-        let use_def = index.use_def_map(scope.file_scope_id(db));
+        let use_def = index.use_def_map(db, scope.file_scope_id(db));
 
         let mut visited_headers = FxHashSet::default();
         if alias

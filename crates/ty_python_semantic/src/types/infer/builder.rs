@@ -585,7 +585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let scope = self.scope();
                 let reachability_constraints = self
                     .index
-                    .use_def_map(scope.file_scope_id(self.db()))
+                    .use_def_map(self.db(), scope.file_scope_id(self.db()))
                     .reachability_constraints();
                 Rc::new(ReachabilityEvaluationCache::new(
                     scope,
@@ -951,8 +951,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn is_in_type_checking_block(&self, scope: ScopeId<'db>, node: impl Ranged) -> bool {
-        self.index
-            .is_in_type_checking_block(scope.file_scope_id(self.db()), node.range())
+        self.index.is_in_type_checking_block(
+            self.db(),
+            scope.file_scope_id(self.db()),
+            node.range(),
+        )
     }
 
     /// Returns whether the current scope is the body of a dataclass or dataclass-transform class.
@@ -1580,7 +1583,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let file_scope_id = binding.file_scope(db);
         let place_table = self.index.place_table(file_scope_id);
-        let use_def = self.index.use_def_map(file_scope_id);
+        let use_def = self.index.use_def_map(self.db(), file_scope_id);
 
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
@@ -1590,7 +1593,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some((owner_scope, owner_symbol)) =
                 self.forwarded_assignment_owner(file_scope_id, symbol)
         {
-            let owner_use_def = self.index.use_def_map(owner_scope);
+            let owner_use_def = self.index.use_def_map(self.db(), owner_scope);
             (
                 owner_use_def.end_of_scope_symbol_declarations(owner_symbol),
                 owner_use_def.end_of_scope_imported_final_candidates(owner_symbol.into()),
@@ -1856,7 +1859,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .category(self.context.in_stub(), self.module())
                 .is_declaration()
         );
-        let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
+        let use_def = self
+            .index
+            .use_def_map(self.db(), declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_definition(declaration);
         let env = self.program_environment();
         // unbound_ty is Never because for this check we don't care about unbound
@@ -2705,7 +2710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let loop_header = loop_header_reachability(self.db(), definition);
         let use_def = self
             .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
+            .use_def_map(self.db(), self.scope().file_scope_id(self.db()));
 
         // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
         // exact union of every visible loop-back binding can recursively force inference of large
@@ -2743,12 +2748,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope_id = definition.file_scope(db);
         let mut binding_sources = nested_bindings_kind
-            .visible_binding_sources(self.index, scope_id)
+            .visible_binding_sources(self.db(), self.index, scope_id)
             .peekable();
         if binding_sources.peek().is_some()
             && self
                 .index
-                .use_def_map(scope_id)
+                .use_def_map(self.db(), scope_id)
                 .reachability_constraints()
                 .used_interiors()
                 .len()
@@ -9245,7 +9250,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let db = self.db();
         let file_scope_id = self.scope().file_scope_id(db);
-        let use_def = self.index.use_def_map(file_scope_id);
+        let use_def = self.index.use_def_map(self.db(), file_scope_id);
 
         let keyword = argument.as_variadic()?;
 
@@ -10506,13 +10511,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
-            let use_def = self.index.use_def_map(*enclosing_scope_file_id);
+            let use_def = self.index.use_def_map(self.db(), *enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
             let place = operand
                 .filter(|op| op.scope == *enclosing_scope_file_id)
                 .map_or_else(|| place_table.place_id(expr).unwrap(), |op| op.place);
 
             match use_def.applicable_constraints(
+                self.db(),
                 *constraint_key,
                 *enclosing_scope_file_id,
                 expr,
@@ -10638,7 +10644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let header = loop_header_reachability(db, definition);
-        let use_def = self.index.use_def_map(definition.file_scope(db));
+        let use_def = self.index.use_def_map(self.db(), definition.file_scope(db));
         let place = definition.place(db);
         let mut union = UnionBuilder::new(db, env);
 
@@ -13537,7 +13543,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);
-        let use_def = builder.index.use_def_map(file_scope_id);
+        let use_def = builder.index.use_def_map(builder.db(), file_scope_id);
         let place_table = builder.index.place_table(file_scope_id);
 
         let mut bound_ty = inferred_ty;

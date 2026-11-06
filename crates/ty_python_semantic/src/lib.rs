@@ -184,7 +184,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
     attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
+        let use_def = index.use_def_map(db, function_scope_id);
         let assignments = use_def
             .reachable_member_bindings(member)
             .filter(move |binding| {
@@ -211,7 +211,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
+        let use_def = index.use_def_map(db, function_scope_id);
         Some((
             use_def.reachable_member_declarations(member),
             function_scope_id,

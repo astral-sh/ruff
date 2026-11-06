@@ -105,7 +105,7 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    index.use_def_maps[scope.file_scope_id(db)].materialize()
 }
 
 /// All the bindings made in a loop, which are visible to the entire loop via "loop header
@@ -319,7 +319,7 @@ pub struct SemanticIndex<'db> {
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, use_def::ScopeMap<'db>>,
 
     /// Lexical scopes and scope-local use IDs recorded at source occurrences.
     ///
@@ -406,8 +406,11 @@ impl<'db> SemanticIndex<'db> {
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     #[track_caller]
-    pub fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
-        &self.use_def_maps[scope_id]
+    pub fn use_def_map(&self, db: &'db dyn Db, scope_id: FileScopeId) -> &UseDefMap<'db> {
+        match &self.use_def_maps[scope_id] {
+            use_def::ScopeMap::Built(map) => map,
+            use_def::ScopeMap::Recorded(..) => use_def_map(db, self.scope_id(scope_id)),
+        }
     }
 
     /// Returns the set of modules that are imported anywhere in this file.
@@ -611,9 +614,14 @@ impl<'db> SemanticIndex<'db> {
             .flat_map(|uses| uses.iter().copied())
     }
 
-    pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
+    pub fn is_in_type_checking_block(
+        &self,
+        db: &'db dyn Db,
+        scope_id: FileScopeId,
+        range: TextRange,
+    ) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
-            self.use_def_map(scope_id)
+            self.use_def_map(db, scope_id)
                 .is_range_in_type_checking_block(range)
         })
     }
@@ -640,10 +648,10 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// See `SemanticIndexBuilder::visit_boolean_test` for details on how we compute
     /// and store the required data for answering this query during semantic indexing.
-    pub fn is_boolean_test_root(&self, expression: &ast::Expr) -> bool {
+    pub fn is_boolean_test_root(&self, db: &'db dyn Db, expression: &ast::Expr) -> bool {
         self.try_expression_scope_id(expression)
             .is_some_and(|scope| {
-                self.use_def_map(scope)
+                self.use_def_map(db, scope)
                     .is_boolean_test_root(expression.node_index().load())
             })
     }
@@ -809,6 +817,7 @@ impl<'db> SemanticIndex<'db> {
     /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested scope.
     pub fn enclosing_snapshot(
         &self,
+        db: &'db dyn Db,
         enclosing_scope: FileScopeId,
         expr: PlaceExprRef,
         nested_scope: FileScopeId,
@@ -829,7 +838,8 @@ impl<'db> SemanticIndex<'db> {
                         nested_laziness: ScopeLaziness::Lazy,
                     };
                     if let Some(id) = self.enclosing_snapshots.get(&key) {
-                        return self.use_def_maps[enclosing_scope]
+                        return self
+                            .use_def_map(db, enclosing_scope)
                             .enclosing_snapshot(*id, key.nested_laziness);
                     }
                 }
@@ -848,7 +858,8 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_map(db, enclosing_scope)
+            .enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
@@ -1491,7 +1502,7 @@ y = 2
         let class_table = index.place_table(class_scope_id);
         assert_eq!(names(class_table), vec!["x"]);
 
-        let use_def = index.use_def_map(class_scope_id);
+        let use_def = index.use_def_map(&db, class_scope_id);
         let binding = use_def
             .first_public_binding(class_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
@@ -1530,7 +1541,7 @@ y = 2
         let function_table = index.place_table(function_scope_id);
         assert_eq!(names(function_table), vec!["x"]);
 
-        let use_def = index.use_def_map(function_scope_id);
+        let use_def = index.use_def_map(&db, function_scope_id);
         let binding = use_def
             .first_public_binding(function_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
@@ -1564,7 +1575,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
-        let use_def = index.use_def_map(function_scope_id);
+        let use_def = index.use_def_map(&db, function_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
                 .first_public_binding(function_table.symbol_id(name).expect("symbol exists"))
@@ -1609,7 +1620,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             vec!["a", "b", "c", "args", "d", "kwargs"],
         );
 
-        let use_def = index.use_def_map(lambda_scope_id);
+        let use_def = index.use_def_map(&db, lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
                 .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
@@ -1682,7 +1693,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         assert_eq!(names(comprehension_symbol_table), vec!["x", "y"]);
 
-        let use_def = index.use_def_map(comprehension_scope_id);
+        let use_def = index.use_def_map(&db, comprehension_scope_id);
         for name in ["x", "y"] {
             let binding = use_def
                 .first_public_binding(
@@ -1713,7 +1724,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             panic!("expected one child scope")
         };
 
-        let use_def = index.use_def_map(comprehension_scope_id);
+        let use_def = index.use_def_map(&db, comprehension_scope_id);
 
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let syntax = module.syntax();
@@ -1809,7 +1820,7 @@ with item1 as x, item2 as y:
 
         assert_eq!(names(global_table), vec!["item1", "x", "item2", "y"]);
 
-        let use_def = index.use_def_map(FileScopeId::global());
+        let use_def = index.use_def_map(&db, FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
@@ -1832,7 +1843,7 @@ with context() as (x, y):
 
         assert_eq!(names(global_table), vec!["context", "x", "y"]);
 
-        let use_def = index.use_def_map(FileScopeId::global());
+        let use_def = index.use_def_map(&db, FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
@@ -1887,7 +1898,7 @@ def func():
         assert_eq!(names(func1_table), vec!["x"]);
         assert_eq!(names(func2_table), vec!["y"]);
 
-        let use_def = index.use_def_map(FileScopeId::global());
+        let use_def = index.use_def_map(&db, FileScopeId::global());
         let binding = use_def
             .first_public_binding(global_table.symbol_id("func").expect("symbol exists"))
             .unwrap();

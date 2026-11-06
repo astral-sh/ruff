@@ -1634,7 +1634,7 @@ impl<'db> DefinitionInference<'db> {
 
             if assignment.value(&module).is_none()
                 && index
-                    .use_def_map(definition.file_scope(db))
+                    .use_def_map(db, definition.file_scope(db))
                     .bindings_at_definition(definition)
                     .any(|binding| {
                         binding

@@ -67,8 +67,8 @@ use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    LiveBindingStatus, PreviousDefinitions, RecordingBuilder, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -104,6 +104,9 @@ struct NarrowingAlias<'ast> {
 }
 
 struct ScopeInfo<'ast> {
+    /// Places with an unannotated collection initializer seen so far in this scope.
+    collection_initializers: FxHashSet<ScopedPlaceId>,
+
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
@@ -280,7 +283,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
     ast_ids: AstIdsBuilder,
     // Box to avoid copying large builders when this index grows.
-    use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
+    use_def_maps: IndexVec<FileScopeId, RecordingBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -520,8 +523,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
-        self.use_def_maps
-            .push(Box::new(UseDefMapBuilder::new(scope_kind)));
+        self.use_def_maps.push(RecordingBuilder::new(scope_kind));
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
@@ -533,6 +535,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // TODO: Cross-scope alias narrowing is not supported yet.
         let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
         self.scope_stack.push(ScopeInfo {
+            collection_initializers: FxHashSet::default(),
             file_scope_id,
             current_loop: None,
             narrowing_aliases: saved_aliases,
@@ -1089,12 +1092,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.place_tables[scope_id]
     }
 
-    fn current_use_def_map_mut(&mut self) -> &mut UseDefMapBuilder<'db> {
+    fn current_use_def_map_mut(&mut self) -> &mut RecordingBuilder<'db> {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id]
     }
 
-    fn current_use_def_map(&self) -> &UseDefMapBuilder<'db> {
+    fn current_use_def_map(&self) -> &RecordingBuilder<'db> {
         let scope_id = self.current_scope();
         &self.use_def_maps[scope_id]
     }
@@ -1133,6 +1136,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
+        if self.current_scope_info().collection_initializers.is_empty() {
+            return None;
+        }
         let use_id = self
             .ast_ids
             .try_scoped_use(self.current_scope(), collection_use)?;
@@ -1637,6 +1643,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) {
         let kind = definition.kind(self.db);
         let category = kind.category(self.source_type.is_stub(), self.module);
+        if let DefinitionKind::Assignment(assignment) = kind
+            && is_collection_initializer(assignment.value(self.module))
+        {
+            self.current_scope_info_mut()
+                .collection_initializers
+                .insert(place);
+        }
         match category {
             DefinitionCategory::Declaration => {
                 self.mark_place_declared(place);
@@ -1718,7 +1731,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_binding_with(
         &mut self,
         definition: Definition<'db>,
-        record: impl FnOnce(&mut UseDefMapBuilder<'db>, ScopedPlaceId),
+        record: impl FnOnce(&mut RecordingBuilder<'db>, ScopedPlaceId),
     ) {
         let place = definition.place(self.db);
         let is_loop_header = definition.kind(self.db).is_loop_header();
@@ -2284,7 +2297,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// another outer boolean test. The [`super::UseDefMap`] answers these queries by storing
     /// [`NodeIndex`]es for each outermost boolean test in any given scope.
     ///
-    /// [`Self::visit_boolean_test`] is responsible for instructing the [`UseDefMapBuilder`]
+    /// [`Self::visit_boolean_test`] is responsible for instructing the [`RecordingBuilder`]
     /// to record a new outermost boolean test. The method is called whenever we visit a boolean
     /// test such as an `if` condition, `while` condition, `assert` condition or `not` operand,
     /// and it consults the [`Self::active_boolean_test_scope`] field to inform its decision:
@@ -3459,7 +3472,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| Arc::new(builder.finish(Arc::clone(&use_def_map_interner))))
+                .map(|builder| builder.finish(&use_def_map_interner))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
@@ -3568,8 +3581,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let use_id = self.record_place_use(place_id, expr);
 
                         // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
-                            self.unannotated_collection_initializer_binding(use_id)
+                        if self
+                            .current_scope_info()
+                            .collection_initializers
+                            .contains(&place_id)
+                            && let Some(collection_def) =
+                                self.unannotated_collection_initializer_binding(use_id)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
                             current_statement
@@ -5579,28 +5596,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.add_standalone_expression_impl(func, ExpressionKind::Callee, None);
                         let call_expr = self.add_standalone_expression(value);
 
-                        let predicate = Predicate {
-                            node: PredicateNode::IsNonTerminalCall(CallableAndCallExpr::new(
-                                self.db, callable, call_expr, is_await,
-                            )),
-                            is_positive: true,
-                        };
-
-                        let predicate_id =
-                            self.add_predicate(PredicateOrLiteral::Predicate(predicate));
-                        let narrowing_constraint = self
-                            .current_use_def_map_mut()
-                            .narrowing_constraints
-                            .add_atom(predicate_id);
-
-                        let reachability_constraint = self
-                            .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
-                        self.current_use_def_map_mut()
-                            .record_non_terminal_call_constraints(
-                                reachability_constraint,
-                                narrowing_constraint,
-                            );
+                        let call = CallableAndCallExpr::new(self.db, callable, call_expr, is_await);
+                        self.current_use_def_map_mut().record_nonterminal_call(call);
                     }
                 }
             }

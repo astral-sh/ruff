@@ -49,7 +49,7 @@ pub fn unreachable_ranges(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Unreachabl
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
     for scope_id in index.scope_ids() {
-        let use_def = index.use_def_map(scope_id.file_scope_id(db));
+        let use_def = index.use_def_map(db, scope_id.file_scope_id(db));
         unreachable.extend(
             use_def
                 .range_reachability()

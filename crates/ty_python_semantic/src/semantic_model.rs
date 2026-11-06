@@ -857,7 +857,7 @@ impl<'db> SemanticModel<'db> {
         };
         DefinitionResolution::from_bindings(
             self.db,
-            index.use_def_map(scope).bindings_at_use(use_id),
+            index.use_def_map(self.db, scope).bindings_at_use(use_id),
         )
         .definitions()
         .to_vec()
@@ -906,7 +906,7 @@ impl<'db> SemanticModel<'db> {
         let resolution = DefinitionResolution::from_bindings(
             self.db,
             index
-                .use_def_map(FileScopeId::global())
+                .use_def_map(self.db, FileScopeId::global())
                 .end_of_scope_symbol_bindings(id),
         );
         definitions.extend_from_slice(resolution.definitions());

@@ -111,7 +111,7 @@ pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding
     // A used synthetic definition counts as a use of the user-visible definitions it represents.
     let used_definitions = index.scope_ids().flat_map(|scope_id| {
         index
-            .use_def_map(scope_id.file_scope_id(db))
+            .use_def_map(db, scope_id.file_scope_id(db))
             .definitions_with_usage()
             .filter_map(|(_, definition, is_used)| is_used.then_some(definition))
     });
@@ -137,7 +137,7 @@ pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding
         let function_is_overload_declaration =
             function_scope_is_overload_declaration(db, index, file_scope_id);
         let place_table = index.place_table(file_scope_id);
-        let use_def_map = index.use_def_map(file_scope_id);
+        let use_def_map = index.use_def_map(db, file_scope_id);
         // Loop headers are synthesized before the loop body definitions they point to;
         // track used IDs as we go.
         let mut loop_header_used_definition_ids = FxHashSet::default();

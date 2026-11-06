@@ -25,7 +25,7 @@ pub(crate) fn check_final_without_value<'db>(
         return;
     }
 
-    let use_def = index.use_def_map(file_scope_id);
+    let use_def = index.use_def_map(db, file_scope_id);
     let place_table = index.place_table(file_scope_id);
     let env = context.program_environment();
 

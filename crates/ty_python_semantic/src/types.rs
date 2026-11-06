@@ -304,6 +304,7 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
 
     // Definitions inside an `if TYPE_CHECKING` block are never available at runtime.
     if semantic_index(db, file).is_in_type_checking_block(
+        db,
         definition.file_scope(db),
         definition.full_range(db, &module).range(),
     ) {

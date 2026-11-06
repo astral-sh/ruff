@@ -111,7 +111,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Quoting a nested test identifies which part of the enclosing condition is redundant.
         let should_quote_test_expression = || {
             !matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                || !self.index.is_boolean_test_root(test)
+                || !self.index.is_boolean_test_root(db, test)
         };
 
         let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
@@ -1540,7 +1540,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This preserves earlier narrowing, including constraints on captured variables.
     fn type_before_if_chain(&self, name: &ast::ExprName) -> Option<Type<'db>> {
         let db = self.db();
-        let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+        let use_def = self.index.use_def_map(db, self.scope().file_scope_id(db));
         let snapshot =
             use_def.if_chain_start_for_use(name.scoped_use_id(db, self.program_file()))?;
         let place_expr = PlaceExpr::from_expr_name(name);

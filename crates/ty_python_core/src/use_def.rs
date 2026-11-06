@@ -285,6 +285,8 @@ use crate::{
 
 mod exception_checkpoint;
 mod place_state;
+mod recording;
+pub(crate) use recording::{RecordingBuilder, ScopeMap};
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
 use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
@@ -304,7 +306,7 @@ pub(super) enum LiveBindingStatus {
 }
 
 /// Describes how a binding changes the imported qualifiers for a place.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) enum ImportedQualifierAction {
     /// An ordinary binding leaves previous imported qualifiers in place.
     Preserve,
@@ -1124,6 +1126,7 @@ impl<'db> UseDefMap<'db> {
 
     pub fn applicable_constraints(
         &self,
+        db: &'db dyn crate::Db,
         constraint_key: ConstraintKey,
         enclosing_scope: FileScopeId,
         expr: PlaceExprRef,
@@ -1138,7 +1141,7 @@ impl<'db> UseDefMap<'db> {
             }
             ConstraintKey::NestedScope(nested_scope) => {
                 let EnclosingSnapshotResult::FoundBindings(bindings) =
-                    index.enclosing_snapshot(enclosing_scope, expr, nested_scope)
+                    index.enclosing_snapshot(db, enclosing_scope, expr, nested_scope)
                 else {
                     unreachable!(
                         "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
@@ -3657,6 +3660,51 @@ mod tests {
     use crate::{TestProgramDb as _, semantic_index};
 
     #[test]
+    fn recorded_scope_is_shared_and_replayed_after_an_edit() -> anyhow::Result<()> {
+        use std::sync::Barrier;
+
+        let path = "/src/mod.py";
+        let source = "def f(x):\n    y = x\n    return y\n";
+        let mut db = TestDbBuilder::new().with_file(path, source).build()?;
+        let file = system_path_to_file(&db, path)?;
+
+        let check = |db: &crate::db::tests::TestDb| {
+            let barrier = Barrier::new(2);
+            std::thread::scope(|threads| {
+                let [first, second] = [db.clone(), db.clone()].map(|worker| {
+                    let barrier = &barrier;
+                    threads.spawn(move || {
+                        let index =
+                            semantic_index(&worker, worker.program().program_file(&worker, file));
+                        let (scope, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+                        assert!(matches!(
+                            index.use_def_maps[scope],
+                            super::ScopeMap::Recorded(..)
+                        ));
+                        barrier.wait();
+                        let map = index.use_def_map(&worker, scope);
+                        assert!(std::ptr::eq(
+                            map,
+                            crate::use_def_map(&worker, index.scope_id(scope))
+                        ));
+                        (
+                            std::ptr::from_ref(map).addr(),
+                            map.all_definitions.states.len(),
+                        )
+                    })
+                });
+                let first = first.join().unwrap();
+                assert_eq!(first, second.join().unwrap());
+                first.1
+            })
+        };
+        let before = check(&db);
+        db.write_file(path, source.replace("return y", "z = y\n    return z"))?;
+        assert_eq!(check(&db), before + 1);
+        Ok(())
+    }
+
+    #[test]
     fn deferred_tables_across_threads_and_edits() -> anyhow::Result<()> {
         let path = "/src/mod.py";
         let source = "def first(x): return x\ndef second(x): return x\ndef third(x): return x\n";
@@ -3667,7 +3715,7 @@ mod tests {
             let index = semantic_index(&db, db.program().program_file(&db, file));
             let scopes: Vec<_> = index
                 .child_scopes(FileScopeId::global())
-                .map(|(id, _)| index.use_def_map(id))
+                .map(|(id, _)| index.use_def_map(&db, id))
                 .collect();
             assert_eq!(scopes.len(), 3);
             assert!(
@@ -3701,7 +3749,7 @@ mod tests {
         )?;
         let index = semantic_index(&db, db.program().program_file(&db, file));
         let (third, _) = index.child_scopes(FileScopeId::global()).nth(2).unwrap();
-        let third = index.use_def_map(third);
+        let third = index.use_def_map(&db, third);
         assert!(!third.reachability_constraints().used_interiors().is_empty());
         assert!(!third.end_of_scope_reachability().is_terminal());
         Ok(())

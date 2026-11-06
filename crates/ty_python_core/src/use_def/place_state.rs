@@ -156,7 +156,7 @@ pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclarat
 /// What happens to any preexisting definitions when a new binding of the same place is added.
 /// `AreShadowed` is how normal assignments behave, but we model some features (loop headers,
 /// `nonlocal` writes from nested scopes) as "synthetic" bindings that don't shadow other bindings.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, get_size2::GetSize)]
 pub(crate) enum PreviousDefinitions {
     AreShadowed,
     AreKept,

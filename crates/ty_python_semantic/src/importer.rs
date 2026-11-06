@@ -362,7 +362,7 @@ impl<'a> Importer<'a> {
                 // Ignore the implicit initial unbound state, but retain deletions so a deleted
                 // import cannot be reused.
                 let mut bindings = index
-                    .use_def_map(scope)
+                    .use_def_map(self.db, scope)
                     .end_of_scope_symbol_bindings(symbol_id)
                     .map(|binding| binding.binding)
                     .filter(|binding| !matches!(binding, DefinitionState::Undefined));

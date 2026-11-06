@@ -1505,7 +1505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
         let previous_definition_in = |scope, place, before| {
-            let use_def = self.index.use_def_map(scope);
+            let use_def = self.index.use_def_map(db, scope);
             use_def
                 .reachable_bindings(place)
                 .map(|binding| {
@@ -1536,7 +1536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let scope = definition.file_scope(db);
         let place = definition.place(db);
-        let use_def = self.index.use_def_map(scope);
+        let use_def = self.index.use_def_map(db, scope);
         let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
             (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
         });
@@ -1547,7 +1547,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or_else(|| {
                 self.forwarded_assignment_owner(scope, place.expect_symbol())
                     .and_then(|(owner_scope, owner_place)| {
-                        let owner_use_def = self.index.use_def_map(owner_scope);
+                        let owner_use_def = self.index.use_def_map(db, owner_scope);
                         let before = owner_use_def
                             .reachable_bindings(owner_place.into())
                             .find_map(|binding| {

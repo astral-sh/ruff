@@ -212,7 +212,7 @@ impl ScopeLaziness {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub enum ScopeKind {
     Module,
     TypeParams,

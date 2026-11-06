@@ -637,7 +637,7 @@ fn own_member_definitions<'db>(
         else {
             continue;
         };
-        let use_def = index.use_def_map(function_scope_id);
+        let use_def = index.use_def_map(db, function_scope_id);
         instance_definitions.extend(
             use_def
                 .reachable_member_declarations(place_id)

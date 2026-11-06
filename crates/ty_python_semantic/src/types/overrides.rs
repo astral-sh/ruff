@@ -316,7 +316,7 @@ fn declared_instance_attribute_names<'db>(
     let index = semantic_index(db, class_scope.program_file(db));
     let mut names = Vec::new();
     for scope in attribute_scopes(db, class_scope) {
-        let map = index.use_def_map(scope);
+        let map = index.use_def_map(db, scope);
         for (member, name) in index.place_table(scope).declared_instance_attributes() {
             if map
                 .reachable_member_declarations(member)

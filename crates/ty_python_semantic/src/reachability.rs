@@ -2067,7 +2067,7 @@ pub(crate) fn is_range_reachable<'db>(
     range: TextRange,
 ) -> bool {
     index.ancestor_scopes(scope_id).all(|(scope_id, _)| {
-        let use_def = index.use_def_map(scope_id);
+        let use_def = index.use_def_map(db, scope_id);
         !use_def
             .range_reachability()
             .any(|(entry_range, constraint)| {
@@ -2414,7 +2414,7 @@ class TargetB:
                     ProgramFile::new(&db, file, db.program_environment().program(&db));
                 let index = semantic_index(&db, program_file);
                 let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
-                let use_def = index.use_def_map(function_scope);
+                let use_def = index.use_def_map(&db, function_scope);
                 let predicate = use_def
                     .predicates()
                     .iter()

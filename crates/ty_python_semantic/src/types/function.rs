@@ -486,7 +486,7 @@ impl<'db> OverloadLiteral<'db> {
         {
             return None;
         }
-        let use_def = index.use_def_map(local_scope);
+        let use_def = index.use_def_map(db, local_scope);
         let use_id = node.name.scoped_use_id(db, self.program_file(db));
 
         let env = ProgramEnvironment::from_scope(scope);
@@ -1809,8 +1809,11 @@ impl<'db> FunctionType<'db> {
         let function = scope.node(db).expect_function();
 
         // Do not perform return type inference for functions in `if TYPE_CHECKING` blocks.
-        if index.is_in_type_checking_block(scope.file_scope_id(db), function.node(&module).range())
-        {
+        if index.is_in_type_checking_block(
+            db,
+            scope.file_scope_id(db),
+            function.node(&module).range(),
+        ) {
             return Type::unknown();
         }
 

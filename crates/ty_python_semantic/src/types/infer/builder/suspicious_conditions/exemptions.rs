@@ -745,6 +745,7 @@ fn definition_contains_special_cased_condition<'db>(
         DefinitionKind::NestedBindings(nested) => {
             return nested
                 .visible_binding_sources(
+                    db,
                     semantic_index(db, program_file),
                     definition.file_scope(db),
                 )
