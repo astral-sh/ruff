@@ -1532,6 +1532,11 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// Remaining live bindings, excluding the optional synthetic leading unbound entry.
+    pub fn live_bindings(&self) -> &'map [LiveBinding] {
+        self.inner.as_slice()
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1547,6 +1552,11 @@ impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
 
 impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.inner.len() + usize::from(self.initial_unbound.is_some());
+        (len, Some(len))
+    }
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(reachability_constraint) = self.initial_unbound.take() {
@@ -1574,6 +1584,8 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             })
     }
 }
+
+impl ExactSizeIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 

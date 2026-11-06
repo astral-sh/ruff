@@ -11,7 +11,7 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
+    NarrowingProjector, ReachabilityEvaluationCache, SiblingBindings, evaluate_reachability,
     evaluate_reachability_with_cache,
 };
 use crate::types::{
@@ -1859,6 +1859,7 @@ fn place_from_bindings_impl<'db>(
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
+    let mut siblings = SiblingBindings::new(&bindings_with_constraints);
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
@@ -1903,6 +1904,7 @@ fn place_from_bindings_impl<'db>(
              reachability_constraint,
              ..
          }| {
+            siblings.next_binding();
             let binding = match binding {
                 DefinitionState::Defined(binding)
                     if is_discarded_dict_key_assignment(db, binding) =>
@@ -1934,7 +1936,7 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_reachability = evaluate_reachability_with_cache(
+            let static_reachability = siblings.evaluate(
                 db,
                 reachability_cache,
                 reachability_constraints,
