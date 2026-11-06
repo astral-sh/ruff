@@ -457,7 +457,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-generator-return-type.md")]
     pub(crate) static INVALID_GENERATOR_RETURN_TYPE = {
         summary: "detects generator functions whose return annotation is incompatible with the generator object",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -466,7 +466,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-return-statement.md")]
     pub(crate) static INVALID_RETURN_STATEMENT = {
         summary: "detects return statements whose value is incompatible with the expected return type",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -475,7 +475,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-return-statement.md")]
     pub(crate) static MISSING_RETURN_STATEMENT = {
         summary: "detects missing returns in functions whose return type does not allow `None`",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }

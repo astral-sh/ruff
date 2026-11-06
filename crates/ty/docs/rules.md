@@ -2141,7 +2141,7 @@ class NonFrozenChild(FrozenBase):  # error
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-generator-return-type%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L456" target="_blank">View source</a>
 </small>
@@ -3234,7 +3234,7 @@ def g():
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-return-statement%22+OR+%22invalid-return-type%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L465" target="_blank">View source</a>
 </small>
@@ -4413,7 +4413,7 @@ class ExplicitChild(Parent):
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-return-statement%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L474" target="_blank">View source</a>
 </small>
