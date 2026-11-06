@@ -1627,6 +1627,36 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 }
 
 #[test]
+fn legacy_typevars_in_an_annotation_track_the_alias_body() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import TypeVar, reveal_type
+        from aliases import Box
+
+        T = TypeVar("T")
+
+        def consume(value: Box[T]) -> None: ...
+
+        reveal_type(consume)
+        "#,
+    )?;
+
+    for (element, expected) in [
+        ("T", "def consume[T](value: Box[T]) -> None"),
+        ("int", "def consume(value: Box[T@consume]) -> None"),
+        ("T", "def consume[T](value: Box[T]) -> None"),
+    ] {
+        db.write_file("/src/aliases.py", format!("type Box[T] = list[{element}]"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+#[test]
 fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_file(
