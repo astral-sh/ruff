@@ -141,6 +141,33 @@ b_string_typing_1: "typing.Union[typing.NamedTuple]" = None
 b_string_typing_2: "typing.Union[typing.NamedTuple, None]" = None
 
 
+# Regression test for https://github.com/astral-sh/ruff/issues/21347
+# Unions built at runtime have no PEP 604 equivalent.
+def dynamic_union(types: tuple[type, ...]):
+    return Union[types]
+
+
+def dynamic_union_from_call():
+    return Union[get_types()]
+
+
+def dynamic_union_as_value(types: tuple[type, ...]):
+    print(Union[types])
+    unions = [Union[types]]
+    text = str(Union[types])
+
+
+# Implicit type aliases are still flagged, even nested ones.
+IntOrStr = Union[int, str]
+ListOfIntOrStr = list[Union[int, str]]
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/27238
+# `Union[<call>]` unions the types the call returns.
+def annotated_dynamic_union(x: typing.Annotated[Union[tuple(get_types())], "meta"]):
+    ...
+
+
 # Regression test for https://github.com/astral-sh/ruff/issues/23207
 # Multi-line single-argument Union should be wrapped in parentheses
 from __future__ import annotations
