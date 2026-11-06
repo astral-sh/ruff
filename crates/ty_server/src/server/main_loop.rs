@@ -1,4 +1,4 @@
-use crate::server::schedule::Scheduler;
+use crate::server::schedule::{RequestAttempt, Scheduler};
 use crate::server::{Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
 use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
@@ -33,11 +33,11 @@ impl Server {
 
             match next_event {
                 Event::Message(msg) => {
-                    let Some(msg) = self.session.should_defer_message(msg) else {
+                    let Some(msg) = self.session.should_defer_message(msg, &client) else {
                         continue;
                     };
 
-                    let task = match msg {
+                    match msg {
                         Message::Request(req) => {
                             self.session
                                 .request_queue_mut()
@@ -60,7 +60,12 @@ impl Server {
                                 continue;
                             }
 
-                            api::request(req)
+                            scheduler.dispatch_request(
+                                req,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Initial,
+                            )?;
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
@@ -74,7 +79,11 @@ impl Server {
                                 return Ok(());
                             }
 
-                            api::notification(notification)
+                            scheduler.dispatch(
+                                api::notification(notification),
+                                &mut self.session,
+                                &client,
+                            )?;
                         }
 
                         // Handle the response from the client to a server request
@@ -94,9 +103,7 @@ impl Server {
                             }
                             continue;
                         }
-                    };
-
-                    scheduler.dispatch(task, &mut self.session, client);
+                    }
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
@@ -127,8 +134,12 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            let task = api::request(request);
-                            scheduler.dispatch(task, &mut self.session, client);
+                            scheduler.dispatch_request(
+                                request,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Retry,
+                            )?;
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -169,8 +180,7 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
-        // Drain worker actions before dispatching more deferred requests. Otherwise, workers
-        // can block on the full action channel while this thread blocks on the full job queue.
+        // Deliver ready worker responses before replaying more deferred requests.
         if let Ok(event) = self.main_loop_receiver.try_recv() {
             return Ok(Some(event));
         }
@@ -254,8 +264,6 @@ struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
     /// Waits for a main-loop action, project wakeup, or client message, in that order.
-    /// Polling uv can wait for worker database snapshots, so drain the bounded action
-    /// channel before applying uv results. Handle both before accepting new requests.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,
