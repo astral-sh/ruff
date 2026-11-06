@@ -10311,6 +10311,20 @@ impl<'db> Type<'db> {
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
+        // The variables in an annotation do not depend on the function whose signature
+        // contains it. Filter the shared result by the variable's actual binding context.
+        if matches!(
+            self,
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Union(_) | Type::Intersection(_)
+        ) {
+            let variables = self.cached_legacy_typevars(db, env.program(db));
+            typevars.extend(variables.iter().copied().filter(|variable| {
+                binding_context.is_none_or(|definition| {
+                    variable.binding_context(db) == BindingContext::Definition(definition)
+                })
+            }));
+            return;
+        }
         self.find_legacy_typevars_impl(
             db,
             env,
@@ -10318,6 +10332,27 @@ impl<'db> Type<'db> {
             typevars,
             &FindLegacyTypeVarsVisitor::default(),
         );
+    }
+
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=|_, _, _, _| Box::default(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn cached_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Box<[BoundTypeVarInstance<'db>]> {
+        let mut variables = FxOrderSet::default();
+        self.find_legacy_typevars_impl(
+            db,
+            &ProgramEnvironment::from_program(program),
+            None,
+            &mut variables,
+            &FindLegacyTypeVarsVisitor::default(),
+        );
+        variables.into_iter().collect()
     }
 
     fn find_legacy_typevars_impl(
