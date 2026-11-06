@@ -27,7 +27,7 @@ use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
+    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictField, TypedDictKeyAssignment,
 };
 use crate::types::typevar::{BindingContext, TypeVarKind, TypeVarSet};
 use crate::types::{
@@ -2012,7 +2012,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 && typed_dict
                                     .items(db)
                                     .values()
-                                    .all(|field| field.is_read_only()))
+                                    .all(TypedDictField::is_read_only))
                         {
                             &INVALID_TYPED_DICT_KEY
                         } else {
