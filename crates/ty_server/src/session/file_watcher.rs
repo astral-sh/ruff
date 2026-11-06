@@ -185,15 +185,18 @@ impl LspFileWatcher {
         workspaces: &Workspaces,
         cache_key: u64,
     ) -> Option<FileWatcherUpdate> {
-        if self.registration_mode != RegistrationMode::Relative {
-            self.registration_mode = RegistrationMode::Failed;
-            return None;
+        match self.registration_mode {
+            RegistrationMode::Relative => self.registration_mode = RegistrationMode::Workspace,
+            RegistrationMode::Workspace => {
+                self.registration_mode = RegistrationMode::Failed;
+                return None;
+            }
+            RegistrationMode::Failed => return None,
         }
 
         tracing::warn!(
             "Falling back to a single workspace-wide file watch; changes outside the workspace may be missed"
         );
-        self.registration_mode = RegistrationMode::Workspace;
         let roots = workspaces
             .into_iter()
             .map(|(root, _)| root.clone())
