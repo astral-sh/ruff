@@ -74,77 +74,84 @@ fn generate_markdown() -> String {
     }
 
     for &lint in registry.lints().iter().sorted_by_key(|lint| lint.name()) {
-        // Keep links to the old rule heading working after a rename.
-        let names = aliases.get(&lint).map(Vec::as_slice).unwrap_or_default();
-        if !names.is_empty() {
-            for name in names {
-                let _ = writeln!(output, r#"<a id="{name}"></a>"#);
-            }
-            output.push('\n');
+        write_rule(&mut output, lint, &aliases);
+    }
+
+    output
+}
+
+fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec<LintName>>) {
+    // Keep links to the old rule heading working after a rename.
+    let names = aliases.get(&lint).map(Vec::as_slice).unwrap_or_default();
+    if !names.is_empty() {
+        for name in names {
+            let _ = writeln!(output, r#"<a id="{name}"></a>"#);
         }
-        let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
+        output.push('\n');
+    }
+    let _ = writeln!(output, "## `{rule_name}`\n", rule_name = lint.name());
 
-        // Reformat headers as bold text
-        let mut in_code_fence = false;
-        let documentation = lint
-            .documentation_lines()
-            .map(|line| {
-                // Toggle the code fence state if we encounter a boundary
-                if line.starts_with("```") {
-                    in_code_fence = !in_code_fence;
-                }
-                if !in_code_fence {
-                    if line.starts_with('#') {
-                        Cow::Owned(format!(
-                            "**{line}**\n",
-                            line = line.trim_start_matches('#').trim_start()
-                        ))
-                    } else {
-                        link_rule_names(line)
-                    }
+    // Reformat headers as bold text
+    let mut in_code_fence = false;
+    let documentation = lint
+        .documentation_lines()
+        .map(|line| {
+            // Toggle the code fence state if we encounter a boundary
+            if line.starts_with("```") {
+                in_code_fence = !in_code_fence;
+            }
+            if !in_code_fence {
+                if line.starts_with('#') {
+                    Cow::Owned(format!(
+                        "**{line}**\n",
+                        line = line.trim_start_matches('#').trim_start()
+                    ))
                 } else {
-                    Cow::Borrowed(line)
+                    link_rule_names(line)
                 }
-            })
-            .join("\n");
+            } else {
+                Cow::Borrowed(line)
+            }
+        })
+        .join("\n");
 
-        let status_text = match lint.status() {
-            ty_python_semantic::lint::LintStatus::Preview { since } => {
-                format!(
-                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-                )
-            }
-            ty_python_semantic::lint::LintStatus::Stable { since } => {
-                format!(
-                    r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
-                )
-            }
-            ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
-                format!(
-                    r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-                )
-            }
-            ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
-                format!(
-                    r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-                )
-            }
-        };
+    let status_text = match lint.status() {
+        ty_python_semantic::lint::LintStatus::Preview { since } => {
+            format!(
+                r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        ty_python_semantic::lint::LintStatus::Stable { since } => {
+            format!(
+                r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
+            )
+        }
+        ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
+            format!(
+                r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
+            format!(
+                r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+    };
 
-        let quoted_name = |name: LintName| format!("\"{name}\"");
-        let search_terms = if names.is_empty() {
-            quoted_name(lint.name())
-        } else {
-            let terms = std::iter::once(lint.name())
-                .chain(names.iter().copied())
-                .map(quoted_name)
-                .join(" OR ");
-            format!("({terms})")
-        };
+    let quoted_name = |name: LintName| format!("\"{name}\"");
+    let search_terms = if names.is_empty() {
+        quoted_name(lint.name())
+    } else {
+        let terms = std::iter::once(lint.name())
+            .chain(names.iter().copied())
+            .map(quoted_name)
+            .join(" OR ");
+        format!("({terms})")
+    };
 
-        let _ = writeln!(
-            &mut output,
-            r#"<small>
+    let _ = writeln!(
+        output,
+        r#"<small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
 {status_text} ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_terms}" target="_blank">Related issues</a> ·
@@ -154,16 +161,13 @@ Default level: <a href="../../rules#rule-levels" title="This lint has a default 
 
 {documentation}
 "#,
-            level = lint.default_level(),
-            encoded_terms =
-                url::form_urlencoded::byte_serialize(search_terms.as_bytes()).collect::<String>(),
-            file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
-                .collect::<String>(),
-            line = lint.line(),
-        );
-    }
-
-    output
+        level = lint.default_level(),
+        encoded_terms =
+            url::form_urlencoded::byte_serialize(search_terms.as_bytes()).collect::<String>(),
+        file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
+            .collect::<String>(),
+        line = lint.line(),
+    );
 }
 
 // Replace `rule-name` with [`rule-name`](url) for any known rule names,
