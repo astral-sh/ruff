@@ -9049,14 +9049,30 @@ def _(key: str) -> None:
     Closed({key: 1})  # error: [unknown-typed-dict-constructor-key]
 ```
 
-The literal union below includes an undeclared key, `"typo"`. Subscripting reports
-`invalid-typed-dict-key`, while construction reports `unknown-typed-dict-constructor-key`.
+Reads and writes through a union of literal keys report `invalid-typed-dict-key` if one of the
+possible keys is undeclared.
 
 ```py
 def _(record: Closed, key: Literal["name", "typo"]) -> None:
     record[key]  # error: [invalid-typed-dict-key]
     record[key] = 1  # error: [invalid-typed-dict-key]
-    Closed({key: 1})  # error: [unknown-typed-dict-constructor-key]
+```
+
+### Constructing a closed TypedDict with a union of declared keys
+
+A single entry is sufficient when both possible fields are optional and accept the supplied value.
+
+```py
+from typing_extensions import Literal, TypedDict
+
+class Dimensions(TypedDict, closed=True, total=False):
+    width: int
+    height: int
+
+def _(key: Literal["width", "height"]) -> None:
+    # TODO: Accept this constructor by checking each literal key in the union.
+    # error: [unknown-typed-dict-constructor-key] "Non-literal string key may be unknown for TypedDict `Dimensions`"
+    Dimensions({key: 1})
 ```
 
 ### Mixed constructors validate source-only keys against `extra_items`
