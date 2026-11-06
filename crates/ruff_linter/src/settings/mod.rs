@@ -1009,6 +1009,7 @@ mod tests {
         	escape-sequence-in-docstring (D301),
         	missing-maxsplit-arg (PLC0207),
         	unnecessary-dunder-call (PLC2801),
+        	no-method-argument (PLE0211),
         	duplicate-bases (PLE0241),
         	dict-iter-missing-items (PLE1141),
         	modified-iterating-set (PLE4703),
