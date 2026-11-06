@@ -319,7 +319,7 @@ pub(super) enum ImportedQualifierAction {
 #[derive(get_size2::GetSize)]
 pub struct LoopHeaderId;
 
-/// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
+/// Uniquely identifies an interned [`Bindings`] entry in [`FlowTables::interned_bindings`].
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct InternedBindingsId;
@@ -328,7 +328,7 @@ struct InternedBindingsId;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BindingsSnapshotId(InternedBindingsId);
 
-/// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
+/// Uniquely identifies an interned [`Declarations`] entry in [`FlowTables::interned_declarations`].
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct InternedDeclarationsId;
