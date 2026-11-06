@@ -278,7 +278,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     resolver_environment: ResolverEnvironment<'db>,
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
-    semantic_checker: SemanticSyntaxChecker,
+    /// Present when the file is checked for diagnostics.
+    semantic_checker: Option<SemanticSyntaxChecker>,
     /// Whether the current statement is inside a `try` statement, including its `except`, `else`,
     /// and `finally` suites. Used for semantic syntax checks independently of handler activity.
     in_try_statement: bool,
@@ -332,10 +333,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         file: ProgramFile<'db>,
         module_ref: &'ast ParsedModuleRef,
     ) -> Self {
+        let source_file = file.file(db);
         let mut builder = Self {
             db,
             file,
-            source_type: file.file(db).source_type(db),
+            source_type: source_file.source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
@@ -375,7 +377,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
-            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_checker: db
+                .should_check_file(source_file)
+                .then(SemanticSyntaxChecker::default),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: NarrowingAliases::default(),
@@ -2297,6 +2301,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// `lambda` needs its own entry. This field is temporary visitor state; only the recorded
     /// expression node IDs are retained in the semantic index.
     fn visit_boolean_test(&mut self, test: &'ast ast::Expr, context: ExpressionContext) {
+        if self.semantic_checker.is_none() {
+            self.visit_expr_with_context(test, context);
+            return;
+        }
+
         let scope = self.current_scope();
         let previous = self.active_boolean_test_scope.replace(scope);
         if previous != Some(scope) {
@@ -3433,9 +3442,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.semantic_checker);
-        f(&mut checker, self);
-        self.semantic_checker = checker;
+        if let Some(checker) = &mut self.semantic_checker {
+            let mut checker = std::mem::take(checker);
+            f(&mut checker, self);
+            self.semantic_checker = Some(checker);
+        }
     }
 
     fn source_text(&self) -> &SourceText {
@@ -5923,7 +5934,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             return;
         }
 
-        if self.db.should_check_file(self.file.file(self.db)) {
+        if self.semantic_checker.is_some() {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
