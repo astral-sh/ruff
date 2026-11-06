@@ -224,6 +224,15 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeAliasType::PEP695(self).specialized_value_type(db, None)
     }
@@ -343,6 +352,15 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// The value type of this manual type alias.
     ///
     /// Computed lazily from the definition with specialization applied.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeAliasType::ManualPEP695(self).specialized_value_type(db, None)
     }
