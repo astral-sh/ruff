@@ -13,7 +13,6 @@ use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     BindingWithConstraintsIterator, ProgramFile,
     definition::{Definition, DefinitionKind},
-    expression::ExpressionKind,
     global_scope,
     place::{PlaceExpr, ScopedPlaceId},
     place_table,
@@ -869,6 +868,7 @@ fn predicate_contains_special_cased_condition<'db>(
     predicate: ScopedPredicateId,
 ) -> bool {
     let expression = match use_def_map(db, scope).predicates()[predicate].node {
+        PredicateNode::EnvironmentGuard { .. } => return true,
         PredicateNode::Expression(expression) | PredicateNode::IsNonEmptyIterable(expression) => {
             expression
         }
@@ -883,9 +883,6 @@ fn predicate_contains_special_cased_condition<'db>(
         | PredicateNode::OrPatternAlternative(_)
         | PredicateNode::StarImportPlaceholder(_) => return false,
     };
-    if matches!(expression.kind(db), ExpressionKind::EnvironmentGuard(_)) {
-        return true;
-    }
     let file = expression.program_file(db);
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let mut inference = None;

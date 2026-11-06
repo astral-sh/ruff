@@ -2387,8 +2387,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let expression =
             registered.unwrap_or_else(|| self.add_predicate_expression(predicate_node, context));
+        let node = match self.vendored_environment_guard(predicate_node) {
+            Some(value) => PredicateNode::EnvironmentGuard { expression, value },
+            None => PredicateNode::Expression(expression),
+        };
         PredicateOrLiteral::Predicate(Predicate {
-            node: PredicateNode::Expression(expression),
+            node,
             is_positive: true,
         })
     }
@@ -2534,7 +2538,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::SubjectElementPattern(_)
+                    PredicateNode::EnvironmentGuard { .. }
+                    | PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
@@ -3067,14 +3072,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         node: &ast::Expr,
         context: ExpressionContext,
     ) -> Expression<'db> {
-        let kind = match self.vendored_environment_guard(node) {
-            Some(value) => ExpressionKind::EnvironmentGuard(value),
-            None => ExpressionKind::Predicate {
+        self.add_standalone_expression_impl(
+            node,
+            ExpressionKind::Predicate {
                 context,
                 in_loop: self.in_loop_context(),
             },
-        };
-        self.add_standalone_expression_impl(node, kind, None)
+            None,
+        )
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa

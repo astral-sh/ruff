@@ -110,7 +110,8 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::ContextManagerSuppresses { .. }
+        PredicateNode::EnvironmentGuard { .. }
+        | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
@@ -1718,7 +1719,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
-            PredicateNode::ContextManagerSuppresses { .. }
+            PredicateNode::EnvironmentGuard { .. }
+            | PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
@@ -3526,6 +3528,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let db = self.db;
         match self.predicate {
             PredicateNode::Expression(expression)
+            | PredicateNode::EnvironmentGuard { expression, .. }
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,

@@ -96,9 +96,6 @@ pub enum ExpressionKind {
         context: ExpressionContext,
         in_loop: bool,
     },
-    /// A bundled stub predicate whose truthiness is known for the target. Keeping the
-    /// expression lets diagnostics trace values selected by a version or platform check.
-    EnvironmentGuard(bool),
     /// The callable part of a call, such as `list[T]` in `list[T]()`.
     ///
     /// Type variables used to specialize the callable must already be bound. A constructor call

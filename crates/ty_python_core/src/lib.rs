@@ -1190,8 +1190,6 @@ mod tests {
             DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
             ParameterDefinitionNodeKind,
         },
-        expression::ExpressionKind,
-        predicate::PredicateNode,
         program::Program,
     };
 
@@ -1331,15 +1329,7 @@ mod tests {
                     .predicates()
                     .iter()
             })
-            .find_map(|predicate| {
-                if let PredicateNode::Expression(expression) = predicate.node
-                    && let ExpressionKind::EnvironmentGuard(value) = expression.kind(&db)
-                {
-                    Some(value)
-                } else {
-                    None
-                }
-            });
+            .find_map(|predicate| predicate.known_environment_value());
         assert_eq!(folded, expected);
         Ok(())
     }

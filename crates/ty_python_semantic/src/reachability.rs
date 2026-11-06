@@ -598,6 +598,7 @@ const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
+        | PredicateNode::EnvironmentGuard { expression, .. }
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -950,13 +951,22 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         &self,
         db: &'db dyn Db,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        id: ScopedReachabilityConstraintId,
+        mut id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        if let Some(reachability) = terminal_reachability(id) {
-            return reachability;
-        }
-
-        let root = self.get_interior_node(id);
+        let root = loop {
+            if let Some(reachability) = terminal_reachability(id) {
+                return reachability;
+            }
+            let node = self.get_interior_node(id);
+            let Some(value) = predicates[node.atom()].known_environment_value() else {
+                break node;
+            };
+            id = if value {
+                node.if_true()
+            } else {
+                node.if_false()
+            };
+        };
         analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
         evaluate_reachability_path(
             db,
@@ -1985,6 +1995,9 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
+        PredicateNode::EnvironmentGuard { value, .. } => {
+            Truthiness::from(value == predicate.is_positive)
+        }
         PredicateNode::Expression(expression) => {
             infer_predicate_truthiness(db, expression).negate_if(!predicate.is_positive)
         }

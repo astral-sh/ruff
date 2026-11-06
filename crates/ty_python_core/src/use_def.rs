@@ -2365,10 +2365,10 @@ impl<'db> UseDefMapBuilder<'db> {
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
     ) {
-        if predicate == ScopedPredicateId::ALWAYS_TRUE
+        if places.is_empty()
+            || predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
-            // No need to record a narrowing constraint for `True` or `False`.
             return;
         }
 
@@ -2652,8 +2652,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .reachability_constraints
             .add_and_constraint(self.checkpoint_flow, reachability_constraint);
         let narrowing_constraint = if self.reachability_narrowing_enabled {
-            self.reachability_constraints
-                .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints)
+            self.reachability_constraints.narrowing_gate(
+                reachability_constraint,
+                &self.predicates,
+                &mut self.narrowing_constraints,
+            )
         } else {
             ScopedNarrowingConstraint::ALWAYS_TRUE
         };
