@@ -80,13 +80,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
         let key = Self::literal_get_key(call)?;
-        // Completions need every declared key, even when the cursor is inside a literal.
-        if self.collects_expected_types() {
+        // An undeclared key relies on the fallback overloads to infer its default.
+        if !self.is_typed_dict_get_for_declared_key(callee, key) {
             return None;
         }
-        // An undeclared key relies on the fallback overloads to infer its default.
-        self.is_typed_dict_get_for_declared_key(callee, key)
-            .then(|| StringLiteralType::new(self.db(), key))
+        // Completions need every declared key. Check the file's open state after the receiver
+        // so other `get` calls can reuse their inference when the file opens or closes.
+        (!self.collects_expected_types()).then(|| StringLiteralType::new(self.db(), key))
     }
 
     /// Recognize `obj.get("key")` and `obj.get("key", default)`.
