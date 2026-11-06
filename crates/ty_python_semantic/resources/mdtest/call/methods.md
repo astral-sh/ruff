@@ -154,6 +154,23 @@ reveal_type("foo".encode(encoding="utf-8"))  # revealed: bytes
 reveal_type(b"abcde".startswith(b"abc"))  # revealed: bool
 ```
 
+### Methods bound to a union of literals
+
+A saved method keeps the union of its possible receivers. A method bound to `LiteralString` can also
+cover methods bound to specific strings.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+
+def f(s: Literal["a", "b"], other: LiteralString, flag: bool):
+    method = s.isalpha
+    reveal_type(method.__self__)  # revealed: Literal["a", "b"]
+
+    mixed = method if flag else other.isalpha
+    reveal_type(mixed)  # revealed: bound method LiteralString.isalpha() -> bool
+```
+
 ## Method calls on `LiteralString`
 
 ```py
