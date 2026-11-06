@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::{
     is_pep604_future_annotations_fix_enabled, is_up006_future_annotations_fix_enabled,
 };
-use crate::registry::Rule;
+use crate::registry::{Rule, RuleSet};
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
     flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
@@ -1739,7 +1739,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
 /// Run rules that need the qualified name of the function being called.
 /// Include each rule in the initial check so it also runs when enabled on its own.
 fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
-    if !checker.any_rule_enabled(&[
+    const QUALIFIED_CALL_RULES: RuleSet = RuleSet::from_rules(&[
         Rule::RedundantOpenModes,
         Rule::OpenAlias,
         Rule::OSErrorAlias,
@@ -1816,7 +1816,9 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::UnnecessaryEmptyIterableWithinDequeCall,
         Rule::StarmapZip,
         Rule::TarfileIgnoreZerosTrue,
-    ]) {
+    ]);
+
+    if !checker.context.rules.any_enabled_in(&QUALIFIED_CALL_RULES) {
         return;
     }
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
