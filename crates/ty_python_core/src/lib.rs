@@ -1178,6 +1178,7 @@ mod tests {
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange, TextSize};
     use test_case::test_case;
+    use zip::CompressionMethod;
 
     use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
     use super::*;
@@ -1313,7 +1314,7 @@ mod tests {
         // Only bundled stubs may fold these guards. Use that filesystem so a negative case
         // exercises import resolution and does not pass just because the file is user code.
         let source = format!("{header}\n        marker: int\n");
-        let mut vendored = VendoredFileSystemBuilder::new(Default::default());
+        let mut vendored = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored.add_directory("stdlib/")?;
         vendored.add_file("stdlib/VERSIONS", "_guard: 3.0-\nsys: 3.0-\n")?;
         vendored.add_file("stdlib/sys.pyi", "")?;
