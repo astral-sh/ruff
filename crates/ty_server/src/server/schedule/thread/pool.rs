@@ -17,14 +17,8 @@ use super::{Builder, JoinHandle, ThreadPriority};
 use crate::server::{MAX_QUEUED_REQUESTS, log_queue_size};
 use crossbeam::channel::{Receiver, SendError, Sender, TrySendError};
 use ruff_db::STACK_SIZE;
+use std::num::NonZeroUsize;
 use std::panic::AssertUnwindSafe;
-use std::{
-    num::NonZeroUsize,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-};
 
 pub(crate) struct Pool {
     // `_handles` is never read: the field is present
@@ -36,7 +30,6 @@ pub(crate) struct Pool {
     // before we join the worker threads!
     job_sender: Sender<Job>,
     _handles: Vec<JoinHandle>,
-    extant_tasks: Arc<AtomicUsize>,
 }
 
 struct Job {
@@ -65,7 +58,6 @@ impl Pool {
         let threads = usize::from(threads);
 
         let (job_sender, job_receiver) = crossbeam::channel::bounded(MAX_QUEUED_REQUESTS);
-        let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);
         for i in 0..threads {
@@ -73,7 +65,6 @@ impl Pool {
                 .stack_size(STACK_SIZE)
                 .name(format!("ty:worker:{i}"))
                 .spawn({
-                    let extant_tasks = Arc::clone(&extant_tasks);
                     let job_receiver: Receiver<Job> = job_receiver.clone();
                     move || {
                         let mut current_priority = INITIAL_PRIORITY;
@@ -82,7 +73,6 @@ impl Pool {
                                 job.requested_priority.apply_to_current_thread();
                                 current_priority = job.requested_priority;
                             }
-                            extant_tasks.fetch_add(1, Ordering::SeqCst);
 
                             // SAFETY: it's safe to assume that `job.f` is unwind safe because we always
                             // abort the process if it panics.
@@ -109,8 +99,6 @@ impl Pool {
 
                                 std::process::abort();
                             }
-
-                            extant_tasks.fetch_sub(1, Ordering::SeqCst);
                         }
                     }
                 })
@@ -121,14 +109,8 @@ impl Pool {
 
         Pool {
             _handles: handles,
-            extant_tasks,
             job_sender,
         }
-    }
-
-    #[expect(dead_code)]
-    fn len(&self) -> usize {
-        self.extant_tasks.load(Ordering::SeqCst)
     }
 }
 
