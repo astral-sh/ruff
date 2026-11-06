@@ -85,9 +85,9 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
-    TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    is_property_method, list_members,
+    StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1045,6 +1045,21 @@ impl<'db> Bindings<'db> {
         self.elements
             .iter_mut()
             .flat_map(BindingsElement::callables_mut)
+    }
+
+    /// Keep the overloads for `key` and the string fallbacks of a bound `TypedDict.get`.
+    pub(crate) fn narrow_typed_dict_get_overloads(&mut self, key: StringLiteralType<'db>) {
+        for callable in self.iter_flat_mut() {
+            let key_index = usize::from(callable.bound_type.is_some());
+            callable.overloads.retain(|overload| {
+                let literal = overload
+                    .signature
+                    .parameters()
+                    .get_positional(key_index)
+                    .and_then(|parameter| parameter.annotated_type().as_string_literal());
+                literal.is_none_or(|literal| literal == key)
+            });
+        }
     }
 
     fn iter_callable_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {

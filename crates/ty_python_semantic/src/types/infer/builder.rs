@@ -939,7 +939,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Attaches the call site's scope so generic argument matching can detect recursive calls.
-    fn bindings_for_call(&self, callable_type: Type<'db>) -> Bindings<'db> {
+    fn scoped_call_bindings(&self, callable_type: Type<'db>) -> Bindings<'db> {
         let db = self.db();
         callable_type
             .bindings(db, self.program_environment())
@@ -5888,7 +5888,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 provenance,
                 ..
             }) => {
-                let bindings = self.bindings_for_call(dunder_callable).match_parameters(
+                let bindings = self.scoped_call_bindings(dunder_callable).match_parameters(
                     db,
                     env,
                     argument_types,
@@ -7361,11 +7361,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(self.db(), literal.value.to_str())
-        } else {
-            Type::literal_string()
-        }
+        Self::precise_string_literal_value(literal).map_or_else(Type::literal_string, |value| {
+            Type::string_literal(self.db(), value)
+        })
+    }
+
+    fn precise_string_literal_value(literal: &ast::ExprStringLiteral) -> Option<&str> {
+        (literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE).then(|| literal.value.to_str())
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
@@ -9450,6 +9452,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    /// Select the overloads for a call expression before matching its arguments.
+    fn bindings_for_call(
+        &self,
+        call: &ast::ExprCall,
+        callee: Type<'db>,
+        result_context: TypeContext<'db>,
+    ) -> Bindings<'db> {
+        let mut bindings = self.scoped_call_bindings(callee);
+        if let Some(key) = self.typed_dict_get_key_for_narrowing(call, callee, result_context) {
+            bindings.narrow_typed_dict_get_overloads(key);
+        }
+        bindings
+    }
+
     /// Infer a callable expression without introducing new type variable bindings.
     ///
     /// An assignment such as `items = list[T]()` creates an instance, not a generic alias.
@@ -10032,9 +10048,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let bindings =
-            self.bindings_for_call(callable_type)
-                .match_parameters(db, env, &call_arguments);
+        let bindings = self
+            .bindings_for_call(call_expression, callable_type, call_expression_tcx)
+            .match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,

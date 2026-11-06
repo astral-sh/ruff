@@ -8802,6 +8802,31 @@ def _(person: Person) -> None:
     reveal_type(get("email", False))  # revealed: Literal[False]
 ```
 
+### Other callables saved as `get`
+
+An attribute named `get` can hold another `TypedDict` method or a getter whose key is already bound.
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class Record(TypedDict):
+    name: str
+    count: int
+
+record: Record = {"name": "name", "count": 1}
+
+class Setter:
+    get = record.__setitem__
+
+Setter().get("name", 1)  # error: [no-matching-overload]
+
+class Count:
+    get = partial(record.get, "count")
+
+reveal_type(Count().get("name"))  # revealed: int
+```
+
 ### `get` default types for absent keys
 
 When a key is absent, the annotation on the result gives the element type for an empty list passed
@@ -8824,6 +8849,82 @@ An annotation does not make an incompatible default valid:
 ```py
 def _(closed: Closed) -> None:
     wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
+```
+
+### Contextual return types for undeclared `get` keys
+
+Calling `get` directly or through a saved reference gives the same type when a key is missing from
+one or more receivers. The type variable supplies a `list[str]` context and preserves the inferred
+type for comparison.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import TypedDict, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+T = TypeVar("T", bound=list[str])
+
+def with_list_context(value: T) -> T:
+    return value
+
+class Record(TypedDict):
+    name: str
+    count: int
+
+class WithEntry(TypedDict):
+    entry: list[str]
+
+def undeclared(row: Record):
+    get = row.get
+    # error: [unsound-assignment]
+    result: list[str] = row.get("entry", [])
+    direct = with_list_context(row.get("entry", []))
+    saved = with_list_context(get("entry", []))
+    static_assert(is_equivalent_to(TypeOf[direct], TypeOf[saved]))
+
+def sometimes_declared(row: Record | WithEntry):
+    get = row.get
+    # error: [unsound-assignment]
+    result: list[str] = row.get("entry", [])
+    direct = with_list_context(row.get("entry", []))
+    saved = with_list_context(get("entry", []))
+    static_assert(is_equivalent_to(TypeOf[direct], TypeOf[saved]))
+```
+
+### `get` with a callable default
+
+When the key is present, `get` can return `None` even if its default is a callable.
+
+```py
+from typing import Callable, NotRequired, TypedDict
+
+class Options(TypedDict):
+    handler: NotRequired[None]
+    enabled: bool
+
+def handler(options: Options) -> Callable[[str], int]:
+    # error: [invalid-return-type]
+    return options.get("handler", lambda name: len(name))
+```
+
+### Contextual types for nested `get` defaults
+
+The inner call infers an empty list as `list[str]` when used as the default for another `get` call.
+
+```py
+from typing import NotRequired, TypedDict, assert_type
+
+class Settings(TypedDict):
+    numbers: NotRequired[list[int]]
+    names: list[str]
+
+def use(settings: Settings):
+    settings.get("numbers", settings.get("names", assert_type([], list[str])))
 ```
 
 ### `get` default types for non-required items
