@@ -49,9 +49,10 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassBase, ClassLiteral, ClassType, EnumLiteralType, IntersectionType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, NominalInstanceType, StringLiteralType, SubclassOfType, Type,
+    TypePair, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -796,6 +797,50 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
+    /// Append a batch of plain nominal instances when none of their classes subsumes another.
+    /// Checking each class's MRO once avoids pairwise redundancy checks for wide unions.
+    pub(super) fn try_extend_nominal_instances(&mut self, incoming: &[Type<'db>]) -> bool {
+        if self.cycle_recovery || incoming.len() < super::WIDE_UNION {
+            return false;
+        }
+
+        let mut classes = FxHashSet::default();
+        for element in &self.elements {
+            let UnionElement::Type(Type::NominalInstance(instance)) = element else {
+                return false;
+            };
+            let Some(class) = instance.plain_static_class() else {
+                return false;
+            };
+            classes.insert(class);
+        }
+
+        let mut new_elements = Vec::new();
+        for &ty in incoming {
+            let Some(class) = ty
+                .as_nominal_instance()
+                .and_then(NominalInstanceType::plain_static_class)
+            else {
+                return false;
+            };
+            if classes.insert(class) {
+                new_elements.push(UnionElement::Type(ty));
+            }
+        }
+
+        let independent = classes.iter().all(|class| {
+            class.try_mro(self.db, None).is_ok_and(|mro| {
+                mro.iter().skip(1).all(|base| {
+                    !matches!(base, ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Static(base))) if classes.contains(base))
+                })
+            })
+        });
+        if independent {
+            self.elements.extend(new_elements);
+        }
+        independent
+    }
+
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
         let cycle_recovery = self.cycle_recovery;
@@ -813,9 +858,11 @@ impl<'db> UnionBuilder<'db> {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(db);
-                self.elements.reserve(new_elements.len());
-                for element in new_elements {
-                    self.add_in_place_impl(*element, seen_aliases);
+                if !self.try_extend_nominal_instances(new_elements) {
+                    self.elements.reserve(new_elements.len());
+                    for element in new_elements {
+                        self.add_in_place_impl(*element, seen_aliases);
+                    }
                 }
                 self.recursively_defined =
                     self.recursively_defined.or(union.recursively_defined(db));
@@ -1160,6 +1207,25 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            // Two plain nominal instances can only remove one another by inheritance.
+            // Check their MROs directly, including in a union that also contains other types.
+            if !self.cycle_recovery
+                && let (Type::NominalInstance(incoming), Type::NominalInstance(existing)) =
+                    (ty, element_type)
+                && let (Some(incoming), Some(existing)) =
+                    (incoming.plain_static_class(), existing.plain_static_class())
+                && let (Ok(incoming_mro), Ok(existing_mro)) =
+                    (incoming.try_mro(db, None), existing.try_mro(db, None))
+            {
+                if incoming_mro.contains(&ClassType::NonGeneric(existing.into()).into()) {
+                    return;
+                }
+                if existing_mro.contains(&ClassType::NonGeneric(incoming.into()).into()) {
+                    to_remove.push(i);
+                }
+                continue;
             }
 
             // `object` already contains every possible union element.

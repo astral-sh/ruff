@@ -94,6 +94,30 @@ def _(
     reveal_type(u4)  # revealed: str | bytes
 ```
 
+Wide unions of nominal instances preserve the order of unrelated classes. A class that inherits from
+multiple members is redundant, including when it appears before the union.
+
+```py
+from typing_extensions import TypeAlias, assert_type
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+class I(A, H): ...
+
+Wide: TypeAlias = A | B | C | D | E | F | G | H
+
+def _(repeated: B | Wide, last: Wide | I, first: I | Wide) -> None:
+    reveal_type(repeated)  # revealed: B | A | C | D | E | F | G | H
+    assert_type(last, Wide)
+    assert_type(first, Wide)
+```
+
 ## Boolean literals
 
 The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:
