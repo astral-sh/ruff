@@ -3865,6 +3865,16 @@ alice = Person(name="Alice", age=30)
 print(f"The height of Alice is {alice['height']}")  # error
 ```
 
+**Migrating from `invalid-key`**
+
+
+ty used to have a rule called [`invalid-key`](#invalid-key) that covered [`invalid-typed-dict-key`](#invalid-typed-dict-key),
+[`unknown-typed-dict-constructor-key`](#unknown-typed-dict-constructor-key), and [`non-literal-typed-dict-key`](#non-literal-typed-dict-key).
+
+The old [`invalid-key`](#invalid-key) name is now an alias for [`invalid-typed-dict-key`](#invalid-typed-dict-key) only. If you previously had
+any configuration for [`invalid-key`](#invalid-key) specifically, you should go through the other two rules to see
+if you want to configure them in the same way.
+
 ## `invalid-typed-dict-statement`
 
 <small>
