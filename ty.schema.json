@@ -1266,6 +1266,16 @@
             }
           ]
         },
+        "misplaced-overload-decorator": {
+          "title": "detects misplaced `@final` or `@override` decorators on overloaded methods",
+          "description": "## What it does\n\nChecks for `@final` or `@override` decorators applied to the wrong definition of an overloaded\nmethod. Put the decorator on the implementation when there is one, or on the first overload when\nthere is no implementation.\n\n## Why is this bad?\n\nThese decorators apply to the whole method. Placing one on an individual overload suggests that only\nthat overload is final or overrides a superclass method.\n\n## Example\n\n```pyi\nfrom typing_extensions import overload, override\n\nclass Decoder:\n    def decode(self, data: bytes) -> str: ...\n\nclass BatchDecoder(Decoder):\n    @overload\n    def decode(self, data: bytes) -> str: ...\n    @overload\n    @override\n    def decode(self, data: list[bytes]) -> list[str]: ...  # error\n```\n\nMove `@override` to the first overload of `BatchDecoder.decode`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\n\nChecks for missing required arguments in a call.\n\n## Why is this bad?\n\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef func(x: int): ...\n\n\n# TypeError: func() missing 1 required positional argument: 'x'\nfunc()  # error\n```",

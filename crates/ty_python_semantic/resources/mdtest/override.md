@@ -771,7 +771,7 @@ class ExplicitChild(Parent):
 class OverrideOnOverload(Parent):
     @overload
     @override
-    def overloaded(self, value: int) -> int: ...  # error: [invalid-overload]
+    def overloaded(self, value: int) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     def overloaded(self, value: str) -> str: ...
     def overloaded(self, value: int | str) -> int | str:  # error: [missing-override-decorator]
@@ -1019,7 +1019,7 @@ class OverrideOnSecondOverload(StubParent):
     def method(self, value: int) -> int: ...  # error: [missing-override-decorator]
     @overload
     @override
-    def method(self, value: str) -> str: ...  # error: [invalid-overload]
+    def method(self, value: str) -> str: ...  # error: [misplaced-overload-decorator]
 
 class OverrideOnFirstOverload(StubParent):
     @overload
@@ -1047,7 +1047,7 @@ class MissingOverrideOnStubImplementation(StubParent):
 class OverrideOnStubOverloadWithImplementation(StubParent):
     @overload
     @override
-    def method(self, value: int) -> int: ...  # error: [invalid-overload]
+    def method(self, value: int) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     def method(self, value: str) -> str: ...
     def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
@@ -1371,7 +1371,7 @@ class Child(Parent):
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
 implementation function. However, we nonetheless respect the decorator in this situation, even
-though we may also emit `invalid-overload` on these methods.
+though we may also emit `misplaced-overload-decorator` on these methods.
 
 ```py
 from typing_extensions import Any, Callable, override, overload
@@ -1390,11 +1390,11 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: str) -> str: ...
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: int) -> int: ...
     @override
     # error: [invalid-explicit-override]
@@ -1403,7 +1403,7 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def baz(self, x: str) -> str: ...
     @overload
     def baz(self, x: int) -> int: ...
@@ -1413,7 +1413,7 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def quux(self, x: str) -> str: ...
     @overload
     def quux(self, x: int) -> int: ...
@@ -1437,14 +1437,14 @@ class Spam:
     def foo(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
-    # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
+    # error: [misplaced-overload-decorator]  "`@override` decorator should be applied only to the first overload"
     def foo(self, x: int) -> int: ...
     @overload
     @override
     def bar(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
-    # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
+    # error: [misplaced-overload-decorator]  "`@override` decorator should be applied only to the first overload"
     def bar(self, x: int) -> int: ...
     @overload
     @override
