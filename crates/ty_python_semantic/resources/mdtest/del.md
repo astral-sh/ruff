@@ -356,7 +356,7 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # error: [invalid-argument-type]
+    # error: [invalid-index-type]
     del l["string"]
 
     l[0] = 1

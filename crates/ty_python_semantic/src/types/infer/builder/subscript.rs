@@ -13,7 +13,7 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_INDEX_TYPE, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
@@ -24,7 +24,9 @@ use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
-use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
+use crate::types::subscript::{
+    LegacyGenericOrigin, SubscriptError, SubscriptErrorKind, has_invalid_index_type,
+};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
@@ -2141,13 +2143,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         }
                                         .validate();
                                     }
-                                } else {
-                                    if emit_diagnostic
-                                        && let Some(builder) = self.context.report_lint(
-                                            &INVALID_ASSIGNMENT,
-                                            target.range.cover(rhs_value_node.range()),
-                                        )
-                                    {
+                                } else if emit_diagnostic {
+                                    let rule = if has_invalid_index_type(db, object_ty, &bindings) {
+                                        &INVALID_INDEX_TYPE
+                                    } else {
+                                        &INVALID_ASSIGNMENT
+                                    };
+                                    if let Some(builder) = self.context.report_lint(
+                                        rule,
+                                        target.range.cover(rhs_value_node.range()),
+                                    ) {
                                         let settings =
                                             DisplaySettings::from_possibly_ambiguous_types(
                                                 db,
@@ -2458,9 +2463,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
                                 } else {
                                     // Non-`TypedDict` object
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
-                                    {
+                                    let rule = if has_invalid_index_type(db, object_ty, &bindings) {
+                                        &INVALID_INDEX_TYPE
+                                    } else {
+                                        &INVALID_ARGUMENT_TYPE
+                                    };
+                                    if let Some(builder) = self.context.report_lint(rule, target) {
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
                                             "Method `__delitem__` of type `{}` cannot \
                                             be called with key of type `{}` on \

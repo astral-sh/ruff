@@ -171,7 +171,7 @@ def g(x: Baz):
     if isinstance(x, Qux):
         # x is Baz & Qux. Baz has __getitem__(int) -> str, Qux has no __getitem__.
         # The intersection IS subscriptable (via Baz), but with wrong argument type.
-        # error: [invalid-argument-type]
+        # error: [invalid-index-type]
         reveal_type(x["hello"])  # revealed: str
 ```
 
@@ -189,8 +189,8 @@ class B:
 def h(x: A):
     if isinstance(x, B):
         # x is A & B. A expects int, B expects str. A list satisfies neither.
-        # error: [invalid-argument-type]
-        # error: [invalid-argument-type]
+        # error: [invalid-index-type]
+        # error: [invalid-index-type]
         reveal_type(x[[]])  # revealed: Never
 ```
 

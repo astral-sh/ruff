@@ -223,7 +223,7 @@ def _(m: int, n: int):
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
 
 def invalid_slice_bound(t: tuple[int, ...], start: float) -> tuple[int, ...]:
-    return t[start:]  # error: [invalid-argument-type]
+    return t[start:]  # error: [invalid-index-type]
 
 class I0: ...
 class I1: ...

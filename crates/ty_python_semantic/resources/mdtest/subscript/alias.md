@@ -33,19 +33,19 @@ def f(
     reveal_type(implicit_tuple[implicit_zero])  # revealed: str
     reveal_type(implicit_tuple[pep_613_zero])  # revealed: str
     reveal_type(implicit_tuple[pep_695_zero])  # revealed: str
-    implicit_tuple[invalid_bound:]  # error: [invalid-argument-type]
+    implicit_tuple[invalid_bound:]  # error: [invalid-index-type]
 
     reveal_type(pep_613_tuple[:2])  # revealed: tuple[str, int]
     reveal_type(pep_613_tuple[implicit_zero])  # revealed: str
     reveal_type(pep_613_tuple[pep_613_zero])  # revealed: str
     reveal_type(pep_613_tuple[pep_695_zero])  # revealed: str
-    pep_613_tuple[invalid_bound:]  # error: [invalid-argument-type]
+    pep_613_tuple[invalid_bound:]  # error: [invalid-index-type]
 
     reveal_type(pep_695_tuple[:2])  # revealed: tuple[str, int]
     reveal_type(pep_695_tuple[implicit_zero])  # revealed: str
     reveal_type(pep_695_tuple[pep_613_zero])  # revealed: str
     reveal_type(pep_695_tuple[pep_695_zero])  # revealed: str
-    pep_695_tuple[invalid_bound:]  # error: [invalid-argument-type]
+    pep_695_tuple[invalid_bound:]  # error: [invalid-index-type]
 ```
 
 ## Recursive containers
@@ -59,13 +59,13 @@ Value = str | list["Value"]
 type ExplicitValue = str | list[ExplicitValue]
 
 def implicit(value: Value):
-    # error: [invalid-argument-type] "on object of type `str`"
-    # error: [invalid-argument-type] "on object of type `list[Value]`"
+    # error: [invalid-index-type] "on object of type `str`"
+    # error: [invalid-index-type] "on object of type `list[Value]`"
     value[0]["checksum"]
 
 def explicit(value: ExplicitValue):
-    # error: [invalid-argument-type] "on object of type `str`"
-    # error: [invalid-argument-type] "on object of type `list[ExplicitValue]`"
+    # error: [invalid-index-type] "on object of type `str`"
+    # error: [invalid-index-type] "on object of type `list[ExplicitValue]`"
     value[0]["checksum"]
 ```
 
@@ -79,15 +79,15 @@ Value = str | list["Value | None"]
 type ExplicitValue = str | list[ExplicitValue | None]
 
 def implicit(value: dict[str, Value | None]):
-    # error: [invalid-argument-type] "on object of type `str`"
-    # error: [invalid-argument-type] "on object of type `list[Value | None]`"
+    # error: [invalid-index-type] "on object of type `str`"
+    # error: [invalid-index-type] "on object of type `list[Value | None]`"
     # error: [not-subscriptable]
     # error: [not-iterable]
     [element["location"] for element in value["output"]]
 
 def explicit(value: dict[str, ExplicitValue | None]):
-    # error: [invalid-argument-type] "on object of type `str`"
-    # error: [invalid-argument-type] "on object of type `list[ExplicitValue | None]`"
+    # error: [invalid-index-type] "on object of type `str`"
+    # error: [invalid-index-type] "on object of type `list[ExplicitValue | None]`"
     # error: [not-subscriptable]
     # error: [not-iterable]
     [element["location"] for element in value["output"]]
@@ -104,14 +104,14 @@ type ExplicitValue = dict[str, ExplicitValue] | str
 
 def implicit(parent: Value, path: tuple[str | int, ...]):
     for segment in path:
-        # error: [invalid-argument-type] "on object of type `dict[str, Value]`"
-        # error: [invalid-argument-type] "on object of type `str`"
+        # error: [invalid-index-type] "on object of type `dict[str, Value]`"
+        # error: [invalid-index-type] "on object of type `str`"
         parent = parent[segment]
 
 def explicit(parent: ExplicitValue, path: tuple[str | int, ...]):
     for segment in path:
-        # error: [invalid-argument-type] "on object of type `dict[str, ExplicitValue]`"
-        # error: [invalid-argument-type] "on object of type `str`"
+        # error: [invalid-index-type] "on object of type `dict[str, ExplicitValue]`"
+        # error: [invalid-index-type] "on object of type `str`"
         parent = parent[segment]
 ```
 
@@ -124,12 +124,26 @@ Key = str | list["Key"]
 type ExplicitKey = str | list[ExplicitKey]
 
 def implicit(value: list[int], key: Key | str):
-    # error: [invalid-argument-type] "with key of type `str`"
-    # error: [invalid-argument-type] "with key of type `list[Key]`"
+    # error: [invalid-index-type] "with key of type `str`"
+    # error: [invalid-index-type] "with key of type `list[Key]`"
     value[key]
 
 def explicit(value: list[int], key: ExplicitKey | str):
-    # error: [invalid-argument-type] "with key of type `str`"
-    # error: [invalid-argument-type] "with key of type `list[ExplicitKey]`"
+    # error: [invalid-index-type] "with key of type `str`"
+    # error: [invalid-index-type] "with key of type `list[ExplicitKey]`"
     value[key]
+```
+
+## Deleting a required field through a TypedDict alias
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    id: int
+
+type Alias = Record
+
+def remove_id(record: Alias):
+    del record["id"]  # error: [invalid-argument-type]
 ```

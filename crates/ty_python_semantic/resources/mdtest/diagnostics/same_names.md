@@ -646,7 +646,7 @@ def assign_value(values: list[first.Model], value: second.Model) -> None:
     values[0] = value
 
 def assign_key(values: dict[first.Model, int], key: second.Model) -> None:
-    # error: [invalid-assignment] "Invalid subscript assignment with key of type `second.Model` and value of type `Literal[1]` on object of type `dict[first.Model, int]`"
+    # error: [invalid-index-type] "Invalid subscript assignment with key of type `second.Model` and value of type `Literal[1]` on object of type `dict[first.Model, int]`"
     values[key] = 1
 ```
 

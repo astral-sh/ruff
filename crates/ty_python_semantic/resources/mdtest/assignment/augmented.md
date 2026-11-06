@@ -514,7 +514,7 @@ error.
 
 ```py
 mapping: dict[str, int] = {}
-# error: [invalid-argument-type]
+# error: [invalid-index-type]
 mapping[1] += 1
 ```
 
@@ -544,7 +544,7 @@ The same rule applies when a subscript cannot be read.
 
 ```py
 mapping: dict[str, int] = {}
-# error: [invalid-argument-type]
+# error: [invalid-index-type]
 # error: [unresolved-reference]
 mapping[1] += missing_subscript_operand
 ```

@@ -85,7 +85,7 @@ be mutated before the lookup. The result is the union of the value types.
 reveal_type({1: "a", 2: "b"}[1])  # revealed: Literal["a", "b"]
 reveal_type({"a": 1, "b": 2}["a"])  # revealed: Literal[1, 2]
 
-{"a": 1}[0]  # error: [invalid-argument-type]
+{"a": 1}[0]  # error: [invalid-index-type]
 ```
 
 This also allows a lookup table to convert between literal unions:

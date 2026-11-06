@@ -49,12 +49,12 @@ def _(s: bytes) -> bytes:
     return reveal_type(byte_slice2)  # revealed: bytes
 
 def invalid_slice_bound(value: bytes, start: float) -> bytes:
-    return value[start:]  # error: [invalid-argument-type]
+    return value[start:]  # error: [invalid-index-type]
 ```
 
 ## Bytearray slices
 
 ```py
 def invalid_slice_bound(value: bytearray, start: float) -> bytearray:
-    return value[start:]  # error: [invalid-argument-type]
+    return value[start:]  # error: [invalid-index-type]
 ```
