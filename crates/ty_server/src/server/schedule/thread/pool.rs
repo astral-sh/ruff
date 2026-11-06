@@ -14,7 +14,8 @@
 //! the threading utilities in [`crate::server::schedule::thread`].
 
 use super::{Builder, JoinHandle, ThreadPriority};
-use crossbeam::channel::{Receiver, Sender};
+use crate::server::{MAX_QUEUED_REQUESTS, log_queue_size};
+use crossbeam::channel::{Receiver, SendError, Sender, TrySendError};
 use ruff_db::STACK_SIZE;
 use std::panic::AssertUnwindSafe;
 use std::{
@@ -44,12 +45,26 @@ struct Job {
 }
 
 impl Pool {
+    /// Reserves space for one job, returning `Full` before the caller builds the work.
+    pub(crate) fn spawn(
+        &mut self,
+        priority: ThreadPriority,
+    ) -> Result<PendingJob<'_>, TrySendError<()>> {
+        if self.job_sender.is_full() {
+            return Err(TrySendError::Full(()));
+        }
+        Ok(PendingJob {
+            sender: &mut self.job_sender,
+            priority,
+        })
+    }
+
     pub(crate) fn new(threads: NonZeroUsize) -> Pool {
         const INITIAL_PRIORITY: ThreadPriority = ThreadPriority::Worker;
 
         let threads = usize::from(threads);
 
-        let (job_sender, job_receiver) = crossbeam::channel::bounded(std::cmp::min(threads * 2, 4));
+        let (job_sender, job_receiver) = crossbeam::channel::bounded(MAX_QUEUED_REQUESTS);
         let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);
@@ -111,10 +126,26 @@ impl Pool {
         }
     }
 
-    pub(crate) fn spawn<F>(&self, priority: ThreadPriority, f: F)
+    #[expect(dead_code)]
+    fn len(&self) -> usize {
+        self.extant_tasks.load(Ordering::SeqCst)
+    }
+}
+
+/// Holds a place in the job queue until submitted or dropped. The exclusive borrow
+/// of the pool's only sender ensures no other submission can take that place.
+pub(crate) struct PendingJob<'pool> {
+    sender: &'pool mut Sender<Job>,
+    priority: ThreadPriority,
+}
+
+impl PendingJob<'_> {
+    /// Submits the work to run on a worker thread.
+    pub(crate) fn run<F>(self, f: F) -> Result<(), SendError<()>>
     where
         F: FnOnce() + Send + 'static,
     {
+        let Self { sender, priority } = self;
         let f = Box::new(move || {
             if cfg!(debug_assertions) {
                 priority.assert_is_used_on_current_thread();
@@ -126,11 +157,8 @@ impl Pool {
             requested_priority: priority,
             f,
         };
-        self.job_sender.send(job).unwrap();
-    }
-
-    #[expect(dead_code)]
-    fn len(&self) -> usize {
-        self.extant_tasks.load(Ordering::SeqCst)
+        sender.send(job).map_err(|_| SendError(()))?;
+        log_queue_size("worker", sender.len());
+        Ok(())
     }
 }

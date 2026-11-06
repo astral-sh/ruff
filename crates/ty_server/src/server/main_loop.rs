@@ -1,4 +1,4 @@
-use crate::server::schedule::Scheduler;
+use crate::server::schedule::{RequestAttempt, Scheduler};
 use crate::server::{Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
 use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
@@ -37,7 +37,7 @@ impl Server {
                         continue;
                     };
 
-                    let task = match msg {
+                    match msg {
                         Message::Request(req) => {
                             self.session
                                 .request_queue_mut()
@@ -60,7 +60,12 @@ impl Server {
                                 continue;
                             }
 
-                            api::request(req)
+                            scheduler.dispatch_request(
+                                req,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Initial,
+                            )?;
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
@@ -74,7 +79,11 @@ impl Server {
                                 return Ok(());
                             }
 
-                            api::notification(notification)
+                            scheduler.dispatch(
+                                api::notification(notification),
+                                &mut self.session,
+                                &client,
+                            )?;
                         }
 
                         // Handle the response from the client to a server request
@@ -94,9 +103,7 @@ impl Server {
                             }
                             continue;
                         }
-                    };
-
-                    scheduler.dispatch(task, &mut self.session, client);
+                    }
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
@@ -127,8 +134,12 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            let task = api::request(request);
-                            scheduler.dispatch(task, &mut self.session, client);
+                            scheduler.dispatch_request(
+                                request,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Retry,
+                            )?;
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
