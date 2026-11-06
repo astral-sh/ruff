@@ -1,5 +1,3 @@
-use ruff_text_size::Ranged;
-
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
     self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternKeyword,
@@ -222,29 +220,14 @@ impl ast::PatternMatchMapping {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchMapping {
-            keys,
-            patterns,
-            rest,
-            range: _,
-            node_index: _,
-        } = self;
-
-        let mut rest = rest.as_ref();
-
-        for (key, pattern) in keys.iter().zip(patterns) {
-            if let Some(rest_identifier) = rest {
-                if rest_identifier.start() < key.start() {
-                    visitor.visit_identifier(rest_identifier);
-                    rest = None;
+        for item in &self.items {
+            match item {
+                ast::MappingPatternItem::Entry { key, pattern } => {
+                    visitor.visit_expr(key);
+                    visitor.visit_pattern(pattern);
                 }
+                ast::MappingPatternItem::Rest(identifier) => visitor.visit_identifier(identifier),
             }
-            visitor.visit_expr(key);
-            visitor.visit_pattern(pattern);
-        }
-
-        if let Some(rest) = rest {
-            visitor.visit_identifier(rest);
         }
     }
 }
