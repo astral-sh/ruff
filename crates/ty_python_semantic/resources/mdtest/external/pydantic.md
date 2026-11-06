@@ -1510,6 +1510,46 @@ class FrozenFieldWithCustomSetattr(BaseModel):
 FrozenFieldWithCustomSetattr(value=1).value = 2  # ok
 ```
 
+## Hashability of frozen models
+
+Pydantic generates a hash for frozen models even when they define their own equality method.
+
+```py
+from collections.abc import Hashable
+from typing import Literal
+from pydantic import BaseModel
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+class Frozen(BaseModel, frozen=True):
+    value: int = 0
+    __eq__ = object.__eq__
+
+class Child(Frozen):
+    __eq__ = object.__eq__
+
+accepts_hashable(Frozen())
+accepts_hashable(Child())
+Frozen.__hash__(1)  # error: [invalid-argument-type]
+```
+
+If a base defines a custom hash, Pydantic leaves it alone. A subclass can then inherit that hash or
+disable it by defining `__eq__`.
+
+```py
+class Custom(BaseModel):
+    def __hash__(self) -> Literal[7]:
+        return 7
+
+class Inherited(Custom, frozen=True): ...
+
+class Disabled(Custom, frozen=True):
+    __eq__ = object.__eq__
+
+reveal_type(Inherited().__hash__())  # revealed: Literal[7]
+accepts_hashable(Disabled())  # error: [invalid-argument-type]
+```
+
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that

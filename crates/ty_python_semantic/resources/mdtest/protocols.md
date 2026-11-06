@@ -1488,9 +1488,9 @@ static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
 static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
-The additional union element is still simplified if it is a final hashable class, because instances
-of that class cannot override their inherited hashability. Final classes with `__hash__ = None` must
-remain in the union:
+A final hashable class is redundant in a union with `Hashable` because it cannot have an unhashable
+subclass. A final class with `__hash__ = None` remains in the union. Python sets `__hash__ = None`
+when a class defines `__eq__` and omits `__hash__`, and subclasses inherit that value.
 
 ```py
 from dataclasses import dataclass
@@ -1526,10 +1526,10 @@ def check_hashable_or_unhashable_final(x: Hashable | Unhashable):
     reveal_type(x)  # revealed: Hashable | Unhashable
 
 def check_hashable_or_eq_only(x: Hashable | EqOnly):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | EqOnly
 
 def check_hashable_or_eq_only_child(x: Hashable | EqOnlyChild):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | EqOnlyChild
 
 def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
     reveal_type(x)  # revealed: Hashable | UnhashableDataclass
@@ -1548,9 +1548,8 @@ class Payload(TypedDict):
 def check_hashable_or_typevar(x: Hashable | T):
     reveal_type(x)  # revealed: Hashable | T@check_hashable_or_typevar
 
-# TODO: Preserve TypedDict types, which are unhashable at runtime.
 def check_hashable_or_typed_dict(x: Hashable | Payload):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | Payload
 
 def check_hashable_or_protocol(x: Hashable | HasX):
     reveal_type(x)  # revealed: Hashable | HasX
@@ -1563,6 +1562,18 @@ def needs_something_hashable(x: Hashable):
     hash(x)
 
 needs_something_hashable([])  # error: [invalid-argument-type]
+```
+
+A subclass can restore hashing by explicitly assigning `object.__hash__`.
+
+```py
+class Restored(EqOnlyBase):
+    __hash__ = object.__hash__
+
+reveal_type(EqOnlyBase.__hash__)  # revealed: None
+needs_something_hashable(EqOnlyBase())  # error: [invalid-argument-type]
+needs_something_hashable(EqOnlyChild())  # error: [invalid-argument-type]
+needs_something_hashable(Restored())  # ok
 ```
 
 ## Unannotated protocol defaults retain inherited declarations
@@ -1724,6 +1735,31 @@ accepts_hashable(InheritedNone())  # error: [invalid-argument-type]
 accepts_hashable(FinalExplicitNone())  # error: [invalid-argument-type]
 ```
 
+Defining other comparison methods leaves the inherited hash in place.
+
+```py
+class OtherComparisons:
+    __ne__ = object.__ne__
+
+    def __lt__(self, other: object, /) -> bool:
+        return False
+
+accepts_hashable(OtherComparisons())
+```
+
+A named tuple inherits the tuple hash even when it defines `__eq__`. Its metaclass installs the
+method after creating the class.
+
+```py
+from typing import NamedTuple
+
+class Key(NamedTuple):
+    value: int
+    __eq__ = object.__eq__
+
+accepts_hashable(Key(1))
+```
+
 The standard-library stubs mark mutable built-in containers as unhashable.
 
 ```py
@@ -1741,10 +1777,13 @@ accepts_typing_hashable(ExplicitNone())  # error: [invalid-argument-type]
 accepts_typing_hashable([])  # error: [invalid-argument-type]
 ```
 
-Explicitly hashable classes and immutable built-in values remain valid.
+A class that defines both `__eq__` and a callable `__hash__` still satisfies `Hashable`, as do the
+immutable built-in values below.
 
 ```py
 class ExplicitHash:
+    __eq__ = object.__eq__
+
     def __hash__(self) -> int:
         return 1
 
@@ -1775,6 +1814,30 @@ static_assert(not is_assignable_to(list[str], Hashable))
 static_assert(not is_subtype_of(list[str], Hashable))
 ```
 
+A class can disable hashing on just one branch of its class body. Defining both methods together
+preserves hashing on either branch.
+
+```py
+def check(flag: bool):
+    class ConditionalEq:
+        if flag:
+            __eq__ = object.__eq__
+
+    class ConditionalHash:
+        __eq__ = object.__eq__
+        if flag:
+            __hash__ = object.__hash__
+
+    class BothTogether:
+        if flag:
+            __eq__ = object.__eq__
+            __hash__ = object.__hash__
+
+    accepts_hashable(ConditionalEq())  # error: [invalid-argument-type]
+    accepts_hashable(ConditionalHash())  # error: [invalid-argument-type]
+    accepts_hashable(BothTogether())  # ok
+```
+
 ## User-defined hash protocols
 
 A user-defined protocol that explicitly requires a callable `__hash__` method imposes the same
@@ -1801,10 +1864,33 @@ accepts_hashable(ExplicitHash())
 accepts_hashable(object())
 ```
 
+A protocol that requires equality can have both hashable and unhashable implementations. The
+protocol class itself disables hashing when it defines only the equality method.
+
+```py
+class HasEquality(Protocol):
+    value: int
+
+    def __eq__(self, other: object, /) -> bool: ...
+
+reveal_type(HasEquality.__hash__)  # revealed: None
+
+def check(value: HasEquality, cls: type[HasEquality]):
+    reveal_type(value.__hash__ is None)  # revealed: bool
+    reveal_type(cls.__hash__ is None)  # revealed: bool
+    if value.__hash__ is not None:
+        reveal_type(value.__hash__())  # revealed: int
+
+class HashableEquality(HasEquality, SupportsHash, Protocol): ...
+
+def check_hashable(value: HashableEquality):
+    reveal_type(value.__hash__())  # revealed: int
+```
+
 ## Hashability of dataclasses
 
-Mutable dataclasses disable hashing by default, while frozen dataclasses synthesize a callable
-`__hash__` method.
+Mutable dataclasses disable hashing by default. Frozen dataclasses synthesize `__hash__` even when
+they define their own equality method.
 
 ```py
 from collections.abc import Hashable
@@ -1822,6 +1908,19 @@ def accepts_hashable(value: Hashable) -> None: ...
 
 accepts_hashable(Mutable(1))  # error: [invalid-argument-type]
 accepts_hashable(Frozen(1))
+```
+
+If the class supplies a hash on only one branch, the decorator generates one on the other.
+
+```py
+def check(flag: bool):
+    @dataclass(frozen=True)
+    class FrozenWithEq:
+        __eq__ = object.__eq__
+        if flag:
+            __hash__ = object.__hash__
+
+    accepts_hashable(FrozenWithEq())
 ```
 
 ## Equivalence of protocols

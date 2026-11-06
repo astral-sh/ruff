@@ -29,8 +29,9 @@ use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
 use crate::types::{
     ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
-    KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral, Type,
-    TypeAliasType, UnionType, definition_expression_type, definition_expression_type_in_scope,
+    KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters, Signature,
+    Specialization, StaticClassLiteral, Type, TypeAliasType, UnionType, definition_expression_type,
+    definition_expression_type_in_scope,
 };
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
@@ -49,6 +50,7 @@ pub(crate) struct ModelMetadata<'db> {
 
 impl get_size2::GetSize for ModelMetadata<'_> {}
 
+#[salsa::tracked]
 impl<'db> ModelMetadata<'db> {
     pub(in crate::types) fn from_class(
         db: &'db dyn Db,
@@ -86,6 +88,47 @@ impl<'db> ModelMetadata<'db> {
 
     fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
+    }
+
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(in crate::types) fn generated_hash(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Type<'db>> {
+        if !self.is_frozen(db) {
+            return None;
+        }
+        let env = &ProgramEnvironment::from_scope(class.body_scope(db));
+        let inherited = class
+            .class_member_from_mro(
+                db,
+                env,
+                "__hash__",
+                MemberLookupPolicy::default(),
+                class.iter_mro(db, specialization).skip(1),
+            )
+            .place
+            .ignore_possibly_undefined()?;
+        let generated = Type::function_like_callable(
+            db,
+            Signature::new(
+                Parameters::standard([Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(KnownClass::PydanticBaseModel.to_instance(db, env))]),
+                KnownClass::Int.to_instance(db, env),
+            ),
+        );
+        // Pydantic replaces a disabled, default, or previously generated hash. It leaves
+        // a user-defined hash alone, even if the subclass disables it by defining __eq__.
+        (inherited.is_none(db)
+            || inherited == generated
+            || Some(inherited)
+                == Type::object()
+                    .class_member(db, env, "__hash__")
+                    .place
+                    .ignore_possibly_undefined())
+        .then_some(generated)
     }
 }
 
