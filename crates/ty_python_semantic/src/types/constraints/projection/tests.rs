@@ -12,12 +12,13 @@ use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
     PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
-    TypeVarSolution,
+    TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, DynamicType, IntersectionType, KnownClass, Type, TypeVarVariance,
+    UnionType,
 };
 
 type Paths<'db> = FxHashSet<Solution<'db>>;
@@ -537,6 +538,77 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         set.solutions(db, &env, inferable),
         Ok(Solutions::Unsatisfiable(_))
     ));
+}
+
+#[test]
+fn unspecialized_phantom_argument_respects_the_evidence_policy() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/a.py", "type Phantom[X] = int")?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = system_path_to_file(db, "/src/a.py")?;
+    let file = ProgramFile::new(db, file, env.program(db));
+    let phantom = global_symbol(db, file, "Phantom")
+        .place
+        .expect_type()
+        .as_type_alias()
+        .ok_or_else(|| anyhow::anyhow!("expected Phantom alias"))?;
+    let phantom = phantom.apply_specialization(db, |context| {
+        context.specialize(db, &[Type::Dynamic(DynamicType::UnspecializedTypeVar)])
+    });
+    let list = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeAlias(phantom)]);
+    let t = create_typevar(db, "T");
+    let u = create_typevar(db, "U");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let builder = ConstraintSetBuilder::new();
+    let upper = ConstraintSet::constrain_typevar_upper_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::INFERRED,
+        t,
+        list,
+    );
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+    let solve = |set: ConstraintSet<'_, '_>, policy| {
+        let candidates = CandidateSolutions::compute(
+            db,
+            &env,
+            &mut builder.storage.borrow_mut(),
+            set.node,
+            inferable,
+            set.source_order,
+            policy,
+        );
+        candidates.solve(db, &env, &builder)
+    };
+
+    // Adding an unrelated choice for U must not change which bounds count as evidence for T.
+    let branched = upper.and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
+    assert_eq!(
+        solve(upper, UnspecializedTypeVarPolicy::Ignore),
+        Solutions::Unconstrained
+    );
+    assert_eq!(
+        solve(branched, UnspecializedTypeVarPolicy::Ignore),
+        Solutions::Constrained(SolutionPaths::Complete(
+            [int, str].map(|ty| solution([binding(u, ty)])).into()
+        ))
+    );
+    assert_eq!(
+        solve(upper, UnspecializedTypeVarPolicy::Retain),
+        Solutions::Constrained(SolutionPaths::Complete(vec![solution([binding(t, list)])]))
+    );
+    assert_eq!(
+        solve(branched, UnspecializedTypeVarPolicy::Retain),
+        Solutions::Constrained(SolutionPaths::Complete(
+            [int, str]
+                .map(|ty| solution([binding(t, list), binding(u, ty)]))
+                .into()
+        ))
+    );
+    Ok(())
 }
 
 #[test]

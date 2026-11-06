@@ -3828,6 +3828,7 @@ impl<'db> CandidateSolutions<'db> {
             node,
             inferable,
             &mut limits,
+            unspecialized_type_var_policy,
         )? {
             return ControlFlow::Continue(path_bounds);
         }
@@ -3860,6 +3861,7 @@ impl<'db> CandidateSolutions<'db> {
     /// constraint set. To be eligible for this fast path, the solution cannot mention any
     /// _constrained_ typevars, since those introduce a disjunction. And like the constraints in
     /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
+    #[expect(clippy::too_many_arguments)]
     fn compute_simple_bound_conjunction<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3868,11 +3870,13 @@ impl<'db> CandidateSolutions<'db> {
         node: NodeId,
         inferable: TypeVarSet<'db>,
         limits: &mut L,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> ControlFlow<L::Break, Option<Self>> {
-        let bound_is_ineligible = |ty: Type<'db>| {
-            any_over_type_expanding_aliases(db, env, ty, |nested| {
-                nested.is_type_var() || nested.is_provisional_marker()
-            })
+        let mentions_typevar =
+            |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
+        let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
+            constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
+                && !mentions_typevar(bound)
         };
 
         let mut constraints = Vec::default();
@@ -3903,57 +3907,21 @@ impl<'db> CandidateSolutions<'db> {
                         return ControlFlow::Continue(None);
                     };
                     let constraint = storage.atomic_constraint_data(constraint_id);
-                    match constraint {
-                        AtomicConstraint::ConcreteLower(lower) => {
-                            if !lower.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if bound_is_ineligible(lower.bound) {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&constraint_id)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
+                    let Some((typevar, bound)) = constraint.as_concrete() else {
+                        return ControlFlow::Continue(None);
+                    };
 
-                        AtomicConstraint::ConcreteUpper(upper) => {
-                            if !upper.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if bound_is_ineligible(upper.bound) {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&constraint_id)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        AtomicConstraint::ConcreteEquivalence(equivalence) => {
-                            if !equivalence.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if bound_is_ineligible(equivalence.bound) {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&constraint_id)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        AtomicConstraint::TypeVarRange(_)
-                        | AtomicConstraint::TypeVarEquivalence(_) => {
-                            return ControlFlow::Continue(None);
-                        }
+                    if !typevar.is_inferable(db, inferable) || !bound_is_eligible(constraint, bound)
+                    {
+                        return ControlFlow::Continue(None);
                     }
+
+                    constraints.push((
+                        constraint,
+                        source_orders
+                            .get_index_of(&constraint_id)
+                            .expect("every TDD constraint should have a source order"),
+                    ));
 
                     current = interior.if_true;
                 }
@@ -4007,7 +3975,7 @@ impl<'db> CandidateSolutions<'db> {
                 None => continue,
             };
 
-            if bound_is_ineligible(bound) {
+            if mentions_typevar(bound) {
                 // If this declared upper bound mentions other typevars, we don't have a simple
                 // conjunction that's eligible for this fast path.
                 return ControlFlow::Continue(None);
