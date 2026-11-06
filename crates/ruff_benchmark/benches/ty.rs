@@ -4,6 +4,7 @@ use ruff_benchmark::real_world_projects::{
     InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, check_project,
 };
 
+use std::cell::LazyCell;
 use std::fmt::Write;
 use std::ops::Range;
 
@@ -2651,34 +2652,21 @@ fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
     }
 }
 
-struct ProjectBenchmark<'a> {
+struct PreparedProject<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
-    freeze_inputs: bool,
-    rules: Option<Rules>,
 }
 
-impl<'a> ProjectBenchmark<'a> {
+impl<'a> PreparedProject<'a> {
     fn new(project: RealWorldProject<'a>) -> Self {
-        let setup_project = project.setup().expect("Failed to setup project");
-        let fs = setup_project
+        let project = project.setup().expect("Failed to set up project");
+        let fs = project
             .copy_to_memory_fs()
             .expect("Failed to copy project to memory fs");
-
-        Self {
-            project: setup_project,
-            fs,
-            freeze_inputs: false,
-            rules: None,
-        }
+        Self { project, fs }
     }
 
-    fn freeze_inputs(mut self) -> Self {
-        self.freeze_inputs = true;
-        self
-    }
-
-    fn setup_iteration(&self) -> ProjectDatabase {
+    fn setup_iteration(&self, variant: ProjectVariant) -> ProjectDatabase {
         let system = TestSystem::new(InMemorySystem::from_memory_fs(self.fs.clone()));
 
         let src_root = SystemPath::new("/");
@@ -2690,7 +2678,12 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
-            rules: self.rules.clone(),
+            rules: matches!(variant, ProjectVariant::AllRules).then(|| {
+                Rules::from_iter([(
+                    RangedValue::cli("all".to_owned()),
+                    RangedValue::cli(Level::Error),
+                )])
+            }),
             ..Options::default()
         });
 
@@ -2705,7 +2698,7 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
-        if self.freeze_inputs {
+        if matches!(variant, ProjectVariant::FrozenInputs) {
             db.freeze();
         }
 
@@ -2713,32 +2706,45 @@ impl<'a> ProjectBenchmark<'a> {
     }
 }
 
-#[track_caller]
-fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    bench_project_named(benchmark, criterion, benchmark.project.config.name);
+#[derive(Clone, Copy)]
+enum ProjectVariant {
+    Default,
+    FrozenInputs,
+    AllRules,
 }
 
 #[track_caller]
-fn bench_project_named(
-    benchmark: &ProjectBenchmark,
+fn bench_project(
     criterion: &mut Criterion,
-    benchmark_name: &str,
+    project: RealWorldProject<'_>,
+    variants: &[ProjectVariant],
 ) {
     setup_rayon();
 
+    let name = project.name;
+    let prepared = LazyCell::new(|| PreparedProject::new(project));
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);
-    group.bench_function(benchmark_name, |b| {
-        b.iter_batched_ref(
-            || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark_name),
-            BatchSize::SmallInput,
-        );
-    });
+    for &variant in variants {
+        let benchmark_name = match variant {
+            ProjectVariant::Default => name.to_owned(),
+            ProjectVariant::FrozenInputs => format!("{name} (frozen inputs)"),
+            ProjectVariant::AllRules => format!("{name} (all rules)"),
+        };
+        group.bench_function(&benchmark_name, |b| {
+            // Prepare the project once, when its first selected variant runs.
+            let project = LazyCell::force(&prepared);
+            b.iter_batched_ref(
+                || project.setup_iteration(variant),
+                |db| check_project(db, &benchmark_name),
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "hydra-zen",
         repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
         commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
@@ -2746,13 +2752,13 @@ fn hydra(criterion: &mut Criterion) {
         dependencies: &["pydantic", "beartype", "hydra-core"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "attrs",
         repository: "https://github.com/python-attrs/attrs",
         commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
@@ -2760,28 +2766,22 @@ fn attrs(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
-
-    bench_project(&benchmark, criterion);
-
-    // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
-    let frozen_benchmark = benchmark.freeze_inputs();
-    bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
-
-    let all_rules_benchmark = ProjectBenchmark {
-        freeze_inputs: false,
-        rules: Some(Rules::from_iter([(
-            RangedValue::cli("all".to_owned()),
-            RangedValue::cli(Level::Error),
-        )])),
-        ..frozen_benchmark
     };
 
-    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
+    bench_project(
+        criterion,
+        project,
+        &[
+            ProjectVariant::Default,
+            // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
+            ProjectVariant::FrozenInputs,
+            ProjectVariant::AllRules,
+        ],
+    );
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "anyio",
         repository: "https://github.com/agronholm/anyio",
         commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
@@ -2789,13 +2789,13 @@ fn anyio(criterion: &mut Criterion) {
         dependencies: &["exceptiongroup", "idna", "pytest"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn datetype(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "DateType",
         repository: "https://github.com/glyph/DateType",
         commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
@@ -2803,9 +2803,9 @@ fn datetype(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
