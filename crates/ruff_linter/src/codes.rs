@@ -495,6 +495,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Async, "240") => rules::flake8_async::rules::BlockingPathMethodInAsyncFunction,
         (Flake8Async, "250") => rules::flake8_async::rules::BlockingInputInAsyncFunction,
         (Flake8Async, "251") => rules::flake8_async::rules::BlockingSleepInAsyncFunction,
+        (Flake8Async, "401") => rules::flake8_async::rules::PytestRaisesExceptionGroup,
 
         // flake8-builtins
         (Flake8Builtins, "001") => rules::flake8_builtins::rules::BuiltinVariableShadowing,
