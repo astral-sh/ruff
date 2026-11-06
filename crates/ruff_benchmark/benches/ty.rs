@@ -4,11 +4,9 @@ use std::fmt::Write;
 use itertools::Itertools;
 use ruff_benchmark::criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
-mod ty_rayon;
 mod ty_shared;
 
-use ty_rayon::setup_rayon;
-use ty_shared::{Case, setup_micro_case};
+use ty_shared::{Case, setup_micro_case, setup_rayon};
 
 fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
     setup_rayon();

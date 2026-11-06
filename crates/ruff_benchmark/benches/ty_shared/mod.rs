@@ -11,6 +11,10 @@ use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
+mod rayon;
+
+pub(super) use self::rayon::setup_rayon;
+
 pub(super) struct Case {
     pub(super) db: ProjectDatabase,
 }

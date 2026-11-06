@@ -21,9 +21,10 @@ use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::lint::Level;
 
-mod ty_rayon;
+#[path = "ty_shared/rayon.rs"]
+mod rayon;
 
-use ty_rayon::setup_rayon;
+use self::rayon::setup_rayon;
 
 struct FileCase {
     db: ProjectDatabase,

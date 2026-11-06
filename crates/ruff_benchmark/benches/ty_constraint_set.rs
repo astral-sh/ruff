@@ -9,11 +9,9 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use itertools::Itertools;
 use ty_project::metadata::python_version::SupportedPythonVersion;
 
-mod ty_rayon;
 mod ty_shared;
 
-use ty_rayon::setup_rayon;
-use ty_shared::{Case, setup_micro_case, setup_micro_case_inner};
+use ty_shared::{Case, setup_micro_case, setup_micro_case_inner, setup_rayon};
 
 fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
     let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
