@@ -1,0 +1,67 @@
+name: Time ty benchmark target builds
+
+on:
+  push:
+    branches: [micha/ty-bench-split-build-timing]
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+
+jobs:
+  build:
+    name: Build (${{ matrix.first }} first)
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        first: [combined, split]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: $/.github/actions/setup-ruff-workspace
+      - name: Prepare toolchain
+        run: |
+          rustup show
+          uv sync --only-dev --frozen
+      - name: Compare benchmark builds
+        env:
+          FIRST: ${{ matrix.first }}
+        run: |
+          set -euo pipefail
+          package=crates/ruff_benchmark
+          if [[ "$FIRST" == combined ]]; then
+            other=split
+          else
+            other=combined
+          fi
+          round=0
+          for layout in "$FIRST" "$other" "$FIRST" "$other" "$FIRST"; do
+            revision=HEAD
+            benches=(--bench module_resolution --bench ty --bench ty_constraint_set)
+            if [[ "$layout" == split ]]; then
+              benches+=(--bench ty_projects)
+            else
+              revision=HEAD^
+            fi
+            git restore --source="$revision" --worktree -- \
+              "$package/Cargo.toml" "$package/benches/ty.rs" "$package/benches/ty_projects.rs"
+            # Rebuild each final executable with the dependencies from the preceding round.
+            touch "$package/benches/"{module_resolution,ty,ty_constraint_set}.rs
+            if [[ "$layout" == split ]]; then
+              touch "$package/benches/ty_projects.rs"
+            fi
+            /usr/bin/time -f "TIMING round=$round layout=$layout elapsed=%e user=%U sys=%S" \
+              uv run --only-dev cargo codspeed build -m simulation -m memory \
+                --features "codspeed,module_resolution,ty_instrumented" --profile profiling \
+                --no-default-features -p ruff_benchmark "${benches[@]}"
+            find -L target/codspeed -type f -printf 'STAGED %p %s\n' | sort
+            round=$((round + 1))
+          done
