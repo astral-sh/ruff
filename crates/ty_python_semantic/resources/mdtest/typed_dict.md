@@ -2684,7 +2684,7 @@ A read with a `str | int` key can report both `non-literal-typed-dict-key` and
 `invalid-typed-dict-key`. Ignoring either rule leaves the error for the other key type visible.
 
 ```py
-from typing import TypedDict
+from typing import Any, TypedDict
 
 class Movie(TypedDict):
     title: str
@@ -2692,8 +2692,39 @@ class Movie(TypedDict):
 def _(movie: Movie, key: str | int):
     # error: [invalid-typed-dict-key] "got key of type `int`"
     movie[key]  # ty: ignore[non-literal-typed-dict-key]
+
     # error: [non-literal-typed-dict-key] "got key of type `str`"
     movie[key]  # ty: ignore[invalid-typed-dict-key]
+
+    # TODO: Report each rejected key type separately on writes, like for reads, i.e.
+    # do not report `unused-ignore-comment`, and change the message in the first
+    # assertion
+    # error: [invalid-typed-dict-key] "got key of type `str | int`"
+    # error: [unused-ignore-comment]
+    movie[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+
+    # TODO: Still report `non-literal-typed-dict-key` for the `str` member.
+    movie[key] = "Alien"  # ty: ignore[invalid-typed-dict-key]
+```
+
+For a gradual `str | Any` key type, ignoring `non-literal-typed-dict-key` suppresses the read error.
+
+```py
+def _(movie: Movie, key: str | Any):
+    # no diagnostic
+    movie[key]  # ty: ignore[non-literal-typed-dict-key]
+
+    # error: [non-literal-typed-dict-key] "got key of type `str`"
+    # error: [unused-ignore-comment]
+    movie[key]  # ty: ignore[invalid-typed-dict-key]
+
+    # TODO: see above
+    # error: [invalid-typed-dict-key] "got key of type `str | Any`"
+    # error: [unused-ignore-comment]
+    movie[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+
+    # TODO: see above
+    movie[key] = "Alien"  # ty: ignore[invalid-typed-dict-key]
 ```
 
 The old `invalid-key` name still suppresses an invalid subscript key, and ty suggests using the new
