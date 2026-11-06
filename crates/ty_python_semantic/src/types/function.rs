@@ -542,7 +542,11 @@ impl<'db> OverloadLiteral<'db> {
         let scope = self.body_scope(db);
         let program_file = self.program_file(db);
         let python_file = program_file.python_file(db);
-        let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
+        let mut signature = if self.is_overload(db) {
+            self.public_overload_signature(db).clone()
+        } else {
+            self.raw_signature(db, ReturnCallableTypeVarScope::Public)
+        };
         let module = parsed_module(db, python_file).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, program_file);
@@ -572,6 +576,18 @@ impl<'db> OverloadLiteral<'db> {
             }
             _ => Either::Right(std::iter::once(self.signature(db))),
         }
+    }
+
+    /// An overload's signature is used both to validate its declaration and to
+    /// assemble the callable. The individual declaration can also occur in more
+    /// than one overload set.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _| Signature::bottom(),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn public_overload_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.raw_signature(db, ReturnCallableTypeVarScope::Public)
     }
 
     /// Typed internally-visible "raw" signature for this function.
