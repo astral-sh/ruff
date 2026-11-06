@@ -199,9 +199,7 @@ pub struct PatternMatchSequence<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchMapping<'a> {
-    keys: Vec<ComparableExpr<'a>>,
-    patterns: Vec<ComparablePattern<'a>>,
-    rest: Option<&'a str>,
+    items: Vec<ast::MappingPatternItem<ComparableExpr<'a>, ComparablePattern<'a>, &'a str>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -256,16 +254,24 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                     patterns: patterns.iter().map(Into::into).collect(),
                 })
             }
-            ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-                keys,
-                patterns,
-                rest,
-                ..
-            }) => Self::MatchMapping(PatternMatchMapping {
-                keys: keys.iter().map(Into::into).collect(),
-                patterns: patterns.iter().map(Into::into).collect(),
-                rest: rest.as_deref(),
-            }),
+            ast::Pattern::MatchMapping(ast::PatternMatchMapping { items, .. }) => {
+                Self::MatchMapping(PatternMatchMapping {
+                    items: items
+                        .iter()
+                        .map(|item| match item {
+                            ast::MappingPatternItem::Entry { key, pattern } => {
+                                ast::MappingPatternItem::Entry {
+                                    key: key.into(),
+                                    pattern: pattern.into(),
+                                }
+                            }
+                            ast::MappingPatternItem::Rest(identifier) => {
+                                ast::MappingPatternItem::Rest(identifier.as_str())
+                            }
+                        })
+                        .collect(),
+                })
+            }
             ast::Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
                 Self::MatchClass(PatternMatchClass {
                     cls: cls.into(),
