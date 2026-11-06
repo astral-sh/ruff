@@ -576,3 +576,55 @@ class Stacked(ABC):
 
 Stacked()  # error: [call-non-callable]
 ```
+
+## Decorator constructors and nullable class fields
+
+A decorator class can return an abstract method from its constructor. An ordinary descriptor
+instance can coexist with that method on the same class.
+
+```py
+from abc import abstractmethod
+from ty_extensions._internal import TypeOf
+
+class Source:
+    @abstractmethod
+    def method(self) -> int: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+
+class ReturnsMethod:
+    def __new__(cls, getter: object) -> TypeOf[Source.method]:
+        return Source.method
+
+class Decorated:
+    @Descriptor
+    def field(self) -> int:
+        return 1
+
+    @ReturnsMethod
+    def required(self) -> int:
+        return 2
+
+Decorated()  # error: [call-non-callable] "unimplemented abstract method `required`"
+```
+
+A field initialized with `None` can retain its declared abstract method when the assignment is
+invalid. The name `Optional` can also be rebound in the class body.
+
+```py
+from typing import Optional
+
+class Fields:
+    nullable: Optional[TypeOf[Source.method]] = None
+    required: TypeOf[Source.method] = None  # error: [invalid-assignment]
+
+Fields()  # error: [call-non-callable] "unimplemented abstract method `required`"
+
+class Shadowed:
+    from ty_extensions._internal import TypeOf as Optional
+
+    required: Optional[Source.method] = None  # error: [invalid-assignment]
+
+Shadowed()  # error: [call-non-callable] "unimplemented abstract method `required`"
+```

@@ -4,19 +4,21 @@ use ruff_db::{
     diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::{
-    definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
+    definition::{AnnotatedAssignmentDefinitionKind, Definition, DefinitionKind},
+    place::PlaceExpr,
+    place_table, semantic_index, use_def_map,
 };
 
 use crate::{
     Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place_load::{PlaceLoadMode, PlaceLoadResolver},
     types::{
-        ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
-        binding_type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, LintDiagnosticGuard, MemberLookupPolicy,
+        Parameters, Signature, SpecialFormType, StaticClassLiteral, Type, binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
         function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
@@ -376,6 +378,38 @@ impl<'db> ClassType<'db> {
     }
 }
 
+/// Whether calling this class as a decorator necessarily creates a nominal instance.
+/// Without a custom allocator or metaclass, initializing a descriptor does not replace the
+/// allocated object with a function, bound method, or property.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
+pub(super) fn constructs_plain_descriptor<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    if class.known(db).is_some() || class.has_decorators(db) {
+        return false;
+    }
+    if !class
+        .metaclass(db)
+        .as_class_literal()
+        .is_some_and(|meta| meta.known(db) == Some(KnownClass::Type))
+    {
+        return false;
+    }
+    let literal = ClassLiteral::Static(class);
+    if !literal.iter_mro(db).skip(1).all(|base| match base {
+        ClassBase::Generic => true,
+        ClassBase::Class(base) => base.is_object(db),
+        _ => false,
+    }) {
+        return false;
+    }
+    let env = ProgramEnvironment::from_file(class.program_file(db));
+    Type::ClassLiteral(literal)
+        .lookup_dunder_new(db, &env, MemberLookupPolicy::empty())
+        .is_none_or(|member| member.is_undefined())
+}
+
 /// Whether a binding could resolve to a method marked with `@abstractmethod`.
 ///
 /// Keep the definition dependency in this query so unrelated edits to a superclass's module do
@@ -383,13 +417,69 @@ impl<'db> ClassType<'db> {
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let DefinitionKind::Function(function) = definition.kind(db) else {
-        return true;
+    let function = match definition.kind(db) {
+        DefinitionKind::Function(function) => function,
+        DefinitionKind::AnnotatedAssignment(assignment) if assignment.has_value() => {
+            return !is_none_in_nullable_annotation(db, definition, assignment);
+        }
+        _ => return true,
     };
     if !function.has_decorators() {
         return false;
     }
     function_known_decorators(db, definition).may_produce_abstract_method()
+}
+
+/// A field initialized with None and declared with Optional or a union including None
+/// cannot introduce an abstract callable. Resolve the outer annotation without evaluating the
+/// type arguments, which may refer to unrelated modules.
+fn is_none_in_nullable_annotation<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    assignment: &AnnotatedAssignmentDefinitionKind,
+) -> bool {
+    let file = definition.program_file(db);
+    if file.file(db).is_stub(db) {
+        return false;
+    }
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    if !assignment
+        .value(&module)
+        .is_some_and(ast::Expr::is_none_literal_expr)
+    {
+        return false;
+    }
+    let ast::Expr::Subscript(annotation) = assignment.annotation(&module) else {
+        return false;
+    };
+    let ast::Expr::Name(name) = &*annotation.value else {
+        return false;
+    };
+    let env = ProgramEnvironment::from_file(file);
+    let index = semantic_index(db, file);
+    let expression = ast::ExprRef::Name(name);
+    let Some(operand) = index.expression_place_use(expression) else {
+        return false;
+    };
+    let scope = index.scope_id(operand.scope);
+    let place = PlaceExpr::from_expr_name(name);
+    let includes_none = |mode| {
+        let resolved =
+            PlaceLoadResolver::new(db, &env, index, scope, &place, mode, None).resolve(|_| {});
+        let Place::Defined(binding) = resolved.place.place else {
+            return false;
+        };
+        binding.is_definitely_defined()
+            && match binding.ty {
+                Type::SpecialForm(SpecialFormType::Optional) => true,
+                Type::SpecialForm(SpecialFormType::Union) => annotation
+                    .slice
+                    .as_tuple_expr()
+                    .is_some_and(|tuple| tuple.elts.iter().any(ast::Expr::is_none_literal_expr)),
+                _ => false,
+            }
+    };
+    includes_none(PlaceLoadMode::AtExpression(expression)) && includes_none(PlaceLoadMode::Deferred)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
