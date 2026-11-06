@@ -177,8 +177,8 @@ python-platform = "linux"
 ```py
 import asyncio
 
-asyncio.TaskGroup  # error: [unresolved-attribute]
-asyncio.WindowsSelectorEventLoopPolicy  # error: [unresolved-attribute]
+asyncio.TaskGroup  # error: "Module `asyncio` has no member `TaskGroup`"
+asyncio.WindowsSelectorEventLoopPolicy  # error: "Module `asyncio` has no member `WindowsSelectorEventLoopPolicy`"
 ```
 
 ### Python 3.11 on Windows
