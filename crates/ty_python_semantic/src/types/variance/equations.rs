@@ -16,8 +16,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::{
-    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
-    TypeAliasType, TypeVarVariance, TypedDictType,
+    BoundTypeVarIdentity, ClassSpecialization, ClassType, FunctionType, RecursiveType,
+    StaticClassLiteral, TypeAliasType, TypeVarVariance, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -153,7 +153,7 @@ pub(crate) enum VarianceOrigin<'db> {
     Class(StaticClassLiteral<'db>),
     /// A use of an explicitly declared protocol parameter, distinct from inferring its body.
     ProtocolParameter(StaticClassLiteral<'db>, TypeVarVariance),
-    GenericAlias(GenericAlias<'db>),
+    ClassSpecialization(ClassSpecialization<'db>),
     TypeAlias(TypeAliasType<'db>),
     Recursive(RecursiveType<'db>),
     Function(FunctionType<'db>),
@@ -204,7 +204,7 @@ impl<'db> VarianceVariable<'db> {
             VarianceOrigin::Class(class) | VarianceOrigin::ProtocolParameter(class, _) => {
                 class.variance_equation(db, typevar)
             }
-            VarianceOrigin::GenericAlias(alias) => alias.variance_equation(db, typevar),
+            VarianceOrigin::ClassSpecialization(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::TypeAlias(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::Recursive(recursive) => recursive.variance_equation(db, typevar),
             VarianceOrigin::Function(function) => function.variance_equation(db, typevar),

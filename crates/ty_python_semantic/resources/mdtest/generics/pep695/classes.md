@@ -345,9 +345,8 @@ def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
 
 ## Narrowing class objects of final generic classes
 
-A specialized alias is distinct from the bare class object, even when the specialization matches the
-default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
-check the return type in that branch.
+A specialized class object identifies the same runtime class as the bare class object. When the
+class is final, excluding that object with `is not` makes the branch unreachable.
 
 ```py
 from typing import final
@@ -357,11 +356,11 @@ class P[U = str]: ...
 
 def create[T: P[str]](cls: type[T]) -> int:
     if cls is not P:
-        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        reveal_type(cls)  # revealed: Never
+        return cls()  # no diagnostic
     return 0
 
-create(P[str])
+create(P)  # no diagnostic
 ```
 
 ## Narrowing class objects against a final protocol

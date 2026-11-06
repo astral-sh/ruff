@@ -73,3 +73,97 @@ def from_dtype_like(value: np._DTypeLike[_ScalarT]) -> np.dtype[_ScalarT]:
 
 reveal_type(from_dtype_like(np.bool))  # revealed: dtype[mini_numpy.bool[builtins.bool]]
 ```
+
+## Scalar classes represented by aliases
+
+Older NumPy stubs represent scalar classes as aliases for specialized generic bases. We retain these
+alias types, including their type arguments, when they are imported or assigned to another name.
+
+`numpy/__init__.pyi`:
+
+```pyi
+from typing import Self, TypeAlias
+
+class _32Bit: ...
+class _64Bit: ...
+
+class signedinteger[Precision]:
+    def __new__(cls, value: int = ...) -> Self: ...
+
+int32: TypeAlias = signedinteger[_32Bit]
+int64 = signedinteger[_64Bit]
+```
+
+```py
+import numpy as np
+from numpy import int64 as Integer
+
+Alias = Integer
+
+def accepts_int64(cls: type[np.int64]) -> None: ...
+
+accepts_int64(Alias)  # no diagnostic
+accepts_int64(np.int32)  # error: [invalid-argument-type]
+
+value: Alias = Integer(1)
+reveal_type(value)  # revealed: signedinteger[_64Bit]
+
+class Int64(Alias): ...  # no diagnostic
+
+Scalar = np.int32 | np.int64
+scalar: Scalar = Integer(1)  # no diagnostic
+reveal_type(scalar)  # revealed: signedinteger[_64Bit]
+
+def narrow(value: np.int32 | np.int64) -> None:
+    if isinstance(value, Integer):
+        reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
+    else:
+        reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
+```
+
+## Scalar classes represented by class definitions
+
+NumPy's newer stubs define scalar classes directly. These retain their concrete class identities and
+allow precise narrowing.
+
+`numpy/__init__.pyi`:
+
+```pyi
+from typing import Self, final
+
+class _32Bit: ...
+class _64Bit: ...
+
+class signedinteger[Precision]:
+    def __new__(cls, value: int = ...) -> Self: ...
+
+@final
+class int32(signedinteger[_32Bit]): ...
+
+@final
+class int64(signedinteger[_64Bit]): ...
+
+longlong = int64
+```
+
+```py
+import numpy as np
+from numpy import int64 as Integer
+
+Alias = Integer
+
+def accepts_int64(cls: type[np.int64]) -> None: ...
+
+accepts_int64(Alias)  # no diagnostic
+accepts_int64(np.longlong)  # no diagnostic
+accepts_int64(np.int32)  # error: [invalid-argument-type]
+
+value: Alias = Integer(1)
+reveal_type(value)  # revealed: int64
+
+def narrow(value: np.int32 | np.int64) -> None:
+    if isinstance(value, Integer):
+        reveal_type(value)  # revealed: int64
+    else:
+        reveal_type(value)  # revealed: int32
+```

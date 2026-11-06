@@ -1006,7 +1006,7 @@ impl<'db> Type<'db> {
                 | Type::Callable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::AlwaysFalsy
                 | Type::AlwaysTruthy
@@ -1021,6 +1021,7 @@ impl<'db> Type<'db> {
                 | Type::NewTypeInstance(_)
                 | Type::NominalInstance(_)
                 | Type::SpecialForm(_)
+                | Type::GenericAlias(_)
                 | Type::KnownInstance(_)
                 | Type::LiteralValue(_)
                 | Type::TypeVar(_)

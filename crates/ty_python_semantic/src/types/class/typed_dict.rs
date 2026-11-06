@@ -150,7 +150,7 @@ fn synthesize_typed_dict_init<'db>(
     // Only a bare generic class exposes a generic method. Explicit aliases already substitute
     // their arguments into both the receiver and the fields.
     let generic_context = typed_dict.defining_class().and_then(|class| {
-        let alias = class.into_generic_alias()?;
+        let alias = class.into_class_specialization()?;
         let specialization = alias.specialization(db);
         let generic_context = specialization.generic_context(db);
         (specialization == generic_context.identity_specialization(db)).then_some(generic_context)

@@ -81,8 +81,8 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, ClassSpecialization,
+    CycleDetector, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
     TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
@@ -1959,15 +1959,22 @@ impl<'db> Bindings<'db> {
                                 ));
                             }
                         }
-                        [Some(Type::GenericAlias(generic_alias))] => {
+                        [
+                            Some(
+                                Type::SpecializedClass(generic_alias)
+                                | Type::GenericAlias(generic_alias),
+                            ),
+                        ] => {
                             let new_origin = generic_alias
                                 .origin(db)
                                 .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
+                            overload.set_return_type(Type::SpecializedClass(
+                                ClassSpecialization::new(
+                                    db,
+                                    new_origin,
+                                    generic_alias.specialization(db),
+                                ),
+                            ));
                         }
                         _ => {}
                     },
@@ -2894,6 +2901,7 @@ impl<'db> Bindings<'db> {
                                         matches!(
                                             overload.return_type(),
                                             Type::ClassLiteral(_)
+                                                | Type::SpecializedClass(_)
                                                 | Type::GenericAlias(_)
                                                 | Type::SubclassOf(_)
                                         )
@@ -2911,14 +2919,15 @@ impl<'db> Bindings<'db> {
                                             ));
                                             continue;
                                         }
-                                        Some(Some(Type::GenericAlias(generic_alias)))
-                                            if returns_class() =>
-                                        {
+                                        Some(Some(
+                                            Type::SpecializedClass(generic_alias)
+                                            | Type::GenericAlias(generic_alias),
+                                        )) if returns_class() => {
                                             let new_origin = generic_alias
                                                 .origin(db)
                                                 .with_dataclass_params(db, Some(dataclass_params));
-                                            overload.set_return_type(Type::GenericAlias(
-                                                GenericAlias::new(
+                                            overload.set_return_type(Type::SpecializedClass(
+                                                ClassSpecialization::new(
                                                     db,
                                                     new_origin,
                                                     generic_alias.specialization(db),
@@ -6320,7 +6329,9 @@ impl<'db> CallInference<'_, 'db> {
         }
         visitor.visit(db, (left, right), || {
             let class_specialization = |ty| match ty {
-                Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                    Some((alias.origin(db), alias.specialization(db)))
+                }
                 Type::NominalInstance(_) => ty.class_specialization(db, env),
                 // A pending protocol materialization affects its members, not just its arguments.
                 Type::ProtocolInstance(protocol) if protocol.materialization_kind(db).is_none() => {
@@ -6394,6 +6405,7 @@ impl<'db> CallInference<'_, 'db> {
             if matches!(
                 (left, right),
                 (Type::NominalInstance(_), Type::NominalInstance(_))
+                    | (Type::SpecializedClass(_), Type::SpecializedClass(_))
                     | (Type::GenericAlias(_), Type::GenericAlias(_))
                     | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
             ) && let (Some((left_class, left)), Some((right_class, right))) =

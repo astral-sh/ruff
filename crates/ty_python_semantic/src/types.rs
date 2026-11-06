@@ -119,7 +119,7 @@ use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
+pub(crate) use class::{ClassLiteral, ClassSpecialization, ClassType, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -380,7 +380,12 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
             ast::Expr::Subscript(subscript),
         ) => !matches!(
             subscript.value.inferred_type(&model),
-            Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
+            Some(
+                Type::SpecialForm(_)
+                    | Type::ClassLiteral(_)
+                    | Type::SpecializedClass(_)
+                    | Type::GenericAlias(_)
+            )
         ),
         _ => true,
     }
@@ -775,7 +780,7 @@ impl TypingModule {
 /// Whether a type represents the upper or lower bound of a gradual type.
 ///
 /// For generic specializations, this matters only if there is at least one invariant or constrained
-/// type parameter. For example, we represent `Top[list[Any]]` as a `GenericAlias` with
+/// type parameter. For example, we represent `Top[list[Any]]` as a `ClassSpecialization` with
 /// `MaterializationKind` set to Top, which we denote as `Top[list[Any]]`.
 /// A type `Top[list[T]]` includes all fully static list types `list[U]` where `U` is
 /// a supertype of `Bottom[T]` and a subtype of `Top[T]`.
@@ -2112,8 +2117,11 @@ pub enum Type<'db> {
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object (either from a `class` statement or `type()` call)
     ClassLiteral(ClassLiteral<'db>),
-    /// A specialization of a generic class
-    GenericAlias(GenericAlias<'db>),
+    /// The exact class object identified by the specialization's origin, carrying static type
+    /// arguments. Subclasses are represented by `SubclassOf`, not by this variant.
+    SpecializedClass(ClassSpecialization<'db>),
+    /// A runtime generic alias such as `list[int]`, distinct from a class object.
+    GenericAlias(ClassSpecialization<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order.
@@ -2676,6 +2684,11 @@ impl<'db> Type<'db> {
             } else {
                 self
             }
+        } else if let (Type::SpecializedClass(current), Type::SpecializedClass(previous)) =
+            (self, previous)
+            && let Some(merged) = current.merge_cycle_recovery(db, previous)
+        {
+            Type::SpecializedClass(merged)
         } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
         {
@@ -2740,8 +2753,9 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub const fn is_generic_alias(&self) -> bool {
-        matches!(self, Type::GenericAlias(_))
+    /// Whether this is a class object or runtime alias carrying a class specialization.
+    pub const fn is_specialized_class_or_alias(&self) -> bool {
+        matches!(self, Type::SpecializedClass(_) | Type::GenericAlias(_))
     }
 
     /// Returns whether this type represents a specialization of a generic type.
@@ -3221,13 +3235,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
-    /// Since a `ClassType` must be specialized, apply the default specialization to any
-    /// unspecialized generic class literal.
+    /// Get the class described by a class object or runtime generic alias. Apply the default
+    /// specialization to an unspecialized generic class.
     fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                Some(ClassType::Generic(alias))
+            }
             _ => None,
         }
     }
@@ -3458,6 +3473,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::KnownBoundMethod(_)
+            | Type::GenericAlias(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -3472,7 +3488,7 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
+            | Type::SpecializedClass(_)
             | Type::SubclassOf(_)
             | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -3547,6 +3563,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ClassLiteral(_)
+            | Type::SpecializedClass(_)
             | Type::GenericAlias(_)
             | Type::KnownInstance(_) => false,
             Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
@@ -3586,6 +3603,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ClassLiteral(_)
+            | Type::SpecializedClass(_)
             | Type::GenericAlias(_)
             | Type::KnownInstance(_) => false,
 
@@ -3891,6 +3909,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::NominalInstance(_)
+            | Type::SpecializedClass(_)
             | Type::GenericAlias(_)
             | Type::Callable(_)
             | Type::FunctionLiteral(_)
@@ -4002,6 +4021,9 @@ impl<'db> Type<'db> {
             Type::BoundSuper(bound_super) => bound_super
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::BoundSuper),
+            Type::SpecializedClass(generic) => generic
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::SpecializedClass),
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::GenericAlias),
@@ -4207,6 +4229,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
+            | Type::SpecializedClass(..)
             | Type::ModuleLiteral(..) => true,
             Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
             Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,
@@ -4359,7 +4382,9 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias)
+                if alias.is_typed_dict(db) =>
+            {
                 Some(alias.origin(db).typed_dict_member(
                     db,
                     env,
@@ -4369,7 +4394,7 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::GenericAlias(alias) => Some(
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => Some(
                 ClassType::from(*alias)
                     .class_member(db, env, name, policy)
                     .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
@@ -4578,7 +4603,10 @@ impl<'db> Type<'db> {
                 policy,
             ),
 
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => ty
+            Type::ClassLiteral(_)
+            | Type::SpecializedClass(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_) => ty
                 .to_meta_type(db, env)
                 .class_object_member(db, env, name, policy),
 
@@ -4975,7 +5003,9 @@ impl<'db> Type<'db> {
                 .to_instance(db, env)
                 .instance_member(db, env, name),
 
-            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) | Type::GenericAlias(_) => {
+                Place::Undefined.into()
+            }
 
             Type::PropertyInstance(property) => property
                 .instance_class(db)
@@ -4999,7 +5029,7 @@ impl<'db> Type<'db> {
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_) => {
                 Place::Undefined.into()
             }
 
@@ -5019,6 +5049,9 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Place<'db> {
+        if let Type::GenericAlias(alias) = self {
+            return Type::SpecializedClass(*alias).static_member(db, env, name);
+        }
         if let Type::ModuleLiteral(module) = self {
             module
                 .static_member(db, env, name)
@@ -5906,7 +5939,7 @@ impl<'db> Type<'db> {
                     .any(|element| element.has_generic_instance_attribute(db, env, name));
             }
             Type::ClassLiteral(class) => class,
-            Type::GenericAlias(alias) => alias.origin(db).into(),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => alias.origin(db).into(),
             _ => return false,
         };
         let Some(generic_context) = class
@@ -6428,7 +6461,7 @@ impl<'db> Type<'db> {
                     ))
                     .into()
                 }
-                Type::ClassLiteral(_) | Type::GenericAlias(_)
+                Type::ClassLiteral(_) | Type::SpecializedClass(_)
                     if matches!(name_str, "__get__" | "__set__" | "__delete__")
                         && let Some(wrapper @ Type::WrapperDescriptor(_)) = this
                             .find_name_in_mro_with_policy(db, env, name_str, policy)
@@ -6731,6 +6764,9 @@ impl<'db> Type<'db> {
                     }
                 }
 
+                Type::GenericAlias(alias) => Type::SpecializedClass(alias)
+                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+
                 Type::NominalInstance(..)
                 | Type::ProtocolInstance(..)
                 | Type::NewTypeInstance(..)
@@ -6750,7 +6786,7 @@ impl<'db> Type<'db> {
                     instance_like_member_lookup(db, env, key, receiver)
                 }
 
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                Type::ClassLiteral(..) | Type::SpecializedClass(..) | Type::SubclassOf(..) => {
                     // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
                     // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`,
                     // unless its constraints also include non-class-object types.
@@ -7394,7 +7430,7 @@ impl<'db> Type<'db> {
                 Self::class_literal_bindings(db, env, class, recursion_guard)
             }
 
-            Type::GenericAlias(alias) => {
+            Type::SpecializedClass(alias) => {
                 self.constructor_bindings(db, env, ClassType::Generic(alias), recursion_guard)
             }
 
@@ -7523,7 +7559,10 @@ impl<'db> Type<'db> {
                     // variants so `type[Base] & Meta` retains both callable candidates.
                     matches!(
                         element.resolve_type_alias(db),
-                        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+                        Type::ClassLiteral(_)
+                            | Type::SpecializedClass(_)
+                            | Type::GenericAlias(_)
+                            | Type::SubclassOf(_)
                     )
                 }) && let Some(instance_type) = self.to_instance_approximation(db, env)
                     && let Type::NominalInstance(lookup_instance) =
@@ -7619,6 +7658,10 @@ impl<'db> Type<'db> {
                             .bindings_impl(db, env, recursion_guard)
                     },
                 )
+            }
+
+            Type::GenericAlias(alias) => {
+                Type::SpecializedClass(alias).bindings_impl(db, env, recursion_guard)
             }
 
             Type::KnownInstance(known_instance) => known_instance
@@ -8066,7 +8109,7 @@ impl<'db> Type<'db> {
         let class_literal = class.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
         let inferable_class_context =
-            if matches!(self, Type::ClassLiteral(_) | Type::GenericAlias(_)) {
+            if matches!(self, Type::ClassLiteral(_) | Type::SpecializedClass(_)) {
                 class_generic_context
             } else {
                 None
@@ -8999,7 +9042,7 @@ impl<'db> Type<'db> {
                         && class.generic_context(db).is_none(),
                 ))
             }
-            Type::GenericAlias(alias) => {
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
                 let instance = Type::instance(db, env, ClassType::from(alias));
                 Some(InstanceProjection::new(
                     instance,
@@ -9112,7 +9155,9 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => Ok(Type::instance(db, env, ClassType::from(*alias))),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                Ok(Type::instance(db, env, ClassType::from(*alias)))
+            }
 
             Type::SubclassOf(_)
             | Type::EnumComplement(_)
@@ -9421,7 +9466,9 @@ impl<'db> Type<'db> {
                     SubclassOfType::from(db, env, SubclassOfInner::TypeVar(bound_typevar))
                 }
                 Type::ClassLiteral(class) => class.metaclass(db),
-                Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                    ClassType::from(alias).metaclass(db)
+                }
                 Type::SubclassOf(subclass_of_ty)
                     if let SubclassOfInner::TypeVar(typevar) = subclass_of_ty.subclass_of() =>
                 {
@@ -9465,6 +9512,7 @@ impl<'db> Type<'db> {
                                 match intersection.with_expanded_typevars_and_newtypes(db, env) {
                                     bound @ (Type::NominalInstance(_)
                                     | Type::ClassLiteral(_)
+                                    | Type::SpecializedClass(_)
                                     | Type::GenericAlias(_)) => Some(bound),
                                     bound @ Type::SubclassOf(subclass_of)
                                         if let SubclassOfInner::Class(_) =
@@ -9842,7 +9890,9 @@ impl<'db> Type<'db> {
 
             let class = match self {
                 Type::ClassLiteral(class) => Some(class),
-                Type::GenericAlias(alias) => Some(alias.origin(db).into()),
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                    Some(alias.origin(db).into())
+                }
                 Type::NominalInstance(instance) => Some(instance.class_literal(db, visitor.env)),
                 Type::SubclassOf(subclass) => match subclass.subclass_of() {
                     SubclassOfInner::Class(class) => Some(class.class_literal(db)),
@@ -10152,6 +10202,9 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
+            Type::SpecializedClass(generic) => Type::SpecializedClass(
+                generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
@@ -10483,7 +10536,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::GenericAlias(alias) => {
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
                 alias.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
 
@@ -10822,7 +10875,9 @@ impl<'db> Type<'db> {
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
             Self::ClassLiteral(class_literal) => class_literal.type_definition(db),
-            Self::GenericAlias(alias) => Some(TypeDefinition::StaticClass(alias.definition(db))),
+            Self::SpecializedClass(alias) | Self::GenericAlias(alias) => {
+                Some(TypeDefinition::StaticClass(alias.definition(db)))
+            }
             Self::NominalInstance(instance) => instance.class(db, env).type_definition(db),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
@@ -11016,7 +11071,9 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
         match self {
-            Type::GenericAlias(generic) => Some(generic.origin(db)),
+            Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
+                Some(generic.origin(db))
+            }
             Type::NominalInstance(instance)
                 if let ClassType::Generic(generic) = instance.class(db, env) =>
             {
@@ -11356,7 +11413,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::NominalInstance(nominal_instance_type) => {
                 nominal_instance_type.variance_of(db, env, typevar)
             }
-            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar),
+            Type::SpecializedClass(generic_alias) | Type::GenericAlias(generic_alias) => {
+                generic_alias.variance_of(db, env, typevar)
+            }
             Type::Callable(callable_type) => {
                 callable_type.signatures(db).variance_of(db, env, typevar)
             }

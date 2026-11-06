@@ -82,7 +82,10 @@ impl<'db> Mro<'db> {
             if original_bases.contains(&Type::SpecialForm(SpecialFormType::Protocol)) {
                 return;
             }
-            if remaining_bases.iter().any(Type::is_generic_alias) {
+            if remaining_bases
+                .iter()
+                .any(Type::is_specialized_class_or_alias)
+            {
                 return;
             }
             resolved_bases.push(ClassBase::Generic);
@@ -139,7 +142,8 @@ impl<'db> Mro<'db> {
                 if !class.has_pep_695_type_params(db)
                     && !matches!(
                         single_base,
-                        Type::GenericAlias(_)
+                        Type::SpecializedClass(_)
+                            | Type::GenericAlias(_)
                             | Type::KnownInstance(
                                 KnownInstanceType::SubscriptedGeneric(_)
                                     | KnownInstanceType::SubscriptedProtocol(_)
