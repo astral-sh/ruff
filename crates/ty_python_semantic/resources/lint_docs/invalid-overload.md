@@ -9,18 +9,6 @@ combinations of arguments and return different types based on the arguments pass
 beneficial for type checkers. But, if the `@overload` usage is invalid, the type checker may not be
 able to provide correct type information.
 
-## Example
-
-```py
-from typing import overload
-
-
-@overload
-def foo() -> None: ...  # error
-@overload
-def foo(x: int) -> int: ...
-```
-
 ## References
 
 - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)

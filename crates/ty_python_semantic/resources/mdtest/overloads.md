@@ -852,14 +852,14 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
-# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
-    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+    # error: [missing-overload-implementation] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -928,7 +928,7 @@ class Fine(metaclass=CustomAbstractMetaclass):
 class Foo:
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -941,14 +941,14 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -1005,7 +1005,7 @@ if TYPE_CHECKING:
 if TYPE_CHECKING:
     @overload
     # not all overloads are in a `TYPE_CHECKING` block, so this is an error
-    def c() -> None: ...  # error: [invalid-overload]
+    def c() -> None: ...  # error: [missing-overload-implementation]
 
 @overload
 def c(x: int) -> int: ...
@@ -2047,7 +2047,7 @@ if flag():
     def a(x: str) -> str: ...
 
 @overload
-# error: [invalid-overload] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
 def a(x: bytes) -> bytes: ...
 @overload
 def a(x: bool) -> bool: ...

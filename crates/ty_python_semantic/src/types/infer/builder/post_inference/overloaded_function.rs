@@ -11,7 +11,7 @@ use crate::{
     types::{
         CallableType, KnownClass, Type,
         context::InferContext,
-        diagnostic::{INVALID_OVERLOAD, SINGLE_OVERLOAD},
+        diagnostic::{INVALID_OVERLOAD, MISSING_OVERLOAD_IMPLEMENTATION, SINGLE_OVERLOAD},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         infer::original_class_type,
         signatures::{ParameterConsistency, ReturnTypeConsistency},
@@ -167,14 +167,16 @@ pub(crate) fn check_overloaded_function<'db>(
 
         if implementation_required {
             let function_node = overloads[0].node(db, context.file(), context.module());
-            if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
+            if let Some(builder) =
+                context.report_lint(&MISSING_OVERLOAD_IMPLEMENTATION, &function_node.name)
+            {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Overloads for function `{}` must be followed by a \
                     non-`@overload`-decorated implementation function",
                     function_node.name
                 ));
                 diagnostic.info(format_args!(
-                    "Attempting to call `{}` will raise `TypeError` at runtime",
+                    "Attempting to call `{}` will raise `NotImplementedError` at runtime",
                     function_node.name
                 ));
                 diagnostic.info("Overloaded functions without implementations are only permitted:");
