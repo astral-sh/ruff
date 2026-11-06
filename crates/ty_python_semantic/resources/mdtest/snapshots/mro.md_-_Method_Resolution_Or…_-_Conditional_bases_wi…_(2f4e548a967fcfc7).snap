@@ -1,0 +1,58 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: mro.md - Method Resolution Order tests - Conditional bases with class objects and `__mro_entries__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Base:
+ 2 |     __mro_entries__ = None
+ 3 | 
+ 4 | class BaseProvider:
+ 5 |     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+ 6 |         return (Base,)
+ 7 | 
+ 8 | def _(flag: bool):
+ 9 |     base = Base if flag else BaseProvider()
+10 |     class Child(base): ...  # error: [unsupported-base]
+11 | class InvalidProvider:
+12 |     def __mro_entries__(self, bases: tuple[type, ...]) -> int:
+13 |         return 0
+14 | 
+15 | def _(flag: bool):
+16 |     base = Base if flag else InvalidProvider()
+17 |     class Child(base): ...  # error: [invalid-base]
+```
+
+# Diagnostics
+
+```
+warning[unsupported-base]: Unsupported class base
+  --> src/mdtest_snippet.py:10:17
+   |
+10 |     class Child(base): ...  # error: [unsupported-base]
+   |                 ^^^^ Has type `<class 'Base'> | BaseProvider`
+info: ty cannot resolve a consistent method resolution order (MRO) for class `Child` due to this base
+info: Only class objects or `Any` are supported as class bases
+
+```
+
+```
+error[invalid-base]: Invalid class base with type `<class 'Base'> | InvalidProvider`
+  --> src/mdtest_snippet.py:17:17
+   |
+17 |     class Child(base): ...  # error: [invalid-base]
+   |                 ^^^^
+info: Definition of class `Child` will raise `TypeError` at runtime
+info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
+info: Type `InvalidProvider` has an `__mro_entries__` method, but it does not return a tuple of types
+
+```
