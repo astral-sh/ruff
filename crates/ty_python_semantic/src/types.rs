@@ -2562,12 +2562,9 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     fn contains_self(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        if let Type::NominalInstance(instance) = self
-            && !instance.is_definition_generic(db)
-        {
+        if !self.may_contain_eager_features(db, env, visitor::EagerTypeFeatures::SELF_TYPEVAR) {
             return false;
         }
-
         // Type alias bodies cannot declare `Self`, but their explicit type arguments can
         // contain the `Self` from an enclosing method or class.
         any_over_type_including_alias_arguments(db, env, self, |ty| {
@@ -3048,7 +3045,8 @@ impl<'db> Type<'db> {
     }
 
     fn has_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        any_over_type(db, env, self, false, |ty| ty.is_dynamic())
+        self.may_contain_eager_features(db, env, visitor::EagerTypeFeatures::DYNAMIC)
+            && any_over_type(db, env, self, false, |ty| ty.is_dynamic())
     }
 
     /// Returns the specialized Python property represented by this type.

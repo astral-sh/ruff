@@ -3889,8 +3889,11 @@ impl<'db> CandidateSolutions<'db> {
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<L::Break, Option<Self>> {
-        let mentions_typevar =
-            |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
+        let mentions_typevar = |bound: Type<'db>| {
+            use super::visitor::EagerTypeFeatures as Features;
+            bound.may_contain_eager_features(db, env, Features::TYPEVAR | Features::ALIAS)
+                && any_over_type_expanding_aliases(db, env, bound, Type::is_type_var)
+        };
         let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
             constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
                 && !mentions_typevar(bound)
