@@ -4707,6 +4707,20 @@ def _(x: A | B | C):
     reveal_type(x)  # revealed: B | A
 ```
 
+If both cases return when another variable is `None`, that variable stays narrowed after the match.
+
+```py
+def narrow_other(value: int | str, other: str | None) -> str:
+    match value:
+        case int():
+            if other is None:
+                return ""
+        case str():
+            if other is None:
+                return ""
+    return other
+```
+
 Reassignment in non-terminal branches is also preserved when the default branch is terminal:
 
 ```py

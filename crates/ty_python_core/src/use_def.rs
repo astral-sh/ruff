@@ -2459,17 +2459,16 @@ impl<'db> UseDefMapBuilder<'db> {
         is_positive: bool,
     ) {
         let atom = self.reachability_constraints.add_atom(predicate);
-        let constraint = if is_positive {
+        let reachability = if is_positive {
             atom
         } else {
             self.reachability_constraints.add_not_constraint(atom)
         };
-        self.record_branch_constraints(constraint, ScopedNarrowingConstraint::ALWAYS_TRUE);
-
         if targets.is_empty()
             || predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
+            self.record_reachability_constraint(reachability);
             return;
         }
         let pattern = if is_positive {
@@ -2489,6 +2488,17 @@ impl<'db> UseDefMapBuilder<'db> {
                 target.place,
                 &target.definitions,
             );
+        }
+        self.record_reachability_constraint(reachability);
+        // Other places still need the case condition at joins. The subject places have already
+        // applied it to the eligible definitions, so skip the scope-wide copy for those places.
+        for target in targets {
+            pending_place_state_mut(
+                target.place,
+                &mut self.symbol_states,
+                &mut self.member_states,
+            )
+            .narrowing = self.pending_reachability.current;
         }
     }
 
@@ -2718,23 +2728,15 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         reachability_constraint: ScopedReachabilityConstraintId,
     ) {
+        self.checkpoint_flow = self
+            .reachability_constraints
+            .add_and_constraint(self.checkpoint_flow, reachability_constraint);
         let narrowing_constraint = if self.reachability_narrowing_enabled {
             self.reachability_constraints
                 .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints)
         } else {
             ScopedNarrowingConstraint::ALWAYS_TRUE
         };
-        self.record_branch_constraints(reachability_constraint, narrowing_constraint);
-    }
-
-    fn record_branch_constraints(
-        &mut self,
-        reachability_constraint: ScopedReachabilityConstraintId,
-        narrowing_constraint: ScopedNarrowingConstraint,
-    ) {
-        self.checkpoint_flow = self
-            .reachability_constraints
-            .add_and_constraint(self.checkpoint_flow, reachability_constraint);
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 
