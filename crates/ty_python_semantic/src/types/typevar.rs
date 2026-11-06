@@ -121,17 +121,35 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// A type variable's bound or constraints can be validated for many different specializations.
+    /// Cache the search through the already-evaluated parts of each compound type.
     pub(crate) fn has_typevar_or_typevar_instance(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
-            matches!(
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        fn contains_typevar<'db>(db: &'db dyn Db, program: Program<'db>, ty: Type<'db>) -> bool {
+            any_over_type(
+                db,
+                &ProgramEnvironment::from_program(program),
                 ty,
-                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+                false,
+                |nested| {
+                    matches!(
+                        nested,
+                        Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
+                    )
+                },
             )
-        })
+        }
+
+        match self {
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_) => true,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => false,
+            ty if matches!(visitor::TypeKind::from(ty), visitor::TypeKind::Atomic) => false,
+            ty => contains_typevar(db, env.program(db), ty),
+        }
     }
 
     pub(crate) fn has_unspecialized_type_var(
