@@ -2255,7 +2255,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new(scope_kind: ScopeKind) -> Self {
+    fn new(scope_kind: ScopeKind) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
@@ -2305,11 +2305,11 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions[def_id].state()
     }
 
-    pub(super) fn mark_unreachable(&mut self) {
+    fn mark_unreachable(&mut self) {
         self.record_reachability_constraint(ScopedReachabilityConstraintId::ALWAYS_FALSE);
     }
 
-    pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
+    fn add_place(&mut self, place: ScopedPlaceId) {
         // Earlier snapshots restore new places as undefined. The first definition
         // changes the bindings visible to an exception handler.
         match place {
@@ -2338,7 +2338,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn next_definition_id(&self) -> ScopedDefinitionId {
+    fn next_definition_id(&self) -> ScopedDefinitionId {
         self.all_definitions.next_index()
     }
 
@@ -2352,7 +2352,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ///
     /// Ordinary bindings preserve imported qualifiers. Imports replace them: member and wildcard
     /// imports may themselves carry qualifiers, while module imports clear them.
-    pub(super) fn record_binding(
+    fn record_binding(
         &mut self,
         place: ScopedPlaceId,
         binding: Definition<'db>,
@@ -2768,11 +2768,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .push(reachability_constraint, narrowing_constraint);
     }
 
-    pub(super) fn record_declaration(
-        &mut self,
-        place: ScopedPlaceId,
-        declaration: Definition<'db>,
-    ) {
+    fn record_declaration(&mut self, place: ScopedPlaceId, declaration: Definition<'db>) {
         let def_id = self.push_definition(DefinitionEntry::Unused(declaration));
         let pending = self.pending_reachability.current;
         let place_state =
@@ -2813,7 +2809,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ///
     /// Annotated assignments can declare before their RHS and bind afterward. Each phase gets a
     /// fresh scoped ID, so definitions created by the RHS remain in execution order.
-    pub(super) fn record_combined_definition(
+    fn record_combined_definition(
         &mut self,
         place: ScopedPlaceId,
         definition: Definition<'db>,
@@ -2869,7 +2865,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
+    fn delete_binding(&mut self, place: ScopedPlaceId) {
         let def_id = self.push_definition(DefinitionEntry::Deleted);
         let pending = self.pending_reachability.current;
         let place_state =
@@ -2892,7 +2888,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     /// Appends the bindings for a source use and returns its scope-local ordinal.
-    pub(super) fn record_use(&mut self, place: ScopedPlaceId) -> ScopedUseId {
+    fn record_use(&mut self, place: ScopedPlaceId) -> ScopedUseId {
         let use_id = self.bindings_by_use.next_index();
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -3019,11 +3015,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_definition_ids_used(binding_definition_ids);
     }
 
-    pub(super) fn record_range_reachability(
-        &mut self,
-        range: TextRange,
-        is_type_checking_block: bool,
-    ) {
+    fn record_range_reachability(&mut self, range: TextRange, is_type_checking_block: bool) {
         let this_range_info = RangeInfo {
             reachability: self.reachability,
             in_type_checking_block: is_type_checking_block,
@@ -3045,7 +3037,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ///
     /// See [`super::SemanticIndexBuilder::visit_boolean_test`] for details on what a boolean
     /// test is, and how the recorded "boolean test roots" are used during type inference.
-    pub(super) fn record_boolean_test_root(&mut self, node: NodeIndex) {
+    fn record_boolean_test_root(&mut self, node: NodeIndex) {
         self.boolean_test_roots.push(node);
     }
 
@@ -3272,10 +3264,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
-    pub(super) fn finish(
-        mut self: Box<Self>,
-        interner: Arc<Mutex<UseDefMapInterner>>,
-    ) -> UseDefMap<'db> {
+    fn finish(mut self: Box<Self>, interner: Arc<Mutex<UseDefMapInterner>>) -> UseDefMap<'db> {
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
