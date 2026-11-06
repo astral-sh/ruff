@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/daily_fuzz.yaml"
+      - ".github/actions/setup-ruff-workspace/action.yml"
       - "python/py-fuzzer/**"
 
 permissions:
@@ -34,6 +35,9 @@ jobs:
     name: Fuzz
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    env:
+      # Keep in sync with the job's timeout-minutes.
+      FUZZ_JOB_TIMEOUT_MINUTES: 20
     permissions:
       contents: read
     outputs:
@@ -41,18 +45,16 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
+      - name: Record job start time
+        run: echo "FUZZ_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: $/.github/actions/setup-ruff-workspace
         with:
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+          enable-cache: auto
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
@@ -73,6 +75,8 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
+            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
+            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ruff \
             "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)

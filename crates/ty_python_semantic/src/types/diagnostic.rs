@@ -12,7 +12,7 @@ use super::{
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::importer::{ImportAction, ImportRequest, MembersInScope};
-use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::lint::{Level, LintMetadata, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::abstract_methods::AbstractMethods;
@@ -31,7 +31,6 @@ use crate::types::string_annotation::{
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_value};
 use crate::types::{
@@ -44,7 +43,7 @@ use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, 
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
     parsed::parsed_module,
 };
@@ -90,7 +89,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
-    registry.register_lint(&INVALID_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_KEY);
+    registry.register_lint(&NON_LITERAL_TYPED_DICT_KEY);
+    registry.register_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY);
+    registry.register_alias(LintName::of("invalid-key"), &INVALID_TYPED_DICT_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -115,6 +117,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&MISMATCHED_TYPE_NAME);
+    registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -165,9 +168,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
-    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&MISSING_ATTRIBUTE);
+    registry.register_lint(&MISSING_UNION_ATTRIBUTE);
+    registry.register_alias(LintName::of("unresolved-attribute"), &MISSING_ATTRIBUTE);
     registry.register_lint(&MISSING_SLOT);
-    registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&IMPORT_NOT_FOUND);
+    registry.register_alias(LintName::of("unresolved-import"), &IMPORT_NOT_FOUND);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
@@ -407,12 +413,11 @@ declare_lint! {
     }
 }
 
-// Added in #19763.
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-key.md")]
-    pub(crate) static INVALID_KEY = {
-        summary: "detects invalid subscript accesses or TypedDict literal keys",
-        status: LintStatus::stable("0.0.1-alpha.17"),
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-key.md")]
+    pub(crate) static INVALID_TYPED_DICT_KEY = {
+        summary: "detects invalid keys when accessing TypedDict items",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -670,6 +675,15 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-sentinel-name.md")]
+    pub(crate) static MISMATCHED_SENTINEL_NAME = {
+        summary: "detects sentinel definitions whose declared name does not match the assigned variable",
+        status: LintStatus::stable("0.0.87"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-metaclass.md")]
     pub(crate) static INVALID_METACLASS = {
         summary: "detects invalid `metaclass=` arguments",
@@ -769,7 +783,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
+    #[doc = include_str!("../../resources/removed_lint_docs/invalid-type-guard-call.md")]
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
         summary: "detects type guard function calls that have no narrowing effect",
         status: LintStatus::removed(
@@ -1173,9 +1187,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-attribute.md")]
-    pub(crate) static UNRESOLVED_ATTRIBUTE = {
-        summary: "detects references to unresolved attributes",
+    #[doc = include_str!("../../resources/lint_docs/missing-attribute.md")]
+    pub(crate) static MISSING_ATTRIBUTE = {
+        summary: "detects references to missing attributes",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
@@ -1191,8 +1205,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-import.md")]
-    pub(crate) static UNRESOLVED_IMPORT = {
+    #[doc = include_str!("../../resources/lint_docs/import-not-found.md")]
+    pub(crate) static IMPORT_NOT_FOUND = {
         summary: "detects unresolved imports",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -1370,7 +1384,7 @@ declare_lint! {
     pub(crate) static INVALID_MUTABLE_OVERRIDE = {
         summary: "detects overrides that narrow writable attribute types",
         status: LintStatus::stable("0.0.81"),
-        default_level: Level::Ignore,
+        default_level: Level::Error,
     }
 }
 
@@ -1452,6 +1466,33 @@ declare_lint! {
         summary: "detects truthiness tests of `Iterable`-typed objects",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-union-attribute.md")]
+    pub(crate) static MISSING_UNION_ATTRIBUTE = {
+        summary: "detects attribute accesses where some union members lack the attribute",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/non-literal-typed-dict-key.md")]
+    pub(crate) static NON_LITERAL_TYPED_DICT_KEY = {
+        summary: "detects non-literal string keys in TypedDict subscripts",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unknown-typed-dict-constructor-key.md")]
+    pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
+        summary: "detects unknown keys when constructing a TypedDict",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
     }
 }
 
@@ -3521,8 +3562,9 @@ impl<'db> IncompatibleBases<'db> {
     }
 
     /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
-    /// This method therefore removes any entry in `self` that is a subclass of one or more
-    /// other entries also contained in `self`.
+    /// This method therefore removes any entry in `self` that is a superclass of one or more
+    /// other entries also contained in `self`, keeping only the most-derived entries. If more
+    /// than one entry remains, no remaining entry is a subclass of another, so they conflict.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
@@ -3535,10 +3577,10 @@ impl<'db> IncompatibleBases<'db> {
                         // CPython's layout check operates on runtime classes. Type arguments are
                         // irrelevant here: a generic disjoint base and any specialization of that
                         // base share the same layout.
-                        !disjoint_base
+                        !other_base
                             .class
                             .default_specialization(db)
-                            .is_subtype_of_class_literal(db, other_base.class)
+                            .is_subtype_of_class_literal(db, disjoint_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
@@ -3602,6 +3644,27 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
             special_form = special_form.into(),
         ));
     }
+}
+
+pub(super) fn report_invalid_runtime_checkable(
+    context: &InferContext,
+    node: impl Ranged,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, node) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic =
+        builder.into_diagnostic("`runtime_checkable` can only be applied to protocol classes");
+    diagnostic.annotate(
+        Annotation::secondary(class.header_span(db))
+            .message(format_args!("`{}` is not a protocol class", class.name(db))),
+    );
+    diagnostic.info(
+        "A class is only a protocol if it directly inherits from \
+        `typing.Protocol` or `typing_extensions.Protocol`",
+    );
 }
 
 pub(crate) fn report_bad_argument_to_get_protocol_members(
@@ -4386,17 +4449,52 @@ fn report_invalid_base<'env, 'db>(
     Some(diagnostic)
 }
 
+/// Uses `non-literal-typed-dict-key` only when every alternative in the rejected key type is
+/// a string of unknown value. This keeps a misspelled literal or a non-string in a mixed union
+/// visible when non-literal key errors are suppressed.
+pub(super) fn typed_dict_subscript_key_lint<'db>(
+    context: &InferContext<'db, '_>,
+    key: Type<'db>,
+) -> &'static LintMetadata {
+    let db = context.db();
+    let env = context.program_environment();
+
+    let is_non_literal_string = |ty: Type<'db>| {
+        if let Some(literal) = ty.as_literal_value() {
+            literal.is_literal_string()
+        } else {
+            ty.is_subtype_of(db, env, KnownClass::Str.to_instance(db, env))
+        }
+    };
+
+    let non_literal = match key.expand_top_level_aliases(db, env) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(is_non_literal_string),
+        key => is_non_literal_string(key),
+    };
+
+    if non_literal {
+        &NON_LITERAL_TYPED_DICT_KEY
+    } else {
+        &INVALID_TYPED_DICT_KEY
+    }
+}
+
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
     typed_dict_node: AnyNodeRef,
     key_node: AnyNodeRef,
-    typed_dict_ty: Type<'db>,
+    typed_dict: TypedDictType<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
-    items: &TypedDictSchema<'db>,
+    lint: &'static LintMetadata,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+    if let Some(builder) = context.report_lint(lint, key_node) {
+        let typed_dict_ty = Type::TypedDict(typed_dict);
         let env = &context.program_environment();
         match key_ty.as_string_literal() {
             Some(key) => {
@@ -4423,7 +4521,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys().map(Name::as_str);
+                let existing_keys = typed_dict.items(db).keys().map(Name::as_str);
 
                 if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
                     && let Some(suggestion) = did_you_mean(existing_keys, key)
@@ -4631,6 +4729,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key exists but is marked `ReadOnly`.
+    ReadOnlyKey,
     /// The key refers to a read-only extra item.
     ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
@@ -4657,6 +4757,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
+        TypedDictDeleteErrorKind::ReadOnlyKey => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
         TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
             "Cannot delete read-only extra item \"{field_name}\" \
             from TypedDict `{typed_dict_name}`"
@@ -4666,8 +4769,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         )),
     };
 
-    // Add sub-diagnostic pointing to where the field is defined (if available)
-    if let Some(field) = field
+    // Only suggest making the field `NotRequired` when that would allow deletion.
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey)
+        && let Some(field) = field
         && let Some(declaration) = field.first_declaration()
     {
         let file = declaration.file(db);
@@ -4990,7 +5094,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
-    type_var_kind: TypeVarKind,
+    type_var_kind: TypeVarKind<'db>,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
@@ -5000,7 +5104,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     let typevar_kind = match type_var_kind {
         TypeVarKind::LegacyTypeVar
         | TypeVarKind::Pep695TypeVar
-        | TypeVarKind::TypingSelf
+        | TypeVarKind::TypingSelf { .. }
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
         TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
@@ -5382,11 +5486,10 @@ pub(super) fn report_overridden_final_method<'db>(
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
     // and we don't yet track those definitions precisely enough to offer a safe fix.
     //
-    // We also only provide autofixes if the subclass member is a function definition (not an
-    // assignment like `method = some_function`). If it's an assignment, the function type
-    // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
+    // Only delete the function defined by the override. An assignment or a decorator can bind
+    // the name to a different function, possibly from another file.
     if let Type::FunctionLiteral(function) = subclass_type
-        && subclass_definition.kind(db).is_function_def()
+        && function.contains_definition(db, subclass_definition)
     {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;

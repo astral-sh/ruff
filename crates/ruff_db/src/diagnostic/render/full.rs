@@ -11,25 +11,23 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::diagnostic::render::{FileResolver, Resolved};
+use crate::diagnostic::render::{FileResolver, Renderer, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
-pub(super) struct FullRenderer<'a> {
+pub struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> FullRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for FullRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let stylesheet = if self.config.color {
             DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
@@ -66,9 +64,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
-            if diag.has_applicable_fix(self.config.fix_applicability())
-                && let Some(diff) =
-                    Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
+            if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
                 if let Some(applicability) = to_applicability_annotate(diff.fix) {
@@ -353,33 +349,77 @@ impl std::fmt::Display for Line {
 }
 
 fn show_nonprinting(s: &str) -> Cow<'_, str> {
-    if s.find(['\x07', '\x08', '\x1b', '\x7f']).is_some() {
-        Cow::Owned(
-            s.replace('\x07', "␇")
-                .replace('\x08', "␈")
-                .replace('\x1b', "␛")
-                .replace('\x7f', "␡"),
-        )
-    } else {
-        Cow::Borrowed(s)
+    // The diff includes its line ending in the text to display.
+    let content = s.trim_end_matches(['\r', '\n']);
+
+    // Accumulate the comparisons without an early exit so LLVM can vectorize the scan.
+    // The Unicode characters below start with 0xE2 or 0xEF in UTF-8. Other lead bytes
+    // in that range are harmless false positives.
+    let mut may_need_replacement = false;
+    for byte in content.bytes() {
+        let control = byte.is_ascii_control() && byte != b'\t';
+        may_need_replacement |= control | (0xe2..=0xef).contains(&byte);
     }
+    if !may_need_replacement {
+        return Cow::Borrowed(s);
+    }
+
+    let mut output = String::with_capacity(s.len());
+    for ch in content.chars() {
+        let visible = match ch {
+            '\0' => '␀',
+            '\x01' => '␁',
+            '\x02' => '␂',
+            '\x03' => '␃',
+            '\x04' => '␄',
+            '\x05' => '␅',
+            '\x06' => '␆',
+            '\x07' => '␇',
+            '\x08' => '␈',
+            '\x0b' => '␋',
+            '\x0c' => '␌',
+            '\r' => '␍',
+            '\x0e' => '␎',
+            '\x0f' => '␏',
+            '\x10' => '␐',
+            '\x11' => '␑',
+            '\x12' => '␒',
+            '\x13' => '␓',
+            '\x14' => '␔',
+            '\x15' => '␕',
+            '\x16' => '␖',
+            '\x17' => '␗',
+            '\x18' => '␘',
+            '\x19' => '␙',
+            '\x1a' => '␚',
+            '\x1b' => '␛',
+            '\x1c' => '␜',
+            '\x1d' => '␝',
+            '\x1e' => '␞',
+            '\x1f' => '␟',
+            '\x7f' => '␡',
+            '\u{200d}' => continue,
+            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}' => '�',
+            _ => ch,
+        };
+        output.push(visible);
+    }
+    output.push_str(&s[content.len()..]);
+    Cow::Owned(output)
 }
 
 fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
     let (level, message) = match fix.applicability() {
         Applicability::Safe => return None,
         Applicability::Unsafe => (
-            AnnotateLevel::WARNING,
+            AnnotateLevel::WARNING.with_name("note"),
             "This is an unsafe fix and may change runtime behavior",
         ),
         Applicability::DisplayOnly => (
-            // Note that this is still only used in tests. There's no `--display-only-fixes`
-            // analog to `--unsafe-fixes` for users to activate this or see the styling.
-            AnnotateLevel::ERROR,
-            "This is a display-only fix and is likely to be incorrect",
+            AnnotateLevel::WARNING.with_name("note"),
+            "This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
         ),
     };
-    let level = level.with_name("note");
 
     Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
@@ -390,23 +430,36 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
-        Annotation, DiagnosticFormat, Severity,
+        Annotation, Severity,
         render::tests::{
-            NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
+            DiagnosticFormat, NOTEBOOK, TestEnvironment, create_diagnostics,
+            create_notebook_diagnostics, create_syntax_error_diagnostics,
         },
     };
 
     #[test]
+    fn nonprinting_diff_characters() {
+        assert_eq!(
+            super::show_nonprinting("→\u{200d}\u{202e}a\r\u{2069}\t\u{feff}！\r\n"),
+            "→�a␍�\t�！\r\n"
+        );
+    }
+
+    #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
           |        ^^
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -419,6 +472,13 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         error[F821]: Undefined name `a`
          --> undef.py:1:4
@@ -443,7 +503,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
@@ -760,6 +820,13 @@ print()
         4 |     x = 1
           |     ^
         help: Remove assignment to unused variable `x`
+         ::: cell 3
+          |
+        3 |     print()
+          -     x = 1
+        4 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -936,6 +1003,28 @@ print()
           |
         1 | import foo
           | ^
+        ");
+    }
+
+    #[test]
+    fn bom_with_full_file_range() {
+        let mut env = TestEnvironment::new();
+        let contents = "\u{feff}import foo";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::up_to(contents.text_len()));
+        diagnostic.annotate(Annotation::primary(span));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | import foo
+          | ^^^^^^^^^^
         ");
     }
 

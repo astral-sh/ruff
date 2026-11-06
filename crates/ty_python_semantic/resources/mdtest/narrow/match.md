@@ -1100,6 +1100,18 @@ def test_union_class_pattern_uses_members_from_matching_class(
             reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
+Failing to match `PatternClass()` can leave an `IndirectPattern` instance because `PatternClass` may
+be a proper subclass.
+
+```py
+def match_possible_subclass(value: IndirectPattern, PatternClass: type[IndirectPattern]) -> None:
+    match value:
+        case PatternClass():
+            pass
+        case _:
+            reveal_type(value)  # revealed: IndirectPattern
+```
+
 ## Class pattern aliases
 
 The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a
@@ -1710,7 +1722,7 @@ def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
             # revealed: int | str
             reveal_type(item)
 
-            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            # error: [missing-attribute] "Object of type `int | str` has no attribute `nonexistent`"
             item.nonexistent()
 ```
 
@@ -2181,22 +2193,53 @@ def test_match_mapping_uses_get(value: CustomGet) -> None:
     match value:
         case {"item": item}:
             reveal_type(item)  # revealed: object
+```
 
+Narrowing a mapping preserves the type of its entries when it still uses the standard `get` method.
+A truthiness check can exclude empty dictionaries, and an `isinstance` check can add another class
+to the subject's type.
+
+```py
+def match_nonempty_dict(value: dict[str, int]) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: int
+
+class Tagged: ...
+
+def match_tagged_mapping(value: Mapping[str, bytes]) -> None:
+    if isinstance(value, Tagged):
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: bytes
+
+def match_nonempty_custom_get(value: CustomGet) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: object
+```
+
+A callable stored on the instance can also provide `get`. The captured value still has type
+`object`.
+
+```py
 class InstanceGet(Protocol):
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
 
 class InstanceGetImpl:
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
     def __call__(self, key: object, default: object = None) -> object:
         return "custom" if key == "item" else default
 
-class InstanceGetMapping(Mapping[str, int]):
+class InstanceGetMapping(Mapping[str, int | str]):
     def __init__(self) -> None:
         self.get: InstanceGet = InstanceGetImpl()
 
@@ -3540,6 +3583,95 @@ def match_tuple_expression_guard_rebinding(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
+## Captures of the subject across cases
+
+### Narrowing guards
+
+Capturing the subject under its original name keeps its value. If the guard fails, later patterns
+can still narrow that capture.
+
+```py
+def narrow_after_capture(value: int | str | bytes) -> None:
+    match value:
+        case value if isinstance(value, int):
+            reveal_type(value)  # revealed: int
+        case str():
+            reveal_type(value)  # revealed: str
+        case bytes():
+            reveal_type(value)  # revealed: bytes
+```
+
+### Constrained `as` patterns
+
+If the first pattern matches but its guard fails, the captured integer cannot reach the string case.
+
+```py
+def narrow_after_as_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case int() as value if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+### Or pattern alternatives
+
+Each alternative can capture the whole subject under its original name.
+
+```py
+def narrow_after_or_capture(value: int | str | bytes, flag: bool) -> None:
+    match value:
+        case (int() as value) | (str() as value) if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+A capture can also refer to the whole subject in one alternative and an extracted element in
+another. Matching the original tuple in a later case does not make its captured integer unreachable.
+
+```py
+def mixed_or_captures(subject: int | tuple[int], flag: bool) -> None:
+    value = subject
+    match value:
+        case (int() as value) | [value] if flag:
+            pass
+        case tuple():
+            reveal_type(value)  # revealed: int
+```
+
+### Reassignment in guards
+
+A guard can assign a different value to the captured name. Later cases still match the saved
+subject, so their patterns do not narrow that assignment.
+
+```py
+def reassign_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case value if (value := "changed") and flag:
+            pass
+        case int():
+            reveal_type(value)  # revealed: Literal["changed"]
+```
+
+### Member subjects
+
+Capturing an attribute under the name of its owner replaces the owner with the attribute value.
+Narrowing the saved attribute does not narrow this new binding of the owner's name.
+
+```py
+class Holder:
+    attr: int | str
+
+def capture_member(holder: Holder) -> None:
+    value = holder
+    match value.attr:
+        case value if False:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int | str
+```
+
 ## Named-expression subjects
 
 A named expression creates a new binding for the subject. The successful pattern narrows that
@@ -3561,6 +3693,17 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
     match subject := value:
         case [subject]:
             # The capture shadows the named-expression binding and receives the element type.
+            reveal_type(subject)  # revealed: int
+```
+
+Capturing the entire subject under its new name preserves narrowing in later cases.
+
+```py
+def match_named_expression_guarded_capture(value: int | str) -> None:
+    match subject := value:
+        case subject if False:
+            pass
+        case int():
             reveal_type(subject)  # revealed: int
 ```
 
@@ -3926,6 +4069,12 @@ class Color(StrEnum):
     RED = "r"
     GREEN = "g"
     BLUE = "b"
+
+def match_string(value: str):
+    match value:
+        case Color.GREEN as captured:
+            reveal_type(value)  # revealed: str
+            reveal_type(captured)  # revealed: str
 
 def test_literal_as_enum(x: Literal["g"]) -> None:
     match x:

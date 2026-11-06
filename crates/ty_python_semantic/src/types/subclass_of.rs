@@ -104,7 +104,7 @@ impl<'db> SubclassOfType<'db> {
         // `type[A | B]` -> `type[A] | type[B]`
         // `type[A & B]` -> `type[A] & type[B]`
         match ty {
-            Type::Never => Ok(Type::Never),
+            Type::Never | Type::Divergent(_) => Ok(ty),
             Type::Union(union) => union
                 .elements(db)
                 .iter()

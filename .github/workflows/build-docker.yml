@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-docker.yml
+      - Dockerfile
 
 env:
   UV_LOCKED: 1
@@ -46,7 +47,7 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
@@ -88,7 +89,7 @@ jobs:
       # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -123,6 +124,10 @@ jobs:
       id-token: write
       packages: write
     steps:
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
+
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -130,7 +135,7 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -151,13 +156,13 @@ jobs:
       # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
       - name: Create manifest list and push
         working-directory: /tmp/digests
-        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
+        # The jaq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
         # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
         # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(jaq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
 
       - name: Export manifest digest
@@ -170,7 +175,7 @@ jobs:
             docker buildx imagetools inspect \
               "${IMAGE}:${VERSION}" \
               --format '{{json .Manifest}}' \
-            | jq -r '.digest'
+            | jaq -r '.digest'
           )"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
@@ -202,7 +207,7 @@ jobs:
           - debian:trixie-slim,trixie-slim,debian-slim
           - buildpack-deps:trixie,trixie,debian
     steps:
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
@@ -267,7 +272,7 @@ jobs:
 
       - name: Build and push
         id: build-and-push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -301,6 +306,10 @@ jobs:
       id-token: write
       packages: write
     steps:
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
+
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -308,7 +317,7 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -332,7 +341,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         # The readarray part is used to make sure the quoting and special characters are preserved on expansion (e.g. spaces)
-        # The jq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
+        # The jaq command expands the docker/metadata json "tags" array entry to `-t tag1 -t tag2 ...` for each tag in the array
         # The printf will expand the base image with the `<RUFF_BASE_IMG>@sha256:<sha256> ...` for each sha256 in the directory
         # The final command becomes `docker buildx imagetools create -t tag1 -t tag2 ... <RUFF_BASE_IMG>@sha256:<sha256_1> <RUFF_BASE_IMG>@sha256:<sha256_2> ...`
         run: |
@@ -341,7 +350,7 @@ jobs:
           # shellcheck disable=SC2046
           docker buildx imagetools create \
             "${annotations[@]}" \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(jaq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
 
       - name: Export manifest digest
@@ -354,7 +363,7 @@ jobs:
             docker buildx imagetools inspect \
               "${IMAGE}:${VERSION}" \
               --format '{{json .Manifest}}' \
-            | jq -r '.digest'
+            | jaq -r '.digest'
           )"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 

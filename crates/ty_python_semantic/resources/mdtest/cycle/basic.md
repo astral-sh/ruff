@@ -76,6 +76,30 @@ def alternate(flag: bool):
     reveal_type(value)  # revealed: tuple[Literal[1]] | tuple[Literal["a"], Literal["b"]]
 ```
 
+## Unpacking a value with a growing type argument
+
+Each time through the loop, the first unpacked value has another callable nested in its type.
+Inference falls back to `Unknown` for that value. The initial `Box[int]` also reaches the read after
+the loop.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+
+class Box[T]:
+    next: tuple[Box[Callable[[], T]], bool]
+
+def read(more: bool):
+    value = Box[int]()
+    while more:
+        value, more = value.next
+    reveal_type(value)  # revealed: Box[int] | Unknown
+```
+
 ## Generic `NamedTuple` with recursive fields
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the
@@ -266,13 +290,13 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
+        # revealed: (positional=...) -> Unknown | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
         # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
         # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
@@ -410,8 +434,8 @@ annotations and preserve the class binding, so constructor calls can still be ch
 ```pyi
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
 def identity(value: annotation) -> annotation: ...
 
 @identity
@@ -467,8 +491,8 @@ on the decorated class.
 from dataclasses import dataclass
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
 def identity(value: annotation) -> annotation: ...
 
 @dataclass
@@ -499,7 +523,7 @@ except Exception:
 
     result = make
 finally:
-    from unknown_module import member as result  # error: [unresolved-import]
+    from unknown_module import member as result  # error: [import-not-found]
 ```
 
 ## Decorated methods with implicit class attributes
@@ -526,7 +550,7 @@ class B:
 
     @d()
     def m2(self, p):
-        self.__slots__  # error: [unresolved-attribute]
+        self.__slots__  # error: [missing-attribute]
 ```
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`
@@ -648,6 +672,11 @@ class Bar: ...
 
 ## Known class instances with a shadowed typing module
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 String members retain their types when a local `typing.py` introduces an inference cycle. Resolving
 `str`'s bases looks up `Sequence` in that module. Determining whether the assignment is reachable
 requires inferring `trigger`'s return annotation. Resolving `C.attribute` requires determining `C`'s
@@ -674,6 +703,11 @@ Sequence = object
 ```
 
 ## Known class instances after checking the shadowing module
+
+```toml
+[environment]
+python-version = "3.10"
+```
 
 String members retain their types when the shadowing module is checked first, as they do when the
 consumer is checked first.
@@ -716,4 +750,24 @@ from types import new_class
 value = 0
 while value:
     value = new_class("C", (value,))
+```
+
+## Generic call constraining a list initializer
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A list passed to a generic function retains the type inferred from its elements, even when the
+call's return type supplies an incompatible context for that list.
+
+```py
+def keep[U](values: list[U]) -> list[U]:
+    return values
+
+def make[T](arg: T) -> list[T]:
+    values = [42]
+    reveal_type(values)  # revealed: list[int]
+    return keep(values)  # error: [invalid-return-type]
 ```

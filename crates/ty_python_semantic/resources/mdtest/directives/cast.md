@@ -114,7 +114,7 @@ from typing_extensions import cast as extension_cast
 
 def f(x: list[Literal["foo"]]) -> None: ...
 
-f(["foo"])  # no diagnostic
+f(["foo"])  # ok
 f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
 f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
 f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
@@ -191,7 +191,7 @@ inference attempt that does not use the type context, and emit neither `redundan
 from typing import Callable
 
 def callback() -> Callable[[int], str]:
-    return cast(Callable[[int], str], lambda value: value())  # no diagnostic
+    return cast(Callable[[int], str], lambda value: value())  # ok
 ```
 
 Diagnostics that occur without the outer context are still reported, once:
@@ -201,13 +201,49 @@ Diagnostics that occur without the outer context are still reported, once:
 item: Item = cast(Item, {"name": undefined, "count": 1})
 
 def make_item_with_error(name: str) -> Item:
-    return cast(  # no diagnostic
+    return cast(  # ok
         Item,
         {
             "name": cast(str, name),  # error: [redundant-cast]
             "count": undefined,  # error: [unresolved-reference]
         },
     )
+```
+
+## Type context from target type
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The parameter type of the value passed to `cast` is declared as `Any`. This declared type is ignored
+when inferring the value, as it may incorrectly make the cast appear redundant if provided as type
+context to a nested generic call:
+
+```py
+from typing import Any, cast
+
+def first[T](values: list[T]) -> T:
+    return values[0]
+
+def _(value: int):
+    cast(Any, first([value]))  # ok
+```
+
+An explicit outer annotation, however, can influence the type of the generic call, leading to the
+cast being redundant:
+
+```py
+def _(value: int):
+    result: list[Any] = cast(list[Any], list((value,)))  # error: [redundant-cast]
+```
+
+A conditional collection literal expression may also receive peer type context:
+
+```py
+def _(prefix: str):
+    cast(list[str], [prefix] if prefix else [])  # error: [redundant-cast]
 ```
 
 ## Redundant casts of tuple classes with unknown elements
@@ -323,21 +359,21 @@ def cast_generic_invalid(
     list_of_any: list[Any],
     just_any: Any,
 ):
-    cast(Any, list_of_integers)  # no diagnostic
-    cast(list[str], list_of_any)  # no diagnostic
-    cast(str, just_any)  # no diagnostic
-    cast(list[Intersection[int, Any]], list_of_integers)  # no diagnostic
-    cast(list[int], dynamic_list_of_integers)  # no diagnostic
-    cast(list[int], list_of_dynamic_integers)  # no diagnostic
-    cast(list[int], list_of_integers_or_any)  # no diagnostic
-    cast(list[int], any_or_list_of_integers)  # no diagnostic
+    cast(Any, list_of_integers)  # ok
+    cast(list[str], list_of_any)  # ok
+    cast(str, just_any)  # ok
+    cast(list[Intersection[int, Any]], list_of_integers)  # ok
+    cast(list[int], dynamic_list_of_integers)  # ok
+    cast(list[int], list_of_dynamic_integers)  # ok
+    cast(list[int], list_of_integers_or_any)  # ok
+    cast(list[int], any_or_list_of_integers)  # ok
 
     # `Any | list[int]` could materialize to `list[str] | list[int]`,
     # which is not disjoint from `list[str]`
-    cast(list[str], any_or_list_of_integers)  # no diagnostic
+    cast(list[str], any_or_list_of_integers)  # ok
 
     # similarly `Any | list[int | Any]` could also materialize to `list[str] | list[int]`
-    cast(list[str], any_or_list_of_integers_or_any)  # no diagnostic
+    cast(list[str], any_or_list_of_integers_or_any)  # ok
 ```
 
 ### Disjoint casts between identically named types
@@ -399,9 +435,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |          Inferred as `list[int | str]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2965:7
+    ::: stdlib/builtins.pyi:2977:7
      |
-2965 | class list(MutableSequence[_T]):
+2977 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
 info: `list[int]` is disjoint from `list[int | str]`
 info: `int | str` and `int` are not mutual subtypes of each other, but must be due to invariance
@@ -479,9 +515,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |          Inferred as `list[str] | list[bytes]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2965:7
+    ::: stdlib/builtins.pyi:2977:7
      |
-2965 | class list(MutableSequence[_T]):
+2977 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
 info: `list[int]` is disjoint from `list[str] | list[bytes]`
 info: every element of union `list[str] | list[bytes]` is disjoint from `list[int]`
@@ -512,9 +548,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |                Inferred as `tuple[int, str]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2850:7
+    ::: stdlib/builtins.pyi:2862:7
      |
-2850 | class tuple(Sequence[_T_co]):
+2862 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
 info: `tuple[int, int]` is disjoint from `tuple[int, str]`
 info: tuple element 2 has disjoint types `str` and `int`
@@ -543,9 +579,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |                Inferred as `tuple[int]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2850:7
+    ::: stdlib/builtins.pyi:2862:7
      |
-2850 | class tuple(Sequence[_T_co]):
+2862 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
 info: `tuple[int, int]` is disjoint from `tuple[int]`
 info: the tuples have incompatible lengths: 1 and 2
@@ -798,7 +834,7 @@ knows what they're doing if they cast to `Never` explicitly:
 ```py
 from typing_extensions import Never, cast
 
-x = cast(Never, 0)  # no diagnostic
+x = cast(Never, 0)  # ok
 ```
 
 Upcasts from a `Never`-inferred type to a supertype are also permitted without the rule being
@@ -808,7 +844,7 @@ triggered:
 from typing_extensions import Never, cast
 
 def test(x: Never):
-    y = cast(str, x)  # no diagnostic
+    y = cast(str, x)  # ok
 ```
 
 The reason why casting to or from `Never` is allowed is that the normal rationale for this rule does
@@ -832,7 +868,7 @@ without using a `cast`.
 ```pyi
 from typing import cast
 
-x = cast(int, ...)  # no diagnostic
+x = cast(int, ...)  # ok
 ```
 
 This is partly to accommodate the fact that the typing spec
@@ -871,7 +907,7 @@ executed at runtime:
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    x = cast(int, ...)  # no diagnostic
+    x = cast(int, ...)  # ok
 ```
 
 ### Casts involving collection literals that are inferred as having a disjoint type due to no type context

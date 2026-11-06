@@ -509,3 +509,17 @@ if api_key is None:
 
 reveal_type(api_key)  # revealed: str
 ```
+
+## Reading two places in both branches preserves their individual types
+
+```py
+def _(condition: bool, number: int, text: str):
+    if condition:
+        pair = (number, text)
+    else:
+        pair = (text, number)
+
+    reveal_type(number)  # revealed: int
+    reveal_type(text)  # revealed: str
+    return pair
+```

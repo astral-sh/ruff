@@ -1,4 +1,4 @@
-use super::{Arguments, FormatElement, write};
+use super::{Arguments, FormatElement, Formatter, write};
 use crate::format_element::Interned;
 use crate::prelude::{LineMode, Tag};
 use crate::{FormatResult, FormatState};
@@ -218,6 +218,10 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
+
+    fn write_fmt(&mut self, arguments: Arguments<Context>) -> FormatResult<()> {
+        Formatter::new_vec(self).write_fmt(arguments)
+    }
 
     fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);

@@ -68,7 +68,7 @@ _ProtocolT = TypeVar("_ProtocolT", bound=BaseProtocol)
 _Context: TypeAlias = dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[AbstractEventLoop, _Context], object]
 _ProtocolFactory: TypeAlias = Callable[[], BaseProtocol]
-_SSLContext: TypeAlias = bool | None | ssl.SSLContext
+_SSLContext: TypeAlias = bool | ssl.SSLContext | None
 
 @type_check_only
 class _TaskFactory(Protocol):

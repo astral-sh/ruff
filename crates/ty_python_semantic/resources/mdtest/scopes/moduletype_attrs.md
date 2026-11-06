@@ -89,7 +89,7 @@ reveal_type(module.__file__)  # revealed: None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
 reveal_type(module.__spec__)  # revealed: ModuleSpec | None
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(module.__warningregistry__)  # revealed: Unknown
 
 def nested_scope():
@@ -150,7 +150,7 @@ we're dealing with:
 ```py
 import typing
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 

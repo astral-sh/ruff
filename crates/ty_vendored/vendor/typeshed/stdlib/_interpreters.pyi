@@ -80,7 +80,7 @@ def whence(id: SupportsIndex) -> _Whence:
 
 def exec(
     id: SupportsIndex, code: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
-) -> None | types.SimpleNamespace:
+) -> types.SimpleNamespace | None:
     """Execute the provided code in the identified interpreter.
 
     This is equivalent to running the builtin exec() under the target

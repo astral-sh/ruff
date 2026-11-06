@@ -21,7 +21,7 @@ that may be changed without notice. Use at your own risk!
 # Since this module defines "overload" it is not recognized by Ruff as typing.overload
 # TODO: The collections import is required, otherwise mypy crashes.
 # https://github.com/python/mypy/issues/16744
-import collections  # noqa: F401  # pyright: ignore[reportUnusedImport]
+import collections  # ruff: ignore[unused-import]  # pyright: ignore[reportUnusedImport]
 import sys
 import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
@@ -1759,6 +1759,7 @@ class AbstractSet(Collection[_T_co]):
     def __or__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
     def __sub__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]: ...
     def __xor__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
+    def __rxor__(self, other: Iterable[_T], /) -> AbstractSet[_T_co | _T]: ...
     def __eq__(self, other: object, /) -> bool: ...
     def isdisjoint(self, other: Iterable[Any], /) -> bool:
         """Return True if two sets have a null intersection."""

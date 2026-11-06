@@ -330,7 +330,7 @@ impl std::fmt::Display for Codes<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut joiner = f.join(", ");
 
-        let namespace = if self.0.is_type_ignore() { "ty:" } else { "" };
+        let namespace = self.0.code_prefix();
 
         for item in self.1 {
             joiner.entry(&format_args!("{namespace}{item}"));

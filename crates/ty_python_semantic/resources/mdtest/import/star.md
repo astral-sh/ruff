@@ -117,7 +117,7 @@ from b import Y
 from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
-from c import Y  # error: [unresolved-import]
+from c import Y  # error: [import-not-found]
 ```
 
 ## Esoteric definitions and redefinitions
@@ -163,7 +163,7 @@ D: (E := 4) = (F := 5)  # error: [invalid-type-form]  # fmt:skip
 for G in [1]:
     pass
 
-for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+for (H := 4).whatever in [2]:  # error: [missing-attribute]
     ...
 
 class I: ...
@@ -1620,7 +1620,7 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 
 ```py
 # TODO: not a great error message
-from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
+from foo import *  # error: [import-not-found] "Cannot resolve imported module `foo`"
 ```
 
 ### Nested scope

@@ -538,6 +538,23 @@ def expanded_tuples(values: list[str]):
     reveal_type(last)  # revealed: Literal[False]
 ```
 
+A protocol's tuple-valued member does not prevent promotion of tuple literals collected alongside
+the protocol instance.
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    pair: tuple[int, int]
+
+def _(value: P) -> None:
+    first, *rest = [0, (1,), (2, 3), value]
+    reveal_type(rest)  # revealed: list[P | tuple[int, ...]]
+
+    first, *rest = (0, (1,), (2, 3), value)
+    reveal_type(rest)  # revealed: list[P | tuple[int, ...]]
+```
+
 ### Starred expressions on the right-hand side
 
 A starred element can contribute an unknown number of values. The literal's AST length does not
@@ -566,6 +583,31 @@ def fixed_ends(values: list[str]):
     reveal_type(first)  # revealed: Literal[1]
     reveal_type(rest)  # revealed: list[str]
     reveal_type(last)  # revealed: Literal[2]
+```
+
+### Tuple unions in starred expressions
+
+Unpacking tuples of different lengths combines their element types but preserves their minimum
+length:
+
+```py
+def _(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int | str, *tuple[int | str, ...]]
+```
+
+Required elements in variable-length tuples also contribute to the minimum, whether they precede or
+follow the variable-length part:
+
+```py
+def _(values: tuple[int, *tuple[int, ...]] | tuple[*tuple[str, ...], str]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int | str, *tuple[int | str, ...]]
+```
+
+If any member can be empty, the unpacked result can be empty too:
+
+```py
+def _(values: tuple[()] | tuple[int]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int, ...]
 ```
 
 ### Ambiguous positions around an expansion

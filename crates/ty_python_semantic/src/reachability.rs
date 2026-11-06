@@ -201,17 +201,16 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
-        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_expression_types, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        class_pattern_coverage_target, definite_match_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_predicate_truthiness, infer_same_file_expression_type,
+        mapping_pattern_type, pattern_binding_fallthrough_type, same_enum_or_pattern_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
-use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -229,7 +228,9 @@ use ty_python_core::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
         ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
     scope::ScopeId,
     use_def_map,
 };
@@ -314,7 +315,7 @@ fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
     predicate
         .guard(db)
-        .is_none_or(|guard| analyze_condition(db, guard).is_always_true())
+        .is_none_or(|guard| infer_predicate_truthiness(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
@@ -597,8 +598,6 @@ const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
-        | PredicateNode::Condition(expression)
-        | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -628,15 +627,27 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
 /// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
-/// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
-/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
-/// demand.
+/// divergent inference cycle. For large scopes, the decision to warm calls depends only on the
+/// structure of the constraint, so every thread takes the same path. A condition whose branches
+/// are all terminals has no call prefix to warm unless it is itself a statement call. Small
+/// scopes evaluate calls on demand because their reverse call chains are already bounded.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
+    root: InteriorNode,
 ) -> bool {
+    let root_predicate = root.atom();
+    if !matches!(
+        predicates[root_predicate].node,
+        PredicateNode::IsNonTerminalCall(_)
+    ) && [root.if_true(), root.if_false(), root.if_ambiguous()]
+        .into_iter()
+        .all(|id| terminal_reachability(id).is_some())
+    {
+        // No branch of this constraint can visit a statement-call predicate. If inferring
+        // the condition itself needs earlier calls, their own reachability walks warm them.
+        return false;
+    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
         .iter()
@@ -747,8 +758,8 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
-    let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+    let root = constraints.get_interior_node(id);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -817,7 +828,13 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
-/// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
+/// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
+///
+/// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
+/// cannot select either boolean branch, so only paths that bypass it remain reachable. Such paths
+/// occur in both its true and false branches: evaluate both and take the conjunction of their
+/// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
+/// Stop as soon as any required branch is unreachable.
 ///
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
@@ -836,24 +853,49 @@ fn evaluate_reachability_path<'db>(
 ) -> Truthiness {
     let env = ProgramEnvironment::from_scope(scope);
     let mut visited = 0;
+    let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
+    let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
+    let mut result = Truthiness::AlwaysTrue;
 
     loop {
-        if let Some(reachability) = terminal_reachability(id) {
-            return reachability;
-        }
-
-        let node = constraints.get_interior_node(id);
-        if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
-            return evaluate_reachability_checkpoint(db, scope, id);
-        }
-
-        id = match analyze_single(db, &env, &predicates[node.atom()]) {
-            Truthiness::AlwaysTrue => node.if_true(),
-            Truthiness::Ambiguous => node.if_ambiguous(),
-            Truthiness::AlwaysFalse => node.if_false(),
+        let reachability = if seen.as_mut().is_some_and(|seen| !seen.insert(id)) {
+            // Every visited suffix already contributes to the conjunction.
+            Truthiness::AlwaysTrue
+        } else if let Some(reachability) = terminal_reachability(id) {
+            reachability
+        } else {
+            let node = constraints.get_interior_node(id);
+            if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
+                evaluate_reachability_checkpoint(db, scope, id)
+            } else {
+                id = match analyze_single(db, &env, &predicates[node.atom()]) {
+                    Truthiness::AlwaysTrue => node.if_true(),
+                    Truthiness::Ambiguous => node.if_ambiguous(),
+                    Truthiness::AlwaysFalse => node.if_false(),
+                    Truthiness::Uninhabited => {
+                        // An uninhabited condition cannot take either branch. Retain only paths
+                        // that bypass the condition, which are represented in both branches.
+                        pending.push(node.if_false());
+                        seen.get_or_insert_with(FxHashSet::default);
+                        node.if_true()
+                    }
+                };
+                use_checkpoint = true;
+                visited += 1;
+                continue;
+            }
         };
+
+        result = result.and(reachability);
+        if result.is_always_false() {
+            return result;
+        }
+        let Some(next) = pending.pop() else {
+            return result;
+        };
+        id = next;
         use_checkpoint = true;
-        visited += 1;
+        visited = 0;
     }
 }
 
@@ -914,11 +956,11 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return reachability;
         }
 
-        let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let root = self.get_interior_node(id);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            predicate_scope(db, &predicates[root.atom()]),
             self,
             predicates,
             None,
@@ -1392,7 +1434,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
-            AnalyzeNonTerminal(Id),
+            VisitBranches(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
         }
@@ -1453,29 +1495,36 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), projected);
                         continue;
                     }
-                    let is_control_flow_gate = matches!(
+                    actions.push(Action::VisitBranches(id));
+                    actions.push(Action::Visit(node.if_uncertain));
+                }
+                Action::VisitBranches(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    // This path bypasses the predicate. If it admits every value, the
+                    // conditional paths cannot narrow this place.
+                    if self.projected_node(node.if_uncertain)
+                        == ProjectedNarrowingNodeId::ALWAYS_TRUE
+                    {
+                        self.project_cache
+                            .insert((id, self.base_ty), ProjectedNarrowingNodeId::ALWAYS_TRUE);
+                        continue;
+                    }
+                    let predicate = self.predicates[node.atom];
+                    if !matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
-                    );
-
-                    if is_control_flow_gate {
-                        actions.push(Action::AnalyzeNonTerminal(id));
-                        actions.push(Action::Visit(node.if_uncertain));
-                    } else {
+                    ) {
                         actions.push(Action::FinishPredicate(id));
                         actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_uncertain));
                         actions.push(Action::Visit(node.if_true));
+                        continue;
                     }
-                }
-                Action::AnalyzeNonTerminal(id) => {
-                    let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
                     let branch = match analyze_single(db, self.env, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
                         Truthiness::Ambiguous => {
                             unreachable!(
                                 "statically decidable predicates should never be Ambiguous"
@@ -1498,6 +1547,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
+                    // If the bypass already covers both conditional branches, their
+                    // predicate cannot affect the projection.
+                    if [if_true, if_false].into_iter().all(|branch| {
+                        branch == ProjectedNarrowingNodeId::ALWAYS_FALSE || branch == if_uncertain
+                    }) {
+                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        continue;
+                    }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
@@ -1511,6 +1568,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                                 let either = self.or(if_true, if_false);
                                 self.or(either, if_uncertain)
                             }
+                            Truthiness::Uninhabited => if_uncertain,
                         }
                     } else {
                         self.add_node(ProjectedNarrowingNode {
@@ -1663,6 +1721,19 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 Truthiness::Ambiguous
             }
         }
+        PatternPredicateKind::Or(predicates)
+            if let Some(matched) = same_enum_or_pattern_type(db, env, predicates, subject_ty) =>
+        {
+            if subject_ty.is_disjoint_from(db, env, matched) {
+                Truthiness::AlwaysFalse
+            } else if IntersectionType::from_positive_and_negative(db, env, subject_ty, matched)
+                .is_never()
+            {
+                Truthiness::AlwaysTrue
+            } else {
+                Truthiness::Ambiguous
+            }
+        }
         PatternPredicateKind::Or(predicates) => {
             use std::ops::ControlFlow;
 
@@ -1701,23 +1772,21 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     (Truthiness::Ambiguous, _) | (_, Truthiness::Ambiguous) => {
                         ControlFlow::Continue(Truthiness::Ambiguous)
                     }
-                    (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
-                        ControlFlow::Continue(Truthiness::AlwaysFalse)
-                    }
+                    (
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                    ) => ControlFlow::Continue(Truthiness::AlwaysFalse),
                 });
             truthiness
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty =
-                match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Type::instance(db, env, class.top_materialization(db))
-                    }
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Type::Callable(CallableType::top(db))
-                    }
-                    _ => return Truthiness::Ambiguous,
-                };
+            let class_ty = match class_pattern_coverage_target(db, kind) {
+                Type::ClassLiteral(class) => Type::instance(db, env, class.top_materialization(db)),
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                    Type::Callable(CallableType::top(db))
+                }
+                _ => return Truthiness::Ambiguous,
+            };
             let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
                 definite_match_pattern_type_for_subject(db, env, predicate_kind, subject_ty)
             });
@@ -1747,8 +1816,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
+            // Exact tuples are always eligible for sequence patterns. Avoid projecting their
+            // element types into a generic tuple specialization just to establish this fact.
+            let is_exact_tuple = |ty: Type<'db>| ty.exact_tuple_instance_spec(db).is_some();
+            let is_tuple_subject = match subject_ty {
+                Type::Union(union) => union.elements(db).iter().copied().all(is_exact_tuple),
+                _ => is_exact_tuple(subject_ty),
+            };
             let sequence_ty = sequence_pattern_type_builder(db, env).build();
-            if subject_ty.is_subtype_of(db, env, sequence_ty) {
+            if is_tuple_subject || subject_ty.is_subtype_of(db, env, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
@@ -1900,108 +1976,17 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Evaluate a condition without re-testing intermediate short-circuit results.
+/// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
 ///
-/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
-/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
-/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
-/// truthy path can complete. Callers that cannot represent the absence of a result can
-/// conservatively map `None` to [`Truthiness::Ambiguous`].
-pub(crate) fn analyze_condition_expression(
-    node: &ast::Expr,
-    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
-) -> Option<Truthiness> {
-    match node {
-        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-            let short_circuit = Truthiness::from(op.is_or());
-            let mut result = short_circuit.negate();
-            for value in values {
-                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
-                    return result.is_ambiguous().then_some(short_circuit);
-                };
-                if truthiness == short_circuit {
-                    return Some(short_circuit);
-                }
-                if truthiness.is_ambiguous() {
-                    result = Truthiness::Ambiguous;
-                }
-            }
-            Some(result)
-        }
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::Not,
-            operand,
-            ..
-        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
-        ast::Expr::If(ast::ExprIf {
-            test, body, orelse, ..
-        }) => match analyze_condition_expression(test, leaf_truthiness)? {
-            Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
-            Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
-            Truthiness::Ambiguous => {
-                let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
-                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
-                match (body_truthiness, orelse_truthiness) {
-                    (None, truthiness) | (truthiness, None) => truthiness,
-                    (Some(body), Some(orelse)) => Some(if body == orelse {
-                        body
-                    } else {
-                        Truthiness::Ambiguous
-                    }),
-                }
-            }
-        },
-        _ => leaf_truthiness(node),
-    }
-}
-
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
-        // A condition can control whether one of its own inputs is reachable. Expression inference
-        // can lose its previous result when it ceases to be a cycle head, so its type widening alone
-        // does not ensure that the condition's truthiness converges. Delay widening here to avoid
-        // retaining imprecise results from the first few iterations.
-        if cycle.iteration() > crate::TAINTED_CYCLES && *previous != result {
-            Truthiness::Ambiguous
-        } else {
-            result
-        }
-    },
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(expression.scope(db));
-    let module = parsed_module(db, expression.python_file(db)).load(db);
-    let inference = infer_expression_types(db, expression, TypeContext::default());
-    analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference
-            .comparison_truthiness(node)
-            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
-    })
-    .unwrap_or(Truthiness::Ambiguous)
-}
-
+/// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
+/// In particular, treating `Never` as ambiguous can introduce loop bindings that then exclude each
+/// other, causing inference to settle on different types depending on file-checking order.
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
-        PredicateNode::Expression(test_expr) => {
-            infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db, env)
-                .negate_if(!predicate.is_positive)
-        }
-        PredicateNode::Condition(test_expr) => {
-            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
-        }
-        PredicateNode::ChainedComparisonCondition(test_expr) => {
-            let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            let expression = test_expr.node_ref(db);
-            inference
-                .comparison_truthiness(expression)
-                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
-                .negate_if(!predicate.is_positive)
+        PredicateNode::Expression(expression) => {
+            infer_predicate_truthiness(db, expression).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
@@ -2089,6 +2074,14 @@ pub(crate) fn is_range_reachable<'db>(
                 entry_range.contains_range(range) && !is_reachable(db, use_def, constraint)
             })
     })
+}
+
+/// Returns whether control flow can reach the end of `scope`.
+///
+/// This can be used to check if a function can implicitly return `None`.
+pub(crate) fn is_end_of_scope_reachable<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
+    let use_def = use_def_map(db, scope);
+    is_reachable(db, use_def, use_def.end_of_scope_reachability())
 }
 
 pub(crate) fn is_reachable<'db>(

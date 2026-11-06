@@ -697,17 +697,19 @@ async def main():
         pass
 ```
 
-## Unknown return type
+## Dynamic return type
 
-An unannotated return type might also be awaitable, so it must not produce an error.
+A dynamic return type might also be awaitable, so it must not produce an error.
 
 ```py
+from typing import Any
+
 class Manager:
-    def __aenter__(self): ...
-    def __aexit__(self, exc_type, exc, tb): ...
+    def __aenter__(self) -> Any: ...
+    def __aexit__(self, exc_type, exc, tb) -> Any: ...
 
 async def main():
-    async with Manager():
+    async with Manager():  # ok
         pass
 ```
 
@@ -815,7 +817,7 @@ from typing import Protocol
 class Stream[T](Protocol):
     def flatten(self: Stream[Stream[T]]) -> None: ...
 
-@asynccontextmanager  # no diagnostic
+@asynccontextmanager  # ok
 async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
     yield value
 
@@ -829,7 +831,7 @@ parameter. Checking the decorator still terminates when the receiver's type argu
 class Node[T: object](Protocol):
     def read(self: Node[tuple[T, T]]) -> int: ...
 
-@asynccontextmanager  # no diagnostic
+@asynccontextmanager  # ok
 async def open_node(value: list[Node[int]]) -> AsyncGenerator[list[Node[int]], None]:
     yield value
 

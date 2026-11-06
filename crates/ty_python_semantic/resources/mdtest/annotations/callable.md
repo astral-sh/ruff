@@ -534,10 +534,10 @@ on function-like callables:
 
 ```py
 def f_wrong(c: Callable[[], None]):
-    # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
+    # error: [missing-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
-    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
+    # error: [missing-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
     c.__qualname__ = "my_callable"
 ```
 
@@ -572,7 +572,7 @@ def f_okay(c: Callable[[], None]):
         # into a writable attribute...? What would that look like? Something like this?
         if (
             hasattr(type(c), "__qualname__")
-            and isinstance(descriptor := type(c).__qualname__, property)
+            and isinstance(descriptor := vars(type(c)).get("__qualname__"), property)
             and descriptor.fset is not None
         ):
             c.__qualname__ = "my_callable"  # error: [invalid-assignment]

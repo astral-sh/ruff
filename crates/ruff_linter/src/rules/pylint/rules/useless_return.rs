@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;

@@ -219,6 +219,15 @@ mapping_segments = {**get_segments_by_name(), "start": (1, 2), "end": (3, 4, 5)}
 reveal_type(mapping_segments)  # revealed: dict[str, tuple[int, int] | tuple[int, int, int]]
 ```
 
+A non-literal tuple also preserves its length when the preceding literal has the same element type
+and length.
+
+```py
+def segments_with_pair(pair: tuple[int, int]):
+    segments = [(1, 2), pair, (3, 4, 5)]
+    reveal_type(segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+```
+
 This also applies when the non-literal tuple type is hidden behind a type alias or a type variable,
 or when it is subsumed by one of the literal tuple types while building the union.
 
@@ -304,6 +313,162 @@ from collections.abc import Mapping
 
 segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
+```
+
+## Non-tuple elements do not block tuple-size promotion
+
+A non-literal tuple blocks tuple-size promotion because its shape must be preserved. A tuple nested
+inside a non-tuple element's type arguments does not:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Box[T]: ...
+
+def _(box: Box[tuple[int, str]]) -> None:
+    # revealed: list[Box[tuple[int, str]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), box])
+```
+
+A tuple in a callable's return type does not prevent promotion either:
+
+```py
+from collections.abc import Callable
+
+def _(callback: Callable[[], tuple[int, str]]) -> None:
+    # revealed: list[(() -> tuple[int, str]) | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), callback])
+```
+
+Protocol members can also contain tuples without blocking promotion:
+
+```py
+from typing import Protocol
+
+class Proto(Protocol):
+    pair: tuple[int, str]
+
+def _(protocol: Proto) -> None:
+    reveal_type([(1,), (1, 2), protocol])  # revealed: list[Proto | tuple[int, ...]]
+```
+
+The same applies to `TypedDict` fields:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    pair: tuple[int, str]
+
+def _(payload: Payload) -> None:
+    reveal_type([(1,), (1, 2), payload])  # revealed: list[Payload | tuple[int, ...]]
+```
+
+## Recursive members do not block tuple-size promotion
+
+Tuple-valued and recursive protocol members do not prevent neighboring tuple literals from being
+promoted:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Recursive[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Recursive[int] | tuple[int, ...]]
+```
+
+The same applies to recursive `TypedDict` fields:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Payload[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Payload[int] | tuple[int, ...]]
+```
+
+## Type parameter declarations do not block tuple-size promotion
+
+A class parameter's bound or default does not describe the shape of instances of that class. A tuple
+in either declaration does not prevent promotion of neighboring tuple literals.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int | tuple[int, str])
+
+class Bounded(Generic[T]): ...
+
+def _(x: Bounded[int]) -> None:
+    # revealed: list[Bounded[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+The supplied type argument also takes precedence over a default:
+
+```py
+U = TypeVar("U", default=tuple[int, str])
+
+class Defaulted(Generic[U]): ...
+
+def _(x: Defaulted[int]) -> None:
+    # revealed: list[Defaulted[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+A default also does not fix the type of a value annotated with the type variable:
+
+```py
+def _(x: U) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[U@_ | tuple[int, ...]]
+```
+
+## Tuple-size promotion uses alias values
+
+Tuple-size promotion inspects alias values. `Alias[Alias[str]]` resolves to `str`, so it does not
+block promotion:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: Alias[Alias[str]]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[str | tuple[int, ...]]
+```
+
+Even a recursively specialized alias permits promotion when its value is a `list`:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def _(x: Recursive[int]) -> None:
+    # revealed: list[list[Recursive[list[int]]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
 ```
 
 ## Invariant and contravariant return types are promoted
@@ -720,7 +885,30 @@ def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
 
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
-    reveal_type(f("x", upper))  # revealed: list[str | int]
+    reveal_type(f("x", upper))  # revealed: list[Literal["x"] | int]
+```
+
+A nested callable argument prevents promotion if the promoted type would not satisfy its upper
+bound.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    count: int
+
+def keys_for[T](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def keys_for_paramspec[T, **P](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def _(data: Payload):
+    keys = keys_for(data.__getitem__)
+    reveal_type(keys)  # revealed: list[Literal["count"]]
+
+    paramspec_keys = keys_for_paramspec(data.__getitem__)
+    reveal_type(paramspec_keys)  # revealed: list[Literal["count"]]
 ```
 
 ## Literal annotations from declaration are respected
@@ -859,5 +1047,5 @@ import module1
 
 my_modules = [module1]
 reveal_type(my_modules)  # revealed: list[<module 'module1'>]
-my_modules[0].flibbertigibbet  # error: [unresolved-attribute]
+my_modules[0].flibbertigibbet  # error: [missing-attribute]
 ```

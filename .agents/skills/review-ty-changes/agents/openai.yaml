@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review ty changes"
+  short_description: "Nitpicky, evidence-backed reviews of ty changes"
+  default_prompt: "Use $review-ty-changes to perform a thorough, deliberately nitpicky review of these ty changes."

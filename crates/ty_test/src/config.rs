@@ -24,6 +24,7 @@ use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
 use ty_module_resolver::ModuleName;
 use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::ReturnTypeInference;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
@@ -86,7 +87,7 @@ impl MarkdownTestConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct ScriptOptions {
     pub(crate) rules: Option<Rules>,
@@ -94,12 +95,19 @@ pub(crate) struct ScriptOptions {
     pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
 }
 
-impl ScriptOptions {
+#[derive(Deserialize)]
+pub(crate) struct ScriptMetadata {
+    tool: Option<ScriptTool>,
+}
+
+impl ScriptMetadata {
     pub(crate) fn from_source(source: &str) -> Option<Self> {
         let tag = ScriptTag::parse(source.as_bytes())?;
-        let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+        toml::from_str(tag.metadata()).ok()
+    }
 
-        let mut options = metadata.tool.and_then(|tool| tool.ty).unwrap_or_default();
+    pub(crate) fn into_options(self) -> Option<ScriptOptions> {
+        let mut options = self.tool?.ty?;
         if let Some(fixture) = &mut options.dependency_metadata {
             for project in &mut fixture.metadata.projects {
                 project.kind = DependencyProjectKind::Script;
@@ -108,11 +116,6 @@ impl ScriptOptions {
 
         Some(options)
     }
-}
-
-#[derive(Deserialize)]
-struct ScriptMetadata {
-    tool: Option<ScriptTool>,
 }
 
 #[derive(Deserialize)]
@@ -164,6 +167,8 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    pub(crate) return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub(crate) strict_generic_narrowing: Option<bool>,
 

@@ -27,7 +27,7 @@ use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
-use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::pylint::settings::{AllowedValue, ConstantType};
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
@@ -357,8 +357,8 @@ pub struct Options {
     /// code upgrades, like rewriting type annotations. Ruff will not propose
     /// changes using features that are not available in the given version.
     ///
-    /// For example, to represent supporting Python >=3.11 or ==3.11
-    /// specify `target-version = "py311"`.
+    /// For example, to represent supporting Python >=3.12 or ==3.12
+    /// specify `target-version = "py312"`.
     ///
     /// If you're already using a `pyproject.toml` file, we recommend
     /// `project.requires-python` instead, as it's based on Python packaging
@@ -385,8 +385,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py310""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314""#,
+        default = r#""py311""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314" | "py315""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -710,9 +710,10 @@ pub struct LintCommonOptions {
 
     /// A regular expression used to identify "dummy" variables, or those which
     /// should be ignored when enforcing (e.g.) unused-variable rules. The
-    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    /// default expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`
+    /// or `_次_`.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        default = r#""^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$""#,
         value_type = "str",
         example = r#"
             # Only ignore variables named "_".
@@ -1661,17 +1662,28 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
+        default = r#"{"altair": "alt", "datetime": "dt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "networkx": "nx", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
             # Declare the default aliases.
             altair = "alt"
+            datetime = "dt"
+            matplotlib = "mpl"
             "matplotlib.pyplot" = "plt"
+            networkx = "nx"
             numpy = "np"
+            "numpy.typing" = "npt"
             pandas = "pd"
             seaborn = "sns"
-            scipy = "sp"
+            tensorflow = "tf"
+            tkinter = "tk"
+            holoviews = "hv"
+            panel = "pn"
+            "plotly.express" = "px"
+            polars = "pl"
+            pyarrow = "pa"
+            "xml.etree.ElementTree" = "ET"
         "#
     )]
     aliases: Option<FxHashMap<ModuleName, Alias>>,
@@ -3696,6 +3708,27 @@ pub struct PylintOptions {
     )]
     allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
+    #[option(
+        default = r#"[0, 1, -1, 0.0, 1.0, -1.0, "", "__main__"]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            allow-magic-values = [42, 3.14, "special"]
+        "#
+    )]
+    allow_magic_values: Option<Vec<AllowedValue>>,
+
+    /// Literal values to ignore when used as "magic values" (see `PLR2004`),
+    /// in addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            extend-allow-magic-values = [42, 3.14, "magic"]
+        "#
+    )]
+    extend_allow_magic_values: Option<Vec<AllowedValue>>,
+
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
     #[option(
@@ -3774,10 +3807,17 @@ pub struct PylintOptions {
 impl PylintOptions {
     pub(crate) fn into_settings(self) -> pylint::settings::Settings {
         let defaults = pylint::settings::Settings::default();
+        let mut allow_magic_values = self
+            .allow_magic_values
+            .unwrap_or(defaults.allow_magic_values);
+        if let Some(extend) = self.extend_allow_magic_values {
+            allow_magic_values.extend(extend);
+        }
         pylint::settings::Settings {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_magic_values,
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_positional_args: self

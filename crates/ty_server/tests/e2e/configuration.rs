@@ -294,6 +294,41 @@ def foo() -> str:
 }
 
 #[test]
+fn conflicting_rule_alias_in_editor_settings() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let content = "import missing\nundefined";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration: Some(
+                        Map::from_iter([(
+                            "rules".to_string(),
+                            json!({
+                                "import-not-found": "ignore",
+                                "unresolved-import": "error",
+                                "unresolved-reference": "warn",
+                            }),
+                        )])
+                        .into(),
+                    ),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(main, content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main, content, 1);
+    let diagnostics = server.document_diagnostic_request(main, None);
+    insta::assert_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @"1:0..1:9[WARNING]: Name `undefined` used when not defined");
+    Ok(())
+}
+
+#[test]
 fn unsupported_editor_python_version() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -376,7 +411,7 @@ reveal_type(sys.version_info[:2])
           "severity": 2,
           "code": "unsupported-python-version",
           "source": "ty",
-          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from your virtual environment metadata."
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from your virtual environment metadata."
         }
       ]
     }
@@ -403,7 +438,7 @@ reveal_type(sys.version_info[:2])
           "severity": 3,
           "code": "revealed-type",
           "source": "ty",
-          "message": "Revealed type: `tuple[Literal[3], Literal[14]]`"
+          "message": "Revealed type: `tuple[Literal[3], Literal[15]]`"
         }
       ],
       "kind": "full"
@@ -508,7 +543,7 @@ fn unsupported_inferred_python_version_setting_diagnostic_for_system_interpreter
           "severity": 2,
           "code": "unsupported-python-version",
           "source": "ty",
-          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
         }
       ]
     }

@@ -2,8 +2,6 @@
 
 Detects overrides that narrow the type of a writable attribute.
 
-This rule is disabled by default. Enable it to enforce invariance of mutable attributes.
-
 ## Why is this bad?
 
 A subclass must accept every write allowed by the superclass. Narrowing a mutable attribute's type

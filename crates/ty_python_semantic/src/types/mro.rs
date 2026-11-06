@@ -13,7 +13,7 @@ use crate::types::{
     ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
 };
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -726,6 +726,40 @@ impl DoubleEndedIterator for MroIterator<'_> {
                     Some(self.first_element())
                 }
             })
+    }
+}
+
+impl<'db> ClassType<'db> {
+    /// Walk the bases that can match a nominal relation to `target`. The lazy first
+    /// entry always has the source's origin, even when a bare class is specialized.
+    pub(super) fn relation_bases(
+        self,
+        db: &'db dyn Db,
+        target: ClassLiteral<'db>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        if self.class_literal(db) == target {
+            return Either::Left(self.iter_mro(db));
+        }
+        let tail = match self {
+            ClassType::NonGeneric(literal) => {
+                literal.iter_mro(db).full_mro_except_first_element().clone()
+            }
+            ClassType::Generic(alias) => {
+                let specialization = alias.specialization(db);
+                // Only an unpacked TypeVarTuple needs a different specialization for its
+                // bases. Otherwise the alias itself already keys the required MRO.
+                let runtime = specialization.tuple_runtime_element_specialization(db);
+                let mro = if runtime == specialization {
+                    alias.try_mro(db).map_err(Box::as_ref)
+                } else {
+                    alias.origin(db).try_mro(db, Some(runtime))
+                };
+                let mut entries = mro.unwrap_or_else(|error| error.fallback_mro()).iter();
+                entries.next();
+                entries
+            }
+        };
+        Either::Right(tail.copied())
     }
 }
 

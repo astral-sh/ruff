@@ -272,18 +272,75 @@ PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
 help: Convert to `elif`
     |
 138 |         pass
-139 +         # inner comment which has mixed
-140 +     # indentation levels
-141 +             # which is pretty weird
-142 +     elif 2:
-143 +         pass
-144 |     else:
+    -     else:
     -             # inner comment which has mixed
-    -         # indentation levels
+139 +     # inner comment which has mixed
+140 |         # indentation levels
     -                 # which is pretty weird
     -         if 2:
     -             pass
     -         else:
     -             pass  # final pass comment
+141 +         # which is pretty weird
+142 +     elif 2:
+143 +         pass
+144 +     else:
 145 +         pass  # final pass comment
+146 |
     |
+
+PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   --> collapsible_else_if.py:152:5
+    |
+150 |       if a:
+151 |           return 1
+152 | /     else:  # explain the fallback
+153 | |         if b:
+    | |________^
+154 |               return 2
+155 |           else:
+    |
+help: Convert to `elif`
+    |
+151 |         return 1
+    -     else:  # explain the fallback
+    -         if b:
+    -             return 2
+    -         else:
+    -             return 3
+152 +     elif b:
+153 +         return 2
+154 +     else:
+155 +         return 3
+156 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   --> collapsible_else_if.py:162:5
+    |
+160 |       if 1:
+161 |           pass
+162 | /     else:  # else line comment
+163 | |         # inner comment
+164 | |         if 2:
+    | |________^
+165 |               pass
+166 |           else:
+    |
+help: Convert to `elif`
+    |
+161 |         pass
+    -     else:  # else line comment
+    -         # inner comment
+    -         if 2:
+    -             pass
+    -         else:
+    -             pass  # final pass comment
+162 +     # inner comment
+163 +     elif 2:
+164 +         pass
+165 +     else:
+166 +         pass  # final pass comment
+    |
+note: This is an unsafe fix and may change runtime behavior

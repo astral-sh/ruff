@@ -39,6 +39,8 @@ def quoteattr(data: str, entities: Mapping[str, str] = {}) -> str:
     """
 
 class XMLGenerator(handler.ContentHandler):
+    """Content handler which writes the events back as an XML document."""
+
     def __init__(
         self,
         out: TextIOBase | RawIOBase | StreamWriter | StreamReaderWriter | SupportsWrite[bytes] | None = None,

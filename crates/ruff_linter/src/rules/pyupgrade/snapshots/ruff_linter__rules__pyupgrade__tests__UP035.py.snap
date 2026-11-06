@@ -1130,10 +1130,97 @@ UP035 [*] Import from `typing` instead: `no_type_check`
 137 | from typing_extensions import no_type_check_decorator
 138 | from typing_extensions import no_type_check, no_type_check_decorator
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+139 |
+140 | # UP035 (unsafe fix: the import contains comments)
+    |
 help: Import from `typing`
     |
 137 | from typing_extensions import no_type_check_decorator
     - from typing_extensions import no_type_check, no_type_check_decorator
 138 + from typing_extensions import no_type_check_decorator
 139 + from typing import no_type_check
+140 |
+    |
+
+UP035 [*] Import from `collections.abc` instead: `Awaitable`
+   --> UP035.py:141:1
+    |
+140 |   # UP035 (unsafe fix: the import contains comments)
+141 | / from typing import (  # noqa: F401
+142 | |     Awaitable as Awaitable,
+143 | | )
+    | |_^
+144 |
+145 |   # UP035 (unsafe fix: the import contains comments)
+    |
+help: Import from `collections.abc`
+    |
+140 | # UP035 (unsafe fix: the import contains comments)
+    - from typing import (  # noqa: F401
+    -     Awaitable as Awaitable,
+    - )
+141 + from collections.abc import Awaitable as Awaitable
+142 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Awaitable`, `Callable`
+   --> UP035.py:146:1
+    |
+145 |   # UP035 (unsafe fix: the import contains comments)
+146 | / from typing import (
+147 | |     Awaitable,  # keep me
+148 | |     Callable,
+149 | | )
+    | |_^
+150 |
+151 |   # UP035 (unsafe fix: the import contains comments)
+    |
+help: Import from `collections.abc`
+    |
+145 | # UP035 (unsafe fix: the import contains comments)
+    - from typing import (
+    -     Awaitable,  # keep me
+    -     Callable,
+    - )
+146 + from collections.abc import Awaitable, Callable
+147 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Awaitable`
+   --> UP035.py:152:1
+    |
+151 |   # UP035 (unsafe fix: the import contains comments)
+152 | / from typing import (
+153 | |     # keep me
+154 | |     Awaitable,
+155 | |     cast,
+156 | | )
+    | |_^
+157 |
+158 |   # UP035 (safe fix: the comment is outside of the import)
+    |
+help: Import from `collections.abc`
+    |
+153 |     # keep me
+    -     Awaitable,
+154 |     cast,
+155 | )
+156 + from collections.abc import Awaitable
+157 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Awaitable`
+   --> UP035.py:159:1
+    |
+158 | # UP035 (safe fix: the comment is outside of the import)
+159 | from typing import Awaitable  # keep me
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `collections.abc`
+    |
+158 | # UP035 (safe fix: the comment is outside of the import)
+    - from typing import Awaitable  # keep me
+159 + from collections.abc import Awaitable  # keep me
     |

@@ -710,7 +710,7 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            let Type::NominalInstance(instance) = positive else {
+            let Type::NominalInstance(instance) = positive.resolve_type_alias(db) else {
                 rest.push(*positive);
                 continue;
             };
@@ -732,7 +732,7 @@ impl<'db> EnumComplementType<'db> {
         }
         let mut excluded_names = FxHashSet::default();
         for negative in negative {
-            let enum_literal = negative.as_enum_literal()?;
+            let enum_literal = negative.resolve_type_alias(db).as_enum_literal()?;
             if enum_literal.enum_class_literal(db) != enum_class_literal {
                 return None;
             }

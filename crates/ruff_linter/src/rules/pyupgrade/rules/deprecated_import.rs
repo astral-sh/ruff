@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::RequiredImports;
@@ -64,6 +64,10 @@ enum Deprecation {
 /// ```python
 /// from collections.abc import Sequence
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if the import statement contains comments, since
+/// rewriting the import may delete them.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.239", category = Category::Suspicious)]
 pub(crate) struct DeprecatedImport {
@@ -794,10 +798,18 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         if let Some(content) = fix
             && preserves_laziness
         {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                import_from_stmt.range(),
-            )));
+            let applicability = if checker
+                .comment_ranges()
+                .intersects(import_from_stmt.range())
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(content, import_from_stmt.range()),
+                applicability,
+            ));
         }
     }
 

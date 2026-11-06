@@ -9,6 +9,9 @@
 # requires-python = ">=3.13"
 # dependencies = []
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
@@ -27,6 +30,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 

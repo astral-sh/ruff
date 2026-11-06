@@ -29,10 +29,6 @@ use super::{
 /// support for generics.
 ///
 /// ## Known problems
-/// [PEP 695] uses inferred variance for type parameters, instead of the
-/// `covariant` and `contravariant` keywords used by `TypeVar` variables. As
-/// such, rewriting a type alias using a PEP-695 `type` statement may change
-/// the variance of the alias's type parameters.
 ///
 /// Unlike type aliases that use simple assignments, definitions created using
 /// [PEP 695] `type` statements cannot be used as drop-in replacements at
@@ -62,8 +58,8 @@ use super::{
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked unsafe because it can change runtime behavior and type-checking
-/// semantics, as described above. It may also remove comments.
+/// This fix is always marked unsafe because it can change runtime behavior, as described above.
+/// It may also remove comments.
 ///
 /// The rule also cannot inspect type variables defined in another module. For `TypeAlias`
 /// annotations, this means the fix may fail to convert legacy type variables to type parameters,

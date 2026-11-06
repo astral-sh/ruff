@@ -32,9 +32,8 @@ reveal_type("\x1b\u200b\U000e0001")  # revealed: Literal["\x1b\u200b\U000e0001"]
 
 ## Combining marks
 
-When displaying a string literal, ty escapes [combining marks] at the start of the string and after
-characters displayed as escape sequences. This prevents the marks from attaching to the opening
-quote or to the escape sequence.
+When displaying a string literal, ty escapes [combining marks] that would attach to the opening
+quote or to an escape sequence.
 
 ```py
 reveal_type("\ufe20")  # revealed: Literal["\ufe20"]
@@ -51,11 +50,48 @@ reveal_type("\\\u0301")  # revealed: Literal["\\\u0301"]
 reveal_type("\U0001d167")  # revealed: Literal["\U0001d167"]
 ```
 
+Unicode's grapheme rules treat the Myanmar vowel sign `ါ` as separate from a preceding quote, so ty
+can display it without an escape:
+
+```py
+reveal_type("\u102b")  # revealed: Literal["ါ"]
+```
+
+## Other characters that attach to quotes
+
+Some characters can attach to a quote even though they are not combining marks. An emoji modifier
+and the Thai character `ำ` attach to the preceding character, while Malayalam dot reph `ൎ` attaches
+to the following character. ty escapes them next to the corresponding quote and leaves them visible
+when they are joined to a character inside the string.
+
+```py
+reveal_type("\U0001f3fb")  # revealed: Literal["\U0001f3fb"]
+reveal_type("👍🏻")  # revealed: Literal["👍🏻"]
+reveal_type("\u0e33")  # revealed: Literal["\u0e33"]
+reveal_type("กำ")  # revealed: Literal["กำ"]
+reveal_type("\u0d4e")  # revealed: Literal["\u0d4e"]
+reveal_type("ൎക")  # revealed: Literal["ൎക"]
+```
+
+An escape sequence also has to stay separate from a preceding Malayalam dot reph:
+
+```py
+reveal_type("\u0d4e\u200b")  # revealed: Literal["\u0d4e\u200b"]
+```
+
+The Angstrom sign `\u212b` normalizes to `Å` in NFC, so ty displays it as an escape to keep the two
+values distinct. A dot reph before that escape would attach to it, so ty escapes it too. A preceding
+dot reph would then attach to this new escape and is escaped as well:
+
+```py
+reveal_type("\u0d4e\u0d4e\u212b")  # revealed: Literal["\u0d4e\u0d4e\u212b"]
+```
+
 ## Canonically equivalent strings
 
-Distinct strings can render identically when they are [canonically equivalent]. ty escapes non-ASCII
-characters that can participate in normalization in parts of the string that are not in [NFC], so
-these strings can be distinguished.
+Distinct strings can render identically when they are [canonically equivalent]. ty escapes
+characters that would make the display non-[NFC], so these strings can be distinguished without
+changing their values.
 
 NFC combines `e\u0301` into `é`, whereas `q\u0301` is already in NFC. It also puts combining marks
 into a standard order.
@@ -70,12 +106,18 @@ reveal_type("é e\u0301")  # revealed: Literal["é e\u0301"]
 reveal_type("Å")  # revealed: Literal["Å"]
 reveal_type("\u212b")  # revealed: Literal["\u212b"]
 reveal_type("가")  # revealed: Literal["가"]
-reveal_type("\u1100\u1161")  # revealed: Literal["\u1100\u1161"]
-reveal_type("q\u0315\u0300")  # revealed: Literal["q\u0315\u0300"]
+reveal_type("\u1100\u1161")  # revealed: Literal["ᄀ\u1161"]
+reveal_type("q\u0315\u0300")  # revealed: Literal["q̕\u0300"]
 reveal_type("q\u0300\u0315")  # revealed: Literal["q̀̕"]
 
 def equivalent_literals(value: Literal["é", "e\u0301"]):
     reveal_type(value)  # revealed: Literal["é", "e\u0301"]
+```
+
+Characters elsewhere in the string can remain visible when another character needs an escape:
+
+```py
+reveal_type("é⏱\u212b")  # revealed: Literal["é⏱\u212b"]
 ```
 
 ## Default-ignorable characters
@@ -101,6 +143,15 @@ from attaching to the escape sequence:
 
 ```py
 reveal_type("a\u034f\u0301")  # revealed: Literal["a\u034f\u0301"]
+```
+
+## Braille blank
+
+The braille blank can look like an ordinary space, so ty displays it as an escape:
+
+```py
+reveal_type(" ")  # revealed: Literal[" "]
+reveal_type("\u2800")  # revealed: Literal["\u2800"]
 ```
 
 [canonically equivalent]: https://www.unicode.org/reports/tr15/#Canon_Compat_Equivalence

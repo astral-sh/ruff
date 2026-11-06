@@ -302,7 +302,7 @@ impl Session {
                 files_changed: true,
             })
         ) {
-            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(
                 db,
                 &scripts,
@@ -838,7 +838,7 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
-        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
+        let scripts = db.project().scripts_to_synchronize(&db);
         Self::synchronize_closed_scripts(
             &mut db,
             &scripts,
@@ -1236,6 +1236,19 @@ impl Session {
             document,
             client_name: self.client_name,
         })
+    }
+
+    /// Returns whether client settings permit import updates for a rename of `path`.
+    pub(crate) fn allows_file_rename_edits(&self, path: &SystemPath) -> bool {
+        match self.workspaces.for_path(path) {
+            Some(workspace) => !workspace.settings().is_language_services_disabled(),
+            None => !self
+                .initialization_options
+                .options
+                .workspace
+                .disable_language_services
+                .unwrap_or_default(),
+        }
     }
 
     /// Selects an open document or a supported closed document for a request.

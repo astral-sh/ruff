@@ -1380,7 +1380,7 @@ class NoMatchArgs:
     x: int
     y: str
 
-NoMatchArgs.__match_args__  # error: [unresolved-attribute]
+NoMatchArgs.__match_args__  # error: [missing-attribute]
 ```
 
 ### `kw_only`
@@ -1683,7 +1683,7 @@ class A:
     y: int
 
 # revealed: Unknown
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(A.__slots__)
 
 @dataclass(slots=True)
@@ -1826,7 +1826,7 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class C: ...
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().__weakref__)  # revealed: Unknown
 ```
 
@@ -1854,9 +1854,9 @@ class Foo: ...
 
 # fmt: on
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__slots__)  # revealed: Unknown
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__match_args__)  # revealed: Unknown
 
 # TODO: this actually *does* exist at runtime
@@ -1864,7 +1864,7 @@ reveal_type(Foo.__match_args__)  # revealed: Unknown
 # We could try to model that more fully...?
 # It's not added by the dataclasses machinery, though.
 #
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__weakref__)  # revealed: Unknown
 ```
 

@@ -9,6 +9,17 @@ or can be run using `uv run --project=./python/py-fuzzer fuzz`
 Note that using `uv run --project` rather than `uvx --from` means that
 uv will respect the script's lockfile.
 
+When `--write-github-issue` writes a report, the report identifies the test
+executable's build commit. Writing a report requires `GITHUB_SERVER_URL`,
+`GITHUB_REPOSITORY`, and `GITHUB_RUN_ID` to be set. If any are missing, the
+fuzzer exits with an error. These are the GitHub server URL, `OWNER/REPO`, and
+run ID from the workflow URL; GitHub Actions sets them automatically.
+
+On normal completion, the fuzzer exits with status 0 when it checks every seed
+and finds no bugs, 1 when it checks every seed and finds bugs, and 2 when it
+leaves seeds unchecked. When minimizing previously reported failures, it exits
+with status 0 after processing all of them.
+
 Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
   `uv run --project=./python/py-fuzzer fuzz --bin ruff 0-2 78 93`
@@ -29,6 +40,7 @@ import concurrent.futures
 import contextlib
 import enum
 import json
+import multiprocessing
 import operator
 import os
 import re
@@ -36,12 +48,12 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass
-from functools import partial
 from pathlib import Path
-from typing import Final, NewType, NoReturn, assert_never, cast
+from typing import Final, NamedTuple, NewType, NoReturn, assert_never
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pysource_codegen import generate as generate_random_code
@@ -53,7 +65,14 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
-MINIMIZATION_BUDGET_SECONDS: Final = 60
+
+# Reserve time within the budget for CI job setup before the first step,
+# the final summary and any issue report, and steps after fuzzing.
+REPORTING_RESERVE_SECONDS: Final = 90
+
+# Before accounting for elapsed setup time, leave at least one minute for
+# checking seeds and minimizing failures in addition to the reserve.
+MINIMUM_BUDGET_MINUTES: Final = REPORTING_RESERVE_SECONDS / 60 + 1
 
 # GitHub issue descriptions are reportedly limited to 65,536 Unicode code points:
 # https://github.com/dead-claudia/github-limits#issue-description
@@ -67,7 +86,7 @@ OLDEST_SUPPORTED_PYTHON: Final = "3.10"
 
 
 class MinimizationTimedOut(Exception):
-    """Raised when a minimization check is requested after the time budget expires."""
+    """The fuzzing deadline was reached or the run was cancelled during minimization."""
 
 
 def run_executable(command: Sequence[str | Path], *, input: str | None = None) -> int:
@@ -79,6 +98,10 @@ def run_executable(command: Sequence[str | Path], *, input: str | None = None) -
     process group to terminate any children in that group without killing
     the caller. On other platforms, kill only the command. Then raise
     `subprocess.TimeoutExpired`.
+
+    For other errors or interruptions while communicating with the command,
+    terminate it if it is still running and wait for it to exit, then re-raise
+    the exception.
 
     Using a process group here is superior due to the fact that ty can
     spawn `uv workspace metadata` in a subprocess when `TY_UV=1` is set;
@@ -94,16 +117,26 @@ def run_executable(command: Sequence[str | Path], *, input: str | None = None) -
     ) as process:
         try:
             process.communicate(input=input, timeout=5)
-        except subprocess.TimeoutExpired:
-            if os.name == "posix":
-                # The process group may have disappeared since the timeout
-                # if its members exited, leaving nothing in the group to kill.
-                # That would result in a `ProcessLookupError` that can be safely ignored.
-                with contextlib.suppress(ProcessLookupError):
-                    os.killpg(process.pid, signal.SIGKILL)
-            else:
-                process.kill()
-            process.wait()
+        except BaseException as error:
+            # Ctrl+C can interrupt communicate() while the checker is still running;
+            # on POSIX, the checker is in a separate session and doesn't receive the signal.
+            # `poll()` returns `None` when the checker is still running, so we can kill it
+            # before re-raising the interruption.
+            # On POSIX, a timeout may leave children in the checker's process group
+            # even after the checker exits, so we try to kill the group regardless.
+            if isinstance(error, subprocess.TimeoutExpired) or process.poll() is None:
+                if os.name == "posix":
+                    # The process group may have disappeared
+                    # if its members exited, leaving nothing in the group to kill.
+                    # That would result in a `ProcessLookupError` that can be safely ignored.
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    # On Windows, `Popen.kill()` handles the race where the process has
+                    # already exited, so the suppression above is unnecessary.
+                    # https://github.com/python/cpython/blob/v3.12.0/Lib/subprocess.py#L1518-L1532
+                    process.kill()
+                process.wait()
             raise
         return process.wait()
 
@@ -189,7 +222,7 @@ class Bug:
     minimization_succeeded: bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FuzzResult:
     # The seed used to generate the random Python file.
     # The same seed always generates the same file.
@@ -200,9 +233,10 @@ class FuzzResult:
     executable: Executable
     _: KW_ONLY
     only_new_bugs: bool
+    minimization_timed_out: bool
 
     def print_description(self, index: int, num_seeds: int) -> None:
-        """Describe the results of fuzzing the parser with this seed."""
+        """Print the result of checking this seed."""
         progress = f"[{index}/{num_seeds}]"
         msg = (
             colored(f"Ran fuzzer on seed {self.seed}", "red")
@@ -227,72 +261,106 @@ class FuzzResult:
                 case _ as unreachable:
                     assert_never(unreachable)
 
+            if self.maybe_bug.minimization_succeeded:
+                print(f"Minimized seed {self.seed}:")
+            else:
+                print(f"Original source for seed {self.seed}:")
             print(colored(panic_message, "red"))
             print()
             print(self.maybe_bug.source)
             print(flush=True)
 
 
-def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
-    """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
-    code = generate_random_code(seed)
-    bug_found = False
-    minimizer_callback: Callable[[str], bool] | None = None
+def contains_reportable_bug(code: str, args: ResolvedCliArgs) -> bool:
+    """Return whether the test executable finds a bug in the code.
 
+    If a baseline executable is provided, only return `True` if the baseline
+    does not find a bug in the code.
+    """
     if args.baseline_executable_path is None:
-        only_new_bugs = False
-        if contains_bug(
+        return contains_bug(
             code, executable=args.executable, executable_path=args.test_executable_path
-        ):
-            bug_found = True
-            minimizer_callback = partial(
-                contains_bug,
-                executable=args.executable,
-                executable_path=args.test_executable_path,
-            )
+        )
+    return contains_new_bug(
+        code,
+        executable=args.executable,
+        test_executable_path=args.test_executable_path,
+        baseline_executable_path=args.baseline_executable_path,
+    )
+
+
+def fuzz_code(
+    seed: Seed,
+    args: ResolvedCliArgs,
+    deadline: float | None,
+    cancelled: threading.Event,
+) -> FuzzResult | None:
+    """Process one seed, or return None if it was not checked."""
+    if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
+        return None
+
+    if args.corpus_dir is None:
+        code = generate_random_code(seed)
     else:
-        only_new_bugs = True
-        if contains_new_bug(
-            code,
-            executable=args.executable,
-            test_executable_path=args.test_executable_path,
-            baseline_executable_path=args.baseline_executable_path,
-        ):
-            bug_found = True
-            minimizer_callback = partial(
-                contains_new_bug,
-                executable=args.executable,
-                test_executable_path=args.test_executable_path,
-                baseline_executable_path=args.baseline_executable_path,
+        code = (args.corpus_dir / f"{seed}.py").read_text(encoding="utf-8")
+
+    if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
+        return None
+
+    bug = None
+    # Saved inputs already failed during detection. Keep the original source in
+    # the report if an intermittent failure stops reproducing during minimization.
+    if args.minimize_failures or contains_reportable_bug(code, args):
+        if args.output_format is OutputFormat.GITHUB and not args.minimize_failures:
+            print(
+                f"::error::{args.executable} fuzzing failed on seed {seed}", flush=True
             )
+        if args.save_failures is None:
+            return minimize_failure(seed, code, args, deadline, cancelled)
+        (args.save_failures / f"{seed}.py").write_text(code, encoding="utf-8")
+        bug = Bug(source=code, minimization_succeeded=False)
 
-    if not bug_found:
-        return FuzzResult(seed, None, args.executable, only_new_bugs=only_new_bugs)
+    return FuzzResult(
+        seed,
+        bug,
+        args.executable,
+        only_new_bugs=args.baseline_executable_path is not None,
+        minimization_timed_out=False,
+    )
 
-    assert minimizer_callback is not None
+
+def minimize_failure(
+    seed: Seed,
+    code: str,
+    args: ResolvedCliArgs,
+    deadline: float | None,
+    cancelled: threading.Event,
+) -> FuzzResult:
+    maybe_bug = Bug(source=code, minimization_succeeded=False)
+    minimization_timed_out = False
 
     if not args.quiet:
         print(f"Found a bug for seed {seed}; minimizing...", flush=True)
 
-    deadline = time.monotonic() + MINIMIZATION_BUDGET_SECONDS
-
     def bounded_callback(candidate: str) -> bool:
-        """Check whether a candidate triggers a bug or timeout in the test executable.
+        """Return whether a candidate triggers a bug.
 
-        If a baseline executable is provided, return `True` only when the
-        candidate does not trigger a bug or timeout in the baseline.
-
-        Raise `MinimizationTimedOut` if the budget has already expired. The
-        budget does not interrupt a check once it has started.
+        Raise `MinimizationTimedOut` if the deadline or cancellation is observed
+        before or after checking the candidate.
         """
-        if time.monotonic() >= deadline:
+        if cancelled.is_set() or (
+            deadline is not None and time.monotonic() >= deadline
+        ):
             raise MinimizationTimedOut
-        return minimizer_callback(candidate)
+        found = contains_reportable_bug(candidate, args)
+        if cancelled.is_set() or (
+            deadline is not None and time.monotonic() >= deadline
+        ):
+            raise MinimizationTimedOut
+        return found
 
     try:
-        maybe_bug = Bug(
-            source=minimize_repro(code, bounded_callback), minimization_succeeded=True
-        )
+        minimized = minimize_repro(code, bounded_callback)
     except CouldNotMinimize as e:
         # This is to double-check that there isn't a bug in
         # `pysource-minimize`/`pysource-codegen`.
@@ -301,12 +369,10 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
             ast.parse(code)
         except SyntaxError:
             raise e from None
-        else:
-            maybe_bug = Bug(source=code, minimization_succeeded=False)
-    except MinimizationTimedOut:
         if not args.quiet:
-            print(f"Minimization timed out for seed {seed}; reporting original source.")
-        maybe_bug = Bug(source=code, minimization_succeeded=False)
+            print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
+    except MinimizationTimedOut:
+        minimization_timed_out = True
     # An input whose execution time is close to the timeout may time out during
     # the minimizer's initial check but finish when the same source is rechecked.
     # `pysource-minimize` currently raises a plain `ValueError` in this case, so
@@ -317,12 +383,29 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     except ValueError as e:
         if not args.quiet:
             print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
-        maybe_bug = Bug(source=code, minimization_succeeded=False)
+    else:
+        maybe_bug = Bug(source=minimized, minimization_succeeded=True)
 
-    return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
+    return FuzzResult(
+        seed=seed,
+        maybe_bug=maybe_bug,
+        executable=args.executable,
+        only_new_bugs=args.baseline_executable_path is not None,
+        minimization_timed_out=minimization_timed_out,
+    )
 
 
-def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
+class FuzzRunResult(NamedTuple):
+    """The bugs found and the seeds left unchecked in a fuzzing run."""
+
+    bugs: list[FuzzResult]
+    unchecked_seeds: list[Seed]
+
+
+def run_fuzzer_concurrently(
+    args: ResolvedCliArgs, deadline: float | None
+) -> FuzzRunResult:
+    """Process seeds concurrently, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
@@ -330,28 +413,38 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
         f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        fuzz_result_futures = [
-            executor.submit(fuzz_code, seed, args) for seed in args.seeds
-        ]
-        try:
-            for i, future in enumerate(
-                concurrent.futures.as_completed(fuzz_result_futures), start=1
-            ):
-                fuzz_result = future.result()
-                if not args.quiet:
-                    fuzz_result.print_description(i, num_seeds)
-                if fuzz_result.maybe_bug is not None:
-                    bugs.append(fuzz_result)
-        except KeyboardInterrupt:
-            print("\nShutting down the ProcessPoolExecutor due to KeyboardInterrupt...")
-            print("(This might take a few seconds)")
-            executor.shutdown(cancel_futures=True)
-            raise
-    return bugs
+    unchecked: list[Seed] = []
+
+    with multiprocessing.Manager() as manager:
+        cancelled = manager.Event()
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            try:
+                futures = {
+                    executor.submit(fuzz_code, seed, args, deadline, cancelled): seed
+                    for seed in args.seeds
+                }
+                for i, future in enumerate(
+                    concurrent.futures.as_completed(futures), start=1
+                ):
+                    fuzz_result = future.result()
+                    if fuzz_result is None:
+                        unchecked.append(futures[future])
+                        continue
+                    if not args.quiet:
+                        fuzz_result.print_description(i, num_seeds)
+                    if fuzz_result.maybe_bug is not None:
+                        bugs.append(fuzz_result)
+            except BaseException:
+                cancelled.set()
+                executor.shutdown(cancel_futures=True)
+                raise
+    return FuzzRunResult(bugs=bugs, unchecked_seeds=unchecked)
 
 
-def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
+def run_fuzzer_sequentially(
+    args: ResolvedCliArgs, *, deadline: float | None
+) -> FuzzRunResult:
+    """Process seeds sequentially, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
@@ -359,13 +452,18 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
         f"file{'s' if num_seeds != 1 else ''}..."
     )
     bugs: list[FuzzResult] = []
+    cancelled = threading.Event()
+
     for i, seed in enumerate(args.seeds, start=1):
-        fuzz_result = fuzz_code(seed, args)
+        fuzz_result = fuzz_code(seed, args, deadline, cancelled)
+        if fuzz_result is None:
+            return FuzzRunResult(bugs=bugs, unchecked_seeds=args.seeds[i - 1 :])
         if not args.quiet:
             fuzz_result.print_description(i, num_seeds)
         if fuzz_result.maybe_bug is not None:
             bugs.append(fuzz_result)
-    return bugs
+
+    return FuzzRunResult(bugs=bugs, unchecked_seeds=[])
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -379,17 +477,15 @@ class RenderableReproducer:
 
 def render_issue_body(
     bugs: list[FuzzResult],
+    unchecked_seeds: list[Seed],
     *,
+    rerun_command: str,
     executable: Executable,
     executable_revision: str,
     run_url: str,
     fuzzer_revision: str,
 ) -> str:
-    """Render a GitHub issue body containing reproducers for the reported bugs.
-
-    Omit reproducers when including them alongside an omission notice would
-    exceed the issue body size limit.
-    """
+    """Render the daily fuzz issue with instructions for reproducing its failures."""
     match executable:
         case Executable.RUFF:
             failure_description = (
@@ -406,14 +502,34 @@ def render_issue_body(
                 "or time out after five seconds during fuzzing."
             )
             reproduction_command = (
-                'repro_dir=$(mktemp -d)\ncp repro.py "$repro_dir/input.py"\n'
-                f'target/debug/ty check "$repro_dir/input.py" '
+                "target/debug/ty check repro.py "
                 f"--python-version={OLDEST_SUPPORTED_PYTHON} "
                 f"--python-platform={TY_TARGET_PLATFORM}"
             )
         case _ as unreachable:
             assert_never(unreachable)
 
+    return render_github_report(
+        "daily_fuzz_issue.md.jinja",
+        bugs,
+        unchecked_seeds,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision,
+        executable=executable,
+        executable_revision=executable_revision,
+        failure_description=failure_description,
+        reproduction_command=reproduction_command,
+        seed_rerun_command=rerun_command,
+    )
+
+
+def render_github_report(
+    template_name: str,
+    bugs: list[FuzzResult],
+    unchecked_seeds: list[Seed],
+    **context: str,
+) -> str:
+    """Render reproducers and unchecked seeds within GitHub's size limit."""
     environment = Environment(
         loader=FileSystemLoader(Path(__file__).parent),
         undefined=StrictUndefined,
@@ -421,23 +537,25 @@ def render_issue_body(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    template = environment.get_template("daily_fuzz_issue.md.jinja")
+
+    template = environment.get_template(template_name)
+    unchecked_seeds = sorted(unchecked_seeds)
+    selected_seeds: list[Seed] = []
 
     def render(reproducers: list[RenderableReproducer], *, omitted: bool) -> str:
-        """Render the selected reproducers and an omission notice when needed."""
+        """Render selected reproducers and unchecked seeds with any omission notices."""
         return template.render(
-            run_url=run_url,
-            fuzzer_revision=fuzzer_revision,
-            executable=executable,
-            executable_revision=executable_revision,
-            failure_description=failure_description,
-            reproduction_command=reproduction_command,
             reproducers=reproducers,
             omitted=omitted,
-        ).removesuffix("\n")
+            unchecked_count=len(unchecked_seeds),
+            unchecked_seeds=selected_seeds,
+            seeds_omitted=len(selected_seeds) < len(unchecked_seeds),
+            **context,
+        ).strip()
 
     reproducers: list[RenderableReproducer] = []
     omitted = False
+
     # Keep the report simple by listing each seed separately, even when several
     # have the same reproducer. The workflow logs list all failing seeds if the
     # issue body fills up.
@@ -456,13 +574,25 @@ def render_issue_body(
             reproducers.append(renderable)
         else:
             omitted = True
+
+    remaining_bytes = MAX_GITHUB_ISSUE_BODY_BYTES - len(
+        render(reproducers, omitted=omitted).encode("utf-8")
+    )
+
+    for seed in unchecked_seeds:
+        seed_bytes = len(f"- `{seed}`\n".encode())
+        if seed_bytes > remaining_bytes:
+            break
+        selected_seeds.append(seed)
+        remaining_bytes -= seed_bytes
+
     return render(reproducers, omitted=omitted)
 
 
 def write_github_issue_body(
-    bugs: list[FuzzResult], args: ResolvedCliArgs, path: Path
+    run_result: FuzzRunResult, args: ResolvedCliArgs, path: Path, *, rerun_command: str
 ) -> None:
-    """Write a GitHub issue body for the reported bugs to a Markdown file."""
+    """Write a GitHub issue body for the fuzzing run to a Markdown file."""
     try:
         run_url = (
             f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
@@ -470,47 +600,105 @@ def write_github_issue_body(
         )
     except KeyError as error:
         raise RuntimeError(
-            f"--write-github-issue requires the {error.args[0]} environment variable"
+            f"`--write-github-issue` requires the {error.args[0]} environment variable"
         ) from None
+
     version_output = subprocess.check_output(
         [args.test_executable_path, "version", "--output-format=json"], text=True
     )
+
     commit_info = json.loads(version_output)["commit_info"]
     if commit_info is None:
         raise RuntimeError(
             f"{args.test_executable_path} does not report its build commit"
         )
+
     commit_hash = commit_info["commit_hash"]
     assert isinstance(commit_hash, str)
-    executable_revision: str = commit_hash
+
     fuzzer_revision = subprocess.check_output(
         ["git", "-C", Path(__file__).parent, "rev-parse", "HEAD"], text=True
-    ).strip()
-    body = render_issue_body(
-        bugs,
-        executable=args.executable,
-        executable_revision=executable_revision,
-        run_url=run_url,
-        fuzzer_revision=fuzzer_revision,
     )
+
+    body = render_issue_body(
+        run_result.bugs,
+        run_result.unchecked_seeds,
+        rerun_command=rerun_command,
+        executable=args.executable,
+        executable_revision=commit_hash,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision.strip(),
+    )
+
     path.write_text(body, encoding="utf-8")
 
 
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
-    if len(args.seeds) <= 5:
-        bugs = run_fuzzer_sequentially(args)
+    if args.save_failures is not None:
+        # An earlier run's failures must not be passed to the minimizer.
+        args.save_failures.mkdir()
+    deadline = None
+    if args.budget_minutes is not None and args.job_started_at is not None:
+        remaining = (
+            args.budget_minutes * 60
+            - (time.time() - args.job_started_at)
+            - REPORTING_RESERVE_SECONDS
+        )
+        deadline = time.monotonic() + remaining
+
+    # Starting a process pool costs more than checking a few seeds, but each
+    # known failure can take minutes to minimize.
+    sequential_limit = 1 if args.minimize_failures else 5
+    if len(args.seeds) <= sequential_limit:
+        run_result = run_fuzzer_sequentially(args, deadline=deadline)
     else:
-        bugs = run_fuzzer_concurrently(args)
+        run_result = run_fuzzer_concurrently(args, deadline=deadline)
+
+    bugs = run_result.bugs
+    unchecked = run_result.unchecked_seeds
+    unfinished = sorted(bug.seed for bug in bugs if bug.minimization_timed_out)
+
+    if unfinished:
+        print("Seeds not minimized before the shared deadline:", *unfinished)
+
+    if unchecked:
+        print(
+            f"Budget expired before checking {len(unchecked)} seed(s):",
+            *sorted(unchecked),
+        )
+
     noun_phrase = "New bugs" if args.baseline_executable_path is not None else "Bugs"
+
     if bugs:
         print(colored(f"{noun_phrase} found in the following seeds:", "red"))
         print(*sorted(bug.seed for bug in bugs))
-        if args.github_issue_path is not None:
-            write_github_issue_body(bugs, args, args.github_issue_path)
-        return ExitCode(1)
+    elif unchecked:
+        print(f"No {noun_phrase.lower()} found among the checked seeds.")
     else:
         print(colored(f"No {noun_phrase.lower()} found!", "green"))
-        return ExitCode(0)
+
+    if bugs or unchecked:
+        message = "To check all seeds that failed or were left unchecked from the repository root:"
+        seeds = sorted({bug.seed for bug in bugs}.union(unchecked))
+        rerun_command = (
+            f"uv run --project=./python/py-fuzzer fuzz --bin={args.executable} "
+            + " ".join(map(str, seeds))
+        )
+        print()
+        print(colored(message, "cyan"))
+        print(colored(rerun_command, "cyan"))
+        if args.github_issue_path is not None:
+            write_github_issue_body(
+                run_result, args, args.github_issue_path, rerun_command=rerun_command
+            )
+        elif args.github_comment_path is not None:
+            body = render_github_report("fuzz_reproducers.md.jinja", bugs, unchecked)
+            args.github_comment_path.write_text(body, encoding="utf-8")
+
+    if unchecked:
+        return ExitCode(2)
+
+    return ExitCode(1 if bugs and not args.minimize_failures else 0)
 
 
 def absolute_path(p: str) -> Path:
@@ -540,12 +728,32 @@ def parse_seed_argument(arg: str) -> int | range:
     return int(arg)
 
 
+def generate_corpus() -> None:
+    """Write the Python source for each requested seed to a directory."""
+    parser = argparse.ArgumentParser(description=generate_corpus.__doc__)
+    parser.add_argument("seeds", type=parse_seed_argument)
+    parser.add_argument("directory", type=Path)
+    args = parser.parse_args()
+    seeds = [args.seeds] if isinstance(args.seeds, int) else args.seeds
+    args.directory.mkdir(exist_ok=True)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        for seed, source in zip(
+            seeds, pool.map(generate_random_code, seeds, chunksize=16), strict=True
+        ):
+            (args.directory / f"{seed}.py").write_text(source, encoding="utf-8")
+
+
 class Executable(enum.StrEnum):
     RUFF = "ruff"
     TY = "ty"
 
 
-@dataclass(slots=True)
+class OutputFormat(enum.StrEnum):
+    GITHUB = "github"
+    TEXT = "text"
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
     _: KW_ONLY
@@ -553,7 +761,14 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
+    output_format: OutputFormat
     github_issue_path: Path | None
+    github_comment_path: Path | None
+    budget_minutes: float | None
+    job_started_at: float | None
+    corpus_dir: Path | None
+    save_failures: Path | None
+    minimize_failures: bool
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -564,8 +779,26 @@ def parse_args() -> ResolvedCliArgs:
     parser.add_argument(
         "seeds",
         type=parse_seed_argument,
-        nargs="+",
+        nargs="*",
         help="Either a single seed, or an inclusive range of seeds in the format `0-5`",
+    )
+    parser.add_argument(
+        "--corpus-dir",
+        type=Path,
+        help="Read the generated source for each seed from <seed>.py in this directory.",
+    )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--save-failures",
+        type=Path,
+        metavar="DIR",
+        help="Save each failing input to <seed>.py in a new directory and skip minimization.",
+    )
+    modes.add_argument(
+        "--minimize-failures",
+        type=Path,
+        metavar="DIR",
+        help="Minimize the inputs saved by --save-failures.",
     )
     parser.add_argument(
         "--only-new-bugs",
@@ -582,10 +815,49 @@ def parse_args() -> ResolvedCliArgs:
         help="Print fewer things to the terminal while running the fuzzer",
     )
     parser.add_argument(
+        "--output-format",
+        choices=[member.value for member in OutputFormat],
+        default=OutputFormat.TEXT.value,
+        help="Use 'github' to emit GitHub Actions error annotations for detected failures (default: text).",
+    )
+    parser.add_argument(
+        "--budget-minutes",
+        type=float,
+        metavar="MINUTES",
+        help=(
+            f"CI job time budget in minutes (minimum: {MINIMUM_BUDGET_MINUTES:g} "
+            "minutes). Requires `--job-started-at`. By default, the fuzzer runs "
+            f"without a time limit. Reserves {REPORTING_RESERVE_SECONDS} seconds for "
+            "setup before the first CI step, the final summary, any issue report, "
+            "and steps after fuzzing. Once the time for checking and minimizing "
+            "expires, stops starting new seed checks and stops minimization before "
+            "checking another candidate. Work already in progress can finish later, "
+            "so the fuzzer may run past the job's time budget."
+        ),
+    )
+    parser.add_argument(
+        "--job-started-at",
+        type=float,
+        metavar="TIMESTAMP",
+        help=(
+            "Unix timestamp in seconds recorded in the CI job's first step. "
+            "Requires `--budget-minutes`. The fuzzer counts the time since this "
+            "timestamp against the budget. Setup time may exhaust the budget "
+            "before fuzzing begins."
+        ),
+    )
+    reports = parser.add_mutually_exclusive_group()
+    reports.add_argument(
         "--write-github-issue",
         type=Path,
         metavar="PATH",
-        help="Write a GitHub issue body to PATH if bugs are found (intended for CI workflows)",
+        help="Write a GitHub issue body to PATH if bugs are found or seeds are unchecked (intended for CI workflows)",
+    )
+    reports.add_argument(
+        "--write-github-comment",
+        type=Path,
+        metavar="PATH",
+        help="Write reproducers and unchecked seeds to PATH for a pull request comment.",
     )
     parser.add_argument(
         "--test-executable",
@@ -612,6 +884,27 @@ def parse_args() -> ResolvedCliArgs:
     )
 
     args = parser.parse_args()
+
+    if args.minimize_failures is not None:
+        if args.seeds or args.corpus_dir is not None:
+            parser.error(
+                "--minimize-failures supplies both the seeds and their sources"
+            )
+        args.corpus_dir = args.minimize_failures
+        try:
+            args.seeds = [int(path.stem) for path in args.corpus_dir.glob("*.py")]
+        except ValueError:
+            parser.error("--minimize-failures expects files named <seed>.py")
+    if not args.seeds:
+        parser.error("no seeds to check")
+
+    if (args.budget_minutes is None) != (args.job_started_at is None):
+        parser.error(
+            "`--budget-minutes` and `--job-started-at` must be provided together"
+        )
+
+    if args.budget_minutes is not None and args.budget_minutes < MINIMUM_BUDGET_MINUTES:
+        parser.error(f"`--budget-minutes` must be at least {MINIMUM_BUDGET_MINUTES:g}")
 
     executable = Executable(args.bin)
 
@@ -676,22 +969,28 @@ def parse_args() -> ResolvedCliArgs:
         args.test_executable = Path("target", "profiling", executable)
         assert args.test_executable.is_file()
 
-    # `args.seeds` is verified by `parse_seed_argument()`
-    seed_arguments = cast(list[range | int], args.seeds)
     seen_seeds: set[int] = set()
-    for arg in seed_arguments:
+
+    for arg in args.seeds:
         if isinstance(arg, int):
             seen_seeds.add(arg)
         else:
             seen_seeds.update(arg)
 
     return ResolvedCliArgs(
-        sorted(map(Seed, seen_seeds)),
+        seeds=sorted(map(Seed, seen_seeds)),
         quiet=args.quiet,
+        output_format=OutputFormat(args.output_format),
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
         github_issue_path=args.write_github_issue,
+        github_comment_path=args.write_github_comment,
+        budget_minutes=args.budget_minutes,
+        job_started_at=args.job_started_at,
+        corpus_dir=args.corpus_dir,
+        save_failures=args.save_failures,
+        minimize_failures=args.minimize_failures is not None,
     )
 
 

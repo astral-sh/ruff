@@ -1320,7 +1320,7 @@ from typing import NamedTuple
 class Point(NamedTuple):
     x: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Point.__match_args__)  # revealed: Unknown
 ```
 
@@ -1368,6 +1368,44 @@ class IntBox(Box[int]):
     pass
 
 reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
+```
+
+### `_replace` methods from different classes
+
+The `_replace` methods of different named tuples retain different return types even when their
+fields match. A union of these methods cannot promise to return only one of the classes, regardless
+of branch order:
+
+```py
+from typing import Callable, NamedTuple
+
+class A(NamedTuple):
+    x: int
+
+class B(NamedTuple):
+    x: int
+
+def choose(flag: bool) -> Callable[..., A]:
+    # error: [invalid-return-type]
+    return A._replace if flag else B._replace
+
+def reversed_order(flag: bool) -> Callable[..., A]:
+    # error: [invalid-return-type]
+    return B._replace if flag else A._replace
+
+def either_class(flag: bool) -> Callable[..., A | B]:
+    return A._replace if flag else B._replace  # ok
+```
+
+The same distinction applies to named tuples created with the functional syntax:
+
+```py
+DynamicA = NamedTuple("DynamicA", [("x", int)])
+DynamicB = NamedTuple("DynamicB", [("x", int)])
+
+def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
+    # error: [invalid-return-type]
+    return DynamicA._replace if flag else DynamicB._replace
 ```
 
 ## `collections.namedtuple`
@@ -1491,7 +1529,7 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 

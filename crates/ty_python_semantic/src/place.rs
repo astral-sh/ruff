@@ -816,6 +816,35 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     )
 }
 
+/// Check whether a member prefix has a binding without inferring its value when possible.
+pub(crate) fn has_bound_prefix<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings: BindingWithConstraintsIterator<'_, 'db>,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> bool {
+    let mut rows = bindings.clone();
+    if let Some(row) = rows.next()
+        && rows.next().is_none()
+    {
+        match row.binding {
+            DefinitionState::Undefined => return false,
+            DefinitionState::Defined(definition) => {
+                let kind = definition.kind(db);
+                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
+                    // With no unbound or deleted alternative, even an unreachable binding gives
+                    // a defined place of type Never. Either way the outer prefix is shadowed.
+                    return true;
+                }
+            }
+            DefinitionState::Deleted => {}
+        }
+    }
+    !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
+        .place
+        .is_undefined()
+}
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -1563,7 +1592,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                             "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
                         )
                     }
-                    Truthiness::AlwaysFalse => Definedness::AlwaysDefined,
+                    Truthiness::AlwaysFalse | Truthiness::Uninhabited => Definedness::AlwaysDefined,
                     Truthiness::Ambiguous => Definedness::PossiblyUndefined,
                 }
             }
@@ -2041,13 +2070,15 @@ fn place_from_bindings_impl<'db>(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
                     )
                 }
-                Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
+                Some(Truthiness::AlwaysFalse | Truthiness::Uninhabited) | None => {
+                    Definedness::AlwaysDefined
+                }
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
             },
         };
 
         match deleted_reachability {
-            Truthiness::AlwaysFalse => Place::Defined(
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => Place::Defined(
                 DefinedPlace::new(ty)
                     .with_definedness(boundness)
                     .with_provenance(provenance),

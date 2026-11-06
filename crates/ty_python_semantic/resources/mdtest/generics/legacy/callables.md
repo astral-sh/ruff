@@ -227,6 +227,23 @@ reveal_type(generic_context(outside_callable(1)))
 outside_callable(1)("string")
 ```
 
+A type variable in an alias object's arguments also belongs to the factory, even if the alias value
+never uses that argument.
+
+```py
+from typing_extensions import TypeAliasType
+from ty_extensions._internal import TypeOf
+
+A = TypeVar("A")
+Tag = TypeAliasType("Tag", int, type_params=(A,))
+
+def tagged_factory(tag: TypeOf[Tag[T]]) -> Callable[[T], T]:
+    return lambda value: value
+
+# revealed: ty_extensions._internal.GenericContext[T@tagged_factory]
+reveal_type(generic_context(tagged_factory))
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
 The same pattern holds if the callable involves a paramspec.
@@ -296,6 +313,73 @@ reveal_type(outside_callable(int_identity))
 reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
+```
+
+## Inference from bottom callable signatures
+
+A callable that accepts every argument list and returns `Never` can satisfy any callable signature.
+Its return and parameter types still provide inference evidence: `Never ≤ T` infers `Never`, while
+`T ≤ object` infers `object`.
+
+```py
+from typing import Callable, Never, TypeVar
+
+T = TypeVar("T")
+
+def abort(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+def wrap(callback: Callable[[], T]) -> list[T]:
+    return []
+
+def wrap_param(callback: Callable[[T], object]) -> list[T]:
+    return []
+
+# revealed: list[Never]
+reveal_type(wrap(abort))
+# revealed: list[object]
+reveal_type(wrap_param(abort))
+value: str = wrap_param(abort)[0]  # error: [invalid-assignment]
+```
+
+## Inference from top callable signatures
+
+A callback accepting the top callable accepts any callable. Comparing its parameter with a callable
+returning `T` still contributes `T ≤ object` to inference.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+
+def wrap(callback: Callable[[Callable[[], T]], None]) -> list[T]:
+    return []
+
+def accepts_top(callback: Top[Callable[..., object]]) -> None: ...
+
+# revealed: list[object]
+reveal_type(wrap(accepts_top))
+value: str = wrap(accepts_top)[0]  # error: [invalid-assignment]
+```
+
+Ignoring a source receiver restriction still preserves return-type inference.
+
+```py
+from typing import Generic
+
+class Restricted(Generic[T]):
+    def method(self: "Allowed[T]") -> T:
+        raise NotImplementedError
+
+class Allowed(Restricted[T]): ...
+
+def infer(callback: Top[Callable[..., T]]) -> list[T]:
+    return []
+
+def check(restricted: Restricted[int]) -> None:
+    # revealed: list[int]
+    reveal_type(infer(restricted.method))
 ```
 
 ## Union without intersection does not consider budget
@@ -538,9 +622,10 @@ reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second)
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -551,13 +636,115 @@ def accepts_callable(converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 @overload
-def f(val: str) -> None: ...
+def overloaded_consumer(val: str) -> None: ...
 @overload
-def f(val: bytes) -> None: ...
-def f(val: str | bytes) -> None:
+def overloaded_consumer(val: bytes) -> None: ...
+def overloaded_consumer(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+def _() -> None:
+    reveal_type(accepts_callable(overloaded_consumer))  # revealed: Never
+```
+
+An additional argument of type `T` supplies the return value and constrains the valid
+specializations. A `str | bytes` value is accepted because the overload set covers both cases:
+
+```py
+def accepts_callable_and_value(converter: Callable[[T], None], value: T) -> T:
+    converter(value)
+    return value
+
+def _(string: str, data: bytes, either: str | bytes) -> None:
+    reveal_type(accepts_callable_and_value(overloaded_consumer, string))  # revealed: str
+    reveal_type(accepts_callable_and_value(overloaded_consumer, data))  # revealed: bytes
+    reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
+```
+
+A `str | int` value is rejected because neither overload of the consumer accepts its `int`
+alternative:
+
+```py
+def _(value: str | int) -> None:
+    # TODO: Do not include the consumer's `bytes` alternative in the error-recovery return type.
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
+```
+
+Type variables inferred from the same overload remain correlated. Here, the valid assignments are
+`PairT = int, U = str` and `PairT = str, U = int`; inference does not mix the input type from one
+overload with the return type from the other:
+
+```py
+from typing import Generic
+
+ResultT = TypeVar("ResultT", covariant=True)
+PairT = TypeVar("PairT", int, str)
+U = TypeVar("U")
+
+class Result(Generic[ResultT]):
+    def use(self, callback: Callable[[ResultT], int]) -> int:
+        raise NotImplementedError
+
+def infer_pair(converter: Callable[[PairT], U]) -> Result[tuple[PairT, U]]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+def _() -> None:
+    reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
+The refined return type is retained even with an explicit declared type annotation:
+
+```py
+def _() -> None:
+    result: Result[tuple[int, str] | tuple[str, int]] = infer_pair(swap)
+    reveal_type(result)  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
+## Returning callables with generic overloads
+
+Matching the generic overload's return type to `A` also lets us infer `A` as the argument type of
+the returned callable, even though another overload accepts only the narrower `B`.
+
+```py
+from typing import Callable, TypeVar, overload
+
+class A: ...
+class B(A): ...
+
+T = TypeVar("T")
+S = TypeVar("S", bound=A)
+
+def wrap(fn: Callable[[T], A]) -> Callable[[T], A]:
+    return fn
+
+@overload
+def f(value: B) -> B: ...
+@overload
+def f(value: S) -> S: ...
+def f(value: A) -> A:
+    return value
+
+wrapped = wrap(f)
+reveal_type(wrapped)  # revealed: (A, /) -> A
+wrapped(A())  # ok
+```
+
+The generic overload of `sum` accepts iterables of arbitrary integers, even though its first
+overload only accepts iterables of booleans and certain integer literals. Wrapping it preserves this
+behavior:
+
+```py
+def wrap_sum(fn: Callable[[T], int]) -> Callable[[T], int]:
+    return fn
+
+stage: Callable[[list[int]], int] = wrap_sum(sum)  # ok
 ```
 
 ## Combining inferred and declared upper bounds
@@ -638,6 +825,41 @@ reveal_type(infer_constrained(invalid_first))  # revealed: int
 reveal_type(infer_constrained(invalid_last))  # revealed: int
 ```
 
+## Unresolved `Self` overloads
+
+The inferred callable retains the argument types accepted by every overload, even when a `Self`
+dependency in one overload cannot be resolved.
+
+```py
+from typing import Callable, TypeVar, overload
+from typing_extensions import Self
+
+A = TypeVar("A")
+B = TypeVar("B")
+R = TypeVar("R")
+
+def identity(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class C:
+    @overload
+    def method(self, value: int) -> "C": ...
+    @overload
+    def method(self, value: str) -> Self: ...
+    def method(self, value: int | str) -> "C":
+        return self
+
+# TODO: Accept the callback without error.
+# error: [invalid-argument-type]
+method = identity(C.method)
+reveal_type(method)  # revealed: (C, int | str, /) -> C
+
+class Sub(C): ...
+
+# TODO: revealed: Sub (preserve the generic `Self` overload)
+reveal_type(method(Sub(), ""))  # revealed: C
+```
+
 ## Overloaded callable with a constrained type variable
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
@@ -688,6 +910,59 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
         return func
 
     return wrapper
+```
+
+## Dependent return types from generic callbacks
+
+A generic identity callback can be used as either `Callable[[A], A]` or `Callable[[B], B]`: it
+returns its argument unchanged:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+```
+
+This overloaded "consumer" can accept either an `A` or a `B`:
+
+```py
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+```
+
+If we pass both the callback and the consumer to a generic function, we can solve `T` (and thus also
+`R`) to either `A` or `B`. This allows us to infer `A & B` as the return type.
+
+```py
+R = TypeVar("R")
+
+def infer_result(callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+reveal_type(infer_result(identity, consume))  # revealed: A & B
+```
+
+If we additionally supply a value, that selects the specific consumer overload that accepts it. The
+identity callback's result type follows that selected argument type:
+
+```py
+def infer_result_with_value(callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:
+    return callback(value)
+
+def _(a: A, b: B) -> None:
+    reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
+    reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
 ```
 
 ## Return type inference from partially annotated overloads
@@ -1096,7 +1371,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/4664>.
 ```py
 @final
 class Closed:
-    @decorate  # no diagnostic
+    @decorate  # ok
     @classmethod
     def method(cls, value: int) -> None: ...
 ```
@@ -1321,6 +1596,226 @@ class IPolys(Protocol[T]):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Specializing generic methods
+
+A method can use its own type parameter as the class argument of another instance. That class
+argument stays fixed whether the method is called directly or saved as a bound method.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self) -> None:
+        self.callback = self.method
+
+    def method(self, value: T) -> tuple[C, T]:
+        def check(other: Box[T], arg: int) -> None:
+            result = other.method(arg)
+            # revealed: tuple[T@method, int]
+            reveal_type(result)
+            pair: tuple[T, int] = result  # no diagnostic
+            # revealed: tuple[T@method, int]
+            reveal_type(other.callback(arg))
+
+        raise NotImplementedError
+```
+
+The same applies when the class argument comes from a separate generic function.
+
+```py
+def check(other: Box[T], arg: int) -> None:
+    result = other.method(arg)
+    # revealed: tuple[T@check, int]
+    reveal_type(result)
+    pair: tuple[T, int] = result  # no diagnostic
+```
+
+## Aliases in the owner of a generic method
+
+Calling a generic method leaves the enclosing method's type parameter fixed, whether an alias
+receives it as an argument or captures it in its definition.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+A = TypeVar("A")
+C = TypeVar("C")
+T = TypeVar("T")
+Items = TypeAliasType("Items", list[A], type_params=(A,))
+Nested = TypeAliasType("Nested", "A | list[Nested[tuple[A]]]", type_params=(A,))
+
+class Box(Generic[C]):
+    @staticmethod
+    def get(value: T) -> C:
+        LocalItems = TypeAliasType("LocalItems", list[T])
+
+        def check(explicit: "Box[Items[T]]", captured: "Box[LocalItems]", n: int) -> None:
+            from_argument = explicit.get(n)
+            ok: list[T] = from_argument
+            wrong: list[int] = from_argument  # error: [invalid-assignment]
+
+            from_definition = captured.get(n)
+            ok_again: list[T] = from_definition
+            wrong_again: list[int] = from_definition  # error: [invalid-assignment]
+
+        def recursive(other: "Box[Nested[T]]", n: int) -> None:
+            result = other.get(n)
+            ok: Nested[T] = result
+            wrong: Nested[int] = result  # error: [invalid-assignment]
+
+        raise NotImplementedError
+```
+
+## `Self` as a protocol's type argument
+
+When a method takes its owner's type argument and returns `Self`, binding the method fixes its
+return type to the receiver. The argument keeps the type supplied when specializing the protocol.
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import Self
+
+C = TypeVar("C")
+
+class P(Protocol[C]):
+    def method(self, value: C) -> tuple[C, Self]:
+        def check(other: "P[Self]", value: Self) -> None:
+            # revealed: tuple[Self@method, P[Self@method]]
+            reveal_type(other.method(value))
+            callback: Callable[[Self], tuple[Self, P[Self]]] = other.method  # ok
+            other.method(object())  # error: [invalid-argument-type]
+
+        raise NotImplementedError
+```
+
+## Inferred returns of specialized generic methods
+
+An inferred return can refer to both the owner's type argument and the called method's type
+argument. Only the latter is inferred from the call.
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from typing import Generic, TypeVar, final
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+@final
+class Box(Generic[C]):
+    value: C
+
+    def pair(self, arg: T):
+        def check(other: Box[T], n: int) -> tuple[T, T]:
+            result = other.pair(n)
+            # revealed: tuple[T@pair, int]
+            reveal_type(result)
+            return result  # error: [invalid-return-type]
+
+        return self.value, arg
+```
+
+## Specializing generic constructors
+
+A constructor's method type parameter is independent of an explicitly supplied class argument, even
+when that argument is the type parameter of an enclosing call to the same constructor.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self, value: tuple[C, T]) -> None:
+        def check(arg: tuple[T, int]) -> None:
+            # revealed: Box[T@__init__]
+            reveal_type(Box[T](arg))
+
+        def check_class_parameter(arg: tuple[C, int]) -> None:
+            # revealed: Box[C@Box]
+            reveal_type(Box[C](arg))
+```
+
+## Specializing generic protocol methods
+
+A method can use its own type parameter as the class argument of another instance of its protocol.
+That class argument stays fixed while the other instance's method accepts independently chosen
+argument types. An implementation that always returns `int` in the first tuple element therefore
+satisfies `Required[int]`, but cannot satisfy `Required[T]` for an arbitrary `T`. The local `accept`
+function captures `method`'s `T`, so passing an argument cannot infer a new value for it.
+
+```py
+from typing import Protocol, TypeVar
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    def method(self, value: T) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## Specializing overloaded generic protocol methods
+
+Each overload's type parameter is independent of the class argument. The local `accept` function
+captures the first overload's type parameter. The second overload's return type places no
+restriction on the class argument.
+
+```toml
+[rules]
+useless-overload-body = "ignore"
+```
+
+```py
+from typing import Literal, Protocol, TypeVar, overload
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U, flag: bool) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    @overload
+    def method(self, value: T, flag: Literal[False]) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+    @overload
+    def method(self, value: T, flag: Literal[True]) -> object: ...
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
 ```
 
 ## Returned callables with recursive parameter aliases

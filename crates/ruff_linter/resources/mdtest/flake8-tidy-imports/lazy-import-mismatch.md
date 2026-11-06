@@ -6,7 +6,6 @@
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID254"]
 
 [lint.flake8-tidy-imports]
@@ -76,7 +75,6 @@ lazy from package import eager
 target-version = "py314"
 
 [lint]
-preview = true
 select = ["TID254"]
 
 [lint.flake8-tidy-imports]
@@ -166,7 +164,6 @@ import json
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID254"]
 
 [lint.flake8-tidy-imports]
@@ -223,7 +220,6 @@ Each alias is checked independently. Here `json` must become eager and `pathlib`
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID254"]
 
 [lint.flake8-tidy-imports]
@@ -247,7 +243,6 @@ individual members.
 target-version = "py314"
 
 [lint]
-preview = true
 select = ["TID254"]
 
 [lint.flake8-tidy-imports]

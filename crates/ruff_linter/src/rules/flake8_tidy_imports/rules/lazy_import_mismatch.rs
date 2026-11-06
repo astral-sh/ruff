@@ -60,7 +60,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.flake8-tidy-imports.require-lazy`
 /// - `lint.flake8-tidy-imports.ban-lazy`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6", category = Category::Restriction)]
+#[violation_metadata(stable_since = "0.17.0", category = Category::Restriction)]
 pub(crate) struct LazyImportMismatch {
     policy: LazyImportPolicy,
     name: Option<String>,
