@@ -7033,6 +7033,7 @@ impl<'db> Type<'db> {
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
         /// The receiver determines how to specialize the method's overloads. Argument matching
         /// mutates the resulting bindings, so each call site starts from its own copy.
+        #[allow(clippy::unnecessary_wraps, reason = "Salsa returns None on a cycle")]
         #[salsa::tracked(returns(ref), no_eq, cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn prepared_method_bindings<'db>(
             db: &'db dyn Db,
