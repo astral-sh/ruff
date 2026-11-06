@@ -696,15 +696,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-overload.md")]
-    pub(crate) static INVALID_OVERLOAD = {
-        summary: "detects invalid `@overload` usages",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/single-overload.md")]
     pub(crate) static SINGLE_OVERLOAD = {
         summary: "detects functions with only one overload declaration",
@@ -1531,6 +1522,19 @@ declare_lint! {
     pub(crate) static MISPLACED_OVERLOAD_DECORATOR = {
         summary: "detects misplaced `@final` or `@override` decorators on overloaded methods",
         status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// Overload declarations and their implementations now have separate rules.
+    static INVALID_OVERLOAD = {
+        summary: "detects invalid `@overload` usages",
+        status: LintStatus::removed(
+            "0.0.100",
+            "Use `single-overload`, `inconsistent-overload-decorator`, `misplaced-overload-decorator`, \
+             `missing-overload-implementation`, or `inconsistent-overload-implementation`.",
+        ),
         default_level: Level::Error,
     }
 }
