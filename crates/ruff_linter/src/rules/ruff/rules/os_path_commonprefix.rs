@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -85,7 +85,11 @@ impl Violation for OsPathCommonprefix {
 }
 
 /// RUF071
-pub(crate) fn os_path_commonprefix(checker: &Checker, call: &ast::ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_commonprefix(
+    checker: &Checker,
+    call: &ExprCallFields<'_>,
+    segments: &[&str],
+) {
     if segments != ["os", "path", "commonprefix"] {
         return;
     }

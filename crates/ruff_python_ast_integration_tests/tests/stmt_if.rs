@@ -16,7 +16,7 @@ elif b:
         .expect("module should contain at least one statement")
         .as_if_stmt()
         .expect("first statement should be an `if` statement");
-    let range = elif_else_range(&if_stmt.elif_else_clauses[0], contents).unwrap();
+    let range = elif_else_range(if_stmt.elif_else_clauses().at(0), contents).unwrap();
     assert_eq!(range.start(), TextSize::from(14));
     assert_eq!(range.end(), TextSize::from(18));
 
@@ -32,7 +32,7 @@ else:
         .expect("module should contain at least one statement")
         .as_if_stmt()
         .expect("first statement should be an `if` statement");
-    let range = elif_else_range(&if_stmt.elif_else_clauses[0], contents).unwrap();
+    let range = elif_else_range(if_stmt.elif_else_clauses().at(0), contents).unwrap();
     assert_eq!(range.start(), TextSize::from(14));
     assert_eq!(range.end(), TextSize::from(18));
 

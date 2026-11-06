@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::function_type;
 
@@ -56,25 +56,28 @@ impl Violation for Pep484StylePositionalOnlyParameter {
 }
 
 /// PYI063
-pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn pep_484_positional_parameter(
+    checker: &Checker,
+    function_def: &StmtFunctionDefFields<'_>,
+) {
     // PEP 570 was introduced in Python 3.8.
     if checker.target_version() < PythonVersion::PY38 {
         return;
     }
 
-    if !function_def.parameters.posonlyargs.is_empty() {
+    if !function_def.parameters.posonlyargs().is_empty() {
         return;
     }
 
-    if function_def.parameters.args.is_empty() {
+    if function_def.parameters.args().is_empty() {
         return;
     }
 
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
     let function_type = function_type::classify(
-        &function_def.name,
-        &function_def.decorator_list,
+        function_def.name.as_str(),
+        function_def.decorator_list,
         scope,
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,
@@ -89,7 +92,7 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
             | function_type::FunctionType::NewMethod
     ));
 
-    if let Some(param) = function_def.parameters.args.get(skip) {
+    if let Some(param) = function_def.parameters.args().get(skip) {
         if param.uses_pep_484_positional_only_convention() {
             checker.report_diagnostic(Pep484StylePositionalOnlyParameter, param.identifier());
         }

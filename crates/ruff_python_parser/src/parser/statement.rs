@@ -1,11 +1,11 @@
+use crate::parser::syntax::{self as id, Construct, IntoList};
+use ruff_python_ast::AstNode as _;
+use ruff_python_ast::{AstNodeId, ExprKind, ListId, build};
 use std::fmt::{Display, Write};
+use std::iter;
 
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
-    Operator, PythonVersion, Stmt, Suite, WithItem,
-};
+use ruff_python_ast::{self as ast, ExprContext, IpyEscapeKind, Operator, PythonVersion};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
@@ -109,21 +109,19 @@ impl<'src> Parser<'src> {
     /// See:
     /// - <https://docs.python.org/3/reference/compound_stmts.html>
     /// - <https://docs.python.org/3/reference/simple_stmts.html>
-    pub(super) fn parse_statement(&mut self) -> Stmt {
+    pub(super) fn parse_statement(&mut self) -> id::Stmt {
         let start = self.node_start();
 
         match self.current_token_kind() {
-            TokenKind::If => Stmt::If(self.parse_if_statement()),
-            TokenKind::For => Stmt::For(self.parse_for_statement(start)),
-            TokenKind::While => Stmt::While(self.parse_while_statement()),
+            TokenKind::If => id::Stmt::from(self.parse_if_statement()),
+            TokenKind::For => id::Stmt::from(self.parse_for_statement(start, false)),
+            TokenKind::While => id::Stmt::from(self.parse_while_statement()),
             TokenKind::Def => {
-                Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
+                id::Stmt::from(self.parse_function_definition(Vec::new(), start, false))
             }
-            TokenKind::Class => {
-                Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
-            }
-            TokenKind::Try => Stmt::Try(self.parse_try_statement()),
-            TokenKind::With => Stmt::With(self.parse_with_statement(start)),
+            TokenKind::Class => id::Stmt::from(self.parse_class_definition(Vec::new(), start)),
+            TokenKind::Try => id::Stmt::from(self.parse_try_statement()),
+            TokenKind::With => id::Stmt::from(self.parse_with_statement(start, false)),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_statement(),
             token => {
@@ -133,11 +131,11 @@ impl<'src> Parser<'src> {
 
                     match self.classify_match_token() {
                         MatchTokenKind::Keyword => {
-                            return Stmt::Match(self.parse_match_statement());
+                            return id::Stmt::from(self.parse_match_statement());
                         }
                         MatchTokenKind::KeywordOrIdentifier => {
                             if let Some(match_stmt) = self.try_parse_match_statement() {
-                                return Stmt::Match(match_stmt);
+                                return id::Stmt::from(match_stmt);
                             }
                         }
                         MatchTokenKind::Identifier => {}
@@ -154,7 +152,7 @@ impl<'src> Parser<'src> {
     /// This statement must be terminated by a newline or semicolon.
     ///
     /// Use [`Parser::parse_simple_statements`] to parse a sequence of simple statements.
-    fn parse_single_simple_statement(&mut self) -> Stmt {
+    fn parse_single_simple_statement(&mut self) -> id::Stmt {
         let stmt = self.parse_simple_statement();
 
         // The order of the token is important here.
@@ -195,7 +193,7 @@ impl<'src> Parser<'src> {
     /// Matches the `simple_stmts` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_statements(&mut self) -> Suite {
+    fn parse_simple_statements(&mut self) -> ListId<AstNodeId<ast::kind::Stmt>> {
         let stmts_snapshot = self.stmt_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
@@ -203,7 +201,7 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             let stmt = self.parse_simple_statement();
-            self.stmt_scratch.push(stmt);
+            self.stmt_scratch.push(stmt.id);
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
@@ -260,33 +258,34 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        self.stmt_scratch.take_thin_vec(stmts_snapshot)
+        self.stmt_scratch
+            .take_range(stmts_snapshot, &mut self.storage)
     }
 
     /// Parses a simple statement.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html>
-    fn parse_simple_statement(&mut self) -> Stmt {
+    fn parse_simple_statement(&mut self) -> id::Stmt {
         match self.current_token_kind() {
-            TokenKind::Return => Stmt::Return(self.parse_return_statement()),
+            TokenKind::Return => id::Stmt::from(self.parse_return_statement()),
             TokenKind::Import => {
                 let start = self.node_start();
-                Stmt::Import(self.parse_import_statement(start, false))
+                id::Stmt::from(self.parse_import_statement(start, false))
             }
             TokenKind::From => {
                 let start = self.node_start();
-                Stmt::ImportFrom(self.parse_from_import_statement(start, false))
+                id::Stmt::from(self.parse_from_import_statement(start, false))
             }
-            TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
-            TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
-            TokenKind::Break => Stmt::Break(self.parse_break_statement()),
-            TokenKind::Raise => Stmt::Raise(self.parse_raise_statement()),
-            TokenKind::Del => Stmt::Delete(self.parse_delete_statement()),
-            TokenKind::Assert => Stmt::Assert(self.parse_assert_statement()),
-            TokenKind::Global => Stmt::Global(self.parse_global_statement()),
-            TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_statement()),
+            TokenKind::Pass => id::Stmt::from(self.parse_pass_statement()),
+            TokenKind::Continue => id::Stmt::from(self.parse_continue_statement()),
+            TokenKind::Break => id::Stmt::from(self.parse_break_statement()),
+            TokenKind::Raise => id::Stmt::from(self.parse_raise_statement()),
+            TokenKind::Del => id::Stmt::from(self.parse_delete_statement()),
+            TokenKind::Assert => id::Stmt::from(self.parse_assert_statement()),
+            TokenKind::Global => id::Stmt::from(self.parse_global_statement()),
+            TokenKind::Nonlocal => id::Stmt::from(self.parse_nonlocal_statement()),
             TokenKind::IpyEscapeCommand => {
-                Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
+                id::Stmt::from(self.parse_ipython_escape_command_statement())
             }
             token => {
                 if token == TokenKind::Lazy {
@@ -328,7 +327,7 @@ impl<'src> Parser<'src> {
                                 UnsupportedSyntaxErrorKind::LazyImportStatement,
                                 lazy_range,
                             );
-                            return Stmt::Import(self.parse_import_statement(start, true));
+                            return id::Stmt::from(self.parse_import_statement(start, true));
                         }
                         TokenKind::From => {
                             self.bump(TokenKind::Lazy);
@@ -336,7 +335,7 @@ impl<'src> Parser<'src> {
                                 UnsupportedSyntaxErrorKind::LazyImportStatement,
                                 lazy_range,
                             );
-                            return Stmt::ImportFrom(self.parse_from_import_statement(start, true));
+                            return id::Stmt::from(self.parse_from_import_statement(start, true));
                         }
                         _ => {}
                     }
@@ -350,7 +349,7 @@ impl<'src> Parser<'src> {
                     if (first == TokenKind::Identifier || first.is_soft_keyword())
                         && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
                     {
-                        return Stmt::TypeAlias(self.parse_type_alias_statement());
+                        return id::Stmt::from(self.parse_type_alias_statement());
                     }
                 }
 
@@ -367,25 +366,27 @@ impl<'src> Parser<'src> {
                     self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
                 if self.at(TokenKind::Equal) {
-                    Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
+                    id::Stmt::from(self.parse_assign_statement(parsed_expr, start))
                 } else if self.at(TokenKind::Colon) {
-                    Stmt::AnnAssign(self.parse_annotated_assignment_statement(parsed_expr, start))
+                    id::Stmt::from(self.parse_annotated_assignment_statement(parsed_expr, start))
                 } else if let Some(op) = self.current_token_kind().as_augmented_assign_operator() {
-                    Stmt::AugAssign(self.parse_augmented_assignment_statement(
+                    id::Stmt::from(self.parse_augmented_assignment_statement(
                         parsed_expr,
                         op,
                         start,
                     ))
                 } else if self.options.mode == Mode::Ipython && self.at(TokenKind::Question) {
-                    Stmt::IpyEscapeCommand(
+                    id::Stmt::from(
                         self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
                     )
                 } else {
-                    Stmt::Expr(ast::StmtExpr {
-                        range: self.node_range(start),
-                        value: Box::new(parsed_expr.expr),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                    id::Stmt::from(
+                        build::StmtExpr {
+                            range: self.node_range(start),
+                            value: parsed_expr.expr.id,
+                        }
+                        .parsed(&mut self.storage),
+                    )
                 }
             }
         }
@@ -398,7 +399,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `del` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-del_stmt>
-    fn parse_delete_statement(&mut self) -> ast::StmtDelete {
+    fn parse_delete_statement(&mut self) -> id::StmtDelete {
         let start = self.node_start();
         self.bump(TokenKind::Del);
 
@@ -412,10 +413,12 @@ impl<'src> Parser<'src> {
             |parser| {
                 // Allow starred expression to raise a better error message for
                 // an invalid delete target later.
-                let mut target = parser.parse_conditional_expression_or_higher_impl(
+                let target = parser.parse_conditional_expression_or_higher_impl(
                     ExpressionContext::starred_conditional(),
                 );
-                helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
+                parser
+                    .storage
+                    .set_expr_context(target.expr.id, ExprContext::Del);
 
                 // test_err invalid_del_target
                 // del x + 1
@@ -437,11 +440,11 @@ impl<'src> Parser<'src> {
             );
         }
 
-        ast::StmtDelete {
-            targets,
+        build::StmtDelete {
+            targets: self.storage.list(targets).into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `return` statement.
@@ -451,7 +454,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `return` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-return_stmt>
-    fn parse_return_statement(&mut self) -> ast::StmtReturn {
+    fn parse_return_statement(&mut self) -> id::StmtReturn {
         let start = self.node_start();
         self.bump(TokenKind::Return);
 
@@ -483,14 +486,14 @@ impl<'src> Parser<'src> {
                 UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return),
             );
 
-            Box::new(parsed_expr.expr)
+            parsed_expr.expr
         });
 
-        ast::StmtReturn {
+        build::StmtReturn {
             range: self.node_range(start),
-            value,
-            node_index: AtomicNodeIndex::NONE,
+            value: value.map(|node| node.id),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Report [`UnsupportedSyntaxError`]s for each starred element in `expr` if it is an
@@ -501,23 +504,27 @@ impl<'src> Parser<'src> {
     ///
     /// [Python 3.8]: https://github.com/python/cpython/issues/76298
     /// [Python 3.9]: https://github.com/python/cpython/issues/90881
-    pub(super) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: UnsupportedSyntaxErrorKind) {
+    pub(super) fn check_tuple_unpacking(
+        &mut self,
+        expr: &id::Expr,
+        kind: UnsupportedSyntaxErrorKind,
+    ) {
         if kind.is_supported(self.options.target_version) {
             return;
         }
 
-        let Expr::Tuple(ast::ExprTuple {
-            elts,
-            parenthesized: false,
-            ..
-        }) = expr
-        else {
+        let Some(tuple) = expr.view(&self.storage).cast::<ast::ExprTuple>() else {
             return;
         };
-
-        for elt in elts {
-            if elt.is_starred_expr() {
-                self.add_unsupported_syntax_error(kind, elt.range());
+        if tuple.parenthesized() {
+            return;
+        }
+        let elements = tuple.elts().id();
+        for i in 0..elements.len() {
+            if let Some(element) = self.storage.get_list(elements).get(i)
+                && element.node_kind() == ast::NodeKind::ExprStarred
+            {
+                self.add_unsupported_syntax_error(kind, element.range());
             }
         }
     }
@@ -529,7 +536,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `raise` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-raise_stmt>
-    fn parse_raise_statement(&mut self) -> ast::StmtRaise {
+    fn parse_raise_statement(&mut self) -> id::StmtRaise {
         let start = self.node_start();
         self.bump(TokenKind::Raise);
 
@@ -557,19 +564,20 @@ impl<'src> Parser<'src> {
                 // raise x := 1
                 let exc = self.parse_expression_list(ExpressionContext::default());
 
-                if let Some(ast::ExprTuple {
-                    parenthesized: false,
-                    ..
-                }) = exc.as_tuple_expr()
+                if exc
+                    .expr
+                    .view(&self.storage)
+                    .cast::<ast::ExprTuple>()
+                    .is_some_and(|tuple| !tuple.parenthesized())
                 {
                     // test_err raise_stmt_unparenthesized_tuple_exc
                     // raise x,
                     // raise x, y
                     // raise x, y from z
-                    self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
+                    self.add_error(ParseErrorType::UnparenthesizedTupleExpression, exc);
                 }
 
-                Some(Box::new(exc.expr))
+                Some(exc.expr)
             }
         };
 
@@ -580,26 +588,27 @@ impl<'src> Parser<'src> {
             // raise x from y := 1
             let cause = self.parse_expression_list(ExpressionContext::default());
 
-            if let Some(ast::ExprTuple {
-                parenthesized: false,
-                ..
-            }) = cause.as_tuple_expr()
+            if cause
+                .expr
+                .view(&self.storage)
+                .cast::<ast::ExprTuple>()
+                .is_some_and(|tuple| !tuple.parenthesized())
             {
                 // test_err raise_stmt_unparenthesized_tuple_cause
                 // raise x from y,
                 // raise x from y, z
-                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &cause);
+                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, cause);
             }
 
-            Box::new(cause.expr)
+            cause.expr
         });
 
-        ast::StmtRaise {
+        build::StmtRaise {
             range: self.node_range(start),
-            exc,
-            cause,
-            node_index: AtomicNodeIndex::NONE,
+            exc: exc.map(|node| node.id),
+            cause: cause.map(|node| node.id),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an import statement.
@@ -609,7 +618,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `import` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
-    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> ast::StmtImport {
+    fn parse_import_statement(&mut self, start: TextSize, is_lazy: bool) -> id::StmtImport {
         self.bump(TokenKind::Import);
 
         // test_err import_stmt_parenthesized_names
@@ -627,9 +636,11 @@ impl<'src> Parser<'src> {
         let names_snapshot = self.alias_scratch.snapshot();
         self.parse_comma_separated_list(RecoveryContextKind::ImportNames, |parser| {
             let alias = parser.parse_alias(ImportStyle::Import);
-            parser.alias_scratch.push(alias);
+            parser.alias_scratch.push(alias.id);
         });
-        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
+        let names = self
+            .alias_scratch
+            .take_range(names_snapshot, &mut self.storage);
 
         if names.is_empty() {
             // test_err import_stmt_empty
@@ -637,12 +648,12 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
-        ast::StmtImport {
+        build::StmtImport {
             names,
             is_lazy,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `from` import statement.
@@ -656,7 +667,7 @@ impl<'src> Parser<'src> {
         &mut self,
         start: TextSize,
         is_lazy: bool,
-    ) -> ast::StmtImportFrom {
+    ) -> id::StmtImportFrom {
         self.bump(TokenKind::From);
 
         let mut leading_dots = 0;
@@ -718,11 +729,13 @@ impl<'src> Parser<'src> {
                 // from x import a.b
                 // from x import a, b.c, d, e.f, g
                 let alias = parser.parse_alias(ImportStyle::ImportFrom);
-                seen_star_import |= alias.name.id == "*";
-                parser.alias_scratch.push(alias);
+                seen_star_import |= alias.view(&parser.storage).name().id() == "*";
+                parser.alias_scratch.push(alias.id);
             },
         );
-        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
+        let names = self
+            .alias_scratch
+            .take_range(names_snapshot, &mut self.storage);
 
         if names.is_empty() {
             // test_err from_import_empty_names
@@ -762,14 +775,14 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        ast::StmtImportFrom {
-            module,
+        build::StmtImportFrom {
+            module: module.map(|node| node.id),
             names,
             level: leading_dots,
             is_lazy,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an `import` or `from` import name.
@@ -777,20 +790,21 @@ impl<'src> Parser<'src> {
     /// See:
     /// - <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
     /// - <https://docs.python.org/3/library/ast.html#ast.alias>
-    fn parse_alias(&mut self, style: ImportStyle) -> ast::Alias {
+    fn parse_alias(&mut self, style: ImportStyle) -> id::Alias {
         let start = self.node_start();
         if self.eat(TokenKind::Star) {
             let range = self.node_range(start);
-            return ast::Alias {
-                name: ast::Identifier {
-                    id: Name::new_static("*"),
+            return build::Alias {
+                name: build::Identifier {
+                    id: self.storage.intern_name("*"),
                     range,
-                    node_index: AtomicNodeIndex::NONE,
-                },
+                }
+                .parsed(&mut self.storage)
+                .id,
                 asname: None,
                 range,
-                node_index: AtomicNodeIndex::NONE,
-            };
+            }
+            .parsed(&mut self.storage);
         }
 
         let name = match style {
@@ -819,27 +833,27 @@ impl<'src> Parser<'src> {
             None
         };
 
-        ast::Alias {
+        build::Alias {
             range: self.node_range(start),
-            name,
-            asname,
-            node_index: AtomicNodeIndex::NONE,
+            name: name.id,
+            asname: asname.map(|node| node.id),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a dotted name.
     ///
     /// A dotted name is a sequence of identifiers separated by a single dot.
-    fn parse_dotted_name(&mut self) -> ast::Identifier {
+    fn parse_dotted_name(&mut self) -> id::Identifier {
         let start = self.node_start();
 
-        let first = self.parse_identifier();
+        let first = self.parse_identifier_with_context(ExpressionContext::default());
         if !self.at(TokenKind::Dot) {
-            return first;
+            return first.parsed(&mut self.storage);
         }
 
         let snapshot = self.name_buffer.len();
-        self.name_buffer.push_str(&first.id);
+        self.name_buffer.push_str(self.storage.name(first.id));
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -849,21 +863,21 @@ impl<'src> Parser<'src> {
             // import a..b
             // import a...b
             self.name_buffer.push('.');
-            let identifier = self.parse_identifier();
-            self.name_buffer.push_str(&identifier.id);
+            let identifier = self.parse_identifier_with_context(ExpressionContext::default());
+            self.name_buffer.push_str(self.storage.name(identifier.id));
         }
 
-        let id = self.name_interner.intern(&self.name_buffer[snapshot..]);
+        let id = self.storage.intern_name(&self.name_buffer[snapshot..]);
         self.name_buffer.truncate(snapshot);
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
-        ast::Identifier {
+        build::Identifier {
             id,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `pass` statement.
@@ -873,13 +887,13 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `pass` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-pass_stmt>
-    fn parse_pass_statement(&mut self) -> ast::StmtPass {
+    fn parse_pass_statement(&mut self) -> id::StmtPass {
         let start = self.node_start();
         self.bump(TokenKind::Pass);
-        ast::StmtPass {
+        build::StmtPass {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `continue` statement.
@@ -889,13 +903,13 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `continue` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-continue_stmt>
-    fn parse_continue_statement(&mut self) -> ast::StmtContinue {
+    fn parse_continue_statement(&mut self) -> id::StmtContinue {
         let start = self.node_start();
         self.bump(TokenKind::Continue);
-        ast::StmtContinue {
+        build::StmtContinue {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `break` statement.
@@ -905,13 +919,13 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `break` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-break_stmt>
-    fn parse_break_statement(&mut self) -> ast::StmtBreak {
+    fn parse_break_statement(&mut self) -> id::StmtBreak {
         let start = self.node_start();
         self.bump(TokenKind::Break);
-        ast::StmtBreak {
+        build::StmtBreak {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an `assert` statement.
@@ -921,7 +935,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `assert` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement>
-    fn parse_assert_statement(&mut self) -> ast::StmtAssert {
+    fn parse_assert_statement(&mut self) -> id::StmtAssert {
         let start = self.node_start();
         self.bump(TokenKind::Assert);
 
@@ -942,7 +956,7 @@ impl<'src> Parser<'src> {
                 // assert False, assert x
                 // assert False, yield x
                 // assert False, x := 1
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                Some(self.parse_conditional_expression_or_higher().expr)
             } else {
                 // test_err assert_empty_msg
                 // assert x,
@@ -956,12 +970,12 @@ impl<'src> Parser<'src> {
             None
         };
 
-        ast::StmtAssert {
-            test: Box::new(test.expr),
-            msg,
+        build::StmtAssert {
+            test: test.expr.id,
+            msg: msg.map(|node| node.id),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a global statement.
@@ -971,7 +985,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `global` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-global_stmt>
-    fn parse_global_statement(&mut self) -> ast::StmtGlobal {
+    fn parse_global_statement(&mut self) -> id::StmtGlobal {
         let start = self.node_start();
         self.bump(TokenKind::Global);
 
@@ -996,11 +1010,11 @@ impl<'src> Parser<'src> {
         // test_ok global_stmt
         // global x
         // global x, y, z
-        ast::StmtGlobal {
+        build::StmtGlobal {
             range: self.node_range(start),
-            names,
-            node_index: AtomicNodeIndex::NONE,
+            names: names.into_list(&mut self.storage),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a nonlocal statement.
@@ -1010,7 +1024,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `nonlocal` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-nonlocal_stmt>
-    fn parse_nonlocal_statement(&mut self) -> ast::StmtNonlocal {
+    fn parse_nonlocal_statement(&mut self) -> id::StmtNonlocal {
         let start = self.node_start();
         self.bump(TokenKind::Nonlocal);
 
@@ -1042,11 +1056,11 @@ impl<'src> Parser<'src> {
         // def _():
         //     nonlocal x
         //     nonlocal x, y, z
-        ast::StmtNonlocal {
+        build::StmtNonlocal {
             range: self.node_range(start),
-            names,
-            node_index: AtomicNodeIndex::NONE,
+            names: names.into_list(&mut self.storage),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a type alias statement.
@@ -1056,7 +1070,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `type` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-type-statement>
-    fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
+    fn parse_type_alias_statement(&mut self) -> id::StmtTypeAlias {
         let start = self.node_start();
         let type_range = self.current_token_range();
         self.bump(TokenKind::Type);
@@ -1074,8 +1088,8 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name(ExpressionContext::default()));
-        helpers::set_expr_ctx(&mut name, ExprContext::Store);
+        let name = id::Expr::from(self.parse_name(ExpressionContext::default()));
+        self.storage.set_expr_context(name.id, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();
 
@@ -1093,13 +1107,13 @@ impl<'src> Parser<'src> {
         // type x = x := 1
         let value = self.parse_conditional_expression_or_higher();
 
-        ast::StmtTypeAlias {
-            name: Box::new(name),
-            type_params: type_params.map(Box::new),
-            value: Box::new(value.expr),
+        build::StmtTypeAlias {
+            name: name.id,
+            type_params: type_params.map(|node| node.id),
+            value: value.expr.id,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an IPython escape command at the statement level.
@@ -1107,7 +1121,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `IpyEscapeCommand` token.
-    fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
+    fn parse_ipython_escape_command_statement(&mut self) -> id::StmtIpyEscapeCommand {
         let start = self.node_start();
 
         let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::LogicalLineStart);
@@ -1117,12 +1131,7 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
         }
 
-        ast::StmtIpyEscapeCommand {
-            range,
-            kind,
-            value,
-            node_index: AtomicNodeIndex::NONE,
-        }
+        build::StmtIpyEscapeCommand { range, kind, value }.parsed(&mut self.storage)
     }
 
     /// Parses an IPython help end escape command at the statement level.
@@ -1133,23 +1142,23 @@ impl<'src> Parser<'src> {
     fn parse_ipython_help_end_escape_command_statement(
         &mut self,
         parsed_expr: &ParsedExpr,
-    ) -> ast::StmtIpyEscapeCommand {
+    ) -> id::StmtIpyEscapeCommand {
         // We are permissive than the original implementation because we would allow whitespace
         // between the expression and the suffix while the IPython implementation doesn't allow it.
         // For example, `foo ?` would be valid in our case but invalid for IPython.
-        fn unparse_expr(parser: &mut Parser, expr: &Expr, buffer: &mut String) {
-            match expr {
-                Expr::Name(ast::ExprName { id, .. }) => {
-                    buffer.push_str(id.as_str());
+        fn unparse_expr(parser: &mut Parser, expr: id::Expr, buffer: &mut String) {
+            match expr.view(&parser.storage).classify() {
+                ExprKind::Name(name) => {
+                    buffer.push_str(name.id().as_str());
                 }
-                Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                ExprKind::Subscript(subscript) => {
+                    let value = id::Node::from_view(subscript.value());
+                    let slice = id::Node::from_view(subscript.slice());
                     unparse_expr(parser, value, buffer);
                     buffer.push('[');
 
-                    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(integer),
-                        ..
-                    }) = &**slice
+                    if let Some(number) = slice.view(&parser.storage).as_number_literal_expr()
+                        && let ast::Number::Int(integer) = number.value()
                     {
                         let _ = write!(buffer, "{integer}");
                     } else {
@@ -1166,10 +1175,12 @@ impl<'src> Parser<'src> {
 
                     buffer.push(']');
                 }
-                Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                ExprKind::Attribute(attribute) => {
+                    let value = id::Node::from_view(attribute.value());
+                    let attr = id::Node::from_view(attribute.attr());
                     unparse_expr(parser, value, buffer);
                     buffer.push('.');
-                    buffer.push_str(attr.as_str());
+                    buffer.push_str(attr.view(&parser.storage).as_str());
                 }
                 _ => {
                     parser.add_error(
@@ -1214,14 +1225,14 @@ impl<'src> Parser<'src> {
         }
 
         let mut value = String::new();
-        unparse_expr(self, &parsed_expr.expr, &mut value);
+        unparse_expr(self, parsed_expr.expr, &mut value);
 
-        ast::StmtIpyEscapeCommand {
+        build::StmtIpyEscapeCommand {
             value: value.into_boxed_str(),
             kind,
             range: self.node_range(parsed_expr.start()),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parse an assignment statement.
@@ -1231,10 +1242,10 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `=` token.
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#assignment-statements>
-    fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
+    fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> id::StmtAssign {
         self.bump(TokenKind::Equal);
 
-        let mut targets = vec![target.expr];
+        let mut additional_targets = Vec::new();
 
         // test_err assign_stmt_missing_rhs
         // x =
@@ -1270,26 +1281,27 @@ impl<'src> Parser<'src> {
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
-                targets.push(parsed_expr.expr);
+                additional_targets.push(parsed_expr.expr);
             });
         }
 
-        for target in &mut targets {
-            helpers::set_expr_ctx(target, ExprContext::Store);
+        let targets = iter::once(target.expr).chain(additional_targets.iter().copied());
+        for target in targets.clone() {
+            self.storage.set_expr_context(target.id, ExprContext::Store);
             // test_err assign_stmt_invalid_target
             // 1 = 1
             // x = 1 = 2
             // x = 1 = y = 2 = z
             // ["a", "b"] = ["a", "b"]
-            self.validate_assignment_target(target);
+            self.validate_assignment_target(&target);
         }
 
-        ast::StmtAssign {
-            targets,
-            value: Box::new(value.expr),
+        build::StmtAssign {
+            targets: self.storage.list(targets),
+            value: value.expr.id,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an annotated assignment statement.
@@ -1301,9 +1313,9 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements>
     fn parse_annotated_assignment_statement(
         &mut self,
-        mut target: ParsedExpr,
+        target: ParsedExpr,
         start: TextSize,
-    ) -> ast::StmtAnnAssign {
+    ) -> id::StmtAnnAssign {
         self.bump(TokenKind::Colon);
 
         // test_err ann_assign_stmt_invalid_target
@@ -1319,7 +1331,8 @@ impl<'src> Parser<'src> {
         // [x, y]: int = 1, 2
         self.validate_annotated_assignment_target(&target.expr);
 
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+        self.storage
+            .set_expr_context(target.expr.id, ExprContext::Store);
 
         // test_ok ann_assign_stmt_simple_target
         // a: int  # simple
@@ -1345,10 +1358,10 @@ impl<'src> Parser<'src> {
                 // x: Any = *a and b
                 // x: Any = x := 1
                 // x: list = [x, *a | b, *a or b]
-                Some(Box::new(
+                Some(
                     self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or())
                         .expr,
-                ))
+                )
             } else {
                 // test_err ann_assign_stmt_missing_rhs
                 // x: int =
@@ -1362,14 +1375,14 @@ impl<'src> Parser<'src> {
             None
         };
 
-        ast::StmtAnnAssign {
-            target: Box::new(target.expr),
-            annotation: Box::new(annotation.expr),
-            value,
+        build::StmtAnnAssign {
+            target: target.expr.id,
+            annotation: annotation.expr.id,
+            value: value.map(|node| node.id),
             simple,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an augmented assignment statement.
@@ -1381,16 +1394,16 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#augmented-assignment-statements>
     fn parse_augmented_assignment_statement(
         &mut self,
-        mut target: ParsedExpr,
+        target: ParsedExpr,
         op: Operator,
         start: TextSize,
-    ) -> ast::StmtAugAssign {
+    ) -> id::StmtAugAssign {
         // Consume the operator
         self.bump_ts(AUGMENTED_ASSIGN_SET);
 
         if !matches!(
-            &target.expr,
-            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_)
+            &target.expr.kind,
+            ast::NodeKind::ExprName | ast::NodeKind::ExprAttribute | ast::NodeKind::ExprSubscript
         ) {
             // test_err aug_assign_stmt_invalid_target
             // 1 += 1
@@ -1399,10 +1412,11 @@ impl<'src> Parser<'src> {
             // pass += 1
             // x += pass
             // (x + y) += 1
-            self.add_error(ParseErrorType::InvalidAugmentedAssignmentTarget, &target);
+            self.add_error(ParseErrorType::InvalidAugmentedAssignmentTarget, target);
         }
 
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+        self.storage
+            .set_expr_context(target.expr.id, ExprContext::Store);
 
         // test_err aug_assign_stmt_missing_rhs
         // x +=
@@ -1418,13 +1432,13 @@ impl<'src> Parser<'src> {
         // x += y := 1
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
-        ast::StmtAugAssign {
-            target: Box::new(target.expr),
+        build::StmtAugAssign {
+            target: target.expr.id,
             op,
-            value: Box::new(value.expr),
+            value: value.expr.id,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an `if` statement.
@@ -1434,7 +1448,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-if-statement>
-    fn parse_if_statement(&mut self) -> ast::StmtIf {
+    fn parse_if_statement(&mut self) -> id::StmtIf {
         let start = self.node_start();
         self.bump(TokenKind::If);
 
@@ -1469,21 +1483,23 @@ impl<'src> Parser<'src> {
         let elif_else_snapshot = self.elif_else_scratch.snapshot();
         self.parse_clauses(Clause::ElIf, |parser| {
             let clause = parser.parse_elif_or_else_clause(ElifOrElse::Elif);
-            parser.elif_else_scratch.push(clause);
+            parser.elif_else_scratch.push(clause.id);
         });
 
         if self.at(TokenKind::Else) {
             let clause = self.parse_elif_or_else_clause(ElifOrElse::Else);
-            self.elif_else_scratch.push(clause);
+            self.elif_else_scratch.push(clause.id);
         }
 
-        ast::StmtIf {
-            test: Box::new(test.expr),
-            body,
-            elif_else_clauses: self.elif_else_scratch.take(elif_else_snapshot),
+        build::StmtIf {
+            test: test.expr.id,
+            body: body.into_list(&mut self.storage),
+            elif_else_clauses: self
+                .elif_else_scratch
+                .take_range(elif_else_snapshot, &mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an `elif` or `else` clause.
@@ -1491,7 +1507,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `elif` or `else` token.
-    fn parse_elif_or_else_clause(&mut self, kind: ElifOrElse) -> ast::ElifElseClause {
+    fn parse_elif_or_else_clause(&mut self, kind: ElifOrElse) -> id::ElifElseClause {
         let start = self.node_start();
         self.bump(kind.as_token_kind());
 
@@ -1522,12 +1538,12 @@ impl<'src> Parser<'src> {
 
         let body = self.parse_body(kind.as_clause());
 
-        ast::ElifElseClause {
-            test,
-            body,
+        build::ElifElseClause {
+            test: test.map(|node| node.id),
+            body: body.into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `try` statement.
@@ -1537,7 +1553,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `try` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-try-statement>
-    fn parse_try_statement(&mut self) -> ast::StmtTry {
+    fn parse_try_statement(&mut self) -> id::StmtTry {
         let try_start = self.node_start();
         self.bump(TokenKind::Try);
         self.expect(TokenKind::Colon);
@@ -1621,14 +1637,14 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            Suite::new()
+            ListId::default()
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
             (self.parse_body(Clause::Finally), true)
         } else {
-            (Suite::new(), false)
+            (ListId::default(), false)
         };
 
         if !has_except && !has_finally {
@@ -1675,15 +1691,15 @@ impl<'src> Parser<'src> {
         // except* KeyError: ...
         // except    *     Error: ...
 
-        ast::StmtTry {
-            body: try_body,
-            handlers,
-            orelse,
-            finalbody,
+        build::StmtTry {
+            body: try_body.into_list(&mut self.storage),
+            handlers: handlers.into_list(&mut self.storage),
+            orelse: orelse.into_list(&mut self.storage),
+            finalbody: finalbody.into_list(&mut self.storage),
             is_star,
             range: self.node_range(try_start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses an `except` clause of a `try` statement.
@@ -1691,7 +1707,7 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `except` token.
-    fn parse_except_clause(&mut self) -> (ExceptHandler, ExceptClauseKind) {
+    fn parse_except_clause(&mut self) -> (id::ExceptHandler, ExceptClauseKind) {
         let start = self.node_start();
         self.bump(TokenKind::Except);
 
@@ -1713,13 +1729,12 @@ impl<'src> Parser<'src> {
             // except* *x:
             //     pass
             let parsed_expr = self.parse_expression_list(ExpressionContext::default());
-            if matches!(
-                parsed_expr.expr,
-                Expr::Tuple(ast::ExprTuple {
-                    parenthesized: false,
-                    ..
-                })
-            ) {
+            if parsed_expr
+                .expr
+                .view(&self.storage)
+                .cast::<ast::ExprTuple>()
+                .is_some_and(|tuple| !tuple.parenthesized())
+            {
                 if self.at(TokenKind::As) {
                     // test_err except_stmt_unparenthesized_tuple_as
                     // try:
@@ -1735,7 +1750,7 @@ impl<'src> Parser<'src> {
                             "Multiple exception types must be parenthesized when using `as`"
                                 .to_string(),
                         ),
-                        &parsed_expr,
+                        parsed_expr,
                     );
                 } else {
                     // test_err except_stmt_unparenthesized_tuple_no_as_py313
@@ -1765,7 +1780,7 @@ impl<'src> Parser<'src> {
                     );
                 }
             }
-            Some(Box::new(parsed_expr.expr))
+            Some(parsed_expr.expr)
         } else {
             if block_kind.is_star() || self.at(TokenKind::As) {
                 // test_err except_stmt_missing_exception
@@ -1827,13 +1842,15 @@ impl<'src> Parser<'src> {
         let except_body = self.parse_body(Clause::Except);
 
         (
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                type_,
-                name,
-                body: except_body,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            }),
+            id::ExceptHandler::from(
+                build::ExceptHandlerExceptHandler {
+                    type_: type_.map(|node| node.id),
+                    name: name.map(|node| node.id),
+                    body: except_body.into_list(&mut self.storage),
+                    range: self.node_range(start),
+                }
+                .parsed(&mut self.storage),
+            ),
             block_kind,
         )
     }
@@ -1848,7 +1865,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `for` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-for-statement>
-    fn parse_for_statement(&mut self, start: TextSize) -> ast::StmtFor {
+    fn parse_for_statement(&mut self, start: TextSize, is_async: bool) -> id::StmtFor {
         self.bump(TokenKind::For);
 
         // test_err for_stmt_missing_target
@@ -1874,10 +1891,11 @@ impl<'src> Parser<'src> {
         // for -x in y: ...
         // for not x in y: ...
         // for x | y in z: ...
-        let mut target =
+        let target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
 
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+        self.storage
+            .set_expr_context(target.expr.id, ExprContext::Store);
 
         // test_err for_stmt_invalid_target
         // for 1 in x: ...
@@ -1934,18 +1952,18 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            Suite::new()
+            ListId::default()
         };
 
-        ast::StmtFor {
-            target: Box::new(target.expr),
-            iter: Box::new(iter.expr),
-            is_async: false,
-            body,
-            orelse,
+        build::StmtFor {
+            target: target.expr.id,
+            iter: iter.expr.id,
+            is_async,
+            body: body.into_list(&mut self.storage),
+            orelse: orelse.into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `while` statement.
@@ -1955,7 +1973,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `while` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-while-statement>
-    fn parse_while_statement(&mut self) -> ast::StmtWhile {
+    fn parse_while_statement(&mut self) -> id::StmtWhile {
         let start = self.node_start();
         self.bump(TokenKind::While);
 
@@ -1984,16 +2002,16 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            Suite::new()
+            ListId::default()
         };
 
-        ast::StmtWhile {
-            test: Box::new(test.expr),
-            body,
-            orelse,
+        build::StmtWhile {
+            test: test.expr.id,
+            body: body.into_list(&mut self.storage),
+            orelse: orelse.into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a function definition.
@@ -2010,9 +2028,10 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: DecoratorList,
+        decorator_list: Vec<id::Node<ast::kind::Decorator>>,
         start: TextSize,
-    ) -> ast::StmtFunctionDef {
+        is_async: bool,
+    ) -> id::StmtFunctionDef {
         self.bump(TokenKind::Def);
 
         // test_err function_def_missing_identifier
@@ -2034,10 +2053,10 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // def foo[T](): ...
         // def foo[](): ...
-        if let Some(ast::TypeParams { range, .. }) = &type_params {
+        if let Some(params) = &type_params {
             self.add_unsupported_syntax_error(
                 UnsupportedSyntaxErrorKind::TypeParameterList,
-                *range,
+                params.range(),
             );
         }
 
@@ -2068,13 +2087,12 @@ impl<'src> Parser<'src> {
                 // def foo() -> yield x: ...
                 let returns = self.parse_expression_list(ExpressionContext::default());
 
-                if matches!(
-                    returns.expr,
-                    Expr::Tuple(ast::ExprTuple {
-                        parenthesized: false,
-                        ..
-                    })
-                ) {
+                if returns
+                    .expr
+                    .view(&self.storage)
+                    .cast::<ast::ExprTuple>()
+                    .is_some_and(|tuple| !tuple.parenthesized())
+                {
                     // test_ok function_def_parenthesized_return_types
                     // def foo() -> (int,): ...
                     // def foo() -> (int, str): ...
@@ -2090,7 +2108,7 @@ impl<'src> Parser<'src> {
                     );
                 }
 
-                Some(Box::new(returns.expr))
+                Some(returns.expr)
             } else {
                 // test_err function_def_missing_return_type
                 // def foo() -> : ...
@@ -2111,19 +2129,22 @@ impl<'src> Parser<'src> {
         // def foo():
         // def foo() -> int:
         // x = 42
+        let body_start = self.storage.node_count();
         let body = self.parse_body(Clause::FunctionDef);
 
-        ast::StmtFunctionDef {
-            name,
-            type_params: type_params.map(Box::new),
-            parameters: Box::new(parameters),
-            body,
-            decorator_list,
-            is_async: false,
-            returns,
+        let function = build::StmtFunctionDef {
+            name: name.id,
+            type_params: type_params.map(|node| node.id),
+            parameters: parameters.id,
+            body: body.into_list(&mut self.storage),
+            decorator_list: decorator_list.into_list(&mut self.storage),
+            is_async,
+            returns: returns.map(|node| node.id),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage);
+        self.storage.record_function_body(function.id, body_start);
+        function
     }
 
     /// Parses a class definition.
@@ -2138,9 +2159,9 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: DecoratorList,
+        decorator_list: Vec<id::Node<ast::kind::Decorator>>,
         start: TextSize,
-    ) -> ast::StmtClassDef {
+    ) -> id::StmtClassDef {
         self.bump(TokenKind::Class);
 
         // test_err class_def_missing_name
@@ -2163,10 +2184,10 @@ impl<'src> Parser<'src> {
         // # parse_options: {"target-version": "3.11"}
         // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
         // class Foo[]: ...
-        if let Some(ast::TypeParams { range, .. }) = &type_params {
+        if let Some(params) = &type_params {
             self.add_unsupported_syntax_error(
                 UnsupportedSyntaxErrorKind::TypeParameterList,
-                *range,
+                params.range(),
             );
         }
 
@@ -2180,7 +2201,7 @@ impl<'src> Parser<'src> {
         // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
+            .then(|| self.parse_arguments(ArgumentsContext::ClassDefinition));
 
         self.expect(TokenKind::Colon);
 
@@ -2190,15 +2211,15 @@ impl<'src> Parser<'src> {
         // x = 42
         let body = self.parse_body(Clause::Class);
 
-        ast::StmtClassDef {
+        build::StmtClassDef {
             range: self.node_range(start),
-            decorator_list,
-            name,
-            type_params: type_params.map(Box::new),
-            arguments,
-            body,
-            node_index: AtomicNodeIndex::NONE,
+            decorator_list: decorator_list.into_list(&mut self.storage),
+            name: name.id,
+            type_params: type_params.map(|node| node.id),
+            arguments: arguments.map(|node| node.id),
+            body: body.into_list(&mut self.storage),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a `with` statement
@@ -2211,7 +2232,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `with` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
-    fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
+    fn parse_with_statement(&mut self, start: TextSize, is_async: bool) -> id::StmtWith {
         self.bump(TokenKind::With);
 
         let mut items = self.parse_with_items();
@@ -2221,19 +2242,19 @@ impl<'src> Parser<'src> {
 
         let body = self.parse_body(Clause::With);
 
-        ast::StmtWith {
-            items,
-            body,
-            is_async: false,
+        build::StmtWith {
+            items: items.into_list(&mut self.storage),
+            body: body.into_list(&mut self.storage),
+            is_async,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a list of with items.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
-    fn parse_with_items(&mut self) -> Vec<WithItem> {
+    fn parse_with_items(&mut self) -> Vec<id::WithItem> {
         if !self.at_expr() {
             self.add_error(
                 ParseErrorType::OtherError(
@@ -2354,7 +2375,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
-    fn try_parse_parenthesized_with_items(&mut self) -> (Option<Vec<WithItem>>, bool) {
+    fn try_parse_parenthesized_with_items(&mut self) -> (Option<Vec<id::WithItem>>, bool) {
         let checkpoint = self.checkpoint();
 
         // We'll start with the assumption that the with items are parenthesized.
@@ -2374,7 +2395,11 @@ impl<'src> Parser<'src> {
         let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
                 let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
-                has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
+                has_optional_vars |= parsed_with_item
+                    .item
+                    .view(&p.storage)
+                    .optional_vars()
+                    .is_some();
                 parsed_with_items.push(parsed_with_item);
             });
 
@@ -2392,15 +2417,27 @@ impl<'src> Parser<'src> {
                     // Parentheses resets the precedence.
                     continue;
                 }
-                let error = match parsed_with_item.item.context_expr {
-                    Expr::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
-                    Expr::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
-                    Expr::Yield(_) | Expr::YieldFrom(_) => {
+                let error = match parsed_with_item
+                    .item
+                    .view(&self.storage)
+                    .context_expr()
+                    .classify()
+                {
+                    ExprKind::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
+                    ExprKind::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
+                    ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                         ParseErrorType::InvalidYieldExpressionUsage
                     }
                     _ => continue,
                 };
-                self.add_error(error, &parsed_with_item.item.context_expr);
+                self.add_error(
+                    error,
+                    parsed_with_item
+                        .item
+                        .view(&self.storage)
+                        .context_expr()
+                        .range(),
+                );
             }
         } else if self.at(TokenKind::Rpar)
             && (
@@ -2422,8 +2459,15 @@ impl<'src> Parser<'src> {
                 if parsed_with_items.iter().any(|parsed_with_item| {
                     !parsed_with_item.is_parenthesized
                         && matches!(
-                            parsed_with_item.item.context_expr,
-                            Expr::Named(_) | Expr::Starred(_) | Expr::Yield(_) | Expr::YieldFrom(_)
+                            parsed_with_item
+                                .item
+                                .view(&self.storage)
+                                .context_expr()
+                                .classify(),
+                            ExprKind::Named(_)
+                                | ExprKind::Starred(_)
+                                | ExprKind::Yield(_)
+                                | ExprKind::YieldFrom(_)
                         )
                 }) {
                     with_item_kind = WithItemKind::ParenthesizedExpression;
@@ -2501,16 +2545,16 @@ impl<'src> Parser<'src> {
 
         let optional_vars = self
             .at(TokenKind::As)
-            .then(|| Box::new(self.parse_with_item_optional_vars().expr));
+            .then(|| self.parse_with_item_optional_vars().expr);
 
         ParsedWithItem {
             is_parenthesized: context_expr.is_parenthesized,
-            item: ast::WithItem {
+            item: build::WithItem {
                 range: self.node_range(start),
-                context_expr: context_expr.expr,
-                optional_vars,
-                node_index: AtomicNodeIndex::NONE,
-            },
+                context_expr: context_expr.expr.id,
+                optional_vars: optional_vars.map(|node| node.id),
+            }
+            .parsed(&mut self.storage),
         }
     }
 
@@ -2522,13 +2566,14 @@ impl<'src> Parser<'src> {
     fn parse_with_item_optional_vars(&mut self) -> ParsedExpr {
         self.bump(TokenKind::As);
 
-        let mut target = self
+        let target = self
             .parse_conditional_expression_or_higher_impl(ExpressionContext::starred_conditional());
 
         // This has the same semantics as an assignment target.
         self.validate_assignment_target(&target.expr);
 
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+        self.storage
+            .set_expr_context(target.expr.id, ExprContext::Store);
 
         target
     }
@@ -2584,7 +2629,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `match` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
-    fn try_parse_match_statement(&mut self) -> Option<ast::StmtMatch> {
+    fn try_parse_match_statement(&mut self) -> Option<id::StmtMatch> {
         let checkpoint = self.checkpoint();
 
         let start = self.node_start();
@@ -2604,12 +2649,14 @@ impl<'src> Parser<'src> {
 
                 let cases = self.parse_match_body();
 
-                Some(ast::StmtMatch {
-                    subject: Box::new(subject),
-                    cases,
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                Some(
+                    build::StmtMatch {
+                        subject: subject.id,
+                        cases: cases.into_list(&mut self.storage),
+                        range: self.node_range(start),
+                    }
+                    .parsed(&mut self.storage),
+                )
             }
             TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
                 // `match` is a keyword
@@ -2627,12 +2674,14 @@ impl<'src> Parser<'src> {
 
                 let cases = self.parse_match_body();
 
-                Some(ast::StmtMatch {
-                    subject: Box::new(subject),
-                    cases,
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                Some(
+                    build::StmtMatch {
+                        subject: subject.id,
+                        cases: cases.into_list(&mut self.storage),
+                        range: self.node_range(start),
+                    }
+                    .parsed(&mut self.storage),
+                )
             }
             _ => {
                 // `match` is an identifier
@@ -2650,7 +2699,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `match` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
-    fn parse_match_statement(&mut self) -> ast::StmtMatch {
+    fn parse_match_statement(&mut self) -> id::StmtMatch {
         let start = self.node_start();
         self.bump_match_statement_keyword();
 
@@ -2675,16 +2724,16 @@ impl<'src> Parser<'src> {
 
         self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
 
-        ast::StmtMatch {
-            subject: Box::new(subject),
-            cases,
+        build::StmtMatch {
+            subject: subject.id,
+            cases: cases.into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses the subject expression for a `match` statement.
-    fn parse_match_subject_expression(&mut self) -> Expr {
+    fn parse_match_subject_expression(&mut self) -> id::Expr {
         let start = self.node_start();
 
         // Subject expression grammar is:
@@ -2722,13 +2771,13 @@ impl<'src> Parser<'src> {
                 p.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
             });
 
-            Expr::Tuple(tuple)
+            id::Expr::from(tuple)
         } else {
             if subject.is_unparenthesized_starred_expr() {
                 // test_err match_stmt_single_starred_subject
                 // match *foo:
                 //     case _: ...
-                self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &subject);
+                self.add_error(ParseErrorType::InvalidStarredExpressionUsage, subject);
             }
             subject.expr
         }
@@ -2738,7 +2787,7 @@ impl<'src> Parser<'src> {
     ///
     /// This method expects that the parser is positioned at a `Newline` token. If not, it adds a
     /// syntax error and continues parsing.
-    fn parse_match_body(&mut self) -> Vec<ast::MatchCase> {
+    fn parse_match_body(&mut self) -> Vec<id::MatchCase> {
         // test_err match_stmt_no_newline_before_case
         // match foo: case _: ...
         self.expect(TokenKind::Newline);
@@ -2765,7 +2814,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a list of match case blocks.
-    fn parse_match_case_blocks(&mut self) -> Vec<ast::MatchCase> {
+    fn parse_match_case_blocks(&mut self) -> Vec<id::MatchCase> {
         let mut cases = vec![];
 
         if !self.at(TokenKind::Case) {
@@ -2799,7 +2848,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `case` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-case_block>
-    fn parse_match_case(&mut self) -> ast::MatchCase {
+    fn parse_match_case(&mut self) -> id::MatchCase {
         let start = self.node_start();
         self.bump(TokenKind::Case);
 
@@ -2827,10 +2876,10 @@ impl<'src> Parser<'src> {
                 //     case y if (*a): ...
                 // match x:
                 //     case y if yield x: ...
-                Some(Box::new(
+                Some(
                     self.parse_named_expression_or_higher(ExpressionContext::default())
                         .expr,
-                ))
+                )
             } else {
                 // test_err match_stmt_missing_guard_expr
                 // match x:
@@ -2853,13 +2902,13 @@ impl<'src> Parser<'src> {
         //     case 2: ...
         let body = self.parse_body(Clause::Case);
 
-        ast::MatchCase {
-            pattern,
-            guard,
-            body,
+        build::MatchCase {
+            pattern: pattern.id,
+            guard: guard.map(|node| node.id),
+            body: body.into_list(&mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a statement that is valid after an `async` token.
@@ -2871,31 +2920,24 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-with-statement>
     /// - <https://docs.python.org/3/reference/compound_stmts.html#the-async-for-statement>
     /// - <https://docs.python.org/3/reference/compound_stmts.html#coroutine-function-definition>
-    fn parse_async_statement(&mut self) -> Stmt {
+    fn parse_async_statement(&mut self) -> id::Stmt {
         let async_start = self.node_start();
         self.bump(TokenKind::Async);
 
         match self.current_token_kind() {
             // test_ok async_function_definition
             // async def foo(): ...
-            TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
-                is_async: true,
-                ..self.parse_function_definition(DecoratorList::new(), async_start)
-            }),
+            TokenKind::Def => {
+                id::Stmt::from(self.parse_function_definition(Vec::new(), async_start, true))
+            }
 
             // test_ok async_with_statement
             // async with item: ...
-            TokenKind::With => Stmt::With(ast::StmtWith {
-                is_async: true,
-                ..self.parse_with_statement(async_start)
-            }),
+            TokenKind::With => id::Stmt::from(self.parse_with_statement(async_start, true)),
 
             // test_ok async_for_statement
             // async for target in iter: ...
-            TokenKind::For => Stmt::For(ast::StmtFor {
-                is_async: true,
-                ..self.parse_for_statement(async_start)
-            }),
+            TokenKind::For => id::Stmt::from(self.parse_for_statement(async_start, true)),
 
             kind => {
                 // test_err async_unexpected_token
@@ -2921,10 +2963,10 @@ impl<'src> Parser<'src> {
     /// Parses a decorator list followed by a class, function or async function definition.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorators>
-    fn parse_decorators(&mut self) -> Stmt {
+    fn parse_decorators(&mut self) -> id::Stmt {
         let start = self.node_start();
 
-        let mut decorators = DecoratorList::new();
+        let mut decorators = Vec::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -2943,7 +2985,7 @@ impl<'src> Parser<'src> {
             self.bump(TokenKind::At);
 
             let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
-                Expr::Name(self.parse_missing_name()).into()
+                id::Expr::from(self.parse_missing_name()).into()
             } else {
                 self.parse_named_expression_or_higher(ExpressionContext::default())
             };
@@ -3009,12 +3051,12 @@ impl<'src> Parser<'src> {
                 // @foo().bar()
                 // def baz(): ...
 
-                let relaxed_decorator_error = match &parsed_expr.expr {
-                    Expr::Call(expr_call) => {
-                        helpers::detect_invalid_pre_py39_decorator_node(&expr_call.func)
-                    }
-                    expr => helpers::detect_invalid_pre_py39_decorator_node(expr),
-                };
+                let value = parsed_expr.expr.view(&self.storage);
+                let target = value
+                    .cast::<ast::ExprCall>()
+                    .map_or(value, ast::ExprCall::func);
+                let relaxed_decorator_error =
+                    helpers::detect_invalid_pre_py39_decorator_node(target);
 
                 if let Some((error, range)) = relaxed_decorator_error {
                     self.add_unsupported_syntax_error(
@@ -3032,11 +3074,13 @@ impl<'src> Parser<'src> {
             // @yield from x
             // def foo(): ...
 
-            decorators.push(ast::Decorator {
-                expression: parsed_expr.expr,
-                range: self.node_range(decorator_start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            decorators.push(
+                build::Decorator {
+                    expression: parsed_expr.expr.id,
+                    range: self.node_range(decorator_start),
+                }
+                .parsed(&mut self.storage),
+            );
 
             // test_err decorator_missing_newline
             // @x def foo(): ...
@@ -3048,18 +3092,17 @@ impl<'src> Parser<'src> {
         decorators.shrink_to_fit();
 
         match self.current_token_kind() {
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
+            TokenKind::Def => {
+                id::Stmt::from(self.parse_function_definition(decorators, start, false))
+            }
+            TokenKind::Class => id::Stmt::from(self.parse_class_definition(decorators, start)),
             TokenKind::Async if self.peek() == TokenKind::Def => {
                 self.bump(TokenKind::Async);
 
                 // test_ok decorator_async_function
                 // @decorator
                 // async def foo(): ...
-                Stmt::FunctionDef(ast::StmtFunctionDef {
-                    is_async: true,
-                    ..self.parse_function_definition(decorators, start)
-                })
+                id::Stmt::from(self.parse_function_definition(decorators, start, true))
             }
             _ => {
                 // test_err decorator_unexpected_token
@@ -3078,24 +3121,27 @@ impl<'src> Parser<'src> {
 
                 let range = self.node_range(start);
 
-                ast::StmtFunctionDef {
-                    node_index: AtomicNodeIndex::default(),
+                build::StmtFunctionDef {
                     range,
                     is_async: false,
-                    decorator_list: decorators,
-                    name: ast::Identifier {
-                        id: Name::empty(),
+                    decorator_list: decorators.into_list(&mut self.storage),
+                    name: build::Identifier {
+                        id: self.storage.intern_name(""),
                         range: self.missing_node_range(),
-                        node_index: AtomicNodeIndex::NONE,
-                    },
+                    }
+                    .parsed(&mut self.storage)
+                    .id,
                     type_params: None,
-                    parameters: Box::new(ast::Parameters {
+                    parameters: build::Parameters {
                         range: self.missing_node_range(),
-                        ..ast::Parameters::default()
-                    }),
+                        ..build::Parameters::default()
+                    }
+                    .parsed(&mut self.storage)
+                    .id,
                     returns: None,
-                    body: Suite::new(),
+                    body: ListId::default(),
                 }
+                .parsed(&mut self.storage)
                 .into()
             }
         }
@@ -3105,7 +3151,7 @@ impl<'src> Parser<'src> {
     ///
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
-    fn parse_body(&mut self, parent_clause: Clause) -> Suite {
+    fn parse_body(&mut self, parent_clause: Clause) -> ListId<AstNodeId<ast::kind::Stmt>> {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
@@ -3143,7 +3189,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        Suite::new()
+        ListId::default()
     }
 
     /// Parses a block of statements.
@@ -3151,17 +3197,19 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `Indent` token.
-    fn parse_block(&mut self) -> Suite {
+    fn parse_block(&mut self) -> ListId<AstNodeId<ast::kind::Stmt>> {
         self.bump(TokenKind::Indent);
 
         let statements = self.with_recursion(|parser| {
             let snapshot = parser.stmt_scratch.snapshot();
             parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
                 let statement = parser.parse_statement();
-                parser.stmt_scratch.push(statement);
+                parser.stmt_scratch.push(statement.id);
             });
 
-            parser.stmt_scratch.take_thin_vec(snapshot)
+            parser
+                .stmt_scratch
+                .take_range(snapshot, &mut parser.storage)
         });
 
         self.expect(TokenKind::Dedent);
@@ -3184,7 +3232,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
         function_kind: FunctionKind,
         allow_star_annotation: AllowStarAnnotation,
-    ) -> ast::Parameter {
+    ) -> id::Parameter {
         let name = self.parse_identifier();
 
         // Annotations are only allowed for function definition. For lambda expression,
@@ -3247,7 +3295,7 @@ impl<'src> Parser<'src> {
                             self.parse_conditional_expression_or_higher()
                         }
                     };
-                    Some(Box::new(parsed_expr.expr))
+                    Some(parsed_expr.expr)
                 } else {
                     // test_err param_missing_annotation
                     // def foo(x:): ...
@@ -3262,12 +3310,12 @@ impl<'src> Parser<'src> {
             _ => None,
         };
 
-        ast::Parameter {
+        build::Parameter {
             range: self.node_range(start),
-            name,
-            annotation,
-            node_index: AtomicNodeIndex::NONE,
+            name: name.id,
+            annotation: annotation.map(|node| node.id),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a parameter with an optional default expression.
@@ -3282,7 +3330,7 @@ impl<'src> Parser<'src> {
         &mut self,
         start: TextSize,
         function_kind: FunctionKind,
-    ) -> ast::ParameterWithDefault {
+    ) -> id::ParameterWithDefault {
         let parameter = self.parse_parameter(start, function_kind, AllowStarAnnotation::No);
 
         let default = if self.eat(TokenKind::Equal) {
@@ -3297,7 +3345,7 @@ impl<'src> Parser<'src> {
                 // def foo(x=*int): ...
                 // def foo(x=(*int)): ...
                 // def foo(x=yield y): ...
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                Some(self.parse_conditional_expression_or_higher().expr)
             } else {
                 // test_err param_missing_default
                 // def foo(x=): ...
@@ -3312,18 +3360,18 @@ impl<'src> Parser<'src> {
             None
         };
 
-        ast::ParameterWithDefault {
+        build::ParameterWithDefault {
             range: self.node_range(start),
-            parameter,
-            default,
-            node_index: AtomicNodeIndex::NONE,
+            parameter: parameter.id,
+            default: default.map(|node| node.id),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a parameter list for the given function kind.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-parameter_list>
-    pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
+    pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> id::Parameters {
         let start = self.node_start();
 
         if matches!(function_kind, FunctionKind::FunctionDef) {
@@ -3335,10 +3383,11 @@ impl<'src> Parser<'src> {
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = ast::Parameters::default();
+        let mut vararg = None;
+        let mut kwarg = None;
         let parameters_snapshot = self.parameter_scratch.snapshot();
-        let mut args_snapshot = None;
-        let mut kwonlyargs_snapshot = None;
+        let mut args_start = None;
+        let mut kwonlyargs_start = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3351,7 +3400,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
             let param_start = parser.node_start();
 
-            if parameters.kwarg.is_some() {
+            if kwarg.is_some() {
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
@@ -3365,7 +3414,9 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
+                    kwonlyargs_start.get_or_insert_with(|| {
+                        parser.parameter_scratch.len_since(&parameters_snapshot)
+                    });
 
                     if parser.at_identifier_or_soft_keyword() {
                         let param = parser.parse_parameter(
@@ -3384,7 +3435,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if seen_keyword_only_separator || parameters.vararg.is_some() {
+                        if seen_keyword_only_separator || vararg.is_some() {
                             // test_err params_multiple_varargs
                             // def foo(a, *, *args, b): ...
                             // # def foo(a, *, b, c, *args): ...
@@ -3400,8 +3451,8 @@ impl<'src> Parser<'src> {
 
                         // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
                         // choose to keep the first one so that the parameters remain in preorder.
-                        if parameters.vararg.is_none() {
-                            parameters.vararg = Some(Box::new(param));
+                        if vararg.is_none() {
+                            vararg = Some(param.id);
                         }
 
                         last_keyword_only_separator_range = None;
@@ -3418,7 +3469,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if parameters.vararg.is_some() {
+                        if vararg.is_some() {
                             // test_err params_star_separator_after_star_param
                             // def foo(a, *args, *, b): ...
                             // def foo(a, *args, b, c, *): ...
@@ -3444,7 +3495,7 @@ impl<'src> Parser<'src> {
                         parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
-                    if parameters.kwarg.is_some() {
+                    if kwarg.is_some() {
                         // test_err params_multiple_kwargs
                         // def foo(a, **kwargs1, **kwargs2): ...
                         parser.add_error(
@@ -3477,7 +3528,7 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    parameters.kwarg = Some(Box::new(param));
+                    kwarg = Some(param.id);
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Slash => {
@@ -3485,8 +3536,8 @@ impl<'src> Parser<'src> {
                     parser.bump(TokenKind::Slash);
 
                     if parser.parameter_scratch.is_empty(&parameters_snapshot)
-                        && parameters.vararg.is_none()
-                        && parameters.kwarg.is_none()
+                        && vararg.is_none()
+                        && kwarg.is_none()
                     {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
@@ -3512,7 +3563,7 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
+                    if seen_keyword_only_separator || vararg.is_some() {
                         // test_err params_star_after_slash
                         // def foo(*a, /): ...
                         // def foo(a, *args, b, /): ...
@@ -3529,8 +3580,9 @@ impl<'src> Parser<'src> {
                     if !seen_positional_only_separator {
                         // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        if kwonlyargs_snapshot.is_none() {
-                            args_snapshot = Some(parser.parameter_scratch.snapshot());
+                        if kwonlyargs_start.is_none() {
+                            args_start =
+                                Some(parser.parameter_scratch.len_since(&parameters_snapshot));
                         }
                         seen_positional_only_separator = true;
 
@@ -3557,10 +3609,10 @@ impl<'src> Parser<'src> {
 
                     // TODO(dhruvmanila): Pyright seems to only highlight the first non-default argument
                     // https://github.com/microsoft/pyright/blob/3b70417dd549f6663b8f86a76f75d8dfd450f4a8/packages/pyright-internal/src/parser/parser.ts#L2038-L2042
-                    if param.default.is_none()
+                    if param.view(&parser.storage).default().is_none()
                         && seen_default_param
                         && !seen_keyword_only_separator
-                        && parameters.vararg.is_none()
+                        && vararg.is_none()
                     {
                         // test_ok params_non_default_after_star
                         // def foo(a=10, *, b, c=11, d): ...
@@ -3568,16 +3620,16 @@ impl<'src> Parser<'src> {
 
                         // test_err params_non_default_after_default
                         // def foo(a=10, b, c: int): ...
-                        parser.add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
+                        parser.add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, param);
                     }
 
-                    seen_default_param |= param.default.is_some();
+                    seen_default_param |= param.view(&parser.storage).default().is_some();
 
                     if seen_keyword_only_separator {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    parser.parameter_scratch.push(param);
+                    parser.parameter_scratch.push(param.id);
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3601,28 +3653,31 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
-            parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
+        let range = self.node_range(start);
+        let id = self
+            .parameter_scratch
+            .take(parameters_snapshot, |ordinary| {
+                let end = kwonlyargs_start.unwrap_or(ordinary.len());
+                let start = args_start.unwrap_or(if seen_positional_only_separator {
+                    end
+                } else {
+                    0
+                });
+                self.storage
+                    .parameters_from_slice(range, ordinary, start..end, vararg, kwarg)
+            });
+        id::Parameters {
+            id,
+            range,
+            kind: ast::NodeKind::Parameters,
         }
-        if let Some(args_snapshot) = args_snapshot {
-            parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
-            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
-        } else if seen_positional_only_separator {
-            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
-        } else {
-            parameters.args = self.parameter_scratch.take_thin_vec(parameters_snapshot);
-        }
-
-        parameters.range = self.node_range(start);
-
-        parameters
     }
 
     /// Try to parse a type parameter list. If the parser is not at the start of a
     /// type parameter list, return `None`.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists>
-    fn try_parse_type_params(&mut self) -> Option<ast::TypeParams> {
+    fn try_parse_type_params(&mut self) -> Option<id::TypeParams> {
         self.at(TokenKind::Lsqb).then(|| self.parse_type_params())
     }
 
@@ -3633,7 +3688,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists>
-    fn parse_type_params(&mut self) -> ast::TypeParams {
+    fn parse_type_params(&mut self) -> id::TypeParams {
         let start = self.node_start();
         self.bump(TokenKind::Lsqb);
 
@@ -3652,17 +3707,17 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
-        ast::TypeParams {
+        build::TypeParams {
             range: self.node_range(start),
-            type_params,
-            node_index: AtomicNodeIndex::NONE,
+            type_params: type_params.into_list(&mut self.storage),
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a type parameter.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-type_param>
-    fn parse_type_param(&mut self) -> ast::TypeParam {
+    fn parse_type_param(&mut self) -> id::TypeParam {
         let start = self.node_start();
 
         // TODO(dhruvmanila): CPython throws an error if `TypeVarTuple` or `ParamSpec`
@@ -3692,12 +3747,12 @@ impl<'src> Parser<'src> {
                     // type X[*Ts = yield x] = int
                     // type X[*Ts = yield from x] = int
                     // type X[*Ts = x := int] = int
-                    Some(Box::new(
+                    Some(
                         self.parse_conditional_expression_or_higher_impl(
                             ExpressionContext::starred_bitwise_or(),
                         )
                         .expr,
-                    ))
+                    )
                 } else {
                     // test_err type_param_type_var_tuple_missing_default
                     // type X[*Ts =] = int
@@ -3714,12 +3769,14 @@ impl<'src> Parser<'src> {
 
             // test_err type_param_type_var_tuple_bound
             // type X[*T: int] = int
-            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
-                range: self.node_range(start),
-                name,
-                default,
-                node_index: AtomicNodeIndex::NONE,
-            })
+            id::TypeParam::from(
+                build::TypeParamTypeVarTuple {
+                    range: self.node_range(start),
+                    name: name.id,
+                    default: default.map(|node| node.id),
+                }
+                .parsed(&mut self.storage),
+            )
 
         // test_ok type_param_param_spec
         // type X[**P] = int
@@ -3737,7 +3794,7 @@ impl<'src> Parser<'src> {
                     // type X[**P = yield from x] = int
                     // type X[**P = x := int] = int
                     // type X[**P = *int] = int
-                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                    Some(self.parse_conditional_expression_or_higher().expr)
                 } else {
                     // test_err type_param_param_spec_missing_default
                     // type X[**P =] = int
@@ -3754,12 +3811,14 @@ impl<'src> Parser<'src> {
 
             // test_err type_param_param_spec_bound
             // type X[**T: int] = int
-            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
-                range: self.node_range(start),
-                name,
-                default,
-                node_index: AtomicNodeIndex::NONE,
-            })
+            id::TypeParam::from(
+                build::TypeParamParamSpec {
+                    range: self.node_range(start),
+                    name: name.id,
+                    default: default.map(|node| node.id),
+                }
+                .parsed(&mut self.storage),
+            )
             // test_ok type_param_type_var
             // type X[T] = int
             // type X[T = int] = int
@@ -3776,7 +3835,7 @@ impl<'src> Parser<'src> {
                     // type X[T: yield x] = int
                     // type X[T: yield from x] = int
                     // type X[T: x := int] = int
-                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                    Some(self.parse_conditional_expression_or_higher().expr)
                 } else {
                     // test_err type_param_missing_bound
                     // type X[T: ] = int
@@ -3801,7 +3860,7 @@ impl<'src> Parser<'src> {
                     // type X[T = yield from x] = int
                     // type X[T = x := int] = int
                     // type X[T: int = *int] = int
-                    Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                    Some(self.parse_conditional_expression_or_higher().expr)
                 } else {
                     // test_err type_param_type_var_missing_default
                     // type X[T =] = int
@@ -3837,13 +3896,15 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                range: self.node_range(start),
-                name,
-                bound,
-                default,
-                node_index: AtomicNodeIndex::NONE,
-            })
+            id::TypeParam::from(
+                build::TypeParamTypeVar {
+                    range: self.node_range(start),
+                    name: name.id,
+                    bound: bound.map(|node| node.id),
+                    default: default.map(|node| node.id),
+                }
+                .parsed(&mut self.storage),
+            )
         }
     }
 
@@ -3853,16 +3914,26 @@ impl<'src> Parser<'src> {
     /// If it's a starred expression, then validate the value of the starred expression.
     ///
     /// Report an error for each invalid assignment expression found.
-    pub(super) fn validate_assignment_target(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Starred(ast::ExprStarred { value, .. }) => self.validate_assignment_target(value),
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for expr in elts {
-                    self.validate_assignment_target(expr);
-                }
+    pub(super) fn validate_assignment_target(&mut self, expr: &id::Expr) {
+        let elements = match expr.view(&self.storage).classify() {
+            ExprKind::Starred(starred) => {
+                let child = id::Node::from_view(starred.value());
+                return self.validate_assignment_target(&child);
             }
-            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
-            _ => self.add_error(ParseErrorType::InvalidAssignmentTarget, expr.range()),
+            ExprKind::List(list) => list.elts().id(),
+            ExprKind::Tuple(tuple) => tuple.elts().id(),
+            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => return,
+            _ => return self.add_error(ParseErrorType::InvalidAssignmentTarget, expr.range()),
+        };
+        for i in 0..elements.len() {
+            if let Some(child) = self
+                .storage
+                .get_list(elements)
+                .get(i)
+                .map(id::Node::from_view)
+            {
+                self.validate_assignment_target(&child);
+            }
         }
     }
 
@@ -3870,21 +3941,21 @@ impl<'src> Parser<'src> {
     ///
     /// Unlike [`Parser::validate_assignment_target`], starred, list and tuple
     /// expressions aren't allowed here.
-    fn validate_annotated_assignment_target(&mut self, expr: &Expr) {
-        match expr {
-            Expr::List(_) => self.add_error(
+    fn validate_annotated_assignment_target(&mut self, expr: &id::Expr) {
+        match expr.view(&self.storage).classify() {
+            ExprKind::List(_) => self.add_error(
                 ParseErrorType::OtherError(
                     "Only single target (not list) can be annotated".to_string(),
                 ),
                 expr,
             ),
-            Expr::Tuple(_) => self.add_error(
+            ExprKind::Tuple(_) => self.add_error(
                 ParseErrorType::OtherError(
                     "Only single target (not tuple) can be annotated".to_string(),
                 ),
                 expr,
             ),
-            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
+            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
         }
     }
@@ -3894,15 +3965,22 @@ impl<'src> Parser<'src> {
     /// If the expression is a list or tuple, then validate each element in the list.
     ///
     /// See: <https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180>
-    fn validate_delete_target(&mut self, expr: &Expr) {
-        match expr {
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for expr in elts {
-                    self.validate_delete_target(expr);
-                }
+    fn validate_delete_target(&mut self, expr: &id::Expr) {
+        let elements = match expr.view(&self.storage).classify() {
+            ExprKind::List(list) => list.elts().id(),
+            ExprKind::Tuple(tuple) => tuple.elts().id(),
+            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => return,
+            _ => return self.add_error(ParseErrorType::InvalidDeleteTarget, expr.range()),
+        };
+        for i in 0..elements.len() {
+            if let Some(child) = self
+                .storage
+                .get_list(elements)
+                .get(i)
+                .map(id::Node::from_view)
+            {
+                self.validate_delete_target(&child);
             }
-            Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
-            _ => self.add_error(ParseErrorType::InvalidDeleteTarget, expr),
         }
     }
 
@@ -4158,7 +4236,7 @@ enum WithItemParsingState {
 #[derive(Debug)]
 struct ParsedWithItem {
     /// The contained with item.
-    item: WithItem,
+    item: id::WithItem,
     /// If the context expression of the item is parenthesized.
     is_parenthesized: bool,
 }

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -45,7 +45,7 @@ impl Violation for SnmpWeakCryptography {
 /// S509
 pub(crate) fn snmp_weak_cryptography(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if call.arguments.len() < 3

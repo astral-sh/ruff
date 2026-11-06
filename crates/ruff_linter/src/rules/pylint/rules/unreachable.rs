@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use ruff_python_ast::{Identifier, Stmt};
+use ruff_python_ast::{Identifier, Suite};
 use ruff_python_semantic::cfg::graph::{BlockId, Condition, ControlFlowGraph, build_cfg};
 use ruff_text_size::TextRange;
 
@@ -44,7 +44,7 @@ impl Violation for UnreachableCode {
     }
 }
 
-pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
+pub(crate) fn in_function(checker: &Checker, name: Identifier<'_>, body: Suite<'_>) {
     let cfg = build_cfg(body);
     let reachable = reachable(&cfg);
 

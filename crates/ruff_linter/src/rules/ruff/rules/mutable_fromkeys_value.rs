@@ -1,11 +1,11 @@
 use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
+use crate::fix::syntax;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Builder, Expr, ExprCallFields, ExprKind, ListId, build};
 use ruff_python_semantic::{SemanticModel, analyze::typing::is_mutable_expr};
 
 use ruff_python_codegen::Generator;
-use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -67,10 +67,12 @@ impl Violation for MutableFromkeysValue {
 }
 
 /// RUF024
-pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
+pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     // Check that the call is to `dict.fromkeys`.
     if attr != "fromkeys" {
@@ -82,51 +84,47 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // Check that the value parameter is a mutable object.
-    let [keys, value] = &*call.arguments.args else {
+    let Some([keys, value]) = call.arguments.args().as_array() else {
         return;
     };
     if !is_mutable_expr(value, semantic) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range());
+    let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator(), checker.semantic()),
-        call.range(),
+        call.range,
     )));
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where
 /// `keys` and `value` are the parameters of `dict.fromkeys`.
 fn generate_dict_comprehension(
-    keys: &Expr,
-    value: &Expr,
+    keys: Expr<'_>,
+    value: Expr<'_>,
     generator: Generator,
     semantic: &SemanticModel<'_>,
 ) -> String {
-    // Construct `key`.
-    let key = ast::ExprName {
-        id: fresh_binding_name(semantic, "key"),
-        ctx: ast::ExprContext::Load,
+    let mut builder = Builder::default();
+    let binding = fresh_binding_name(semantic, "key");
+    let target = syntax::name(&mut builder, &binding);
+    let iter = builder.copy_node(keys);
+    let comp = builder.add(build::Comprehension {
+        target,
+        iter,
+        ifs: ListId::default(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    // Construct `key in keys`.
-    let comp = ast::Comprehension {
-        target: key.clone().into(),
-        iter: keys.clone(),
-        ifs: vec![],
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         is_async: false,
-    };
-    // Construct the dict comprehension.
-    let dict_comp = ast::ExprDictComp {
-        key: Some(Box::new(key.into())),
-        value: Box::new(value.clone()),
-        generators: Box::new([comp]),
+    });
+    let generators = builder.list([comp]);
+    let key = syntax::name(&mut builder, &binding);
+    let value = builder.copy_node(value);
+    let dict = builder.add(build::ExprDictComp {
+        key: Some(key),
+        value,
+        generators,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.expr(&dict_comp.into())
+    });
+    generator.expr(builder.get(dict).into())
 }

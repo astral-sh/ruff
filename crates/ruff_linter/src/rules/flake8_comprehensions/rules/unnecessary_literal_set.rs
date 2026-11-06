@@ -1,13 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{AlwaysFixableViolation, Edit, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `set()` calls that take unnecessary list or tuple literals
@@ -53,13 +52,9 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "set",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+pub(crate) fn unnecessary_literal_set(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let call = call_fields.node;
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call_fields) else {
         return;
     };
     let Some(kind) = UnnecessaryLiteral::try_from_expr(argument) else {
@@ -69,23 +64,26 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call.range());
+    let mut diagnostic =
+        checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call_fields.range);
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
-        let elts = match &argument {
-            Expr::List(ast::ExprList { elts, .. }) => elts,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+        let elts = match argument.classify() {
+            ExprKind::List(expr_list) => expr_list.elts(),
+            ExprKind::Tuple(expr_tuple) => expr_tuple.elts(),
             _ => unreachable!(),
         };
 
-        match elts.as_slice() {
+        match elts {
             // If the list or tuple is empty, replace the entire call with `set()`.
-            [] => Fix::unsafe_edit(Edit::range_replacement("set()".to_string(), call.range())),
+            args if args.is_empty() => Fix::unsafe_edit(Edit::range_replacement(
+                "set()".to_string(),
+                call_fields.range,
+            )),
             // If it's a single-element tuple (with no whitespace around it), remove the trailing
             // comma.
-            [elt]
-                if argument.is_tuple_expr()
+            args if let Some([elt]) = args.as_array() && argument.is_tuple_expr()
                     // The element must start right after the `(`.
                     && elt.start() == argument.start() + TextSize::new(1)
                     // The element must be followed by exactly one comma and a closing `)`.
@@ -93,14 +91,24 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
             {
                 // Replace from the start of the call to the start of the inner element.
                 let call_start = Edit::replacement(
-                    pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                    pad_start(
+                        "{",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     call.start(),
                     elt.start(),
                 );
 
                 // Replace from the end of the inner element to the end of the call with `}`.
                 let call_end = Edit::replacement(
-                    pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                    pad_end(
+                        "}",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     elt.end(),
                     call.end(),
                 );
@@ -110,14 +118,24 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
             _ => {
                 // Replace from the start of the call to the start of the inner list or tuple with `{`.
                 let call_start = Edit::replacement(
-                    pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                    pad_start(
+                        "{",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     call.start(),
                     argument.start() + TextSize::from(1),
                 );
 
                 // Replace from the end of the inner list or tuple to the end of the call with `}`.
                 let call_end = Edit::replacement(
-                    pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                    pad_end(
+                        "}",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     argument.end() - TextSize::from(1),
                     call.end(),
                 );
@@ -135,10 +153,10 @@ enum UnnecessaryLiteral {
 }
 
 impl UnnecessaryLiteral {
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::List(_) => Some(Self::List),
-            Expr::Tuple(_) => Some(Self::Tuple),
+    fn try_from_expr(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::List(_) => Some(Self::List),
+            ExprKind::Tuple(_) => Some(Self::Tuple),
             _ => None,
         }
     }

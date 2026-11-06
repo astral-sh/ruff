@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprGenerator;
+use ruff_python_ast::{ExprGenerator, SyntaxNode};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
@@ -19,7 +18,7 @@ pub enum GeneratorExpParentheses {
     Preserve,
 }
 
-impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGenerator {
+impl FormatRuleWithOptions<ExprGenerator<'_>, PyFormatContext<'_>> for FormatExprGenerator {
     type Options = GeneratorExpParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -33,15 +32,11 @@ pub struct FormatExprGenerator {
     parentheses: GeneratorExpParentheses,
 }
 
-impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
-    fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprGenerator {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-            parenthesized: is_parenthesized,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::ExprGenerator> for FormatExprGenerator {
+    fn fmt_fields(&self, item: ExprGenerator<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let elt = item.elt();
+        let generators = item.generators();
+        let is_parenthesized = item.parenthesized();
 
         let joined = format_with(|f| {
             f.join_with(soft_line_break_or_space())
@@ -78,10 +73,10 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
     }
 }
 
-impl NeedsParentheses for ExprGenerator {
+impl NeedsParentheses for ExprGenerator<'_> {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {

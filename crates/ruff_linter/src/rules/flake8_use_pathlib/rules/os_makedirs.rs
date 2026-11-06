@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_python_ast::ArgOrKeyword;
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,12 +69,12 @@ impl Violation for OsMakedirs {
 }
 
 /// PTH103
-pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if segments != ["os", "makedirs"] {
         return;
     }
 
-    let range = call.range();
+    let range = call.range;
     let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func.range());
 
     let Some(name) = call.arguments.find_argument_value("name", 0) else {
@@ -98,7 +99,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     // We should not offer autofixes if there are keyword arguments
     // that don't match the original function signature
     if has_unknown_keywords_or_starred_expr(
-        &call.arguments,
+        call.arguments,
         &["name", "mode", "exist_ok", "parent_mode"],
     ) {
         return;
@@ -107,7 +108,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range.start(),
             checker.semantic(),
         )?;
 

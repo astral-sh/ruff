@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::{self as ast, ExceptHandler, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -66,17 +66,20 @@ impl Violation for BinaryOpException {
 }
 
 /// PLW0711
-pub(crate) fn binary_op_exception(checker: &Checker, except_handler: &ExceptHandler) {
-    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
-        except_handler;
+pub(crate) fn binary_op_exception(checker: &Checker, except_handler: ExceptHandler<'_>) {
+    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
+        type_,
+        ..
+    }) = except_handler.fields();
 
     let Some(type_) = type_ else {
         return;
     };
 
-    let Expr::BoolOp(ast::ExprBoolOp { op, .. }) = type_.as_ref() else {
+    let ExprKind::BoolOp(bool_op) = type_.classify() else {
         return;
     };
+    let op = bool_op.op();
 
-    checker.report_diagnostic(BinaryOpException { op: op.into() }, type_.range());
+    checker.report_diagnostic(BinaryOpException { op: (&op).into() }, type_.range());
 }

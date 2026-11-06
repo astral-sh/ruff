@@ -71,12 +71,12 @@ pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, sett
         return;
     };
 
-    if is_test(&function.name) {
+    if is_test(function.name().as_str()) {
         return;
     }
 
     if is_property(
-        &function.decorator_list,
+        function.decorator_list(),
         settings.property_decorators(),
         checker.semantic(),
     ) {

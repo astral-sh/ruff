@@ -141,7 +141,7 @@ pub struct Expression<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub node_ref: AstNodeRef<ast::Expr>,
+    pub node_ref: AstNodeRef<ast::kind::Expr>,
 
     /// An assignment statement, if this expression is immediately used as the rhs of that
     /// assignment.
@@ -153,7 +153,7 @@ pub struct Expression<'db> {
     #[no_eq]
     #[tracked]
     #[returns(clone)]
-    pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
+    pub assigned_to: Option<AstNodeRef<ast::kind::StmtAssign>>,
 
     /// The inference context for this expression.
     #[returns(copy)]

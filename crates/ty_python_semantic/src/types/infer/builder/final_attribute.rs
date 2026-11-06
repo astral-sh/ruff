@@ -1,6 +1,6 @@
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
@@ -101,7 +101,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// expression refers to the first parameter of the enclosing method and has not been shadowed
     /// in intermediate scopes. We additionally check that the nearest enclosing function has an
     /// implicit receiver, since static methods also have a first parameter.
-    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+    fn is_instance_attribute_assignment(&self, target: ast::ExprAttribute<'_>) -> bool {
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
@@ -121,13 +121,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// definition scopes, but their annotations were accepted before non-name target validation.
     pub(super) fn is_receiver_attribute_annotation_target(
         &self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
     ) -> bool {
         if self.is_instance_attribute_assignment(target) {
             return true;
         }
 
-        let Some(receiver) = target.value.as_name_expr() else {
+        let Some(receiver) = target.value().as_name_expr() else {
             return false;
         };
         let current_scope_id = self.scope().file_scope_id(self.db());
@@ -146,8 +146,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///         def inner():
     ///             self.attribute = 1
     /// ```
-    pub(super) fn receiver_method_scope(&self, receiver: &ast::ExprName) -> Option<FileScopeId> {
-        let receiver_name = receiver.id.as_str();
+    pub(super) fn receiver_method_scope(&self, receiver: ast::ExprName<'_>) -> Option<FileScopeId> {
+        let receiver_name = receiver.id().as_str();
         let current_scope_id = self.scope().file_scope_id(self.db());
         let (receiver_scope_id, receiver_scope, receiver_symbol) = self
             .index
@@ -169,7 +169,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.index.class_definition_of_method(receiver_scope_id)?;
 
         (function
-            .parameters
+            .parameters()
             .iter_non_variadic_params()
             .next()
             .is_some_and(|parameter| parameter.name() == receiver_name)
@@ -182,7 +182,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn invalid_assignment_to_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
@@ -196,9 +196,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Use the full assignment statement range for these diagnostics instead of
         // just the attribute target range.
 
-        let is_in_allowed_initializer = self
-            .current_function_definition()
-            .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
+        let is_in_allowed_initializer = self.current_function_definition().is_some_and(|func| {
+            func.name().id() == "__init__" || func.name().id() == "__post_init__"
+        });
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
@@ -287,7 +287,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn invalid_deletion_of_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
         emit_diagnostics: bool,
@@ -320,7 +320,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_assignment(
         &mut self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
     ) -> bool {
@@ -365,7 +365,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_deletion(
         &self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
         emit_diagnostics: bool,

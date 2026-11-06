@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprKind;
 use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
@@ -87,31 +88,29 @@ impl Violation for LogExceptionOutsideExceptHandler {
 }
 
 /// LOG004
-pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &ExprCall) {
+pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
-    if !outside_handlers(call.start(), semantic) {
+    if !outside_handlers(call.range.start(), semantic) {
         return;
     }
 
-    let fix = match &*call.func {
-        func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
+    let func = call.func;
+    let fix = match func.classify() {
+        ExprKind::Attribute(attribute) => {
+            let attr = attribute.attr();
             let logger_objects = &checker.settings().logger_objects;
-
-            if !logging::is_logger_candidate(func, semantic, logger_objects) {
+            if attr != "exception" || !logging::is_logger_candidate(func, semantic, logger_objects)
+            {
                 return;
             }
 
-            if attr != "exception" {
-                return;
-            }
-
-            let edit = Edit::range_replacement("error".to_string(), attr.range);
+            let edit = Edit::range_replacement("error".to_string(), attr.range());
 
             Some(Fix::unsafe_edit(edit))
         }
 
-        func @ Expr::Name(_) => {
+        ExprKind::Name(_) => {
             let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
                 return;
             };
@@ -126,7 +125,7 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         _ => return,
     };
 
-    let mut diagnostic = checker.report_diagnostic(LogExceptionOutsideExceptHandler, call.range());
+    let mut diagnostic = checker.report_diagnostic(LogExceptionOutsideExceptHandler, call.range);
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);

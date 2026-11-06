@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -51,7 +50,7 @@ impl Violation for PandasUseOfDotReadTable {
 /// PD012
 pub(crate) fn use_of_read_table(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
@@ -59,10 +58,11 @@ pub(crate) fn use_of_read_table(
     }
 
     if matches!(qualified_name.segments(), ["pandas", "read_table"])
-        && let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = call
-            .arguments
-            .find_keyword("sep")
-            .map(|keyword| &keyword.value)
+        && let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
+            call.arguments
+                .find_keyword("sep")
+                .map(Keyword::value)
+                .map(Expr::fields)
         && value == ","
     {
         checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());

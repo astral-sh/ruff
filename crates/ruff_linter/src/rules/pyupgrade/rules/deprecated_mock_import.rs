@@ -4,11 +4,12 @@ use libcst_native::{
     NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::debug;
+use ruff_python_ast::{ExprAttribute, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -167,7 +168,7 @@ fn format_mocks(
 
 /// Format the `import mock` rewrite.
 fn format_import(
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     indent: &str,
     locator: &Locator,
     stylist: &Stylist,
@@ -192,7 +193,7 @@ fn format_import(
 
 /// Format the `from mock import ...` rewrite.
 fn format_import_from(
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     indent: &str,
     locator: &Locator,
     stylist: &Stylist,
@@ -261,51 +262,53 @@ fn format_import_from(
 }
 
 /// UP026
-pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::ExprAttribute) {
+pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: ExprAttribute<'_>) {
     if !checker.semantic().seen_module(Modules::MOCK) {
         return;
     }
 
-    if UnqualifiedName::from_expr(&attribute.value)
+    if UnqualifiedName::from_expr(attribute.value())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedMockImport {
                 reference_type: MockReference::Attribute,
             },
-            attribute.value.range(),
+            attribute.value().range(),
         );
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "mock".to_string(),
-            attribute.value.range(),
+            attribute.value().range(),
         )));
     }
 }
 
 /// UP026
-pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
-    match stmt {
+pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: Stmt<'_>) {
+    match stmt.classify() {
         // Find all `mock` imports.
-        Stmt::Import(ast::StmtImport {
-            names,
-            is_lazy,
-            range: _,
-            node_index: _,
-        }) if names
-            .iter()
-            .any(|name| &name.name == "mock" || &name.name == "mock.mock") =>
+        StmtKind::Import(stmt_import)
+            if stmt_import
+                .names()
+                .iter()
+                .any(|name| name.name() == "mock" || name.name() == "mock.mock") =>
         {
+            let names = stmt_import.names();
+            let is_lazy = stmt_import.is_lazy();
+
             // Explicit `lazy` imports stay lazy because the fix preserves the keyword.
             // Otherwise, changing the module must preserve whether `__lazy_modules__`
             // makes the import lazy.
-            let can_fix = *is_lazy
+            let can_fix = is_lazy
                 || names
                     .iter()
-                    .filter(|name| matches!(name.name.as_str(), "mock" | "mock.mock"))
-                    .all(|name| checker.import_rewrite_preserves_laziness(&name.name, "unittest"));
+                    .filter(|name| matches!(name.name().as_str(), "mock" | "mock.mock"))
+                    .all(|name| {
+                        checker.import_rewrite_preserves_laziness(name.name().as_str(), "unittest")
+                    });
             // Generate the fix, if needed, which is shared between all `mock` imports.
-            let content = if can_fix && let Some(indent) = indentation(checker.source(), stmt) {
+            let content = if can_fix && let Some(indent) = indentation(checker.source(), &stmt) {
                 match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                     Ok(content) => Some(content),
                     Err(e) => {
@@ -319,10 +322,10 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
 
             // Add a `Diagnostic` for each `mock` import.
             for name in names {
-                if (&name.name == "mock" || &name.name == "mock.mock")
+                if (name.name() == "mock" || name.name() == "mock.mock")
                     && !is_import_required_by_isort(
                         &checker.settings().isort.required_imports,
-                        stmt.into(),
+                        stmt,
                         name,
                     )
                 {
@@ -342,23 +345,21 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module: Some(module),
-            level,
-            names,
-            is_lazy,
-            ..
-        }) => {
-            if *level > 0 {
+        StmtKind::ImportFrom(stmt_import_from) if let Some(module) = stmt_import_from.module() => {
+            let level = stmt_import_from.level();
+            let names = stmt_import_from.names();
+            let is_lazy = stmt_import_from.is_lazy();
+
+            if level > 0 {
                 return;
             }
 
             if module == "mock" {
                 if names.iter().any(|alias| {
-                    alias.name.as_str() == "mock"
+                    alias.name().as_str() == "mock"
                         && is_import_required_by_isort(
                             &checker.settings().isort.required_imports,
-                            stmt.into(),
+                            stmt,
                             alias,
                         )
                 }) {
@@ -372,16 +373,16 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                     stmt.range(),
                 );
                 diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-                let can_fix = *is_lazy
+                let can_fix = is_lazy
                     || names.iter().all(|name| {
-                        let target = if name.name.as_str() == "mock" {
+                        let target = if name.name().as_str() == "mock" {
                             "unittest"
                         } else {
                             "unittest.mock"
                         };
-                        checker.import_rewrite_preserves_laziness(module, target)
+                        checker.import_rewrite_preserves_laziness(module.as_str(), target)
                     });
-                if can_fix && let Some(indent) = indentation(checker.source(), stmt) {
+                if can_fix && let Some(indent) = indentation(checker.source(), &stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())
                             .map(|content| Edit::range_replacement(content, stmt.range()))

@@ -1,6 +1,5 @@
 use ruff_formatter::{Buffer, FormatResult, format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprSetComp;
+use ruff_python_ast::{ExprSetComp, SyntaxNode};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
@@ -8,14 +7,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprSetComp;
 
-impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
-    fn fmt_fields(&self, item: &ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::ExprSetComp> for FormatExprSetComp {
+    fn fmt_fields(&self, item: ExprSetComp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let elt = item.elt();
+        let generators = item.generators();
 
         let joined = format_with(|f| {
             f.join_with(soft_line_break_or_space())
@@ -42,10 +37,10 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
     }
 }
 
-impl NeedsParentheses for ExprSetComp {
+impl NeedsParentheses for ExprSetComp<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never

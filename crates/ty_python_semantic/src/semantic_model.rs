@@ -3,9 +3,10 @@ use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
+
 use ruff_python_ast::find_node::CoveringNode;
-use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
-use ruff_python_ast::{Expr, ExprRef, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, AstNode, Expr, ExprStringLiteral};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
@@ -51,7 +52,10 @@ pub struct SemanticModel<'db> {
     file: ProgramFile<'db>,
     /// If `Some` then this `SemanticModel` is for analyzing the sub-AST of a string annotation.
     /// This expression will be used as a witness to the scope/location we're analyzing.
-    in_string_annotation_expr: Option<Box<Expr>>,
+    in_string_annotation_expr: Option<(
+        ruff_db::parsed::ParsedModuleRef,
+        ty_python_core::ast_node_ref::AstNodeRef<ast::kind::ExprStringLiteral>,
+    )>,
 }
 
 impl<'db> SemanticModel<'db> {
@@ -107,7 +111,7 @@ impl<'db> SemanticModel<'db> {
     pub(crate) fn definitely_has_builtin_binding(
         &self,
         name: &str,
-        node: ast::AnyNodeRef<'_>,
+        node: ast::SyntaxNode<'_>,
     ) -> bool {
         let index = semantic_index(self.db, self.program_file());
         let Some(scope) = self.scope(node) else {
@@ -135,7 +139,7 @@ impl<'db> SemanticModel<'db> {
     /// AST node.
     pub(crate) fn members_in_scope_at(
         &self,
-        node: ast::AnyNodeRef<'_>,
+        node: ast::SyntaxNode<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let db = self.db;
         let mut members = FxHashMap::default();
@@ -202,7 +206,7 @@ impl<'db> SemanticModel<'db> {
     }
 
     /// Returns completions for symbols available in a `from module import <CURSOR>` context.
-    pub fn from_import_completions(&self, import: &ast::StmtImportFrom) -> Vec<Completion<'db>> {
+    pub fn from_import_completions(&self, import: ast::StmtImportFrom<'_>) -> Vec<Completion<'db>> {
         let module_name = match ModuleName::from_import_statement(
             self.db,
             ImportingFile::File(
@@ -215,8 +219,8 @@ impl<'db> SemanticModel<'db> {
             Err(err) => {
                 tracing::debug!(
                     "Could not extract module name from `{module:?}` with level {level}: {err:?}",
-                    module = import.module,
-                    level = import.level,
+                    module = import.module(),
+                    level = import.level(),
                 );
                 return vec![];
             }
@@ -297,9 +301,9 @@ impl<'db> SemanticModel<'db> {
     }
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
-    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
+    pub fn attribute_completions(&self, node: ast::ExprAttribute<'_>) -> Vec<Completion<'db>> {
         let db = self.db;
-        let Some(ty) = node.value.inferred_type(self) else {
+        let Some(ty) = node.value().inferred_type(self) else {
             return Vec::new();
         };
 
@@ -319,7 +323,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
+    pub fn scoped_completions(&self, node: ast::SyntaxNode<'_>) -> Vec<Completion<'db>> {
         let db = self.db;
         let program_file = self.program_file();
         let index = semantic_index(self.db, program_file);
@@ -386,7 +390,7 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns `true` if the given class definition's name was previously
     /// bound in the same scope (i.e., the class definition is a re-assignment).
-    pub fn is_class_name_reassigned(&self, class_def: &ast::StmtClassDef) -> bool {
+    pub fn is_class_name_reassigned(&self, class_def: ast::StmtClassDef<'_>) -> bool {
         let index = semantic_index(self.db, self.program_file());
         let definition = index.expect_single_definition(class_def);
         let scope = definition.scope(self.db);
@@ -396,44 +400,44 @@ impl<'db> SemanticModel<'db> {
     }
 
     /// Returns the scope in which `node` is defined (handles string annotations).
-    pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
+    pub fn scope(&self, node: ast::SyntaxNode<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.program_file());
-        match self.node_in_ast(node) {
-            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+        match self.node_in_ast(node).classify() {
+            ast::AnyNode::Identifier(identifier) => index.try_expression_scope_id(&identifier),
 
             // Nodes implementing `HasDefinition`
-            ast::AnyNodeRef::StmtFunctionDef(function) => Some(
+            ast::AnyNode::StmtFunctionDef(function) => Some(
                 function
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::StmtClassDef(class) => {
+            ast::AnyNode::StmtClassDef(class) => {
                 Some(class.definition(self).scope(self.db).file_scope_id(self.db))
             }
-            ast::AnyNodeRef::Parameter(parameter) => Some(
+            ast::AnyNode::Parameter(parameter) => Some(
                 parameter
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ParameterWithDefault(parameter) => Some(
+            ast::AnyNode::ParameterWithDefault(parameter) => Some(
                 parameter
                     .definition(self)
                     .scope(self.db)
                     .file_scope_id(self.db),
             ),
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+            ast::AnyNode::ExceptHandlerExceptHandler(handler) => handler
                 .optional_definition(self)
                 .map(|definition| definition.scope(self.db).file_scope_id(self.db))
-                .or_else(|| index.try_expression_scope_id(handler.type_.as_deref()?))
+                .or_else(|| index.try_expression_scope_id(&handler.type_()?))
                 .or(Some(FileScopeId::global())),
-            ast::AnyNodeRef::TypeParamTypeVar(var) => {
+            ast::AnyNode::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
 
             // Fallback
-            node => match node.as_expr_ref() {
+            node => match node.syntax_node().cast::<Expr>() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
                 // fall back to the global scope.
@@ -449,7 +453,7 @@ impl<'db> SemanticModel<'db> {
     /// Like [`Self::scope`], this handles nodes inside string annotations.
     pub fn ancestor_scopes(
         &self,
-        node: ast::AnyNodeRef<'_>,
+        node: ast::SyntaxNode<'_>,
     ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
         let index = semantic_index(self.db, self.program_file());
         self.scope(node)
@@ -464,13 +468,16 @@ impl<'db> SemanticModel<'db> {
     ///
     /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
     /// target, or inference skipped the name inside a string annotation.
-    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
-        if name.ctx.is_del() {
+    pub fn reaching_definitions(
+        &self,
+        name: ast::ExprName<'_>,
+    ) -> Option<DefinitionResolution<'db>> {
+        if name.ctx().is_del() {
             return None;
         }
 
         let index = semantic_index(self.db, self.file);
-        let expression = ast::ExprRef::Name(name);
+        let expression: ast::Expr<'_> = name.into();
 
         // Require an expression use ID to exclude plain stores. Names in parsed string annotations
         // have no use IDs, so check them after inference instead.
@@ -548,37 +555,25 @@ impl<'db> SemanticModel<'db> {
         None
     }
 
-    /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
+    /// Get a "safe" [`ast::SyntaxNode`] to use for referring to the given (sub-)AST node.
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
     /// Otherwise it will return the input.
-    fn node_in_ast<'a>(&'a self, node: ast::AnyNodeRef<'a>) -> ast::AnyNodeRef<'a> {
-        if let Some(string_annotation) = &self.in_string_annotation_expr {
-            (&**string_annotation).into()
+    fn node_in_ast<'a>(&'a self, node: ast::SyntaxNode<'a>) -> ast::SyntaxNode<'a> {
+        if let Some((module, witness)) = &self.in_string_annotation_expr {
+            witness.node(module).syntax_node()
         } else {
             node
         }
     }
 
-    /// Get a "safe" [`Expr`] to use for referring to the given (sub-)expression.
+    /// Returns the expression to use for scope lookups in the module AST.
     ///
     /// If we're analyzing a string annotation, it will return the string literal's expression.
     /// Otherwise it will return the input.
-    fn expr_in_ast<'a>(&'a self, expr: &'a Expr) -> &'a Expr {
-        if let Some(string_annotation) = &self.in_string_annotation_expr {
-            string_annotation
-        } else {
-            expr
-        }
-    }
-
-    /// Get a "safe" [`ExprRef`] to use for referring to the given (sub-)expression.
-    ///
-    /// If we're analyzing a string annotation, it will return the string literal's expression.
-    /// Otherwise it will return the input.
-    fn expr_ref_in_ast<'a>(&'a self, expr: ExprRef<'a>) -> ExprRef<'a> {
-        if let Some(string_annotation) = &self.in_string_annotation_expr {
-            ExprRef::from(string_annotation)
+    fn expr_in_ast<'a>(&'a self, expr: Expr<'a>) -> Expr<'a> {
+        if let Some((module, witness)) = &self.in_string_annotation_expr {
+            witness.node(module).into()
         } else {
             expr
         }
@@ -591,14 +586,14 @@ impl<'db> SemanticModel<'db> {
     /// may return nonsense results or even panic!
     pub fn enter_string_annotation(
         &self,
-        string_expr: &ExprStringLiteral,
-    ) -> Option<(Parsed<ModExpression>, Self)> {
+        string_expr: ExprStringLiteral<'_>,
+    ) -> Option<(Parsed<ast::kind::ModExpression>, Self)> {
         // Ask the inference engine whether this is actually a string annotation
-        let expr = ExprRef::StringLiteral(string_expr);
+        let expr = string_expr.into();
         let index = semantic_index(self.db, self.program_file());
         // When looking up scopes, use the expr in the top-level AST
         // (we might be trying to enter a sub-sub-AST, so this isn't silly)
-        let file_scope = index.expression_scope_id(&self.expr_ref_in_ast(expr));
+        let file_scope = index.expression_scope_id(&self.expr_in_ast(expr));
         let scope = file_scope.to_scope_id(self.db, self.program_file());
         // When querying whether the expr is a string annotation, we do however use the actual expr
         // (the inference engine should record this information even for sub-nodes)
@@ -617,17 +612,22 @@ impl<'db> SemanticModel<'db> {
         let model = Self {
             db: self.db,
             file: self.file,
-            // Use expr_in_ast here because we might be entering a sub-sub-AST
-            in_string_annotation_expr: Some(Box::new(
-                self.expr_in_ast(&Expr::StringLiteral(string_expr.clone()))
-                    .clone(),
+            // A nested annotation keeps the witness from the outermost string.
+            in_string_annotation_expr: Some(self.in_string_annotation_expr.clone().unwrap_or_else(
+                || {
+                    let module =
+                        ruff_db::parsed::parsed_module(self.db, self.python_file()).load(self.db);
+                    let witness =
+                        ty_python_core::ast_node_ref::AstNodeRef::from_view(&module, string_expr);
+                    (module, witness)
+                },
             )),
         };
         Some((ast, model))
     }
 
     /// Returns whether `annotation` declares a PEP 613 type alias.
-    pub fn is_type_alias_annotation(&self, annotation: &Expr) -> bool {
+    pub fn is_type_alias_annotation(&self, annotation: Expr<'_>) -> bool {
         matches!(
             annotation.inferred_type(self),
             Some(Type::SpecialForm(SpecialFormType::TypeAlias))
@@ -649,10 +649,10 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
     /// if the expression refers to a name or attribute with declared qualifiers.
-    pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
+    pub fn type_qualifiers(&self, expr: Expr<'_>) -> TypeQualifiers {
         let db = self.db;
-        match expr {
-            ExprRef::Name(name) => {
+        match expr.classify() {
+            ast::ExprKind::Name(name) => {
                 let Some(definition) =
                     definition_for_name(self, name, ImportAliasResolution::ResolveAliases)
                 else {
@@ -672,15 +672,15 @@ impl<'db> SemanticModel<'db> {
                 };
                 declared.qualifiers()
             }
-            ExprRef::Attribute(attr) => {
-                let Some(value_ty) = attr.value.inferred_type(self) else {
+            ast::ExprKind::Attribute(attr) => {
+                let Some(value_ty) = attr.value().inferred_type(self) else {
                     return TypeQualifiers::empty();
                 };
                 value_ty
                     .member_lookup_with_policy(
                         db,
                         &self.program_environment(),
-                        &attr.attr.id,
+                        attr.attr().id(),
                         crate::types::MemberLookupPolicy::default(),
                     )
                     .qualifiers
@@ -696,8 +696,8 @@ impl<'db> SemanticModel<'db> {
     /// them or that it contains no other keys.
     pub fn expected_string_literal_completions(
         &self,
-        string_expr: &ast::ExprStringLiteral,
-        subscript: Option<&ast::ExprSubscript>,
+        string_expr: ast::ExprStringLiteral<'_>,
+        subscript: Option<ast::ExprSubscript<'_>>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
@@ -759,7 +759,7 @@ impl<'db> SemanticModel<'db> {
             && let Some(subscript) = subscript
         {
             self.dictionary_initializer_keys(
-                &subscript.value,
+                subscript.value(),
                 &mut FxHashSet::default(),
                 &mut candidates,
             );
@@ -784,16 +784,16 @@ impl<'db> SemanticModel<'db> {
     /// and removes duplicates.
     fn dictionary_initializer_keys(
         &self,
-        receiver: &ast::Expr,
+        receiver: ast::Expr<'_>,
         visited: &mut FxHashSet<Definition<'db>>,
         candidates: &mut Vec<ExpectedStringLiteralCompletion<'db>>,
     ) {
-        if let ast::Expr::Dict(dict) = receiver {
-            candidates.extend(dict.items.iter().filter_map(|item| {
-                let ast::Expr::StringLiteral(key) = item.key.as_ref()? else {
+        if let ast::ExprKind::Dict(dict) = receiver.classify() {
+            candidates.extend(dict.items().iter().filter_map(|item| {
+                let ast::ExprKind::StringLiteral(key) = item.key()?.classify() else {
                     return None;
                 };
-                let value = key.value.to_string();
+                let value = key.value().to_string();
                 Some(ExpectedStringLiteralCompletion {
                     ty: Type::string_literal(self.db, value.as_str()),
                     value,
@@ -839,9 +839,9 @@ impl<'db> SemanticModel<'db> {
     /// Other tracked places use the bindings recorded at their use site.
     fn definitions_for_dictionary_key_completion(
         &self,
-        receiver: &ast::Expr,
+        receiver: ast::Expr<'_>,
     ) -> Vec<Definition<'db>> {
-        if let ast::Expr::Name(name) = receiver {
+        if let Some(name) = receiver.as_name_expr() {
             return self
                 .reaching_definitions(name)
                 .map(|resolution| resolution.definitions().to_vec())
@@ -849,10 +849,10 @@ impl<'db> SemanticModel<'db> {
         }
 
         let index = semantic_index(self.db, self.file);
-        let Some(scope) = index.try_expression_scope_id(receiver) else {
+        let Some(scope) = index.try_expression_scope_id(&receiver) else {
             return Vec::new();
         };
-        let Some(use_id) = index.try_expression_use_id(receiver.into()) else {
+        let Some(use_id) = index.try_expression_use_id(receiver) else {
             return Vec::new();
         };
         DefinitionResolution::from_bindings(
@@ -875,9 +875,10 @@ impl<'db> SemanticModel<'db> {
         let kind = definition.kind(self.db);
         let module = parsed_module(self.db, file.python_file(self.db)).load(self.db);
         let (import, name) = match &kind {
-            DefinitionKind::ImportFrom(import) => {
-                (import.import(&module), import.alias(&module).name.as_str())
-            }
+            DefinitionKind::ImportFrom(import) => (
+                import.import(&module),
+                import.alias(&module).name().as_str(),
+            ),
             DefinitionKind::StarImport(import) => {
                 let Some(symbol) = semantic_index(self.db, file)
                     .place_table(definition.file_scope(self.db))
@@ -914,11 +915,11 @@ impl<'db> SemanticModel<'db> {
 
     fn string_literal_completion_expected_type(
         &self,
-        string_expr: &ast::ExprStringLiteral,
+        string_expr: ast::ExprStringLiteral<'_>,
     ) -> Option<Type<'db>> {
-        let expr = ast::ExprRef::from(string_expr);
+        let expr = string_expr.into();
         let index = semantic_index(self.db, self.program_file());
-        let file_scope = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))?;
+        let file_scope = index.try_expression_scope_id(&self.expr_in_ast(expr))?;
         let scope = file_scope.to_scope_id(self.db, self.program_file());
 
         infer_complete_scope_types(self.db, scope).try_expected_type(expr)
@@ -1019,15 +1020,15 @@ trait HasOptionalDefinition {
     fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>>;
 }
 
-impl HasType for ast::ExprRef<'_> {
+impl HasType for Expr<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let file = model.program_file();
         let index = semantic_index(model.db, file);
         // TODO(#1637): semantic tokens is making this crash even with
-        // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
+        // `expr_in_ast` guarding this, for now just use `try_expression_scope_id`.
         // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
         // is we're too eagerly setting `is_string_annotation` in inference.
-        let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
+        let file_scope = index.try_expression_scope_id(&model.expr_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, file);
 
         infer_complete_scope_types(model.db, scope).try_expression_type(*self)
@@ -1039,86 +1040,45 @@ macro_rules! impl_expression_has_type {
         impl HasType for $ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-                let expression_ref = ExprRef::from(self);
-                expression_ref.inferred_type(model)
+                Expr::from(*self).inferred_type(model)
             }
         }
     };
 }
 
-impl_expression_has_type!(ast::ExprBoolOp);
-impl_expression_has_type!(ast::ExprNamed);
-impl_expression_has_type!(ast::ExprBinOp);
-impl_expression_has_type!(ast::ExprUnaryOp);
-impl_expression_has_type!(ast::ExprLambda);
-impl_expression_has_type!(ast::ExprIf);
-impl_expression_has_type!(ast::ExprDict);
-impl_expression_has_type!(ast::ExprSet);
-impl_expression_has_type!(ast::ExprListComp);
-impl_expression_has_type!(ast::ExprSetComp);
-impl_expression_has_type!(ast::ExprDictComp);
-impl_expression_has_type!(ast::ExprGenerator);
-impl_expression_has_type!(ast::ExprAwait);
-impl_expression_has_type!(ast::ExprYield);
-impl_expression_has_type!(ast::ExprYieldFrom);
-impl_expression_has_type!(ast::ExprCompare);
-impl_expression_has_type!(ast::ExprCall);
-impl_expression_has_type!(ast::ExprFString);
-impl_expression_has_type!(ast::ExprTString);
-impl_expression_has_type!(ast::ExprStringLiteral);
-impl_expression_has_type!(ast::ExprBytesLiteral);
-impl_expression_has_type!(ast::ExprNumberLiteral);
-impl_expression_has_type!(ast::ExprBooleanLiteral);
-impl_expression_has_type!(ast::ExprNoneLiteral);
-impl_expression_has_type!(ast::ExprEllipsisLiteral);
-impl_expression_has_type!(ast::ExprAttribute);
-impl_expression_has_type!(ast::ExprSubscript);
-impl_expression_has_type!(ast::ExprStarred);
-impl_expression_has_type!(ast::ExprName);
-impl_expression_has_type!(ast::ExprList);
-impl_expression_has_type!(ast::ExprTuple);
-impl_expression_has_type!(ast::ExprSlice);
-impl_expression_has_type!(ast::ExprIpyEscapeCommand);
-
-impl HasType for ast::Expr {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        match self {
-            Expr::BoolOp(inner) => inner.inferred_type(model),
-            Expr::Named(inner) => inner.inferred_type(model),
-            Expr::BinOp(inner) => inner.inferred_type(model),
-            Expr::UnaryOp(inner) => inner.inferred_type(model),
-            Expr::Lambda(inner) => inner.inferred_type(model),
-            Expr::If(inner) => inner.inferred_type(model),
-            Expr::Dict(inner) => inner.inferred_type(model),
-            Expr::Set(inner) => inner.inferred_type(model),
-            Expr::ListComp(inner) => inner.inferred_type(model),
-            Expr::SetComp(inner) => inner.inferred_type(model),
-            Expr::DictComp(inner) => inner.inferred_type(model),
-            Expr::Generator(inner) => inner.inferred_type(model),
-            Expr::Await(inner) => inner.inferred_type(model),
-            Expr::Yield(inner) => inner.inferred_type(model),
-            Expr::YieldFrom(inner) => inner.inferred_type(model),
-            Expr::Compare(inner) => inner.inferred_type(model),
-            Expr::Call(inner) => inner.inferred_type(model),
-            Expr::FString(inner) => inner.inferred_type(model),
-            Expr::TString(inner) => inner.inferred_type(model),
-            Expr::StringLiteral(inner) => inner.inferred_type(model),
-            Expr::BytesLiteral(inner) => inner.inferred_type(model),
-            Expr::NumberLiteral(inner) => inner.inferred_type(model),
-            Expr::BooleanLiteral(inner) => inner.inferred_type(model),
-            Expr::NoneLiteral(inner) => inner.inferred_type(model),
-            Expr::EllipsisLiteral(inner) => inner.inferred_type(model),
-            Expr::Attribute(inner) => inner.inferred_type(model),
-            Expr::Subscript(inner) => inner.inferred_type(model),
-            Expr::Starred(inner) => inner.inferred_type(model),
-            Expr::Name(inner) => inner.inferred_type(model),
-            Expr::List(inner) => inner.inferred_type(model),
-            Expr::Tuple(inner) => inner.inferred_type(model),
-            Expr::Slice(inner) => inner.inferred_type(model),
-            Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
-        }
-    }
-}
+impl_expression_has_type!(ast::ExprBoolOp<'_>);
+impl_expression_has_type!(ast::ExprNamed<'_>);
+impl_expression_has_type!(ast::ExprBinOp<'_>);
+impl_expression_has_type!(ast::ExprUnaryOp<'_>);
+impl_expression_has_type!(ast::ExprLambda<'_>);
+impl_expression_has_type!(ast::ExprIf<'_>);
+impl_expression_has_type!(ast::ExprDict<'_>);
+impl_expression_has_type!(ast::ExprSet<'_>);
+impl_expression_has_type!(ast::ExprListComp<'_>);
+impl_expression_has_type!(ast::ExprSetComp<'_>);
+impl_expression_has_type!(ast::ExprDictComp<'_>);
+impl_expression_has_type!(ast::ExprGenerator<'_>);
+impl_expression_has_type!(ast::ExprAwait<'_>);
+impl_expression_has_type!(ast::ExprYield<'_>);
+impl_expression_has_type!(ast::ExprYieldFrom<'_>);
+impl_expression_has_type!(ast::ExprCompare<'_>);
+impl_expression_has_type!(ast::ExprCall<'_>);
+impl_expression_has_type!(ast::ExprFString<'_>);
+impl_expression_has_type!(ast::ExprTString<'_>);
+impl_expression_has_type!(ast::ExprStringLiteral<'_>);
+impl_expression_has_type!(ast::ExprBytesLiteral<'_>);
+impl_expression_has_type!(ast::ExprNumberLiteral<'_>);
+impl_expression_has_type!(ast::ExprBooleanLiteral<'_>);
+impl_expression_has_type!(ast::ExprNoneLiteral<'_>);
+impl_expression_has_type!(ast::ExprEllipsisLiteral<'_>);
+impl_expression_has_type!(ast::ExprAttribute<'_>);
+impl_expression_has_type!(ast::ExprSubscript<'_>);
+impl_expression_has_type!(ast::ExprStarred<'_>);
+impl_expression_has_type!(ast::ExprName<'_>);
+impl_expression_has_type!(ast::ExprList<'_>);
+impl_expression_has_type!(ast::ExprTuple<'_>);
+impl_expression_has_type!(ast::ExprSlice<'_>);
+impl_expression_has_type!(ast::ExprIpyEscapeCommand<'_>);
 
 macro_rules! impl_binding_has_ty_def {
     ($ty: ty) => {
@@ -1126,7 +1086,7 @@ macro_rules! impl_binding_has_ty_def {
             #[inline]
             fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
                 let index = semantic_index(model.db, model.program_file());
-                index.expect_single_definition(self)
+                index.expect_single_definition(*self)
             }
         }
 
@@ -1140,38 +1100,38 @@ macro_rules! impl_binding_has_ty_def {
     };
 }
 
-impl_binding_has_ty_def!(ast::StmtFunctionDef);
-impl_binding_has_ty_def!(ast::StmtClassDef);
-impl_binding_has_ty_def!(ast::Parameter);
-impl_binding_has_ty_def!(ast::ParameterWithDefault);
-impl_binding_has_ty_def!(ast::TypeParamTypeVar);
-impl_binding_has_ty_def!(ast::TypeParamParamSpec);
-impl_binding_has_ty_def!(ast::TypeParamTypeVarTuple);
-impl_binding_has_ty_def!(ast::StmtTypeAlias);
+impl_binding_has_ty_def!(ast::StmtFunctionDef<'_>);
+impl_binding_has_ty_def!(ast::StmtClassDef<'_>);
+impl_binding_has_ty_def!(ast::Parameter<'_>);
+impl_binding_has_ty_def!(ast::ParameterWithDefault<'_>);
+impl_binding_has_ty_def!(ast::TypeParamTypeVar<'_>);
+impl_binding_has_ty_def!(ast::TypeParamParamSpec<'_>);
+impl_binding_has_ty_def!(ast::TypeParamTypeVarTuple<'_>);
+impl_binding_has_ty_def!(ast::StmtTypeAlias<'_>);
 
-impl HasType for ast::Alias {
+impl HasType for ast::Alias<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        if &self.name == "*" {
+        if self.name() == "*" {
             return Some(Type::Never);
         }
         let index = semantic_index(model.db, model.program_file());
         Some(binding_type(
             model.db(),
-            index.expect_single_definition(self),
+            index.expect_single_definition(*self),
         ))
     }
 }
 
-impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
+impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler<'_> {
     fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
-        self.name.as_ref()?;
+        self.name()?;
 
         let index = semantic_index(model.db, model.program_file());
-        Some(index.expect_single_definition(self))
+        Some(index.expect_single_definition(*self))
     }
 }
 
-impl HasType for ast::ExceptHandlerExceptHandler {
+impl HasType for ast::ExceptHandlerExceptHandler<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let definition = self.optional_definition(model)?;
         Some(binding_type(model.db(), definition))
@@ -1182,16 +1142,19 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 mod tests {
     use std::fmt::Write;
 
-    use crate::db::tests::TestDbBuilder;
+    use crate::db::tests::{TestDb, TestDbBuilder};
+    use crate::types::{ClassLiteral, Type};
     use crate::{DefinitionResolution, HasType, SemanticModel};
     use insta::assert_snapshot;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_python_ast as ast;
+    use ruff_db::system::DbWithWritableSystem;
     use ruff_python_ast::visitor::{Visitor, walk_expr};
+    use ruff_python_ast::{self as ast, AstNode, ExprCall};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::LineIndex;
     use ruff_text_size::{Ranged, TextRange};
+    use salsa::plumbing::AsId;
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -1205,7 +1168,7 @@ mod tests {
         let foo = ProgramFile::new(&db, foo, db.program_environment().program(&db));
         let ast = parsed_module(&db, foo.python_file(&db)).load(&db);
 
-        let function = ast.suite()[0].as_function_def_stmt().unwrap();
+        let function = ast.suite().at(0).as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
         let ty = function.inferred_type(&model).unwrap();
 
@@ -1225,12 +1188,48 @@ mod tests {
         let foo = ProgramFile::new(&db, foo, db.program_environment().program(&db));
         let ast = parsed_module(&db, foo.python_file(&db)).load(&db);
 
-        let class = ast.suite()[0].as_class_def_stmt().unwrap();
+        let class = ast.suite().at(0).as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
         let ty = class.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
 
+        Ok(())
+    }
+
+    #[test]
+    fn dangling_class_rows_survive_edits_around_the_calls() -> anyhow::Result<()> {
+        let path = "/src/factory.py";
+        let source = "def make(flag):\n    if flag:\n        return type('C', (), {})\n    return type('C', (), {})\n";
+        let mut db = TestDbBuilder::new().with_file(path, source).build()?;
+        let file = system_path_to_file(&db, path)?;
+        let classes = |db: &TestDb| {
+            let file = ProgramFile::new(db, file, db.program_environment().program(db));
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let model = SemanticModel::new(db, file);
+            module
+                .root()
+                .descendants()
+                .filter_map(AstNode::cast::<ExprCall>)
+                .map(|call| {
+                    let literal = call
+                        .inferred_type(&model)
+                        .and_then(Type::as_class_literal)
+                        .unwrap();
+                    assert_eq!(literal.header_range(db), call.range());
+                    let ClassLiteral::Dynamic(class) = literal else {
+                        panic!("expected a dynamic class")
+                    };
+                    class.as_id()
+                })
+                .collect::<Vec<_>>()
+        };
+        let before = classes(&db);
+        assert_eq!(before.len(), 2);
+        assert_ne!(before[0], before[1]);
+        // Both the module row numbers and the function's closing row move.
+        db.write_file(path, format!("outside = [1, 2]\n\n{source}    pass\n"))?;
+        assert_eq!(classes(&db), before);
         Ok(())
     }
 
@@ -1246,8 +1245,8 @@ mod tests {
         let bar = ProgramFile::new(&db, bar, db.program_environment().program(&db));
         let ast = parsed_module(&db, bar.python_file(&db)).load(&db);
 
-        let import = ast.suite()[0].as_import_from_stmt().unwrap();
-        let alias = &import.names[0];
+        let import = ast.suite().at(0).as_import_from_stmt().unwrap();
+        let alias = import.names().at(0);
         let model = SemanticModel::new(&db, bar);
         let ty = alias.inferred_type(&model).unwrap();
 
@@ -1292,7 +1291,7 @@ mod tests {
             del value
             ";
 
-        assert_snapshot!(render_name_resolutions(source, "/src/test.py", None, |name| name.id == "value"), @"
+        assert_snapshot!(render_name_resolutions(source, "/src/test.py", None, |name| name.id() == "value"), @"
         1 | value = 1
           | ^^^^^ -> <no resolution>
         2 | value += 1
@@ -1687,7 +1686,7 @@ mod tests {
         detail: Option<ResolutionDetail>,
     ) -> String {
         render_name_resolutions(source, path, detail, |node| {
-            node.id == name && node.ctx.is_load()
+            node.id() == name && node.ctx().is_load()
         })
     }
 
@@ -1697,7 +1696,7 @@ mod tests {
         source: &str,
         path: &str,
         detail: Option<ResolutionDetail>,
-        include_name: impl Fn(&ast::ExprName) -> bool,
+        include_name: impl Fn(ast::ExprName<'_>) -> bool,
     ) -> String {
         let source = dedent(source);
         let source = source.trim();
@@ -1776,18 +1775,19 @@ mod tests {
 
     struct NameResolutions<'db, 'filter> {
         model: SemanticModel<'db>,
-        include_name: &'filter dyn Fn(&ast::ExprName) -> bool,
+        include_name: &'filter dyn Fn(ast::ExprName<'_>) -> bool,
         resolutions: Vec<(TextRange, Option<DefinitionResolution<'db>>)>,
     }
 
     impl<'ast> Visitor<'ast> for NameResolutions<'_, '_> {
-        fn visit_expr(&mut self, expression: &'ast ast::Expr) {
-            if let ast::Expr::Name(name) = expression
+        fn visit_expr(&mut self, expression: ast::Expr<'ast>) {
+            let kind = expression.classify();
+            if let ast::ExprKind::Name(name) = kind
                 && (self.include_name)(name)
             {
                 self.resolutions
                     .push((name.range(), self.model.reaching_definitions(name)));
-            } else if let ast::Expr::StringLiteral(string) = expression
+            } else if let ast::ExprKind::StringLiteral(string) = kind
                 && let Some((parsed, model)) = self.model.enter_string_annotation(string)
             {
                 let mut nested = NameResolutions {
@@ -1798,7 +1798,7 @@ mod tests {
                 nested.visit_expr(parsed.expr());
                 self.resolutions.extend(nested.resolutions);
             }
-            walk_expr(self, expression);
+            walk_expr(self, kind);
         }
     }
 }

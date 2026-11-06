@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprStringLiteral;
+use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -48,7 +48,10 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
 }
 
 /// FURB156
-pub(crate) fn hardcoded_string_charset_literal(checker: &Checker, expr: &ExprStringLiteral) {
+pub(crate) fn hardcoded_string_charset_literal(
+    checker: &Checker,
+    expr: &ast::ExprStringLiteralFields<'_>,
+) {
     // if the string literal is a docstring, the rule is not applied
     if checker.semantic().in_pep_257_docstring() {
         return;

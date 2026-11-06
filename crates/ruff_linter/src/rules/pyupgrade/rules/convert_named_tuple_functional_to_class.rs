@@ -2,20 +2,16 @@ use log::debug;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
-};
-use ruff_python_codegen::Generator;
+use ruff_python_ast::{self as ast, Expr, NodeList, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::rules::pyupgrade::fixes::{ClassField, functional_to_class_fix};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `NamedTuple` declarations that use functional syntax.
@@ -77,25 +73,23 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 /// UP014
 pub(crate) fn convert_named_tuple_functional_to_class(
     checker: &Checker,
-    stmt: &Stmt,
-    targets: &[Expr],
-    value: &Expr,
+    stmt: Stmt<'_>,
+    targets: NodeList<'_, ast::kind::Expr>,
+    value: Expr<'_>,
 ) {
-    let Some((typename, args, keywords, base_class)) =
-        match_named_tuple_assign(targets, value, checker.semantic())
+    let Some((typename, call)) = match_named_tuple_assign(targets, value, checker.semantic())
     else {
         return;
     };
 
-    let fields = match (args, keywords) {
-        // Ex) `NamedTuple("MyType")`
-        ([_typename], []) => Suite::from([Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })]),
+    let arguments = call.arguments();
+    let fields = match (arguments.args(), arguments.keywords()) {
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
-        ([_typename, fields], []) => {
-            if let Some(fields) = create_fields_from_fields_arg(fields) {
+        (args, keywords)
+            if let Some([_typename, fields]) = args.as_array()
+                && keywords.is_empty() =>
+        {
+            if let Some(fields) = fields_from_list(fields) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse fields");
@@ -103,8 +97,8 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             }
         }
         // Ex) `NamedTuple("MyType", a=int, b=str)`
-        ([_typename], keywords) => {
-            if let Some(fields) = create_fields_from_keywords(keywords) {
+        (args, keywords) if let Some([_typename]) = args.as_array() => {
+            if let Some(fields) = ClassField::from_keywords(keywords) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse keywords");
@@ -126,149 +120,43 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     );
     // TODO(charlie): Preserve indentation, to remove the first-column requirement.
     if checker.locator().is_at_start_of_line(stmt.start()) {
-        diagnostic.set_fix(convert_to_class(
+        diagnostic.set_fix(functional_to_class_fix(
+            checker,
             stmt,
             typename,
+            call.func(),
             fields,
-            base_class,
-            checker.generator(),
-            checker.comment_ranges(),
+            NodeList::default(),
         ));
     }
 }
 
-/// Return the typename, args, keywords, and base class.
+/// Match an assignment to the result of calling `typing.NamedTuple`.
 fn match_named_tuple_assign<'a>(
-    targets: &'a [Expr],
-    value: &'a Expr,
+    targets: NodeList<'a, ast::kind::Expr>,
+    value: Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
-    let [Expr::Name(ast::ExprName { id: typename, .. })] = targets else {
-        return None;
-    };
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        range_start: _,
-        node_index: _,
-    }) = value
-    else {
-        return None;
-    };
-    if !semantic.match_typing_expr(func, "NamedTuple") {
-        return None;
-    }
-    Some((typename, args, keywords, func))
+) -> Option<(&'a str, ast::ExprCall<'a>)> {
+    let [target] = targets.as_array()?;
+    let name = target.as_name_expr()?.id();
+    let call = value.as_call_expr()?;
+    semantic
+        .match_typing_expr(call.func(), "NamedTuple")
+        .then_some((name, call))
 }
 
-/// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
-fn create_field_assignment_stmt(field: Name, annotation: &Expr) -> Stmt {
-    ast::StmtAnnAssign {
-        target: Box::new(
-            ast::ExprName {
-                id: field,
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        ),
-        annotation: Box::new(annotation.clone()),
-        value: None,
-        simple: true,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-    .into()
-}
-
-/// Create a list of field assignments from the `NamedTuple` fields argument.
-fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
-    let fields = fields.as_list_expr()?;
-    if fields.is_empty() {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
-        Some(Suite::from([node]))
-    } else {
-        fields
-            .iter()
-            .map(|field| {
-                let ast::ExprTuple { elts, .. } = field.as_tuple_expr()?;
-                let [field, annotation] = elts.as_slice() else {
-                    return None;
-                };
-                if annotation.is_starred_expr() {
-                    return None;
-                }
-                let ast::ExprStringLiteral { value: field, .. } = field.as_string_literal_expr()?;
-                if !is_identifier(field.to_str()) {
-                    return None;
-                }
-                if is_dunder(field.to_str()) {
-                    return None;
-                }
-                Some(create_field_assignment_stmt(
-                    Name::new(field.to_str()),
-                    annotation,
-                ))
-            })
-            .collect()
-    }
-}
-
-/// Create a list of field assignments from the `NamedTuple` keyword arguments.
-fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
-    keywords
+fn fields_from_list(fields: Expr<'_>) -> Option<Vec<ClassField<'_>>> {
+    fields
+        .as_list_expr()?
+        .elts()
         .iter()
-        .map(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map(|field| create_field_assignment_stmt(field.id.clone(), &keyword.value))
+        .map(|field| {
+            let [name, annotation] = field.as_tuple_expr()?.elts().as_array()?;
+            let name = name.as_string_literal_expr()?.value().to_str();
+            if annotation.is_starred_expr() || !is_identifier(name) || is_dunder(name) {
+                return None;
+            }
+            Some(ClassField { name, annotation })
         })
         .collect()
-}
-
-/// Generate a `StmtKind:ClassDef` statement based on the provided body and
-/// keywords.
-fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt {
-    ast::StmtClassDef {
-        name: Identifier::new(typename.to_string(), TextRange::default()),
-        arguments: Some(Box::new(Arguments {
-            args: [base_class.clone()].into(),
-            keywords: std::iter::empty().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        body,
-        type_params: None,
-        decorator_list: DecoratorList::new(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-    .into()
-}
-
-/// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.
-fn convert_to_class(
-    stmt: &Stmt,
-    typename: &str,
-    body: Suite,
-    base_class: &Expr,
-    generator: Generator,
-    comment_ranges: &CommentRanges,
-) -> Fix {
-    Fix::applicable_edit(
-        Edit::range_replacement(
-            generator.stmt(&create_class_def_stmt(typename, body, base_class)),
-            stmt.range(),
-        ),
-        if comment_ranges.intersects(stmt.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        },
-    )
 }

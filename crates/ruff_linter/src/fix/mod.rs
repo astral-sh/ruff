@@ -16,6 +16,7 @@ use crate::{Edit, Fix};
 pub(crate) mod codemods;
 pub(crate) mod edits;
 pub(crate) mod snippet;
+pub(crate) mod syntax;
 
 pub(crate) struct FixResult {
     /// The resulting source code, after applying all fixes.

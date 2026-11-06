@@ -6,9 +6,14 @@ use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
 use ruff_python_ast::token::{Token, Tokens};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
-use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
+use ruff_python_ast::visitor::{
+    Visitor,
+    source_order::{SourceOrderVisitor, TraversalSignal, walk_module},
+};
+use ruff_python_ast::{
+    self as ast, AnyNode, Ast, AstNode, AstNodeId, Builder, Comprehension, Expr, PythonVersion,
+    Stmt, SyntaxNode,
+};
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
@@ -112,10 +117,10 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(source, parsed.ast())
+        .with_python_version(options.target_version());
 
-    for stmt in parsed.suite() {
+    for stmt in parsed.root().body() {
         visitor.visit_stmt(stmt);
     }
 
@@ -210,10 +215,10 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(source, parsed.ast())
+        .with_python_version(options.target_version());
 
-    for stmt in parsed.suite() {
+    for stmt in parsed.root().body() {
         visitor.visit_stmt(stmt);
     }
 
@@ -428,18 +433,62 @@ Tokens: {tokens:#?}
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
-fn validate_ast(parsed: &Parsed<Mod>, source_len: TextSize) {
-    walk_module(
-        &mut ValidateAstVisitor::new(parsed.tokens(), source_len),
-        parsed.syntax(),
+/// * direct children and descendants agree with the source-order visitor, including recovered nodes.
+/// * copying into another arena preserves node kinds, ranges and fields.
+fn validate_ast(parsed: &Parsed<ruff_python_ast::kind::Mod>, source_len: TextSize) {
+    let mut builder = Builder::default();
+    let copied = builder.copy_node(parsed.root());
+    assert_eq!(builder.get(copied), parsed.root());
+
+    let mut visitor = ValidateAstVisitor::new(parsed.tokens(), source_len);
+    walk_module(&mut visitor, parsed.root().classify());
+    let mut expected_statements = visitor
+        .visited
+        .iter()
+        .filter_map(|node| node.cast::<Stmt>())
+        .map(AstNode::node_id);
+    let mut statements = parsed.root().descendant_statements();
+    for stmt in statements.by_ref().take(3) {
+        assert_eq!(Some(stmt.node_id()), expected_statements.next());
+    }
+    statements.for_each(|stmt| assert_eq!(Some(stmt.node_id()), expected_statements.next()));
+    assert!(expected_statements.next().is_none());
+    for (node, expected) in parsed.root().descendants().zip_eq(visitor.visited) {
+        assert!(node.is_same_node(expected));
+        validate_children(node);
+    }
+}
+
+fn validate_children(node: SyntaxNode<'_>) {
+    #[derive(Default)]
+    struct ImmediateChildren(Vec<AstNodeId<ruff_python_ast::kind::Any>>);
+    impl SourceOrderVisitor<'_> for ImmediateChildren {
+        fn enter_node(&mut self, kind: AnyNode<'_>) -> TraversalSignal {
+            let node = kind.syntax_node();
+            self.0.push(node.node_id());
+            TraversalSignal::Skip
+        }
+    }
+
+    let mut expected = ImmediateChildren::default();
+    node.visit_source_order(&mut expected);
+    assert_eq!(
+        node.first_child().map(AstNode::node_id),
+        expected.0.first().copied()
     );
+    assert_eq!(
+        node.last_child().map(AstNode::node_id),
+        expected.0.last().copied()
+    );
+    assert!(node.children().map(AstNode::node_id).eq(expected.0));
 }
 
 #[derive(Debug)]
 struct ValidateAstVisitor<'a> {
     tokens: std::iter::Peekable<std::slice::Iter<'a, Token>>,
-    parents: Vec<AnyNodeRef<'a>>,
-    previous: Option<AnyNodeRef<'a>>,
+    parents: Vec<SyntaxNode<'a>>,
+    visited: Vec<SyntaxNode<'a>>,
+    previous: Option<SyntaxNode<'a>>,
     source_length: TextSize,
 }
 
@@ -447,6 +496,7 @@ impl<'a> ValidateAstVisitor<'a> {
     fn new(tokens: &'a Tokens, source_length: TextSize) -> Self {
         Self {
             tokens: tokens.iter().peekable(),
+            visited: Vec::new(),
             parents: Vec::new(),
             previous: None,
             source_length,
@@ -457,7 +507,7 @@ impl<'a> ValidateAstVisitor<'a> {
 impl ValidateAstVisitor<'_> {
     /// Check that the node's start doesn't fall within a token.
     /// Called in `enter_node` before visiting children.
-    fn assert_start_boundary(&mut self, node: AnyNodeRef<'_>) {
+    fn assert_start_boundary(&mut self, node: SyntaxNode<'_>) {
         // Skip tokens that end at or before the node starts.
         self.tokens
             .peeking_take_while(|t| t.end() <= node.start())
@@ -482,7 +532,7 @@ Root: {root:#?}",
     /// Check that the node's end doesn't fall within a token.
     /// Called in `leave_node` after visiting children, so all tokens
     /// within the node have been consumed.
-    fn assert_end_boundary(&mut self, node: AnyNodeRef<'_>) {
+    fn assert_end_boundary(&mut self, node: SyntaxNode<'_>) {
         // Skip tokens that end at or before the node ends.
         self.tokens
             .peeking_take_while(|t| t.end() <= node.end())
@@ -506,15 +556,17 @@ Root: {root:#?}",
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
-    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
-        if let AnyNodeRef::ExprCompare(compare) = node {
+    fn enter_node(&mut self, kind: AnyNode<'ast>) -> TraversalSignal {
+        let node = kind.syntax_node();
+        self.visited.push(node);
+        if let AnyNode::ExprCompare(compare) = kind {
             assert!(
-                !compare.ops.is_empty(),
+                !compare.ops().is_empty(),
                 "Comparison without an operator: {compare:#?}"
             );
             assert_eq!(
-                compare.operands.len(),
-                compare.ops.len() + 1,
+                compare.operands().len(),
+                compare.ops().len() + 1,
                 "Comparison operands and operators are unbalanced: {compare:#?}",
             );
         }
@@ -560,7 +612,8 @@ Root: {root:#?}",
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+    fn leave_node(&mut self, node: AnyNode<'ast>) {
+        let node = node.syntax_node();
         self.assert_end_boundary(node);
 
         self.parents.pop().expect("Expected tree to be balanced");
@@ -586,9 +639,9 @@ struct SemanticSyntaxCheckerVisitor<'a> {
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
-    fn new(source: &'a str) -> Self {
+    fn new(source: &'a str, ast: &Ast) -> Self {
         Self {
-            checker: SemanticSyntaxChecker::new(),
+            checker: SemanticSyntaxChecker::new(ast),
             diagnostics: RefCell::default(),
             python_version: PythonVersion::default(),
             source,
@@ -608,7 +661,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.checker);
+        let mut checker = self.checker;
         f(&mut checker, self);
         self.checker = checker;
     }
@@ -719,16 +772,20 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
-        match stmt {
-            ast::Stmt::ClassDef(ast::StmtClassDef {
-                arguments,
-                body,
-                decorator_list,
-                type_params,
-                ..
-            }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
+        let kind = stmt.classify();
+        self.with_semantic_checker(|semantic, context| {
+            semantic.visit_stmt(kind, context);
+        });
+        match kind {
+            ast::StmtKind::ClassDef(class_def) => {
+                let ast::StmtClassDefFields {
+                    arguments,
+                    body,
+                    decorator_list,
+                    type_params,
+                    ..
+                } = class_def.fields();
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -742,71 +799,52 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.scopes.push(Scope::Function {
-                    is_async: *is_async,
-                });
-                ast::visitor::walk_stmt(self, stmt);
+            ast::StmtKind::FunctionDef(function_def) => {
+                let is_async = function_def.is_async();
+                self.scopes.push(Scope::Function { is_async });
+                ruff_python_ast::visitor::walk_stmt(self, kind);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::Try(_) => {
+            ast::StmtKind::Try(_) => {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
-                ast::visitor::walk_stmt(self, stmt);
+                ruff_python_ast::visitor::walk_stmt(self, kind);
                 self.in_try = was_in_try;
             }
             _ => {
-                ast::visitor::walk_stmt(self, stmt);
+                ruff_python_ast::visitor::walk_stmt(self, kind);
             }
         }
     }
 
-    fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
-        match expr {
-            ast::Expr::Lambda(_) => {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
+        let kind = expr.classify();
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(kind, context));
+        let (key, value, generators) = match kind {
+            ast::ExprKind::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });
-                ast::visitor::walk_expr(self, expr);
+                ruff_python_ast::visitor::walk_expr(self, kind);
                 self.scopes.pop().unwrap();
+                return;
             }
-            ast::Expr::ListComp(ast::ExprListComp {
-                elt, generators, ..
-            })
-            | ast::Expr::SetComp(ast::ExprSetComp {
-                elt, generators, ..
-            })
-            | ast::Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
-                });
-                self.visit_expr(elt);
-                self.scopes.pop().unwrap();
-            }
-            ast::Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                ..
-            }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
-                });
-                if let Some(key) = key {
-                    self.visit_expr(key);
-                }
-                self.visit_expr(value);
-                self.scopes.pop().unwrap();
-            }
+            ast::ExprKind::ListComp(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::SetComp(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::Generator(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::DictComp(node) => (node.key(), node.value(), node.generators()),
             _ => {
-                ast::visitor::walk_expr(self, expr);
+                ruff_python_ast::visitor::walk_expr(self, kind);
+                return;
             }
+        };
+        for comprehension in generators {
+            self.visit_comprehension(comprehension);
         }
+        self.scopes.push(Scope::Comprehension {
+            is_async: generators.iter().any(Comprehension::is_async),
+        });
+        if let Some(key) = key {
+            self.visit_expr(key);
+        }
+        self.visit_expr(value);
+        self.scopes.pop().unwrap();
     }
 }

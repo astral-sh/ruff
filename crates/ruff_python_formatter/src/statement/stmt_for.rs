@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::{Expr, Stmt, StmtFor};
+use ruff_python_ast::{self as ast, Expr, ExprKind, StmtFor};
 use ruff_text_size::Ranged;
 
 use crate::expression::expr_tuple::TupleParentheses;
@@ -10,16 +10,18 @@ use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Debug)]
-struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+struct ExprTupleWithoutParentheses<'a>(Expr<'a>);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.0 {
-            Expr::Tuple(expr_tuple) => expr_tuple
+        match self.0.classify() {
+            ExprKind::Tuple(expr_tuple) => expr_tuple
                 .format()
                 .with_options(TupleParentheses::NeverPreserve)
                 .fmt(f),
-            other => maybe_parenthesize_expression(other, self.0, Parenthesize::IfBreaks).fmt(f),
+            other => {
+                maybe_parenthesize_expression(other.view(), self.0, Parenthesize::IfBreaks).fmt(f)
+            }
         }
     }
 }
@@ -27,21 +29,21 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
 #[derive(Default)]
 pub struct FormatStmtFor;
 
-impl FormatNodeRule<StmtFor> for FormatStmtFor {
-    fn fmt_fields(&self, item: &StmtFor, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtFor {
+impl FormatNodeRule<ruff_python_ast::kind::StmtFor> for FormatStmtFor {
+    fn fmt_fields(&self, item: StmtFor<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let ast::StmtForFields {
             is_async,
             target,
             iter,
             body,
             orelse,
             range: _,
-            node_index: _,
-        } = item;
+            node: _,
+        } = item.fields();
 
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling(item);
-        let body_start = body.first().map_or(iter.end(), Stmt::start);
+        let body_start = body.first().map_or(iter.end(), |node| node.start());
         let or_else_comments_start =
             dangling_comments.partition_point(|comment| comment.end() < body_start);
 

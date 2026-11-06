@@ -1,4 +1,4 @@
-use ruff_python_ast::{Identifier, Pattern};
+use ruff_python_ast::Identifier;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -6,38 +6,26 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::pep8_naming;
 
-/// Run lint rules over a [`Pattern`] syntax node.
-pub(crate) fn pattern(pattern: &Pattern, checker: &Checker) {
-    let name = match pattern {
-        Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-        Pattern::MatchStar(pattern) => pattern.name.as_ref(),
-        Pattern::MatchMapping(mapping) => mapping.rest(),
-        _ => None,
-    };
-    if let Some(name) = name {
-        check_pattern_name(checker, name);
-    }
-}
-
-fn check_pattern_name(checker: &Checker, name: &Identifier) {
+/// Check the name bound by a pattern.
+pub(crate) fn pattern_name(name: Identifier<'_>, checker: &Checker) {
     if checker.is_rule_enabled(Rule::NonLowercaseVariableInFunction)
         && checker.semantic().current_scope().kind.is_function()
     {
-        pep8_naming::rules::non_lowercase_variable_in_function(checker, name.range(), &name.id);
+        pep8_naming::rules::non_lowercase_variable_in_function(checker, name.range(), name.id());
     }
     if checker.is_rule_enabled(Rule::MixedCaseVariableInClassScope) {
         if let ScopeKind::Class(class_def) = &checker.semantic().current_scope().kind {
             pep8_naming::rules::mixed_case_variable_in_class_scope(
                 checker,
                 name.range(),
-                &name.id,
-                class_def,
+                name.id(),
+                *class_def,
             );
         }
     }
     if checker.is_rule_enabled(Rule::MixedCaseVariableInGlobalScope)
         && matches!(checker.semantic().current_scope().kind, ScopeKind::Module)
     {
-        pep8_naming::rules::mixed_case_variable_in_global_scope(checker, name.range(), &name.id);
+        pep8_naming::rules::mixed_case_variable_in_global_scope(checker, name.range(), name.id());
     }
 }

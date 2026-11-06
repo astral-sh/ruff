@@ -46,7 +46,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::ExprKind;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -1054,12 +1054,10 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
-    pub(crate) fn is_deferred_name_load(&self, name: &ast::ExprName) -> bool {
-        self.extra.as_deref().is_some_and(|extra| {
-            extra
-                .deferred_name_loads
-                .contains(&ast::ExprRef::Name(name).into())
-        })
+    pub(crate) fn is_deferred_name_load(&self, name: ruff_python_ast::ExprName<'_>) -> bool {
+        self.extra
+            .as_deref()
+            .is_some_and(|extra| extra.deferred_name_loads.contains(&name.into()))
     }
 
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
@@ -1608,10 +1606,10 @@ impl<'db> DefinitionInference<'db> {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
-            let known_collection = match assignment.value(&module) {
-                ast::Expr::Set(_) => Some(KnownClass::Set),
-                ast::Expr::List(_) => Some(KnownClass::List),
-                ast::Expr::Dict(_) => Some(KnownClass::Dict),
+            let known_collection = match assignment.value(&module).classify() {
+                ExprKind::Set(_) => Some(KnownClass::Set),
+                ExprKind::List(_) => Some(KnownClass::List),
+                ExprKind::Dict(_) => Some(KnownClass::Dict),
                 _ => None,
             };
 

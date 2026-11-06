@@ -39,8 +39,8 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub(crate) fn ambiguous_function_name(checker: &Checker, name: &Identifier) {
-    if is_ambiguous_name(name) {
+pub(crate) fn ambiguous_function_name(checker: &Checker, name: Identifier<'_>) {
+    if is_ambiguous_name(name.as_str()) {
         checker.report_diagnostic(AmbiguousFunctionName(name.to_string()), name.range());
     }
 }

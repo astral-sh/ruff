@@ -1,15 +1,12 @@
-use ruff_index::newtype_index;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
-use ruff_python_ast::ExprRef;
+use rustc_hash::FxHashMap;
 
-use crate::Db;
 use crate::HasTrackedScope;
-use crate::ProgramFile;
 use crate::frozen::PackedIds;
 use crate::member::ScopedMemberId;
 use crate::place::ScopedPlaceId;
-use crate::scope::FileScopeId;
-use crate::semantic_index;
+use crate::scope::{FileScopeId, Scope};
 use crate::symbol::ScopedSymbolId;
 
 pub use node_key::ExpressionNodeKey;
@@ -42,31 +39,34 @@ pub struct PlaceUse {
     pub place: ScopedPlaceId,
 }
 
-/// Indexed by root AST node while the flow builder visits expressions in evaluation order.
-/// Inference parses quoted annotations separately and resolves their names from syntax.
+/// Records lexical uses by root AST row, with separately parsed string annotations in a sparse index space.
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
     root: Box<[NodeIds]>,
-}
-
-fn root_index(node: ast::NodeIndex) -> usize {
-    node.as_u32()
-        .expect("expected an indexed node from the root AST") as usize
+    annotations: FxHashMap<ast::NodeIndex, NodeIds>,
 }
 
 impl AstIdsBuilder {
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
             root: vec![NodeIds::default(); node_count].into_boxed_slice(),
+            annotations: FxHashMap::default(),
         }
     }
 
     fn entry(&mut self, node: ast::NodeIndex) -> &mut NodeIds {
-        &mut self.root[root_index(node)]
+        if let Some(row) = node
+            .as_u32()
+            .and_then(|index| self.root.get_mut(index as usize))
+        {
+            row
+        } else {
+            self.annotations.entry(node).or_default()
+        }
     }
 
     pub(super) fn record_expression(&mut self, expr: &impl HasTrackedScope, scope: FileScopeId) {
-        self.entry(expr.node_index().load()).scope = Some(scope);
+        self.entry(expr.node_index()).scope = Some(scope);
     }
 
     /// Records a use on a non-expression node, such as a function name or the `**kwargs`
@@ -81,7 +81,7 @@ impl AstIdsBuilder {
 
     pub(super) fn record_place_use(
         &mut self,
-        expr: &ast::Expr,
+        expr: ast::Expr<'_>,
         scope: FileScopeId,
         use_id: ScopedUseId,
         place: ScopedPlaceId,
@@ -103,7 +103,10 @@ impl AstIdsBuilder {
         key: impl Into<ExpressionNodeKey>,
     ) -> Option<ScopedUseId> {
         let node = key.into().index();
-        let row = &self.root[root_index(node)];
+        let row = node
+            .as_u32()
+            .and_then(|index| self.root.get(index as usize))
+            .or_else(|| self.annotations.get(&node))?;
         row.use_id.filter(|_| row.scope == Some(scope))
     }
 
@@ -114,7 +117,13 @@ impl AstIdsBuilder {
         let mut use_ids = Vec::new();
         let mut places_plus_one = Vec::new();
         let mut scopes = Vec::new();
-        for (node, row) in (0..).map(ast::NodeIndex::from).zip(self.root) {
+        let mut annotations: Vec<_> = self.annotations.into_iter().collect();
+        annotations.sort_unstable_by_key(|(node, _)| *node);
+        for (node, row) in (0..)
+            .map(ast::NodeIndex::from)
+            .zip(self.root)
+            .chain(annotations)
+        {
             if let Some(scope) = row.scope {
                 ScopeRange::record(&mut scopes, node, scope);
             }
@@ -201,6 +210,12 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
+    pub(super) fn record_first_expression_rows(&self, scopes: &mut IndexVec<FileScopeId, Scope>) {
+        for range in &self.scopes {
+            scopes[range.scope].record_first_expression_row(range.start);
+        }
+    }
+
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
@@ -221,16 +236,16 @@ impl AstIds {
     }
 
     pub(super) fn expression_scope(&self, node: &impl HasTrackedScope) -> Option<FileScopeId> {
-        self.scope_at(node.node_index().load())
+        self.scope_at(node.node_index())
     }
 
-    pub(super) fn place_use(&self, expr: ast::ExprRef<'_>) -> Option<PlaceUse> {
+    pub(super) fn place_use(&self, expr: ast::Expr<'_>) -> Option<PlaceUse> {
         let node = ExpressionNodeKey::from(expr).index();
         let index = self.use_index(node)?;
         let ordinal = self.places_plus_one.get(index).checked_sub(1)?;
-        let place = match expr {
-            ast::ExprRef::Name(_) => ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(ordinal)),
-            ast::ExprRef::Attribute(_) | ast::ExprRef::Subscript(_) => {
+        let place = match expr.classify() {
+            ast::ExprKind::Name(_) => ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(ordinal)),
+            ast::ExprKind::Attribute(_) | ast::ExprKind::Subscript(_) => {
                 ScopedPlaceId::Member(ScopedMemberId::from_u32(ordinal))
             }
             _ => return None,
@@ -242,19 +257,10 @@ impl AstIds {
         })
     }
 
-    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        self.try_use_id(key)
-            .expect("the flow builder should have recorded this use")
-    }
-
     pub(super) fn try_use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
         self.use_index(key.into().index())
             .map(|index| self.use_ids.get(index))
     }
-}
-
-fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
-    semantic_index(db, file).ast_ids()
 }
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
@@ -262,56 +268,9 @@ fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedUseId;
 
-pub trait HasScopedUseId {
-    /// Returns the ID that uniquely identifies the use in its scope.
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId;
-}
-
-impl HasScopedUseId for ast::Identifier {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(self)
-    }
-}
-
-impl HasScopedUseId for ast::ExprName {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let expression_ref = ExprRef::from(self);
-        expression_ref.scoped_use_id(db, file)
-    }
-}
-
-impl HasScopedUseId for ast::ExprAttribute {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let expression_ref = ExprRef::from(self);
-        expression_ref.scoped_use_id(db, file)
-    }
-}
-
-impl HasScopedUseId for ast::ExprSubscript {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let expression_ref = ExprRef::from(self);
-        expression_ref.scoped_use_id(db, file)
-    }
-}
-
-impl HasScopedUseId for ast::Keyword {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(self)
-    }
-}
-
-impl HasScopedUseId for ast::ExprRef<'_> {
-    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(*self)
-    }
-}
-
 /// Node key that can only be constructed for expressions.
 pub(crate) mod node_key {
-    use ruff_python_ast as ast;
+    use ruff_python_ast::{self as ast};
 
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
@@ -335,45 +294,39 @@ pub(crate) mod node_key {
         }
     }
 
-    impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
-        fn from(value: ast::ExprRef<'_>) -> Self {
-            Self(NodeKey::from_node(value))
+    impl From<ast::Expr<'_>> for ExpressionNodeKey {
+        fn from(value: ast::Expr<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
-    impl From<&ast::Expr> for ExpressionNodeKey {
-        fn from(value: &ast::Expr) -> Self {
-            Self(NodeKey::from_node(value))
+    impl From<ast::ExprName<'_>> for ExpressionNodeKey {
+        fn from(value: ast::ExprName<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
-    impl From<&Box<ast::Expr>> for ExpressionNodeKey {
-        fn from(value: &Box<ast::Expr>) -> Self {
-            Self(NodeKey::from_node(&**value))
+    impl From<ast::ExprCall<'_>> for ExpressionNodeKey {
+        fn from(value: ast::ExprCall<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
-    impl From<&ast::ExprCall> for ExpressionNodeKey {
-        fn from(value: &ast::ExprCall) -> Self {
-            Self(NodeKey::from_node(value))
+    impl From<ast::ExprLambda<'_>> for ExpressionNodeKey {
+        fn from(value: ast::ExprLambda<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
-    impl From<&ast::ExprLambda> for ExpressionNodeKey {
-        fn from(value: &ast::ExprLambda) -> Self {
-            Self(NodeKey::from_node(value))
+    impl From<ast::Identifier<'_>> for ExpressionNodeKey {
+        fn from(value: ast::Identifier<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
-    impl From<&ast::Identifier> for ExpressionNodeKey {
-        fn from(value: &ast::Identifier) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
-    impl From<&ast::Keyword> for ExpressionNodeKey {
-        fn from(value: &ast::Keyword) -> Self {
-            Self(NodeKey::from_node(value))
+    impl From<ast::Keyword<'_>> for ExpressionNodeKey {
+        fn from(value: ast::Keyword<'_>) -> Self {
+            Self(NodeKey::from_view(value))
         }
     }
 
@@ -386,6 +339,10 @@ pub(crate) mod node_key {
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::parsed::parsed_string_annotation;
+    use ruff_python_ast::AstNode as _;
+    use ruff_python_parser::{ParseError, parse_module};
+
     use super::*;
 
     #[test]
@@ -405,5 +362,45 @@ mod tests {
         assert_eq!(lookup(63), Some(2));
         assert_eq!(lookup(64), Some(0));
         assert_eq!(lookup(128), Some(3));
+    }
+    #[test]
+    fn uses_across_blocks_scopes_and_annotations() -> Result<(), ParseError> {
+        let source = format!("({}a, b, c, 'T')", "x, ".repeat(63));
+        let mut module = parse_module(&source)?;
+        module.index_module();
+        let [stmt] = module.suite().as_array().unwrap();
+        let expr = stmt.as_expr_stmt().unwrap().value();
+        let tuple = expr.as_tuple_expr().unwrap();
+        let [a, b, c, string] = tuple.elts().slice(63..).as_array().unwrap();
+        assert_eq!(a.node_index().as_u32(), Some(63));
+        assert_eq!(b.node_index().as_u32(), Some(64));
+
+        let string = string
+            .as_string_literal_expr()
+            .unwrap()
+            .as_single_part_string()
+            .unwrap();
+        let annotation = parsed_string_annotation(&source, string)?;
+        let t = annotation.expr();
+
+        let mut builder = AstIdsBuilder::with_node_count(module.ast().len());
+        let outer = FileScopeId::global();
+        let inner = FileScopeId::from_u32(1);
+        let (c_id, a_id, b_id, t_id) = (0_u32.into(), 1_u32.into(), 0_u32.into(), 1_u32.into());
+        let place = ScopedSymbolId::from_u32(0).into();
+        builder.record_place_use(c, outer, c_id, place);
+        builder.record_place_use(a, outer, a_id, place);
+        builder.record_place_use(b, inner, b_id, place);
+        builder.record_place_use(t, inner, t_id, place);
+        assert_eq!(builder.try_scoped_use(outer, b), None);
+        assert_eq!(builder.try_scoped_use(inner, t), Some(t_id));
+
+        let ids = builder.finish();
+        assert_eq!(ids.try_use_id(expr), None);
+        assert_eq!(ids.try_use_id(a), Some(a_id));
+        assert_eq!(ids.try_use_id(b), Some(b_id));
+        assert_eq!(ids.try_use_id(c), Some(c_id));
+        assert_eq!(ids.try_use_id(t), Some(t_id));
+        Ok(())
     }
 }

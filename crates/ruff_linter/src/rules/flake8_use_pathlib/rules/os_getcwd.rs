@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,12 +68,12 @@ impl Violation for OsGetcwd {
 }
 
 /// PTH109
-pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if !matches!(segments, ["os", "getcwd" | "getcwdb"]) {
         return;
     }
 
-    let range = call.range();
+    let range = call.range;
     let mut diagnostic = checker.report_diagnostic(OsGetcwd, call.func.range());
 
     if !call.arguments.is_empty() {
@@ -84,7 +84,7 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("pathlib", "Path"),
-                call.start(),
+                call.range.start(),
                 checker.semantic(),
             )?;
 

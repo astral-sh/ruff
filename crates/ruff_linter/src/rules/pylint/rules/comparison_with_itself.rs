@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCompare};
+use ruff_python_ast::{ExprCompare, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -47,11 +47,13 @@ impl Violation for ComparisonWithItself {
 }
 
 /// PLR0124
-pub(crate) fn comparison_with_itself(checker: &Checker, compare: &ExprCompare) {
+pub(crate) fn comparison_with_itself(checker: &Checker, compare: ExprCompare<'_>) {
     for (left, op, right) in compare.iter() {
-        match (left, right) {
+        match (left.classify(), right.classify()) {
             // Ex) `foo == foo`
-            (Expr::Name(left_name), Expr::Name(right_name)) if left_name.id == right_name.id => {
+            (ExprKind::Name(left_name), ExprKind::Name(right_name))
+                if left_name.id() == right_name.id() =>
+            {
                 let actual = format!(
                     "{} {} {}",
                     checker.locator().slice(left),
@@ -66,29 +68,39 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: &ExprCompare) {
                 );
             }
             // Ex) `id(foo) == id(foo)`
-            (Expr::Call(left_call), Expr::Call(right_call)) => {
+            (ExprKind::Call(left_call), ExprKind::Call(right_call)) => {
                 // Both calls must take a single argument, of the same name.
-                if !left_call.arguments.keywords.is_empty()
-                    || !right_call.arguments.keywords.is_empty()
+                if !left_call.arguments().keywords().is_empty()
+                    || !right_call.arguments().keywords().is_empty()
                 {
                     continue;
                 }
-                let [Expr::Name(left_arg)] = &*left_call.arguments.args else {
+                let Some([ExprKind::Name(left_arg)]) = left_call
+                    .arguments()
+                    .args()
+                    .as_array()
+                    .map(|items| items.map(ruff_python_ast::Expr::classify))
+                else {
                     continue;
                 };
-                let [Expr::Name(right_right)] = &*right_call.arguments.args else {
+                let Some([ExprKind::Name(right_right)]) = right_call
+                    .arguments()
+                    .args()
+                    .as_array()
+                    .map(|items| items.map(ruff_python_ast::Expr::classify))
+                else {
                     continue;
                 };
-                if left_arg.id != right_right.id {
+                if left_arg.id() != right_right.id() {
                     continue;
                 }
 
                 // Both calls must be to the same function.
                 let semantic = checker.semantic();
-                let Some(left_name) = semantic.resolve_builtin_symbol(&left_call.func) else {
+                let Some(left_name) = semantic.resolve_builtin_symbol(left_call.func()) else {
                     continue;
                 };
-                let Some(right_name) = semantic.resolve_builtin_symbol(&right_call.func) else {
+                let Some(right_name) = semantic.resolve_builtin_symbol(right_call.func()) else {
                     continue;
                 };
                 if left_name != right_name {

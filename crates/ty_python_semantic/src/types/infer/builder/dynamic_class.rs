@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, AstNode, NodeIndex};
 use ruff_text_size::Ranged;
 
 use crate::types::class::{DynamicClassLiteral, DynamicClassScopeOffset};
@@ -39,38 +40,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Identify a dangling dynamic-class call without retaining an absolute source position.
     pub(super) fn dynamic_class_scope_offset(
         &self,
-        call: &ast::ExprCall,
+        call: ast::ExprCall<'_>,
     ) -> DynamicClassScopeOffset {
-        let scope_anchor = self
-            .scope()
-            .node(self.db())
-            .node_index()
-            .unwrap_or(NodeIndex::from(0));
-        let anchor_u32 = scope_anchor
-            .as_u32()
-            .expect("scope anchor should not be NodeIndex::NONE");
-        let relative_index = |index: NodeIndex| {
-            index
+        let anchor = self.scope().scope(self.db()).first_expression_row();
+        let relative_row = |index: NodeIndex| {
+            let row = index
                 .as_u32()
-                .expect("dynamic class anchor should not be NodeIndex::NONE")
-                - anchor_u32
+                .expect("dynamic class anchor is a module row");
+            i32::try_from(i64::from(row) - i64::from(anchor))
+                .expect("module rows are at most 30 bits")
         };
 
         if let DeferredExpressionState::InStringAnnotation(enclosing_node_key) = self.deferred_state
         {
             let enclosing_index = enclosing_node_key.index();
-            let string: &ast::ExprStringLiteral = self
+            let string: ast::ExprStringLiteral<'_> = self
                 .module()
                 .get_by_index(enclosing_index)
-                .try_into()
+                .cast()
                 .expect("string annotation key should point to ExprStringLiteral");
 
             DynamicClassScopeOffset::StringAnnotation {
-                offset: relative_index(enclosing_index),
+                offset: relative_row(enclosing_index),
                 range: call.range() - string.start(),
             }
         } else {
-            DynamicClassScopeOffset::Node(relative_index(call.node_index().load()))
+            DynamicClassScopeOffset::Node(relative_row(call.node_index()))
         }
     }
 
@@ -81,7 +76,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Returns `None` if the bases cannot be extracted.
     pub(super) fn extract_explicit_bases(
         &mut self,
-        bases_node: &ast::Expr,
+        bases_node: ast::Expr<'_>,
         bases_type: Type<'db>,
         kind: DynamicClassKind,
     ) -> Option<Box<[Type<'db>]>> {
@@ -122,16 +117,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Returns disjoint bases found (for instance-layout-conflict checking).
     pub(super) fn validate_dynamic_type_bases(
         &mut self,
-        bases_node: &ast::Expr,
+        bases_node: ast::Expr<'_>,
         bases: &[Type<'db>],
         name: &Name,
         kind: DynamicClassKind,
     ) -> IncompatibleBases<'db> {
         let db = self.db();
 
-        let bases_tuple_elts = bases_node
-            .as_tuple_expr()
-            .map(|tuple| tuple.elts.as_slice());
+        let bases_tuple_elts = bases_node.as_tuple_expr().map(ast::ExprTuple::elts);
         let mut disjoint_bases = IncompatibleBases::default();
         let fn_name = kind.function_name();
         let env = self.context.program_environment();
@@ -256,8 +249,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 pub(super) fn report_dynamic_mro_errors<'db>(
     context: &InferContext<'db, '_>,
     dynamic_class: DynamicClassLiteral<'db>,
-    call_expr: &ast::ExprCall,
-    bases: &ast::Expr,
+    call_expr: ast::ExprCall<'_>,
+    bases: ast::Expr<'_>,
 ) -> bool {
     let db = context.db();
     let env = context.program_environment();
@@ -288,13 +281,13 @@ pub(super) fn report_dynamic_mro_errors<'db>(
 pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
     context: &InferContext<'db, '_>,
     dynamic_class: DynamicClassLiteral<'db>,
-    bases: &ast::Expr,
+    bases: ast::Expr<'_>,
 ) {
     let db = context.db();
     let explicit_bases = dynamic_class.explicit_bases(context.db());
     let base_nodes = bases
         .as_tuple_expr()
-        .map(|tuple| tuple.elts.as_slice())
+        .map(ast::ExprTuple::elts)
         .filter(|nodes| {
             nodes.len() == explicit_bases.len() && !nodes.iter().any(ast::Expr::is_starred_expr)
         });
@@ -322,8 +315,8 @@ pub(super) fn report_mro_error_kind<'db>(
     context: &InferContext<'db, '_>,
     error: &DynamicMroError<'db>,
     class_name: &Name,
-    call_expr: &ast::ExprCall,
-    bases_expr: Option<&ast::Expr>,
+    call_expr: ast::ExprCall<'_>,
+    bases_expr: Option<ast::Expr<'_>>,
     bases_display: Option<&str>,
 ) {
     let db = context.db();
@@ -333,12 +326,12 @@ pub(super) fn report_mro_error_kind<'db>(
                 return;
             };
             let env = context.program_environment();
-            let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
+            let bases_tuple_elts = bases.as_tuple_expr().map(ast::ExprTuple::elts);
             for (idx, base_type) in invalid_bases {
                 let instance_of_type = KnownClass::Type.to_instance(db, env);
                 let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
                 let diagnostic_range = specific_base
-                    .map(ast::Expr::range)
+                    .map(|node| node.range())
                     .unwrap_or_else(|| bases.range());
 
                 if base_type.is_assignable_to(db, env, instance_of_type) {

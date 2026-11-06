@@ -5,9 +5,8 @@ use libcst_native::{Arg, Expression};
 use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast};
 use ruff_python_codegen::Stylist;
-use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
@@ -65,7 +64,11 @@ impl Violation for FormatLiterals {
 }
 
 /// UP030
-pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn format_literals(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+    summary: &FormatSummary,
+) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
         return;
@@ -91,22 +94,22 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Preserve
     } else {
         // Ex) `"{1} {0}".format(foo=1, bar=2)`
-        if !call.arguments.keywords.is_empty() {
+        if !call.arguments.keywords().is_empty() {
             return;
         }
 
         // Ex) `"{1} {0}".format(foo)`
-        if call.arguments.args.len() < summary.indices.len() {
+        if call.arguments.args().len() < summary.indices.len() {
             return;
         }
 
         // Ex) `"{1} {0}".format(*foo)`
         if call
             .arguments
-            .args
+            .args()
             .iter()
             .take(summary.indices.len())
-            .any(Expr::is_starred_expr)
+            .any(ast::Expr::is_starred_expr)
         {
             return;
         }
@@ -114,10 +117,10 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Reorder(&summary.indices)
     };
 
-    let mut diagnostic = checker.report_diagnostic(FormatLiterals, call.range());
+    let mut diagnostic = checker.report_diagnostic(FormatLiterals, call.range);
     diagnostic.try_set_fix(|| {
-        generate_call(call, arguments, checker.locator(), checker.stylist())
-            .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
+        generate_call(call.node, arguments, checker.locator(), checker.stylist())
+            .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range)))
     });
 }
 
@@ -210,7 +213,7 @@ enum Arguments<'a> {
 
 /// Returns the corrected function call.
 fn generate_call(
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     arguments: Arguments,
     locator: &Locator,
     stylist: &Stylist,

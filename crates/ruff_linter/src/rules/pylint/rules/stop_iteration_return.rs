@@ -1,9 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast,
-    helpers::map_callable,
-    visitor::{Visitor, walk_expr, walk_stmt},
-};
+use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
+use ruff_python_ast::{self as ast, ExprKind, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -54,14 +52,21 @@ impl Violation for StopIterationReturn {
 }
 
 /// PLR1708
-pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn stop_iteration_return(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
+    if !function_def.node.body_may_contain_yield() {
+        return;
+    }
+
     let mut analyzer = GeneratorAnalyzer {
         checker,
         has_yield: false,
         stop_iteration_raises: Vec::new(),
     };
 
-    analyzer.visit_body(&function_def.body);
+    analyzer.visit_body(function_def.body);
 
     if analyzer.has_yield {
         for raise_stmt in analyzer.stop_iteration_raises {
@@ -73,14 +78,15 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtF
 struct GeneratorAnalyzer<'a, 'b> {
     checker: &'a Checker<'b>,
     has_yield: bool,
-    stop_iteration_raises: Vec<&'a ast::StmtRaise>,
+    stop_iteration_raises: Vec<ast::StmtRaise<'a>>,
 }
 
 impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(_) => {}
-            ast::Stmt::Raise(raise @ ast::StmtRaise { exc: Some(exc), .. }) => {
+    fn visit_stmt(&mut self, stmt: ast::Stmt<'a>) {
+        let kind = stmt.classify();
+        match kind {
+            StmtKind::FunctionDef(_) => {}
+            StmtKind::Raise(raise) if let Some(exc) = raise.exc() => {
                 if self
                     .checker
                     .semantic()
@@ -88,20 +94,21 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
                 {
                     self.stop_iteration_raises.push(raise);
                 }
-                walk_stmt(self, stmt);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        match expr {
-            ast::Expr::Lambda(_) => {}
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: ast::Expr<'a>) {
+        let kind = expr.classify();
+        match kind {
+            ExprKind::Lambda(_) => {}
+            ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
-                walk_expr(self, expr);
+                walk_expr(self, kind);
             }
-            _ => walk_expr(self, expr),
+            _ => walk_expr(self, kind),
         }
     }
 }

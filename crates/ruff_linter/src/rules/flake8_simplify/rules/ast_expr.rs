@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::str_prefix::StringLiteralPrefix;
+use ruff_python_ast::{Builder, Expr, ExprKind};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -9,6 +10,7 @@ use ruff_python_semantic::analyze::typing::is_dict;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -138,32 +140,31 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 }
 
 /// SIM112
-pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
     // Ex) `os.environ['foo']`
-    if let Expr::Subscript(_) = expr {
+    if let ExprKind::Subscript(_) = expr.classify() {
         check_os_environ_subscript(checker, expr);
         return;
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    }) = expr
-    else {
+    let ExprKind::Call(call) = expr.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
+    let ExprKind::StringLiteral(string_literal) = arg.classify() else {
         return;
     };
+    let env_var = string_literal.value();
     if !checker
         .semantic()
         .resolve_qualified_name(func)
@@ -195,27 +196,28 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
     );
 }
 
-fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
+fn check_os_environ_subscript(checker: &Checker, expr: Expr<'_>) {
+    let ExprKind::Subscript(subscript) = expr.classify() else {
         return;
     };
-    let Expr::Attribute(ast::ExprAttribute {
-        value: attr_value,
-        attr,
-        ..
-    }) = value.as_ref()
-    else {
+    let value = subscript.value();
+    let slice = subscript.slice();
+    let ExprKind::Attribute(attribute) = value.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = attr_value.as_ref() else {
+    let attr_value = attribute.value();
+    let attr = attribute.attr();
+    let ExprKind::Name(name_node) = attr_value.classify() else {
         return;
     };
+    let id = name_node.id();
     if id != "os" || attr != "environ" {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = slice.as_ref() else {
+    let ExprKind::StringLiteral(string_literal) = slice.classify() else {
         return;
     };
+    let env_var = string_literal.value();
 
     if is_lowercase_allowed(env_var.to_str()) {
         return;
@@ -233,42 +235,38 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         },
         slice.range(),
     );
-    let node = ast::StringLiteral {
-        value: capital_env_var.into_boxed_str(),
-        flags: checker.default_string_flags().with_prefix({
-            if env_var.is_unicode() {
-                StringLiteralPrefix::Unicode
-            } else {
-                StringLiteralPrefix::Empty
-            }
-        }),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let new_env_var = node.into();
+    let flags = checker
+        .default_string_flags()
+        .with_prefix(if env_var.is_unicode() {
+            StringLiteralPrefix::Unicode
+        } else {
+            StringLiteralPrefix::Empty
+        });
+    let mut builder = Builder::default();
+    let new_env_var = syntax::string_literal(&mut builder, &capital_env_var, flags);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(&new_env_var),
+        checker.generator().expr(builder.get(new_env_var)),
         slice.range(),
     )));
 }
 
 /// SIM910
-pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        range_start: _,
-        node_index: _,
-    }) = expr
-    else {
+pub(crate) fn dict_get_with_none_default(checker: &Checker, &expr: &Expr<'_>) {
+    let ExprKind::Call(call) = expr.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     if !keywords.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
     if attr != "get" {
         return;
     }
@@ -283,9 +281,9 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     }
 
     // Check if the value is a dictionary.
-    match value.as_ref() {
-        Expr::Dict(_) | Expr::DictComp(_) => {}
-        Expr::Name(name) => {
+    match value.classify() {
+        ExprKind::Dict(_) | ExprKind::DictComp(_) => {}
+        ExprKind::Name(name) => {
             let Some(binding) = checker
                 .semantic()
                 .resolve_name(name)
@@ -302,7 +300,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
 
     let expected = format!(
         "{}({})",
-        checker.locator().slice(func.as_ref()),
+        checker.locator().slice(func),
         checker.locator().slice(key)
     );
     let actual = checker.locator().slice(expr);

@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
-use ruff_python_ast::{PythonVersion, helpers};
+use ruff_python_ast::{self as ast, NodeList, PythonVersion, Stmt, StmtKind, Suite, helpers};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -66,16 +65,15 @@ impl Violation for SuppressibleException {
     }
 }
 
-fn is_empty(body: &[Stmt]) -> bool {
-    match body {
-        [Stmt::Pass(_)] => true,
-        [
-            Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _,
-                node_index: _,
-            }),
-        ] => value.is_ellipsis_literal_expr(),
+fn is_empty(body: Suite<'_>) -> bool {
+    match body
+        .as_array()
+        .map(|items| items.map(ruff_python_ast::Stmt::fields))
+    {
+        Some([ast::StmtFields::Pass(_)]) => true,
+        Some([ast::StmtFields::Expr(ast::StmtExprFields { value, .. })]) => {
+            value.is_ellipsis_literal_expr()
+        }
         _ => false,
     }
 }
@@ -83,24 +81,26 @@ fn is_empty(body: &[Stmt]) -> bool {
 /// SIM105
 pub(crate) fn suppressible_exception(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     is_star: bool,
-    try_body: &[Stmt],
-    handlers: &[ExceptHandler],
-    orelse: &[Stmt],
-    finalbody: &[Stmt],
+    try_body: Suite<'_>,
+    handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
+    orelse: Suite<'_>,
+    finalbody: Suite<'_>,
 ) {
     if !matches!(
-        try_body,
-        [Stmt::Delete(_)
-            | Stmt::Assign(_)
-            | Stmt::AugAssign(_)
-            | Stmt::AnnAssign(_)
-            | Stmt::Assert(_)
-            | Stmt::Import(_)
-            | Stmt::ImportFrom(_)
-            | Stmt::Expr(_)
-            | Stmt::Pass(_)]
+        try_body
+            .as_array()
+            .map(|items| items.map(ruff_python_ast::Stmt::classify)),
+        Some([StmtKind::Delete(_)
+            | StmtKind::Assign(_)
+            | StmtKind::AugAssign(_)
+            | StmtKind::AnnAssign(_)
+            | StmtKind::Assert(_)
+            | StmtKind::Import(_)
+            | StmtKind::ImportFrom(_)
+            | StmtKind::Expr(_)
+            | StmtKind::Pass(_)])
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
         || (is_star && checker.target_version() <= PythonVersion::PY311)
@@ -108,14 +108,15 @@ pub(crate) fn suppressible_exception(
         return;
     }
 
-    let [
-        ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            body, range, type_, ..
-        }),
-    ] = handlers
-    else {
+    let Some([except_handler]) = handlers.as_array() else {
         return;
     };
+    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
+        body,
+        range,
+        type_,
+        ..
+    }) = except_handler.fields();
 
     if !is_empty(body) {
         return;
@@ -149,7 +150,7 @@ pub(crate) fn suppressible_exception(
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt, checker.source())
+        .has_comments(&stmt, checker.source())
     {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -169,7 +170,7 @@ pub(crate) fn suppressible_exception(
                 content = format!("with {binding}({exception})");
             }
             rest.push(Edit::range_deletion(
-                checker.locator().full_lines_range(*range),
+                checker.locator().full_lines_range(range),
             ));
             rest.push(Edit::range_replacement(
                 content,

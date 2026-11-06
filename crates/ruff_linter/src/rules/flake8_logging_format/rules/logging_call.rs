@@ -1,12 +1,15 @@
-use ruff_python_ast::InterpolatedStringElement;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, AtomicNodeIndex, Expr, Keyword, Operator};
+use ruff_python_ast::{
+    self as ast, Arguments, Builder, Expr, ExprKind, InterpolatedStringElementKind, Keyword,
+    Operator,
+};
 
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::syntax;
 use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
@@ -17,9 +20,9 @@ use crate::{Applicability, Edit, Fix};
 
 fn logging_f_string(
     checker: &Checker,
-    msg: &Expr,
-    f_string: &ast::ExprFString,
-    arguments: &Arguments,
+    msg: Expr<'_>,
+    f_string: ast::ExprFString<'_>,
+    arguments: Arguments<'_>,
     msg_pos: usize,
 ) {
     // Report the diagnostic up-front so we can attach a fix later only when preview is enabled.
@@ -32,7 +35,7 @@ fn logging_f_string(
 
     // If there are existing positional arguments after the message, bail out.
     // This could indicate a mistake or complex usage we shouldn't try to fix.
-    if arguments.args.len() > msg_pos + 1 {
+    if arguments.args().len() > msg_pos + 1 {
         return;
     }
 
@@ -44,41 +47,41 @@ fn logging_f_string(
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
 
-    for part in &f_string.value {
+    for part in f_string.value() {
         match part {
-            ast::FStringPartRef::Literal(literal) => {
+            ast::FStringPartView::Literal(literal) => {
                 let literal_text = literal.as_str();
                 if literal_text.contains('%') {
                     return;
                 }
                 format_string.push_str(literal_text);
             }
-            ast::FStringPartRef::FString(f) => {
-                for element in &f.elements {
-                    match element {
-                        InterpolatedStringElement::Literal(lit) => {
+            ast::FStringPartView::FString(f) => {
+                for element in f.elements() {
+                    match element.classify() {
+                        InterpolatedStringElementKind::Literal(lit) => {
                             // If the literal text contains a '%' placeholder, bail out: mixing
                             // f-string interpolation with '%' placeholders is ambiguous for our
                             // automatic conversion, so don't offer a fix for this case.
-                            if lit.value.as_ref().contains('%') {
+                            if lit.value().contains('%') {
                                 return;
                             }
-                            format_string.push_str(lit.value.as_ref());
+                            format_string.push_str(lit.value().as_ref());
                         }
-                        InterpolatedStringElement::Interpolation(interpolated) => {
-                            if interpolated.debug_text.is_some()
-                                || interpolated.format_spec.is_some()
+                        InterpolatedStringElementKind::Interpolation(interpolated) => {
+                            if interpolated.debug_text().is_some()
+                                || interpolated.format_spec().is_some()
                                 || !matches!(
-                                    interpolated.conversion,
+                                    interpolated.conversion(),
                                     ruff_python_ast::ConversionFlag::None
                                 )
                             {
                                 return;
                             }
-                            match interpolated.expression.as_ref() {
-                                Expr::Name(name) => {
+                            match interpolated.expression().classify() {
+                                ExprKind::Name(name) => {
                                     format_string.push_str("%s");
-                                    args.push(name.id.as_str());
+                                    args.push(name.id().as_str());
                                 }
                                 _ => return,
                             }
@@ -93,22 +96,14 @@ fn logging_f_string(
         return;
     }
 
-    let format_string = checker
-        .generator()
-        .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
-            value: ast::StringLiteralValue::single(ast::StringLiteral {
-                value: Box::from(format_string),
-                range: TextRange::default(),
-                node_index: AtomicNodeIndex::NONE,
-                flags: checker.default_string_flags(),
-            }),
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-        }));
+    let mut builder = Builder::default();
+    let message =
+        syntax::string_literal(&mut builder, &format_string, checker.default_string_flags());
+    let format_string = checker.generator().expr(builder.get(message));
 
     // Leaving the parentheses around the replacement would turn the message into a tuple.
     let target =
-        parenthesized_range(msg.into(), arguments.into(), checker.tokens()).unwrap_or(msg.range());
+        parenthesized_range(msg, arguments.into(), checker.tokens()).unwrap_or(msg.range());
 
     let replacement = format!("{format_string}, {}", args.join(", "));
 
@@ -155,27 +150,32 @@ fn is_reserved_attr(attr: &str) -> bool {
 }
 
 /// Check logging messages for violations.
-fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usize) {
-    match msg {
+fn check_msg(checker: &Checker, msg: Expr<'_>, arguments: Arguments<'_>, msg_pos: usize) {
+    match msg.classify() {
         // Check for string concatenation and percent format.
-        Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
-            Operator::Add => {
-                checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
+        ExprKind::BinOp(expr_bin_op) => {
+            let op = expr_bin_op.op();
+            match op {
+                Operator::Add => {
+                    checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
+                }
+                Operator::Mod => {
+                    checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
+                }
+                _ => {}
             }
-            Operator::Mod => {
-                checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
-            }
-            _ => {}
-        },
+        }
         // Check for f-strings.
-        Expr::FString(f_string) if checker.is_rule_enabled(Rule::LoggingFString) => {
+        ExprKind::FString(f_string) if checker.is_rule_enabled(Rule::LoggingFString) => {
             logging_f_string(checker, msg, f_string, arguments, msg_pos);
         }
         // Check for .format() calls.
-        Expr::Call(ast::ExprCall { func, .. })
-            if checker.is_rule_enabled(Rule::LoggingStringFormat) =>
-        {
-            if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+        ExprKind::Call(expr_call) if checker.is_rule_enabled(Rule::LoggingStringFormat) => {
+            let func = expr_call.func();
+
+            if let ExprKind::Attribute(attribute_node) = func.classify() {
+                let value = attribute_node.value();
+                let attr = attribute_node.attr();
                 if attr == "format" && value.is_literal_expr() {
                     checker.report_diagnostic(LoggingStringFormat, msg.range());
                 }
@@ -186,31 +186,34 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
 }
 
 /// Check contents of the `extra` argument to logging calls.
-fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
-    match &extra.value {
-        Expr::Dict(dict) => {
+fn check_log_record_attr_clash(checker: &Checker, extra: Keyword<'_>) {
+    match extra.value().classify() {
+        ExprKind::Dict(dict) => {
             for invalid_key in dict.iter_keys().filter_map(|key| {
                 let string_key = key?.as_string_literal_expr()?;
-                if is_reserved_attr(string_key.value.to_str()) {
+                if is_reserved_attr(string_key.value().to_str()) {
                     Some(string_key)
                 } else {
                     None
                 }
             }) {
                 checker.report_diagnostic(
-                    LoggingExtraAttrClash(invalid_key.value.to_string()),
+                    LoggingExtraAttrClash(invalid_key.value().to_string()),
                     invalid_key.range(),
                 );
             }
         }
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
-        }) if checker.semantic().match_builtin_expr(func, "dict") => {
+        ExprKind::Call(expr_call)
+            if checker
+                .semantic()
+                .match_builtin_expr(expr_call.func(), "dict") =>
+        {
+            let arguments = expr_call.arguments();
+
+            let keywords = arguments.keywords();
             for keyword in keywords {
-                if let Some(attr) = &keyword.arg {
-                    if is_reserved_attr(attr) {
+                if let Some(attr) = keyword.arg() {
+                    if is_reserved_attr(attr.as_str()) {
                         checker.report_diagnostic(
                             LoggingExtraAttrClash(attr.to_string()),
                             keyword.range(),
@@ -243,14 +246,16 @@ impl LoggingCallType {
 
 pub(crate) fn find_logging_call(
     checker: &Checker,
-    call: &ast::ExprCall,
+    func: Expr<'_>,
 ) -> Option<(LoggingCallType, TextRange)> {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
-    match call.func.as_ref() {
-        Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
+    match func.classify() {
+        ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             let call_type = LoggingCallType::from_attribute(attr.as_str())?;
             if !logging::is_logger_candidate(
-                &call.func,
+                func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
@@ -258,30 +263,28 @@ pub(crate) fn find_logging_call(
             }
             Some((call_type, attr.range()))
         }
-        Expr::Name(_) => {
-            let qualified_name = checker
-                .semantic()
-                .resolve_qualified_name(call.func.as_ref())?;
+        ExprKind::Name(_) => {
+            let qualified_name = checker.semantic().resolve_qualified_name(func)?;
             let ["logging", attribute] = qualified_name.segments() else {
                 return None;
             };
             let call_type = LoggingCallType::from_attribute(attribute)?;
-            Some((call_type, call.func.range()))
+            Some((call_type, func.range()))
         }
         _ => None,
     }
 }
 
 /// Check logging calls for violations.
-pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
-    let Some((logging_call_type, range)) = find_logging_call(checker, call) else {
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some((logging_call_type, range)) = find_logging_call(checker, call.func) else {
         return;
     };
 
     // G001, G002, G003, G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
-        check_msg(checker, format_arg, &call.arguments, msg_pos);
+        check_msg(checker, format_arg, call.arguments, msg_pos);
     }
 
     // G010
@@ -310,7 +313,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
-        let Some(exc_info) = logging::exc_info(&call.arguments, checker.semantic()) else {
+        let Some(exc_info) = logging::exc_info(call.arguments, checker.semantic()) else {
             return;
         };
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {

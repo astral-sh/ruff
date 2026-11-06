@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind};
+use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
@@ -92,8 +94,12 @@ impl Violation for ReturnInGenerator {
 }
 
 /// B901
-pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDef) {
-    if function_def.name.id == "__await__" {
+pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDefFields<'_>) {
+    if !function_def.node.body_may_contain_yield() {
+        return;
+    }
+
+    if function_def.name.id() == "__await__" {
         return;
     }
 
@@ -111,7 +117,7 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
     }
 
     let mut visitor = ReturnInGeneratorVisitor::default();
-    visitor.visit_body(&function_def.body);
+    visitor.visit_body(function_def.body);
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
@@ -127,30 +133,29 @@ struct ReturnInGeneratorVisitor {
 }
 
 impl Visitor<'_> for ReturnInGeneratorVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::FunctionDef(_) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
+        let kind = stmt.classify();
+        match kind {
+            StmtKind::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
-            Stmt::Return(ast::StmtReturn {
-                value: Some(_),
-                range,
-                node_index: _,
-            }) => {
-                self.return_ = Some(*range);
-                walk_stmt(self, stmt);
+            StmtKind::Return(stmt_return) if stmt_return.value().is_some() => {
+                let range = stmt_return.range();
+
+                self.return_ = Some(range);
+                walk_stmt(self, kind);
             }
-            _ => walk_stmt(self, stmt),
+            _ => walk_stmt(self, kind),
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Lambda(_) => {}
-            Expr::Yield(_) | Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
+        match expr.classify() {
+            ExprKind::Lambda(_) => {}
+            ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
             }
-            _ => walk_expr(self, expr),
+            kind => walk_expr(self, kind),
         }
     }
 }

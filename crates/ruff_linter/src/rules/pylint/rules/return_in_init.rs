@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{Stmt, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -47,13 +47,9 @@ impl Violation for ReturnInInit {
 }
 
 /// PLE0101
-pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
-    if let Stmt::Return(ast::StmtReturn {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    {
+pub(crate) fn return_in_init(checker: &Checker, stmt: Stmt<'_>) {
+    if let StmtKind::Return(return_node) = stmt.classify() {
+        let value = return_node.value();
         if let Some(expr) = value {
             if expr.is_none_literal_expr() {
                 // Explicit `return None`.

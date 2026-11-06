@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
+use ruff_python_ast::{Builder, Expr, Stmt, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -6,6 +6,7 @@ use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -51,43 +52,28 @@ impl AlwaysFixableViolation for AssertFalse {
     }
 }
 
-fn assertion_error(msg: Option<&Expr>) -> Stmt {
-    Stmt::Raise(ast::StmtRaise {
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        exc: Some(Box::new(Expr::Call(ast::ExprCall {
-            func: Box::new(Expr::Name(ast::ExprName {
-                id: "AssertionError".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            })),
-            arguments: Arguments {
-                args: if let Some(msg) = msg {
-                    [msg.clone()].into()
-                } else {
-                    [].into()
-                },
-                keywords: std::iter::empty().collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }))),
-        cause: None,
-    })
-}
-
 /// B011
-pub(crate) fn assert_false(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn assert_false(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    test: Expr<'_>,
+    msg: Option<Expr<'_>>,
+) {
     if !is_const_false(test) {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(AssertFalse, test.range());
+    let mut builder = Builder::default();
+    let args = builder.copy_nodes(msg);
+    let exc = syntax::call_name(&mut builder, "AssertionError", args);
+    let statement = builder.add(build::StmtRaise {
+        range: TextRange::default(),
+        exc: Some(exc),
+        cause: None,
+    });
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().stmt(&assertion_error(msg)),
+        checker.generator().stmt(builder.get(statement).into()),
         stmt.range(),
     )));
 }
