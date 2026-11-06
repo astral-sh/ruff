@@ -105,7 +105,7 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    Arc::clone(index.use_def_maps[scope.file_scope_id(db)].get())
 }
 
 /// All the bindings made in a loop, which are visible to the entire loop via "loop header
@@ -319,7 +319,7 @@ pub struct SemanticIndex<'db> {
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, use_def::ScopeMap<'db>>,
 
     /// Lexical scopes and scope-local use IDs recorded at source occurrences.
     ///

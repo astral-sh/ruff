@@ -20,7 +20,7 @@ use ty_python_core::SemanticIndex;
 /// - `P` must already be in scope
 /// - No keyword-only parameters are allowed between `*args: P.args` and `**kwargs: P.kwargs`
 pub(super) fn validate_paramspec_components<'db>(
-    context: &'db InferContext<'db, '_>,
+    context: &InferContext<'db, '_>,
     index: &SemanticIndex<'db>,
     parameters: &ast::Parameters,
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,

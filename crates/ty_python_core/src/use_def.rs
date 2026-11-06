@@ -283,6 +283,8 @@ use crate::{
 
 mod exception_checkpoint;
 mod place_state;
+mod recording;
+pub(crate) use recording::{RecordingBuilder, ScopeMap};
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
 use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
@@ -302,7 +304,7 @@ pub(super) enum LiveBindingStatus {
 }
 
 /// Describes how a binding changes the imported qualifiers for a place.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) enum ImportedQualifierAction {
     /// An ordinary binding leaves previous imported qualifiers in place.
     Preserve,
@@ -870,7 +872,7 @@ pub struct UseDefMap<'db> {
 ///
 /// Their IDs are interpreted through each scope's own definitions and constraints, so
 /// identical tables can share storage without sharing the scope-specific data they reference.
-#[derive(Default)]
+#[derive(Debug, Default, get_size2::GetSize)]
 pub(super) struct UseDefMapInterner {
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,

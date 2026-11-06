@@ -885,7 +885,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, get_size2::GetSize)]
 pub enum DefinitionCategory {
     /// A Definition which binds a value to a name (e.g. `x = 1`).
     Binding,
