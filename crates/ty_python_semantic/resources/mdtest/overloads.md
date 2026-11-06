@@ -825,7 +825,7 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
@@ -835,7 +835,7 @@ def func(x: int | str) -> int | str:
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 ```
 

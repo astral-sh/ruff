@@ -534,6 +534,7 @@ def collect_ty_diagnostics(
             "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
+            "--error=single-overload",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),
