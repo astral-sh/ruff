@@ -2005,7 +2005,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         // With explicit extra items, a string key reaches this branch if it might
                         // overwrite a read-only item. Keep that error under `invalid-typed-dict-key`.
-                        let lint = if typed_dict.explicit_extra_items(db).is_some() {
+                        // A closed TypedDict with no writable fields also has no valid destination.
+                        let openness = typed_dict.openness(db);
+                        let lint = if openness.explicit_extra_items().is_some()
+                            || (openness.is_closed()
+                                && typed_dict
+                                    .items(db)
+                                    .values()
+                                    .all(|field| field.is_read_only()))
+                        {
                             &INVALID_TYPED_DICT_KEY
                         } else {
                             typed_dict_subscript_key_lint(&self.context, slice_ty)
