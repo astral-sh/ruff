@@ -110,6 +110,96 @@ pub fn resolve_module_confident<'db>(
     resolve_module_query(db, interned_name)
 }
 
+/// Locates a module's implementation on configured search paths, falling back to its typing
+/// definition when no implementation can be resolved.
+pub fn resolve_module_location<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    name: &ModuleName,
+) -> Option<&'db ModuleLocation<'db>> {
+    let key = ModuleLocationIngredient::new(db, resolver_environment, name);
+    resolve_module_location_query(db, key)
+}
+
+/// A selected module and the directories supplying its package.
+#[derive(PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct ModuleLocation<'db> {
+    module: Module<'db>,
+    package_directories: Option<Box<[SystemPathBuf]>>,
+}
+
+#[allow(
+    dead_code,
+    reason = "Package directory renames use these accessors in the next change."
+)]
+impl<'db> ModuleLocation<'db> {
+    /// Returns the selected module.
+    pub fn module(&self) -> Module<'db> {
+        self.module
+    }
+
+    /// Returns the package's directories in search order.
+    ///
+    /// Returns `None` for a single-file module or when any directory is outside the local filesystem.
+    pub fn package_directories(&self) -> Option<&[SystemPathBuf]> {
+        self.package_directories.as_deref()
+    }
+}
+
+/// Shares complete resolution across references to the same name and environment.
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn resolve_module_location_query<'db>(
+    db: &'db dyn Db,
+    key: ModuleLocationIngredient<'db>,
+) -> Option<ModuleLocation<'db>> {
+    let resolver_environment = key.resolver_environment(db);
+    let name = key.name(db);
+    let (candidates, mode) =
+        resolve_name(db, resolver_environment, name, ModuleResolveMode::Runtime)
+            .map(|candidates| (candidates, ModuleResolveMode::Runtime))
+            .or_else(|| {
+                resolve_name(db, resolver_environment, name, ModuleResolveMode::Typing)
+                    .map(|candidates| (candidates, ModuleResolveMode::Typing))
+            })?;
+    let resolution = candidates.first()?;
+    let context = ResolverContext::new(db, resolver_environment, mode);
+
+    let package_directories: Option<Vec<SystemPathBuf>> = match resolution.module {
+        ResolvedModule::Module(_) => None,
+        _ if candidates.len() > 1 && resolution.is_any_namespace_package(&context) => candidates
+            .iter()
+            .map(|candidate| candidate.directory.path().to_system_path())
+            .collect(),
+        _ => {
+            // A regular package uses the first candidate's directory. Lower-priority candidates can
+            // still supply missing submodules (e.g., for a partial stub package), but their directories
+            // are not additional locations of the package itself.
+            resolution
+                .directory
+                .path()
+                .to_system_path()
+                .map(|directory| vec![directory])
+        }
+    };
+    let module = candidates
+        .into_iter()
+        .next()?
+        .into_module(db, resolver_environment, name);
+
+    Some(ModuleLocation {
+        module,
+        package_directories: package_directories.map(Vec::into_boxed_slice),
+    })
+}
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct ModuleLocationIngredient<'db> {
+    #[returns(copy)]
+    resolver_environment: ResolverEnvironment<'db>,
+    #[returns(ref)]
+    name: ModuleName,
+}
+
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
@@ -1888,6 +1978,90 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn namespace_package_locations_include_all_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("shared/left.py", "")])
+            .with_site_packages_files(&[("shared/right.py", "")])
+            .build();
+
+        db.assert_package_directories("shared", Some(&["/src/shared", "/site-packages/shared"]));
+    }
+
+    #[test]
+    fn regular_package_locations_exclude_shadowed_namespaces() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("regular/left.py", "")])
+            .with_site_packages_files(&[("regular/__init__.py", "")])
+            .build();
+
+        db.assert_package_directories("regular", Some(&["/site-packages/regular"]));
+    }
+
+    #[test]
+    fn legacy_namespace_locations_include_all_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[(
+                "legacy/__init__.py",
+                "__path__ = __import__(\"pkgutil\").extend_path(__path__, __name__)",
+            )])
+            .with_site_packages_files(&[("legacy/right.py", "")])
+            .build();
+
+        db.assert_module_file("legacy", "/src/legacy/__init__.py");
+        db.assert_package_directories("legacy", Some(&["/src/legacy", "/site-packages/legacy"]));
+    }
+
+    #[test]
+    fn file_module_locations_exclude_shadowed_namespaces() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("shadowed/child.py", "")])
+            .with_site_packages_files(&[("shadowed.py", ""), ("shadowed-stubs/__init__.pyi", "")])
+            .build();
+
+        db.assert_package_directories("shadowed", None);
+        db.assert_module_file("shadowed", "/site-packages/shadowed.py");
+    }
+
+    #[test]
+    fn module_locations_prefer_implementations_over_stubs() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .with_site_packages_files(&[("package-stubs/__init__.pyi", "")])
+            .build();
+
+        db.assert_module_file("package", "/src/package/__init__.py");
+        db.assert_package_directories("package", Some(&["/src/package"]));
+    }
+
+    #[test]
+    fn module_locations_fall_back_to_typing_definitions() {
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(&[("package-stubs/__init__.pyi", "")])
+            .build();
+
+        db.assert_module_file("package", "/site-packages/package-stubs/__init__.pyi");
+        db.assert_package_directories("package", Some(&["/site-packages/package-stubs"]));
+
+        db.write_file("/src/package/__init__.py", "").unwrap();
+
+        db.assert_module_file("package", "/src/package/__init__.py");
+        db.assert_package_directories("package", Some(&["/src/package"]));
+    }
+
+    #[test]
+    fn vendored_packages_resolve_without_system_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+
+        let location = module_location(&db, "_typeshed");
+
+        assert_matches!(
+            location.module().file(&db).map(|file| file.path(&db)),
+            Some(FilePath::Vendored(_))
+        );
+        db.assert_package_directories("_typeshed", None);
+    }
+
     fn resolve_module_confident<'db>(
         db: &'db TestDb,
         module_name: &ModuleName,
@@ -3411,5 +3585,43 @@ not_a_directory
         )
         .unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
+    }
+
+    #[track_caller]
+    fn module_location<'db>(db: &'db TestDb, name: &str) -> &'db ModuleLocation<'db> {
+        let name = ModuleName::new(name).unwrap();
+        resolve_module_location(db, db.resolver_environment(), &name).unwrap()
+    }
+
+    impl TestDb {
+        /// Asserts that the named module has the expected package directories in search order.
+        #[track_caller]
+        fn assert_package_directories(&self, name: &str, expected: Option<&[&str]>) {
+            let actual = module_location(self, name).package_directories();
+            let expected = expected.map(|directories| {
+                directories
+                    .iter()
+                    .map(|directory| SystemPathBuf::from(*directory))
+                    .collect::<Vec<_>>()
+            });
+
+            assert_eq!(
+                actual,
+                expected.as_deref(),
+                "package directories for {name}"
+            );
+        }
+
+        /// Asserts that the named module's defining file matches the expected filesystem path.
+        #[track_caller]
+        fn assert_module_file(&self, name: &str, expected: &str) {
+            let actual = module_location(self, name)
+                .module()
+                .file(self)
+                .map(|file| file.path(self));
+            let expected = FilePath::from(SystemPathBuf::from(expected));
+
+            assert_eq!(actual, Some(&expected), "defining file for {name}");
+        }
     }
 }
