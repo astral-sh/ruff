@@ -21,6 +21,12 @@ def foo(x: int) -> int:
     return x
 ```
 
+## Migrating from `invalid-overload`
+
+In 0.0.100, `invalid-overload` was split into `single-overload`, `missing-overload-implementation`,
+`inconsistent-overload-implementation`, `inconsistent-overload-decorator`, and
+`misplaced-overload-decorator`.
+
 ## References
 
 - [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)
