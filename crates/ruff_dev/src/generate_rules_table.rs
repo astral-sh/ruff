@@ -170,19 +170,13 @@ fn generate_table(
 
         // Message placeholders can be mistaken for an attribute list on the table cell.
         // Keep the identity class on an HTML wrapper so messages retain their Markdown.
-        #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| <span class='rule-identity'>{ss}{explanation}<br>{message}{se}</span> \
+            "| <span class='rule-identity'>{ss}[`{rule_name}`](rules/{rule_name}.md)<br>{message}{se}</span> \
              | {ss}{category}{se} {{ .rule-category }} \
              | {ss}{linter_name}{se} {{ {linter_anchor} .rule-linter data-linter='{linter_slug}' }} \
              | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}{default_token}</div> {{ .rule-status data-status='{status}' }} |",
             category = rule.category(),
-            explanation = rule
-                .explanation()
-                .is_some()
-                .then_some(format_args!("[`{rule_name}`](rules/{rule_name}.md)"))
-                .unwrap_or(format_args!("`{rule_name}`")),
         );
         table_out.push('\n');
     }

@@ -37,6 +37,31 @@ reveal_type(add(1))  # revealed: int
 reveal_type(add(1, 2))  # revealed: int
 ```
 
+## Local functions in a loop
+
+A previous iteration can bind the same local function. An overloaded local function still sees the
+overloads defined earlier in the loop body.
+
+```py
+from typing import overload
+
+def outer(values: list[int]):
+    for value in values:
+        def plain() -> int:
+            return value
+
+        reveal_type(plain)  # revealed: def plain() -> int
+
+        @overload
+        def convert(x: int) -> int: ...
+        @overload
+        def convert(x: str) -> str: ...
+        def convert(x: int | str) -> int | str:
+            return x
+
+        reveal_type(convert)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
 ## Overriding
 
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly

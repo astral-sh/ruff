@@ -100,7 +100,7 @@ class AbstractOrdered(ABC):
 @dataclass(order=True)
 class ConcreteOrdered(AbstractOrdered): ...
 
-ConcreteOrdered()  # no diagnostic
+ConcreteOrdered()  # ok
 
 @total_ordering
 class AlsoConcreteOrdered(AbstractOrdered):
@@ -132,7 +132,7 @@ class ConcreteDynamic(AbstractDynamic):
     f: ClassVar[int]
     g: ClassVar[Callable[..., str]]
 
-ConcreteDynamic()  # no diagnostic
+ConcreteDynamic()  # ok
 ```
 
 But if the annotation does not use `ClassVar`, we do not see that as overriding the abstract method:
@@ -180,7 +180,7 @@ class Sub1(AbstractMixin, ConcreteMixin): ...
 class Sub2(ConcreteMixin, AbstractMixin): ...
 
 Sub1()  # error: [call-non-callable]
-Sub2()  # no diagnostic
+Sub2()  # ok
 ```
 
 When a class has many unimplemented abstract methods, the diagnostic lists only a few unless
@@ -289,7 +289,7 @@ class Concrete(Abstract):
     def method(self) -> int:
         return super().method()
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Generic abstract classes and aliases
@@ -317,7 +317,7 @@ class Concrete[T](Abstract[T]):
     def method(self) -> T:
         raise NotImplementedError
 
-Concrete[int]()  # no diagnostic
+Concrete[int]()  # ok
 ```
 
 ## Constructor calls through `type[]`
@@ -338,10 +338,10 @@ class Concrete(Abstract):
         return 42
 
 def construct(cls: type[Abstract]) -> Abstract:
-    return cls()  # no diagnostic
+    return cls()  # ok
 
-construct(Concrete)  # no diagnostic
-construct(Abstract)  # no diagnostic
+construct(Concrete)  # ok
+construct(Abstract)  # ok
 ```
 
 ## Abstract property accessors
@@ -367,7 +367,7 @@ class ConcreteSetter(AbstractSetter):
     @AbstractSetter.value.setter
     def value(self, value: int) -> None: ...
 
-ConcreteSetter()  # no diagnostic
+ConcreteSetter()  # ok
 
 class AbstractDeleter(ABC):
     @property
@@ -384,7 +384,7 @@ class ConcreteDeleter(AbstractDeleter):
     @AbstractDeleter.value.deleter
     def value(self) -> None: ...
 
-ConcreteDeleter()  # no diagnostic
+ConcreteDeleter()  # ok
 ```
 
 ## Slots overriding abstract properties
@@ -404,18 +404,17 @@ class Abstract(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
-# no diagnostic: the abstract property is implemented by the slot
+# ok: the abstract property is implemented by the slot
 @final
 class Concrete(Abstract):
     __slots__ = ("value",)
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Slots and abstract properties in the MRO
 
-A slot inherited from a mixin overrides an abstract property only if the mixin comes before the
-property's defining class in the MRO.
+A slot inherited from a mixin overrides an abstract property when the mixin comes first in the MRO.
 
 ```py
 from abc import ABC, abstractmethod
@@ -429,9 +428,16 @@ class SlotMixin:
     __slots__ = ("value",)
 
 class Concrete(SlotMixin, Abstract): ...
-class StillAbstract(Abstract, SlotMixin): ...
 
-Concrete()  # no diagnostic
+Concrete()  # ok
+```
+
+With the bases reversed, the class remains abstract. The getter-only property also removes writes
+permitted by the mixin's slot, so the class definition receives an override error.
+
+```py
+class StillAbstract(Abstract, SlotMixin): ...  # error: [invalid-property-type-override]
+
 StillAbstract()  # error: [call-non-callable]
 ```
 
@@ -461,7 +467,7 @@ class Abstract(ABC):
 class Concrete(Abstract):
     value: int
 
-Concrete(1)  # no diagnostic
+Concrete(1)  # ok
 ```
 
 ## Methods in stub files
@@ -494,7 +500,7 @@ class Concrete(Interface):
     def required(self) -> int:
         return 42
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Abstract overloads
@@ -535,4 +541,38 @@ class Alias:
     method = Abstract.method
 
 Alias()  # error: [call-non-callable]
+```
+
+A decorator can also return an abstract method. Here the decorator replaces `Decorated.method` with
+`Abstract.method`, so `Decorated` is abstract.
+
+```py
+from abc import ABC
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def replace_with(value: T) -> Callable[[object], T]:
+    return lambda _: value
+
+class Decorated(ABC):
+    @replace_with(Abstract.method)
+    def method(self) -> None:
+        pass
+
+Decorated()  # error: [call-non-callable]
+```
+
+Python applies the inner decorator first. It returns a plain object, which the outer decorator
+replaces with `Abstract.method`.
+
+```py
+class Stacked(ABC):
+    @replace_with(Abstract.method)
+    @replace_with(object())
+    def method(self) -> None:
+        pass
+
+Stacked()  # error: [call-non-callable]
 ```

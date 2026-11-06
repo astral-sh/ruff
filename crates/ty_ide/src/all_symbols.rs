@@ -40,7 +40,8 @@ pub fn all_symbols<'db>(
             // Filter out non-first-party test and private modules, while retaining private
             // typeshed packages that are useful when writing type annotations.
             if is_non_first_party
-                && (name.is_test_module() || name.is_private() && !module.is_type_check_only(db))
+                && (name.is_test_module()
+                    || name.is_private() && !module.is_bundled_typing_stub(db))
             {
                 return Vec::new();
             }

@@ -1052,11 +1052,29 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         ty: Type<'db>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
+        self.visit_type_with_cycle_fallback(db, ty, compute, |_| Some(ty), |_| true)
+    }
+
+    /// Transform a type with a caller-selected cycle fallback and cache policy.
+    ///
+    /// `cycle_fallback` receives the active type whose identity matched the input type.
+    /// Returning `None` recomputes an active type without caching that
+    /// recursive visit. The caller must ensure that another guard closes the recursion.
+    /// `cache_result` can reject completed results that depend on a recursive fallback.
+    pub(super) fn visit_type_with_cycle_fallback(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        compute: impl FnOnce() -> Type<'db>,
+        cycle_fallback: impl FnOnce(Type<'db>) -> Option<Type<'db>>,
+        cache_result: impl FnOnce(Type<'db>) -> bool,
+    ) -> Type<'db> {
         match self.begin_visit(db, ty) {
             TypeTransformerVisit::Ready(result) => result,
+            TypeTransformerVisit::Cycle(active) => cycle_fallback(active).unwrap_or_else(compute),
             TypeTransformerVisit::Pending(ty) => {
                 let result = compute();
-                self.finish_visit(ty, result)
+                self.finish_visit(ty, result, cache_result(result))
             }
         }
     }
@@ -1068,11 +1086,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
 
         let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen
+        if let Some(active) = seen
             .iter()
-            .any(|active| active.ty == ty || active.identity == identity)
+            .find(|active| active.ty == ty || active.identity == identity)
         {
-            return TypeTransformerVisit::Ready(ty);
+            return TypeTransformerVisit::Cycle(active.ty);
         }
         drop(seen);
 
@@ -1082,10 +1100,12 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         TypeTransformerVisit::Pending(ty)
     }
 
-    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
+    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>, cache_result: bool) -> Type<'db> {
         let active = self.seen.borrow_mut().pop();
         debug_assert_eq!(active.map(|active| active.ty), Some(ty));
-        self.cache.borrow_mut().insert_completed(ty, result);
+        if cache_result {
+            self.cache.borrow_mut().insert_completed(ty, result);
+        }
         result
     }
 }
@@ -1098,6 +1118,7 @@ struct ActiveTypeTransformation<'db> {
 
 enum TypeTransformerVisit<'db> {
     Ready(Type<'db>),
+    Cycle(Type<'db>),
     Pending(Type<'db>),
 }
 

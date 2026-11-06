@@ -1,5 +1,139 @@
 # Changelog
 
+## 0.17.4
+
+Released on 2026-11-05.
+
+### Preview features
+
+- \[`flake8-logging-format`\] Avoid behavior changes and syntax errors in fixes (`G004`) ([#27419](https://github.com/astral-sh/ruff/pull/27419))
+- \[`security`\] Implement `tarfile-ignore-zeros-true` ([#28680](https://github.com/astral-sh/ruff/pull/28680))
+
+### Bug fixes
+
+- Accept a bare raise before a semicolon ([#29761](https://github.com/astral-sh/ruff/pull/29761))
+- Allow match identifiers after a semicolon ([#29760](https://github.com/astral-sh/ruff/pull/29760))
+- Fix panic on BOM-prefixed files in diagnostic renderer ([#30017](https://github.com/astral-sh/ruff/pull/30017))
+- \[`flake8-simplify`\] Report collapsible `elif` clauses after a multi-statement `if` branch (`SIM102`) ([#29814](https://github.com/astral-sh/ruff/pull/29814))
+
+### Rule changes
+
+- Show more nonprinting characters in diagnostic fix diffs ([#30062](https://github.com/astral-sh/ruff/pull/30062))
+
+### Performance
+
+- Coalesce source slices when formatting attributes ([#29841](https://github.com/astral-sh/ruff/pull/29841))
+- Collect return statements with a statement-only visitor ([#29911](https://github.com/astral-sh/ruff/pull/29911))
+- \[`pyflakes`\] Defer value comparisons for repeated dictionary keys (`F601`, `F602`) ([#29739](https://github.com/astral-sh/ruff/pull/29739))
+- Format node fields directly when comment handling is unnecessary ([#29853](https://github.com/astral-sh/ruff/pull/29853))
+- Reduce formatter source-slice overhead ([#29855](https://github.com/astral-sh/ruff/pull/29855))
+- Reuse a callee's qualified name across lint rules ([#29916](https://github.com/astral-sh/ruff/pull/29916))
+- Skip invalid string character checks when the source contains none ([#29883](https://github.com/astral-sh/ruff/pull/29883))
+- Use a Bloom filter for formatter comment lookups ([#29852](https://github.com/astral-sh/ruff/pull/29852))
+- Use a concrete buffer for ordinary writes ([#29819](https://github.com/astral-sh/ruff/pull/29819))
+
+### CLI
+
+- Give `NO_COLOR` precedence in Ruff and ty diagnostics ([#29898](https://github.com/astral-sh/ruff/pull/29898))
+- Honor `CLICOLOR=0` in Ruff and ty diagnostics ([#29910](https://github.com/astral-sh/ruff/pull/29910))
+
+### Documentation
+
+- Correct the documented `version` and `src` defaults for `ruff-action` ([#29880](https://github.com/astral-sh/ruff/pull/29880))
+- \[`flake8-bugbear`\] Make `B014` example error out-of-the-box ([#29941](https://github.com/astral-sh/ruff/pull/29941))
+- \[`flake8-no-pep420`\] Document preview behavior (`INP001`) ([#29764](https://github.com/astral-sh/ruff/pull/29764))
+- \[`isort`\] Expand `I001` documentation ([#29843](https://github.com/astral-sh/ruff/pull/29843))
+
+### Other changes
+
+- [syntax-errors] Extend `__debug__` write check to attribute targets ([#27908](https://github.com/astral-sh/ruff/pull/27908))
+
+### Contributors
+
+- [@fixfon](https://github.com/fixfon)
+- [@hirehamir](https://github.com/hirehamir)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@saberoueslati](https://github.com/saberoueslati)
+- [@mangod12](https://github.com/mangod12)
+- [@Sacrimento](https://github.com/Sacrimento)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@mulaihonglixihonglixi-web](https://github.com/mulaihonglixihonglixi-web)
+- [@adarrevah](https://github.com/adarrevah)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@shan3520](https://github.com/shan3520)
+- [@halcyon-past](https://github.com/halcyon-past)
+
+## 0.17.3
+
+Released on 2026-10-26.
+
+### Preview features
+
+- \[`suspicious`\] Add `shared-clock-mock` ([#29074](https://github.com/astral-sh/ruff/pull/29074))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Avoid incorrect conversions to f-strings (`UP032`) ([#25485](https://github.com/astral-sh/ruff/pull/25485))
+
+### Performance
+
+- Buffer stdout in `ruff format` ([#29631](https://github.com/astral-sh/ruff/pull/29631))
+- Specialize ASCII identifier lexing ([#29503](https://github.com/astral-sh/ruff/pull/29503))
+- Speed up identifier and keyword lexing ([#29463](https://github.com/astral-sh/ruff/pull/29463))
+
+### Documentation
+
+- \[`flake8-bandit`\] Describe what the rule actually checks for `httpx` (`S113`) ([#27936](https://github.com/astral-sh/ruff/pull/27936))
+
+### Contributors
+
+- [@itsvedantkumar](https://github.com/itsvedantkumar)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@anishgirianish](https://github.com/anishgirianish)
+
+## 0.17.2
+
+Released on 2026-10-22.
+
+### Preview features
+
+- \[`complexity`\] Add `unnecessary-regular-expression-compile` ([#25533](https://github.com/astral-sh/ruff/pull/25533))
+
+### Bug fixes
+
+- Avoid syntax errors for type variables with starred constraints (`UP040`, `UP046`, `UP047`, `RUF053`) ([#28362](https://github.com/astral-sh/ruff/pull/28362))
+- \[`pydocstyle`\] Treat backslash-escaped `*args` and `**kwargs` as documented (`D417`) ([#29536](https://github.com/astral-sh/ruff/pull/29536))
+- \[`pylint`\] Avoid false positive on starred elements (`PLE0643`) ([#29483](https://github.com/astral-sh/ruff/pull/29483))
+- \[`pylint`\] Mark fixes unsafe when deleting comments (`PLR5501`, `PLW0120`) ([#29414](https://github.com/astral-sh/ruff/pull/29414))
+- \[`pyupgrade`\] Mark fix unsafe when deleting comments (`UP035`) ([#29413](https://github.com/astral-sh/ruff/pull/29413))
+
+### Performance
+
+- Avoid intermediate names in lint name resolution ([#29506](https://github.com/astral-sh/ruff/pull/29506))
+- Prefilter bidirectional Unicode checks by UTF-8 leading bytes ([#29561](https://github.com/astral-sh/ruff/pull/29561))
+- Share postfix parsing and reduce expression copies ([#29480](https://github.com/astral-sh/ruff/pull/29480))
+
+### Configuration
+
+- \[`pylint`\] Add a configurable allowlist for `magic-value-comparison` (`PLR2004`) ([#18961](https://github.com/astral-sh/ruff/pull/18961))
+
+### Documentation
+
+- Clarify documentation and correct stale guidance ([#29374](https://github.com/astral-sh/ruff/pull/29374))
+- \[`pyupgrade`\] Remove mentions of variance related to fix safety (`UP040`, `UP047`) ([#29592](https://github.com/astral-sh/ruff/pull/29592))
+
+### Contributors
+
+- [@fixfon](https://github.com/fixfon)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@zaniebot](https://github.com/zaniebot)
+- [@FrancescoPezzella](https://github.com/FrancescoPezzella)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@rajveer3x](https://github.com/rajveer3x)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@LckyLike](https://github.com/LckyLke)
+- [@DaniBodor](https://github.com/DaniBodor)
+
 ## 0.17.1
 
 Released on 2026-10-15.

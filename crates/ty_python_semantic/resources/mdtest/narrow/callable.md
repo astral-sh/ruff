@@ -260,7 +260,7 @@ from collections import abc
 
 def accepts_type(x: type): ...
 
-accepts_type(abc.Callable)  # no diagnostic
+accepts_type(abc.Callable)  # ok
 
 def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:

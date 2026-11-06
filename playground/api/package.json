@@ -6,18 +6,15 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.0.0",
-    "miniflare": "^4.20260706.0",
     "typescript": "^7.0.0",
     "wrangler": "^4.107.1"
   },
   "private": true,
   "scripts": {
     "start": "wrangler dev",
-    "deploy": "wrangler publish"
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@miniflare/kv": "^2.14.0",
-    "@miniflare/storage-memory": "^2.14.0",
     "uuid": "^14.0.0"
   }
 }

@@ -1,3 +1,4 @@
+use crate::types::call::CallError;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
     dynamic_class_bases_argument,
@@ -254,10 +255,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);
         let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
 
-        let mut bindings =
-            callable_type
-                .bindings(db, env)
-                .match_parameters(db, env, &call_arguments);
+        let bindings = callable_type
+            .bindings(db, env)
+            .match_parameters(db, env, &call_arguments);
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(&call_expr.arguments),
             &mut call_arguments,
@@ -274,11 +274,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.infer_expression(expr, tcx)
                 }
             },
-            &mut bindings,
+            bindings,
             TypeContext::default(),
         );
 
-        if bindings_result.is_err() {
+        if let Err(CallError(_, bindings)) = bindings_result {
             bindings.report_diagnostics(&self.context, call_expr.into());
         }
     }

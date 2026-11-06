@@ -87,6 +87,10 @@ invalid_module_self_forms: tuple[TypeForm[Any], ...] = module_self_forms  # erro
 
 bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
 bad_config: Config = {"form": str}  # error: [invalid-argument-type]
+
+# Bare `Literal` prevents the stored union from denoting a type.
+invalid_union_forms = (bytes | Literal | str,)
+type_forms: tuple[TypeForm[object], ...] = invalid_union_forms  # error: [invalid-assignment]
 ```
 
 `TypeForm` is covariant in its type argument:
@@ -204,7 +208,7 @@ from typing_extensions import TypeForm
 
 def unwrap(form: TypeForm):
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__supertype__
         unwrap(form)
 ```
@@ -217,7 +221,7 @@ class Wrapper: ...
 
 def unwrap_alias(form: Wrapper) -> TypeForm:
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__value__
         if form:
             return form
@@ -491,6 +495,13 @@ def foo(form: TypeForm[int] | TypeForm[str]) -> int | str:
 reveal_type(foo(int))  # revealed: int
 reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
+```
+
+An invalid union operator still produces a diagnostic when the argument matches an overload.
+
+```py
+# error: [unsupported-operator]
+reveal_type(foo("bool" | "int" | bool))  # revealed: int
 ```
 
 ## Narrowing to runtime classes

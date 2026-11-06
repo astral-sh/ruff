@@ -58,7 +58,7 @@ def pascal_case(linter_name: str) -> str:
 
 
 def get_indent(line: str) -> str:
-    return re.match(r"^\s*", line).group()  # type: ignore[union-attr, ty:unresolved-attribute]
+    return re.match(r"^\s*", line).group()  # type: ignore[union-attr, ty:missing-union-attribute]
 
 
 def main(*, plugin: str, url: str, prefix_code: str) -> None:

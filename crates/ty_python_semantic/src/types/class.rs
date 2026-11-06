@@ -13,7 +13,7 @@ pub(super) use self::named_tuple::{
 };
 pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
+    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassHeader, StaticClassLiteral,
     expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{
@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member::{ClassBodyDeclaration, Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -194,10 +194,11 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_static_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Self> {
-        if class.dataclass_params(db).is_none()
-            && class.known(db).is_none()
-            && !class.has_explicit_bases(db)
-            && !class.has_explicit_metaclass(db)
+        let header = class.header(db);
+        if header.dataclass_params.is_none()
+            && header.known.is_none()
+            && !header.has_explicit_bases
+            && !header.has_explicit_metaclass
         {
             return None;
         }
@@ -469,7 +470,7 @@ impl<'db> GenericAlias<'db> {
         let tcx = if type_mapping.is_structural() {
             &[]
         } else {
-            tcx.annotation
+            tcx.declared_type()
                 .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
                 .map(|specialization| specialization.types(db))
                 .unwrap_or(&[])
@@ -2341,7 +2342,8 @@ impl<'db> ClassType<'db> {
                     .origin(db)
                     .own_instance_member(db, env, name)
                     .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                        ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+                            .apply_optional_owner_specialization_to_member(db, Some(specialization))
                     })
             }
         }
@@ -2681,72 +2683,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
-        match (source, target) {
-            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
-                return self.always();
-            }
-            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
-                if source_alias.origin(db) == target_alias.origin(db) =>
-            {
-                return self.check_specialization_pair(
-                    db,
-                    source_alias.specialization(db),
-                    target_alias.specialization(db),
-                );
-            }
-            _ => {}
+        if source == target && matches!(target, ClassType::NonGeneric(_)) {
+            return self.always();
         }
 
-        let mut generic_target = None;
-        let result = source.iter_mro(db).when_any(db, self.constraints, |base| {
-            match base {
-                ClassBase::Any => ConstraintSet::from_bool(
-                    self.constraints,
-                    self.relation.is_assignability() || target.is_object(db),
-                ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => {
-                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
-                    }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                },
+        let unknown_base_matches = |base| match base {
+            ClassBase::Any => self.relation.is_assignability() || target.is_object(db),
+            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => target.is_object(db),
+                TypeRelation::Assignability => !target.is_final(db),
+            },
+            _ => false,
+        };
 
-                // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
+        let ClassType::Generic(target_alias) = target else {
+            let found = source
+                .relation_bases(db, target.class_literal(db))
+                .any(|base| base == ClassBase::Class(target) || unknown_base_matches(base));
+            return ConstraintSet::from_bool(self.constraints, found);
+        };
 
-                ClassBase::Class(source) => match (source, target) {
-                    // Two non-generic classes match if they have the same class literal.
-                    (
-                        ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
-                    ) => {
-                        ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
-                    }
+        let origin = target_alias.origin(db);
+        if let ClassType::Generic(source_alias) = source
+            && source_alias.origin(db) == origin
+        {
+            return self.check_specialization_pair(
+                db,
+                source_alias.specialization(db),
+                target_alias.specialization(db),
+            );
+        }
 
-                    // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target))
-                        if source.origin(db) == target.origin(db) =>
-                    {
-                        generic_target = Some(target);
-                        self.check_specialization_pair(
-                            db,
-                            source.specialization(db),
-                            target.specialization(db),
-                        )
-                    }
-
-                    // Different generic origins, or generic and non-generic classes, don't match.
-                    (ClassType::Generic(_), ClassType::Generic(_) | ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
-                },
+        let mut matched_origin = false;
+        let candidates = source
+            .relation_bases(db, origin.into())
+            .filter(|&base| match base {
+                ClassBase::Class(ClassType::Generic(alias)) => alias.origin(db) == origin,
+                _ => unknown_base_matches(base),
+            });
+        let result = candidates.when_any(db, self.constraints, |base| {
+            if let ClassBase::Class(ClassType::Generic(alias)) = base {
+                matched_origin = true;
+                self.check_specialization_pair(
+                    db,
+                    alias.specialization(db),
+                    target_alias.specialization(db),
+                )
+            } else {
+                self.always()
             }
         });
-
-        let Some(target) = generic_target else {
+        if !matched_origin {
             return result;
-        };
+        }
 
         // The MRO retains only one specialization per class. A different inheritance path can
         // still establish the relation: `Child(Gradual, Concrete)` is a subtype of `Base[int]`
@@ -2755,12 +2744,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             source
                 .iter_explicit_ancestors(db, self.env)
                 .filter_map(ClassType::into_generic_alias)
-                .filter(|ancestor| ancestor.origin(db) == target.origin(db))
+                .filter(|ancestor| ancestor.origin(db) == origin)
                 .when_any(db, self.constraints, |ancestor| {
                     self.check_specialization_pair(
                         db,
                         ancestor.specialization(db),
-                        target.specialization(db),
+                        target_alias.specialization(db),
                     )
                 })
         })
@@ -2934,7 +2923,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations. A dynamic base
     /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
     /// Final declarations are handled by override diagnostics instead of supplying context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<ClassBodyDeclaration<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
@@ -2971,10 +2960,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             } else {
                 (!declared.qualifiers.contains(TypeQualifiers::FINAL)
                     && declarations.contains_only_annotated_assignments(db))
-                .then_some(declared)
+                .then_some(ClassBodyDeclaration {
+                    member: declared,
+                    class: base,
+                })
             };
-            return declaration.map(|declaration| {
-                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+            return declaration.map(|declaration| ClassBodyDeclaration {
+                member: declaration
+                    .member
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ..declaration
             });
         }
         None
@@ -3178,9 +3173,35 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    let member = class.own_instance_member(db, &self.env, name);
+                    let definitely_declared = matches!(
+                        member.inner.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Declared,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        })
+                    );
+                    if definitely_declared {
+                        let overriding_class_default =
+                            definitely_bound_member.is_some_and(|previous| {
+                                !previous
+                                    .qualifiers
+                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                            }) && !member
+                                .inner
+                                .qualifiers
+                                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
+                        if !overriding_class_default {
+                            // Annotations take precedence over inferred writes, including augmented
+                            // assignments. Avoid inferring method bodies just to discard their types.
+                            return InstanceMemberResult::Done(member.inner);
+                        }
+                    }
+
                     let implicit = class.member_with_augmented_bindings(
                         db,
-                        class.own_instance_member(db, &self.env, name),
+                        member,
                         name,
                         MethodDecorator::None,
                     );
@@ -3188,11 +3209,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         pending_augmented_bindings.push((class, bindings));
                     }
 
+                    if definitely_declared {
+                        // An overriding class default shadows this declaration, but its augmented
+                        // assignments can still contribute to an inherited instance attribute.
+                        continue;
+                    }
+
                     if let member @ PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
                                 ty,
-                                origin,
                                 definedness: boundness,
                                 provenance: member_provenance,
                                 ..
@@ -3201,24 +3227,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     } = implicit.member.inner
                     {
                         if boundness == Definedness::AlwaysDefined {
-                            if origin.is_declared() {
-                                if definitely_bound_member.is_some_and(|member| {
-                                    !member
-                                        .qualifiers
-                                        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                                }) && !qualifiers
-                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                                {
-                                    // An overriding class default shadows inherited declarations,
-                                    // but inherited instance assignments must still be collected.
-                                    continue;
-                                }
-
-                                // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from subclasses and return the declared type.
-                                return InstanceMemberResult::Done(member);
-                            }
-
                             definitely_bound_member = Some(member);
                         }
 

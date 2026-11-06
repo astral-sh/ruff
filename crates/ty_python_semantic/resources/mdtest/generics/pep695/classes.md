@@ -322,6 +322,27 @@ def value[T](factory: type[Box[T]]) -> T:
 reveal_type(value(Box))  # revealed: int
 ```
 
+## Aliases of unsubscripted generic classes
+
+An implicit alias preserves the generic class object. A PEP 613 alias uses the class's default
+specialization, including when that alias is assigned to another name:
+
+```py
+from typing import TypeAlias
+
+class Box[T = str]: ...
+
+BoxAlias = Box
+DefaultBox: TypeAlias = Box
+ForwardedDefault = DefaultBox
+
+def inspect(generic: BoxAlias[int], default: DefaultBox):
+    reveal_type(generic)  # revealed: Box[int]
+    reveal_type(default)  # revealed: Box[str]
+
+def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
@@ -640,8 +661,8 @@ reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 
 ### Failed constructor inference
 
-A failed constructor call reports its argument error without exposing an unsolved class type
-parameter or producing an additional assignment error.
+A failed constructor call reports an assignability error without exposing an unsolved class type
+parameter or producing an additional argument error.
 
 ```py
 from collections.abc import Callable
@@ -655,7 +676,8 @@ class Consumer[T]:
 
 def accepts_dog(value: Dog) -> None: ...
 
-consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`"
+consumer: Consumer[Animal] = Consumer(accepts_dog)
 ```
 
 ### Constrained constructor inference uses argument evidence
@@ -686,13 +708,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
+        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
@@ -887,6 +909,108 @@ reveal_type(D(1))  # revealed: D[int]
 # TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
+```
+
+### Reordered type arguments in `__new__`
+
+```py
+class Pair[T, U]:
+    first: T
+
+    def __new__(cls, x: T, y: U) -> "Pair[U, T]":
+        raise NotImplementedError
+
+    def check(self, x: int, y: str) -> int:
+        # revealed: Pair[str, int]
+        reveal_type(Pair(x, y))
+        return Pair(x, y).first  # error: [invalid-return-type]
+
+def check(x: int, y: str) -> None:
+    # revealed: Pair[str, int]
+    reveal_type(Pair(x, y))
+```
+
+### Type variable defaults across `__new__` and `__init__`
+
+A type variable left unsolved by `__new__` can still be inferred from `__init__`. Its default
+applies only when neither method solves it, including when `__new__` is inherited.
+
+```py
+from typing import Any, Self
+
+class Base:
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+class C[T = str](Base):
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(C(int()))  # revealed: C[int]
+reveal_type(C())  # revealed: C[str]
+reveal_type(C[float](float()))  # revealed: C[float]
+C[str](int())  # error: [invalid-argument-type]
+```
+
+Inferring a gradual type from an argument also takes precedence over the default:
+
+```py
+from ty_extensions._internal import Unknown
+
+def gradual(unknown: Unknown, dynamic: Any):
+    reveal_type(C(unknown))  # revealed: C[Unknown]
+    reveal_type(C(dynamic))  # revealed: C[Any]
+```
+
+The same applies when `__new__` is defined directly and returns the generic class instead of `Self`:
+
+```py
+class Direct[T = str]:
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Direct[T]":
+        return super().__new__(cls)
+
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(Direct(int()))  # revealed: Direct[int]
+reveal_type(Direct())  # revealed: Direct[str]
+```
+
+An explicitly annotated `self` can infer the class's type argument through a method type variable:
+
+```py
+class ExplicitSelf[T = str](Base):
+    def __init__[V](self: "ExplicitSelf[V]", value: V) -> None: ...
+
+reveal_type(ExplicitSelf(int()))  # revealed: ExplicitSelf[int]
+```
+
+Each method can solve different type variables. A default that references another type variable uses
+that variable's inferred type:
+
+```py
+class Pair[T = str, U = T]:
+    def __new__(cls, first: T, second: object = None) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: U | None = None) -> None: ...
+
+reveal_type(Pair(int(), bytes()))  # revealed: Pair[int, bytes]
+reveal_type(Pair(int()))  # revealed: Pair[int, int]
+```
+
+When both methods infer a type, we combine their results even if one happens to equal the default:
+
+```py
+class Both[T = str]:
+    def __new__(cls, first: T, second: object) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: T) -> None: ...
+
+reveal_type(Both(str(), int()))  # revealed: Both[str | int]
+
+def inferred_unknown(unknown: Unknown):
+    reveal_type(Both(unknown, int()))  # revealed: Both[Unknown | int]
+    reveal_type(Both(int(), unknown))  # revealed: Both[int | Unknown]
 ```
 
 ### Both present, `__new__` inherited from a generic base class
@@ -1299,11 +1423,11 @@ child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
 
-child.value = "b"  # no diagnostic
+child.value = "b"  # ok
 child.value = 1  # error: [invalid-assignment]
 
 reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
-child.__replace__(value="b")  # no diagnostic
+child.__replace__(value="b")  # ok
 child.__replace__(value=1)  # error: [invalid-argument-type]
 ```
 
@@ -1319,7 +1443,7 @@ class Indirect(Nested[str]): ...
 reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
-indirect.value = ["b"]  # no diagnostic
+indirect.value = ["b"]  # ok
 indirect.value = [1]  # error: [invalid-assignment]
 ```
 
@@ -2049,7 +2173,7 @@ The returned instance supports known methods, and ty still rejects missing attri
 def _(series: Series[Any]):
     result = series + 1
     reveal_type(result.count())  # revealed: int
-    result.missing()  # error: [unresolved-attribute]
+    result.missing()  # error: [missing-attribute]
 ```
 
 ## Ambiguous overloads returning generic protocols
@@ -2156,13 +2280,59 @@ class Pair[T, U]:
     def __init__(self, first: T, second: U):
         self.first: T = first
         self.second: U = second
+        self.values: list[T] = [first]
 
     def swapped(self, other: "Pair[U, T]"):
         reveal_type(other.first)  # revealed: U@Pair
         reveal_type(other.second)  # revealed: T@Pair
+        # revealed: list[U@Pair]
+        reveal_type(other.values)
 
     def nested(self, other: "Pair[list[T], U]"):
         reveal_type(other.first)  # revealed: list[T@Pair]
+        # revealed: list[list[T@Pair]]
+        reveal_type(other.values)
+```
+
+## Inferred attributes preserve captured type variables
+
+Specializing a local generic class replaces its own type variables in inferred attributes. Type
+variables captured from the enclosing function retain that function's binding.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        def __init__(self, value: U) -> None:
+            self.value = (value,)
+            self.captured = (captured,)
+
+    local = Local[int](1)
+    # revealed: tuple[int]
+    reveal_type(local.value)
+    unchanged: tuple[T] = local.captured  # ok
+```
+
+## Annotated attributes preserve captured type variables
+
+A local class's attribute and method annotations capture the enclosing function's type variables.
+The class's own parameters remain available for specialization.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        value: U
+        captured: T
+
+        def __init__(self, value: U, captured: T) -> None:
+            self.value = value  # ok
+            self.captured = captured  # ok
+
+    local = Local[int](1, captured)
+    # revealed: int
+    reveal_type(local.value)
+    unchanged: T = local.captured  # ok
+    Local[int]("wrong", captured)  # error: [invalid-argument-type]
+    Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
 
 ## Materialized `TypeIs` return types
@@ -2426,6 +2596,27 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+## Writable `__class__` protocol specializations
+
+Specializing a writable `__class__` property to `object` still requires the exact class.
+
+```py
+from typing import Protocol
+
+class Just[T](Protocol):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+
+class Custom: ...
+
+exact: Just[object] = object()  # ok
+subclass: Just[object] = Custom()  # error: [invalid-assignment]
+exact_class: type[Just[object]] = object  # ok
+subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
+```
+
 ## Subscripting non-generic classes
 
 Subscripting a non-generic class in a type expression is an error. The invalid type expression
@@ -2573,9 +2764,8 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 
 <!-- snapshot-diagnostics -->
 
-A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
-prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
-arguments, making any subsequent defaults meaningless.
+A `TypeVar` with a default cannot follow a `TypeVarTuple`, even if a required `TypeVar` comes
+between them. A specialization could use the default and bind one more argument to the pack.
 
 ```py
 # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
@@ -2587,11 +2777,11 @@ class Bar[T1, *Ts, T2 = int]: ...
 # error: [invalid-type-variable-default]
 class Baz[*Ts, T1 = int, T2 = str]: ...
 
-# Note: the spec says this is fine,
-# but it raises `TypeError` at runtime
-# (<https://github.com/python/typing/issues/2211>)
-#
 # error: [invalid-type-variable-default]
+class Separated[*Ts, U, T = int]: ...
+
+# A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
+# CPython raises TypeError here (https://github.com/python/typing/issues/2211).
 class Qux[*Ts, **P = [int, str]]: ...
 
 # error: [invalid-type-variable-default]
@@ -2600,7 +2790,6 @@ class Quux[*Ts, T1 = int, **P = [int, str]]: ...
 # error: [invalid-type-variable-default]
 class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 
-# error: [invalid-type-variable-default]
 # error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"
 class Grault[*Us, *Ts = *tuple[int, str]]: ...
 
@@ -2730,6 +2919,151 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Multiple inherited recursive protocol methods
+
+A subclass with several inherited recursive methods satisfies the matching protocol specialization.
+An arbitrary type argument does not satisfy `Chain[int]`.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise NotImplementedError
+    def first[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def second[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def third[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Concrete[T](Chain[T]): ...
+
+def check[T](value: Concrete[T]) -> None:
+    matching: Chain[T] = value  # ok
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:19:32
+   |
+19 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
+```
+
+## Recursive protocol receiver restrictions
+
+An implementation can use the same receiver restriction as a generic protocol. Its other parameters
+and return types must still match.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise RuntimeError
+    def step[S](self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise RuntimeError
+
+class Inherited[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+class Structural[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def step[S](self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise NotImplementedError
+
+class Invalid[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def step[S](self: Chain[tuple[S]], callback: Callable[[S], str]) -> None:
+        raise NotImplementedError
+
+def accepts(value: Chain[int]) -> None: ...
+def check(inherited: Inherited[int], structural: Structural[int], wrong: Structural[str], invalid: Invalid[int]):
+    accepts(inherited)  # ok
+    accepts(structural)  # ok
+    accepts(wrong)  # error: [invalid-argument-type]
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+A subprotocol must pass the same assignability check.
+
+```py
+class StructuralProtocol[T](Protocol):
+    def value(self) -> T: ...
+    def step[S](self: Chain[tuple[S]], callback: Callable[[S], T]) -> None: ...
+
+def check_protocol(valid: StructuralProtocol[int], invalid: StructuralProtocol[str]):
+    accepts(valid)  # ok
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+The expected protocol also supplies the inherited constructor's type argument.
+
+```py
+contextual: Chain[int] = Inherited(())  # ok
+reveal_type(contextual)  # revealed: Inherited[int]
+```
+
+## Variance of protocol receiver restrictions
+
+An implementation can accept a broader receiver than a protocol requires.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+class Required(Protocol):
+    def method(self: Reader[bool]) -> None: ...
+
+class Broad:
+    def method(self: Reader[int]) -> None: ...
+
+class Incompatible:
+    def method(self: Reader[str]) -> None: ...
+
+def accepts(value: Required) -> None: ...
+def check(broad: Broad, incompatible: Incompatible):
+    accepts(broad)  # ok
+    accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Receiver requirements in constructor overloads
+
+Each constructor overload checks its receiver restriction together with its arguments. The receiver
+restriction also applies when every explicit argument has a default.
+
+```py
+from typing import overload
+
+class Required[T]:
+    @overload
+    def __init__(self: "Required[int]", value: int = 0) -> None: ...
+    @overload
+    def __init__(self: "Required[str]", value: str = "") -> None: ...
+    def __init__(self, value: object = 0) -> None: ...
+
+Required[int]()  # ok
+Required[str]()  # ok
+Required[bytes]()  # error: [no-matching-overload]
+Required[int]("wrong")  # error: [no-matching-overload]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
@@ -2815,7 +3149,7 @@ An expected return type also provides context for the call:
 ```py
 def contextual_argument[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
     box = a if cond else b
-    return box.pair_with_values([])  # no diagnostic
+    return box.pair_with_values([])  # ok
 
 def inferred_result[T](a: Box[str], b: Box[T], cond: bool):
     box = a if cond else b
@@ -2864,7 +3198,7 @@ python-version = "3.12"
 ```py
 def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
     for current in (first, second):
-        for key, data in current.items():  # no diagnostic
+        for key, data in current.items():  # ok
             reveal_type(data)  # revealed: T@compare | int
             reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
@@ -2908,7 +3242,7 @@ class WithDefault(Base[int]):
     value: str = ""  # error: [invalid-attribute-override]
 
 class Grandchild(WithDefault):
-    value: str = ""  # no diagnostic
+    value: str = ""  # ok
 ```
 
 A new concrete inheritance path can introduce a conflict absent from a parent's gradual
@@ -2938,7 +3272,7 @@ class Base[T]:
 
 class Same(Base[int]):
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 ```
 
 Narrowing to `bool` would prevent writes of other integers. An unrelated type such as `str` also
@@ -3036,6 +3370,38 @@ def narrow_intersection[S](value: Intersection[Parent[S], Other[S]]) -> None:
 def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]) -> None:
     if isinstance(value, ChildBoth):
         reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
+```
+
+## Inheriting different specializations of a property
+
+`String` can return `str` for the property inherited from `Base[Any]`. Combining it with `Integer`
+also requires the property to return `int`, so the new subclass is invalid.
+
+```py
+from typing import Any
+
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class String(Base[Any]):  # ok
+    @property
+    def value(self) -> str:
+        return ""
+
+class Integer(Base[int]): ...
+class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+```
+
+An explicit override is also checked against `Base[int]`, and the error is reported only at the
+override.
+
+```py
+class Explicit(String, Integer):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

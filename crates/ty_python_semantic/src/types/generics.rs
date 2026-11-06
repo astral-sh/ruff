@@ -15,8 +15,9 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget, Sol
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
-    SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution,
+    ReportDiagnostics, Solution, SolutionPaths, SolutionViolation, SolutionViolationKind,
+    Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -28,8 +29,10 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
+use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
+    TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -39,9 +42,10 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
+    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
+    inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -171,7 +175,7 @@ fn find_typevar_binding<'db>(
     // We also match `FunctionTypeParameters` as a valid inner scope because for generic methods
     // (e.g., `def foo[T](self) -> Self`), the type-params scope sits between the function body
     // and the class body in the ancestor chain.
-    if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
+    if matches!(typevar.kind(db), TypeVarKind::TypingSelf { .. }) {
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
                 match inner.node() {
@@ -275,7 +279,9 @@ pub(crate) fn typing_self<'db>(
         // https://github.com/astral-sh/ty/issues/2514. So we just pass `None`
         // for the definition field here.
         None,
-        TypeVarKind::TypingSelf,
+        TypeVarKind::TypingSelf {
+            origin: SelfTypeVarOrigin::Class(class),
+        },
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
         db,
@@ -368,6 +374,7 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -536,6 +543,9 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns the typevars directly bound by this generic context.
+    ///
+    /// Argument inference reuses this set for each parameter of each candidate overload.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
         TypeVarSet::from_typevars(db, self.variables(db))
     }
@@ -545,6 +555,14 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
         self.variables_inner(db).values().copied()
+    }
+
+    pub(super) fn variable_index(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<usize> {
+        self.variables_inner(db).get_index_of(&typevar)
     }
 
     pub(crate) fn contains(
@@ -828,6 +846,10 @@ impl<'db> GenericContext<'db> {
                 } else {
                     walk_callable_type(db, callable, self);
                 }
+            }
+
+            fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                walk_type_alias_arguments(db, alias, self);
             }
 
             fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
@@ -1368,8 +1390,7 @@ impl<'db> Specialization<'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
+            .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
     }
 
@@ -1514,34 +1535,6 @@ impl<'db> Specialization<'db> {
         } else {
             self
         }
-    }
-
-    /// Combines two specializations of the same generic context. If either specialization maps a
-    /// typevar to `Type::Unknown`, the other specialization's mapping is used. If both map the
-    /// typevar to a known type, those types are unioned together.
-    ///
-    /// Panics if the two specializations are not for the same generic context.
-    pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
-        let generic_context = self.generic_context(db);
-        assert_eq!(other.generic_context(db), generic_context);
-        let env = ProgramEnvironment::from_program(generic_context.program(db));
-        // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
-        // confusing/wrong results in cases where there was a mapping found for a typevar, and it
-        // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
-        // may fail to specialize, but not end up as `Unknown`. We should add a bitset or similar
-        // to Specialization that explicitly tells us which typevars are mapped.
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(other.types(db))
-            .map(|(self_type, other_type)| match (self_type, other_type) {
-                (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
-                _ => UnionType::from_two_elements(db, &env, *self_type, *other_type),
-            })
-            .collect();
-        // TODO: Combine the tuple specs too
-        // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -2212,6 +2205,23 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     let left_type = left_type.resolve_type_alias(db);
                     let right_type = right_type.resolve_type_alias(db);
 
+                    // Ordinary type variables with upper bounds can both specialize to `Never`,
+                    // even when those upper bounds are disjoint. A constrained variable instead
+                    // has to select one of its declared alternatives.
+                    let can_choose_never = |var: BoundTypeVarInstance<'db>| {
+                        matches!(
+                            var.kind(db),
+                            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar
+                        ) && !var.typevar(db).is_constrained(db)
+                    };
+                    if let (Type::TypeVar(left_var), Type::TypeVar(right_var)) =
+                        (left_type, right_type)
+                        && can_choose_never(left_var)
+                        && can_choose_never(right_var)
+                    {
+                        return self.never();
+                    }
+
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
                     // using a directional subtyping checker.
@@ -2222,11 +2232,15 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // These variables stand for specializations we have yet to choose. Keep
                     // their declared domains intact: materializing `T: Any` to `T: Never`
                     // would incorrectly rule out the valid choice `T = str`.
+                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
+                    // Nested overlap checks can recurse through materialization equivalence.
+                    // Retain that guard while starting fresh transformation caches.
                     let materialization_visitor = ApplyTypeMappingVisitor {
                         materialize_typevar_bounds_and_defaults: false,
-                        ..ApplyTypeMappingVisitor::new(self.env)
+                        ..checker
+                            .materialization_visitor
+                            .for_new_materialization_root()
                     };
-                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self
@@ -2295,7 +2309,8 @@ pub enum ApplySpecialization<'a, 'db> {
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
-    /// Overrides the given type variables in an existing specialization mapping.
+    /// Selects parameter lists for the current callable's outer signatures. Ordinary type
+    /// variable lookups still use the underlying specialization.
     WithBindings {
         specialization: &'a ApplySpecialization<'a, 'db>,
         bindings: &'a [(BoundTypeVarInstance<'db>, Type<'db>)],
@@ -2328,6 +2343,34 @@ impl<'db> ApplySpecialization<'_, 'db> {
             Self::WithBindings { specialization, .. } => specialization.preserves_lazy_signatures(),
             _ => false,
         }
+    }
+
+    /// Returns the parameter list to substitute for `paramspec` in the current callable signature.
+    ///
+    /// Choosing one parameter list for a signature must preserve the full `ParamSpec` in nested types.
+    ///
+    /// For example, if `f` has type `Callable[P, Callable[P, None]]` and `P` supports both
+    /// `(int, /)` and `(str, /)`, then `f(1)("text")` is valid. Narrowing both occurrences
+    /// of `P` to `(int, /)` would incorrectly reject the second call.
+    pub(super) fn get_parameter_list(
+        self,
+        db: &'db dyn Db,
+        paramspec: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        debug_assert!(
+            paramspec.is_paramspec(db),
+            "Expected a ParamSpec, got {:?}",
+            paramspec.kind(db)
+        );
+
+        if let Self::WithBindings { bindings, .. } = self
+            && let Some((_, value)) = bindings
+                .iter()
+                .find(|(variable, _)| variable.is_same_typevar_as(db, paramspec))
+        {
+            return Some(*value);
+        }
+        self.get(db, paramspec)
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -2365,14 +2408,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     None
                 }
             }
-            ApplySpecialization::WithBindings {
-                specialization,
-                bindings,
-            } => bindings
-                .iter()
-                .find(|(typevar, _)| bound_typevar.is_same_typevar_as(db, *typevar))
-                .map(|(_, ty)| *ty)
-                .or_else(|| specialization.get(db, bound_typevar)),
+            ApplySpecialization::WithBindings { specialization, .. } => {
+                specialization.get(db, bound_typevar)
+            }
         }
     }
 
@@ -2406,24 +2444,8 @@ impl<'db> ApplySpecialization<'_, 'db> {
                 ),
             ),
             ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
-            ApplySpecialization::WithBindings {
-                specialization,
-                bindings,
-            } => {
-                let specialization = specialization.as_specialization(db)?;
-                let types = specialization.map_types(db, |_, variable, original| {
-                    bindings
-                        .iter()
-                        .find(|(typevar, _)| variable.is_same_typevar_as(db, *typevar))
-                        .map_or(original, |(_, ty)| *ty)
-                });
-                Some(Specialization::new(
-                    db,
-                    specialization.generic_context(db),
-                    types,
-                    specialization.materialization_kind(db),
-                    specialization.tuple_inner(db),
-                ))
+            ApplySpecialization::WithBindings { specialization, .. } => {
+                specialization.as_specialization(db)
             }
         }
     }
@@ -2534,12 +2556,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
-    /// Keep the first supplied parameter list. Argument checking still validates later
-    /// occurrences against the chosen list.
-    ///
-    /// TODO: Combine repeated `ParamSpec` bounds using unions and intersections of parameter lists
-    /// instead of keeping only the first occurrence's contribution.
-    paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
 /// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
@@ -2573,6 +2589,17 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Whether inference supplied a type for this variable, before applying defaults.
+    pub(super) fn has_inferred_type(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        self.generic_context(db)
+            .variable_index(db, typevar)
+            .is_some_and(|index| self.merged_types(db)[index].is_some())
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -2778,7 +2805,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
             types: LegacyTypeMappings::Available(FxHashMap::default()),
-            paramspec_seen: FxHashSet::default(),
         }
     }
 
@@ -2788,7 +2814,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
-        let set = self.remove_seen_paramspecs(set, &self.paramspec_seen);
         self.infer_from_constraint_set(set)
     }
 
@@ -2877,12 +2902,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Returns an error if the call-wide pending constraints are unsatisfiable.
     pub(crate) fn build_inference_with(
         &mut self,
+        report_diagnostics: ReportDiagnostics,
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             Option<&CandidateTypeVarSolution<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
     ) -> Result<TypeVarInference<'db>, Vec<SpecializationError<'db>>> {
-        self.solve_pending_with(SolutionBudget::default(), &mut choose)
+        self.solve_pending_with(SolutionBudget::default(), report_diagnostics, &mut choose)
     }
 
     /// Build a diagnostic specialization after the call-wide constraints were unsatisfiable.
@@ -2903,7 +2929,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
             let analysis = self.analyze_constraint_set(when);
-            self.record_constraint_analysis(&analysis);
+            if matches!(&analysis, ConstraintSetAnalysis::Unsatisfiable(failures) if failures.is_empty())
+                && let Type::Union(actual_union) = actual.resolve_type_alias(db)
+            {
+                // An invalid member must reject the whole call, but other members can still
+                // provide useful diagnostic evidence, such as `int` in `list[int] | None`.
+                // Do not merge separate solutions of an already-rejected declaration: for
+                // `T: (str, bytes)`, valid `str` and `bytes` members cannot be combined into T.
+                // Keep that evidence out of `pending`, and never retry an exhausted relation.
+                for actual in actual_union.elements(db) {
+                    let when =
+                        self.constraint_for_relation(formal, *actual, TypeVarVariance::Covariant);
+                    let analysis = self.analyze_constraint_set(when);
+                    self.project_for_legacy_fallback(&analysis);
+                }
+            }
+            self.project_for_legacy_fallback(&analysis);
         }
 
         let inference =
@@ -2961,6 +3002,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_pending_with(
         &mut self,
         budget: SolutionBudget,
+        report_diagnostics: ReportDiagnostics,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
             Option<&CandidateTypeVarSolution<'db>>,
@@ -2974,6 +3016,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 builder.env,
                 builder.inferable,
                 budget,
+                report_diagnostics,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
                         CandidateSolutions::default_solve(
@@ -2987,7 +3030,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             )?;
             Ok(match solutions {
                 Solutions::Unsatisfiable(solutions) => {
-                    if let SolutionPaths::Complete(paths) = solutions {
+                    if report_diagnostics.is_yes() && let SolutionPaths::Complete(paths) = solutions {
                         specialization_errors = paths
                             .iter()
                             .flat_map(Solution::violations)
@@ -3398,11 +3441,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     Some(mapped_ty) => {
                         // The legacy map has already merged its solutions and discarded their
                         // directional bounds. Treat the resulting mapping as an exact equality.
-                        let candidate =
-                            CandidateTypeVarSolution::from_equivalence(*variable, mapped_ty);
+                        let candidate = CandidateTypeVarSolution::from_equivalence(
+                            *variable,
+                            mapped_ty,
+                            self.inferable,
+                        );
                         choose(*variable, Some(&candidate)).unwrap_or(mapped_ty)
                     }
                     None => choose(*variable, None)?,
+                };
+                // The legacy recovery map can retain a union of parameter lists. Keep the first
+                // parameter list so argument validation reports the incompatible callbacks.
+                let chosen = if variable.domain(db) == TypeVarDomain::ParameterSignature
+                    && let Type::Union(union) = chosen
+                {
+                    *union.elements(db).first()?
+                } else {
+                    chosen
                 };
                 Some((*identity, chosen))
             })
@@ -3481,17 +3536,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn intersect_pending_typevar_constraint(
-        &mut self,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        constraint: ConstraintSet<'db, 'c>,
-    ) {
+    fn intersect_pending_typevar_constraint(&mut self, constraint: ConstraintSet<'db, 'c>) {
         let db = self.db;
-        let identity = bound_typevar.identity(db);
-        // TODO: Remove this guard once repeated `ParamSpec` bounds can be combined.
-        if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
-            return;
-        }
         self.pending.intersect(db, self.constraints, constraint);
     }
 
@@ -3536,7 +3582,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3544,7 +3590,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3552,13 +3598,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
             TypeVarVariance::Bivariant => return,
         };
-        self.intersect_pending_typevar_constraint(bound_typevar, constraint);
+        self.intersect_pending_typevar_constraint(constraint);
     }
 
     /// Solves one relation without recording it or changing the legacy type mappings.
@@ -3569,6 +3615,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.env,
             self.inferable,
             SolutionBudget::default(),
+            ReportDiagnostics::Yes,
             |_variance, path_bound| {
                 CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
             },
@@ -3587,46 +3634,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
-        }
-    }
-
-    /// Record supplied parameter lists independently from the diagnostic recovery mapping.
-    ///
-    /// TODO: Remove this wrapper once repeated `ParamSpec` bounds can be combined.
-    fn record_constraint_analysis(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
-        if let ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(solutions)) = analysis {
-            self.record_paramspecs(
-                &solutions
-                    .iter()
-                    .map(|solution| solution.solved_typevars.as_slice()),
-            );
-        }
-        self.project_for_legacy_fallback(analysis);
-    }
-
-    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
-    fn record_paramspecs<'a>(
-        &mut self,
-        solutions: &(impl Iterator<Item = &'a [TypeVarSolution<'db>]> + Clone),
-    ) where
-        'db: 'a,
-    {
-        for typevar in self
-            .generic_context
-            .variables(self.db)
-            .filter(|typevar| typevar.is_paramspec(self.db))
-        {
-            // Different alternatives can supply different lists. They still belong to the
-            // first argument, so a later argument must not choose between them.
-            if solutions.clone().next().is_some()
-                && solutions.clone().all(|path| {
-                    path.iter().any(|binding| {
-                        binding.bound_typevar.identity(self.db) == typevar.identity(self.db)
-                    })
-                })
-            {
-                self.paramspec_seen.insert(typevar.identity(self.db));
-            }
         }
     }
 
@@ -3690,25 +3697,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
     pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
-        let when = self.remove_seen_paramspecs(when, &self.paramspec_seen);
         self.pending.intersect(self.db, self.constraints, when);
-    }
-
-    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
-    fn remove_seen_paramspecs(
-        &self,
-        when: ConstraintSet<'db, 'c>,
-        seen: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    ) -> ConstraintSet<'db, 'c> {
-        // Callable and protocol comparisons can supply several variables at once. Ignore later
-        // occurrences of a ParamSpec without losing the other variables' requirements.
-        let seen = TypeVarSet::from_typevars(
-            self.db,
-            self.generic_context.variables(self.db).filter(|typevar| {
-                seen.contains(&typevar.identity(self.db)) && when.mentions_typevar(*typevar)
-            }),
-        );
-        when.reduce_inferable(self.db, self.env, self.constraints, seen)
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -3725,7 +3714,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if let Some(error) = analysis.specialization_error(db, self.env) {
             return Err(error);
         }
-        self.record_constraint_analysis(&analysis);
+        self.project_for_legacy_fallback(&analysis);
         Ok(())
     }
 
@@ -3922,9 +3911,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 env,
                 &element.when_constraint_set_assignable_to_owned(db, env, formal),
             );
-            element_when
-                .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env, self.inferable)
+            element_when.is_equivalent_to(db, env, mapping_when, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
@@ -4020,26 +4007,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // Retain every alternative that was not proved unsatisfiable. Solving the
                 // combined TDD here would repeat their potentially expensive path traversals.
                 self.record_constraint_set(combined);
-                // TODO: Remove this bookkeeping once repeated `ParamSpec` bounds can be combined.
-                if accepted.iter().all(|(_, analysis)| {
-                    matches!(
-                        analysis,
-                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(_))
-                    )
-                }) {
-                    self.record_paramspecs(
-                        &accepted
-                            .iter()
-                            .filter_map(|(_, analysis)| match analysis {
-                                ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(
-                                    paths,
-                                )) => Some(paths),
-                                _ => None,
-                            })
-                            .flatten()
-                            .map(|solution| solution.solved_typevars.as_slice()),
-                    );
-                }
                 for (_, analysis) in accepted {
                     self.project_for_legacy_fallback(&analysis);
                 }
@@ -4060,6 +4027,134 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             TypeVarVariance::Covariant,
             &InferSpecializationVisitor::new(Ok(())),
         )
+    }
+
+    /// Conservatively checks whether union matching may discard gradual evidence.
+    ///
+    /// The formal type limits which gradual types we look for in the actual type; we do not
+    /// match corresponding positions to determine whether that evidence reaches a type variable.
+    fn has_gradual_union_evidence(&self, formal: Type<'db>, actual: Type<'db>) -> bool {
+        let db = self.db;
+        let formal = formal.resolve_type_alias(db);
+        // `Box[Any] <= Box[T | None] | int` loses the nested `Any` before reaching `T`, too.
+        // Keep this compatibility case until relations preserve gradual evidence. A plain
+        // `Box[T] | int` can infer `Any` directly, and a concrete `dict[str, Any]` arm must not
+        // prevent inference from other members of an argument union.
+        if any_over_type_expanding_aliases(db, self.env, formal, |nested| {
+            nested != formal && nested.is_union()
+        }) && self.has_nested_gradual_evidence(
+            formal,
+            actual,
+            &RefCell::default(),
+            &ActiveRecursionDetector::default(),
+        ) {
+            return true;
+        }
+
+        let mut pending: SmallVec<[Type<'db>; 4]> = smallvec::smallvec![actual];
+        let mut seen = FxHashSet::default();
+        let mut seen_recursive_types = FxHashSet::default();
+        while let Some(actual) = pending.pop() {
+            if !seen.insert(actual) {
+                continue;
+            }
+            match actual {
+                Type::Dynamic(_) => return true,
+                Type::TypeAlias(alias) => {
+                    // Recursive aliases can grow their specialization on every expansion.
+                    // An incomplete walk cannot establish that gradual evidence is absent.
+                    if !seen_recursive_types.insert(actual.to_type_identity(db)) {
+                        return true;
+                    }
+                    pending.push(alias.value_type(db));
+                }
+                Type::Recursive(recursive) => {
+                    if !seen_recursive_types.insert(actual.to_type_identity(db)) {
+                        return true;
+                    }
+                    pending.push(recursive.unfold(db, self.env).into_type());
+                }
+                Type::Union(union) => pending.extend(union.elements(db).iter().copied()),
+                Type::Intersection(intersection) => pending.extend(intersection.iter_positive(db)),
+                Type::NominalInstance(instance)
+                    if instance
+                        .class(db, self.env)
+                        .iter_mro(db)
+                        .any(|base| matches!(base, ClassBase::Any | ClassBase::Dynamic(_))) =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    fn has_nested_gradual_evidence(
+        &self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        seen_classes: &RefCell<FxHashSet<ClassType<'db>>>,
+        active_classes: &ActiveRecursionDetector<ClassLiteral<'db>>,
+    ) -> bool {
+        let db = self.db;
+        any_over_type_expanding_aliases(db, self.env, actual, |nested| match nested {
+            Type::Dynamic(_) => true,
+            Type::NominalInstance(instance) => {
+                let class = instance.class(db, self.env);
+                // Exact recursion adds no evidence, as when `str` inherits `Sequence[str]`.
+                if !seen_classes.borrow_mut().insert(class) {
+                    return false;
+                }
+                // A subtype can inherit gradual evidence without having explicit type arguments,
+                // as in `class AnyBox(Box[Any])`. Base arguments can themselves contain subtypes.
+                // Stop growing specializations such as `C[T](Box[C[list[T]]])` conservatively.
+                active_classes.visit(
+                    &class.class_literal(db),
+                    || true,
+                    || {
+                        // The type visitor already checks this class's own arguments.
+                        class.iter_mro(db).skip(1).any(|base| match base {
+                            ClassBase::Any | ClassBase::Dynamic(_) => true,
+                            ClassBase::Class(ClassType::Generic(base))
+                                if any_over_type_expanding_aliases(
+                                    db,
+                                    self.env,
+                                    formal,
+                                    |ty| {
+                                        let origin = ClassLiteral::Static(base.origin(db));
+                                        match ty {
+                                            Type::NominalInstance(instance) => {
+                                                instance.class_literal(db, self.env) == origin
+                                            }
+                                            Type::ProtocolInstance(protocol) => {
+                                                protocol.class_origin(db).is_some_and(|class| {
+                                                    class.class_literal(db) == origin
+                                                })
+                                            }
+                                            _ => false,
+                                        }
+                                    },
+                                ) =>
+                            {
+                                // Only bases present in the formal type can supply this evidence:
+                                // `str` inheriting `Container[Any]` does not make it gradual here.
+                                base.specialization(db).types(db).iter().any(|&ty| {
+                                    self.has_nested_gradual_evidence(
+                                        formal,
+                                        ty,
+                                        seen_classes,
+                                        active_classes,
+                                    )
+                                })
+                            }
+                            _ => false,
+                        })
+                    },
+                )
+            }
+            _ => false,
+        })
     }
 
     fn infer_map_impl(
@@ -4101,6 +4196,29 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // To make progress on that migration, we use constraint set assignability whenever
         // possible when adding any new heuristics here. See the `Callable` clause below for an
         // example.
+
+        let has_variadic = self
+            .inferable
+            .iter(db)
+            .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+
+        // Keep alternative matches in one constraint set until all arguments have contributed
+        // their evidence. Filtering either union first can discard an obligation or apply a
+        // variable's bound to an argument member that matches a different formal member.
+        // Variadic unions retain their existing inference path, as does direct gradual evidence:
+        // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
+        // Recursive aliases retain their unfolding path, which collects leaf evidence for
+        // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
+        if formal.resolve_type_alias(db).is_union()
+            && !has_variadic
+            && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
+                matches!(nested, Type::Recursive(_))
+            })
+            && !self.has_gradual_union_evidence(formal, actual)
+        {
+            let when = self.constraint_for_relation(formal, actual, polarity);
+            return self.infer_from_constraint_set(when);
+        }
 
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
@@ -4221,12 +4339,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            // TODO: We haven't implemented a full unification solver yet. If typevars appear in
-            // multiple union elements, we ideally want to express that _only one_ of them needs to
-            // match, and that we should infer the smallest type mapping that allows that.
-            //
-            // For now, we punt on fully handling multiple typevar elements. Instead, we handle two
-            // common cases specially:
+            // Compatibility inference for variadics, recursive aliases, and gradual union evidence.
+            // Other unions use the complete relation above, before either disjointness filter.
+            // TODO: Remove these heuristics once the solver handles the remaining inference cases.
             (Type::Union(formal_union), Type::Union(actual_union)) => {
                 // First, if both formal and actual are unions, and precisely one formal union
                 // element contains type variables, infer through that element after removing
@@ -4907,7 +5022,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             formal_specialization,
                             base_specialization
                         ) {
-                            let variance = typevar.variance_with_polarity(db, polarity);
+                            let variance =
+                                polarity.compose_thunk(|| specialization_variance(db, typevar));
                             self.infer_map_impl(*formal_ty, *base_ty, variance, visitor)?;
                         }
                         return Ok(());
@@ -4927,6 +5043,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 } else {
                     self.constraint_for_relation(formal, actual, relation_polarity)
                 };
+                return self.infer_from_constraint_set(when);
+            }
+
+            (formal @ Type::TypedDict(_), actual) => {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 return self.infer_from_constraint_set(when);
             }
 
@@ -4966,7 +5087,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -5033,7 +5154,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
-                        ConstraintProvenance::Evidence,
+                        ConstraintProvenance::INFERRED,
                         typevar,
                         ty,
                     )
@@ -5063,7 +5184,7 @@ mod tests {
             ));
 
             let inference = builder
-                .build_inference_with(|_, _| None)
+                .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
                 .map_err(|_| anyhow::anyhow!("expected satisfiable alternatives"))?;
             let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
                 anyhow::bail!(
@@ -5110,10 +5231,8 @@ mod tests {
                 ));
 
                 let inference = builder
-                    .build_inference_with(|typevar, bounds| {
-                        let lower = bounds
-                            .as_ref()
-                            .and_then(|bounds| bounds.inference_lower(db, &env));
+                    .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                        let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                         (typevar == t && lower == Some(str))
                             .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
@@ -5161,7 +5280,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
         ));
@@ -5174,6 +5293,7 @@ mod tests {
                     type_terms: 1,
                     ..SolutionBudget::default()
                 },
+                ReportDiagnostics::Yes,
                 &mut |_, _| None,
             )
             .map_err(|_| anyhow::anyhow!("expected a single solution"))?;
@@ -5204,7 +5324,7 @@ mod tests {
         let str = KnownClass::Str.to_instance(db, &env);
 
         let unconstrained = builder
-            .build_inference_with(|_, _| None)
+            .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
             .map_err(|_| anyhow::anyhow!("unconstrained inference should recover"))?;
         assert_eq!(
             unconstrained.solutions(db),
@@ -5217,12 +5337,16 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             ));
         }
-        assert!(builder.build_inference_with(|_, _| None).is_err());
+        assert!(
+            builder
+                .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
+                .is_err()
+        );
 
         let diagnostic = builder.build_diagnostic_inference_with(
             [(Type::TypeVar(t), int), (Type::TypeVar(t), str)],
@@ -5254,7 +5378,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5287,7 +5411,7 @@ mod tests {
             builder.record_constraint_set(relation);
             let mut choices = 0;
             let inference = builder
-                .solve_pending_with(budget, &mut |_, _| {
+                .solve_pending_with(budget, ReportDiagnostics::Yes, &mut |_, _| {
                     choices += 1;
                     None
                 })
@@ -5320,7 +5444,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5337,6 +5461,7 @@ mod tests {
                         type_terms,
                         ..SolutionBudget::default()
                     },
+                    ReportDiagnostics::Yes,
                     &mut |_, _| None,
                 )
                 .map_err(|_| anyhow::anyhow!("alternative storage exhaustion should recover"))?;
@@ -5395,17 +5520,15 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
         }));
 
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let lower = bounds
-                    .as_ref()
-                    .and_then(|bounds| bounds.inference_lower(db, &env));
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                 (typevar == t && lower == Some(str))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
@@ -5451,8 +5574,8 @@ mod tests {
         // Select T = list[U], U = T on one path and T = U = object on the other. Only the
         // individual path still contains the cycle after merging with object.
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let lower = bounds?.inference_lower(db, &env);
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                let lower = bounds?.inference_lower();
                 let ty = match (typevar, lower) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
@@ -5511,7 +5634,7 @@ mod tests {
         builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int, int]]));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|_| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
@@ -5546,14 +5669,14 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
             int,
         ));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|_| anyhow::anyhow!("a missing dependency remains satisfiable"))?;
@@ -5580,7 +5703,7 @@ mod tests {
         builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int, int]]));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 Some(PathBoundSolution::Solved(Type::TypeVar(if typevar == t {
                     u
                 } else {
@@ -5622,7 +5745,7 @@ mod tests {
         // The merged specialization needs recovery for T = list[U], U = T. That does not
         // discard the original alternative or the independent, resolved binding V = int.
         let inference = builder
-            .build_inference_with(|variable, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |variable, _| {
                 if variable == t {
                     Some(PathBoundSolution::Solved(list_of_u))
                 } else if variable == u {
@@ -5680,7 +5803,7 @@ mod tests {
         ));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(outer)))
             })
             .map_err(|_| anyhow::anyhow!("an outer dependency remains satisfiable"))?;
@@ -5718,7 +5841,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
@@ -5765,7 +5888,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             ty,
         );
@@ -5812,7 +5935,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5820,7 +5943,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5828,7 +5951,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );

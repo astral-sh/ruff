@@ -299,7 +299,7 @@ this:
 
 ```py
 try:
-    import optional_dependency  # ty: ignore[unresolved-import]
+    import optional_dependency  # ty: ignore[import-not-found]
 except ImportError:
     optional_dependency = None
 

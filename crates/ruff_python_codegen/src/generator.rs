@@ -7,8 +7,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
-    Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Parameter, Parameters, Pattern, PatternOrKeyword, Singleton, Stmt, StringFlags, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -817,7 +817,28 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Pattern::MatchClass(_) => {}
+            Pattern::MatchClass(ast::PatternMatchClass {
+                cls,
+                arguments,
+                range: _,
+                node_index: _,
+            }) => {
+                self.unparse_expr(cls, precedence::MAX);
+                self.p("(");
+                let mut first = true;
+                for pattern_or_keyword in arguments.iter_source_order() {
+                    self.p_delim(&mut first, ", ");
+                    match pattern_or_keyword {
+                        PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
+                        PatternOrKeyword::Keyword(keyword) => {
+                            self.p_id(&keyword.attr);
+                            self.p("=");
+                            self.unparse_pattern(&keyword.pattern);
+                        }
+                    }
+                }
+                self.p(")");
+            }
             Pattern::MatchStar(ast::PatternMatchStar {
                 name,
                 range: _,

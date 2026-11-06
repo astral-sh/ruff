@@ -147,7 +147,7 @@ class _:
 
     class _:
         a = 1
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         a.b.c1.d = D()
 
         class _3:
@@ -161,7 +161,7 @@ class _:
     a.b = B()
 
     class _:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         reveal_type(a.b.c1.d)  # revealed: D | None
         reveal_type(a.b.c1)  # revealed: C | None
 ```

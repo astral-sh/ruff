@@ -229,8 +229,8 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
 }
 
 /// An abstraction for printing each line of a docstring.
-struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
-    f: &'fmt mut PyFormatter<'ast, 'buf>,
+struct DocstringLinePrinter<'ast, 'buf, 'state, 'fmt, 'src> {
+    f: &'fmt mut PyFormatter<'ast, 'buf, 'state>,
 
     /// A queue of actions to perform.
     ///
@@ -263,7 +263,7 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     code_example: CodeExample<'src>,
 }
 
-impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
+impl<'src> DocstringLinePrinter<'_, '_, '_, '_, 'src> {
     /// Print all of the lines in the given iterator to this
     /// printer's formatter.
     ///

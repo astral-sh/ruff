@@ -112,12 +112,22 @@ impl<'db> Module<'db> {
     ///
     /// A project or installed module with the same name may still exist on a
     /// lower-priority search path and be available at runtime.
-    pub fn is_type_check_only(self, db: &'db dyn Database) -> bool {
+    pub fn is_bundled_typing_stub(self, db: &'db dyn Database) -> bool {
         self.search_path(db)
             .is_some_and(SearchPath::is_standard_library)
             && matches!(
                 self.name(db).first_component(),
                 "_typeshed" | "typing_extensions" | "ty_extensions"
+            )
+    }
+
+    /// Returns whether this module is a known typing helper with no runtime implementation.
+    pub fn is_known_stub_only(self, db: &'db dyn Database) -> bool {
+        self.search_path(db)
+            .is_some_and(SearchPath::is_standard_library)
+            && matches!(
+                self.name(db).first_component(),
+                "_typeshed" | "ty_extensions"
             )
     }
 
@@ -253,6 +263,12 @@ pub enum KnownModule {
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
     // Third-party modules
+    #[strum(serialize = "django.db.models.base")]
+    DjangoDbModelsBase,
+    #[strum(serialize = "django.db.models.fields")]
+    DjangoDbModelsFields,
+    #[strum(serialize = "django.db.models.fields.related")]
+    DjangoDbModelsFieldsRelated,
     #[strum(serialize = "pydantic.config")]
     PydanticConfig,
     #[strum(serialize = "pydantic.fields")]
@@ -312,6 +328,9 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::DjangoDbModelsBase => "django.db.models.base",
+            Self::DjangoDbModelsFields => "django.db.models.fields",
+            Self::DjangoDbModelsFieldsRelated => "django.db.models.fields.related",
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticFields => "pydantic.fields",
             Self::PydanticFunctionalValidators => "pydantic.functional_validators",
@@ -346,7 +365,10 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::PydanticConfig
+            Self::DjangoDbModelsBase
+            | Self::DjangoDbModelsFields
+            | Self::DjangoDbModelsFieldsRelated
+            | Self::PydanticConfig
             | Self::PydanticFields
             | Self::PydanticFunctionalValidators
             | Self::PydanticMain

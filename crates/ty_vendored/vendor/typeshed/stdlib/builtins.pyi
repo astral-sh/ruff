@@ -3428,13 +3428,13 @@ class set(MutableSet[_T]):
     @overload
     def __rsub__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
 
-    def __xor__(self, value: AbstractSet[_S], /) -> set[_T | _S]:
+    def __xor__(self, value: set[_S] | frozenset[_S], /) -> set[_T | _S]:  # type: ignore[override]
         """Return self^value."""
 
     def __ixor__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self^=value."""
 
-    @overload
+    @overload  # type: ignore[override]
     def __rxor__(self, value: set[_S], /) -> set[_T | _S]:
         """Return value^self."""
     @overload
@@ -3518,10 +3518,10 @@ class frozenset(AbstractSet[_T_co]):
     @overload
     def __rsub__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
 
-    def __xor__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
+    def __xor__(self, value: set[_S] | frozenset[_S], /) -> frozenset[_T_co | _S]:  # type: ignore[override]
         """Return self^value."""
 
-    @overload
+    @overload  # type: ignore[override]
     def __rxor__(self, value: set[_S], /) -> set[_T_co | _S]:
         """Return value^self."""
     @overload

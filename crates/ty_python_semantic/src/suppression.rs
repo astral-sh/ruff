@@ -10,6 +10,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
 use ruff_db::{PythonFile, files::File, parsed::parsed_module, source::source_text};
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -49,6 +50,15 @@ declare_lint! {
     pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../resources/lint_docs/renamed-rule-in-ignore-comment.md")]
+    pub(crate) static RENAMED_RULE_IN_IGNORE_COMMENT = {
+        summary: "detects ignore comments that use a rule's old name",
+        status: LintStatus::stable("0.0.97"),
         default_level: Level::Warn,
     }
 }
@@ -146,6 +156,7 @@ pub(crate) fn check_suppressions(
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
+    check_renamed_rules(&mut context);
     check_invalid_suppression(&mut context);
     check_blanket_suppressions(&mut context);
     check_unused_suppressions(&mut context);
@@ -195,6 +206,40 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     }
 }
 
+fn check_renamed_rules(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&RENAMED_RULE_IN_IGNORE_COMMENT) {
+        return;
+    }
+
+    let source = source_text(context.db, context.file());
+    for suppression in context.suppressions.iter() {
+        let SuppressionTarget::Lint(lint) = suppression.target else {
+            continue;
+        };
+
+        let range = suppression
+            .range
+            .add_start(suppression.kind.code_prefix().text_len());
+        let name = &source[range];
+        let canonical = lint.name().as_str();
+        if name == canonical {
+            continue;
+        }
+        let Some(diag) = context.report_lint(&RENAMED_RULE_IN_IGNORE_COMMENT, range) else {
+            continue;
+        };
+        let mut diag = diag.into_diagnostic(format_args!(
+            "Rule `{name}` has been renamed to `{canonical}`"
+        ));
+
+        diag.help(format_args!("Replace `{name}` with `{canonical}`"));
+        diag.set_fix(Fix::safe_edit(Edit::range_replacement(
+            canonical.to_owned(),
+            range,
+        )));
+    }
+}
+
 fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
     if context.is_lint_disabled(&INVALID_IGNORE_COMMENT) {
         return;
@@ -213,26 +258,29 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
 
 struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
-    file: File,
+    python_file: PythonFile<'a>,
     suppressions: &'a Suppressions,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
-        let suppressions = suppressions(db, file);
+    fn new(db: &'a dyn Db, python_file: PythonFile<'a>, diagnostics: TypeCheckDiagnostics) -> Self {
         Self {
             db,
-            file: file.file(db),
-            suppressions,
+            python_file,
+            suppressions: suppressions(db, python_file),
             diagnostics: diagnostics.into(),
         }
+    }
+
+    fn file(&self) -> File {
+        self.python_file.file(self.db)
     }
 
     fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
         !self
             .db
-            .rule_selection(self.file)
+            .rule_selection(self.file())
             .is_enabled(LintId::of(lint))
     }
 
@@ -281,7 +329,10 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
         lint: &'static LintMetadata,
         range: TextRange,
     ) -> Option<Self> {
-        let severity = ctx.db.rule_selection(ctx.file).severity(LintId::of(lint))?;
+        let severity = ctx
+            .db
+            .rule_selection(ctx.file())
+            .severity(LintId::of(lint))?;
 
         Some(Self {
             ctx,
@@ -301,9 +352,10 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     fn into_diagnostic(self, message: impl IntoDiagnosticMessage) -> DiagnosticGuard<'ctx> {
         let mut diag = Diagnostic::new(self.id, self.severity, message);
 
-        let primary_span = Span::from(self.ctx.file).with_range(self.range);
+        let file = self.ctx.file();
+        let primary_span = Span::from(file).with_range(self.range);
         diag.annotate(Annotation::primary(primary_span));
-        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
+        DiagnosticGuard::new(file, &self.ctx.diagnostics, diag)
     }
 }
 
@@ -492,6 +544,14 @@ enum SuppressionKind {
 }
 
 impl SuppressionKind {
+    /// In a `type: ignore` comment, only codes prefixed with `ty:` belong to ty.
+    fn code_prefix(self) -> &'static str {
+        match self {
+            Self::Ty => "",
+            Self::TypeIgnore => "ty:",
+        }
+    }
+
     const fn is_type_ignore(self) -> bool {
         matches!(self, SuppressionKind::TypeIgnore)
     }
@@ -658,17 +718,10 @@ impl<'a> SuppressionsBuilder<'a> {
             // `ty: ignore[a, b]` or `type: ignore[a, b]`
             Some(codes) => {
                 for &code_range in codes {
-                    let code = &self.source[code_range];
-
-                    // For `type:ignore`, ignore codes that don't start with `ty:`.
-                    let code = if comment.kind().is_type_ignore() {
-                        if let Some(prefix) = code.strip_prefix("ty:") {
-                            prefix
-                        } else {
-                            continue;
-                        }
-                    } else {
-                        code
+                    let Some(code) =
+                        self.source[code_range].strip_prefix(comment.kind().code_prefix())
+                    else {
+                        continue;
                     };
 
                     match self.lint_registry.get(code) {

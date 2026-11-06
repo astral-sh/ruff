@@ -94,8 +94,9 @@ mod tests {
     use super::{UnreachableKind, unreachable_ranges};
     use crate::db::tests::{TestDb, TestDbBuilder};
     use insta::assert_snapshot;
+    use ruff_db::diagnostic::render::{FullRenderer, Renderer};
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity,
     };
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_python_ast::PythonVersion;
@@ -168,13 +169,10 @@ mod tests {
         })
         .collect::<Vec<_>>();
 
-        DisplayDiagnostics::new(
-            db,
-            &DisplayDiagnosticConfig::new("ty").context(0),
-            &diagnostics,
-        )
-        .to_string()
-        .replace('\\', "/")
+        FullRenderer::new(db, &DisplayDiagnosticConfig::new("ty").context(0))
+            .display(&diagnostics)
+            .to_string()
+            .replace('\\', "/")
     }
 
     #[test]

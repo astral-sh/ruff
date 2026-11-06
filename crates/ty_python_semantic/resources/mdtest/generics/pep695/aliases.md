@@ -115,7 +115,7 @@ reveal_type(SpecializedList[str])  # revealed: Unknown
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias values"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias definitions"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
@@ -501,6 +501,20 @@ def _(value: Any):
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
 ```
 
+## Recursive calls returning a generic alias
+
+```py
+type Chain[T] = tuple[T, Chain[T] | None]
+
+def chain[T](value: T, recurse: bool) -> Chain[T]:
+    if recurse:
+        _, tail = chain(1, False)
+        if tail is not None:
+            # revealed: Literal[1]
+            reveal_type(tail[0])
+    return value, (value, None)
+```
+
 ## Negation after specializing a recursive alias
 
 Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is
@@ -660,8 +674,8 @@ def test[X: int](items: list[X]) -> list[X]:
     # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
     # Bidirectional inference should infer list[str | int] from the list() call.
     a: MaybeList[str | int] = list(items)
-    # The revealed type is list[str | int] because that's what list() returns.
-    reveal_type(a)  # revealed: list[str | int]
+    # The revealed type is list[int | str] because that's what list() returns.
+    reveal_type(a)  # revealed: list[int | str]
     return items
 ```
 
@@ -832,11 +846,74 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
     a: Container1.Item = y
 ```
 
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+def outer[T](value: T) -> T:
+    type Captured = T
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # ok
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+def generic_outer[T](value: T) -> tuple[T, int]:
+    type Pair[U] = tuple[T, U]
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # ok
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # ok
+```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+class Box[T]:
+    type Items = list[T]
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+class PairBox[T]:
+    type Pair[U] = tuple[T, U]
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
+```
+
 ## Default type parameter after `TypeVarTuple`
 
-A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
-prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
-arguments, making any subsequent defaults meaningless.
+A `TypeVar` with a default cannot follow a `TypeVarTuple` in a type alias. Its default would make it
+ambiguous how many arguments belong to the pack.
 
 ```py
 # snapshot: invalid-type-variable-default
@@ -844,14 +921,14 @@ type Alias1[*Ts, T = int] = tuple[*Ts, T]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:2:18
   |
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
   |             ---  ^^^^^^^ `T` has a default
   |             |
   |             `Ts` is a TypeVarTuple
-info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ```py
@@ -860,14 +937,14 @@ type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:4:22
   |
 4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
   |                 ---  ^^^^^^^^ `T2` has a default
   |                 |
   |                 `Ts` is a TypeVarTuple
-info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ```py
@@ -876,7 +953,7 @@ type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:6:18
   |
 6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
@@ -884,25 +961,13 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
   |             |    |
   |             |    `T1` has a default
   |             `Ts` is a TypeVarTuple
-info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ```py
-# snapshot: invalid-type-variable-default
 # error: [invalid-type-form] "Type alias `Alias4` cannot have multiple `TypeVarTuple` type parameters"
 # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
-```
-
-```snapshot
-error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
-  --> src/mdtest_snippet.py:10:18
-   |
-10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
-   |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
-   |             |
-   |             `Us` is a TypeVarTuple
-info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
 ```py

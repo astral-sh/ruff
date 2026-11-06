@@ -76,8 +76,8 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_db::{
         diagnostic::{
-            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-            LintName, Span, SubDiagnostic,
+            Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Span,
+            SubDiagnostic,
         },
         files::{File, system_path_to_file},
         system::{DbWithWritableSystem, SystemPathBuf},
@@ -966,10 +966,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             for mut action in code_actions(
                 &self.db,

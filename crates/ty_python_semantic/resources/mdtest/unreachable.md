@@ -438,7 +438,7 @@ def f():
 
 ### Attributes
 
-When attribute expressions appear in unreachable code, we should not emit `unresolved-attribute`
+When attribute expressions appear in unreachable code, we should not emit `missing-attribute`
 diagnostics:
 
 ```py
@@ -451,7 +451,7 @@ if sys.version_info >= (3, 11):
 
 ### Imports
 
-When import statements appear in unreachable code, we should not emit `unresolved-import`
+When import statements appear in unreachable code, we should not emit `import-not-found`
 diagnostics:
 
 ```py

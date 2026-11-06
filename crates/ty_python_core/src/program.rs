@@ -77,16 +77,19 @@ impl ProgramSettings {
         }
     }
 
+    /// The selected environment, or the last usable one if resolution failed.
+    pub fn last_usable_python_environment(&self) -> Option<&PythonEnvironment> {
+        match &self.python_environment {
+            Ok(environment) => environment.as_ref(),
+            Err(error) => error.last_usable.as_ref(),
+        }
+    }
+
     /// The root of the resolved virtual environment, for watching `pyvenv.cfg` and directory changes.
     /// System installations are unlikely to be recreated, and watching a prefix such as `/usr`
     /// recursively would be expensive.
     pub fn virtual_environment(&self) -> Option<&SystemPath> {
-        let environment = match &self.python_environment {
-            Ok(environment) => environment,
-            Err(error) => &error.last_usable,
-        };
-        environment
-            .as_ref()
+        self.last_usable_python_environment()
             .filter(|environment| environment.is_virtual())
             .map(|environment| &**environment.sys_prefix())
     }

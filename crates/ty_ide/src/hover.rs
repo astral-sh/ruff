@@ -1,7 +1,8 @@
 use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{
-    Definitions, GotoTarget, docstring_for_call_definition, find_goto_target, find_goto_target_impl,
+    Definitions, GotoTarget, docstring_for_call_definition, docstring_for_parameter_field,
+    find_goto_target, find_goto_target_impl,
 };
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::FileRange;
@@ -297,6 +298,8 @@ fn keyword_argument_hover_contents<'db>(
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
         contents.push(HoverContent::DocstringFragment(documentation));
+    } else if let Some(docstring) = docstring_for_parameter_field(db, parameter.definition) {
+        contents.push(HoverContent::Docstring(docstring));
     }
 
     Some(contents)
@@ -507,8 +510,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
-        Severity, Span,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity, Span,
     };
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextRange};
@@ -2354,6 +2356,84 @@ mod tests {
            |      ^^^^^- Cursor offset
            |      |
            |      source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_inherited_dataclass_field() {
+        let test = hover_test(
+            r#"
+            from dataclasses import dataclass
+
+            @dataclass
+            class Options:
+                verbose: bool
+                """Include debug messages."""
+
+            @dataclass
+            class LogOptions(Options):
+                pass
+
+            LogOptions(ver<CURSOR>bose=True)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) verbose: bool
+        ---------------------------------------------
+        Include debug messages.
+
+        ---------------------------------------------
+        ```python
+        (parameter) verbose: bool
+        ```
+        ---
+        Include debug messages.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:12
+           |
+        13 | LogOptions(verbose=True)
+           |            ^^^-^^^
+           |            |  |
+           |            |  Cursor offset
+           |            source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_named_tuple_field() {
+        let test = hover_test(
+            r#"
+            from typing import NamedTuple
+
+            class Point(NamedTuple):
+                x: int
+                """Horizontal coordinate."""
+
+            Point(x<CURSOR>=1)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) x: int
+        ---------------------------------------------
+        Horizontal coordinate.
+
+        ---------------------------------------------
+        ```python
+        (parameter) x: int
+        ```
+        ---
+        Horizontal coordinate.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:7
+          |
+        8 | Point(x=1)
+          |       ^- Cursor offset
+          |       |
+          |       source
         ");
     }
 
@@ -7451,10 +7531,7 @@ type U<CURSOR> = MyType
             )
             .unwrap();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("hover")),

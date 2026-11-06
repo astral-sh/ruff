@@ -5,13 +5,14 @@
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
     BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
-    UNUSED_TYPE_IGNORE_COMMENT,
+    RENAMED_RULE_IN_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
 pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -38,6 +39,7 @@ use ty_python_core::{
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
+    VirtualEnvironmentCandidates,
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
@@ -87,11 +89,12 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 }
 
 /// Register all known semantic lints.
-fn register_lints(registry: &mut LintRegistryBuilder) {
+pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
+    registry.register_lint(&RENAMED_RULE_IN_IGNORE_COMMENT);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
     registry.register_lint(&BLANKET_IGNORE_COMMENT);
 }

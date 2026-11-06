@@ -219,6 +219,15 @@ mapping_segments = {**get_segments_by_name(), "start": (1, 2), "end": (3, 4, 5)}
 reveal_type(mapping_segments)  # revealed: dict[str, tuple[int, int] | tuple[int, int, int]]
 ```
 
+A non-literal tuple also preserves its length when the preceding literal has the same element type
+and length.
+
+```py
+def segments_with_pair(pair: tuple[int, int]):
+    segments = [(1, 2), pair, (3, 4, 5)]
+    reveal_type(segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
+```
+
 This also applies when the non-literal tuple type is hidden behind a type alias or a type variable,
 or when it is subsumed by one of the literal tuple types while building the union.
 
@@ -876,7 +885,30 @@ def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
 
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
-    reveal_type(f("x", upper))  # revealed: list[str | int]
+    reveal_type(f("x", upper))  # revealed: list[Literal["x"] | int]
+```
+
+A nested callable argument prevents promotion if the promoted type would not satisfy its upper
+bound.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    count: int
+
+def keys_for[T](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def keys_for_paramspec[T, **P](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def _(data: Payload):
+    keys = keys_for(data.__getitem__)
+    reveal_type(keys)  # revealed: list[Literal["count"]]
+
+    paramspec_keys = keys_for_paramspec(data.__getitem__)
+    reveal_type(paramspec_keys)  # revealed: list[Literal["count"]]
 ```
 
 ## Literal annotations from declaration are respected
@@ -1015,5 +1047,5 @@ import module1
 
 my_modules = [module1]
 reveal_type(my_modules)  # revealed: list[<module 'module1'>]
-my_modules[0].flibbertigibbet  # error: [unresolved-attribute]
+my_modules[0].flibbertigibbet  # error: [missing-attribute]
 ```

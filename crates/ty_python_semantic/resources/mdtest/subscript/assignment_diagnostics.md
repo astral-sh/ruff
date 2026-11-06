@@ -67,7 +67,7 @@ class Config(TypedDict):
     retries: int
 
 def _(config: Config) -> None:
-    config[0] = 3  # error: [invalid-key]
+    config[0] = 3  # error: [invalid-typed-dict-key]
 ```
 
 ## Misspelled key for `TypedDict`
@@ -79,7 +79,7 @@ class Config(TypedDict):
     retries: int
 
 def _(config: Config) -> None:
-    config["Retries"] = 30.0  # error: [invalid-key]
+    config["Retries"] = 30.0  # error: [invalid-typed-dict-key]
 ```
 
 ## No `__setitem__` method
@@ -114,7 +114,7 @@ class Animal(TypedDict):
     legs: int
 
 def _(being: Person | Animal) -> None:
-    being["legs"] = 4  # error: [invalid-key]
+    being["legs"] = 4  # error: [invalid-typed-dict-key]
 ```
 
 ## Unknown key for all elements of a union
@@ -131,8 +131,8 @@ class Animal(TypedDict):
     legs: int
 
 def _(being: Person | Animal) -> None:
-    # error: [invalid-key]
-    # error: [invalid-key]
+    # error: [invalid-typed-dict-key]
+    # error: [invalid-typed-dict-key]
     being["nane"] = "unknown"
 ```
 

@@ -434,7 +434,7 @@ impl<'db> CallError<'db> {
 }
 
 /// The reason why calling a type failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum CallErrorKind {
     /// The type is not callable. For a union type, _none_ of the union elements are callable.
     NotCallable,

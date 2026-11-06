@@ -90,7 +90,7 @@ class zipimporter(_LoaderBasics):
         """get_filename(fullname) -> filename string.
 
         Return the filename for the specified module or raise ZipImportError
-        if it couldn't be imported.
+        if it couldn't be found.
         """
 
     if sys.version_info >= (3, 14):

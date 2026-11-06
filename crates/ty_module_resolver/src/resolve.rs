@@ -48,10 +48,7 @@ use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_pat
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::{
-    self as ast, PySourceType,
-    visitor::{Visitor, walk_body},
-};
+use ruff_python_ast::{self as ast, PySourceType};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -1251,13 +1248,9 @@ enum ComponentFileFilter {
     StubOnly,
 }
 
-/// Where a candidate sits in the typing specification's module-resolution order.
-///
-/// Variants are declared from highest to lowest precedence so that derived ordering can be used
-/// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
-/// sorts used by the resolver preserve search-path order between candidates in the same tier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
-enum CandidatePrecedence {
+/// Where a module resolution candidate originated.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+enum CandidateOrigin {
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
     /// Stub packages take precedence over candidates for `<package>` regardless of where those
@@ -1268,7 +1261,19 @@ enum CandidatePrecedence {
     ///
     /// This includes `.pyi` and `.py` packages and modules from extra paths, first-party code,
     /// editable installs, site-packages, and the standard library.
-    SearchPathOrder,
+    SearchPath,
+}
+
+impl CandidateOrigin {
+    /// Returns the candidate's precedence tier in the typing specification's module-resolution order.
+    ///
+    /// The resolver's stable sort preserves search-path order between candidates in the same tier.
+    fn sort_key(self) -> impl Ord {
+        match self {
+            Self::StubPackage => 0,
+            Self::SearchPath => 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1280,28 +1285,28 @@ struct ModuleResolutionCandidate<'db> {
     directory: ModuleDirectory<'db>,
     module: ResolvedModule,
     py_typed: PyTyped,
-    precedence: CandidatePrecedence,
+    origin: CandidateOrigin,
 }
 
 impl<'db> ModuleResolutionCandidate<'db> {
     fn root(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
-        Self::with_precedence(context, search_path, CandidatePrecedence::SearchPathOrder)
+        Self::with_origin(context, search_path, CandidateOrigin::SearchPath)
     }
 
     fn stub(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
-        Self::with_precedence(context, search_path, CandidatePrecedence::StubPackage)
+        Self::with_origin(context, search_path, CandidateOrigin::StubPackage)
     }
 
-    fn with_precedence(
+    fn with_origin(
         context: &ResolverContext<'db>,
         search_path: &SearchPath,
-        precedence: CandidatePrecedence,
+        origin: CandidateOrigin,
     ) -> Self {
         Self {
             directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
-            precedence,
+            origin,
         }
     }
 
@@ -1414,9 +1419,11 @@ fn resolve_stub_package_in_search_path<'db>(
 /// Orders candidates for the same module name by precedence and removes shadowed namespace packages.
 ///
 /// Regular packages and file modules shadow namespace packages, including legacy namespaces.
-/// When `for_module_name_prefix` is true, partial namespaces with higher precedence than every
-/// competing regular package or file module remain available to supply descendants. Candidates
-/// within the same precedence tier retain their search-path order.
+/// While resolving descendants, stub packages retain ordinary namespace candidates as fallbacks,
+/// and partial namespace stubs remain available alongside ordinary concrete candidates. Within
+/// each precedence tier, concrete candidates still shadow namespace packages. At the final
+/// component, any concrete candidate shadows namespaces. Candidates within the same precedence
+/// tier retain their search-path order.
 fn normalize_candidates<'db>(
     context: &ResolverContext,
     mut candidates: ResolvedNames<'db>,
@@ -1427,13 +1434,19 @@ fn normalize_candidates<'db>(
         return candidates;
     }
 
-    let best_concrete_precedence = candidates
+    let mut has_concrete_stub_package = false;
+    let mut has_concrete_search_path_candidate = false;
+    for candidate in candidates
         .iter()
         .filter(|candidate| !candidate.is_any_namespace_package(context))
-        .map(|candidate| candidate.precedence)
-        .min();
+    {
+        match candidate.origin {
+            CandidateOrigin::StubPackage => has_concrete_stub_package = true,
+            CandidateOrigin::SearchPath => has_concrete_search_path_candidate = true,
+        }
+    }
 
-    candidates.sort_by_key(|candidate| candidate.precedence);
+    candidates.sort_by_key(|candidate| candidate.origin.sort_key());
 
     // Note that we intentionally do *not* filter out ordinary search-path candidates when a stub
     // package is found. Even when a non-namespace, non-partial stub package exists, we keep the
@@ -1445,15 +1458,20 @@ fn normalize_candidates<'db>(
             return true;
         }
 
-        // A higher-precedence partial namespace remains available while resolving its descendants.
-        // At the final component, a concrete package or module shadows it.
-        let preserved_for_descendants = best_concrete_precedence.is_none_or(|precedence| {
-            for_module_name_prefix
-                && candidate.py_typed == PyTyped::Partial
-                && candidate.precedence < precedence
-        });
+        let shadowed = if for_module_name_prefix {
+            match candidate.origin {
+                CandidateOrigin::StubPackage => {
+                    has_concrete_stub_package
+                        || (has_concrete_search_path_candidate
+                            && candidate.py_typed != PyTyped::Partial)
+                }
+                CandidateOrigin::SearchPath => has_concrete_search_path_candidate,
+            }
+        } else {
+            has_concrete_stub_package || has_concrete_search_path_candidate
+        };
 
-        if preserved_for_descendants {
+        if !shadowed {
             return true;
         }
 
@@ -1629,6 +1647,18 @@ fn is_legacy_namespace_package(
     )
 }
 
+/// Recognizes these top-level legacy namespace declarations.
+/// ```python
+/// __path__ = pkgutil.extend_path(__path__, __name__)
+/// ```
+/// or
+/// ```python
+/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+/// ```
+/// or
+/// ```python
+/// __import__('pkg_resources').declare_namespace(__name__)
+/// ```
 #[salsa::tracked(returns(copy))]
 fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
@@ -1639,10 +1669,151 @@ fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
     let parsed = ruff_db::parsed::parsed_module(db, init);
-    let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(db).suite());
+    parsed.load(db).suite().iter().any(|stmt| match stmt {
+        ast::Stmt::Assign(assign) => is_pkgutil_extend_path(&assign.targets, &assign.value),
+        ast::Stmt::Expr(stmt) => is_pkg_resources_declare_namespace(&stmt.value),
+        _ => false,
+    })
+}
 
-    visitor.is_legacy_namespace_package
+/// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
+/// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
+fn is_pkgutil_extend_path(targets: &[ast::Expr], value: &ast::Expr) -> bool {
+    let [ast::Expr::Name(maybe_path)] = targets else {
+        return false;
+    };
+
+    if &*maybe_path.id != "__path__" {
+        return false;
+    }
+
+    let ast::Expr::Call(ast::ExprCall {
+        func: extend_func,
+        arguments: extend_arguments,
+        ..
+    }) = value
+    else {
+        return false;
+    };
+
+    let ast::Expr::Attribute(ast::ExprAttribute {
+        value: maybe_pkg_util,
+        attr: maybe_extend_path,
+        ..
+    }) = &**extend_func
+    else {
+        return false;
+    };
+
+    // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
+    match &**maybe_pkg_util {
+        // __import__("pkgutil").extend_path(__path__, __name__)
+        ast::Expr::Call(ruff_python_ast::ExprCall {
+            func: maybe_import,
+            arguments: import_arguments,
+            ..
+        }) => {
+            let ast::Expr::Name(maybe_import) = &**maybe_import else {
+                return false;
+            };
+
+            if maybe_import.id() != "__import__" {
+                return false;
+            }
+
+            let Some(ast::Expr::StringLiteral(name)) =
+                import_arguments.find_argument_value("name", 0)
+            else {
+                return false;
+            };
+
+            if name.value.to_str() != "pkgutil" {
+                return false;
+            }
+        }
+        // "pkgutil.extend_path(__path__, __name__)"
+        ast::Expr::Name(name) => {
+            if name.id() != "pkgutil" {
+                return false;
+            }
+        }
+        _ => {
+            return false;
+        }
+    }
+
+    // Test that this is an `extend_path(__path__, __name__)` call
+    if maybe_extend_path != "extend_path" {
+        return false;
+    }
+
+    let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
+        return false;
+    };
+    let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
+        return false;
+    };
+
+    path.id() == "__path__" && name.id() == "__name__"
+}
+
+/// Check for `__import__('pkg_resources').declare_namespace(__name__)`
+fn is_pkg_resources_declare_namespace(value: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall {
+        func,
+        arguments: declare_arguments,
+        ..
+    }) = value
+    else {
+        return false;
+    };
+
+    let ast::Expr::Attribute(ast::ExprAttribute {
+        value: maybe_pkg_resources,
+        attr: maybe_declare_namespace,
+        ..
+    }) = &**func
+    else {
+        return false;
+    };
+
+    if maybe_declare_namespace != "declare_namespace" {
+        return false;
+    }
+
+    // Match `__import__("pkg_resources")`
+    let ast::Expr::Call(ast::ExprCall {
+        func: maybe_import,
+        arguments: import_arguments,
+        ..
+    }) = &**maybe_pkg_resources
+    else {
+        return false;
+    };
+
+    let ast::Expr::Name(maybe_import) = &**maybe_import else {
+        return false;
+    };
+
+    if maybe_import.id() != "__import__" {
+        return false;
+    }
+
+    let Some(ast::Expr::StringLiteral(name)) = import_arguments.find_argument_value("name", 0)
+    else {
+        return false;
+    };
+
+    if name.value.to_str() != "pkg_resources" {
+        return false;
+    }
+
+    // Check that the argument is `__name__`
+    let Some(ast::Expr::Name(name_arg)) = declare_arguments.find_argument_value("name", 0) else {
+        return false;
+    };
+
+    name_arg.id() == "__name__"
 }
 
 /// Info about the `py.typed` file for this package
@@ -1692,203 +1863,6 @@ impl<'db> ResolverContext<'db> {
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
         self.db.vendored()
-    }
-}
-
-/// Detects if a module contains a statement of the form:
-/// ```python
-/// __path__ = pkgutil.extend_path(__path__, __name__)
-/// ```
-/// or
-/// ```python
-/// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
-/// ```
-/// or
-/// ```python
-/// __import__('pkg_resources').declare_namespace(__name__)
-/// ```
-#[derive(Default)]
-struct LegacyNamespacePackageVisitor {
-    is_legacy_namespace_package: bool,
-    in_body: bool,
-}
-
-impl Visitor<'_> for LegacyNamespacePackageVisitor {
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        if self.is_legacy_namespace_package {
-            return;
-        }
-
-        // Don't traverse into nested bodies.
-        if self.in_body {
-            return;
-        }
-
-        self.in_body = true;
-
-        walk_body(self, body);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        if self.is_legacy_namespace_package {
-            return;
-        }
-
-        match stmt {
-            // __path__ = pkgutil.extend_path(__path__, __name__)
-            // __path__ = __import__("pkgutil").extend_path(__path__, __name__)
-            ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                self.check_pkgutil_extend_path(targets, value);
-            }
-            // __import__('pkg_resources').declare_namespace(__name__)
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                self.check_pkg_resources_declare_namespace(value);
-            }
-            _ => {}
-        }
-    }
-}
-
-impl LegacyNamespacePackageVisitor {
-    /// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
-    /// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
-    fn check_pkgutil_extend_path(&mut self, targets: &[ast::Expr], value: &ast::Expr) {
-        let [ast::Expr::Name(maybe_path)] = targets else {
-            return;
-        };
-
-        if &*maybe_path.id != "__path__" {
-            return;
-        }
-
-        let ast::Expr::Call(ast::ExprCall {
-            func: extend_func,
-            arguments: extend_arguments,
-            ..
-        }) = value
-        else {
-            return;
-        };
-
-        let ast::Expr::Attribute(ast::ExprAttribute {
-            value: maybe_pkg_util,
-            attr: maybe_extend_path,
-            ..
-        }) = &**extend_func
-        else {
-            return;
-        };
-
-        // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
-        match &**maybe_pkg_util {
-            // __import__("pkgutil").extend_path(__path__, __name__)
-            ast::Expr::Call(ruff_python_ast::ExprCall {
-                func: maybe_import,
-                arguments: import_arguments,
-                ..
-            }) => {
-                let ast::Expr::Name(maybe_import) = &**maybe_import else {
-                    return;
-                };
-
-                if maybe_import.id() != "__import__" {
-                    return;
-                }
-
-                let Some(ast::Expr::StringLiteral(name)) =
-                    import_arguments.find_argument_value("name", 0)
-                else {
-                    return;
-                };
-
-                if name.value.to_str() != "pkgutil" {
-                    return;
-                }
-            }
-            // "pkgutil.extend_path(__path__, __name__)"
-            ast::Expr::Name(name) => {
-                if name.id() != "pkgutil" {
-                    return;
-                }
-            }
-            _ => {
-                return;
-            }
-        }
-
-        // Test that this is an `extend_path(__path__, __name__)` call
-        if maybe_extend_path != "extend_path" {
-            return;
-        }
-
-        let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
-            return;
-        };
-        let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
-            return;
-        };
-
-        self.is_legacy_namespace_package = path.id() == "__path__" && name.id() == "__name__";
-    }
-
-    /// Check for `__import__('pkg_resources').declare_namespace(__name__)`
-    fn check_pkg_resources_declare_namespace(&mut self, value: &ast::Expr) {
-        let ast::Expr::Call(ast::ExprCall {
-            func,
-            arguments: declare_arguments,
-            ..
-        }) = value
-        else {
-            return;
-        };
-
-        let ast::Expr::Attribute(ast::ExprAttribute {
-            value: maybe_pkg_resources,
-            attr: maybe_declare_namespace,
-            ..
-        }) = &**func
-        else {
-            return;
-        };
-
-        if maybe_declare_namespace != "declare_namespace" {
-            return;
-        }
-
-        // Match `__import__("pkg_resources")`
-        let ast::Expr::Call(ast::ExprCall {
-            func: maybe_import,
-            arguments: import_arguments,
-            ..
-        }) = &**maybe_pkg_resources
-        else {
-            return;
-        };
-
-        let ast::Expr::Name(maybe_import) = &**maybe_import else {
-            return;
-        };
-
-        if maybe_import.id() != "__import__" {
-            return;
-        }
-
-        let Some(ast::Expr::StringLiteral(name)) = import_arguments.find_argument_value("name", 0)
-        else {
-            return;
-        };
-
-        if name.value.to_str() != "pkg_resources" {
-            return;
-        }
-
-        // Check that the argument is `__name__`
-        let Some(ast::Expr::Name(name_arg)) = declare_arguments.find_argument_value("name", 0)
-        else {
-            return;
-        };
-
-        self.is_legacy_namespace_package = name_arg.id() == "__name__";
     }
 }
 
