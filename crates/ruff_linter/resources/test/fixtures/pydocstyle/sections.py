@@ -630,3 +630,36 @@ def another_valid_google_style_docstring(a: str) -> str:
 
     """
     return a
+
+def canonical_section_name_in_examples():
+    """Don't treat canonical-looking example content as a section.
+
+    Examples:
+        Here is some example text
+    Returns:
+        this is literal example content
+
+    """
+
+def google_argument_alias_followed_by_returns():
+    """Recognize Returns after a Google argument-section alias.
+
+    Keyword Args:
+        option: some argument
+    Returns:
+        bool: some return value
+
+    """
+
+
+def singular_return_followed_by_raises():
+    """Recognize supported singular section aliases.
+
+    Args:
+        value: some argument.
+    Return:
+        bool: some return value
+    Raises:
+        ValueError: bad value
+
+    """
