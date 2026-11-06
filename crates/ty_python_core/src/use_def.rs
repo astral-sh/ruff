@@ -169,7 +169,7 @@
 //! this in the future for some closures, but for now this is where we start.)
 //!
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
-//! `bindings_by_use` table of reaching bindings and place ordinals indexed by [`ScopedUseId`]
+//! `bindings_by_use` table of reaching bindings indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
 //! `definitions_by_definition` map of [`DefinitionsAtDefinition`], and `symbol_states` and
 //! `member_states` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in
@@ -261,7 +261,7 @@ use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionCategory, DefinitionState};
-use crate::frozen::FrozenMap;
+use crate::frozen::{FrozenMap, PackedIds};
 use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
@@ -678,82 +678,6 @@ impl PredicateNarrowingTargets {
     }
 }
 
-/// A symbol or member index within a scope. The expression determines which table to use.
-#[newtype_index]
-#[derive(get_size2::GetSize)]
-struct PlaceOrdinal;
-
-/// The bindings reaching one use and the lexical place they belong to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
-struct UseRecord<B> {
-    bindings: B,
-    /// `None` for a splatted keyword whose bindings come from several places.
-    place: Option<PlaceOrdinal>,
-}
-
-/// The two-byte representation of an interned use.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
-struct CompactUseRecord {
-    bindings_id: u8,
-    /// Zero for a multi-place use. A single place stores its ordinal plus one.
-    place_plus_one: u8,
-}
-
-impl CompactUseRecord {
-    /// A scope switches to full-width records if either field exceeds one byte.
-    fn try_pack(record: UseRecord<InternedBindingsId>) -> Option<Self> {
-        Some(Self {
-            bindings_id: u8::try_from(record.bindings.as_u32()).ok()?,
-            place_plus_one: u8::try_from(record.place.map_or(0, |place| place.as_u32() + 1))
-                .ok()?,
-        })
-    }
-
-    fn unpack(self) -> UseRecord<InternedBindingsId> {
-        UseRecord {
-            bindings: InternedBindingsId::from_u32(u32::from(self.bindings_id)),
-            place: self
-                .place_plus_one
-                .checked_sub(1)
-                .map(|ordinal| PlaceOrdinal::from_u32(u32::from(ordinal))),
-        }
-    }
-}
-
-static_assertions::assert_eq_size!(CompactUseRecord, [u8; 2]);
-static_assertions::assert_eq_size!(UseRecord<InternedBindingsId>, [u32; 2]);
-
-/// Each scope uses compact records when all of its uses fit.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-enum RetainedUses {
-    Compact(FrozenIndexVec<ScopedUseId, CompactUseRecord>),
-    Full(FrozenIndexVec<ScopedUseId, UseRecord<InternedBindingsId>>),
-}
-
-impl FromIterator<UseRecord<InternedBindingsId>> for RetainedUses {
-    fn from_iter<T: IntoIterator<Item = UseRecord<InternedBindingsId>>>(iter: T) -> Self {
-        let rows: FrozenIndexVec<ScopedUseId, _> = iter.into_iter().collect();
-        let compact = rows
-            .iter()
-            .copied()
-            .map(CompactUseRecord::try_pack)
-            .collect();
-        match compact {
-            Some(compact) => Self::Compact(compact),
-            None => Self::Full(rows),
-        }
-    }
-}
-
-impl RetainedUses {
-    fn get(&self, use_id: ScopedUseId) -> UseRecord<InternedBindingsId> {
-        match self {
-            Self::Compact(uses) => uses[use_id].unpack(),
-            Self::Full(uses) => uses[use_id],
-        }
-    }
-}
-
 /// Fields that are empty in most use-def maps.
 ///
 /// These fields share an allocation to avoid storing five collection headers in every
@@ -761,7 +685,7 @@ impl RetainedUses {
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: RetainedUses,
+    bindings_by_use: PackedIds<InternedBindingsId>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -1072,20 +996,11 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.extra().bindings_by_use.get(use_id).bindings;
+        let bindings_id = self.extra().bindings_by_use.get(use_id.index());
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
-    }
-
-    /// The source expression determines whether this ordinal refers to a symbol or a member.
-    pub(super) fn place_ordinal_at_use(&self, use_id: ScopedUseId) -> Option<u32> {
-        self.extra()
-            .bindings_by_use
-            .get(use_id)
-            .place
-            .map(PlaceOrdinal::as_u32)
     }
 
     /// Return the state before the enclosing `if` chain for a use in its final `elif` condition.
@@ -2188,8 +2103,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
-    /// Live bindings and the lexical place at each use.
-    bindings_by_use: IndexVec<ScopedUseId, UseRecord<Bindings>>,
+    /// Live bindings at each use.
+    bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
     /// Live bindings associated with each so-far-recorded use.
     ///
@@ -2430,7 +2345,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = &LiveBinding> {
-        self.bindings_by_use[use_id].bindings.iter()
+        self.bindings_by_use[use_id].iter()
     }
 
     pub(super) fn add_predicate(
@@ -2493,7 +2408,7 @@ impl<'db> UseDefMapBuilder<'db> {
         state.record_narrowing_constraint_for_bindings_at_use(
             &mut self.narrowing_constraints,
             constraint,
-            &self.bindings_by_use[use_id].bindings,
+            &self.bindings_by_use[use_id],
         );
     }
 
@@ -2927,11 +2842,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings = place_state.bindings().clone();
 
-        let ordinal = match place {
-            ScopedPlaceId::Symbol(id) => id.as_u32(),
-            ScopedPlaceId::Member(id) => id.as_u32(),
-        };
-        self.record_use_bindings(bindings, Some(PlaceOrdinal::from_u32(ordinal)))
+        self.record_use_bindings(bindings)
     }
 
     pub(super) fn set_if_chain_start(&mut self, snapshot: Option<FlowSnapshot>) {
@@ -2964,20 +2875,16 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
-        self.record_use_bindings(Bindings::default(), None)
+        self.record_use_bindings(Bindings::default())
     }
 
-    fn record_use_bindings(
-        &mut self,
-        bindings: Bindings,
-        place: Option<PlaceOrdinal>,
-    ) -> ScopedUseId {
+    fn record_use_bindings(&mut self, bindings: Bindings) -> ScopedUseId {
         let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
         self.mark_definition_ids_used(binding_definition_ids);
 
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        self.bindings_by_use.push(UseRecord { bindings, place })
+        self.bindings_by_use.push(bindings)
     }
 
     pub(super) fn symbol_binding_definition_ids(
@@ -3330,11 +3237,9 @@ impl<'db> UseDefMapBuilder<'db> {
         let bindings_by_use = self
             .bindings_by_use
             .into_iter()
-            .map(|use_record| UseRecord {
-                bindings: place_state_interner.intern_bindings(&use_record.bindings),
-                place: use_record.place,
-            })
-            .collect();
+            .map(|bindings| place_state_interner.intern_bindings(&bindings))
+            .collect::<Vec<_>>()
+            .into();
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
@@ -3612,36 +3517,5 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         interned_ids_by_snapshot
-    }
-}
-
-#[cfg(test)]
-mod source_use_rows_tests {
-    use super::*;
-
-    #[test]
-    fn retains_the_scope_local_place_and_binding_widths() {
-        let first = ScopedUseId::from_u32(0);
-        let second = ScopedUseId::from_u32(1);
-        for (bindings, ordinal, full) in [
-            (0, 0, false),
-            (255, 254, false),
-            (256, 0, true),
-            (1, 255, true),
-            (u32::MAX - 1, u32::MAX - 1, true),
-        ] {
-            let single = UseRecord {
-                bindings: InternedBindingsId::from_u32(bindings),
-                place: Some(PlaceOrdinal::from_u32(ordinal)),
-            };
-            let multi = UseRecord {
-                place: None,
-                ..single
-            };
-            let rows: RetainedUses = [single, multi].into_iter().collect();
-            assert_eq!(matches!(rows, RetainedUses::Full(_)), full);
-            assert_eq!(rows.get(first), single);
-            assert_eq!(rows.get(second), multi);
-        }
     }
 }

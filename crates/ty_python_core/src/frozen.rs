@@ -3,6 +3,38 @@ use std::hash::Hash;
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
+/// A slice of 32-bit IDs stored at the narrowest width that fits every entry.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(super) enum PackedIds<T> {
+    U8(Box<[u8]>),
+    U16(Box<[u16]>),
+    Full(Box<[T]>),
+}
+
+impl<T: Copy + Into<u32>> From<Vec<T>> for PackedIds<T> {
+    fn from(ids: Vec<T>) -> Self {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the largest ID fits in the selected integer width"
+        )]
+        match ids.iter().copied().map(Into::into).max().unwrap_or(0) {
+            0..=0xff => Self::U8(ids.into_iter().map(|id| id.into() as u8).collect()),
+            0x100..=0xffff => Self::U16(ids.into_iter().map(|id| id.into() as u16).collect()),
+            _ => Self::Full(ids.into_boxed_slice()),
+        }
+    }
+}
+
+impl<T: Copy + From<u32>> PackedIds<T> {
+    pub(super) fn get(&self, index: usize) -> T {
+        match self {
+            Self::U8(ids) => T::from(u32::from(ids[index])),
+            Self::U16(ids) => T::from(u32::from(ids[index])),
+            Self::Full(ids) => ids[index],
+        }
+    }
+}
+
 /// Compact immutable key-value entries stored in key order.
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
@@ -280,7 +312,25 @@ impl<K> Default for FrozenSet<K> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FrozenMap, FrozenValueMap};
+    use std::assert_matches;
+
+    use super::{FrozenMap, FrozenValueMap, PackedIds};
+
+    #[test]
+    fn packed_ids_preserve_values_at_width_boundaries() {
+        let pack = |max| {
+            let ids = PackedIds::from(vec![max, 0]);
+            assert_eq!(ids.get(0), max);
+            assert_eq!(ids.get(1), 0);
+            ids
+        };
+
+        assert_matches!(pack(255), PackedIds::U8(_));
+        assert_matches!(pack(256), PackedIds::U16(_));
+        assert_matches!(pack(65_535), PackedIds::U16(_));
+        assert_matches!(pack(65_536), PackedIds::Full(_));
+        assert_matches!(pack(u32::MAX), PackedIds::Full(_));
+    }
 
     #[test]
     fn frozen_map_preserves_last_value_for_duplicate_keys() {
