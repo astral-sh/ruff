@@ -13,7 +13,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::LintName;
 use ty_python_semantic::default_lint_registry;
-use ty_python_semantic::lint::LintId;
+use ty_python_semantic::lint::{LintId, LintStatus};
 
 use crate::ROOT_DIR;
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
@@ -89,6 +89,30 @@ fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec
         }
         output.push('\n');
     }
+
+    let status_text = match lint.status() {
+        LintStatus::Preview { since } => {
+            format!(
+                r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        LintStatus::Stable { since } => {
+            format!(
+                r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
+            )
+        }
+        LintStatus::Deprecated { since, .. } => {
+            format!(
+                r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        LintStatus::Removed { since, .. } => {
+            format!(
+                r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+    };
+
     let _ = writeln!(output, "## `{rule_name}`\n", rule_name = lint.name());
 
     // Reformat headers as bold text
@@ -114,29 +138,6 @@ fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec
             }
         })
         .join("\n");
-
-    let status_text = match lint.status() {
-        ty_python_semantic::lint::LintStatus::Preview { since } => {
-            format!(
-                r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-        ty_python_semantic::lint::LintStatus::Stable { since } => {
-            format!(
-                r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
-            )
-        }
-        ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
-            format!(
-                r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-        ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
-            format!(
-                r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-    };
 
     let quoted_name = |name: LintName| format!("\"{name}\"");
     let search_terms = if names.is_empty() {
