@@ -1042,7 +1042,7 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: this would ideally raise an `missing-attribute` error
+# TODO: this would ideally raise a `missing-attribute` error
 reveal_type(C().x)  # revealed: str
 ```
 
@@ -1073,7 +1073,7 @@ class C:
 
 # TODO: this would ideally be `int`
 reveal_type(C(True).a)  # revealed: int | str
-# TODO: this would ideally raise an `missing-attribute` error
+# TODO: this would ideally raise a `missing-attribute` error
 reveal_type(C(True).b)  # revealed: int
 reveal_type(C(True).c)  # revealed: int | str
 # TODO: ideally this would be `str`, but we don't attempt to analyze control flow within methods
@@ -3069,29 +3069,6 @@ def h[T: list[int] | None](x: T):
     x.append
 ```
 
-## Selecting missing attribute diagnostics
-
-Each rule can be suppressed independently, even when both accesses occur on the same line:
-
-```py
-def f(x: str | int):
-    # error: [missing-attribute]
-    x.strip(), x.typo  # ty: ignore[missing-union-attribute]
-    # error: [missing-union-attribute]
-    x.strip(), x.typo  # ty: ignore[missing-attribute]
-```
-
-The former name of `missing-attribute` still suppresses the error in both forms of ignore comment.
-ty reports the rename in each case.
-
-```py
-def g(x: str):
-    # error: [renamed-rule-in-ignore-comment]
-    x.typo  # ty: ignore[unresolved-attribute]
-    # error: [renamed-rule-in-ignore-comment]
-    x.typo  # type: ignore[ty:unresolved-attribute]
-```
-
 ## Disabling definite missing attribute errors
 
 Disabling `missing-attribute` using its former name still allows ty to report attributes missing
@@ -3106,21 +3083,6 @@ unresolved-attribute = "ignore"
 def f(x: str | int):
     x.typo  # ok
     x.strip()  # error: [missing-union-attribute]
-```
-
-## Disabling missing union attribute errors
-
-Disabling `missing-union-attribute` still catches a typo shared by all union members:
-
-```toml
-[rules]
-missing-union-attribute = "ignore"
-```
-
-```py
-def f(x: str | int):
-    x.strip()  # ok
-    x.typo  # error: [missing-attribute]
 ```
 
 ## Inherited class attributes

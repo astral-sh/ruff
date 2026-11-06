@@ -168,7 +168,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
-    register_missing_attribute_lints(registry);
+    registry.register_lint(&MISSING_ATTRIBUTE);
+    registry.register_lint(&MISSING_UNION_ATTRIBUTE);
+    registry.register_alias(LintName::of("unresolved-attribute"), &MISSING_ATTRIBUTE);
     registry.register_lint(&MISSING_SLOT);
     registry.register_lint(&IMPORT_NOT_FOUND);
     registry.register_alias(LintName::of("unresolved-import"), &IMPORT_NOT_FOUND);
@@ -1492,12 +1494,6 @@ declare_lint! {
         status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
-}
-
-fn register_missing_attribute_lints(registry: &mut LintRegistryBuilder) {
-    registry.register_lint(&MISSING_ATTRIBUTE);
-    registry.register_lint(&MISSING_UNION_ATTRIBUTE);
-    registry.register_alias(LintName::of("unresolved-attribute"), &MISSING_ATTRIBUTE);
 }
 
 /// A collection of type check diagnostics.

@@ -1,7 +1,7 @@
 ## What it does
 
 Checks for reads or deletions of attributes that are present on some members of a union and missing
-from others. If every member lacks the attribute, ty reports `missing-attribute`.
+from others.
 
 ## Why is this bad?
 
@@ -23,9 +23,7 @@ def normalize(value: str | bytes) -> str:
     return value
 ```
 
-## Rule selection
+## See also
 
-Before ty 0.0.100, these accesses used the same rule as accesses to attributes missing from every
-member. If you configured a severity such as `unresolved-attribute = "warn"`, also set
-`missing-union-attribute = "warn"` to keep it for both cases. To suppress an access where only some
-members lack the attribute, use `# ty: ignore[missing-union-attribute]`.
+- `missing-attribute` reports attributes missing from every union member and explains how to migrate
+    from `unresolved-attribute`.
