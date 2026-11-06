@@ -676,11 +676,12 @@ impl<'r> RenderableAnnotation<'r> {
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
     fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
-        // This should only ever saturate if a BOM is present _and_ the annotation range points
-        // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
-        // `TextRange::default()` for a diagnostic range instead of a range relative to file
-        // contents.
-        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
+        // An annotation can start at byte zero even when a leading BOM was stripped from the
+        // snippet. Clamp each endpoint separately so the annotation still covers any visible text.
+        let range = TextRange::new(
+            ann.range.start().saturating_sub(snippet_start),
+            ann.range.end().saturating_sub(snippet_start),
+        );
         RenderableAnnotation {
             range,
             message: ann.message,

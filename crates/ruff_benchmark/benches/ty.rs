@@ -4,6 +4,7 @@ use ruff_benchmark::real_world_projects::{
     InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, check_project,
 };
 
+use std::cell::LazyCell;
 use std::fmt::Write;
 use std::ops::Range;
 
@@ -221,6 +222,54 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
             BatchSize::SmallInput,
         );
     });
+}
+
+/// Shared recursive references should reuse constructor bodies when aliases are unfolded.
+fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
+    // Cover both sparse and dense references between specialized aliases.
+    for (aliases, references) in [(16, 3), (8, 8)] {
+        let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
+        for alias in 0..aliases {
+            write!(code, "A{alias} = tuple[T").unwrap();
+            for target in 0..aliases {
+                if (target + aliases - alias) % aliases < references {
+                    write!(code, ", 'A{target}[T] | None'").unwrap();
+                }
+            }
+            writeln!(code, "]").unwrap();
+        }
+        for alias in 0..aliases {
+            writeln!(
+                code,
+                "def inspect_{alias}(value: A{alias}[int]) -> int:\n    return value[0]"
+            )
+            .unwrap();
+        }
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[mutually_recursive_aliases_{aliases}_{references}]"),
+            &code,
+        );
+    }
+}
+
+/// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
+fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
+    let aliases = 8;
+    let mut code = String::new();
+    for alias in 0..aliases {
+        write!(code, "A{alias} = tuple[int").unwrap();
+        for target in 0..aliases {
+            write!(code, ", 'A{target}'").unwrap();
+        }
+        writeln!(code, "]").unwrap();
+    }
+    // Only define aliases: using them would also measure recursive unfolding.
+    benchmark_micro_case(
+        criterion,
+        &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
+        &code,
+    );
 }
 
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
@@ -814,6 +863,66 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4924>.
+fn benchmark_string_literal_union_comparison(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let literal_members = |start| {
+            (start..start + num_members)
+                .map(|index| format!("'k{index}'"))
+                .join(", ")
+        };
+        let members = literal_members(0);
+        let other_members = literal_members(num_members / 2);
+        let overlapping_generator_filter = format!(
+            "
+        OtherKind = Literal[{other_members}]
+
+        class Target:
+            kind: OtherKind
+
+        def find(items: list[Item], target: Target) -> str | None:
+            return next((item.kind for item in items if item.kind == target.kind), None)
+            "
+        );
+        for (name, body) in [
+            (
+                "equality",
+                "
+        def compare(left: Item, right: Item) -> bool:
+            return left.kind == right.kind
+                ",
+            ),
+            (
+                "generator_filter",
+                "
+        def find(items: list[Item], target: Item) -> Item | None:
+            return next((item for item in items if item.kind == target.kind), None)
+                ",
+            ),
+            (
+                "overlapping_generator_filter",
+                overlapping_generator_filter.as_str(),
+            ),
+        ] {
+            let code = format!(
+                "
+        from typing import Literal
+
+        Kind = Literal[{members}]
+
+        class Item:
+            kind: Kind
+        {body}"
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[string_literal_union_{name}_{num_members}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1198,12 +1307,12 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
 /// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
 /// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
 fn benchmark_recursive_callable_materialization(criterion: &mut Criterion) {
-    for depth in [8, 12] {
+    for (leaf_depth, cycle_depth) in [(8, 8), (12, 10)] {
         // Implicit aliases in the leaf case expose shared callables directly, without an
         // intervening cache for each named type alias.
-        for (name, recursive_target, alias_prefix) in [
-            ("leaf", "Recursive".to_string(), ""),
-            ("cycle", format!("A{depth}"), "type "),
+        for (name, depth, recursive_target, alias_prefix) in [
+            ("leaf", leaf_depth, "Recursive".to_string(), ""),
+            ("cycle", cycle_depth, format!("A{cycle_depth}"), "type "),
         ] {
             let mut code = format!(
                 "
@@ -2163,6 +2272,35 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4893>.
+///
+/// Checking for an implicit return requires proving that the two OR patterns cover every member.
+fn benchmark_enum_or_pattern_exhaustiveness(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let mut code = "from enum import StrEnum\n\nclass Status(StrEnum):\n".to_string();
+        for index in 0..num_members {
+            writeln!(code, "    M{index} = \"m{index}\"").ok();
+        }
+
+        code.push_str("\n    @property\n    def is_active(self) -> bool:\n        match self:\n");
+        let split = num_members * 3 / 10;
+        for (group, result) in [(0..split, "True"), (split..num_members, "False")] {
+            let alternatives = group.map(|index| format!("Status.M{index}")).join(" | ");
+            writeln!(
+                code,
+                "            case {alternatives}:\n                return {result}"
+            )
+            .ok();
+        }
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[enum_or_pattern_exhaustiveness_{num_members}]"),
+            &code,
+        );
+    }
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4676>.
 ///
 /// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
@@ -2562,34 +2700,21 @@ fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
     }
 }
 
-struct ProjectBenchmark<'a> {
+struct PreparedProject<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
-    freeze_inputs: bool,
-    rules: Option<Rules>,
 }
 
-impl<'a> ProjectBenchmark<'a> {
+impl<'a> PreparedProject<'a> {
     fn new(project: RealWorldProject<'a>) -> Self {
-        let setup_project = project.setup().expect("Failed to setup project");
-        let fs = setup_project
+        let project = project.setup().expect("Failed to set up project");
+        let fs = project
             .copy_to_memory_fs()
             .expect("Failed to copy project to memory fs");
-
-        Self {
-            project: setup_project,
-            fs,
-            freeze_inputs: false,
-            rules: None,
-        }
+        Self { project, fs }
     }
 
-    fn freeze_inputs(mut self) -> Self {
-        self.freeze_inputs = true;
-        self
-    }
-
-    fn setup_iteration(&self) -> ProjectDatabase {
+    fn setup_iteration(&self, variant: ProjectVariant) -> ProjectDatabase {
         let system = TestSystem::new(InMemorySystem::from_memory_fs(self.fs.clone()));
 
         let src_root = SystemPath::new("/");
@@ -2601,7 +2726,12 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
-            rules: self.rules.clone(),
+            rules: matches!(variant, ProjectVariant::AllRules).then(|| {
+                Rules::from_iter([(
+                    RangedValue::cli("all".to_owned()),
+                    RangedValue::cli(Level::Error),
+                )])
+            }),
             ..Options::default()
         });
 
@@ -2616,7 +2746,7 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
-        if self.freeze_inputs {
+        if matches!(variant, ProjectVariant::FrozenInputs) {
             db.freeze();
         }
 
@@ -2624,32 +2754,45 @@ impl<'a> ProjectBenchmark<'a> {
     }
 }
 
-#[track_caller]
-fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    bench_project_named(benchmark, criterion, benchmark.project.config.name);
+#[derive(Clone, Copy)]
+enum ProjectVariant {
+    Default,
+    FrozenInputs,
+    AllRules,
 }
 
 #[track_caller]
-fn bench_project_named(
-    benchmark: &ProjectBenchmark,
+fn bench_project(
     criterion: &mut Criterion,
-    benchmark_name: &str,
+    project: RealWorldProject<'_>,
+    variants: &[ProjectVariant],
 ) {
     setup_rayon();
 
+    let name = project.name;
+    let prepared = LazyCell::new(|| PreparedProject::new(project));
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);
-    group.bench_function(benchmark_name, |b| {
-        b.iter_batched_ref(
-            || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark_name),
-            BatchSize::SmallInput,
-        );
-    });
+    for &variant in variants {
+        let benchmark_name = match variant {
+            ProjectVariant::Default => name.to_owned(),
+            ProjectVariant::FrozenInputs => format!("{name} (frozen inputs)"),
+            ProjectVariant::AllRules => format!("{name} (all rules)"),
+        };
+        group.bench_function(&benchmark_name, |b| {
+            // Prepare the project once, when its first selected variant runs.
+            let project = LazyCell::force(&prepared);
+            b.iter_batched_ref(
+                || project.setup_iteration(variant),
+                |db| check_project(db, &benchmark_name),
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "hydra-zen",
         repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
         commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
@@ -2657,13 +2800,13 @@ fn hydra(criterion: &mut Criterion) {
         dependencies: &["pydantic", "beartype", "hydra-core"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "attrs",
         repository: "https://github.com/python-attrs/attrs",
         commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
@@ -2671,28 +2814,22 @@ fn attrs(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
-
-    bench_project(&benchmark, criterion);
-
-    // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
-    let frozen_benchmark = benchmark.freeze_inputs();
-    bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
-
-    let all_rules_benchmark = ProjectBenchmark {
-        freeze_inputs: false,
-        rules: Some(Rules::from_iter([(
-            RangedValue::cli("all".to_owned()),
-            RangedValue::cli(Level::Error),
-        )])),
-        ..frozen_benchmark
     };
 
-    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
+    bench_project(
+        criterion,
+        project,
+        &[
+            ProjectVariant::Default,
+            // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
+            ProjectVariant::FrozenInputs,
+            ProjectVariant::AllRules,
+        ],
+    );
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "anyio",
         repository: "https://github.com/agronholm/anyio",
         commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
@@ -2700,13 +2837,13 @@ fn anyio(criterion: &mut Criterion) {
         dependencies: &["exceptiongroup", "idna", "pytest"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn datetype(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "DateType",
         repository: "https://github.com/glyph/DateType",
         commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
@@ -2714,14 +2851,16 @@ fn datetype(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_mutually_recursive_aliases,
+    benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
@@ -2738,6 +2877,7 @@ criterion_group!(
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
     benchmark_mixed_str_enum_comparison,
+    benchmark_string_literal_union_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
@@ -2767,6 +2907,7 @@ criterion_group!(
     benchmark_gradual_intersection_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
+    benchmark_enum_or_pattern_exhaustiveness,
     benchmark_tuple_class_pattern_captures,
     benchmark_nested_class_pattern_capture,
     benchmark_nested_class_pattern_exhaustiveness,

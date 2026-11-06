@@ -25,7 +25,7 @@ def normalize(value: str | bytes) -> str:
 
 ## Rule selection
 
-Before ty 0.0.97, these accesses used the same rule as accesses to attributes missing from every
+Before ty 0.0.100, these accesses used the same rule as accesses to attributes missing from every
 member. If you configured a severity such as `unresolved-attribute = "warn"`, also set
 `missing-union-attribute = "warn"` to keep it for both cases. To suppress an access where only some
 members lack the attribute, use `# ty: ignore[missing-union-attribute]`.

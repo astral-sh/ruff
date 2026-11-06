@@ -47,12 +47,27 @@ pub(crate) fn check_function_definition<'db>(
     if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
         return;
     }
-    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
+    // The checks below read parameter kinds and the public generic context. A function's
+    // ordinary callable signature already has both, including for async functions whose
+    // public return type is wrapped in a coroutine.
+    let raw_signature;
+    let signature = if last_definition.is_overload(db) {
+        last_definition.public_overload_signature(db)
+    } else if function_type.updated_signature(db).is_none()
+        && let ([], Some(_)) = function_type.overloads_and_implementation(db)
+        && let [signature] = function_type.signature(db).overloads.as_slice()
+        && signature.definition == Some(definition)
+    {
+        signature
+    } else {
+        raw_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
+        &raw_signature
+    };
 
-    check_legacy_positional_only_convention(context, last_definition, &signature);
+    check_legacy_positional_only_convention(context, last_definition, signature);
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
-    check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
-    check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+    check_legacy_typevar_defaults(context, last_definition, signature, file_expression_type);
+    check_legacy_typevar_ordering(context, last_definition, signature, file_expression_type);
 }
 
 /// Check that a nominal class's exposed methods respect its declared type-parameter variance.

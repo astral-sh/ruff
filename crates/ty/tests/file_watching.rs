@@ -4100,7 +4100,7 @@ mod uv_metadata {
         Ok(())
     }
 
-    /// Installing the dependency with `uv pip install` clears the unresolved-import diagnostic
+    /// Installing the dependency with `uv pip install` clears the import-not-found diagnostic
     /// and uv metadata warning without changing the project's manifest or lockfile.
     #[test]
     fn uv_pip_install_clears_import_and_metadata_errors() -> anyhow::Result<()> {
@@ -4140,7 +4140,7 @@ mod uv_metadata {
         )?;
         // The optional dependency is resolved but not installed by setup's `uv sync`.
         assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
-        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        main.py:1:8: error[import-not-found] Cannot resolve imported module `dependency`
         pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
         ");
 
@@ -4153,7 +4153,7 @@ mod uv_metadata {
         Ok(())
     }
 
-    /// Uninstalling the dependency with `uv pip uninstall` reports an unresolved-import
+    /// Uninstalling the dependency with `uv pip uninstall` reports an import-not-found
     /// diagnostic and uv metadata warning without changing the project's manifest or lockfile.
     #[test]
     fn uv_pip_uninstall_reports_import_and_metadata_errors() -> anyhow::Result<()> {
@@ -4197,7 +4197,7 @@ mod uv_metadata {
         let deleted = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
         apply_changes_and_synchronize_project(&mut case, &deleted)?;
         assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
-        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        main.py:1:8: error[import-not-found] Cannot resolve imported module `dependency`
         pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
         ");
         Ok(())
@@ -4256,7 +4256,7 @@ mod uv_metadata {
 
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `attrs`"
+            @"script.py:6:6: error[import-not-found] Cannot resolve imported module `attrs`"
         );
 
         update_and_synchronize_script(
@@ -4292,7 +4292,7 @@ mod uv_metadata {
 
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"script.py:1:6: error[unresolved-import] Cannot resolve imported module `attrs`"
+            @"script.py:1:6: error[import-not-found] Cannot resolve imported module `attrs`"
         );
 
         update_and_synchronize_script(
@@ -4376,7 +4376,7 @@ mod uv_metadata {
         let pth = site_packages.join("dependency.pth");
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `dependency`"
+            @"script.py:6:6: error[import-not-found] Cannot resolve imported module `dependency`"
         );
 
         let dependencies = case.root_path().join("dependencies");

@@ -39,16 +39,13 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{
-    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
-};
+use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
     MaterializationKind, ParamSpecAttrKind, ParamSpecValue, ParameterDescription, SelfBinding,
-    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types,
-    todo_type,
+    SelfTypeVarOrigin, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypedDictType,
+    UnionBuilder, VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -99,12 +96,11 @@ pub(super) fn lexical_return_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     function: &ast::StmtFunctionDef,
-) -> Type<'db> {
+) -> Option<Type<'db>> {
     function
         .returns
         .as_deref()
         .map(|returns| function_signature_expression_type(db, definition, returns))
-        .unwrap_or_else(Type::unknown)
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -247,6 +243,19 @@ impl<'db> CallableSignature<'db> {
         }))
     }
 
+    pub(super) fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads.iter().map(|signature| {
+                signature.freshen_for_owner_specialization(db, env, specialization)
+            }),
+        )
+    }
+
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
@@ -351,10 +360,9 @@ impl<'db> CallableSignature<'db> {
                         parameter.source_parameter_index = source.source_parameter_index;
                     }
 
-                    let env = visitor.env;
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.and_then(|context| {
-                            type_mapping.update_signature_generic_context(db, env, context)
+                            type_mapping.update_signature_generic_context(db, context, visitor)
                         }),
                         definition: self_signature.definition,
                         extras: SignatureExtras::new(
@@ -383,7 +391,8 @@ impl<'db> CallableSignature<'db> {
                                 db,
                                 signature.generic_context,
                                 self_signature.generic_context.and_then(|context| {
-                                    type_mapping.update_signature_generic_context(db, env, context)
+                                    type_mapping
+                                        .update_signature_generic_context(db, context, visitor)
                                 }),
                             ),
                             // Keep the enclosing method's definition for binding `Self` and
@@ -604,6 +613,25 @@ impl<'db> CallableSignature<'db> {
             .parameters
             .as_paramspec()
             .map(|bound_typevar| (bound_typevar, signature))
+    }
+
+    /// A `false` result guarantees that an eager comparison of these callables would produce
+    /// an empty error context.
+    ///
+    /// The checker suppresses notes while trying individual source overloads. For a target such
+    /// as `Callable[[int | bytes], str]`, the aggregate check can still explain which member of
+    /// the overloads' combined return type is incompatible with `str`.
+    pub(super) fn may_explain_relation_to(&self, target: &Self) -> bool {
+        if self.overloads.len() <= 1 {
+            return true;
+        }
+
+        target.iter().any(|signature| {
+            signature.supports_overload_aggregation()
+                && signature
+                    .single_required_positional_parameter_type()
+                    .is_some_and(Type::is_union)
+        }) && self.iter().all(Signature::supports_overload_aggregation)
     }
 
     pub(crate) fn when_constraint_set_assignable_to<'c>(
@@ -1202,10 +1230,9 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let env = visitor.env;
         Self {
             generic_context: self.generic_context.and_then(|context| {
-                type_mapping.update_signature_generic_context(db, env, context)
+                type_mapping.update_signature_generic_context(db, context, visitor)
             }),
             definition: self.definition,
             extras: SignatureExtras::new(
@@ -1246,11 +1273,44 @@ impl<'db> Signature<'db> {
         )
     }
 
-    fn max_typevar_freshness_matching_generic_context(
+    /// Keep incoming class arguments separate from this method's own type parameters.
+    fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+        let arguments = specialization
+            .generic_context(db)
+            .variables(db)
+            .zip(specialization.types(db))
+            .filter_map(|(parameter, &argument)| {
+                (argument
+                    .as_typevar()
+                    .is_none_or(|var| !var.is_same_typevar_as(db, parameter)))
+                .then_some(argument)
+            });
+        if let Some(delta) = freshening_delta(db, arguments, generic_context) {
+            // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
+            // from the projected method's local T. Rename the method's binders before
+            // substituting the class arguments, while those occurrences are distinguishable.
+            self.freshen_bound_typevars(db, env, delta)
+        } else {
+            // Identity substitutions introduce no new occurrences. A different nonce already
+            // distinguishes two occurrences; freshening just because they share a declaration
+            // would introduce unbounded new identities during recursive member projection.
+            self.clone()
+        }
+    }
+
+    fn freshening_delta_for(
         &self,
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
-    ) -> Option<TypeVarNonce> {
+    ) -> Option<u32> {
         let typevars = self
             .generic_context
             .into_iter()
@@ -1264,7 +1324,7 @@ impl<'db> Signature<'db> {
             .chain(parameters)
             .chain(std::iter::once(self.return_ty));
 
-        max_typevar_freshness_matching_generic_context(db, types, generic_context)
+        freshening_delta(db, types, generic_context)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1297,6 +1357,21 @@ impl<'db> Signature<'db> {
     /// Return the parameters in this signature.
     pub(crate) fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
+    }
+
+    fn single_required_positional_parameter_type(&self) -> Option<Type<'db>> {
+        match self.parameters.as_slice() {
+            [parameter] if parameter.is_positional() && !parameter.has_default() => {
+                Some(parameter.annotated_type())
+            }
+            _ => None,
+        }
+    }
+
+    /// Aggregation compares parameter and return types. A receiver constraint imposes an
+    /// additional obligation, and a `ParamSpec` value has no meaningful return type.
+    fn supports_overload_aggregation(&self) -> bool {
+        self.receiver_constraints().is_none() && !self.is_paramspec_value()
     }
 
     pub(super) fn with_nominal_protocol_receiver(
@@ -1461,6 +1536,20 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
+        let self_mapping = |self_type| {
+            // In `P[Self].method`, the owner argument and the method's own `Self` can have
+            // the same declaration. Only the occurrence bound by this signature is the receiver.
+            if let Some(context) = self.generic_context
+                && let Some(typevar) = context.variables(db).find(|typevar| {
+                    Some(typevar.binding_context(db)) == binding_context
+                        && typevar.typevar(db).is_self(db)
+                })
+            {
+                TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, self_type))
+            } else {
+                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
+            }
+        };
         let receiver_constraint = if impossible_receiver {
             // Keep the signature for bound-method diagnostics, but make it incompatible with
             // callable contracts: no parameter can receive the implicit positional argument.
@@ -1476,12 +1565,7 @@ impl<'db> Signature<'db> {
                     ))
                 });
                 let annotation = if let Some(typing_self_type) = typing_self_type {
-                    let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                        db,
-                        env,
-                        typing_self_type,
-                        binding_context,
-                    ));
+                    let mapping = self_mapping(typing_self_type);
                     parameter.annotated_type().apply_type_mapping(
                         db,
                         env,
@@ -1520,8 +1604,7 @@ impl<'db> Signature<'db> {
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, env, parameters.as_slice())
         {
-            let self_mapping =
-                TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
+            let self_mapping = self_mapping(self_type);
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -1649,7 +1732,7 @@ impl<'db> Signature<'db> {
                         .evaluate(db)
                         .is_covariant())
                 && bounds
-                    .inference_lower(db, env)
+                    .inference_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
                     CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
@@ -2326,7 +2409,7 @@ impl<'db> Signature<'db> {
                 db,
                 env,
                 constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 self_bound_typevar,
                 upper,
             );
@@ -2495,36 +2578,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        // Aggregation summarizes visible parameters and return types, but receiver bindings are
-        // additional per-signature obligations and `ParamSpec` values have no meaningful return
-        // type. Leave those signatures to the ordinary relation.
-        if target_signature.receiver_constraints().is_some()
-            || target_signature.is_paramspec_value()
-            || source_signatures.iter().any(|signature| {
-                signature.receiver_constraints().is_some() || signature.is_paramspec_value()
-            })
+        if !target_signature.supports_overload_aggregation()
+            || !source_signatures
+                .iter()
+                .all(Signature::supports_overload_aggregation)
         {
             return None;
         }
 
-        let single_required_positional_parameter_type = |signature: &Signature<'db>| {
-            if signature.parameters().len() != 1 {
-                return None;
-            }
-            let parameter = signature.parameters().get(0)?;
-
-            match parameter.kind() {
-                ParameterKind::PositionalOnly {
-                    default_type: None, ..
-                }
-                | ParameterKind::PositionalOrKeyword {
-                    default_type: None, ..
-                } => Some(parameter.annotated_type()),
-                _ => None,
-            }
-        };
-
-        let other_parameter_type = single_required_positional_parameter_type(target_signature)?;
+        let other_parameter_type = target_signature.single_required_positional_parameter_type()?;
         // Keep this aggregate path narrowly scoped to unary target callables whose parameter
         // domain is an explicit union.
         //
@@ -2552,7 +2614,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut has_overlapping_domain = false;
 
         for self_signature in source_signatures {
-            let self_parameter_type = single_required_positional_parameter_type(self_signature)?;
+            let self_parameter_type = self_signature.single_required_positional_parameter_type()?;
             if !is_unary_overload_aggregate_candidate_type(self_parameter_type)
                 || !is_unary_overload_aggregate_candidate_type(self_signature.return_ty)
             {
@@ -2850,9 +2912,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let freshened_source;
         let source = if signature_context(source) != signature_context(target)
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = target.freshening_delta_for(db, generic_context)
         {
             freshened_source = source.freshen_bound_typevars(db, env, delta);
             &freshened_source
@@ -2862,9 +2922,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+            && let Some(delta) = source.freshening_delta_for(db, generic_context)
         {
             freshened_target = target.freshen_bound_typevars(db, env, delta);
             &freshened_target
@@ -5612,7 +5670,25 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
-        Self::new(value, kind).expand_starred_variadic_annotations(db)
+        let parameters = Self::new(value, kind);
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
+            && let Some((_, variadic)) = parameters.variadic()
+            && variadic.has_starred_annotation()
+            && variadic
+                .annotated_type()
+                .exact_tuple_instance_spec(db)
+                .is_some_and(|tuple| tuple.is_variadic())
+        {
+            // Resolving typevar identities does not specialize a pack. Keep its fixed boundaries
+            // in the starred annotation so call binding can infer the residual tuple shape.
+            parameters
+        } else {
+            // TODO: Make expansion an explicit operation for consumers that need it. Type
+            // mappings can otherwise introduce positional suffixes after unsolved variadics,
+            // which call binding does not handle correctly. This also happens when specializing
+            // a class parameter unrelated to a method's pack.
+            parameters.expand_starred_variadic_annotations(db)
+        }
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -5733,6 +5809,10 @@ impl<'db> Parameters<'db> {
     ///
     /// Preserve the original `*args` definition and source position on every expanded parameter
     /// so diagnostics can identify its declaration after specialization or overload filtering.
+    ///
+    /// TODO: This also expands unsolved packs, producing positional suffixes that call binding
+    /// does not support. Type mappings should preserve starred annotations and leave expansion
+    /// to consumers that support the expanded representation, such as signature comparison.
     ///
     /// ```python
     /// from typing import Unpack
@@ -5935,9 +6015,7 @@ pub(crate) struct Parameter<'db> {
 
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
-    /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
-    /// field is only used to decide whether to display the annotated type; it has no effect on the
-    /// type semantics of the parameter.
+    /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods.
     pub(crate) inferred_annotation: bool,
 
     /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
@@ -6301,6 +6379,15 @@ impl<'db> Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
+    }
+
+    pub(super) fn argument_context_type(&self) -> Option<Type<'db>> {
+        // The fallback `Unknown` for a missing annotation provides no context for an argument.
+        if self.inferred_annotation && self.annotated_type == Type::unknown() {
+            return None;
+        }
+
+        Some(self.annotated_type)
     }
 
     /// Returns the source definition represented by this parameter, if any.

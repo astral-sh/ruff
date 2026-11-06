@@ -125,14 +125,9 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-pub fn run(
-    Args {
-        command,
-        global_options,
-    }: Args,
-) -> Result<ExitStatus> {
+pub fn run(args: Args) -> Result<ExitStatus> {
     // Set color before so all outputs are properly colored
-    let color = TerminalColor::resolve(global_options.color);
+    let color = TerminalColor::resolve(args.global_options.color);
     colored::control::set_override(color.should_colorize(&io::stdout()));
 
     {
@@ -160,10 +155,20 @@ pub fn run(
 
     // Don't set up logging for the server command, as it has its own logging setup
     // and setting the global logger can only be done once.
-    if !matches!(command, Command::Server { .. }) {
-        set_up_logging(global_options.log_level())?;
+    if !matches!(args.command, Command::Server { .. }) {
+        set_up_logging(args.global_options.log_level())?;
     }
 
+    run_command(args)
+}
+
+/// Run a CLI command without reinstalling the process-wide logger and panic hook.
+pub fn run_command(
+    Args {
+        command,
+        global_options,
+    }: Args,
+) -> Result<ExitStatus> {
     match command {
         Command::Version { output_format } => {
             commands::version::version(output_format)?;

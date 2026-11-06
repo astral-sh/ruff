@@ -47,7 +47,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -84,7 +84,7 @@
       "type": "object",
       "properties": {
         "allowed-unresolved-imports": {
-          "description": "A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "description": "A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
           "type": [
             "array",
             "null"
@@ -158,7 +158,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. Otherwise, ty looks for an\nactivated child Conda or Pixi environment, a `.venv` directory in the project root, then\nan activated base Conda environment, in that order. ty skips Conda and Pixi environments\nthat contain no Python interpreter. If none of these environments are found, ty looks for\na `python3` or `python` binary in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -180,7 +180,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nScripts with inline metadata use their `requires-python` field instead of\n`project.requires-python`. They do not inherit the Python version of the enclosing project.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nA script uses its inline `environment.python-version` first, then `requires-python`.\nIt falls back to the project's version if it has no inline `[tool.ty]` table.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/SupportedPythonVersion"
@@ -191,7 +191,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` to allow importing local modules.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` in the script's `[tool.ty.environment]` table\nto import sibling modules.",
           "type": [
             "array",
             "null"
@@ -646,6 +646,16 @@
             }
           ]
         },
+        "import-not-found": {
+          "title": "detects unresolved imports",
+          "description": "## What it does\n\nChecks for imports where ty cannot find the module or a member named in a `from` import.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from\nan existing module raises `ImportError`.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n\n# ImportError: cannot import name 'sine' from 'math'\nfrom math import sine  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\n\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\n\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass A: ...\n\n\nclass B(A): ...\n\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...  # error\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
@@ -859,16 +869,6 @@
         "invalid-init-type-variable": {
           "title": "detects type variables from outer scopes in `__init__` receiver annotations",
           "description": "## What it does\n\nChecks for type variables from outer scopes in an explicit annotation of the `self` parameter of\n`__init__`.\n\n## Why is this bad?\n\nAn explicit `self` annotation on `__init__` can determine the type arguments of the constructed\nclass. Referring to type variables bound to the class or an enclosing scope in this annotation can\nmake their meaning ambiguous. The\n[typing specification](https://typing.python.org/en/latest/spec/constructors.html#init-method)\nallows type variables scoped to `__init__` instead.\n\n## Example\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Container[T]:\n    # error: [invalid-init-type-variable]\n    def __init__(self: \"Container[list[T]]\", value: T) -> None: ...\n```\n\nUse a type variable scoped to `__init__` instead:\n\n```python\nclass ListContainer[T]:\n    def __init__[U](self: \"ListContainer[list[U]]\", value: U) -> None: ...\n```\n\nIf the receiver annotation does not change the class's type arguments, it can be omitted:\n\n```python\nclass Box[T]:\n    def __init__(self, value: T) -> None: ...\n```\n\nThis restriction also applies to type variables declared with legacy syntax:\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass LegacyContainer(Generic[T]):\n    # error: [invalid-init-type-variable]\n    def __init__(self: \"LegacyContainer[list[T]]\", value: T) -> None: ...\n```\n\n## References\n\n- [Typing specification: `__init__` method](https://typing.python.org/en/latest/spec/constructors.html#init-method)",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-key": {
-          "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`\nit also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1176,6 +1176,16 @@
             }
           ]
         },
+        "invalid-typed-dict-key": {
+          "title": "detects invalid keys when accessing TypedDict items",
+          "description": "## What it does\n\nChecks for invalid keys when accessing or assigning items on a `TypedDict`.\n\nThis rule flags invalid keys such as a misspelled string literal or an integer. If the rejected key\nis a string whose value is unknown, ty reports `non-literal-typed-dict-key` instead.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\n\nalice = Person(name=\"Alice\", age=30)\n\n# KeyError: 'height'\nprint(f\"The height of Alice is {alice['height']}\")  # error\n```\n\n## Migrating from `invalid-key`\n\nty used to have a rule called `invalid-key` that covered `invalid-typed-dict-key`,\n`unknown-typed-dict-constructor-key`, and `non-literal-typed-dict-key`.\n\nThe old `invalid-key` name is now an alias for `invalid-typed-dict-key` only. If you previously had\nany configuration for `invalid-key` specifically, you should go through the other two rules to see\nif you want to configure them in the same way.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\n\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,\nmethod definitions and field values aren't allowed. None of these will be available on \"instances of\nthe `TypedDict`\" at runtime (as `dict` is the runtime class of all \"`TypedDict` instances\").\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
@@ -1248,7 +1258,7 @@
         },
         "missing-attribute": {
           "title": "detects references to missing attributes",
-          "description": "## What it does\n\nChecks for references to attributes that ty cannot find on the object's type. For a union, this rule\napplies when every member lacks the attribute. If only some members lack it, ty reports\n`missing-union-attribute`.\n\n## Why is this bad?\n\nAccessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is\nnot guaranteed to exist from the type alone, so this could also indicate that the object is not of\nthe type that the user expects.\n\n## Examples\n\n```python\nclass A: ...\n\n\n# AttributeError: 'A' object has no attribute 'foo'\nA().foo  # error\n```\n\n## Rule selection\n\nThis rule was renamed in ty 0.0.97. Settings such as `unresolved-attribute = \"ignore\"` and comments\nsuch as `# ty: ignore[unresolved-attribute]` still apply to this rule. To configure or suppress an\naccess where only some union members lack the attribute, use `missing-union-attribute`.",
+          "description": "## What it does\n\nChecks for references to attributes that ty cannot find on the object's type. For a union, this rule\napplies when every member lacks the attribute. If only some members lack it, ty reports\n`missing-union-attribute`.\n\n## Why is this bad?\n\nAccessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is\nnot guaranteed to exist from the type alone, so this could also indicate that the object is not of\nthe type that the user expects.\n\n## Examples\n\n```python\nclass A: ...\n\n\n# AttributeError: 'A' object has no attribute 'foo'\nA().foo  # error\n```\n\n## Rule selection\n\nThis rule was renamed in ty 0.0.100. Settings such as `unresolved-attribute = \"ignore\"` and comments\nsuch as `# ty: ignore[unresolved-attribute]` still apply to this rule. To configure or suppress an\naccess where only some union members lack the attribute, use `missing-union-attribute`.",
           "default": "error",
           "oneOf": [
             {
@@ -1308,7 +1318,7 @@
         },
         "missing-union-attribute": {
           "title": "detects attribute accesses where some union members lack the attribute",
-          "description": "## What it does\n\nChecks for reads or deletions of attributes that are present on some members of a union and missing\nfrom others. If every member lacks the attribute, ty reports `missing-attribute`.\n\n## Why is this bad?\n\nReading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.\n\n## Examples\n\n```python\ndef normalize(value: str | bytes) -> str:\n    return value.decode()  # error: [missing-union-attribute]\n```\n\nNarrow the type before accessing the attribute:\n\n```python\ndef normalize(value: str | bytes) -> str:\n    if isinstance(value, bytes):\n        return value.decode()\n    return value\n```\n\n## Rule selection\n\nBefore ty 0.0.97, these accesses used the same rule as accesses to attributes missing from every\nmember. If you configured a severity such as `unresolved-attribute = \"warn\"`, also set\n`missing-union-attribute = \"warn\"` to keep it for both cases. To suppress an access where only some\nmembers lack the attribute, use `# ty: ignore[missing-union-attribute]`.",
+          "description": "## What it does\n\nChecks for reads or deletions of attributes that are present on some members of a union and missing\nfrom others. If every member lacks the attribute, ty reports `missing-attribute`.\n\n## Why is this bad?\n\nReading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.\n\n## Examples\n\n```python\ndef normalize(value: str | bytes) -> str:\n    return value.decode()  # error: [missing-union-attribute]\n```\n\nNarrow the type before accessing the attribute:\n\n```python\ndef normalize(value: str | bytes) -> str:\n    if isinstance(value, bytes):\n        return value.decode()\n    return value\n```\n\n## Rule selection\n\nBefore ty 0.0.100, these accesses used the same rule as accesses to attributes missing from every\nmember. If you configured a severity such as `unresolved-attribute = \"warn\"`, also set\n`missing-union-attribute = \"warn\"` to keep it for both cases. To suppress an access where only some\nmembers lack the attribute, use `# ty: ignore[missing-union-attribute]`.",
           "default": "error",
           "oneOf": [
             {
@@ -1329,6 +1339,16 @@
         "non-callable-init-subclass": {
           "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
           "description": "## What it does\n\nChecks for class definitions that will fail due to non-callable `__init_subclass__` methods.\n\n## Why is this bad?\n\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt to subclass that\nclass will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass Super:\n    __init_subclass__ = None\n\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-literal-typed-dict-key": {
+          "title": "detects non-literal string keys in TypedDict subscripts",
+          "description": "## What it does\n\nReports attempts to subscript `TypedDict` instances with a key of type `str`.\n\n## Why is this bad?\n\nA `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a\ndistinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot\ninfer a precise type for the subscript expression.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n```\n\nUse instead:\n\n```py\nfrom typing import Literal\n\n\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typed-dict-key` reports other invalid subscripts, such as a misspelled field name or an\n    integer key.",
           "default": "error",
           "oneOf": [
             {
@@ -1506,6 +1526,16 @@
             }
           ]
         },
+        "renamed-rule-in-ignore-comment": {
+          "title": "detects ignore comments that use a rule's old name",
+          "description": "## What it does\n\nChecks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.\n\n## Why is this bad?\n\nWhen ty renames a rule, the old name still works in ignore comments. Prefer the current name to keep\nignore comments consistent across your codebase.\n\n## Examples\n\nIf ty renames `old-rule-name` to `new-rule-name`, the automatic fix changes\n`# ty: ignore[old-rule-name]` to `# ty: ignore[new-rule-name]`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "shadowed-type-variable": {
           "title": "detects type variables that shadow type variables from outer scopes",
           "description": "## What it does\n\nChecks for type variables in nested generic classes or functions that shadow type variables from an\nenclosing scope.\n\n## Why is this bad?\n\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Outer[T]:\n    # `T` is already used by `Outer`\n    class Inner[T]: ...  # error\n\n    # `T` is already used by `Outer`\n    def method[T](self, x: T) -> T:  # error\n        return x\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
@@ -1646,20 +1676,20 @@
             }
           ]
         },
-        "unresolved-global": {
-          "title": "detects `global` statements with no definition in the global scope",
-          "description": "## What it does\n\nDetects variables declared as `global` in an inner scope that have no explicit bindings or\ndeclarations in the global scope.\n\n## Why is this bad?\n\nFunction bodies with `global` statements can run in any order (or not at all), which makes it hard\nfor static analysis tools to infer the types of globals without explicit definitions or\ndeclarations.\n\n## Example\n\n### Assigning without a global-scope declaration\n\n```python\ndef f():\n    # unresolved global\n    global x  # error\n    x = 42\n\n\ndef g():\n    print(x)  # unresolved reference\n```\n\n### Use instead\n\n#### Declare the global\n\n```python\nx: int\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```\n\n#### Initialize the global\n\n```python\nx: int | None = None\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```",
-          "default": "warn",
+        "unknown-typed-dict-constructor-key": {
+          "title": "detects unknown keys when constructing a TypedDict",
+          "description": "## What it does\n\nReports `TypedDict` constructions where an unknown key is or may be provided.\n\n## Why is this bad?\n\nAn unexpected key in a constructor often means a field name was misspelled. Even an implicitly open\n`TypedDict` rejects an explicitly supplied key it does not declare.\n\n## Examples\n\n```python\nfrom typing_extensions import TypedDict, NotRequired\n\n\nclass Person(TypedDict):\n    name: str\n    age: NotRequired[int]\n\n\n# error: \"Unknown key \"aeg\"\"\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n\n\n# error: \"Unknown key \"nickname\"\"\nbob: Person = {\"name\": \"Robert\", \"nickname\": \"Bob\", \"age\": 30}  # unknown key!\n```\n\nIf a `TypedDict` is declared with `closed=True`, this rule will also flag a string key being passed\nto the constructor, as this might introduce an illegal extra item:\n\n```py\nimport json\nfrom typing_extensions import TypedDict\n\n\nclass NotificationPatch(TypedDict, closed=True, total=False):\n    email: bool\n    sms: bool\n\n\ndef encode_patch(channel: str, enabled: bool) -> str:\n    # error: \"Non-literal string key may be unknown\"\n    payload: NotificationPatch = {channel: enabled}\n    return json.dumps(payload)\n```",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
             }
           ]
         },
-        "unresolved-import": {
-          "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n```",
-          "default": "error",
+        "unresolved-global": {
+          "title": "detects `global` statements with no definition in the global scope",
+          "description": "## What it does\n\nDetects variables declared as `global` in an inner scope that have no explicit bindings or\ndeclarations in the global scope.\n\n## Why is this bad?\n\nFunction bodies with `global` statements can run in any order (or not at all), which makes it hard\nfor static analysis tools to infer the types of globals without explicit definitions or\ndeclarations.\n\n## Example\n\n### Assigning without a global-scope declaration\n\n```python\ndef f():\n    # unresolved global\n    global x  # error\n    x = 42\n\n\ndef g():\n    print(x)  # unresolved reference\n```\n\n### Use instead\n\n#### Declare the global\n\n```python\nx: int\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```\n\n#### Initialize the global\n\n```python\nx: int | None = None\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

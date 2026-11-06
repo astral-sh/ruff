@@ -151,6 +151,12 @@ impl ProjectDatabase {
         project.freeze_open_files(self);
     }
 
+    /// Skips dropping cached Salsa data when the CLI is about to exit. The remaining fields
+    /// drop normally so the uv worker pool receives its shutdown signal.
+    pub fn forget_storage_on_exit(self) {
+        std::mem::forget(self.storage);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -989,10 +995,10 @@ mod tests {
         // available configuration; preparing the environment is the host's responsibility.
         let diagnostics = db.check();
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
 
         Ok(())
     }

@@ -558,7 +558,7 @@ parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` ca
 ```py
 from typing import TypeVar
 
-from missing import Base  # error: [unresolved-import]
+from missing import Base  # error: [import-not-found]
 
 reveal_type(Base)  # revealed: Unknown
 
@@ -1372,7 +1372,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 ```
 
@@ -1502,11 +1502,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        # TODO: Only report the return error. The explicitly specialized constructor accepts
-        # `value: T` and `self: Self`; the incompatible return context should not reject them.
-        # error: [invalid-argument-type]
-        # error: [invalid-return-type]
-        return Box[T, Self](value, self)
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Constructing through a classmethod receiver
@@ -1633,6 +1629,30 @@ reveal_type(D(1))  # revealed: D[int]
 # TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
+```
+
+### Reordered type arguments in `__new__`
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]):
+    first: T
+
+    def __new__(cls, x: T, y: U) -> "Pair[U, T]":
+        raise NotImplementedError
+
+    def check(self, x: int, y: str) -> int:
+        # revealed: Pair[str, int]
+        reveal_type(Pair(x, y))
+        return Pair(x, y).first  # error: [invalid-return-type]
+
+def check(x: int, y: str) -> None:
+    # revealed: Pair[str, int]
+    reveal_type(Pair(x, y))
 ```
 
 ### Type variable defaults across `__new__` and `__init__`
@@ -3350,13 +3370,69 @@ class Pair(Generic[T, U]):
     def __init__(self, first: T, second: U):
         self.first: T = first
         self.second: U = second
+        self.values: list[T] = [first]
 
     def swapped(self, other: "Pair[U, T]"):
         reveal_type(other.first)  # revealed: U@Pair
         reveal_type(other.second)  # revealed: T@Pair
+        # revealed: list[U@Pair]
+        reveal_type(other.values)
 
     def nested(self, other: "Pair[list[T], U]"):
         reveal_type(other.first)  # revealed: list[T@Pair]
+        # revealed: list[list[T@Pair]]
+        reveal_type(other.values)
+```
+
+## Inferred attributes preserve captured type variables
+
+Specializing a local generic class replaces its own type variables in inferred attributes. Type
+variables captured from the enclosing function retain that function's binding.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def outer(captured: T) -> None:
+    class Local(Generic[U]):
+        def __init__(self, value: U) -> None:
+            self.value = (value,)
+            self.captured = (captured,)
+
+    local = Local[int](1)
+    # revealed: tuple[int]
+    reveal_type(local.value)
+    unchanged: tuple[T] = local.captured  # ok
+```
+
+## Annotated attributes preserve captured type variables
+
+A local class's attribute and method annotations capture the enclosing function's type variables.
+The class's own parameters remain available for specialization.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def outer(captured: T) -> None:
+    class Local(Generic[U]):
+        value: U
+        captured: T
+
+        def __init__(self, value: U, captured: T) -> None:
+            self.value = value  # ok
+            self.captured = captured  # ok
+
+    local = Local[int](1, captured)
+    # revealed: int
+    reveal_type(local.value)
+    unchanged: T = local.captured  # ok
+    Local[int]("wrong", captured)  # error: [invalid-argument-type]
+    Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
 
 ## Materialized `TypeIs` return types
@@ -3920,6 +3996,29 @@ class Implementation:
 def accepts(value: Required) -> None: ...
 def check(value: Implementation):
     accepts(value)  # ok
+```
+
+## Receiver requirements in constructor overloads
+
+Each constructor overload checks its receiver restriction together with its arguments. The receiver
+restriction also applies when every explicit argument has a default.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Required(Generic[T]):
+    @overload
+    def __init__(self: "Required[int]", value: int = 0) -> None: ...
+    @overload
+    def __init__(self: "Required[str]", value: str = "") -> None: ...
+    def __init__(self, value: object = 0) -> None: ...
+
+Required[int]()  # ok
+Required[str]()  # ok
+Required[bytes]()  # error: [no-matching-overload]
+Required[int]("wrong")  # error: [no-matching-overload]
 ```
 
 ## Aliased `Self` in explicit receivers

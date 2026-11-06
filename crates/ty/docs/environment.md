@@ -46,18 +46,29 @@ When set, ty will use this format for output instead of the default.
 
 Accepts the same values as the `--output-format` command-line argument.
 
+### `TY_UV`
+
+Enable and configure uv integration.
+
+When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
+
+When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+environment.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
 
 ### `CLICOLOR`
 
-Enables color in `ty check` diagnostics when stdout is a terminal, even if `TERM=dumb`.
+Controls color in `ty check` diagnostics when stdout is a terminal.
 
-Setting this environment variable to any non-empty value (including `0`) enables this
-behavior. An empty value has the same effect as leaving the variable unset. All of the
-following have higher precedence: setting the `NO_COLOR` environment variable to any
-non-empty value, passing `--color=always`, or passing `--color=never`.
+Setting this to `0` disables color. Any other non-empty value enables color, even if
+`TERM=dumb`. An empty value has the same effect as leaving the variable unset.
+
+An explicit `--color=always` or `--color=never` takes precedence, as does a non-empty
+`NO_COLOR`, `FORCE_COLOR`, or `CLICOLOR_FORCE` environment variable.
 
 ### `CLICOLOR_FORCE`
 
@@ -69,8 +80,9 @@ Used to determine the name of the active Conda environment.
 
 ### `CONDA_PREFIX`
 
-Used to detect the path of an active Conda environment.
-If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+The path to the active Conda or Pixi environment. If it contains no Python interpreter,
+ty continues searching, including in the project's `.venv`.
+A non-empty `VIRTUAL_ENV` takes precedence.
 
 ### `FORCE_COLOR`
 

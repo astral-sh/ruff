@@ -17,6 +17,7 @@ help: Convert to lazy `%` formatting
 6 + log.info("ab %s", variablename)
 7 | log.info("a " f"b {variablename}")
   |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
  --> G004_implicit_concat.py:7:10
@@ -34,6 +35,7 @@ help: Convert to lazy `%` formatting
 7 + log.info("a b %s", variablename)
 8 | log.info("prefix " f"middle {variablename}" f" suffix")
   |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
  --> G004_implicit_concat.py:8:10
@@ -48,3 +50,4 @@ help: Convert to lazy `%` formatting
   - log.info("prefix " f"middle {variablename}" f" suffix")
 8 + log.info("prefix middle %s suffix", variablename)
   |
+note: This is an unsafe fix and may change runtime behavior

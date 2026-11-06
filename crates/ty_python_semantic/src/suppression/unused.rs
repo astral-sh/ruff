@@ -95,7 +95,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                     suppression.kind
                 ))
             }
-            SuppressionTarget::Lint(lint) => {
+            SuppressionTarget::Lint(_) => {
                 // A single code in a `ty: ignore[<code1>, <code2>, ...]` directive
 
                 // Is this the first code directly after the `[`?
@@ -109,13 +109,13 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
                 // Group successive codes together into a single diagnostic,
                 // or report the entire directive if all codes are unused.
                 while let Some(next) = unused_iter.peek() {
-                    if let SuppressionTarget::Lint(next_lint) = next.target
+                    if next.target.is_lint()
                         && next.comment_range == current.comment_range
                         && source[TextRange::new(current.range.end(), next.range.start())]
                             .chars()
                             .all(|c| c.is_whitespace() || c == ',')
                     {
-                        unused_codes.push(next_lint);
+                        unused_codes.push(&source[next.range]);
                         current = *next;
                         unused_iter.next();
                     } else {
@@ -130,9 +130,9 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
 
                 // If only some codes are unused
                 if !includes_first_code || !includes_last_code {
-                    let mut codes = format!("'{}'", lint.name());
+                    let mut codes = format!("'{}'", &source[suppression.range]);
                     for code in &unused_codes {
-                        let _ = write!(&mut codes, ", '{code}'", code = code.name());
+                        let _ = write!(&mut codes, ", '{code}'");
                     }
 
                     if let Some(diag) = context.report_unchecked(

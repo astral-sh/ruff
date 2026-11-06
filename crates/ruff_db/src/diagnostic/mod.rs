@@ -1015,6 +1015,9 @@ pub enum DiagnosticId {
     /// No rule with the given name exists.
     UnknownRule,
 
+    /// A rule was selected using its former name.
+    RenamedRule,
+
     /// A glob pattern doesn't follow the expected syntax.
     InvalidGlob,
 
@@ -1154,6 +1157,7 @@ impl DiagnosticId {
             DiagnosticId::Lint(name) => name.as_str(),
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
+            DiagnosticId::RenamedRule => "renamed-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
             DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
             DiagnosticId::UvMetadata => "uv-metadata",

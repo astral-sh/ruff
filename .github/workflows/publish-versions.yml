@@ -50,13 +50,7 @@ jobs:
           token: ${{ steps.token.outputs.token }}
           persist-credentials: false
 
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
-          enable-cache: false
+      - uses: $/.github/actions/setup-ruff-workspace
 
       - name: "Update versions"
         env:

@@ -2,11 +2,11 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use lsp_types::RenameRequest;
-use lsp_types::{RenameParams, TextEdit, Uri, WorkspaceEdit};
-use ty_ide::rename;
+use lsp_types::{RenameParams, Uri, WorkspaceEdit};
+use ty_ide::{RangedValue, rename};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::document::{PositionExt, ToLink};
+use crate::document::{PositionExt, extend_lsp_edits};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -55,19 +55,12 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        // Group text edits by file
-        let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
-
-        for reference in rename_results {
-            if let Some(location) = reference.to_location(db, snapshot.encoding()) {
-                let edit = TextEdit {
-                    range: location.range,
-                    new_text: params.new_name.clone(),
-                };
-
-                changes.entry(location.uri).or_default().push(edit);
-            }
-        }
+        let edits = rename_results.into_iter().map(|reference| RangedValue {
+            range: reference.file_range(),
+            value: params.new_name.as_str(),
+        });
+        let mut changes = HashMap::new();
+        extend_lsp_edits(db, snapshot.encoding(), edits, &mut changes);
 
         if changes.is_empty() {
             return Ok(None);

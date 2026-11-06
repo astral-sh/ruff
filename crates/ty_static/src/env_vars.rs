@@ -61,12 +61,13 @@ impl EnvVars {
     /// Accepts the same values as the `--output-format` command-line argument.
     pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
-    /// Enable uv integration.
+    /// Enable and configure uv integration.
     ///
-    /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
-    /// root and initialize script environments. When set to `"scripts"`, only script environments
-    /// are initialized.
-    #[attr_hidden]
+    /// When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+    /// Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
+    ///
+    /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+    /// environment.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
@@ -87,8 +88,9 @@ impl EnvVars {
     /// Used to determine the name of the active Conda environment.
     pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
 
-    /// Used to detect the path of an active Conda environment.
-    /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+    /// The path to the active Conda or Pixi environment. If it contains no Python interpreter,
+    /// ty continues searching, including in the project's `.venv`.
+    /// A non-empty `VIRTUAL_ENV` takes precedence.
     pub const CONDA_PREFIX: &'static str = "CONDA_PREFIX";
 
     /// Used to determine the root install path of Conda.
@@ -96,12 +98,13 @@ impl EnvVars {
 
     // Externally defined environment variables
 
-    /// Enables color in `ty check` diagnostics when stdout is a terminal, even if `TERM=dumb`.
+    /// Controls color in `ty check` diagnostics when stdout is a terminal.
     ///
-    /// Setting this environment variable to any non-empty value (including `0`) enables this
-    /// behavior. An empty value has the same effect as leaving the variable unset. All of the
-    /// following have higher precedence: setting the `NO_COLOR` environment variable to any
-    /// non-empty value, passing `--color=always`, or passing `--color=never`.
+    /// Setting this to `0` disables color. Any other non-empty value enables color, even if
+    /// `TERM=dumb`. An empty value has the same effect as leaving the variable unset.
+    ///
+    /// An explicit `--color=always` or `--color=never` takes precedence, as does a non-empty
+    /// `NO_COLOR`, `FORCE_COLOR`, or `CLICOLOR_FORCE` environment variable.
     pub const CLICOLOR: &'static str = "CLICOLOR";
 
     /// Alias for [`FORCE_COLOR`](#force_color).

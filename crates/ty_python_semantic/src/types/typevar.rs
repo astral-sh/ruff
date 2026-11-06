@@ -16,13 +16,14 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
         GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
-        MaterializationKind, Parameter, Parameters, Specialization, Type, TypeAliasType,
-        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        MaterializationKind, Parameter, Parameters, RecursiveType, Specialization, Type,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        any_over_type, any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
-        generics::enclosing_binding_contexts,
+        generics::{enclosing_binding_contexts, walk_specialization_types},
         tuple::Tuple,
+        type_alias::walk_type_alias_arguments,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
     },
@@ -150,10 +151,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
-            ty.as_dynamic()
-                .is_some_and(DynamicType::is_provisional_marker)
-        })
+        any_over_type(db, env, self, false, Self::is_provisional_marker)
+    }
+
+    pub(super) const fn is_provisional_marker(self) -> bool {
+        matches!(
+            self,
+            Self::Dynamic(DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter)
+        )
     }
 }
 
@@ -341,6 +346,16 @@ impl<'db> TypeVarInstance<'db> {
             Some(ty)
         } else {
             None
+        }
+    }
+
+    /// A simple type variable has no bound, constraints, or default.
+    pub(super) fn is_simple(self, db: &'db dyn Db) -> bool {
+        match self.kind(db) {
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar => {
+                self._bound_or_constraints(db).is_none() && self._default(db).is_none()
+            }
+            _ => false,
         }
     }
 
@@ -870,8 +885,8 @@ impl<'db> TypeVarInstance<'db> {
 
 /// A nonce that gives a bound typevar occurrence a fresh identity.
 ///
-/// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
-/// occurrences.
+/// `0` is the source-level occurrence. Higher values distinguish other occurrences of the same
+/// typevar. Inferability is determined by membership in a [`TypeVarSet`], not by the nonce itself.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct TypeVarNonce(u32);
 
@@ -886,7 +901,7 @@ impl TypeVarNonce {
         self.0
     }
 
-    pub(crate) fn increment(self) -> Self {
+    fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
@@ -955,77 +970,73 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
-pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
+/// Returns a freshening delta if a binder would collide with an occurrence in `types`.
+pub(super) fn freshening_delta<'db>(
     db: &'db dyn Db,
     types: impl IntoIterator<Item = Type<'db>>,
     generic_context: GenericContext<'db>,
-) -> Option<TypeVarNonce> {
-    struct MatchingFreshnessCollector<'a, 'db> {
+) -> Option<u32> {
+    struct Freshness<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
-        base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
-        recursion_guard: TypeCollector<'db>,
-        max_freshness: Cell<Option<TypeVarNonce>>,
+        binders: GenericContext<'db>,
+        seen: TypeCollector<'db>,
+        collides: Cell<bool>,
+        max: Cell<TypeVarNonce>,
     }
 
-    impl<'a, 'db> MatchingFreshnessCollector<'a, 'db> {
-        fn new(
-            db: &'db dyn Db,
-            env: &'a ProgramEnvironment<'db>,
-            generic_context: GenericContext<'db>,
-        ) -> Self {
-            let base_identities = generic_context
-                .variables(db)
-                .map(|typevar| {
-                    let mut identity = typevar.identity(db);
-                    identity.freshness = TypeVarNonce::NONE;
-                    identity
-                })
-                .collect();
-            Self {
-                env,
-                base_identities,
-                recursion_guard: TypeCollector::default(),
-                max_freshness: Cell::default(),
-            }
-        }
-    }
-
-    impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'_, 'db> {
+    impl<'db> TypeVisitor<'db> for Freshness<'_, 'db> {
         fn program_environment(&self) -> &ProgramEnvironment<'db> {
             self.env
         }
-
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
         }
 
-        fn visit_bound_type_var_type(
-            &self,
-            db: &'db dyn Db,
-            bound_typevar: BoundTypeVarInstance<'db>,
-        ) {
-            let mut identity = bound_typevar.identity(db);
-            identity.freshness = TypeVarNonce::NONE;
-            if self.base_identities.contains(&identity) {
-                self.max_freshness.set(
-                    self.max_freshness
-                        .get()
-                        .max(Some(bound_typevar.freshness(db))),
-                );
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            // Separate the arguments from the definition so recursion through a growing
+            // specialization cannot keep introducing new types to visit.
+            walk_type_alias_arguments(db, alias, self);
+            self.visit_type(db, alias.raw_value_type(db));
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            if let Some(arguments) = recursive.arguments(db) {
+                walk_specialization_types(db, arguments, self);
             }
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            if let Type::TypeVar(var) = ty {
+                let id = var.identity(db);
+                if self.binders.contains(db, id) {
+                    self.collides.set(true);
+                } else if !self.binders.variables(db).any(|binder| {
+                    binder.identity(db).unfreshened_binder() == id.unfreshened_binder()
+                }) {
+                    return;
+                }
+                self.max.set(self.max.get().max(var.freshness(db)));
+            } else {
+                walk_type_with_recursion_guard(db, ty, self, &self.seen);
+            }
         }
     }
 
     let env = ProgramEnvironment::from_program(generic_context.program(db));
-    let collector = MatchingFreshnessCollector::new(db, &env, generic_context);
+    let visitor = Freshness {
+        env: &env,
+        binders: generic_context,
+        seen: TypeCollector::default(),
+        collides: Cell::new(false),
+        max: Cell::new(TypeVarNonce::NONE),
+    };
     for ty in types {
-        collector.visit_type(db, ty);
+        visitor.visit_type(db, ty);
     }
-    collector.max_freshness.get()
+    visitor
+        .collides
+        .get()
+        .then(|| visitor.max.get().increment().value())
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
@@ -1307,7 +1318,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let env = ProgramEnvironment::from_program(self.binding_context(db).program(db));
         let typevar = self.typevar(db);
-        let bound_or_constraints = f(typevar.bound_or_constraints(db, &env));
+        let original_bound_or_constraints = typevar.bound_or_constraints(db, &env);
+        let bound_or_constraints = f(original_bound_or_constraints);
+        if bound_or_constraints == original_bound_or_constraints {
+            return self;
+        }
         let typevar = TypeVarInstance::new(
             db,
             typevar.identity(db),
@@ -1457,27 +1472,21 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
                 delta,
-            } => {
+            } => visitor.visit(db, Type::TypeVar(self), type_mapping, || {
                 let identity = if self.is_paramspec(db) {
                     self.identity(db).without_paramspec_attr(db)
                 } else {
                     self.identity(db)
                 };
-                if generic_context.contains(db, identity) {
-                    Type::TypeVar(self.freshen_with_mapping(
-                        db,
-                        self.freshness(db).add(*delta),
-                        type_mapping,
-                        visitor,
-                    ))
+                let nonce = if generic_context.contains(db, identity) {
+                    self.freshness(db).add(*delta)
                 } else {
-                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
-                        db,
-                        type_mapping,
-                        visitor,
-                    ))
-                }
-            }
+                    self.freshness(db)
+                };
+                // Bounds and defaults can mention this context's typevars even when the
+                // typevar itself belongs to another context.
+                Type::TypeVar(self.freshen_with_mapping(db, nonce, type_mapping, visitor))
+            }),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1590,30 +1599,26 @@ impl<'db> BoundTypeVarInstance<'db> {
         let bound_or_constraints = typevar.bound_or_constraints(db, visitor.env);
         let default = self.default_type(db);
 
-        if bound_or_constraints.is_none() && default.is_none() {
-            return Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                nonce,
-            );
-        }
-
-        let typevar = TypeVarInstance::new(
-            db,
-            typevar.identity(db),
-            bound_or_constraints.map(|bound_or_constraints| {
-                bound_or_constraints
-                    .apply_type_mapping_impl(db, type_mapping, visitor)
-                    .into()
-            }),
-            typevar.explicit_variance(db),
-            default.map(|ty| {
-                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                    .into()
-            }),
-        );
+        let mapped_bound_or_constraints = bound_or_constraints.map(|bound_or_constraints| {
+            bound_or_constraints.apply_type_mapping_impl(db, type_mapping, visitor)
+        });
+        let mapped_default = default.map(|ty| {
+            ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+        });
+        // Replacing unchanged lazy bounds or defaults with eager values changes the interned
+        // typevar even when freshening only needs a new occurrence identity.
+        let typevar =
+            if mapped_bound_or_constraints == bound_or_constraints && mapped_default == default {
+                typevar
+            } else {
+                TypeVarInstance::new(
+                    db,
+                    typevar.identity(db),
+                    mapped_bound_or_constraints.map(Into::into),
+                    typevar.explicit_variance(db),
+                    mapped_default.map(Into::into),
+                )
+            };
 
         Self::new(
             db,
@@ -1906,6 +1911,16 @@ pub struct BoundTypeVarIdentity<'db> {
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
+    /// All fresh occurrences of a binder, including both components of a `ParamSpec`, share
+    /// the same source declaration.
+    fn unfreshened_binder(self) -> Self {
+        Self {
+            paramspec_attr: None,
+            freshness: TypeVarNonce::NONE,
+            ..self
+        }
+    }
+
     fn kind(self, db: &'db dyn Db) -> TypeVarKind<'db> {
         self.identity.kind(db)
     }

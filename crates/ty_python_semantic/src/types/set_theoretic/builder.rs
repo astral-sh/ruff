@@ -1121,6 +1121,55 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    /// Return whether two distinct types can skip union redundancy and complement checks.
+    ///
+    /// A `true` result guarantees that neither type subsumes the other under union redundancy,
+    /// and that their union cannot cover `object`. The caller must handle equal types first.
+    /// A `false` result leaves the decision to the general relation checks.
+    ///
+    /// Distinct class and module literals identify different objects. Methods bound to distinct
+    /// singleton literals also remain distinct because `__self__` exposes their captured receiver:
+    ///
+    /// ```python
+    /// from typing import Literal, LiteralString, reveal_type
+    ///
+    /// def select(s: Literal["a", "b"], other: LiteralString, flag: bool):
+    ///     method = s.isalpha
+    ///     reveal_type(method.__self__)  # Literal["a", "b"]
+    ///
+    ///     mixed = method if flag else other.isalpha
+    ///     reveal_type(mixed.__self__)  # LiteralString
+    /// ```
+    ///
+    /// `LiteralString` is excluded because it is not a singleton: its bound method can subsume
+    /// methods bound to particular strings, as in `mixed` above.
+    ///
+    /// Dynamic types remain alongside non-`object` nominal instances: assignability to `Any`
+    /// does not make a union element redundant. `object` is excluded because it subsumes every
+    /// other type.
+    fn is_incomparable_for_union(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        match (left, right) {
+            (Type::ClassLiteral(_), Type::ClassLiteral(_))
+            | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
+            (Type::Dynamic(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::Dynamic(_))
+                if !instance.is_object() =>
+            {
+                true
+            }
+            (Type::BoundMethod(left), Type::BoundMethod(right))
+                if let (Type::LiteralValue(left), Type::LiteralValue(right)) =
+                    (left.self_instance(db), right.self_instance(db))
+                    && !left.is_literal_string()
+                    && !right.is_literal_string()
+                    && left.kind() != right.kind() =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
         let mut ty = ty;
@@ -1160,6 +1209,10 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            if Self::is_incomparable_for_union(db, ty, element_type) {
+                continue;
             }
 
             // `object` already contains every possible union element.

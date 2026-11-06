@@ -15,6 +15,10 @@ on:
       title:
         type: string
         default: ""
+      update-existing-only:
+        description: Update the report only if its comment already exists on the pull request.
+        type: boolean
+        default: false
       full-report-artifact:
         type: string
         default: ""
@@ -60,13 +64,9 @@ jobs:
           ref: ${{ job.workflow_sha }}
           sparse-checkout: scripts
           persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
-          enable-cache: false
+      - uses: $/.github/actions/setup-ruff-workspace
       - name: Read the stored comment ID
+        id: comment-id
         uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
         with:
           service-url: ${{ secrets.KV_API_URL }}
@@ -74,6 +74,7 @@ jobs:
           key: report-comment-${{ inputs.report }}
           path: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Get a report publishing token
+        if: ${{ !inputs.update-existing-only || steps.comment-id.outputs.found == 'true' }}
         id: token
         uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
@@ -84,7 +85,7 @@ jobs:
             actions: read
             pull_requests: write
       - name: Get report upload credentials
-        if: inputs.upload-html
+        if: inputs.upload-html && steps.token.outcome == 'success'
         id: aws
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -95,6 +96,7 @@ jobs:
           role-session-name: report-${{ github.run_id }}-${{ github.run_attempt }}
           unset-current-credentials: true
       - name: Publish the report
+        if: steps.token.outcome == 'success'
         id: publish
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
@@ -121,6 +123,7 @@ jobs:
           --html-bucket "$HTML_BUCKET" --html-base-url "$HTML_BASE_URL"
           --html-files "$HTML_FILES"
           --comment-id-file "$COMMENT_ID_FILE"
+          ${{ inputs.update-existing-only && '--update-existing-only' || '' }}
       - name: Store the comment ID
         if: steps.publish.outputs.comment-id != ''
         uses: astral-sh/github-actions/key-value-store/put@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454

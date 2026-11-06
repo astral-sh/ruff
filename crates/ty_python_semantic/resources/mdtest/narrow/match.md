@@ -1100,6 +1100,18 @@ def test_union_class_pattern_uses_members_from_matching_class(
             reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
+Failing to match `PatternClass()` can leave an `IndirectPattern` instance because `PatternClass` may
+be a proper subclass.
+
+```py
+def match_possible_subclass(value: IndirectPattern, PatternClass: type[IndirectPattern]) -> None:
+    match value:
+        case PatternClass():
+            pass
+        case _:
+            reveal_type(value)  # revealed: IndirectPattern
+```
+
 ## Class pattern aliases
 
 The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a

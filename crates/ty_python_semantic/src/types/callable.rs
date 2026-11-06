@@ -36,6 +36,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(super) fn is_function_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_function_like(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).is_function_like(db),
+            _ => self.function_like_kind(db).is_some(),
+        }
+    }
+
     pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
         self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
     }
@@ -99,6 +107,49 @@ impl<'db> Type<'db> {
                 ))
             },
         ))
+    }
+
+    /// Return a type that represents the "contract" that a callable must satisfy when attempting
+    /// to shadow a method on an instance. For example:
+    ///
+    /// ```python
+    /// class C:
+    ///     def method(self, x: int) -> str:
+    ///         return str(x)
+    ///
+    ///     def swap(self) -> None:
+    ///         self.method = xxx # which contract must the type of `xxx` satisfy?
+    /// ```
+    ///
+    /// To construct this contract type, ty binds the original `C.method` to the receiver (`self`)
+    /// and uses its call signature, `(x: int) -> str`, as the expected type. This allows `method`
+    /// to be shadowed by non-function callables, too, even if that is not sound (those might not
+    /// have the same attributes as function-like callables).
+    pub(super) fn method_shadowing_contract(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::Union(union) => union.try_map(db, env, |ty| {
+                ty.method_shadowing_contract(db, env, receiver)
+            }),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .method_shadowing_contract(db, env, receiver),
+            _ if self.function_like_kind(db).is_some()
+                // When the receiver is a class object (i.e. `C.method = ...` instead of `c_instance.method = ...`),
+                // it would actually overwrite the function on the class, i.e. this would not be shadowing.
+                && !receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) =>
+            {
+                let bound = self.function_like_dunder_get(db, env, Some(receiver), None)?;
+                let callables = bound.try_upcast_to_callable(db, env)?;
+                let regular = callables.map(|callable| callable.into_regular(db));
+                Some(regular.to_type(db, env))
+            }
+            _ => None,
+        }
     }
 
     /// Create a callable type with a single non-overloaded signature.

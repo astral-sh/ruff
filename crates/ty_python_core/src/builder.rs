@@ -26,7 +26,6 @@ use ty_module_resolver::{
     ImportingFile, ModuleName, ResolverEnvironment, resolve_module_for_import_from,
 };
 
-use crate::HasTrackedScope;
 use crate::ProgramFile;
 use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
@@ -72,8 +71,8 @@ use crate::use_def::{
     UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
-    AncestorsIter, DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader,
-    LoopHeaderId, NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
+    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
 };
 use crate::{Db, Statement, StatementNodeKey};
 
@@ -100,6 +99,8 @@ struct NarrowingAlias<'ast> {
     expression_scope: FileScopeId,
     /// Places that, if reassigned, should invalidate this alias.
     narrowed_places: PossiblyNarrowedPlaces,
+    /// The first definition ID allocated after the alias assignment.
+    first_definition_after_alias: ScopedDefinitionId,
 }
 
 struct ScopeInfo<'ast> {
@@ -277,11 +278,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
+    ast_ids: AstIdsBuilder,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
@@ -303,8 +303,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     async_comprehensions: FxHashSet<FileScopeId>,
     /// Node indices of syntactic annotation roots.
     annotations: Vec<NodeIndex>,
-    /// Snapshots of enclosing-scope place states visible from nested scopes.
-    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Snapshots taken when an eager scope finishes. These never need to be updated.
+    eager_snapshots: Vec<(EnclosingSnapshotKey, ScopedEnclosingSnapshotId)>,
+    /// A reassignment can update lazy snapshots of the same name in several nested scopes.
+    lazy_snapshots: FxHashMap<Name, Vec<(EnclosingSnapshotKey, ScopedEnclosingSnapshotId)>>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -340,11 +342,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            ast_ids: IndexVec::new(),
+            ast_ids: AstIdsBuilder::with_node_count(module_ref.node_count()),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
@@ -361,7 +362,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             async_comprehensions: FxHashSet::default(),
             annotations: Vec::new(),
 
-            enclosing_snapshots: FxHashMap::default(),
+            eager_snapshots: Vec::new(),
+            lazy_snapshots: FxHashMap::default(),
 
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
@@ -523,15 +525,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(Box::new(UseDefMapBuilder::new(scope_kind)));
-        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
         debug_assert_eq!(previous, None);
-
-        debug_assert_eq!(ast_id_scope, file_scope_id);
 
         // Save narrowing aliases. They will be restored with `pop_scope` after returning from inspecting the inner scope.
         // TODO: Cross-scope alias narrowing is not supported yet.
@@ -590,7 +589,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place,
                     ancestor.is_lexically_visible,
                 );
-                self.enclosing_snapshots.insert(key, eager_snapshot);
+                self.eager_snapshots.push((key, eager_snapshot));
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
@@ -771,7 +770,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place.into(),
                     !enclosing_scope_kind.is_class(),
                 );
-                self.enclosing_snapshots.insert(key, lazy_snapshot);
+                self.lazy_snapshots
+                    .entry(nested_symbol.name().clone())
+                    .or_default()
+                    .push((key, lazy_snapshot));
             }
         }
     }
@@ -810,47 +812,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each matching snapshot is updated independently"
-        )]
-        for (key, snapshot_id) in &self.enclosing_snapshots {
-            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
-                let name = self.place_tables[key.enclosing_scope]
-                    .symbol(enclosing_symbol)
-                    .name();
-                let is_reassignment_of_snapshotted_symbol = || {
-                    for (ancestor, _) in self.visible_ancestor_scopes(key.enclosing_scope) {
-                        if ancestor == current_scope {
-                            return true;
-                        }
-                        let ancestor_table = &self.place_tables[ancestor];
-                        // If there is a symbol binding in an ancestor scope,
-                        // then a reassignment in the current scope is not relevant to the snapshot.
-                        if ancestor_table
-                            .symbol_id(name)
-                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
-                        {
-                            return false;
-                        }
-                    }
-                    false
-                };
-
-                if key.nested_laziness.is_lazy()
-                    && symbol.name() == name
-                    && is_reassignment_of_snapshotted_symbol()
-                {
-                    self.use_def_maps[key.enclosing_scope]
-                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
-                }
+        let name = symbol.name();
+        let Some(snapshots) = self.lazy_snapshots.get(name) else {
+            return;
+        };
+        for &(key, snapshot_id) in snapshots {
+            // A binding between the snapshot and this scope shadows the reassignment.
+            let first_binding =
+                self.visible_ancestor_scopes(key.enclosing_scope)
+                    .find(|(ancestor, _)| {
+                        let table = &self.place_tables[*ancestor];
+                        *ancestor == current_scope
+                            || table
+                                .symbol_id(name)
+                                .is_some_and(|id| table.symbol(id).is_bound())
+                    });
+            if first_binding.is_some_and(|(ancestor, _)| ancestor == current_scope) {
+                self.use_def_maps[key.enclosing_scope]
+                    .update_enclosing_snapshot(snapshot_id, key.enclosing_place.expect_symbol());
             }
         }
     }
 
-    fn sweep_nonlocal_lazy_snapshots(&mut self) {
-        if self.enclosing_snapshots.is_empty() {
-            return;
+    fn finish_enclosing_snapshots(
+        &mut self,
+    ) -> FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId> {
+        let mut snapshots = std::mem::take(&mut self.eager_snapshots);
+        if self.lazy_snapshots.is_empty() {
+            return FrozenMap::from_entries(snapshots);
         }
 
         // Only the last scope containing a bound nonlocal matters: a lazy snapshot must be
@@ -865,24 +854,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        if last_nonlocal_binding.is_empty() {
-            return;
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "FrozenMap::from_entries sorts snapshots by their unique keys"
+        )]
+        for (name, lazy) in self.lazy_snapshots.drain() {
+            let last_nonlocal = last_nonlocal_binding.get(&name);
+            snapshots.extend(lazy.into_iter().filter(|(key, _)| {
+                last_nonlocal.is_none_or(|scope| scope.index() < key.enclosing_scope.index())
+            }));
         }
-
-        self.enclosing_snapshots.retain(|key, _| {
-            if key.nested_laziness.is_eager() {
-                return true;
-            }
-            let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
-                return true;
-            };
-            let name = self.place_tables[key.enclosing_scope]
-                .symbol(symbol_id)
-                .name();
-            last_nonlocal_binding
-                .get(name)
-                .is_none_or(|scope| scope.index() < key.enclosing_scope.index())
-        });
+        FrozenMap::from_entries(snapshots)
     }
 
     /// Finds the nearest visible ancestor scope that actually owns a local binding for `name`.
@@ -1108,24 +1090,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
-    fn current_ast_ids(&self) -> &AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &self.ast_ids[scope_id]
-    }
-
-    fn current_ast_ids_mut(&mut self) -> &mut AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &mut self.ast_ids[scope_id]
-    }
-
     /// If the given expression is a use of an unannotated collection initializer, returns
     /// the definition of the initializer.
     fn unannotated_collection_initializer_binding(
         &self,
-        collection_use: &ast::Expr,
+        use_id: ScopedUseId,
     ) -> Option<Definition<'db>> {
         let use_def = self.current_use_def_map();
-        let use_id = self.current_ast_ids().try_use_id(collection_use)?;
 
         use_def
             .bindings_at_use(use_id)
@@ -1148,7 +1119,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
-        let definition = self.unannotated_collection_initializer_binding(collection_use)?;
+        let use_id = self
+            .ast_ids
+            .try_scoped_use(self.current_scope(), collection_use)?;
+        let definition = self.unannotated_collection_initializer_binding(use_id)?;
         definition
             .kind(self.db)
             .as_unannotated_assignment()
@@ -1189,6 +1163,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     expression: value,
                     expression_scope: self.current_scope(),
                     narrowed_places,
+                    first_definition_after_alias: self.current_use_def_map().next_definition_id(),
                 },
             );
         }
@@ -1291,9 +1266,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(alias) = self.narrowing_aliases.get(&name.id) else {
                 return;
             };
-            if self.current_ast_ids().try_use_id(leaf).is_none() {
+            if self
+                .ast_ids
+                .try_scoped_use(self.current_scope(), leaf)
+                .is_none()
+            {
                 return;
             }
+
+            // A loop entered after the alias was evaluated can carry a new value to this test.
+            // Record the headers here and check their backedges once reachability is available.
+            let use_def = self.current_use_def_map();
+            let mut loop_headers: SmallVec<[_; 2]> = alias
+                .narrowed_places
+                .iter()
+                .flat_map(|place| use_def.current_binding_ids(*place))
+                .filter(|id| *id >= alias.first_definition_after_alias)
+                .filter(|id| {
+                    use_def
+                        .definition(*id)
+                        .definition()
+                        .is_some_and(|definition| definition.kind(self.db).is_loop_header())
+                })
+                .collect();
+            // Keep the stored order stable across semantic-index rebuilds.
+            loop_headers.sort_unstable();
 
             let aliased_expression = Expression::new(
                 self.db,
@@ -1306,6 +1303,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ExpressionNodeKey::from(leaf),
                 NarrowingAliasPredicate {
                     expression: aliased_expression,
+                    intervening_loop_headers: loop_headers.into_boxed_slice(),
                 },
             );
         });
@@ -1406,12 +1404,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
-    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
+    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) -> ScopedUseId {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
-        let use_id = self.current_ast_ids_mut().record_use(expr);
-        self.current_use_def_map_mut().record_use(place_id, use_id);
+        let scope = self.current_scope();
+        let use_id = self.use_def_maps[scope].record_use(place_id);
+        self.ast_ids.record_place_use(expr, scope, use_id, place_id);
+        use_id
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -3043,8 +3043,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ..
                     }) => (name, &None, default),
                 };
-                self.scopes_by_expression
-                    .record_expression(name, self.current_scope());
+                self.ast_ids.record_expression(name, self.current_scope());
                 let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
@@ -3384,12 +3383,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.sweep_nonlocal_lazy_snapshots();
+        let enclosing_snapshots = self.finish_enclosing_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
+        let ast_ids = self.ast_ids.finish();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
@@ -3442,7 +3441,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps: self
                 .use_def_maps
@@ -3454,7 +3452,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
+            enclosing_snapshots,
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
@@ -3477,8 +3475,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
-        self.scopes_by_expression
-            .record_expression(expr, self.current_scope());
+        // A place use records its scope together with its reaching-definition ID,
+        // after child expressions have been evaluated. Other expressions have only a scope.
+        if !matches!(
+            expr,
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+        ) {
+            self.ast_ids.record_expression(expr, self.current_scope());
+        }
 
         match expr {
             ast::Expr::Name(ast::ExprName { ctx, .. })
@@ -3537,6 +3541,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let is_use = deferred_effects
                     .as_ref()
                     .is_some_and(|(_, is_use, _)| *is_use);
+                if !is_use {
+                    self.ast_ids.record_expression(expr, self.current_scope());
+                }
                 let can_raise = self.place_access_can_raise(expr, is_use);
                 self.record_exception_checkpoint_if(can_raise);
 
@@ -3544,11 +3551,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        self.record_place_use(place_id, expr);
+                        let use_id = self.record_place_use(place_id, expr);
 
                         // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =
-                            self.unannotated_collection_initializer_binding(expr)
+                            self.unannotated_collection_initializer_binding(use_id)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
                             current_statement
@@ -3973,9 +3980,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids_mut().record_use(name);
-                self.current_use_def_map_mut()
-                    .record_use(symbol.into(), use_id);
+                let use_id = self.current_use_def_map_mut().record_use(symbol.into());
+                self.ast_ids.record_other_use(name, use_id);
 
                 self.add_definition(symbol.into(), function_def);
                 self.mark_symbol_used(symbol);
@@ -4046,8 +4052,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
-                        self.scopes_by_expression
-                            .record_expression(asname, self.current_scope());
+                        self.ast_ids.record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
@@ -4252,8 +4257,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
-                        self.scopes_by_expression
-                            .record_expression(asname, self.current_scope());
+                        self.ast_ids.record_expression(asname, self.current_scope());
                         // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
@@ -4915,7 +4919,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let place = PlaceExpr::try_from_expr(expression).and_then(|place| {
                             self.current_place_table().place_id((&place).into())
                         })?;
-                        Some((place, self.current_ast_ids().try_use_id(expression)))
+                        Some((
+                            place,
+                            self.ast_ids
+                                .try_scoped_use(self.current_scope(), expression),
+                        ))
                     })
                     .collect::<SmallVec<[_; 2]>>();
                 let mut subject_targets =
@@ -4939,7 +4947,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let subject_place = PlaceExpr::try_from_expr(subject.as_ref())
                     .and_then(|place| self.current_place_table().place_id((&place).into()));
                 let places = self.current_place_table();
-                let ast_ids = self.current_ast_ids();
+                let scope = self.current_scope();
+                let ast_ids = &self.ast_ids;
                 let mut sequence_subject_targets =
                     SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
                 let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
@@ -4954,7 +4963,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         _ => {
                             let Some(target) = PlaceExpr::try_from_expr(element)
                                 .and_then(|place| places.place_id((&place).into()))
-                                .zip(ast_ids.try_use_id(element))
+                                .zip(ast_ids.try_scoped_use(scope, element))
                             else {
                                 continue;
                             };
@@ -5372,8 +5381,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 names,
             }) => {
                 for name in names {
-                    self.scopes_by_expression
-                        .record_expression(name, self.current_scope());
+                    self.ast_ids.record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
@@ -5412,9 +5420,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_global() {
                         continue;
                     }
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
-                        .mark_global();
+                    let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
+                    symbol.mark_global();
+                    symbol.mark_scope_declaration();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id.clone(), *range);
@@ -5427,8 +5435,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 names,
             }) => {
                 for name in names {
-                    self.scopes_by_expression
-                        .record_expression(name, self.current_scope());
+                    self.ast_ids.record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
@@ -5465,9 +5472,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_nonlocal() {
                         continue;
                     }
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol_id)
-                        .mark_nonlocal();
+                    let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
+                    symbol.mark_nonlocal();
+                    symbol.mark_scope_declaration();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
                         .insert(name.id.clone(), *range);
@@ -5720,9 +5727,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
             });
 
-        let use_id = self.ast_ids[current_scope].record_use(keyword);
-        self.use_def_maps[current_scope]
-            .record_multi_use(member_places.into_iter().flatten(), use_id);
+        let use_id =
+            self.use_def_maps[current_scope].record_multi_use(member_places.into_iter().flatten());
+        self.ast_ids.record_other_use(keyword, use_id);
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
@@ -6187,63 +6194,6 @@ fn is_direct_range_call(expr: &ast::Expr) -> bool {
         .as_call_expr()
         .and_then(|call| call.func.as_name_expr())
         .is_some_and(|name| name.id == "range")
-}
-
-/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
-///
-/// The interval map is built in a two-step process because the expression ids are assigned in source order,
-/// but we visit the expressions in semantic order. Few expressions are registered out of order.
-///
-/// 1. build a point vector that maps node indices to their corresponding file scopes.
-/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
-///    by collapsing adjacent node indices with the same scope
-///    into a single interval.
-struct ExpressionsScopeMapBuilder {
-    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
-}
-
-impl ExpressionsScopeMapBuilder {
-    fn new() -> Self {
-        Self {
-            expression_and_scope: vec![],
-        }
-    }
-
-    fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
-        self.expression_and_scope
-            .push((expression.node_index().load(), scope));
-    }
-
-    fn build(mut self) -> ExpressionsScopeMap {
-        self.expression_and_scope
-            .sort_unstable_by_key(|(index, _)| *index);
-
-        let mut iter = self.expression_and_scope.into_iter();
-        let Some(first) = iter.next() else {
-            return ExpressionsScopeMap::default();
-        };
-
-        let mut interval_map = Vec::new();
-
-        let mut current_scope = first.1;
-        let mut range = first.0..=first.0;
-
-        for (index, scope) in iter {
-            if scope == current_scope {
-                range = *range.start()..=index;
-                continue;
-            }
-
-            interval_map.push((range, current_scope));
-
-            current_scope = scope;
-            range = index..=index;
-        }
-
-        interval_map.push((range, current_scope));
-
-        ExpressionsScopeMap(interval_map.into_boxed_slice())
-    }
 }
 
 /// Returns the static truthiness of a literal iterable.

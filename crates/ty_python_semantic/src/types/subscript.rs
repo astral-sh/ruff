@@ -17,7 +17,7 @@ use super::context::InferContext;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
-    report_not_subscriptable, report_slice_step_size_zero,
+    report_not_subscriptable, report_slice_step_size_zero, typed_dict_subscript_key_lint,
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
@@ -377,10 +377,10 @@ impl<'db> SubscriptErrorKind<'db> {
                             context,
                             value_node.into(),
                             slice_node.into(),
-                            *value_ty,
+                            typed_dict,
                             None,
                             *slice_ty,
-                            typed_dict.items(db),
+                            typed_dict_subscript_key_lint(context, *slice_ty),
                         );
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -410,15 +410,14 @@ impl<'db> SubscriptErrorKind<'db> {
                 slice_ty,
                 full_object_ty,
             } => {
-                let typed_dict_ty = Type::TypedDict(*typed_dict);
                 report_invalid_key_on_typed_dict(
                     context,
                     value_node.into(),
                     slice_node.into(),
-                    typed_dict_ty,
+                    *typed_dict,
                     *full_object_ty,
                     *slice_ty,
-                    typed_dict.items(db),
+                    typed_dict_subscript_key_lint(context, *slice_ty),
                 );
             }
             Self::NotSubscriptable { value_ty, method } => {
@@ -585,9 +584,10 @@ where
     ))
 }
 
-// `TypedDict` subscripts need custom handling because invalid keys should emit `invalid-key` while
-// recovering with the union of value types for non-literal string keys on closed `TypedDict`s and
-// `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
+// On a closed `TypedDict`, a successful lookup with an arbitrary string must return one of the
+// declared value types. Recover with their union after reporting the invalid subscript. Other
+// invalid keys recover with `Unknown`. Synthesized `__getitem__` overloads cannot express both
+// the error and its recovery type.
 fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,

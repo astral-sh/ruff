@@ -13,8 +13,9 @@ use ruff_text_size::Ranged;
 use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
 use super::diagnostic::{
-    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
-    TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPED_DICT_KEY,
+    PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY,
+    report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
@@ -1621,7 +1622,6 @@ pub(super) struct TypedDictKeyAssignment<'a, 'db, 'ast> {
 impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     pub(super) fn validate(&self) -> bool {
         let db = self.context.db();
-        let items = self.typed_dict.items(db);
 
         // Check if key exists in `TypedDict` or is accepted by explicit extra items.
         let Some(item) = self.typed_dict.item(db, self.key) else {
@@ -1630,10 +1630,13 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                     self.context,
                     self.typed_dict_node,
                     self.key_node,
-                    Type::TypedDict(self.typed_dict),
+                    self.typed_dict,
                     self.full_object_ty,
                     Type::string_literal(db, self.key),
-                    items,
+                    match self.assignment_kind {
+                        TypedDictAssignmentKind::Subscript => &INVALID_TYPED_DICT_KEY,
+                        TypedDictAssignmentKind::Constructor => &UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY,
+                    },
                 );
             }
 
@@ -2474,7 +2477,7 @@ fn validate_extracted_typed_dict_openness<'db, 'ast>(
         return false;
     }
 
-    if let Some(builder) = context.report_lint(&INVALID_KEY, nodes.key) {
+    if let Some(builder) = context.report_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY, nodes.key) {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Unpacked argument may contain unknown keys for TypedDict `{}`",
             typed_dict_ty.display(db, env),
@@ -2908,7 +2911,9 @@ fn validate_merged_dict_literal<'db, 'ast>(
                         }
                     } else if typed_dict.openness(db).is_closed() {
                         valid = false;
-                        if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                        if let Some(builder) =
+                            context.report_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY, key_expr)
+                        {
                             builder.into_diagnostic(format_args!(
                                 "Non-literal string key may be unknown for TypedDict `{}`",
                                 Type::TypedDict(typed_dict).display(db, env),
@@ -2917,7 +2922,9 @@ fn validate_merged_dict_literal<'db, 'ast>(
                     }
                 } else {
                     valid = false;
-                    if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                    if let Some(builder) =
+                        context.report_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY, key_expr)
+                    {
                         builder.into_diagnostic(format_args!(
                             "TypedDict `{}` requires string keys, got key of type `{}`",
                             Type::TypedDict(typed_dict).display(db, env),

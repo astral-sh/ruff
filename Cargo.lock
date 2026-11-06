@@ -566,15 +566,15 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "clearscreen"
-version = "4.0.6"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d669bb552908e336ad5681789752033b45566b7e591aeaac7a614e58e5d6d8f2"
+checksum = "6ebe9918b237e4e17e25a04d539d99ef3515417a85f703e0ed8bf44353eb17b3"
 dependencies = [
  "nix",
  "terminfo",
  "thiserror 2.0.21",
  "which",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -693,7 +693,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -718,9 +718,9 @@ checksum = "baf0a07a401f374238ab8e2f11a104d2851bf9ce711ec69804834de8af45c7af"
 
 [[package]]
 name = "console"
-version = "0.16.4"
+version = "0.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fe5f465a4f6fee88fad41b85d990f84c835335e85b5d9e6e63e0d06d28cba7c"
+checksum = "e96a4956774c13c126a8b5af4daa79384f4d826534c95a02d76afb39e2ab64e3"
 dependencies = [
  "encode_unicode",
  "libc",
@@ -1043,7 +1043,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1123,7 +1123,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1689,9 +1689,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.48.0"
+version = "1.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0f8fee8c926415c58d6ae43a08523a26faccb2323f5e6b644fe7dd4ef6b82"
+checksum = "b67d3d2e287e4b86c10b3f3b641033d1f89b74bdb39d05f34952e2b9a6fe21cd"
 dependencies = [
  "console",
  "once_cell",
@@ -1925,9 +1925,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.189"
+version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
 name = "libcst"
@@ -3098,7 +3098,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.17.3"
+version = "0.17.4"
 dependencies = [
  "anyhow",
  "assert_fs",
@@ -3162,7 +3162,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_annotate_snippets"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anstream 1.0.0",
  "anstyle",
@@ -3177,12 +3177,14 @@ name = "ruff_benchmark"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "clap",
  "codspeed-criterion-compat",
  "codspeed-divan-compat",
  "criterion",
  "itertools 0.15.0",
  "mimalloc",
  "rayon",
+ "ruff",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
@@ -3206,7 +3208,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cache"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "char_str",
  "filetime",
@@ -3220,7 +3222,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_command_line"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "argfile",
  "clap",
@@ -3229,7 +3231,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_db"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anstyle",
  "arc-swap",
@@ -3292,6 +3294,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
+ "ruff_db",
  "ruff_formatter",
  "ruff_linter",
  "ruff_notebook",
@@ -3302,6 +3305,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_workspace",
+ "rustc-hash",
  "schemars",
  "serde",
  "serde_json",
@@ -3321,7 +3325,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_diagnostics"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
  "is-macro",
@@ -3331,7 +3335,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_formatter"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "drop_bomb",
  "ruff_cache",
@@ -3347,7 +3351,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_graph"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "clap",
@@ -3368,7 +3372,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_index"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
  "ruff_macros",
@@ -3378,7 +3382,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.17.3"
+version = "0.17.4"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3440,7 +3444,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "heck",
  "itertools 0.15.0",
@@ -3453,7 +3457,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_markdown"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "insta",
  "regex",
@@ -3484,14 +3488,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_memory_usage"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
 ]
 
 [[package]]
 name = "ruff_notebook"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "rand 0.10.3",
@@ -3507,14 +3511,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_options_metadata"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "ruff_python_ast"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "aho-corasick",
  "arrayvec",
@@ -3551,7 +3555,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_codegen"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_literal",
@@ -3563,7 +3567,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_edits"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
@@ -3573,7 +3577,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_formatter"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "clap",
@@ -3606,7 +3610,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_importer"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "insta",
@@ -3621,7 +3625,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_index"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
@@ -3632,7 +3636,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_literal"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "bitflags 2.13.2",
  "icu_normalizer",
@@ -3643,7 +3647,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_parser"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "bitflags 2.13.2",
@@ -3674,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_semantic"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "bitflags 2.13.2",
  "insta",
@@ -3695,7 +3699,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_stdlib"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "bitflags 2.13.2",
  "unicode-ident",
@@ -3703,7 +3707,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_trivia"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "itertools 0.15.0",
  "memchr",
@@ -3726,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_ranged_value"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
  "ruff_db",
@@ -3739,7 +3743,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_server"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "crossbeam",
@@ -3783,7 +3787,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_source_file"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
  "memchr",
@@ -3793,7 +3797,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_text_size"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "get-size2",
  "schemars",
@@ -3804,7 +3808,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_unicode_names2"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "phf 0.14.0",
  "rand 0.10.3",
@@ -3813,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_unicode_names2_generator"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "phf_codegen 0.14.0",
  "rand 0.10.3",
@@ -3821,7 +3825,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.17.3"
+version = "0.17.4"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3848,7 +3852,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_workspace"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "colored",
@@ -3921,7 +3925,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4234,7 +4238,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4341,10 +4345,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4354,7 +4358,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix",
- "windows-sys 0.61.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4733,7 +4737,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -4814,7 +4818,7 @@ dependencies = [
 
 [[package]]
 name = "ty_module_resolver"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "camino",
@@ -4895,7 +4899,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "bitflags 2.13.2",
@@ -4930,7 +4934,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "anyhow",
  "bitflags 2.13.2",
@@ -5031,7 +5035,7 @@ dependencies = [
 
 [[package]]
 name = "ty_site_packages"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "camino",
  "colored",
@@ -5052,7 +5056,7 @@ dependencies = [
 
 [[package]]
 name = "ty_static"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "ruff_macros",
 ]
@@ -5068,6 +5072,7 @@ dependencies = [
  "mdtest",
  "ruff_db",
  "ruff_diagnostics",
+ "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_trivia",
@@ -5085,7 +5090,7 @@ dependencies = [
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.20"
+version = "0.0.21"
 dependencies = [
  "path-slash",
  "ruff_db",
@@ -5234,9 +5239,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.26.1"
+version = "1.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
+checksum = "97277d36b9c3ace13e58fa6e753f8b0bbbf302a18dd193240d70f9e29681059a"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -5524,7 +5529,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

@@ -125,6 +125,7 @@ impl Workspace {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            ty_python_semantic::default_lint_registry(),
         )
         .map_err(into_error)?;
 
@@ -153,6 +154,7 @@ impl Workspace {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            self.db.lint_registry(),
         )
         .map_err(into_error)?;
 

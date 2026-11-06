@@ -154,6 +154,23 @@ reveal_type("foo".encode(encoding="utf-8"))  # revealed: bytes
 reveal_type(b"abcde".startswith(b"abc"))  # revealed: bool
 ```
 
+### Methods bound to a union of literals
+
+A saved method keeps the union of its possible receivers. A method bound to `LiteralString` can also
+cover methods bound to specific strings.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+
+def f(s: Literal["a", "b"], other: LiteralString, flag: bool):
+    method = s.isalpha
+    reveal_type(method.__self__)  # revealed: Literal["a", "b"]
+
+    mixed = method if flag else other.isalpha
+    reveal_type(mixed)  # revealed: bound method LiteralString.isalpha() -> bool
+```
+
 ## Method calls on `LiteralString`
 
 ```py
@@ -706,6 +723,284 @@ assert_type(a.method(), int)
 value: str = a.method()  # error: [invalid-assignment]
 
 assert_type(a.non_existing_method(), Any)
+```
+
+## Shadowing methods
+
+### Explanation and basic examples
+
+Consider the following example where a `method` on a class can be dynamically `swap`ped with another
+method:
+
+```py
+class C:
+    def method(self, x: int) -> str:
+        print("original")
+        return str(x)
+
+    def some_compatible_method(self, x: int) -> str:
+        print("replaced")
+        return str(x)
+
+    def swap(self) -> None:
+        self.method = self.some_compatible_method
+
+c = C()
+c.swap()
+```
+
+When `swap` is called, `self.some_compatible_method` creates a bound method object which is assigned
+to the *instance attribute* `self.method`, i.e. it shadows the function defined on the class itself
+(`C.method`). At runtime, when `c.method` is accessed, Python first looks up `method` on the class
+itself. It finds the original function `C.method`, but since it is a non-data descriptor, attribute
+lookup continues to check if there is an attribute on the instance itself (see
+`descriptor_protocol.md` for details). In this case, it finds the bound method object referring to
+`self.some_compatible_method` and returns it *without calling `__get__`*, i.e. the function is not
+bound to the instance "again".
+
+In summary, calling `c.method(42)` works, returns a string, and prints "replaced":
+
+```py
+reveal_type(c.method(42))  # revealed: str
+```
+
+We can see that `C.method` is not actually replaced, though. Calling `C.method(c, 42)` directly
+still invokes the original function on the class. It prints "original" and returns a string.
+
+```py
+reveal_type(C.method(c, 42))  # revealed: str
+```
+
+Since this is a common pattern, ty does support it. We generally allow this replacement if the
+callable being assigned has a signature that is compatible with the original method:
+
+```py
+from typing import Callable
+
+class Correct:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def compatible_method(self, x: int, /) -> str:
+        return str(x)
+
+    def swap(self, replacement: Callable[[int], str]) -> None:
+        self.method = self.compatible_method
+
+        self.method = replacement
+
+        self.method = lambda x: str(x)
+
+        class CompatibleCallable:
+            def __call__(self, x: int) -> str:
+                return str(x)
+
+        self.method = CompatibleCallable()
+```
+
+We emit diagnostics if the signature is not compatible:
+
+```py
+class Wrong:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def incompatible_method1(self, x: str, /) -> str:
+        return x
+
+    def incompatible_method2(self, /) -> str:
+        return ""
+
+    def swap(self, wrong_replacement: Callable[[str], str]) -> None:
+        self.method = self.incompatible_method1  # error: [invalid-assignment]
+        self.method = self.incompatible_method2  # error: [invalid-assignment]
+        self.method = wrong_replacement  # error: [invalid-assignment]
+        self.method = lambda: ""  # error: [invalid-assignment]
+        self.method = lambda self, x: ""  # error: [invalid-assignment]
+        self.method = lambda x: x  # error: [invalid-assignment]
+        self.method = Wrong.method  # error: [invalid-assignment]
+```
+
+### Keyword arguments
+
+If callers can pass `x` by keyword, the shadowing callable must also accept that keyword. Both
+lambdas below accept a positional argument, but only the first accepts `x=42`.
+
+```py
+class C:
+    def method(self, x: int) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        self.method = lambda x: str(x)
+
+    def swap_with_different_keyword(self) -> None:
+        self.method = lambda y: str(y)  # error: [invalid-assignment]
+
+c = C()
+c.swap()
+c.method(x=42)
+```
+
+When a method accepts arguments only by keyword, a shadowing lambda can list those parameters in
+either order. Here, callers pass `y` by name, so the lambda's `y` should be inferred as `int`.
+
+```py
+class D:
+    def method(self, *, x: str, y: int) -> int:
+        return y
+
+    def swap(self) -> None:
+        self.method = lambda x, y: y + 1
+        # TODO: Infer the lambda's parameter types by name for keyword-only arguments.
+        # See https://github.com/astral-sh/ty/issues/4935
+        # error: [invalid-assignment]
+        # error: [unsupported-operator]
+        self.method = lambda y, x: y + 1
+```
+
+### Classmethods and static methods
+
+The same reasoning applies to classmethods and static methods:
+
+```py
+class C:
+    @classmethod
+    def class_method(cls, x: int) -> str:
+        return str(x)
+
+    @staticmethod
+    def static_method(x: int) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        self.class_method = lambda x: str(x)
+        self.static_method = lambda x: str(x)
+
+        reveal_type(self.class_method(42))  # revealed: str
+        reveal_type(self.static_method(42))  # revealed: str
+```
+
+Replacing with an invalid signature is an error:
+
+```py
+        self.class_method = lambda x: x  # error: [invalid-assignment]
+        self.static_method = lambda x: x  # error: [invalid-assignment]
+```
+
+### Unsoundness
+
+Shadowing a method in the way described above is actually unsound. For one, since we allow
+replacement with arbitrary callables, we cannot guarantee that the replacement will have all
+attributes that the original bound method had. Consider:
+
+```py
+from typing import Callable
+
+class Problematic:
+    def method(self, x: int, /) -> str:
+        return str(x)
+
+    def swap(self) -> None:
+        class CompatibleCallable:
+            def __call__(self, x: int) -> str:
+                return str(x)
+
+        self.method = CompatibleCallable()
+
+p = Problematic()
+```
+
+Attributes like `__self__` are usually present on bound methods (demonstrating with `p.swap` here):
+
+```py
+p.swap.__self__  # ok
+```
+
+However, after we call `swap()`, the `method` attribute is replaced with a callable that is not a
+bound method, and thus lacks the `__self__` attribute. ty does not aim to track this, and therefore
+does not emit an error for the missing `__self__` attribute:
+
+```py
+p.swap()
+p.method.__self__
+```
+
+Maybe more importantly, consider what happens if the class is subclassed. Since we only checked the
+replacement against the base class method's signature, shadowing the method in the subclass may lead
+to inconsistencies:
+
+```py
+class C:
+    def method(self, x: int) -> object:
+        return x
+
+    def seemingly_compatible(self, x: int) -> object:
+        return x
+
+    def swap(self) -> None:
+        # TODO: with a proposed strict rule, this should be an error
+        self.method = self.seemingly_compatible
+
+class D(C):
+    def method(self, x: int) -> str:
+        return str(x)
+```
+
+If we call `swap()` on a `D` instance, `method` promises to return a `str`, but returns an `int`
+instead:
+
+```py
+d = D()
+d.swap()
+
+reveal_type(d.method(42))  # revealed: str
+```
+
+We might therefore consider implementing a stricter check that emits a diagnostic on the problematic
+`self.method = self.seemingly_compatible` assignment above.
+
+### Explicitly annotated instance attributes
+
+When the instance attribute assignment is explicitly annotated with a type that is incompatible with
+the method it shadows, we assume that shadowing is intentional, and prefer the annotation over the
+method's type:
+
+```py
+class C:
+    def f(self) -> int:
+        return 1
+
+    def __init__(self) -> None:
+        self.f: str = "foo"
+
+# TODO: The explicit annotation should make this a `str`.
+reveal_type(C().f)  # revealed: bound method C.f() -> int
+# TODO: This should emit `call-non-callable`.
+C().f()
+```
+
+### Identity of a shadowed static method
+
+A static method that can optionally be replaced should not retain its identity as a singleton type
+that refers to `def format`:
+
+```py
+from typing import Callable
+
+class Formatter:
+    @staticmethod
+    def format(text: str, /) -> str:
+        return text
+
+    def __init__(self, custom: Callable[[str], str] | None = None) -> None:
+        if custom is not None:
+            self.format = custom
+
+def check(formatter: Formatter) -> None:
+    reveal_type(formatter.format("hello"))  # revealed: str
+    # TODO: This should be `bool` because the instance may hold the custom callable.
+    reveal_type(formatter.format is Formatter.format)  # revealed: Literal[True]
 ```
 
 ## Error cases: Calling `__get__` for methods

@@ -184,6 +184,7 @@ impl InstanceDictionary {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => None,

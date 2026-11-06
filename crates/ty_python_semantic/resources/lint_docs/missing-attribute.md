@@ -22,6 +22,6 @@ A().foo  # error
 
 ## Rule selection
 
-This rule was renamed in ty 0.0.97. Settings such as `unresolved-attribute = "ignore"` and comments
+This rule was renamed in ty 0.0.100. Settings such as `unresolved-attribute = "ignore"` and comments
 such as `# ty: ignore[unresolved-attribute]` still apply to this rule. To configure or suppress an
 access where only some union members lack the attribute, use `missing-union-attribute`.

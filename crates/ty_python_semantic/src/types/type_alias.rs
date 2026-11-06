@@ -5,8 +5,9 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        RecursiveType, Type, TypeContext, TypeMapping, TypeRecursionContext, TypingModule,
+        UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -30,7 +31,7 @@ impl<'db> Type<'db> {
     /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        AliasCycleSummary::from_type(db, self).cycle.is_some()
+        AliasCycleSummary::from_type(db, self, None).cycle.is_some()
     }
 }
 
@@ -39,14 +40,19 @@ impl<'db> Type<'db> {
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct AliasCycleSummary<'db> {
     /// The divergent marker or unbound reference that closes an unguarded cycle.
-    pub(super) cycle: Option<Type<'db>>,
+    cycle: Option<Type<'db>>,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 impl<'db> AliasCycleSummary<'db> {
-    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    /// Inspect a body without specializing it; `scope` resolves variables in an open graph body.
+    pub(super) fn from_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        scope: Option<RecursiveType<'db>>,
+    ) -> Self {
         let mut typevars = FxOrderSet::default();
-        let cycle = Self::collect(db, ty, &mut typevars);
+        let cycle = Self::collect(db, ty, &mut typevars, scope);
         Self {
             cycle,
             typevars: typevars.into_iter().collect(),
@@ -57,10 +63,24 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        scope: Option<RecursiveType<'db>>,
     ) -> Option<Type<'db>> {
         match ty {
-            // A bare reference is unguarded: recursive binders do not introduce a container.
-            Type::RecursiveVar(_) => Some(ty),
+            Type::RecursiveVar(variable) => {
+                let Some(scope) = scope else {
+                    return Some(ty);
+                };
+                let recursive = scope.reference(db, variable);
+                let summary = recursive.cycle_summary(db);
+                summary.cycle.or_else(|| {
+                    summary.collect_exposed_arguments(
+                        db,
+                        recursive.arguments(db),
+                        typevars,
+                        Some(scope),
+                    )
+                })
+            }
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
@@ -75,14 +95,14 @@ impl<'db> AliasCycleSummary<'db> {
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                summary.collect_exposed_arguments(db, specialization, typevars)
+                summary.collect_exposed_arguments(db, specialization, typevars, scope)
             }
             Type::Recursive(recursive) => {
                 let summary = recursive.cycle_summary(db);
                 if summary.cycle.is_some() {
                     return summary.cycle;
                 }
-                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars)
+                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars, scope)
             }
             Type::TypeVar(typevar) => {
                 typevars.insert(typevar);
@@ -91,12 +111,12 @@ impl<'db> AliasCycleSummary<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, scope)),
             Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
                 .chain(intersection.negative(db))
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, scope)),
             Type::Divergent(divergent)
                 if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
             {
@@ -112,13 +132,14 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        scope: Option<RecursiveType<'db>>,
     ) -> Option<Type<'db>> {
         self.typevars.iter().find_map(|&typevar| {
             if let Some(argument) =
                 specialization.and_then(|specialization| specialization.get(db, typevar))
                 && argument != Type::TypeVar(typevar)
             {
-                Self::collect(db, argument, typevars)
+                Self::collect(db, argument, typevars, scope)
             } else {
                 typevars.insert(typevar);
                 None
@@ -510,7 +531,7 @@ impl<'db> TypeAliasType<'db> {
             alias: TypeAliasType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            AliasCycleSummary::from_type(db, alias.raw_value_type(db))
+            AliasCycleSummary::from_type(db, alias.raw_value_type(db), None)
         }
 
         cycle_summary(db, self.unspecialized(db), ())
@@ -556,7 +577,7 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         context: Option<&TypeRecursionContext<'db>>,
     ) -> Type<'db> {
-        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle {
+        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self), None).cycle {
             let env = ProgramEnvironment::from_definition(self.definition(db));
             return AliasCycleRecovery {
                 env: &env,
@@ -745,6 +766,21 @@ impl<'db> TypeAliasType<'db> {
         match type_mapping {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+            }
+            TypeMapping::FreshenBoundTypeVars { .. } => {
+                visitor.visit(db, ty, type_mapping, || {
+                    // Stored arguments account for the alias's own parameters, but its
+                    // definition can also capture outer typevars. Expand only when those
+                    // captures change; changing arguments alone must retain the alias.
+                    let raw = self.raw_value_type(db);
+                    let mapped = raw.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if mapped == raw || mapped == ty {
+                        Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+                    } else {
+                        self.value_type_with_recursion(db, visitor.recursion_context)
+                            .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }
+                })
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self

@@ -648,10 +648,12 @@ class Variadic(Generic[*Ts]):
         self.shape = shape
 
 reveal_type(Positional(()))  # revealed: Positional[()]
-reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
+# TODO: We should promote to `Positional[int, str]` here.
+reveal_type(Positional((1, "a")))  # revealed: Positional[Literal[1], Literal["a"]]
 
 reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# TODO: We should promote to `Variadic[int, str]` here.
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[Literal[1], Literal["a"]]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
@@ -777,6 +779,76 @@ def tail(head: int, *args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
 reveal_type(tail(*[1, "two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
 reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
 reveal_type(tail(*[1]))  # revealed: tuple[()]
+```
+
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect(*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded(*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
+```
+
+### Fixed boundaries in starred variadic parameters
+
+A fixed trailing type in a starred parameter is excluded from the inferred pack, including when the
+arguments come from an unpacked tuple.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def bounded(head: int, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
+    reveal_type(bounded(1, *suffix))
+    raise NotImplementedError
+```
+
+### Starred variadic methods on specialized classes
+
+TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred
+parameters. Both unpacked tuples and direct arguments can then infer the wrong pack.
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class C(Generic[T]):
+    def f(self, marker: T, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def check(c: C[int], suffix: tuple[bool, str]) -> None:
+    # TODO: Should reveal `tuple[bool]`.
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, *suffix))
+
+    # TODO: Should reveal `tuple[bool, bool]` without an argument error.
+    # error: [invalid-argument-type]
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, suffix[0], suffix[0], suffix[1]))
 ```
 
 ### Union splatted arguments

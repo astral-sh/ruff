@@ -698,6 +698,61 @@ class Answer(Enum):
                 return False
 ```
 
+Two OR patterns can cover every member of an enum when matching on `self`. Repeating a member across
+cases still leaves an implicit return if another member is missing. Matching an alias also excludes
+the member under its original name.
+
+```py
+from enum import StrEnum
+
+class Status(StrEnum):
+    NEW = "new"
+    PENDING = "pending"
+    QUEUED = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+    def is_terminal(self) -> bool:
+        match self:
+            case Status.NEW | Status.PENDING:
+                return False
+            case Status.SUCCEEDED | Status.FAILED:
+                return True
+
+    def incomplete(self) -> bool:  # error: [invalid-return-type]
+        match self:
+            case Status.NEW | Status.QUEUED:
+                return False
+            case Status.NEW | Status.SUCCEEDED:
+                return True
+
+        # revealed: Self@incomplete & ~Literal[Status.NEW] & ~Literal[Status.PENDING] & ~Literal[Status.SUCCEEDED]
+        reveal_type(self)
+```
+
+## Enum value patterns with custom equality
+
+Listing every member can leave an implicit return when the enum's `__eq__` rejects a match.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Unmatchable(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+    def matches(self) -> bool:  # error: [invalid-return-type]
+        match self:
+            case Unmatchable.A | Unmatchable.B:
+                return True
+
+        reveal_type(self)  # revealed: Self@matches
+```
+
 ## Exhaustiveness checking for type variables with bounds or constraints
 
 ```toml

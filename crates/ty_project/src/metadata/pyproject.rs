@@ -43,13 +43,10 @@ impl PyProject {
 
     fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
-        // TOML tables are unordered and the `toml` crate sorts keys
-        // lexicographically. Normalize rule order so that the `all` selector
-        // is applied before per-rule selectors.
-        if let Some(tool) = &mut pyproject.tool {
-            if let Some(ty) = &mut tool.ty {
-                ty.prioritize_all_selectors();
-            }
+        if let Some(tool) = &mut pyproject.tool
+            && let Some(ty) = &mut tool.ty
+        {
+            ty.order_rule_selectors(ty_python_semantic::default_lint_registry());
         }
         Ok(pyproject)
     }

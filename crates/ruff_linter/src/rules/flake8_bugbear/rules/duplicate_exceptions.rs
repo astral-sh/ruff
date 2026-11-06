@@ -76,7 +76,7 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except (Exception, ValueError):  # `Exception` includes `ValueError`.
+/// except (ValueError, ValueError):
 ///     ...
 /// ```
 ///
@@ -84,7 +84,7 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except Exception:
+/// except ValueError:
 ///     ...
 /// ```
 ///

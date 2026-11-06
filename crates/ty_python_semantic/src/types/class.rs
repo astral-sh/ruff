@@ -470,7 +470,7 @@ impl<'db> GenericAlias<'db> {
         let tcx = if type_mapping.is_structural() {
             &[]
         } else {
-            tcx.annotation
+            tcx.declared_type()
                 .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
                 .map(|specialization| specialization.types(db))
                 .unwrap_or(&[])
@@ -2342,7 +2342,8 @@ impl<'db> ClassType<'db> {
                     .origin(db)
                     .own_instance_member(db, env, name)
                     .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                        ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+                            .apply_optional_owner_specialization_to_member(db, Some(specialization))
                     })
             }
         }
@@ -2682,72 +2683,59 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
-        match (source, target) {
-            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
-                return self.always();
-            }
-            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
-                if source_alias.origin(db) == target_alias.origin(db) =>
-            {
-                return self.check_specialization_pair(
-                    db,
-                    source_alias.specialization(db),
-                    target_alias.specialization(db),
-                );
-            }
-            _ => {}
+        if source == target && matches!(target, ClassType::NonGeneric(_)) {
+            return self.always();
         }
 
-        let mut generic_target = None;
-        let result = source.iter_mro(db).when_any(db, self.constraints, |base| {
-            match base {
-                ClassBase::Any => ConstraintSet::from_bool(
-                    self.constraints,
-                    self.relation.is_assignability() || target.is_object(db),
-                ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => {
-                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
-                    }
-                    TypeRelation::Assignability => {
-                        ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                },
+        let unknown_base_matches = |base| match base {
+            ClassBase::Any => self.relation.is_assignability() || target.is_object(db),
+            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => target.is_object(db),
+                TypeRelation::Assignability => !target.is_final(db),
+            },
+            _ => false,
+        };
 
-                // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
+        let ClassType::Generic(target_alias) = target else {
+            let found = source
+                .relation_bases(db, target.class_literal(db))
+                .any(|base| base == ClassBase::Class(target) || unknown_base_matches(base));
+            return ConstraintSet::from_bool(self.constraints, found);
+        };
 
-                ClassBase::Class(source) => match (source, target) {
-                    // Two non-generic classes match if they have the same class literal.
-                    (
-                        ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
-                    ) => {
-                        ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
-                    }
+        let origin = target_alias.origin(db);
+        if let ClassType::Generic(source_alias) = source
+            && source_alias.origin(db) == origin
+        {
+            return self.check_specialization_pair(
+                db,
+                source_alias.specialization(db),
+                target_alias.specialization(db),
+            );
+        }
 
-                    // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target))
-                        if source.origin(db) == target.origin(db) =>
-                    {
-                        generic_target = Some(target);
-                        self.check_specialization_pair(
-                            db,
-                            source.specialization(db),
-                            target.specialization(db),
-                        )
-                    }
-
-                    // Different generic origins, or generic and non-generic classes, don't match.
-                    (ClassType::Generic(_), ClassType::Generic(_) | ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
-                },
+        let mut matched_origin = false;
+        let candidates = source
+            .relation_bases(db, origin.into())
+            .filter(|&base| match base {
+                ClassBase::Class(ClassType::Generic(alias)) => alias.origin(db) == origin,
+                _ => unknown_base_matches(base),
+            });
+        let result = candidates.when_any(db, self.constraints, |base| {
+            if let ClassBase::Class(ClassType::Generic(alias)) = base {
+                matched_origin = true;
+                self.check_specialization_pair(
+                    db,
+                    alias.specialization(db),
+                    target_alias.specialization(db),
+                )
+            } else {
+                self.always()
             }
         });
-
-        let Some(target) = generic_target else {
+        if !matched_origin {
             return result;
-        };
+        }
 
         // The MRO retains only one specialization per class. A different inheritance path can
         // still establish the relation: `Child(Gradual, Concrete)` is a subtype of `Base[int]`
@@ -2756,12 +2744,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             source
                 .iter_explicit_ancestors(db, self.env)
                 .filter_map(ClassType::into_generic_alias)
-                .filter(|ancestor| ancestor.origin(db) == target.origin(db))
+                .filter(|ancestor| ancestor.origin(db) == origin)
                 .when_any(db, self.constraints, |ancestor| {
                     self.check_specialization_pair(
                         db,
                         ancestor.specialization(db),
-                        target.specialization(db),
+                        target_alias.specialization(db),
                     )
                 })
         })

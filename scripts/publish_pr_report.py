@@ -328,8 +328,11 @@ def publish(
     html_base_url: str = "",
     html_files: dict[str, tuple[str, str]] | None = None,
     stored_comment_id: int | None = None,
+    update_existing_only: bool = False,
     dry_run: bool = False,
 ) -> int | None:
+    if update_existing_only and stored_comment_id is None:
+        return
     if not (run := current_run(run_id, run_attempt, workflow_ref, pull_request)):
         return
     artifact = find_artifact(run_id, artifact_name)
@@ -380,6 +383,8 @@ def publish(
         comment_id = existing["id"]
         if existing["body"] != body:
             api(f"issues/comments/{comment_id}", method="PATCH", body=body)
+    elif update_existing_only:
+        return
     else:
         comment_id = api(f"issues/{pull_request}/comments", method="POST", body=body)[
             "id"
@@ -403,6 +408,7 @@ def main() -> None:
     parser.add_argument("--html-base-url", default="")
     parser.add_argument("--html-files", type=read_html_files, default="{}")
     parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
+    parser.add_argument("--update-existing-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.run_id <= 0 or args.run_attempt <= 0:
@@ -423,6 +429,7 @@ def main() -> None:
         html_base_url=args.html_base_url,
         html_files=args.html_files,
         stored_comment_id=args.comment_id,
+        update_existing_only=args.update_existing_only,
         dry_run=args.dry_run,
     )
     if comment_id is not None and (output := os.environ.get("GITHUB_OUTPUT")):
