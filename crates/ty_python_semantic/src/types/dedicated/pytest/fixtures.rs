@@ -53,7 +53,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{
     ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module_for_import_from,
-    resolve_real_module_confident, stub_file_to_real_module,
+    resolve_real_module, resolve_real_module_confident, stub_file_to_real_module,
 };
 use ty_python_core::ast_node_ref::AstNodeRef;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
@@ -94,8 +94,8 @@ use crate::{Db, FxIndexMap, FxIndexSet};
 /// ```
 ///
 /// At present, we search the parameter's class hierarchy, module, enclosing
-/// conftest hierarchy, and installed core pytest plugins. Fixtures from other
-/// plugins are not yet supported.
+/// conftest hierarchy, plugins registered through `pytest_plugins`, and installed
+/// core pytest plugins. Fixtures from other plugins are not yet supported.
 ///
 /// The resolution implemented here matches what pytest will actually resolve at
 /// runtime for context A, but not necessarily for context B. To see why,
@@ -191,14 +191,35 @@ pub fn fixture_bindings_for_parameter<'db>(
         }
     }
 
-    // Finally, search installed core plugins in reverse registration order. The legacy
-    // temporary-directory plugin is registered after the static core plugins, so it comes first.
+    // Fourth, search the legacy temporary-directory plugin. Pytest registers it while
+    // configuring, after the core plugins and the plugins named by initial conftests, so it
+    // takes precedence over both. Plugins named by test modules are registered later, but we
+    // don't distinguish them here.
     if let Some(plugin) = pytest_legacy_tmpdir_plugin(db, request_file.program(db)) {
         let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(plugin));
         if !bindings.is_empty() {
             return bindings;
         }
     }
+
+    // Fifth, search plugins registered through `pytest_plugins` in reverse registration order.
+    // Their fixtures are visible to the whole session, so conftest fixtures take precedence.
+    // https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/fixtures.py#L1776-L1792
+    for plugin in pytest_registered_plugin_files(db, request_file)
+        .iter()
+        .rev()
+    {
+        let bindings = bindings_in_search_scope(
+            db,
+            &request,
+            FixtureSearchScope::Scope(global_scope(db, *plugin)),
+        );
+        if !bindings.is_empty() {
+            return bindings;
+        }
+    }
+
+    // Finally, search installed core plugins in reverse registration order.
     for plugin in pytest_global_plugin_files(db, request_file.program(db))
         .iter()
         .rev()
@@ -302,26 +323,232 @@ pub fn fixture_exposures_for_definition<'db>(
     exposures_contributed_by_definition(db, definition, name)
 }
 
+/// Returns the plugins registered through `pytest_plugins` by `request_file` and its conftest
+/// hierarchy, in registration order.
+///
+/// Pytest imports conftests from the outermost directory inward and registers the plugins named by
+/// each module depth-first, since a plugin can name further plugins. Plugins registered by
+/// unrelated conftests or test modules can also be visible at runtime, depending on collection
+/// order, but we don't consider them.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn pytest_registered_plugin_files<'db>(
+    db: &'db dyn Db,
+    request_file: ProgramFile<'db>,
+) -> Box<[ProgramFile<'db>]> {
+    let program = request_file.program(db);
+    let mut registry = PytestPluginRegistry {
+        builtin_names: pytest_builtin_plugin_names(db, program),
+        // Pytest registers its core plugins before importing any conftest.
+        registered_files: pytest_global_plugin_files(db, program)
+            .iter()
+            .copied()
+            .collect(),
+        registered_names: FxHashSet::default(),
+        plugins: Vec::new(),
+    };
+
+    // Pytest reads `request_file`'s own registrations when it loads the file as a conftest, test
+    // module, or plugin. As an approximation, we always read them.
+    let mut modules = conftest_files(db, request_file);
+    modules.reverse();
+    modules.push(request_file);
+
+    for module in modules {
+        if registry.registered_files.insert(module) {
+            registry.consider_module(db, module);
+        }
+    }
+
+    registry.plugins.into_boxed_slice()
+}
+
+/// Follows the plugin registrations that pytest performs for `pytest_plugins` variables.
+struct PytestPluginRegistry<'db> {
+    builtin_names: &'db [String],
+    registered_files: FxHashSet<ProgramFile<'db>>,
+    registered_names: FxHashSet<&'db str>,
+    plugins: Vec<ProgramFile<'db>>,
+}
+
+impl<'db> PytestPluginRegistry<'db> {
+    /// Registers the plugins named by `module`'s `pytest_plugins` variable, in order.
+    fn consider_module(&mut self, db: &'db dyn Db, module: ProgramFile<'db>) {
+        for name in pytest_plugin_names(db, module) {
+            self.import_plugin(db, module, name);
+        }
+    }
+
+    /// Registers the plugin `name`, followed by the plugins that it names in turn.
+    fn import_plugin(&mut self, db: &'db dyn Db, module: ProgramFile<'db>, name: &'db str) {
+        // Pytest skips names that are already registered, and imports built-in plugins such as
+        // `pytester` from `_pytest`, even when a project module has the same name.
+        // https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/config/__init__.py#L900-L903
+        if self.registered_names.contains(name) {
+            return;
+        }
+
+        let module_name = if self.builtin_names.iter().any(|builtin| builtin == name) {
+            ModuleName::new(&format!("_pytest.{name}"))
+        } else {
+            ModuleName::new(name)
+        };
+        let Some(module_name) = module_name else {
+            return;
+        };
+
+        // Resolve the plugin like an import in the registering module. For conftests and test
+        // modules, the fallback search of the importing file's ancestor directories approximates
+        // the directories that pytest adds to `sys.path`.
+        let importing_file = ImportingFile::File(module.file(db), module.resolver_environment(db));
+        let Some(plugin) = resolve_real_module(db, importing_file, &module_name)
+            .and_then(|plugin| plugin.file(db))
+        else {
+            return;
+        };
+
+        self.registered_names.insert(name);
+        let plugin = ProgramFile::new(db, plugin, module.program(db));
+        if self.registered_files.insert(plugin) {
+            self.plugins.push(plugin);
+            self.consider_module(db, plugin);
+        }
+    }
+}
+
+/// Returns the plugin names in `file`'s `pytest_plugins` variable, which pytest accepts as a
+/// sequence of module names or a comma-separated string.
+///
+/// A conditionally bound variable contributes the names from each reachable binding that may exist
+/// at runtime. Bindings in branches that ty treats as unreachable, such as the `else` branch of
+/// `if TYPE_CHECKING:`, are ignored.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn pytest_plugin_names<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[String]> {
+    let scope = global_scope(db, file);
+    let Some(symbol) = place_table(db, scope).symbol_id("pytest_plugins") else {
+        return Box::default();
+    };
+    let resolution = DefinitionResolution::from_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+    );
+
+    resolution
+        .definitions()
+        .iter()
+        .filter(|definition| may_exist_at_runtime(db, **definition))
+        .flat_map(|definition| pytest_plugin_names_from_definition(db, *definition))
+        .collect()
+}
+
+/// Returns the statically known plugin names assigned by one binding of `pytest_plugins`.
+fn pytest_plugin_names_from_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Vec<String> {
+    let value_type = infer_definition_types(db, definition).binding_type(definition);
+    if let Some(names) = value_type.as_string_literal() {
+        return names.value(db).split(',').map(str::to_owned).collect();
+    }
+
+    // A list display is inferred as `list[str]`, so read its elements from the assignment.
+    if let Some(names) = static_string_sequence_for_definition(db, definition) {
+        return names;
+    }
+
+    // An imported tuple has no local value, but its type preserves its literal elements.
+    let environment = ProgramEnvironment::from_definition(definition);
+    value_type
+        .tuple_instance_spec(db, &environment)
+        .and_then(|tuple| {
+            tuple
+                .as_fixed_length()?
+                .all_elements()
+                .iter()
+                .map(|element| {
+                    element
+                        .as_string_literal()
+                        .map(|string| string.value(db).to_owned())
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Returns pytest's installed configuration module.
+fn pytest_config_file<'db>(db: &'db dyn Db, program: Program<'db>) -> Option<ProgramFile<'db>> {
+    let config_module = resolve_real_module_confident(
+        db,
+        program.resolver_environment(db),
+        &KnownModule::PytestConfig.name(),
+    )?;
+    if !config_module.is_known(db, KnownModule::PytestConfig) {
+        return None;
+    }
+    Some(program.program_file(db, config_module.file(db)?))
+}
+
+/// Returns the names of pytest's built-in plugins, including those not loaded by default.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn pytest_builtin_plugin_names<'db>(db: &'db dyn Db, program: Program<'db>) -> Box<[String]> {
+    let Some(config_file) = pytest_config_file(db, program) else {
+        return Box::default();
+    };
+    let mut names = FxIndexSet::default();
+    names.extend(
+        static_string_sequence_for_module_symbol(db, config_file, "default_plugins")
+            .into_iter()
+            .flatten(),
+    );
+
+    let module = parsed_module(db, config_file.python_file(db)).load(db);
+    if let Some(definition) = end_of_scope_definition(db, config_file, "builtin_plugins")
+        && let DefinitionKind::Assignment(assignment) = definition.kind(db)
+        && let ast::Expr::Set(set) = assignment.value(&module)
+    {
+        for element in &set.elts {
+            match element {
+                ast::Expr::Starred(starred) => names.extend(
+                    static_string_sequence_from_expression(db, definition, &starred.value)
+                        .into_iter()
+                        .flatten(),
+                ),
+                ast::Expr::StringLiteral(string) => {
+                    names.insert(string.value.to_str().to_owned());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Before pytest 9, optional plugins are added after creating the set.
+    for statement in module.suite() {
+        if let Some(call) = statement
+            .as_expr_stmt()
+            .and_then(|statement| statement.value.as_call_expr())
+            && let Some(attribute) = call.func.as_attribute_expr()
+            && attribute.attr.as_str() == "add"
+            && attribute
+                .value
+                .as_name_expr()
+                .is_some_and(|name| name.id == "builtin_plugins")
+            && let [ast::Expr::StringLiteral(string)] = call.arguments.args.as_ref()
+            && call.arguments.keywords.is_empty()
+        {
+            names.insert(string.value.to_str().to_owned());
+        }
+    }
+
+    names.into_iter().collect()
+}
+
 /// Returns the installed core pytest plugin files in registration order.
 pub fn pytest_global_plugin_files<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
 ) -> &'db [ProgramFile<'db>] {
-    let Some(config_module) = resolve_real_module_confident(
-        db,
-        program.resolver_environment(db),
-        &KnownModule::PytestConfig.name(),
-    ) else {
-        return &[];
-    };
-    if !config_module.is_known(db, KnownModule::PytestConfig) {
-        return &[];
-    }
-    let Some(config_file) = config_module.file(db) else {
-        return &[];
-    };
-
-    pytest_global_plugin_files_from_config(db, program.program_file(db, config_file))
+    pytest_config_file(db, program)
+        .map(|file| pytest_global_plugin_files_from_config(db, file))
+        .unwrap_or_default()
 }
 
 /// Reads the installed core pytest plugin files from the resolved configuration module.
@@ -1508,7 +1735,15 @@ fn static_string_sequence_for_module_symbol(
     name: &str,
 ) -> Option<Vec<String>> {
     let definition = end_of_scope_definition(db, file, name)?;
-    let module = parsed_module(db, file.python_file(db)).load(db);
+    static_string_sequence_for_definition(db, definition)
+}
+
+/// Returns the statically known string sequence assigned by `definition`.
+fn static_string_sequence_for_definition(
+    db: &dyn Db,
+    definition: Definition<'_>,
+) -> Option<Vec<String>> {
+    let module = parsed_module(db, definition.python_file(db)).load(db);
     let expression = match definition.kind(db) {
         DefinitionKind::Assignment(assignment) => Some(assignment.value(&module)),
         DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module),
@@ -1592,11 +1827,12 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast as ast;
     use ruff_text_size::Ranged;
+    use test_case::test_case;
     use ty_python_core::definition::Definition;
     use ty_python_core::semantic_index;
 
     use super::{
-        FixtureExposure, FixtureNameSource, end_of_scope_definition,
+        FixtureBinding, FixtureExposure, FixtureNameSource, end_of_scope_definition,
         fixture_bindings_for_parameter, fixture_exposures_for_definition,
         pytest_global_plugin_files,
     };
@@ -3081,6 +3317,599 @@ def resource(): ...
     }
 
     #[test]
+    fn resolves_fixtures_from_pytest_plugins() {
+        let test = PytestTestCase::with_files(
+            "/src/tests/unit/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["tests.fixtures.resources"]"#,
+                ),
+                (
+                    "/src/tests/fixtures/resources.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/tests/unit/test_example.py",
+                    "def test_use(resource): ...",
+                ),
+            ],
+        );
+
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/tests/unit/test_example.py:1:14
+          |
+        1 | def test_use(resource): ...
+          |              ^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/tests/fixtures/resources.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        ");
+    }
+
+    #[test_case(r#"pytest_plugins = ["custom_fixtures"]"#; "list")]
+    #[test_case(r#"pytest_plugins = ["invalid-name", "missing", "custom_fixtures"]"#; "list with unresolvable names")]
+    #[test_case(r#"pytest_plugins = ("custom_fixtures",)"#; "tuple")]
+    #[test_case(r#"pytest_plugins: list[str] = ["custom_fixtures"]"#; "annotated list")]
+    #[test_case(r#"pytest_plugins = "custom_fixtures""#; "string")]
+    #[test_case(r#"pytest_plugins = "missing,custom_fixtures""#; "comma separated string")]
+    #[test_case(r#"plugins = ("custom_fixtures",); pytest_plugins = plugins"#; "tuple alias")]
+    #[test_case(r#"plugins = ("custom_fixtures",); pytest_plugins = (*plugins,)"#; "unpacked tuple")]
+    #[test_case(r#"pytest_plugins = ("missing",) + ("custom_fixtures",)"#; "concatenated tuples")]
+    #[test_case(r#"pytest_plugins = ["missing"] + ["custom_fixtures"]"#; "concatenated lists")]
+    #[test_case("import sys\nif sys.version_info >= (3, 11):\n    pytest_plugins = ['custom_fixtures']\nelse:\n    pytest_plugins = ['missing']"; "python version guard")]
+    #[test_case("def enabled() -> bool: ...\nif enabled():\n    pytest_plugins = ['custom_fixtures']"; "conditional registration")]
+    #[test_case("def enabled() -> bool: ...\nif enabled():\n    pytest_plugins = ['custom_fixtures']\nelse:\n    pytest_plugins = []"; "conditional registration with fallback")]
+    #[test_case("def enabled() -> bool: ...\npytest_plugins = []\nif enabled():\n    pytest_plugins = ['custom_fixtures']"; "conditional reassignment")]
+    fn resolves_static_pytest_plugin_names(registration: &'static str) {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                ("/src/conftest.py", registration),
+                (
+                    "/src/custom_fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture(name="resource")
+def implementation(): ...
+"#,
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        test.function("test_use").assert_fixture(
+            "resource",
+            "/src/custom_fixtures.py",
+            "implementation",
+        );
+    }
+
+    #[test_case(r#"pytest_plugins = ("first", "second")"#; "tuple")]
+    #[test_case(r#"pytest_plugins = "first,second""#; "string")]
+    fn resolves_imported_pytest_plugin_names(registration: &'static str) {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                ("/src/conftest.py", "from registry import pytest_plugins"),
+                ("/src/registry.py", registration),
+                (
+                    "/src/first.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                (
+                    "/src/second.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        test.function("test_use")
+            .assert_fixture("resource", "/src/second.py", "resource");
+    }
+
+    #[test_case("pytest_plugins = None"; "none")]
+    #[test_case("pytest_plugins = []"; "empty list")]
+    #[test_case(r#"pytest_plugins = """#; "empty string")]
+    #[test_case(r#"pytest_plugins = ["invalid-name", "missing"]"#; "invalid and unresolved names")]
+    #[test_case("if False:\n    pytest_plugins = ['custom_fixtures']"; "unreachable registration")]
+    #[test_case("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pytest_plugins = ['custom_fixtures']"; "typing only registration")]
+    fn ignores_pytest_plugin_registrations_absent_at_runtime(registration: &'static str) {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                ("/src/conftest.py", registration),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+        assert!(
+            fixture_bindings_for_parameter(&test.db, test_use.parameter_definition("resource"))
+                .is_empty()
+        );
+    }
+
+    #[test_case("def plugins() -> list[str]: ...\npytest_plugins = plugins()"; "dynamic list")]
+    #[test_case("plugins = ['custom_fixtures']\npytest_plugins = plugins"; "aliased list")]
+    #[test_case("from shared import pytest_plugins"; "imported list")]
+    #[test_case("from registry import pytest_plugins"; "imported variable length tuple")]
+    #[test_case("pytest_plugins = ['missing']\npytest_plugins += ['custom_fixtures']"; "augmented list")]
+    #[test_case("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']\nelse:\n    pytest_plugins = ['custom_fixtures']"; "runtime branch hidden by typing guard")]
+    #[test_case("from typing import TYPE_CHECKING\npytest_plugins = ['custom_fixtures']\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']"; "runtime binding hidden by typing reassignment")]
+    fn ignores_pytest_plugin_registrations_that_are_not_statically_known(
+        registration: &'static str,
+    ) {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                // Pytest can register `custom_fixtures` at runtime in each case, but the value is
+                // computed, follows a list defined elsewhere, or is bound in a branch that ty
+                // treats as unreachable.
+                ("/src/conftest.py", registration),
+                ("/src/shared.py", "pytest_plugins = ['custom_fixtures']"),
+                (
+                    "/src/registry.py",
+                    "def plugins() -> tuple[str, ...]: ...\npytest_plugins = plugins()",
+                ),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+        assert!(
+            fixture_bindings_for_parameter(&test.db, test_use.parameter_definition("resource"))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn resolves_pytest_plugins_from_registering_module_directories() {
+        let test = PytestTestCase::with_files(
+            "/src/tests/unit/test_example.py",
+            &[
+                // `tests` is not a package, so pytest adds it to `sys.path` when importing its
+                // conftest.
+                (
+                    "/src/tests/conftest.py",
+                    r#"pytest_plugins = ["fixtures.resources"]"#,
+                ),
+                (
+                    "/src/tests/fixtures/resources.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                (
+                    "/src/tests/unit/test_example.py",
+                    "def test_use(resource): ...",
+                ),
+            ],
+        );
+
+        test.function("test_use").assert_fixture(
+            "resource",
+            "/src/tests/fixtures/resources.py",
+            "resource",
+        );
+    }
+
+    #[test]
+    fn pytest_plugins_preserve_registration_order_and_fixture_precedence() {
+        let test = PytestTestCase::with_files(
+            "/src/tests/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["first", "second", "first", "nested"]"#,
+                ),
+                (
+                    "/src/first.py",
+                    r#"
+import pytest
+
+pytest_plugins = ["nested"]
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/nested.py",
+                    r#"
+import pytest
+
+pytest_plugins = ["first"]
+
+@pytest.fixture
+def resource(): ...
+
+@pytest.fixture
+def nested_only(): ...
+"#,
+                ),
+                (
+                    "/src/second.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+
+@pytest.fixture
+def conftest_override(): ...
+
+@pytest.fixture
+def module_override(): ...
+
+@pytest.fixture
+def core_value(): ...
+"#,
+                ),
+                (
+                    "/src/tests/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def conftest_override(): ...
+"#,
+                ),
+                (
+                    "/src/tests/test_example.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def module_override(): ...
+
+def test_use(resource, nested_only, conftest_override, module_override, core_value): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+        test_use.assert_fixture("resource", "/src/second.py", "resource");
+        test_use.assert_fixture("nested_only", "/src/nested.py", "nested_only");
+        test_use.assert_fixture(
+            "conftest_override",
+            "/src/tests/conftest.py",
+            "conftest_override",
+        );
+        test_use.assert_fixture(
+            "module_override",
+            "/src/tests/test_example.py",
+            "module_override",
+        );
+        test_use.assert_fixture("core_value", "/src/second.py", "core_value");
+    }
+
+    #[test]
+    fn legacy_tmpdir_plugin_takes_precedence_over_conftest_pytest_plugins() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["custom_fixtures"]"#,
+                ),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef tmpdir(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(tmpdir): ..."),
+            ],
+        );
+
+        test.function("test_use").assert_fixture(
+            "tmpdir",
+            "/.venv/lib/python3.13/site-packages/_pytest/legacypath.py",
+            "LegacyTmpdirPlugin.tmpdir",
+        );
+    }
+
+    #[test]
+    fn pytest_plugins_follow_conftest_and_test_module_registration_order() {
+        let mut test = PytestTestCase::with_files(
+            "/src/tests/test_example.py",
+            &[
+                ("/src/conftest.py", r#"pytest_plugins = ["first"]"#),
+                ("/src/tests/conftest.py", r#"pytest_plugins = ["second"]"#),
+                (
+                    "/src/first.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                (
+                    "/src/second.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_plugin.py", r#"pytest_plugins = ["unrelated"]"#),
+                (
+                    "/src/unrelated.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/tests/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        test.function("test_use")
+            .assert_fixture("resource", "/src/second.py", "resource");
+
+        test.write_file(
+            "/src/tests/test_example.py",
+            "pytest_plugins = ['unrelated']\ndef test_use(resource): ...",
+        );
+        test.function("test_use")
+            .assert_fixture("resource", "/src/unrelated.py", "resource");
+    }
+
+    #[test]
+    fn resolves_pytest_plugins_registered_by_plugin_package() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                ("/src/conftest.py", r#"pytest_plugins = ["fixtures"]"#),
+                (
+                    "/src/fixtures/__init__.py",
+                    r#"pytest_plugins = ["fixtures.database"]"#,
+                ),
+                (
+                    "/src/fixtures/database.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        test.function("test_use").assert_fixture(
+            "resource",
+            "/src/fixtures/database.py",
+            "resource",
+        );
+    }
+
+    #[test]
+    fn pytest_plugins_register_each_name_once() {
+        let test = PytestTestCase::with_files(
+            "/src/tests/unit/test_example.py",
+            &[
+                ("/src/tests/conftest.py", r#"pytest_plugins = ["helper"]"#),
+                (
+                    "/src/tests/helper.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                (
+                    "/src/tests/unit/helper.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                // The conftest already registered `helper`, so pytest skips this registration.
+                (
+                    "/src/tests/unit/test_example.py",
+                    "pytest_plugins = ['helper']\ndef test_use(resource): ...",
+                ),
+            ],
+        );
+
+        test.function("test_use")
+            .assert_fixture("resource", "/src/tests/helper.py", "resource");
+    }
+
+    #[test_case(
+        r#"
+default_plugins = ("baseplugin",)
+builtin_plugins = {*default_plugins, "pytester", "pytester_assertions"}
+"#; "set display"
+    )]
+    #[test_case(
+        r#"
+default_plugins = ("baseplugin",)
+builtin_plugins = set(default_plugins)
+builtin_plugins.add("pytester")
+builtin_plugins.add("pytester_assertions")
+"#; "set additions"
+    )]
+    fn resolves_builtin_pytest_plugin_names_before_project_modules(config: &'static str) {
+        let test = PytestTestCase::with_config(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["pytester", "custom_fixtures", "baseplugin"]"#,
+                ),
+                (
+                    "/.venv/lib/python3.13/site-packages/_pytest/pytester.py",
+                    r#"
+import pytest
+
+pytest_plugins = ["pytester_assertions"]
+
+@pytest.fixture
+def pytester(): ...
+"#,
+                ),
+                (
+                    "/.venv/lib/python3.13/site-packages/_pytest/pytester_assertions.py",
+                    "import pytest\n@pytest.fixture\ndef assertions(): ...",
+                ),
+                (
+                    "/src/pytester.py",
+                    "import pytest\n@pytest.fixture\ndef pytester(): ...",
+                ),
+                (
+                    "/src/baseplugin.py",
+                    "import pytest\n@pytest.fixture\ndef core_value(): ...",
+                ),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef core_value(): ...",
+                ),
+                (
+                    "/src/test_example.py",
+                    "def test_use(pytester, assertions, core_value): ...",
+                ),
+            ],
+            config,
+        );
+
+        let test_use = test.function("test_use");
+        test_use.assert_fixture(
+            "pytester",
+            "/.venv/lib/python3.13/site-packages/_pytest/pytester.py",
+            "pytester",
+        );
+        test_use.assert_fixture(
+            "assertions",
+            "/.venv/lib/python3.13/site-packages/_pytest/pytester_assertions.py",
+            "assertions",
+        );
+        test_use.assert_fixture("core_value", "/src/custom_fixtures.py", "core_value");
+    }
+
+    #[test]
+    fn resolves_plugin_fixture_dependencies_through_registering_conftest() {
+        let test = PytestTestCase::with_files(
+            "/src/plugins/consumer.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    "pytest_plugins = ['plugins.consumer', 'plugins.provider']",
+                ),
+                (
+                    "/src/plugins/consumer.py",
+                    "import pytest\n@pytest.fixture\ndef consumer(resource): ...",
+                ),
+                (
+                    "/src/plugins/provider.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+            ],
+        );
+
+        test.function("consumer").assert_fixture(
+            "resource",
+            "/src/plugins/provider.py",
+            "resource",
+        );
+    }
+
+    #[test]
+    fn resolves_plugin_fixture_dependencies_through_its_own_registrations() {
+        let test = PytestTestCase::with_files(
+            "/src/plugins/consumer.py",
+            &[
+                (
+                    "/src/test_registration.py",
+                    "pytest_plugins = ['plugins.consumer']",
+                ),
+                (
+                    "/src/plugins/consumer.py",
+                    "import pytest\npytest_plugins = ['plugins.provider']\n@pytest.fixture\ndef consumer(resource): ...",
+                ),
+                (
+                    "/src/plugins/provider.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+            ],
+        );
+
+        test.function("consumer").assert_fixture(
+            "resource",
+            "/src/plugins/provider.py",
+            "resource",
+        );
+    }
+
+    #[test_case("/src/test_registration.py"; "test module")]
+    #[test_case("/src/tests/conftest.py"; "unrelated conftest")]
+    fn plugin_dependencies_do_not_discover_registration_contexts(registration_file: &'static str) {
+        let test = PytestTestCase::with_files(
+            "/src/plugins/consumer.py",
+            &[
+                (
+                    registration_file,
+                    "pytest_plugins = ['plugins.consumer', 'plugins.provider']",
+                ),
+                (
+                    "/src/plugins/consumer.py",
+                    "import pytest\n@pytest.fixture\ndef consumer(resource): ...",
+                ),
+                (
+                    "/src/plugins/provider.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+            ],
+        );
+
+        // The consumer's directory hierarchy does not identify the modules that registered it.
+        let consumer = test.function("consumer");
+        let parameter = consumer.parameter_definition("resource");
+        assert!(fixture_bindings_for_parameter(&test.db, parameter).is_empty());
+    }
+
+    #[test]
+    fn creating_pytest_plugin_and_updating_registration_updates_resolution() {
+        let mut test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["custom_fixtures"]"#,
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+
+        test.write_file(
+            "/src/custom_fixtures.py",
+            "import pytest\n@pytest.fixture\ndef resource(): ...",
+        );
+        test.function("test_use")
+            .assert_fixture("resource", "/src/custom_fixtures.py", "resource");
+
+        test.write_file("/src/conftest.py", "pytest_plugins = []");
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+    }
+
+    #[test]
+    fn updating_nested_pytest_plugin_registration_updates_resolution() {
+        let mut test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                ("/src/conftest.py", r#"pytest_plugins = ["first"]"#),
+                ("/src/first.py", r#"pytest_plugins = ["second"]"#),
+                (
+                    "/src/second.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+        test.function("test_use")
+            .assert_fixture("resource", "/src/second.py", "resource");
+
+        test.write_file("/src/first.py", "pytest_plugins = []");
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+    }
+
+    #[test]
     fn resolves_installed_core_plugins_in_registration_order() {
         let test = PytestTestCase::new(
             "/src/test_example.py",
@@ -3492,6 +4321,18 @@ resource = None
     }
 
     impl PytestTestFunction<'_> {
+        fn assert_fixture(&self, parameter_name: &str, path: &str, name: &str) {
+            let parameter = self.parameter_definition(parameter_name);
+            let fixtures = fixture_bindings_for_parameter(&self.test.db, parameter);
+            assert_eq!(
+                fixtures
+                    .iter()
+                    .map(FixtureBinding::fixture)
+                    .collect::<Vec<_>>(),
+                [self.test.function_definition(path, name)],
+            );
+        }
+
         fn fixture_resolution(&self, parameter_name: &str) -> String {
             let db = &self.test.db;
             let parameter = self.parameter_definition(parameter_name);
