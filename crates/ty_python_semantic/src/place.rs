@@ -12,8 +12,9 @@ use ty_module_resolver::{
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
     NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
-    evaluate_reachability_with_cache,
+    evaluate_reachability_with_cache, narrow_type_by_constraint,
 };
+use crate::types::narrow::projected_match_capture;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
@@ -2023,6 +2024,13 @@ fn place_from_bindings_impl<'db>(
             let narrowed = match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
+                _ if matches!(binding_kind, DefinitionKind::MatchPattern(_))
+                    && let Some(capture) = projected_match_capture(db, binding) =>
+                {
+                    narrow_type_by_constraint(db, env, &narrowing_constraint, binding_ty, || {
+                        (binding.place(db), Some(capture))
+                    })
+                }
                 constraint => narrowing_projector
                     .get_or_insert_with(|| {
                         NarrowingProjector::new(

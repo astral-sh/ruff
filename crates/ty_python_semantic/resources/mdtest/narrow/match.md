@@ -3601,6 +3601,41 @@ def narrow_after_capture(value: int | str | bytes) -> None:
             reveal_type(value)  # revealed: bytes
 ```
 
+A positional capture in a built-in class pattern such as `str(value)` binds the whole string. A
+later integer case can only see the original integer binding.
+
+```py
+def narrow_after_positional_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case str(value) if flag:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int
+```
+
+When the positional capture extracts an attribute, a later case can still exclude the original
+class. Here both integer cases see the original integer binding.
+
+```py
+from typing import final
+
+@final
+class WrappedText:
+    __match_args__ = ("text",)
+    text: str
+
+def narrow_after_attribute_capture(subject: int | WrappedText, flag: bool) -> int:
+    value = subject
+    match value:
+        case WrappedText(value) if flag:
+            return 0
+        case 0:
+            return value
+        case int() as number:
+            return value
+    return 0
+```
+
 ### Constrained `as` patterns
 
 If the first pattern matches but its guard fails, the captured integer cannot reach the string case.
@@ -3631,10 +3666,10 @@ A capture can also refer to the whole subject in one alternative and an extracte
 another. Matching the original tuple in a later case does not make its captured integer unreachable.
 
 ```py
-def mixed_or_captures(subject: int | tuple[int], flag: bool) -> None:
+def mixed_or_captures(subject: str | tuple[int], flag: bool) -> None:
     value = subject
     match value:
-        case (int() as value) | [value] if flag:
+        case str(value) | [value] if flag:
             pass
         case tuple():
             reveal_type(value)  # revealed: int
@@ -3652,6 +3687,52 @@ def reassign_capture(value: int | str, flag: bool) -> None:
             pass
         case int():
             reveal_type(value)  # revealed: Literal["changed"]
+```
+
+When a guard assigns a stripped string, either a string case returns or the original subject was an
+integer.
+
+```py
+def narrow_after_strip(value: int | str) -> int:
+    match value:
+        case str() if value := value.strip():
+            return len(value)
+        case str():
+            return 0
+    return value
+```
+
+### Mutable captures
+
+A list can change after its pattern succeeds. Checking one item before mutating the list cannot
+establish the type of that item afterward.
+
+```py
+def mutate_capture(value: list[int | str], flag: bool) -> int:
+    match value:
+        case list([int()] as value) if flag:
+            value[:] = ["changed"]
+            return value[0]  # error: [invalid-return-type]
+    return 0
+
+def mutate_after_guard(value: list[int | str], flag: bool) -> int:
+    match value:
+        case list(value) if flag:
+            return 0
+        case [int()]:
+            value[:] = ["changed"]
+            return value[0]  # error: [invalid-return-type]
+    return 0
+```
+
+An unguarded pattern can still narrow an item read immediately in the same case.
+
+```py
+def read_item(value: list[int | str]) -> int:
+    match value:
+        case [int()] as value:
+            return value[0]
+    return 0
 ```
 
 ### Member subjects
@@ -4692,6 +4773,20 @@ def _(x: A | B | C):
             raise ValueError()
 
     reveal_type(x)  # revealed: B | A
+```
+
+If both cases return when another variable is `None`, that variable stays narrowed after the match.
+
+```py
+def narrow_other(value: int | str, other: str | None) -> str:
+    match value:
+        case int():
+            if other is None:
+                return ""
+        case str():
+            if other is None:
+                return ""
+    return other
 ```
 
 Reassignment in non-terminal branches is also preserved when the default branch is terminal:

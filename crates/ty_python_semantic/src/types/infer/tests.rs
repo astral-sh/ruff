@@ -743,6 +743,34 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
     Ok(())
 }
 
+/// Keep the final case precise without building a separate constraint for each pair of captures.
+#[test]
+fn many_guarded_match_captures() -> anyhow::Result<()> {
+    let cases = 512;
+    for pattern in ["str() as x", "str(x)"] {
+        let mut db = setup_db();
+        let mut source = String::from(
+            "def f(x: int | str | tuple[str], flags: list[bool]) -> int:\n    match x:\n",
+        );
+        for index in 0..cases {
+            writeln!(source, "        case {pattern} if flags[{index}]: return 0")?;
+        }
+        source.push_str("        case int(): return x\n    return 0\n");
+        db.write_dedented("src/a.py", &source)?;
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        let inferences = db.take_salsa_events().iter().filter(|event| {
+            matches!(event.kind, salsa::EventKind::WillExecute { database_key }
+                if db.ingredient_debug_name(database_key.ingredient_index()) == "pattern_capture_types")
+        }).count();
+        assert!(
+            inferences <= 4 * cases,
+            "inferred capture types {inferences} times for {cases} cases"
+        );
+    }
+    Ok(())
+}
+
 /// Repeated conditions share cached definition and reachability summaries. Reassigned names need
 /// different definitions at each read, but share the index of their original assignment guards.
 /// Rebuilding that index for every condition would make these examples quadratic even if their
