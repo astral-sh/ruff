@@ -3984,10 +3984,39 @@ impl<'db> CallableBinding<'db> {
                 }
             };
 
-        // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
-        // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx, None);
+        // Step 2: check the remaining overloads. For ordinary arguments, step 5 discards all
+        // later matches if the first one accepts every materialization of every argument.
+        // Partial application still needs their signatures for arguments supplied later.
+        let mut check_first_match = !should_retry_after_provisional_arity
+            && (0..call_arguments.len()).all(|index| !call_arguments.is_variadic(index))
+            && self.matching_overloads().all(|(_, overload)| {
+                !overload.is_partial_application
+                    && !overload.variadic_argument_matched_to_variadic_parameter
+                    && overload.argument_matches.iter().all(|matched| {
+                        matches!(matched.parameters.as_slice(), [parameter] if parameter.argument_type.is_none())
+                    })
+            });
+        {
+            let mut overloads = self.matching_overloads_mut().peekable();
+            while let Some((_, overload)) = overloads.next() {
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx, None);
+                if check_first_match && !overload.has_errors_affecting_overload_resolution() {
+                    check_first_match = false;
+                    if overloads.peek().is_some()
+                        && overload.accepts_all_argument_materializations(
+                            db,
+                            env,
+                            constraints,
+                            call_arguments.as_ref(),
+                        )
+                    {
+                        for (_, later) in overloads {
+                            later.mark_as_unmatched_overload();
+                        }
+                        return;
+                    }
+                }
+            }
         }
 
         tracing::trace!(
@@ -9216,6 +9245,35 @@ impl<'db> Binding<'db> {
         );
         checker.check_argument_types(constraints);
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
+    }
+
+    /// Proves the first matching overload covers the call even if every argument slot is
+    /// considered by step 5. Removing slots with identical parameters preserves this result.
+    fn accepts_all_argument_materializations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        let specialization = self.merged_specialization(db);
+        self.argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .all(|(matched, argument)| {
+                let [parameter] = matched.parameters.as_slice() else {
+                    return false;
+                };
+                let raw = self.signature.parameters()[parameter.index].annotated_type();
+                let argument = argument
+                    .source_types()
+                    .get_for_declared_type(raw)
+                    .top_materialization(db, env);
+                let parameter = raw.apply_optional_specialization(db, specialization);
+                argument
+                    .when_assignable_to(db, env, parameter, constraints, self.inferable_typevars)
+                    .is_always_satisfied(db, env, self.inferable_typevars)
+            })
     }
 
     fn check_keyword_unpack_key_types(
