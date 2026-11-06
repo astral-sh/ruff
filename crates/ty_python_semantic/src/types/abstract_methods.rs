@@ -15,8 +15,8 @@ use crate::{
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     types::{
-        ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
-        binding_type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, LintDiagnosticGuard, MemberLookupPolicy,
+        Parameters, Signature, StaticClassLiteral, Type, binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
         function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
@@ -374,6 +374,38 @@ impl<'db> ClassType<'db> {
 
         abstract_methods
     }
+}
+
+/// Whether calling this class as a decorator necessarily creates a nominal instance.
+/// Without a custom allocator or metaclass, initializing a descriptor does not replace the
+/// allocated object with a function, bound method, or property.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
+pub(super) fn constructs_plain_descriptor<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    if class.known(db).is_some() || class.has_decorators(db) {
+        return false;
+    }
+    if !class
+        .metaclass(db)
+        .as_class_literal()
+        .is_some_and(|meta| meta.known(db) == Some(KnownClass::Type))
+    {
+        return false;
+    }
+    let literal = ClassLiteral::Static(class);
+    if !literal.iter_mro(db).skip(1).all(|base| match base {
+        ClassBase::Generic => true,
+        ClassBase::Class(base) => base.is_object(db),
+        _ => false,
+    }) {
+        return false;
+    }
+    let env = ProgramEnvironment::from_file(class.program_file(db));
+    Type::ClassLiteral(literal)
+        .lookup_dunder_new(db, &env, MemberLookupPolicy::empty())
+        .is_none_or(|member| member.is_undefined())
 }
 
 /// Whether a binding could resolve to a method marked with `@abstractmethod`.

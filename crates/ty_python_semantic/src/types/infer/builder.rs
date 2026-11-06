@@ -12312,6 +12312,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Specializing a nominal return type can change a descriptor's type arguments, but it
         // cannot turn the descriptor into an abstract function, bound method, or property.
         fn returns_nominal_instance<'db>(db: &'db dyn Db, decorator: Type<'db>) -> bool {
+            if let Type::ClassLiteral(ClassLiteral::Static(class)) = decorator {
+                return crate::types::abstract_methods::constructs_plain_descriptor(db, class);
+            }
             let Type::Callable(callable) = decorator else {
                 return false;
             };
