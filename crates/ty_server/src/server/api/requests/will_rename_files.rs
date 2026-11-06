@@ -4,10 +4,8 @@ use lsp_types::{
     FileRename as LspFileRename, RenameFilesParams, TextEdit, Uri, WillRenameFilesRequest,
     WorkspaceEdit,
 };
-use ruff_db::files::system_path_to_file;
 use ruff_db::system::SystemPathBuf;
 use ty_ide::{FileRename, will_rename_files};
-use ty_project::ProjectDatabase;
 
 use crate::document::extend_lsp_edits;
 use crate::server::api::traits::{
@@ -42,11 +40,7 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
         let mut changes = HashMap::new();
 
         for db in snapshot.projects() {
-            let renames: Vec<_> = params
-                .files
-                .iter()
-                .filter_map(|rename| prepare_rename(db, rename))
-                .collect();
+            let renames: Vec<_> = params.files.iter().filter_map(prepare_rename).collect();
             if renames.is_empty() {
                 continue;
             }
@@ -68,11 +62,10 @@ impl RetriableRequestHandler for WillRenameFilesHandler {
 }
 
 /// Converts an LSP rename request into our internal representation of the same.
-fn prepare_rename(db: &ProjectDatabase, rename: &LspFileRename) -> Option<FileRename> {
+fn prepare_rename(rename: &LspFileRename) -> Option<FileRename> {
     let old_path = file_uri_to_path(&rename.old_uri)?;
     let new_path = file_uri_to_path(&rename.new_uri)?;
-    let file = system_path_to_file(db, &old_path).ok()?;
-    Some(FileRename { file, new_path })
+    Some(FileRename { old_path, new_path })
 }
 
 /// Deduplicates edits and drops files with overlapping edits.

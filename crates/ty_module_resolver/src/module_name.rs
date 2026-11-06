@@ -264,6 +264,14 @@ impl ModuleName {
         Some(Self(name))
     }
 
+    /// Returns a new module name with the components of `other` appended to `self`.
+    #[must_use]
+    pub fn join(&self, other: &ModuleName) -> Self {
+        let mut name = self.clone();
+        name.extend(other);
+        name
+    }
+
     /// Extend `self` with the components of `other`
     ///
     /// # Examples
