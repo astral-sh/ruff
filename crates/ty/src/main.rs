@@ -2,7 +2,12 @@ use colored::Colorize;
 use std::io;
 use ty::{ExitStatus, run};
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[cfg(all(
+    not(all(target_os = "linux", target_arch = "x86_64")),
     not(target_os = "macos"),
     not(target_os = "windows"),
     not(target_os = "openbsd"),
