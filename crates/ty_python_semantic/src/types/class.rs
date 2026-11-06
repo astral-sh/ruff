@@ -541,7 +541,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
-    /// Resolve the MRO with this alias's type arguments applied to its base classes.
+    /// Resolve this alias's ancestors in MRO order with its type arguments applied.
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, alias: GenericAlias<'db>| {
@@ -555,16 +555,13 @@ impl<'db> GenericAlias<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(in crate::types) fn try_mro(
+    pub(in crate::types) fn try_mro_ancestors(
         self,
         db: &'db dyn Db,
-    ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
+    ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
-        tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
-        if let Some(mro) = Mro::from_plan(db, self) {
-            return Ok(mro);
-        }
-        Mro::of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
+        tracing::trace!("GenericAlias::try_mro_ancestors: {}", origin.name(db));
+        Mro::ancestors_of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
     }
 
     /// Compose each type argument's variance with its formal parameter's variance. Inferred
@@ -1399,7 +1396,7 @@ impl<'db> ClassType<'db> {
     ///
     /// If the MRO could not be accurately resolved, this method falls back to iterating
     /// over an MRO that has the class directly inheriting from `Unknown`. Use
-    /// [`StaticClassLiteral::try_mro`] if you need to distinguish between the success and failure
+    /// [`StaticClassLiteral::try_mro_ancestors`] if you need to distinguish between the success and failure
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order

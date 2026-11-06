@@ -1571,6 +1571,88 @@ T = TypeVar("T", default=Default)
 reveal_type(f())  # revealed: Unknown
 ```
 
+### A default that refers to the subclass through an inherited alias
+
+Both classes use the alias that `Child` inherits from `Root` as their default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+R = TypeVar("R")
+P = TypeVar("P", default="Child.Item")
+C = TypeVar("C", default="Child.Item")
+
+class Root(Generic[R]):
+    Item: TypeAlias = "Child[int]"
+
+class Parent(Root["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+
+reveal_type(Child[int]())  # revealed: Child[int]
+```
+
+### A generic default with an inherited type argument
+
+A bare `Parent` defaults to `Child`, which takes its own default from `Root.Item`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+R = TypeVar("R")
+P = TypeVar("P", default="Child")
+C = TypeVar("C", default="Parent.Item")
+
+class Root(Generic[R]):
+    Item = int
+
+class Parent(Root["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+
+concrete: Child[int]
+
+def check(x: Parent):
+    reveal_type(x)  # revealed: Parent[Child[int]]
+```
+
+### A default that looks up an alias on a grandchild
+
+Resolving `Leaf.Item` traverses `Parent` while its default is being inferred. The alias still
+supplies the concrete type `Child[int]`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+P = TypeVar("P", default="Leaf.Item")
+C = TypeVar("C", default="Parent.Item")
+
+class Root(Generic[T]):
+    Item: TypeAlias = "Child[int]"
+
+class Mid(Root[T]): ...
+class Parent(Mid["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+class Leaf(Child[T]): ...
+
+def check(p: Parent):
+    reveal_type(p)  # revealed: Parent[Child[int]]
+```
+
 ### Use of typevar with default inside a function body that binds it
 
 ```toml
