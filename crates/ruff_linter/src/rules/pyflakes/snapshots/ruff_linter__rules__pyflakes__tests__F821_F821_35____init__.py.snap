@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `foo`
+ --> __init__.py:4:7
+  |
+2 | from .pkg.bar import Baz
+3 |
+4 | print(foo.Bar, Bar)
+  |       ^^^
+5 | print(pkg.bar.Baz, Baz)
+  |
+
+F821 Undefined name `pkg`
+ --> __init__.py:5:7
+  |
+4 | print(foo.Bar, Bar)
+5 | print(pkg.bar.Baz, Baz)
+  |       ^^^
+  |
