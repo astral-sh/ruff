@@ -107,6 +107,11 @@ harness = false
 required-features = ["ty_instrumented"]
 
 [[bench]]
+name = "ty_projects"
+harness = false
+required-features = ["ty_instrumented"]
+
+[[bench]]
 name = "ty_constraint_set"
 harness = false
 required-features = ["ty_instrumented"]

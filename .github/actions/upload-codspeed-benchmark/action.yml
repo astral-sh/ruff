@@ -1,0 +1,17 @@
+name: Upload a CodSpeed benchmark
+description: Upload one instrumented benchmark executable for the shards that run it.
+inputs:
+  target:
+    description: Cargo benchmark target name.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: benchmarks-instrumented-${{ inputs.target }}
+        # The wildcard preserves the directory layout CodSpeed expects under target/codspeed.
+        path: target/codspeed/**/${{ inputs.target }}
+        compression-level: 1
+        if-no-files-found: "error"
+        retention-days: 1
