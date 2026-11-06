@@ -1162,17 +1162,29 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            // Looking up a method on a union of literals binds it to each receiver.
-            // Different singleton receivers rule out redundancy in both directions via
-            // `__self__`; neither method can cover the complement of the other either.
-            if let (Type::BoundMethod(left), Type::BoundMethod(right)) = (ty, element_type)
-                && let (Type::LiteralValue(left), Type::LiteralValue(right)) =
-                    (left.self_instance(db), right.self_instance(db))
-                && !left.is_literal_string()
-                && !right.is_literal_string()
-                && left.kind() != right.kind()
-            {
-                continue;
+            // These pairs are incomparable under union redundancy and cannot cover
+            // `object` together. Skip the subtype and complement queries for them.
+            match (ty, element_type) {
+                (Type::ClassLiteral(_), Type::ClassLiteral(_))
+                | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => continue,
+                (Type::Dynamic(_), Type::NominalInstance(instance))
+                | (Type::NominalInstance(instance), Type::Dynamic(_))
+                    if !instance.is_object() =>
+                {
+                    continue;
+                }
+                // A method on a literal union is bound separately to each receiver.
+                // Its `__self__` distinguishes methods bound to different singletons.
+                (Type::BoundMethod(left), Type::BoundMethod(right))
+                    if let (Type::LiteralValue(left), Type::LiteralValue(right)) =
+                        (left.self_instance(db), right.self_instance(db))
+                        && !left.is_literal_string()
+                        && !right.is_literal_string()
+                        && left.kind() != right.kind() =>
+                {
+                    continue;
+                }
+                _ => {}
             }
 
             // `object` already contains every possible union element.
