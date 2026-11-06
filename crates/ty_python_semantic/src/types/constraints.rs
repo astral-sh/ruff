@@ -3696,6 +3696,19 @@ pub(crate) struct CandidateSolution<'db> {
     validity: SolutionValidity<'db>,
 }
 
+/// Whether or not to report diagnostics when the constraint solver encounters unsatisfied bounds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReportDiagnostics {
+    Yes,
+    No,
+}
+
+impl ReportDiagnostics {
+    pub(super) const fn is_yes(self) -> bool {
+        matches!(self, ReportDiagnostics::Yes)
+    }
+}
+
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
 trait SolutionLimits {
     type Break;
@@ -3771,6 +3784,7 @@ impl<'db> CandidateSolutions<'db> {
             source_order,
             UnboundedSolutionLimits,
             unspecialized_type_var_policy,
+            ReportDiagnostics::Yes,
         );
         result
     }
@@ -3783,11 +3797,10 @@ impl<'db> CandidateSolutions<'db> {
     fn compute_bounded(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
+        set: ConstraintSet<'db, '_>,
         inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
         budget: SolutionBudget,
+        report_diagnostics: ReportDiagnostics,
     ) -> Result<Self, ProjectionError> {
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -3796,12 +3809,13 @@ impl<'db> CandidateSolutions<'db> {
         match Self::compute_with_limits(
             db,
             env,
-            storage,
-            node,
+            &mut set.builder.storage.borrow_mut(),
+            set.node,
             inferable,
-            source_order,
+            set.source_order,
             limits,
             UnspecializedTypeVarPolicy::Ignore,
+            report_diagnostics,
         ) {
             ControlFlow::Continue(result) => Ok(result),
             ControlFlow::Break(error) => Err(error),
@@ -3818,6 +3832,7 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         mut limits: L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+        report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<L::Break, Self> {
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -3829,6 +3844,7 @@ impl<'db> CandidateSolutions<'db> {
             inferable,
             &mut limits,
             unspecialized_type_var_policy,
+            report_diagnostics,
         )? {
             return ControlFlow::Continue(path_bounds);
         }
@@ -3871,6 +3887,7 @@ impl<'db> CandidateSolutions<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+        report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<L::Break, Option<Self>> {
         let mentions_typevar =
             |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
@@ -3988,10 +4005,14 @@ impl<'db> CandidateSolutions<'db> {
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
             let Some(solution) = bounds.finish(db, env, storage, bound_typevar, inferable) else {
-                // If any of the typevars doesn't have a solution (either because the constraint set is
-                // overly restrictive, or because a candidate solution doesn't satisfy the declared
-                // upper bounds), fall back on the slow path to construct useful diagnostics.
-                return ControlFlow::Continue(None);
+                return ControlFlow::Continue(match report_diagnostics {
+                    ReportDiagnostics::No => Some(Self::Unsatisfiable),
+                    // If any of the typevars doesn't have a solution (either because the constraint
+                    // set is overly restrictive, or because a candidate solution doesn't satisfy
+                    // the declared upper bounds), fall back on the slow path to construct useful
+                    // diagnostics.
+                    ReportDiagnostics::Yes => None,
+                });
             };
             typevars.push(solution);
         }
@@ -5210,15 +5231,14 @@ mod tests {
         CandidateSolutions::compute_bounded(
             db,
             &db.program_environment(),
-            &mut set.builder.storage.borrow_mut(),
-            set.node,
+            set,
             inferable,
-            set.source_order,
             SolutionBudget {
                 paths: max_paths,
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
+            ReportDiagnostics::Yes,
         )
     }
 

@@ -42,7 +42,8 @@ use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, ReportDiagnostics, SolutionPaths,
+    Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
@@ -7068,7 +7069,16 @@ impl<'db> CallInference<'_, 'db> {
         return_context: Option<(Type<'db>, Type<'db>)>,
     ) -> Result<(TypeVarInference<'db>, Type<'db>, bool), Vec<SpecializationError<'db>>> {
         let db = self.db;
-        let inference = builder.build_inference_with(|_, bounds| {
+
+        let report_diagnostics = if return_context.is_some() {
+            // Note that we perform a retry for failures performed with return context, and so can
+            // avoid constructing expensive diagnostics on the initial failure in that case.
+            ReportDiagnostics::No
+        } else {
+            ReportDiagnostics::Yes
+        };
+
+        let inference = builder.build_inference_with(report_diagnostics, |_, bounds| {
             bounds.map(|bounds| self.solve_typevar(constraints, bounds))
         })?;
         let (return_ty, arguments_validated) = self.select_return_type(inference);
@@ -7216,7 +7226,7 @@ impl<'db> CallInference<'_, 'db> {
         };
 
         builder
-            .build_inference_with(&mut choose)
+            .build_inference_with(ReportDiagnostics::Yes, &mut choose)
             .unwrap_or_else(|errors| {
                 self.inference_recovery(&mut builder, errors, specialization_errors, choose)
             })

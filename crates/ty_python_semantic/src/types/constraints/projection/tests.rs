@@ -11,8 +11,8 @@ use crate::place::global_symbol;
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
-    TypeVarSolution, UnspecializedTypeVarPolicy,
+    PathBoundSolution, ReportDiagnostics, Solution, SolutionPaths, SolutionValidity,
+    SolutionViolationKind, Solutions, TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
@@ -211,6 +211,7 @@ fn invalid_paths_respect_projection_budgets() {
                     paths,
                     ..SolutionBudget::default()
                 },
+                ReportDiagnostics::Yes,
                 choose,
             ),
             Err(ProjectionError::PathBudgetExceeded)
@@ -227,6 +228,7 @@ fn invalid_paths_respect_projection_budgets() {
             type_terms: 1,
             ..SolutionBudget::default()
         },
+        ReportDiagnostics::Yes,
         choose,
     );
     assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
@@ -239,6 +241,7 @@ fn invalid_paths_respect_projection_budgets() {
                 type_terms: 2,
                 ..SolutionBudget::default()
             },
+            ReportDiagnostics::Yes,
             choose,
         ),
         Ok(Solutions::Unsatisfiable(_))
@@ -273,9 +276,14 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
 
     for bounds in [[bool, bytes], [bytes, bool]] {
         let set = upper(bounds[0]).or(db, &builder, || upper(bounds[1]));
-        let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
-            PathBoundSolution::Unsolved
-        });
+        let result = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            ReportDiagnostics::Yes,
+            |_, _| PathBoundSolution::Unsolved,
+        );
         let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
             panic!("expected invalid paths");
         };
@@ -309,9 +317,14 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
 
     // A failing alternative must not produce a diagnostic when another alternative is valid.
     let set = upper(bool).or(db, &builder, || upper(str));
-    let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
-        PathBoundSolution::Unsolved
-    });
+    let result = set.solutions_with(
+        db,
+        &env,
+        inferable,
+        SolutionBudget::default(),
+        ReportDiagnostics::Yes,
+        |_, _| PathBoundSolution::Unsolved,
+    );
     assert!(matches!(result, Ok(Solutions::Constrained(_))));
 }
 
@@ -787,7 +800,7 @@ fn incomplete_solution_discards_the_projection() {
         };
 
         assert_eq!(
-            set.solutions_with(db, &env, inferable, budget, choose),
+            set.solutions_with(db, &env, inferable, budget, ReportDiagnostics::Yes, choose),
             Ok(Solutions::Constrained(SolutionPaths::BudgetExceeded(
                 alternatives.map(|ty| solution([binding(t, ty)])).into()
             )))
@@ -853,7 +866,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     }
                 };
                 assert_eq!(
-                    set.solutions_with(db, &env, inferable, budget, choose),
+                    set.solutions_with(db, &env, inferable, budget, ReportDiagnostics::Yes, choose),
                     Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
                         solution([binding(t, int),])
                     ])))
@@ -915,7 +928,14 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ),
     ] {
         assert_eq!(
-            set.solutions_with(db, &env, inferable, budget, |_, _| selected),
+            set.solutions_with(
+                db,
+                &env,
+                inferable,
+                budget,
+                ReportDiagnostics::Yes,
+                |_, _| selected
+            ),
             Ok(collected)
         );
         assert_eq!(
@@ -956,10 +976,17 @@ fn type_budget_is_charged_before_constructing_a_union() {
             ..SolutionBudget::default()
         };
         let mut selected = 0;
-        let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
-            selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, bound)
-        });
+        let collected = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            budget,
+            ReportDiagnostics::Yes,
+            |_, bound| {
+                selected += 1;
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
+            },
+        );
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
         assert_eq!(selected, (max_type_terms + 1).min(3));
