@@ -303,8 +303,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     async_comprehensions: FxHashSet<FileScopeId>,
     /// Node indices of syntactic annotation roots.
     annotations: Vec<NodeIndex>,
-    /// Snapshots of enclosing-scope place states visible from nested scopes.
-    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Snapshots taken when an eager scope finishes. These never need to be updated.
+    eager_snapshots: Vec<(EnclosingSnapshotKey, ScopedEnclosingSnapshotId)>,
+    /// A reassignment can update lazy snapshots of the same name in several nested scopes.
+    lazy_snapshots: FxHashMap<Name, Vec<(EnclosingSnapshotKey, ScopedEnclosingSnapshotId)>>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -360,7 +362,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             async_comprehensions: FxHashSet::default(),
             annotations: Vec::new(),
 
-            enclosing_snapshots: FxHashMap::default(),
+            eager_snapshots: Vec::new(),
+            lazy_snapshots: FxHashMap::default(),
 
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
@@ -586,7 +589,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place,
                     ancestor.is_lexically_visible,
                 );
-                self.enclosing_snapshots.insert(key, eager_snapshot);
+                self.eager_snapshots.push((key, eager_snapshot));
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
@@ -767,7 +770,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place.into(),
                     !enclosing_scope_kind.is_class(),
                 );
-                self.enclosing_snapshots.insert(key, lazy_snapshot);
+                self.lazy_snapshots
+                    .entry(nested_symbol.name().clone())
+                    .or_default()
+                    .push((key, lazy_snapshot));
             }
         }
     }
@@ -806,47 +812,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each matching snapshot is updated independently"
-        )]
-        for (key, snapshot_id) in &self.enclosing_snapshots {
-            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
-                let name = self.place_tables[key.enclosing_scope]
-                    .symbol(enclosing_symbol)
-                    .name();
-                let is_reassignment_of_snapshotted_symbol = || {
-                    for (ancestor, _) in self.visible_ancestor_scopes(key.enclosing_scope) {
-                        if ancestor == current_scope {
-                            return true;
-                        }
-                        let ancestor_table = &self.place_tables[ancestor];
-                        // If there is a symbol binding in an ancestor scope,
-                        // then a reassignment in the current scope is not relevant to the snapshot.
-                        if ancestor_table
-                            .symbol_id(name)
-                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
-                        {
-                            return false;
-                        }
-                    }
-                    false
-                };
-
-                if key.nested_laziness.is_lazy()
-                    && symbol.name() == name
-                    && is_reassignment_of_snapshotted_symbol()
-                {
-                    self.use_def_maps[key.enclosing_scope]
-                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
-                }
+        let name = symbol.name();
+        let Some(snapshots) = self.lazy_snapshots.get(name) else {
+            return;
+        };
+        for &(key, snapshot_id) in snapshots {
+            // A binding between the snapshot and this scope shadows the reassignment.
+            let first_binding =
+                self.visible_ancestor_scopes(key.enclosing_scope)
+                    .find(|(ancestor, _)| {
+                        let table = &self.place_tables[*ancestor];
+                        *ancestor == current_scope
+                            || table
+                                .symbol_id(name)
+                                .is_some_and(|id| table.symbol(id).is_bound())
+                    });
+            if first_binding.is_some_and(|(ancestor, _)| ancestor == current_scope) {
+                self.use_def_maps[key.enclosing_scope]
+                    .update_enclosing_snapshot(snapshot_id, key.enclosing_place.expect_symbol());
             }
         }
     }
 
-    fn sweep_nonlocal_lazy_snapshots(&mut self) {
-        if self.enclosing_snapshots.is_empty() {
-            return;
+    fn finish_enclosing_snapshots(
+        &mut self,
+    ) -> FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId> {
+        let mut snapshots = std::mem::take(&mut self.eager_snapshots);
+        if self.lazy_snapshots.is_empty() {
+            return FrozenMap::from_entries(snapshots);
         }
 
         // Only the last scope containing a bound nonlocal matters: a lazy snapshot must be
@@ -861,24 +854,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        if last_nonlocal_binding.is_empty() {
-            return;
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "FrozenMap::from_entries sorts snapshots by their unique keys"
+        )]
+        for (name, lazy) in self.lazy_snapshots.drain() {
+            let last_nonlocal = last_nonlocal_binding.get(&name);
+            snapshots.extend(lazy.into_iter().filter(|(key, _)| {
+                last_nonlocal.is_none_or(|scope| scope.index() < key.enclosing_scope.index())
+            }));
         }
-
-        self.enclosing_snapshots.retain(|key, _| {
-            if key.nested_laziness.is_eager() {
-                return true;
-            }
-            let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
-                return true;
-            };
-            let name = self.place_tables[key.enclosing_scope]
-                .symbol(symbol_id)
-                .name();
-            last_nonlocal_binding
-                .get(name)
-                .is_none_or(|scope| scope.index() < key.enclosing_scope.index())
-        });
+        FrozenMap::from_entries(snapshots)
     }
 
     /// Finds the nearest visible ancestor scope that actually owns a local binding for `name`.
@@ -3397,7 +3383,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.sweep_nonlocal_lazy_snapshots();
+        let enclosing_snapshots = self.finish_enclosing_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
@@ -3466,7 +3452,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
+            enclosing_snapshots,
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
