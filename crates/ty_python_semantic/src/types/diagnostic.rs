@@ -415,7 +415,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-key.md")]
     pub(crate) static INVALID_TYPED_DICT_KEY = {
         summary: "detects invalid keys when accessing TypedDict items",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -1471,7 +1471,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/non-literal-typed-dict-key.md")]
     pub(crate) static NON_LITERAL_TYPED_DICT_KEY = {
         summary: "detects non-literal string keys in TypedDict subscripts",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -1480,7 +1480,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unknown-typed-dict-constructor-key.md")]
     pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
         summary: "detects unknown keys when constructing a TypedDict",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
