@@ -1453,13 +1453,13 @@ class Intermediate(Base):
     #
     # The opt-in mutable-override rule rejects this narrowing.
     #
-    redeclared_with_narrower_type: str  # error: [invalid-mutable-override]
+    redeclared_with_narrower_type: str  # error: [incompatible-mutable-override]
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
-    redeclared_with_wider_type: str | int | None  # error: [invalid-attribute-override]
+    redeclared_with_wider_type: str | int | None  # error: [incompatible-attribute-override]
 
     overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
@@ -1471,9 +1471,9 @@ class Intermediate(Base):
     def set_attributes(self) -> None:
         self.redeclared_in_method_with_same_type: str | None = None
 
-        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [invalid-mutable-override]
+        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [incompatible-mutable-override]
 
-        self.redeclared_in_method_with_wider_type: object = object()  # error: [invalid-attribute-override]
+        self.redeclared_in_method_with_wider_type: object = object()  # error: [incompatible-attribute-override]
 
         self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
@@ -3183,7 +3183,7 @@ class Invalid(Base):
     values = ("wrong",)  # error: [invalid-assignment]
 
 class Redeclared(Base):
-    value: str = "child"  # error: [invalid-mutable-override]
+    value: str = "child"  # error: [incompatible-mutable-override]
 
 reveal_type(Redeclared.value)  # revealed: str
 ```
@@ -3246,7 +3246,7 @@ class Right:
     value: bytes = b""
 
 class Child(Left, Right):
-    value = "child"  # error: [invalid-attribute-override]
+    value = "child"  # error: [incompatible-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
@@ -3415,12 +3415,12 @@ class Other:
     value: bytes = b""
 
 class Child(Intermediate, Other):
-    value = 1  # error: [invalid-attribute-override]
+    value = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
 class Invalid(Intermediate, Other):
-    # error: [invalid-attribute-override]
+    # error: [incompatible-attribute-override]
     value = b"wrong"  # error: [invalid-assignment]
 ```
 
@@ -3534,11 +3534,11 @@ class Left(Root):
     value = 1
 
 class Right(Root):
-    value: str = "right"  # error: [invalid-attribute-override]
+    value: str = "right"  # error: [incompatible-attribute-override]
 
 class Child(Left, Right):
     # error: [invalid-assignment]
-    # error: [invalid-attribute-override]
+    # error: [incompatible-attribute-override]
     value = "wrong"
 
 reveal_type(Child.value)  # revealed: int
@@ -4001,7 +4001,7 @@ return type for error recovery.
 class InvalidGetAttribute:
     defined: bool = True
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 
@@ -4035,7 +4035,7 @@ An incompatible type for the attribute name also makes the implicit call invalid
 
 ```py
 class InvalidNameType:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self, name: int) -> bytes:
         return b"fallback"
 
@@ -4050,7 +4050,7 @@ the subclass.
 
 ```py
 class InvalidBase:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4087,7 +4087,7 @@ An invalid `__getattribute__` raises before Python can call an otherwise valid `
 
 ```py
 class CustomAccess:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4229,7 +4229,7 @@ attributes. Their original types remain available for error recovery.
 
 ```py
 class Meta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4253,7 +4253,7 @@ the class object.
 
 ```py
 class InvalidBaseMeta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4411,7 +4411,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -5173,7 +5173,7 @@ class Base:
         return Sub()
 
 class Sub(Base):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def flip(self) -> "Base":
         return Base()
 

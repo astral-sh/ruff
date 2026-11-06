@@ -760,7 +760,7 @@ class Different:
 import first
 import second
 
-# error: [invalid-method-override] "Base classes for class `mdtest_snippet.Model` define method `method` incompatibly: `first.Model.method` is incompatible with `Different.method`"
+# error: [incompatible-method-override] "Base classes for class `mdtest_snippet.Model` define method `method` incompatibly: `first.Model.method` is incompatible with `Different.method`"
 class Model(first.Model, second.Different): ...
 ```
 

@@ -2434,7 +2434,7 @@ class Gradual(Base[Any]): ...
 class Concrete(Base[int]): ...
 
 class Invalid(Gradual, Concrete):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 
@@ -2448,7 +2448,7 @@ invalid override produces one diagnostic.
 
 ```py
 class Reversed(Concrete, Gradual):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 
@@ -2457,7 +2457,7 @@ class Combined(Gradual, Concrete): ...
 reveal_type(Combined().method())  # revealed: Any
 
 class Indirect(Combined):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -2481,7 +2481,7 @@ class Strings(Gradual):
         return ""
 
 class Child(Strings, Concrete):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 
@@ -2497,7 +2497,7 @@ intermediate class.
 class Intermediate(Strings): ...
 
 class IndirectChild(Intermediate, Concrete):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -2508,7 +2508,7 @@ Specializing a generic intermediate class also specializes the inherited method'
 class GenericDiamond(Gradual, Base[T]): ...
 
 class Specialized(GenericDiamond[int]):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -2530,7 +2530,7 @@ class Base(Generic[T]):
         raise NotImplementedError
 
 class Invalid(Base[Any]):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self, value: str) -> Any:
         return value
 
@@ -4202,13 +4202,13 @@ class Same(Base[int]):
         return True
 
 class Narrow(Base[int]):
-    value: bool  # error: [invalid-mutable-override]
+    value: bool  # error: [incompatible-mutable-override]
 
 class Incompatible(Base[int]):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
     @property
-    def readonly(self) -> str:  # error: [invalid-property-type-override]
+    def readonly(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 
@@ -4217,7 +4217,7 @@ repeat an incompatibility already introduced by the parent.
 
 ```py
 class WithDefault(Base[int]):
-    value: str = ""  # error: [invalid-attribute-override]
+    value: str = ""  # error: [incompatible-attribute-override]
 
 class Grandchild(WithDefault):
     value: str = ""  # ok
@@ -4235,7 +4235,7 @@ class Gradual(Base[Any]):
 class Concrete(Base[int]): ...
 
 class NewConflict(Gradual, Concrete):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 ## Attribute annotations in generic constructors
@@ -4263,10 +4263,10 @@ fails to preserve the inherited type.
 ```py
 class Narrow(Base[int]):
     def __init__(self) -> None:
-        self.value: bool = True  # error: [invalid-mutable-override]
+        self.value: bool = True  # error: [incompatible-mutable-override]
 
 class Incompatible(Base[int]):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 ## Specialized declarations after a dynamic base
@@ -4384,7 +4384,7 @@ class String(Base[Any]):  # ok
         return ""
 
 class Integer(Base[int]): ...
-class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+class Conflict(String, Integer): ...  # error: [incompatible-property-override]
 ```
 
 An explicit override is also checked against `Base[int]`, and the error is reported only at the
@@ -4393,7 +4393,7 @@ override.
 ```py
 class Explicit(String, Integer):
     @property
-    def value(self) -> str:  # error: [invalid-property-type-override]
+    def value(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 

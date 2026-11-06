@@ -206,7 +206,7 @@ stored callable must not replace that explicitly defined attribute.
 
 ```py
 class HiddenGetter(property):
-    fget: None = None  # error: [invalid-mutable-override]
+    fget: None = None  # error: [incompatible-mutable-override]
 
 def get_value(obj: object) -> int:
     return 1

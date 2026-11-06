@@ -17,7 +17,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
  2 |     __bool__: None = None
  3 | 
  4 | class A:
- 5 |     # error: [invalid-method-override]
+ 5 |     # error: [incompatible-method-override]
  6 |     def __eq__(self, other) -> NotBoolable:
  7 |         return NotBoolable()
  8 | 
@@ -35,7 +35,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md
 # Diagnostics
 
 ```
-error[invalid-method-override]: Invalid override of method `__eq__`
+error[incompatible-method-override]: Invalid override of method `__eq__`
    --> src/mdtest_snippet.py:6:9
     |
   6 |     def __eq__(self, other) -> NotBoolable:

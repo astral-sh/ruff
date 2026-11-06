@@ -20,7 +20,7 @@ class Base:
 
 class Child(Base):
     @property
-    def value(self) -> str:  # error: [invalid-property-type-override]
+    def value(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 

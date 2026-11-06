@@ -23,7 +23,8 @@ use crate::{
         context::InferContext,
         dedicated::django,
         diagnostic::{
-            INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
+            INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_MUTABLE_OVERRIDE,
+            INCOMPATIBLE_PROPERTY_OVERRIDE,
         },
     },
 };
@@ -414,9 +415,9 @@ impl AttributeViolation<'_> {
     /// Property violations have a dedicated rule, including incompatible writes.
     const fn rule(&self, involves_property: bool) -> &'static LintMetadata {
         match self {
-            _ if involves_property => &INVALID_PROPERTY_TYPE_OVERRIDE,
-            Self::Write { .. } => &INVALID_MUTABLE_OVERRIDE,
-            Self::Read { .. } | Self::ReadOnly => &INVALID_ATTRIBUTE_OVERRIDE,
+            _ if involves_property => &INCOMPATIBLE_PROPERTY_OVERRIDE,
+            Self::Write { .. } => &INCOMPATIBLE_MUTABLE_OVERRIDE,
+            Self::Read { .. } | Self::ReadOnly => &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
         }
     }
 }
