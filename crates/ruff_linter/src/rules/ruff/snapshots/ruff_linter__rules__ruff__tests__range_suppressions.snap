@@ -485,4 +485,5 @@ help: Remove unused suppression
     - # ruff:disable[F401]
 175 | print("goodbye")
     - # ruff:enable[F401]
+176 |
     |

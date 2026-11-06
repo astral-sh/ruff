@@ -1025,3 +1025,92 @@ select = ["D100"]
 #!/usr/bin/env python
 # ruff:ignore[D100]
 ```
+
+## Suppressing `RUF104` (`unmatched-suppression-comment`)
+
+```toml
+[lint]
+preview = true
+select = ["E741", "F841", "RUF100", "RUF104"]
+```
+
+### `ruff:ignore`
+
+`RUF104` can be suppressed with an `ignore` comment by code or name:
+
+```py
+def f():
+    # ruff: disable[F841]  # ruff: ignore[RUF104]
+    foo = 0
+
+def g():
+    # ruff: disable[F841]  # ruff: ignore[unmatched-suppression-comment]
+    foo = 0
+```
+
+### `ruff:file-ignore`
+
+`RUF104` can be suppressed with `file-ignore`:
+
+```py
+# ruff: file-ignore[RUF104]
+def f():
+    # ruff: disable[F841]
+    foo = 0
+```
+
+### `ruff:file-ignore` with rule name
+
+`RUF104` can be suppressed with `file-ignore` by rule name:
+
+```py
+# ruff: file-ignore[unmatched-suppression-comment]
+def f():
+    # ruff: disable[F841]
+    foo = 0
+```
+
+### `ruff:disable` / `ruff:enable` pair
+
+`RUF104` can be suppressed within a `disable`/`enable` pair by code or name:
+
+```py
+# ruff: disable[RUF104]
+def f():
+    # ruff: disable[F841]
+    foo = 0
+# ruff: enable[RUF104]
+
+# ruff: disable[unmatched-suppression-comment]
+def g():
+    # ruff: disable[F841]
+    foo = 0
+# ruff: enable[unmatched-suppression-comment]
+```
+
+### Unmatched `ruff:disable` cannot suppress itself
+
+An unmatched `disable[RUF104]` cannot suppress itself or other unmatched comments:
+
+```py
+def f():
+    # error: [unused-noqa]
+    # ruff: disable[RUF104]
+    # error: [unmatched-suppression-comment]
+    # ruff: disable[F841]
+    foo = 0
+```
+
+### Unused suppression for `RUF104`
+
+Unused suppressions for `RUF104` are still reported as `RUF100`:
+
+```py
+# error: [unused-noqa]
+# ruff: ignore[RUF104]
+```
+
+```py
+# error: [unused-noqa]
+# ruff: file-ignore[RUF104]
+```
