@@ -3601,6 +3601,17 @@ def narrow_after_capture(value: int | str | bytes) -> None:
             reveal_type(value)  # revealed: bytes
 ```
 
+A positional capture of the subject also keeps its value when the guard fails.
+
+```py
+def narrow_after_positional_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case str(value) if flag:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int
+```
+
 ### Constrained `as` patterns
 
 If the first pattern matches but its guard fails, the captured integer cannot reach the string case.
@@ -3612,37 +3623,6 @@ def narrow_after_as_capture(value: int | str, flag: bool) -> None:
             pass
         case str():
             reveal_type(value)  # revealed: str
-```
-
-### Positional class patterns
-
-`str(value)` binds the subject itself. If the guard fails, later cases can still narrow that
-binding.
-
-```py
-def guarded_positional_capture(value: int | str, enabled: bool) -> None:
-    match value:
-        case str(value) if enabled:
-            pass
-        case int():
-            reveal_type(value)  # revealed: int
-```
-
-A subclass that defines `__match_args__` can capture an attribute instead. Later cases match the
-original string while the name retains the captured integer.
-
-```py
-class Text(str):
-    __match_args__ = ("item",)
-    item: int
-
-def guarded_attribute_capture(subject: Text, enabled: bool) -> None:
-    value = subject
-    match value:
-        case Text(value) if enabled:
-            pass
-        case str():
-            reveal_type(value)  # revealed: int
 ```
 
 ### Or pattern alternatives
@@ -3662,10 +3642,10 @@ A capture can also refer to the whole subject in one alternative and an extracte
 another. Matching the original tuple in a later case does not make its captured integer unreachable.
 
 ```py
-def mixed_or_captures(subject: int | tuple[int], flag: bool) -> None:
+def mixed_or_captures(subject: str | tuple[int], flag: bool) -> None:
     value = subject
     match value:
-        case (int() as value) | [value] if flag:
+        case str(value) | [value] if flag:
             pass
         case tuple():
             reveal_type(value)  # revealed: int

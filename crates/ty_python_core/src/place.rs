@@ -1,9 +1,12 @@
-use crate::PossiblyNarrowedPlaces;
+use crate::expression::Expression;
 use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
     ScopedMemberId,
 };
+use crate::predicate::PatternPredicate;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use crate::{Db, PossiblyNarrowedPlaces};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
@@ -612,18 +615,28 @@ impl FusedIterator for ParentPlaceIter<'_> {}
 ///
 /// This mirrors the structure of `NarrowingConstraintsBuilder` but only computes which places
 /// *could* be narrowed, without performing type inference to determine the actual constraints.
-pub(crate) struct PossiblyNarrowedPlacesBuilder<'a> {
+pub(crate) struct PossiblyNarrowedPlacesBuilder<'db, 'a> {
+    db: &'db dyn Db,
     places: &'a PlaceTableBuilder,
 }
 
-impl<'a> PossiblyNarrowedPlacesBuilder<'a> {
-    pub(crate) fn new(places: &'a PlaceTableBuilder) -> Self {
-        Self { places }
+impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
+    pub(crate) fn new(db: &'db dyn Db, places: &'a PlaceTableBuilder) -> Self {
+        Self { db, places }
     }
 
     /// Compute possibly narrowed places for an expression predicate.
     pub(crate) fn expression(self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
         self.expression_node(expr)
+    }
+
+    /// Compute possibly narrowed places for a pattern predicate.
+    pub(crate) fn pattern(
+        self,
+        pattern: PatternPredicate<'db>,
+        module: &ParsedModuleRef,
+    ) -> PossiblyNarrowedPlaces {
+        self.pattern_kind(pattern.subject(self.db), module)
     }
 
     fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
@@ -797,5 +810,24 @@ impl<'a> PossiblyNarrowedPlacesBuilder<'a> {
             }
             _ => {}
         }
+    }
+
+    /// Pattern predicates narrow the match subject.
+    fn pattern_kind(
+        &self,
+        subject: Expression<'db>,
+        module: &ParsedModuleRef,
+    ) -> PossiblyNarrowedPlaces {
+        let mut places = PossiblyNarrowedPlaces::default();
+
+        let subject_node = subject.node_ref(self.db).node(module);
+        for expression in match_subject_place_expressions(subject_node) {
+            if let Some(place) = PlaceExpr::try_from_expr(expression)
+                .and_then(|place| self.places.place_id((&place).into()))
+            {
+                places.insert(place);
+            }
+        }
+        places
     }
 }

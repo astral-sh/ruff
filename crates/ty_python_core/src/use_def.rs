@@ -267,7 +267,10 @@ use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
 };
 use crate::place::{PlaceExprRef, ScopedPlaceId};
-use crate::predicate::{PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId};
+use crate::predicate::{
+    PatternPredicate, Predicate, PredicateNode, PredicateOrLiteral, Predicates, PredicatesBuilder,
+    ScopedPredicateId,
+};
 use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
@@ -290,20 +293,12 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
-/// A binding that can still refer to the value initially read by a `match` statement.
-pub(super) struct MatchSubjectBinding {
-    definition: ScopedDefinitionId,
-    /// If a positional class pattern extracted an attribute, later cases test a different value.
-    pub(super) when_extracted: ScopedNarrowingConstraint,
-}
-
-impl MatchSubjectBinding {
-    pub(super) fn new(definition: ScopedDefinitionId) -> Self {
-        Self {
-            definition,
-            when_extracted: ScopedNarrowingConstraint::ALWAYS_FALSE,
-        }
-    }
+/// Bindings of one place that a case can narrow. Captures from a single pattern share the
+/// same fallback for values that pattern extracted from the subject.
+pub(super) struct MatchSubjectBindings {
+    pub(super) place: ScopedPlaceId,
+    pub(super) definitions: SmallVec<[ScopedDefinitionId; 2]>,
+    pub(super) extracted: ScopedNarrowingConstraint,
 }
 
 /// Summarizes whether the live control-flow paths leave a symbol bound.
@@ -2428,57 +2423,95 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    /// Record the path where a case matched or failed. The path applies to every place, but the
-    /// pattern narrows only bindings that still refer to the saved subject.
+    /// Capture definitions created by this pattern replace the subject name if its guard fails.
+    pub(super) fn match_captures(
+        &mut self,
+        pattern: PatternPredicate<'db>,
+        symbol: ScopedSymbolId,
+        first_capture: ScopedDefinitionId,
+    ) -> Option<MatchSubjectBindings> {
+        let definitions: SmallVec<[_; 2]> = self
+            .symbol_binding_definition_ids(symbol)
+            .filter(|id| *id >= first_capture)
+            .collect();
+        if definitions.is_empty() {
+            return None;
+        }
+        let place = symbol.into();
+        let predicate = self.predicates.add_predicate(Predicate {
+            node: PredicateNode::PatternExtractedCapture(pattern),
+            is_positive: true,
+        });
+        self.predicate_narrowing_targets.push((predicate, place));
+        Some(MatchSubjectBindings {
+            place,
+            definitions,
+            extracted: self.narrowing_constraints.add_atom(predicate),
+        })
+    }
+
+    /// A match narrows only the bindings that supplied the subject. A scope-wide narrowing gate
+    /// would also constrain a replacement assigned in an earlier guard.
     pub(super) fn record_match_branch(
         &mut self,
         predicate: ScopedPredicateId,
-        subjects: &[(ScopedPlaceId, SmallVec<[MatchSubjectBinding; 2]>)],
+        targets: &[MatchSubjectBindings],
         is_positive: bool,
     ) {
-        let entry = self.pending_reachability.current;
-        let reachability = self.reachability_constraints.add_atom(predicate);
-        let reachability = if is_positive {
-            reachability
+        let atom = self.reachability_constraints.add_atom(predicate);
+        let constraint = if is_positive {
+            atom
         } else {
-            self.reachability_constraints
-                .add_not_constraint(reachability)
+            self.reachability_constraints.add_not_constraint(atom)
         };
-        self.record_reachability_constraint(reachability);
+        self.record_branch_constraints(constraint, ScopedNarrowingConstraint::ALWAYS_TRUE);
 
-        if subjects.is_empty()
+        if targets.is_empty()
             || predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
             return;
         }
-
-        let constraint = if is_positive {
+        let pattern = if is_positive {
             self.predicate_narrowing_targets
-                .extend(subjects.iter().map(|(place, _)| (predicate, *place)));
+                .extend(targets.iter().map(|target| (predicate, target.place)));
             self.narrowing_constraints.add_atom(predicate)
         } else {
             self.narrowing_constraints.add_negated_atom(predicate)
         };
-        for (place, bindings) in subjects {
-            let state =
-                pending_place_state_mut(*place, &mut self.symbol_states, &mut self.member_states);
-            self.pending_reachability
-                .materialize(
-                    state,
-                    entry,
-                    &mut self.narrowing_constraints,
-                    &mut self.reachability_constraints,
-                )
-                .record_narrowing_constraint_for_bindings(
-                    &mut self.narrowing_constraints,
-                    constraint,
-                    bindings,
-                );
-            // A later merge must not apply the same pattern a second time to every binding,
-            // including an attribute capture or an assignment made in an earlier guard.
-            state.narrowing = self.pending_reachability.current;
+        for target in targets {
+            // A later case can narrow the subject but must preserve values extracted into its name.
+            let constraint = self
+                .narrowing_constraints
+                .add_or_constraint(pattern, target.extracted);
+            self.record_narrowing_constraint_for_bindings(
+                constraint,
+                target.place,
+                &target.definitions,
+            );
         }
+    }
+
+    fn record_narrowing_constraint_for_bindings(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        place: ScopedPlaceId,
+        bindings: &[ScopedDefinitionId],
+    ) {
+        let pending = self.pending_reachability.current;
+        let state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let state = self.pending_reachability.materialize(
+            state,
+            pending,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        state.record_narrowing_constraint_for_bindings(
+            &mut self.narrowing_constraints,
+            constraint,
+            bindings,
+        );
     }
 
     /// Records a negated narrowing constraint for only the specified places.
@@ -2685,15 +2718,23 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         reachability_constraint: ScopedReachabilityConstraintId,
     ) {
-        self.checkpoint_flow = self
-            .reachability_constraints
-            .add_and_constraint(self.checkpoint_flow, reachability_constraint);
         let narrowing_constraint = if self.reachability_narrowing_enabled {
             self.reachability_constraints
                 .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints)
         } else {
             ScopedNarrowingConstraint::ALWAYS_TRUE
         };
+        self.record_branch_constraints(reachability_constraint, narrowing_constraint);
+    }
+
+    fn record_branch_constraints(
+        &mut self,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        narrowing_constraint: ScopedNarrowingConstraint,
+    ) {
+        self.checkpoint_flow = self
+            .reachability_constraints
+            .add_and_constraint(self.checkpoint_flow, reachability_constraint);
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 

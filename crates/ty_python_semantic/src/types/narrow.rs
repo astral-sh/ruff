@@ -102,6 +102,10 @@ pub(crate) fn infer_narrowing_constraints<'db>(
                 .and_then(|constraints| constraints.get(&place).cloned());
             (positive, negative)
         }
+        PredicateNode::PatternExtractedCapture(pattern) => {
+            let ty = pattern_capture_types(db, pattern, Captures::Extracted).binding_type(place);
+            (Some(NarrowingConstraint::intersection(ty)), None)
+        }
         PredicateNode::SubjectElementPattern(subject_element) => {
             let positive = all_narrowing_constraints_for_subject_element_pattern(
                 db,
@@ -111,8 +115,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             .and_then(|constraints| constraints.get(&place).cloned());
             (positive, None)
         }
-        PredicateNode::ClassPatternMatchesSelf(_)
-        | PredicateNode::ContextManagerSuppresses { .. }
+        PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
@@ -472,18 +475,32 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
 ///         case item:
 ///             reveal_type(item)  # str
 /// ```
+pub(crate) fn pattern_success_types<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> &'db PatternSuccessTypes<'db> {
+    pattern_capture_types(db, pattern, Captures::All)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum Captures {
+    All,
+    Extracted,
+}
+
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
-    cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>| {
+    cycle_initial=|_, id, _, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
         result.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn pattern_success_types<'db>(
+fn pattern_capture_types<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
+    captures: Captures,
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
     let env = ProgramEnvironment::from_scope(subject.scope(db));
@@ -495,7 +512,12 @@ pub(crate) fn pattern_success_types<'db>(
         bindings: result
             .bindings
             .into_iter()
-            .map(|(place, binding)| (place, binding.ty(db, &env)))
+            .map(|(place, mut binding)| {
+                if captures == Captures::Extracted {
+                    binding.contributions.retain(|part| !part.aliases_subject);
+                }
+                (place, binding.ty(db, &env))
+            })
             .collect(),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
@@ -1720,7 +1742,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
-            PredicateNode::ClassPatternMatchesSelf(_)
+            PredicateNode::PatternExtractedCapture(_)
             | PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
@@ -3529,9 +3551,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let db = self.db;
         match self.predicate {
             PredicateNode::Expression(expression)
-            | PredicateNode::ClassPatternMatchesSelf(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
-            PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::Pattern(pattern) | PredicateNode::PatternExtractedCapture(pattern) => {
+                pattern.scope(db)
+            }
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
             PredicateNode::OrPatternAlternative(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {

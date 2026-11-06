@@ -55,7 +55,6 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
 use smallvec::{SmallVec, smallvec};
 
-use super::MatchSubjectBinding;
 use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
@@ -632,15 +631,10 @@ impl PlaceState {
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
-        bindings: &[MatchSubjectBinding],
+        bindings: &[ScopedDefinitionId],
     ) {
         for binding in &mut self.bindings.live_bindings {
-            if let Some(subject) = bindings
-                .iter()
-                .find(|subject| subject.definition == binding.binding())
-            {
-                let constraint =
-                    narrowing_constraints.add_or_constraint(subject.when_extracted, constraint);
+            if bindings.contains(&binding.binding()) {
                 binding.narrowing_constraint = narrowing_constraints
                     .add_and_constraint(binding.narrowing_constraint, constraint);
             }

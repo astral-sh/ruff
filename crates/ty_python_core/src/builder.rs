@@ -43,6 +43,7 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
+use crate::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -67,7 +68,7 @@ use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, MatchSubjectBinding, PreviousDefinitions, ScopedDefinitionId,
+    LiveBindingStatus, MatchSubjectBindings, PreviousDefinitions, ScopedDefinitionId,
     ScopedEnclosingSnapshotId, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
@@ -1147,7 +1148,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         let place_table = self.current_place_table();
-        let narrowed_places = PossiblyNarrowedPlacesBuilder::new(place_table).expression(value);
+        let narrowed_places =
+            PossiblyNarrowedPlacesBuilder::new(self.db, place_table).expression(value);
 
         // Don't register if the target itself is one of the narrowed places (e.g. `x = x is None`),
         // since the alias would be invalidated immediately by this same assignment.
@@ -1317,8 +1319,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .expression
                     .node_ref(self.db)
                     .node(self.module);
-                let aliased_places = PossiblyNarrowedPlacesBuilder::new(self.current_place_table())
-                    .expression(aliased_node);
+                let aliased_places =
+                    PossiblyNarrowedPlacesBuilder::new(self.db, self.current_place_table())
+                        .expression(aliased_node);
                 places.extend(aliased_places);
             }
         });
@@ -2373,21 +2376,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 match pred.node {
                     PredicateNode::Expression(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
-                        let mut places = PossiblyNarrowedPlacesBuilder::new(place_table)
+                        let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
                         self.add_alias_narrowed_places(expression_node, &mut places);
                         places
                     }
-                    // Match patterns narrow the saved subject bindings in `record_match_branch`.
-                    PredicateNode::Pattern(_)
+                    PredicateNode::Pattern(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .pattern(pattern, module)
+                    }
+                    PredicateNode::PatternExtractedCapture(_)
                     | PredicateNode::SubjectElementPattern(_)
-                    | PredicateNode::ClassPatternMatchesSelf(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
-                    | PredicateNode::StarImportPlaceholder(_) => PossiblyNarrowedPlaces::default(),
+                    | PredicateNode::StarImportPlaceholder(_) => {
+                        // These predicates don't narrow any places
+                        PossiblyNarrowedPlaces::default()
+                    }
                 }
             }
         }
@@ -2815,22 +2824,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_matched_pattern(
         &mut self,
         pattern_predicate: PatternPredicate<'db>,
-        subject_targets: &[(ScopedPlaceId, SmallVec<[MatchSubjectBinding; 2]>)],
+        subject_targets: &[MatchSubjectBindings],
         sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         is_catchall: bool,
     ) -> ScopedPredicateId {
+        let predicate = PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::Pattern(pattern_predicate),
+            is_positive: true,
+        });
+
         // For the last catchall case (irrefutable wildcard without guard), we skip
         // recording the narrowing constraint from the pattern. The accumulated negated
         // constraints from earlier cases (~P1, ~P2, ...) are sufficient. This ensures
         // `P1 OR (~P1 AND P2) OR (~P1 AND ~P2)` simplifies to ALWAYS_TRUE, preserving
-        // the original type after an exhaustive match.
+        // the original type after an exhaustive match. The reachability and pattern
+        // predicates are still created normally for proper control flow tracking.
         let predicate_id = if is_catchall {
             ScopedPredicateId::ALWAYS_TRUE
+        } else if subject_targets.is_empty() && sequence_subject_targets.is_empty() {
+            self.record_narrowing_constraint(predicate)
         } else {
-            let predicate_id = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
-                node: PredicateNode::Pattern(pattern_predicate),
-                is_positive: true,
-            }));
+            let predicate_id = self.add_predicate(predicate);
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
                     self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
@@ -2854,67 +2868,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut()
             .record_match_branch(predicate_id, subject_targets, true);
         predicate_id
-    }
-
-    /// Retain captures that bind the entire subject to its original name. These definitions
-    /// still refer to the saved subject if a guard fails, so later cases can narrow them.
-    fn extend_match_subject_bindings(
-        &mut self,
-        pattern: &ast::Pattern,
-        symbol: ScopedSymbolId,
-        bindings: &mut SmallVec<[MatchSubjectBinding; 2]>,
-    ) {
-        match pattern {
-            ast::Pattern::MatchAs(pattern) => {
-                if let Some(name) = &pattern.name
-                    && let Some(definition) = self
-                        .definitions_by_node
-                        .get(&name.into())
-                        .and_then(|definitions| definitions.first())
-                {
-                    let use_def = self.current_use_def_map();
-                    bindings.extend(
-                        use_def
-                            .symbol_binding_definition_ids(symbol)
-                            .filter(|binding| {
-                                use_def.definition(*binding).definition() == Some(*definition)
-                            })
-                            .map(MatchSubjectBinding::new),
-                    );
-                }
-                if let Some(pattern) = &pattern.pattern {
-                    self.extend_match_subject_bindings(pattern, symbol, bindings);
-                }
-            }
-            ast::Pattern::MatchOr(pattern) => {
-                for pattern in &pattern.patterns {
-                    self.extend_match_subject_bindings(pattern, symbol, bindings);
-                }
-            }
-            ast::Pattern::MatchClass(class)
-                if let [positional] = class.arguments.patterns.as_slice() =>
-            {
-                let start = bindings.len();
-                self.extend_match_subject_bindings(positional, symbol, bindings);
-                if bindings.len() > start {
-                    // `str(x)` captures the subject, but `Box(x)` can capture an attribute.
-                    // Only type inference knows what the class expression resolves to.
-                    let class =
-                        self.expressions_by_node[&ExpressionNodeKey::from(class.cls.as_ref())];
-                    let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
-                        node: PredicateNode::ClassPatternMatchesSelf(class),
-                        is_positive: true,
-                    }));
-                    let constraints = &mut self.current_use_def_map_mut().narrowing_constraints;
-                    let extracted = constraints.add_negated_atom(predicate);
-                    for binding in &mut bindings[start..] {
-                        binding.when_extracted =
-                            constraints.add_or_constraint(binding.when_extracted, extracted);
-                    }
-                }
-            }
-            _ => {}
-        }
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -4952,24 +4905,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ))
                     })
                     .collect::<SmallVec<[_; 2]>>();
-                let mut subject_targets =
-                    SmallVec::<[(ScopedPlaceId, SmallVec<[MatchSubjectBinding; 2]>); 2]>::new();
+                let mut subject_targets = SmallVec::<[MatchSubjectBindings; 2]>::new();
                 for &(place, use_id) in &subject_places {
                     let bindings = if let Some(use_id) = use_id {
                         self.current_use_def_map()
                             .bindings_at_use(use_id)
                             .map(LiveBinding::binding)
-                            .map(MatchSubjectBinding::new)
                             .collect()
                     } else {
                         // A named-expression subject creates its target binding instead of reading
                         // one, so snapshot the binding that was just created.
                         self.current_use_def_map_mut()
                             .current_bindings(place)
-                            .map(|binding| MatchSubjectBinding::new(binding.binding()))
+                            .map(|binding| binding.binding())
                             .collect()
                     };
-                    subject_targets.push((place, bindings));
+                    subject_targets.push(MatchSubjectBindings {
+                        place,
+                        definitions: bindings,
+                        extracted: ScopedNarrowingConstraint::ALWAYS_FALSE,
+                    });
                 }
                 let subject_place = PlaceExpr::try_from_expr(subject.as_ref())
                     .and_then(|place| self.current_place_table().place_id((&place).into()));
@@ -5024,13 +4979,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         match_pattern_predicate,
                     ));
                     self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
+                    let first_capture = self.current_use_def_map().next_definition_id();
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    if let Some((ScopedPlaceId::Symbol(symbol), bindings)) = subject_targets
-                        .iter_mut()
-                        .find(|(place, _)| Some(*place) == subject_place)
+                    if case.guard.is_some()
+                        && let Some(ScopedPlaceId::Symbol(symbol)) = subject_place
+                        && let Some(captures) = self.current_use_def_map_mut().match_captures(
+                            match_pattern_predicate,
+                            symbol,
+                            first_capture,
+                        )
                     {
-                        self.extend_match_subject_bindings(&case.pattern, *symbol, bindings);
+                        subject_targets.push(captures);
                     }
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
                     // here because the effects of visiting a pattern is binding
