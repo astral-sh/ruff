@@ -1482,6 +1482,27 @@ fn benchmark_vararg_parameter_type_accumulation(criterion: &mut Criterion) {
     );
 }
 
+/// The inferred attribute type gives each nested dictionary a union context. The scalar
+/// sibling keeps the union present at each level, and the two leaves give the branches
+/// distinct types.
+fn benchmark_nested_dict_union_context(criterion: &mut Criterion) {
+    let nest = |leaf: &str| {
+        (0..10).fold(leaf.to_owned(), |inner, _| {
+            format!("{{'value': 0, 'next': {inner}}}")
+        })
+    };
+    let code = format!(
+        "
+        class Policies:
+            def __init__(self) -> None:
+                self.policies = {{0: {}, 1: {}}}
+        ",
+        nest("1"),
+        nest("'x'"),
+    );
+    benchmark_micro_case(criterion, "ty_micro[nested_dict_union_context]", &code);
+}
+
 /// Regression benchmark for contextual inference of `TypedDict.get` with a large literal union.
 ///
 /// Passing the result to a typed function should not retry inference against each literal in the
@@ -2841,6 +2862,7 @@ criterion_group!(
     benchmark_async_context_manager_recursive_protocol,
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
+    benchmark_nested_dict_union_context,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
