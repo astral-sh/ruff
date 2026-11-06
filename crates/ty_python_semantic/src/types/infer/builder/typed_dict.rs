@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 
 use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
-use crate::types::call::CallError;
+use crate::types::call::{Bindings, CallError};
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -66,6 +66,74 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// In `record.get("name", default)`, skip overloads for other keys before inferring `default`.
+    pub(super) fn narrow_typed_dict_get_overloads(
+        &self,
+        call: &ast::ExprCall,
+        callee: Type<'db>,
+        bindings: &mut Bindings<'db>,
+    ) {
+        let Some(key) = Self::literal_get_key(call) else {
+            return;
+        };
+        // Completions need every declared key, even when the cursor is inside a literal.
+        if self.collects_expected_types() {
+            return;
+        }
+        // If any receiver lacks the key, the full overload set supplies the type context for the default.
+        if !self.is_typed_dict_get_for_declared_key(callee, key) {
+            return;
+        }
+
+        bindings.retain_overloads(|signature| {
+            let literal_key = signature
+                .parameters()
+                .positional_only_by_name("key")
+                .and_then(|(_, parameter)| parameter.annotated_type().as_string_literal());
+            literal_key.is_none_or(|literal| literal.value(self.db()) == key)
+        });
+    }
+
+    /// Recognize `obj.get("key")` and `obj.get("key", default)`.
+    fn literal_get_key(call: &ast::ExprCall) -> Option<&str> {
+        if call.func.as_attribute_expr()?.attr.as_str() != "get"
+            || !call.arguments.keywords.is_empty()
+        {
+            return None;
+        }
+        let key = match &call.arguments.args[..] {
+            [key] => key,
+            [key, default] if !default.is_starred_expr() => key,
+            _ => return None,
+        };
+        Self::precise_string_literal_value(key.as_string_literal_expr()?)
+    }
+
+    fn is_typed_dict_get_for_declared_key(&self, callee: Type<'db>, key: &str) -> bool {
+        let db = self.db();
+        let receiver = match callee {
+            Type::Union(union) => {
+                return union
+                    .elements(db)
+                    .iter()
+                    .all(|&element| self.is_typed_dict_get_for_declared_key(element, key));
+            }
+            Type::BoundMethod(method) if matches!(method.func(db), Type::Callable(_)) => {
+                method.self_instance(db)
+            }
+            _ => return false,
+        };
+        let Type::TypedDict(typed_dict) = receiver else {
+            return false;
+        };
+        // An attribute named `get` can hold another method, such as `record.__setitem__`.
+        typed_dict.items(db).contains_key(key)
+            && receiver
+                .member(db, self.program_environment(), "get")
+                .ignore_possibly_undefined()
+                == Some(callee)
+    }
+
     /// Infer a `TypedDict(name, fields)` call expression.
     ///
     /// This method *does not* call `infer_expression` on the object being called;

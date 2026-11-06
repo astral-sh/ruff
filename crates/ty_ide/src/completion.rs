@@ -8306,7 +8306,7 @@ class Record(TypedDict):
     name: str
 
 def use(record: Record):
-    record.get("<CURSOR>")
+    record.get("<CURSOR>name")
 "#,
         );
 
