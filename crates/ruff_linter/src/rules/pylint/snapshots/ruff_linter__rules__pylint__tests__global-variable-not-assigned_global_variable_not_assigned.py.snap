@@ -18,3 +18,81 @@ PLW0602 Using global for `X` but no assignment is done
 10 |
 11 |     print(X)
    |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:23:12
+   |
+21 | # The enclosing function also declares `X` as global, so there's no local `X` to skip.
+22 | def f():
+23 |     global X
+   |            ^
+24 |
+25 |     def g():
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:26:16
+   |
+25 |     def g():
+26 |         global X
+   |                ^
+27 |
+28 |         print(X)
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:37:16
+   |
+36 |     def g():
+37 |         global X
+   |                ^
+38 |
+39 |         print(X)
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:48:16
+   |
+47 |     def g():
+48 |         global X
+   |                ^
+49 |
+50 |         print(X)
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:58:16
+   |
+57 |     def f(self):
+58 |         global X
+   |                ^
+59 |
+60 |         print(X)
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:68:16
+   |
+67 |     def g():
+68 |         global X
+   |                ^
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:76:16
+   |
+75 |     def g():
+76 |         global X
+   |                ^
+77 |
+78 |         def h():
+   |
+
+PLW0602 Using global for `X` but no assignment is done
+  --> global_variable_not_assigned.py:79:20
+   |
+78 |         def h():
+79 |             global X
+   |                    ^
+80 |
+81 |             print(X)
+   |
