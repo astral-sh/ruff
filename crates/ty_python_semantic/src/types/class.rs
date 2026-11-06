@@ -74,6 +74,7 @@ mod dynamic_literal;
 mod enum_literal;
 mod implicit_attributes;
 mod known;
+mod member_sources;
 mod named_tuple;
 mod slots;
 mod static_literal;
@@ -2262,18 +2263,11 @@ impl<'db> ClassType<'db> {
                 enum_lit.instance_member(db, env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                if class.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
                 class.instance_member(db, env, None, name)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = Some(generic.specialization(db));
-
-                if class_literal.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
 
                 // MRO lookup already specializes each member in the class that defines it.
                 // Applying the receiver's specialization again would also substitute type
@@ -2310,7 +2304,7 @@ impl<'db> ClassType<'db> {
     /// Names assigned through a method receiver in this class, excluding inherited names.
     pub(super) fn own_instance_attribute_names(self, db: &'db dyn Db) -> &'db [Name] {
         self.static_class_literal(db).map_or(&[], |(literal, _)| {
-            implicit_attributes::implicit_attribute_names(db, literal.body_scope(db))
+            member_sources::implicit_attribute_names(db, literal.body_scope(db))
         })
     }
 
@@ -3173,6 +3167,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    // An augmented assignment can still read a class attribute from this base.
+                    if pending_augmented_bindings.is_empty()
+                        && !class.may_define_own_instance_member(db, name)
+                    {
+                        continue;
+                    }
                     let member = class.own_instance_member(db, &self.env, name);
                     let definitely_declared = matches!(
                         member.inner.place,

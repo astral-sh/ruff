@@ -1,8 +1,10 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
-use std::{convert::Infallible, ops::ControlFlow, sync::Arc};
+use std::{convert::Infallible, ops::ControlFlow};
 
-use super::{MethodDecorator, static_literal::StaticClassLiteral};
+use super::{
+    MethodDecorator, member_sources::ClassMemberSources, static_literal::StaticClassLiteral,
+};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
@@ -18,7 +20,6 @@ use crate::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -52,26 +53,6 @@ impl<'db> StaticClassLiteral<'db> {
                 },
                 |attribute| Self::implicit_attribute_inner(db, attribute),
             )
-    }
-
-    /// Names assigned to a method's receiver, in sorted order.
-    pub(in crate::types) fn implicit_attribute_definition_names(
-        self,
-        db: &'db dyn Db,
-    ) -> &'db [Name] {
-        &self.member_sources(db).implicit_names
-    }
-
-    /// The class-body table and receiver assignments used by lookups on this class.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn member_sources(self, db: &'db dyn Db) -> ClassMemberSources<'db> {
-        let scope = self.body_scope(db);
-        let index = semantic_index(db, scope.program_file(db));
-        ClassMemberSources {
-            scope,
-            table: index.shared_place_table(scope.file_scope_id(db)),
-            implicit_names: collect_implicit_attribute_names(db, scope, true),
-        }
     }
 
     #[salsa::tracked(
@@ -472,22 +453,6 @@ fn implicit_attribute_binding_type<'db>(
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, false)
-}
-
-/// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ClassMemberSources<'db> {
-    pub(super) scope: ScopeId<'db>,
-    pub(super) table: Arc<ty_python_core::place::PlaceTable>,
-    implicit_names: Box<[Name]>,
-}
-
 impl<'db> ClassMemberSources<'db> {
     fn implicit_attribute_name(
         &self,
@@ -495,16 +460,8 @@ impl<'db> ClassMemberSources<'db> {
         name: &str,
         decorator: MethodDecorator,
     ) -> Option<ImplicitAttributeName<'db>> {
-        let index = self
-            .implicit_names
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .ok()?;
-        Some(ImplicitAttributeName::new(
-            db,
-            self.scope,
-            &self.implicit_names[index],
-            decorator,
-        ))
+        let name = self.receiver_attribute_name(name)?;
+        Some(ImplicitAttributeName::new(db, self.scope, name, decorator))
     }
 
     /// Does a method establish instance storage for an attribute already typed by the class?
@@ -530,32 +487,6 @@ impl<'db> ClassMemberSources<'db> {
                 StaticClassLiteral::implicit_attribute_inner(db, attribute).member
             })
     }
-}
-
-fn collect_implicit_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    defined_only: bool,
-) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.program_file(db));
-    let mut names = Vec::new();
-
-    for function_scope_id in attribute_scopes(db, class_body_scope) {
-        let table = index.place_table(function_scope_id);
-        if defined_only {
-            names.extend(table.defined_instance_attribute_names().map(Name::new));
-        } else {
-            names.extend(
-                table
-                    .members()
-                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-            );
-        }
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
 }
 
 fn implicit_attribute_cycle_recover<'db>(
