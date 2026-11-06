@@ -7031,8 +7031,32 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
+        /// The receiver determines how to specialize the method's overloads. Argument matching
+        /// mutates the resulting bindings, so each call site starts from its own copy.
+        #[expect(clippy::unnecessary_wraps, reason = "Salsa returns None on a cycle")]
+        #[salsa::tracked(returns(ref), no_eq, cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn prepared_method_bindings<'db>(
+            db: &'db dyn Db,
+            method: BoundMethodType<'db>,
+        ) -> Option<Box<Bindings<'db>>> {
+            let env = ProgramEnvironment::from_program(method.program(db));
+            let mut bindings = Box::new(Type::BoundMethod(method).bindings_impl(
+                db,
+                &env,
+                &ActiveRecursionDetector::default(),
+            ));
+            bindings.shrink_to_fit();
+            Some(bindings)
+        }
+
         if let Type::ClassLiteral(ClassLiteral::Static(class)) = self {
             return Self::static_class_bindings(db, env, class);
+        }
+        if let Type::BoundMethod(method) = self
+            && method.program(db) == env.program(db)
+            && let Some(prepared) = prepared_method_bindings(db, method)
+        {
+            return prepared.as_ref().clone();
         }
         self.bindings_impl(db, env, &ActiveRecursionDetector::default())
     }
