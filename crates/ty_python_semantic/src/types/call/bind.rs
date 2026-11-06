@@ -1046,6 +1046,44 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
+    /// A synthesized `TypedDict.get` has separate overloads for its literal keys, followed
+    /// by a fallback accepting `str`. A string literal cannot match another key's overloads.
+    pub(crate) fn retain_typed_dict_get_overloads(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: &str,
+    ) {
+        for element in &mut self.elements {
+            let Type::BoundMethod(method) = element.callable_type else {
+                continue;
+            };
+            let [CallableItem::Regular(callable)] = element.items.as_mut_slice() else {
+                continue;
+            };
+            let receiver = method.self_instance(db);
+            // An attribute named `get` can hold a different bound method. Only the
+            // synthesized getter has the fallback that accepts every string key.
+            if !receiver.is_typed_dict()
+                || method.func(db).as_callable().is_none()
+                || callable.bound_type.is_some()
+                || callable.signature_type != element.callable_type
+                || receiver.member(db, env, "get").ignore_possibly_undefined()
+                    != Some(element.callable_type)
+            {
+                continue;
+            }
+            callable.overloads.retain(|overload| {
+                overload
+                    .signature
+                    .parameters()
+                    .get(0)
+                    .and_then(|parameter| parameter.annotated_type().as_string_literal())
+                    .is_none_or(|literal| literal.value(db) == key)
+            });
+        }
+    }
+
     fn iter_callable_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
         self.elements.iter().flat_map(BindingsElement::items)
     }

@@ -8725,6 +8725,31 @@ def _(person: Person) -> None:
     reveal_type(get("email", False))  # revealed: Literal[False]
 ```
 
+### Other callables saved as `get`
+
+An attribute named `get` can hold another `TypedDict` method or a getter whose key is already bound.
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class Record(TypedDict):
+    name: str
+    count: int
+
+record: Record = {"name": "name", "count": 1}
+
+class Setter:
+    get = record.__setitem__
+
+Setter().get("missing", 1)  # error: [no-matching-overload]
+
+class Count:
+    get = partial(record.get, "count")
+
+reveal_type(Count().get("name"))  # revealed: int
+```
+
 ### `get` default types for absent keys
 
 When a key is absent, the annotation on the result gives the element type for an empty list passed

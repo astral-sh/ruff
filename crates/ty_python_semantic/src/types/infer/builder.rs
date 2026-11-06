@@ -10021,9 +10021,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let bindings =
-            self.bindings_for_call(callable_type)
-                .match_parameters(db, env, &call_arguments);
+        let mut bindings = self.bindings_for_call(callable_type);
+        if let ast::Expr::Attribute(attribute) = func.as_ref()
+            && attribute.attr.id == "get"
+            && arguments.keywords.is_empty()
+            && matches!(arguments.args.len(), 1 | 2)
+            && let Some(ast::Expr::StringLiteral(key)) = arguments.args.first()
+            && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
+            && arguments
+                .args
+                .get(1)
+                .is_none_or(|arg| !arg.is_starred_expr())
+            // Completions in an open file need the expected keys of every overload.
+            && !self.collects_expected_types()
+        {
+            bindings.retain_typed_dict_get_overloads(db, env, key.value.to_str());
+        }
+        let bindings = bindings.match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,
