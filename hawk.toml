@@ -129,14 +129,6 @@ reason = "preserves the public parser and linter target-version accessor pair"
 [[override]]
 lint = "hawk::unnecessary_public"
 crate = "ruff_python_parser"
-item = "Parsed::<T>::has_no_syntax_errors"
-kind = "inherent_method"
-level = "expect"
-reason = "preserves the public syntax-validity predicate API"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ruff_python_parser"
 item = "lexer::Lexer::<'src>::current_range"
 kind = "inherent_method"
 level = "expect"
