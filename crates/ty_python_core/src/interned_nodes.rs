@@ -8,7 +8,7 @@ use std::hash::{BuildHasher, Hash};
 use std::ops::Index;
 
 use hashbrown::{HashTable, hash_table::Entry};
-use ruff_index::{Idx, IndexVec};
+use ruff_index::{Idx, IndexSlice, IndexVec};
 use rustc_hash::FxBuildHasher;
 
 /// An indexed collection of distinct nodes with a reverse table of their IDs.
@@ -17,7 +17,7 @@ use rustc_hash::FxBuildHasher;
 /// IDs, hashing and comparing them by reading the corresponding nodes from the vector. Both
 /// collections are private, and [`Self::intern`] updates them together: every table entry
 /// refers to a node in the vector, and an equal node reuses that node's ID. Once the graph is
-/// built, [`Self::into_nodes_boxed_slice`] returns a boxed slice of nodes and drops the table.
+/// built, [`Self::into_nodes`] returns the node arena and drops the table.
 #[derive(Debug)]
 pub(crate) struct InternedNodes<I: Idx, N> {
     nodes: IndexVec<I, N>,
@@ -34,18 +34,17 @@ impl<I: Idx, N> Default for InternedNodes<I, N> {
 }
 
 impl<I: Idx, N> InternedNodes<I, N> {
+    /// Consume the reverse lookup table and return the arena in its original ID order.
+    pub(crate) fn into_nodes(self) -> IndexVec<I, N> {
+        self.nodes
+    }
+
+    pub(crate) fn as_slice(&self) -> &IndexSlice<I, N> {
+        &self.nodes
+    }
+
     pub(crate) const fn len(&self) -> usize {
         self.nodes.raw.len()
-    }
-
-    /// Consume `self` and return an iterator over the interned nodes.
-    pub(crate) fn into_node_iterator(self) -> impl Iterator<Item = N> {
-        self.nodes.into_iter()
-    }
-
-    /// Consume `self` and return a boxed slice of the interned nodes.
-    pub(crate) fn into_nodes_boxed_slice(self) -> Box<[N]> {
-        self.nodes.raw.into_boxed_slice()
     }
 }
 

@@ -340,8 +340,8 @@ impl Bindings {
 
     pub(super) fn finish(
         &mut self,
-        narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut crate::narrowing_constraints::NarrowingCompaction,
+        reachability_constraints: &mut crate::reachability_constraints::ReachabilityCompaction,
     ) {
         self.live_bindings.shrink_to_fit();
         for binding in &self.live_bindings {

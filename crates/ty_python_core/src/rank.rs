@@ -33,6 +33,10 @@ pub struct RankBitBox {
 pub type RankBitBoxStorage = BitBox<Chunk, Msb0>;
 pub type RankBitBoxVec = BitVec<Chunk, Msb0>;
 
+pub(crate) fn bit_vec_size(bits: &RankBitBoxVec) -> usize {
+    bits.capacity().div_ceil(8)
+}
+
 fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
     std::mem::size_of_val(bits.as_raw_slice())
 }

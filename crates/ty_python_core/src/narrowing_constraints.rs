@@ -34,13 +34,13 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::Idx;
+use ruff_index::{Idx, IndexSlice, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
 use crate::interned_nodes::InternedNodes;
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::{RankBitBox, RankBitBoxVec, bit_vec_size};
 use crate::scope::FileScopeId;
 use crate::use_def::BindingsSnapshotId;
 
@@ -92,7 +92,7 @@ pub struct InteriorNode {
     pub if_false: ScopedNarrowingConstraint,
 }
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Default, get_size2::GetSize)]
 pub struct NarrowingConstraints {
     used_interiors: Box<[InteriorNode]>,
     used_indices: Option<RankBitBox>,
@@ -143,17 +143,32 @@ pub struct NarrowingConstraintsBuilder {
     >,
 }
 
-impl NarrowingConstraintsBuilder {
+#[derive(Debug, Default, get_size2::GetSize)]
+pub(crate) struct NarrowingCompaction {
+    interiors: IndexVec<ScopedNarrowingConstraint, InteriorNode>,
+    #[get_size(size_fn = bit_vec_size)]
+    interior_used: RankBitBoxVec,
+}
+
+impl NarrowingCompaction {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.interiors.is_empty()
+    }
+
+    pub(crate) fn mark_used(&mut self, node: ScopedNarrowingConstraint) {
+        mark_used(&self.interiors, &mut self.interior_used, node);
+    }
+
     pub(crate) fn build(self) -> NarrowingConstraints {
         if self.interior_used.first_zero().is_none() {
             NarrowingConstraints {
-                used_interiors: self.interiors.into_nodes_boxed_slice(),
+                used_interiors: self.interiors.raw.into_boxed_slice(),
                 used_indices: None,
             }
         } else {
             let used_interiors = self
                 .interiors
-                .into_node_iterator()
+                .into_iter()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
@@ -164,15 +179,34 @@ impl NarrowingConstraintsBuilder {
             }
         }
     }
+}
+
+fn mark_used(
+    interiors: &IndexSlice<ScopedNarrowingConstraint, InteriorNode>,
+    used: &mut RankBitBoxVec,
+    node: ScopedNarrowingConstraint,
+) {
+    if !node.is_terminal() && !used[node.index()] {
+        used.set(node.index(), true);
+        let node = interiors[node];
+        mark_used(interiors, used, node.if_true);
+        mark_used(interiors, used, node.if_uncertain);
+        mark_used(interiors, used, node.if_false);
+    }
+}
+
+impl NarrowingConstraintsBuilder {
+    /// Drop the interning and operation caches. Only the node arena and its liveness
+    /// marks are needed to compact the graph when this scope is first queried.
+    pub(crate) fn into_compaction(self) -> NarrowingCompaction {
+        NarrowingCompaction {
+            interiors: self.interiors.into_nodes(),
+            interior_used: self.interior_used,
+        }
+    }
 
     pub(crate) fn mark_used(&mut self, node: ScopedNarrowingConstraint) {
-        if !node.is_terminal() && !self.interior_used[node.index()] {
-            self.interior_used.set(node.index(), true);
-            let node = self.interiors[node];
-            self.mark_used(node.if_true);
-            self.mark_used(node.if_uncertain);
-            self.mark_used(node.if_false);
-        }
+        mark_used(self.interiors.as_slice(), &mut self.interior_used, node);
     }
 
     fn cmp_atoms(&self, a: ScopedNarrowingConstraint, b: ScopedNarrowingConstraint) -> Ordering {

@@ -4,13 +4,13 @@
 
 use std::cmp::Ordering;
 
-use ruff_index::Idx;
+use ruff_index::{Idx, IndexSlice, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::interned_nodes::InternedNodes;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::{RankBitBox, RankBitBoxVec, bit_vec_size};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -139,7 +139,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 /// A collection of reachability constraints for a given scope.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Default, get_size2::GetSize)]
 pub struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
     used_interiors: Box<[InteriorNode]>,
@@ -194,22 +194,32 @@ pub struct ReachabilityConstraintsBuilder {
     >,
 }
 
-impl ReachabilityConstraintsBuilder {
-    /// Returns whether new constraint combinations may lose precision at the arena limit.
-    pub(crate) fn is_saturated(&self) -> bool {
-        self.interiors.len() >= MAX_INTERIOR_NODES
+#[derive(Debug, Default, get_size2::GetSize)]
+pub(crate) struct ReachabilityCompaction {
+    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    #[get_size(size_fn = bit_vec_size)]
+    interior_used: RankBitBoxVec,
+}
+
+impl ReachabilityCompaction {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.interiors.is_empty()
+    }
+
+    pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
+        mark_used(&self.interiors, &mut self.interior_used, node);
     }
 
     pub(crate) fn build(self) -> ReachabilityConstraints {
         if self.interior_used.first_zero().is_none() {
             ReachabilityConstraints {
-                used_interiors: self.interiors.into_nodes_boxed_slice(),
+                used_interiors: self.interiors.raw.into_boxed_slice(),
                 used_indices: None,
             }
         } else {
             let used_interiors = self
                 .interiors
-                .into_node_iterator()
+                .into_iter()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
@@ -220,18 +230,42 @@ impl ReachabilityConstraintsBuilder {
             }
         }
     }
+}
+
+fn mark_used(
+    interiors: &IndexSlice<ScopedReachabilityConstraintId, InteriorNode>,
+    used: &mut RankBitBoxVec,
+    node: ScopedReachabilityConstraintId,
+) {
+    if !node.is_terminal() && !used[node.index()] {
+        used.set(node.index(), true);
+        let node = interiors[node];
+        mark_used(interiors, used, node.if_true);
+        mark_used(interiors, used, node.if_ambiguous);
+        mark_used(interiors, used, node.if_false);
+    }
+}
+
+impl ReachabilityConstraintsBuilder {
+    /// Drop the interning and operation caches. Only the node arena and its liveness
+    /// marks are needed to compact the graph when this scope is first queried.
+    pub(crate) fn into_compaction(self) -> ReachabilityCompaction {
+        ReachabilityCompaction {
+            interiors: self.interiors.into_nodes(),
+            interior_used: self.interior_used,
+        }
+    }
+
+    /// Returns whether new constraint combinations may lose precision at the arena limit.
+    pub(crate) fn is_saturated(&self) -> bool {
+        self.interiors.len() >= MAX_INTERIOR_NODES
+    }
 
     /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were
     /// only calculated for intermediate values, and which don't need to be included in the final
     /// built result.
     pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
-        if !node.is_terminal() && !self.interior_used[node.index()] {
-            self.interior_used.set(node.index(), true);
-            let node = self.interiors[node];
-            self.mark_used(node.if_true);
-            self.mark_used(node.if_ambiguous);
-            self.mark_used(node.if_false);
-        }
+        mark_used(self.interiors.as_slice(), &mut self.interior_used, node);
     }
 
     /// Converts a reachability formula into a narrowing gate.

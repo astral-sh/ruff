@@ -3415,7 +3415,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .collect(),
         );
 
-        let mut use_def_map_interner = UseDefMapInterner::default();
+        let use_def_map_interner = Arc::new(std::sync::Mutex::new(UseDefMapInterner::default()));
         let mut interned_place_tables: FxHashMap<u64, SmallVec<[Arc<PlaceTable>; 1]>> =
             FxHashMap::default();
         let place_tables = self
@@ -3459,7 +3459,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| use_def_map_interner.intern(builder.finish()))
+                .map(|builder| Arc::new(builder.finish(Arc::clone(&use_def_map_interner))))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
