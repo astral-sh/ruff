@@ -461,24 +461,11 @@ fn watches_project_without_relative_patterns() -> Result<()> {
 
 #[test]
 fn falls_back_to_a_workspace_watch_after_registration_fails() -> Result<()> {
-    let (mut server, initial_id, fallback) = server_with_pending_workspace_fallback()?;
-    server.acknowledge_request(fallback);
-    assert_eq!(server.acknowledge_unregistration()?, initial_id);
-    assert_no_registration_after_updates(&mut server)
-}
-
-#[test]
-fn stops_registering_after_workspace_watch_is_rejected() -> Result<()> {
-    let (mut server, _, fallback) = server_with_pending_workspace_fallback()?;
-    reject_registration(&mut server, fallback);
-    assert_no_registration_after_updates(&mut server)
-}
-
-fn server_with_pending_workspace_fallback() -> Result<(TestServer, String, RequestId)> {
+    let main = SystemPath::new("src/main.py");
     let config = SystemPath::new("src/ty.toml");
     let mut server = TestServerBuilder::new()?
         .with_workspace(SystemPath::new("src"), None)?
-        .with_file("src/main.py", "x = 1")?
+        .with_file(main, "x = 1")?
         .with_file(config, "")?
         .with_file("deps/dep.py", "")?
         .with_watched_file_support(true)
@@ -494,12 +481,41 @@ fn server_with_pending_workspace_fallback() -> Result<(TestServer, String, Reque
 
     let (fallback, _, watches) = server.watcher_registration_request()?;
     assert_eq!(watcher_snapshot(&watches), ["**"]);
-    Ok((server, initial_id, fallback))
+    server.acknowledge_request(fallback);
+    assert_eq!(server.acknowledge_unregistration()?, initial_id);
+
+    server.open_text_document(main, "x = 1", 1);
+    server.write_file(config, "")?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    server.document_diagnostic_request(main, None);
+    server.assert_no_pending_messages();
+    Ok(())
 }
 
-fn assert_no_registration_after_updates(server: &mut TestServer) -> Result<()> {
+#[test]
+fn stops_registering_after_workspace_watch_is_rejected() -> Result<()> {
     let main = SystemPath::new("src/main.py");
     let config = SystemPath::new("src/ty.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main, "x = 1")?
+        .with_file(config, "")?
+        .with_file("deps/dep.py", "")?
+        .with_watched_file_support(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    watcher_registrations(&mut server)?;
+
+    server.write_file(config, r#"environment.extra-paths = ["../deps"]"#)?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    let (request, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watches.len(), 2);
+    reject_registration(&mut server, request);
+
+    let (fallback, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watcher_snapshot(&watches), ["**"]);
+    reject_registration(&mut server, fallback);
+
     server.open_text_document(main, "x = 1", 1);
     server.write_file(config, "")?;
     server.did_change_watched_file(config, FileChangeType::Changed);
