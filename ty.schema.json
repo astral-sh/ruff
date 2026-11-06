@@ -876,16 +876,6 @@
             }
           ]
         },
-        "invalid-key": {
-          "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`\nit also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-legacy-positional-parameter": {
           "title": "detects incorrect usage of the legacy convention for specifying positional-only parameters",
           "description": "## What it does\n\nChecks for parameters that appear to be attempting to use the legacy convention to specify that a\nparameter is positional-only, but do so incorrectly.\n\nThe \"legacy convention\" for specifying positional-only parameters was specified in\n[PEP 484][pep-484]. It states that parameters with names starting with `__` should be considered\npositional-only by type checkers. [PEP 570][pep-570], introduced in Python 3.8, added dedicated\nsyntax for specifying positional-only parameters, rendering the legacy convention obsolete. However,\nsome codebases may still use the legacy convention for compatibility with older Python versions.\n\nThis rule is disabled by default because modern code may use `__`-prefixed parameter names for other\npurposes. Enable it if your codebase uses the legacy convention and you want to check that it is\napplied consistently.\n\n## Why is this bad?\n\nIn most cases, a type checker will not consider a parameter to be positional-only if it comes after\na positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected if the\nauthor intended to use the legacy convention.\n\n## Example\n\n```python\n# `__y` is not considered positional-only\ndef f(x, __y):  # error\n    pass\n```\n\nUse instead:\n\n```python\ndef f(__x, __y):  # If you need compatibility with Python <=3.7\n    pass\n```\n\nor:\n\n```python\ndef f(x, y, /):  # Python 3.8+ syntax\n    pass\n```\n\n## References\n\n- [Typing spec: positional-only parameters (legacy syntax)](https://typing.python.org/en/latest/spec/historical.html#pos-only-double-underscore)\n- [Python glossary: parameters](https://docs.python.org/3/glossary.html#term-parameter)\n\n[pep-484]: https://peps.python.org/pep-0484/#positional-only-arguments\n[pep-570]: https://peps.python.org/pep-0570/",
@@ -1186,6 +1176,16 @@
             }
           ]
         },
+        "invalid-typed-dict-key": {
+          "title": "detects invalid keys when accessing TypedDict items",
+          "description": "## What it does\n\nChecks for invalid keys when accessing or assigning items on a `TypedDict`.\n\nThis rule flags invalid keys such as a misspelled string literal or an integer. If the rejected key\nis a string whose value is unknown, ty reports `non-literal-typed-dict-key` instead.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\n\nalice = Person(name=\"Alice\", age=30)\n\n# KeyError: 'height'\nprint(f\"The height of Alice is {alice['height']}\")  # error\n```\n\n## Migrating from `invalid-key`\n\nty used to have a rule called `invalid-key` that covered `invalid-typed-dict-key`,\n`unknown-typed-dict-constructor-key`, and `non-literal-typed-dict-key`.\n\nThe old `invalid-key` name is now an alias for `invalid-typed-dict-key` only. If you previously had\nany configuration for `invalid-key` specifically, you should go through the other two rules to see\nif you want to configure them in the same way.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\n\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,\nmethod definitions and field values aren't allowed. None of these will be available on \"instances of\nthe `TypedDict`\" at runtime (as `dict` is the runtime class of all \"`TypedDict` instances\").\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
@@ -1319,6 +1319,16 @@
         "non-callable-init-subclass": {
           "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
           "description": "## What it does\n\nChecks for class definitions that will fail due to non-callable `__init_subclass__` methods.\n\n## Why is this bad?\n\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt to subclass that\nclass will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass Super:\n    __init_subclass__ = None\n\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-literal-typed-dict-key": {
+          "title": "detects non-literal string keys in TypedDict subscripts",
+          "description": "## What it does\n\nReports attempts to subscript `TypedDict` instances with a key of type `str`.\n\n## Why is this bad?\n\nA `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a\ndistinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot\ninfer a precise type for the subscript expression.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n```\n\nUse instead:\n\n```py\nfrom typing import Literal\n\n\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typed-dict-key` reports other invalid subscripts, such as a misspelled field name or an\n    integer key.",
           "default": "error",
           "oneOf": [
             {
@@ -1639,6 +1649,16 @@
         "unknown-argument": {
           "title": "detects unknown keyword arguments in calls",
           "description": "## What it does\n\nChecks for keyword arguments in calls that don't match any parameter of the callable.\n\n## Why is this bad?\n\nProviding an unknown keyword argument will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(x: int) -> int:\n    return x\n\n\nf(x=1, y=2)  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unknown-typed-dict-constructor-key": {
+          "title": "detects unknown keys when constructing a TypedDict",
+          "description": "## What it does\n\nReports `TypedDict` constructions where an unknown key is or may be provided.\n\n## Why is this bad?\n\nAn unexpected key in a constructor often means a field name was misspelled. Even an implicitly open\n`TypedDict` rejects an explicitly supplied key it does not declare.\n\n## Examples\n\n```python\nfrom typing_extensions import TypedDict, NotRequired\n\n\nclass Person(TypedDict):\n    name: str\n    age: NotRequired[int]\n\n\n# error: \"Unknown key \"aeg\"\"\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n\n\n# error: \"Unknown key \"nickname\"\"\nbob: Person = {\"name\": \"Robert\", \"nickname\": \"Bob\", \"age\": 30}  # unknown key!\n```\n\nIf a `TypedDict` is declared with `closed=True`, this rule will also flag a string key being passed\nto the constructor, as this might introduce an illegal extra item:\n\n```py\nimport json\nfrom typing_extensions import TypedDict\n\n\nclass NotificationPatch(TypedDict, closed=True, total=False):\n    email: bool\n    sms: bool\n\n\ndef encode_patch(channel: str, enabled: bool) -> str:\n    # error: \"Non-literal string key may be unknown\"\n    payload: NotificationPatch = {channel: enabled}\n    return json.dumps(payload)\n```",
           "default": "error",
           "oneOf": [
             {

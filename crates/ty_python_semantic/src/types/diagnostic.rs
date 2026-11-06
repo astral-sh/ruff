@@ -12,7 +12,7 @@ use super::{
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::importer::{ImportAction, ImportRequest, MembersInScope};
-use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::lint::{Level, LintMetadata, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::abstract_methods::AbstractMethods;
@@ -31,7 +31,6 @@ use crate::types::string_annotation::{
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_value};
 use crate::types::{
@@ -90,7 +89,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
-    registry.register_lint(&INVALID_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_KEY);
+    registry.register_lint(&NON_LITERAL_TYPED_DICT_KEY);
+    registry.register_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY);
+    registry.register_alias(LintName::of("invalid-key"), &INVALID_TYPED_DICT_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -409,12 +411,11 @@ declare_lint! {
     }
 }
 
-// Added in #19763.
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-key.md")]
-    pub(crate) static INVALID_KEY = {
-        summary: "detects invalid subscript accesses or TypedDict literal keys",
-        status: LintStatus::stable("0.0.1-alpha.17"),
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-key.md")]
+    pub(crate) static INVALID_TYPED_DICT_KEY = {
+        summary: "detects invalid keys when accessing TypedDict items",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -1463,6 +1464,24 @@ declare_lint! {
         summary: "detects truthiness tests of `Iterable`-typed objects",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/non-literal-typed-dict-key.md")]
+    pub(crate) static NON_LITERAL_TYPED_DICT_KEY = {
+        summary: "detects non-literal string keys in TypedDict subscripts",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unknown-typed-dict-constructor-key.md")]
+    pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
+        summary: "detects unknown keys when constructing a TypedDict",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
     }
 }
 
@@ -4419,17 +4438,52 @@ fn report_invalid_base<'env, 'db>(
     Some(diagnostic)
 }
 
+/// Uses `non-literal-typed-dict-key` only when every alternative in the rejected key type is
+/// a string of unknown value. This keeps a misspelled literal or a non-string in a mixed union
+/// visible when non-literal key errors are suppressed.
+pub(super) fn typed_dict_subscript_key_lint<'db>(
+    context: &InferContext<'db, '_>,
+    key: Type<'db>,
+) -> &'static LintMetadata {
+    let db = context.db();
+    let env = context.program_environment();
+
+    let is_non_literal_string = |ty: Type<'db>| {
+        if let Some(literal) = ty.as_literal_value() {
+            literal.is_literal_string()
+        } else {
+            ty.is_subtype_of(db, env, KnownClass::Str.to_instance(db, env))
+        }
+    };
+
+    let non_literal = match key.expand_top_level_aliases(db, env) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(is_non_literal_string),
+        key => is_non_literal_string(key),
+    };
+
+    if non_literal {
+        &NON_LITERAL_TYPED_DICT_KEY
+    } else {
+        &INVALID_TYPED_DICT_KEY
+    }
+}
+
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
     typed_dict_node: AnyNodeRef,
     key_node: AnyNodeRef,
-    typed_dict_ty: Type<'db>,
+    typed_dict: TypedDictType<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
-    items: &TypedDictSchema<'db>,
+    lint: &'static LintMetadata,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+    if let Some(builder) = context.report_lint(lint, key_node) {
+        let typed_dict_ty = Type::TypedDict(typed_dict);
         let env = &context.program_environment();
         match key_ty.as_string_literal() {
             Some(key) => {
@@ -4456,7 +4510,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys().map(Name::as_str);
+                let existing_keys = typed_dict.items(db).keys().map(Name::as_str);
 
                 if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
                     && let Some(suggestion) = did_you_mean(existing_keys, key)

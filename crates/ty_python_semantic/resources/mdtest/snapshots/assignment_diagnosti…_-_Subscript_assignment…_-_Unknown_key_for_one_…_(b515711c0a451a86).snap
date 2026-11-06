@@ -24,16 +24,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
  9 |     legs: int
 10 | 
 11 | def _(being: Person | Animal) -> None:
-12 |     being["legs"] = 4  # error: [invalid-key]
+12 |     being["legs"] = 4  # error: [invalid-typed-dict-key]
 ```
 
 # Diagnostics
 
 ```
-error[invalid-key]: Unknown key "legs" for TypedDict `Person`
+error[invalid-typed-dict-key]: Unknown key "legs" for TypedDict `Person`
   --> src/mdtest_snippet.py:12:11
    |
-12 |     being["legs"] = 4  # error: [invalid-key]
+12 |     being["legs"] = 4  # error: [invalid-typed-dict-key]
    |     ----- ^^^^^^ Unknown key "legs"
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
