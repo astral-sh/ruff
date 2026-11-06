@@ -134,7 +134,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::allows_expression(db, env, Some(expression), ty) {
+        if self.allow(typevar_identity) && !Self::allows_expression(db, env, Some(expression), ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -147,7 +147,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if !Self::allows_expression(db, env, None, ty) {
+        if self.allow(typevar_identity) && !Self::allows_expression(db, env, None, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
