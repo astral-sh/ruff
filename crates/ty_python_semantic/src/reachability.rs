@@ -977,6 +977,7 @@ impl<'a, 'db> PredicateEvaluator<'a, 'db> {
 /// General checkpoints are created only after traversing a genuinely long path. Their positions
 /// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
 /// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
+#[expect(clippy::too_many_arguments)]
 fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
