@@ -122,6 +122,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&SINGLE_OVERLOAD);
     registry.register_lint(&MISSING_OVERLOAD_IMPLEMENTATION);
+    registry.register_lint(&INCONSISTENT_OVERLOAD_IMPLEMENTATION);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
@@ -1500,6 +1501,15 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-overload-implementation.md")]
     pub(crate) static MISSING_OVERLOAD_IMPLEMENTATION = {
         summary: "detects overloaded functions missing a required implementation",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-overload-implementation.md")]
+    pub(crate) static INCONSISTENT_OVERLOAD_IMPLEMENTATION = {
+        summary: "detects implementations that are inconsistent with their overloads",
         status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }

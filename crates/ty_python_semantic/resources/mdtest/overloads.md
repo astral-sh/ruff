@@ -1072,7 +1072,7 @@ from typing import overload
 @overload
 def return_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+# error: [inconsistent-overload-implementation] "Overload return type is not assignable to implementation return type"
 def return_type(x: str) -> str: ...
 def return_type(x: int | str) -> int:
     return 1
@@ -1080,7 +1080,7 @@ def return_type(x: int | str) -> int:
 @overload
 def parameter_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def parameter_type(x: str) -> str: ...
 def parameter_type(x: int) -> int | str:
     return 1
@@ -1093,7 +1093,7 @@ use the overload signatures.
 class StaticMethod:
     @overload
     @staticmethod
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
     def method(x: int) -> int: ...
     @overload
     @staticmethod
@@ -1131,7 +1131,7 @@ P = ParamSpec("P")
 
 class Task(Generic[P]):
     @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
     def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> int: ...
     @overload
     def submit(self: "Task[P]", value: int) -> int: ...
@@ -1173,7 +1173,7 @@ def narrow_parameter(func: Callable[[int | str], int | str]) -> Callable[[int], 
 @overload
 def narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def narrowed(x: str, /) -> str: ...
 @narrow_parameter
 def narrowed(x: int | str) -> int | str:
@@ -1270,7 +1270,7 @@ def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
 @overload
 def replaced(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def replaced(x: str, /) -> str: ...
 @deprecated("use replacement directly")
 @replace_with(replacement)
@@ -1334,7 +1334,7 @@ def callback_valid(x: int | str) -> int | str:
 @overload
 def callback_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def callback_narrowed(x: str, /) -> str: ...
 @narrow_callback
 def callback_narrowed(x: int | str) -> int | str:
@@ -1351,7 +1351,7 @@ def union_valid(x: int | str) -> int | str:
 @overload
 def union_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def union_narrowed(x: str, /) -> str: ...
 @narrow_union
 def union_narrowed(x: int | str) -> int | str:
@@ -1362,7 +1362,7 @@ def not_callable(x: int, /) -> int: ...
 @overload
 def not_callable(x: str, /) -> str: ...
 @noncallable
-# error: [invalid-overload] "Overload implementation is not callable after applying decorators"
+# error: [inconsistent-overload-implementation] "Overload implementation is not callable after applying decorators"
 def not_callable(x: int | str) -> int | str:
     return x
 
@@ -1427,7 +1427,7 @@ class Invalid:
     def identity(cls, value: int) -> int: ...
     @overload
     @classmethod
-    # error: [invalid-overload] "Overload signature is not consistent with implementation"
+    # error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
     def identity(cls, value: str) -> str: ...
     @classmethod
     @narrow_wrap
@@ -1453,7 +1453,7 @@ class ColumnSelector:
     @overload
     def _extract(self, row_key: int) -> object: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def _extract(self, column_key: int) -> object: ...
     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
         return object()
@@ -1462,14 +1462,14 @@ class PositionalOnlyWithKwargs:
     @overload
     def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def update(self, **kwds: str | Iterable[str]) -> None: ...
     def update(self, params=(), /, **kwds) -> None:
         pass
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:9:9
    |
  9 |     def _extract(self, column_key: int) -> object: ...
@@ -1480,7 +1480,7 @@ info: Implementation signature `(self, row_key: int | None = None, column_key: i
 info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
 
 
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:18:9
    |
 18 |     def update(self, **kwds: str | Iterable[str]) -> None: ...
@@ -1505,7 +1505,7 @@ python-version = "3.12"
 from typing import overload
 
 @overload
-# snapshot: invalid-overload
+# snapshot: inconsistent-overload-implementation
 def return_tuple(x: int) -> tuple[str]: ...
 @overload
 def return_tuple(x: str) -> tuple[int]: ...
@@ -1514,7 +1514,7 @@ def return_tuple(x: int | str) -> tuple[int]:
 ```
 
 ```snapshot
-error[invalid-overload]: Overload return type is not assignable to implementation return type
+error[inconsistent-overload-implementation]: Overload return type is not assignable to implementation return type
  --> src/mdtest_snippet.py:5:5
   |
 5 | def return_tuple(x: int) -> tuple[str]: ...
