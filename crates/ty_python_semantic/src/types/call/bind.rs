@@ -6112,11 +6112,12 @@ impl<'a, 'db> CallInference<'a, 'db> {
                         }
 
                         let parameter = &parameters[parameter_index];
-                        let declared_type = matched_parameter
-                            .expected_type
-                            .unwrap_or_else(|| parameter.annotated_type());
-                        let argument_type = argument_types
-                            .matched_type(declared_type, matched_parameter.argument_type)?;
+                        // Note that the inferred type of a positional argument is stored under
+                        // the variadic parameter type, rather than the matched parameter.
+                        let argument_type = argument_types.matched_type(
+                            parameter.annotated_type(),
+                            matched_parameter.argument_type,
+                        )?;
 
                         Some(ArgumentRelation::new(
                             argument_index,

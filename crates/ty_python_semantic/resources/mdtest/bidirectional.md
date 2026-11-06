@@ -2318,6 +2318,19 @@ def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     return future
 ```
 
+Variadic arguments are inferred using their matching parameter as type context.
+
+```py
+@overload
+def pair[T: int, U](*args: *tuple[list[T], list[U]]) -> tuple[T, U]: ...
+@overload
+def pair(first: list[str], second: list[int], /) -> tuple[str, int]: ...
+def pair(*args: object) -> object:
+    raise NotImplementedError
+
+reveal_type(pair([42], ["x"]))  # revealed: tuple[int, str]
+```
+
 ## Class constructor parameters
 
 The parameters of both `__init__` and `__new__` are used as type context sources for constructor
