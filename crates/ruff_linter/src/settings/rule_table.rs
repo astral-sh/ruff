@@ -34,6 +34,12 @@ impl RuleTable {
         self.enabled.any(rules)
     }
 
+    /// Returns whether any rule in the given set is enabled.
+    #[inline]
+    pub(crate) const fn any_enabled_in(&self, rules: &RuleSet) -> bool {
+        self.enabled.intersects(rules)
+    }
+
     /// Returns whether violations of the given rule should be fixed.
     #[inline]
     pub(crate) const fn should_fix(&self, rule: Rule) -> bool {
