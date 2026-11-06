@@ -360,7 +360,7 @@ help: Replace with `Path(...).is_absolute()`
 26 | os.path.join(p, q)
    |
 
-PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.path.join()` should be replaced by `Path` with `/` operator
   --> full_name.py:25:1
    |
 23 | os.stat(p)
@@ -370,8 +370,20 @@ PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
 26 | os.sep.join([p, q])
 27 | os.sep.join((p, q))
    |
+help: Replace with `Path(...) / ...`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+25 | os.path.isabs(p)
+   - os.path.join(p, q)
+26 + pathlib.Path(p) / q
+27 | os.sep.join([p, q])
+   |
+note: This is an unsafe fix and may change runtime behavior
 
-PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.sep.join()` should be replaced by `Path` with `/` operator
   --> full_name.py:26:1
    |
 24 | os.path.isabs(p)
@@ -381,8 +393,20 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 27 | os.sep.join((p, q))
 28 | os.path.basename(p)
    |
+help: Replace with `Path(...) / ...`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+26 | os.path.join(p, q)
+   - os.sep.join([p, q])
+27 + pathlib.Path(p) / q
+28 | os.sep.join((p, q))
+   |
+note: This is an unsafe fix and may change runtime behavior
 
-PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+PTH118 [*] `os.sep.join()` should be replaced by `Path` with `/` operator
   --> full_name.py:27:1
    |
 25 | os.path.join(p, q)
@@ -392,6 +416,18 @@ PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
 28 | os.path.basename(p)
 29 | os.path.dirname(p)
    |
+help: Replace with `Path(...) / ...`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+27 | os.sep.join([p, q])
+   - os.sep.join((p, q))
+28 + pathlib.Path(p) / q
+29 | os.path.basename(p)
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH119 [*] `os.path.basename()` should be replaced by `Path.name`
   --> full_name.py:28:1
@@ -518,7 +554,7 @@ PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
 help: Replace with `Path.cwd()`
 
-PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
+PTH118 [*] `os.path.join()` should be replaced by `Path.joinpath()`
   --> full_name.py:36:1
    |
 34 | open(p).close()
@@ -527,6 +563,18 @@ PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    | ^^^^^^^^^^^^
 37 | os.sep.join(p, *q)
    |
+help: Replace with `Path(...).joinpath(...)`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+36 | os.getcwdb(p)
+   - os.path.join(p, *q)
+37 + pathlib.Path(p).joinpath(*q)
+38 | os.sep.join(p, *q)
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
   --> full_name.py:37:1
@@ -538,6 +586,7 @@ PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
 38 |
 39 | # https://github.com/astral-sh/ruff/issues/7620
    |
+help: Replace with `Path(...).joinpath(...)`
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:46:1
