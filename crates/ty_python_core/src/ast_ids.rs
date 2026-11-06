@@ -386,7 +386,7 @@ mod tests {
         let mut builder = AstIdsBuilder::with_node_count(module.ast().len());
         let outer = FileScopeId::global();
         let inner = FileScopeId::from_u32(1);
-        let (c_id, a_id, b_id, t_id) = (0.into(), 1.into(), 0.into(), 1.into());
+        let (c_id, a_id, b_id, t_id) = (0_u32.into(), 1_u32.into(), 0_u32.into(), 1_u32.into());
         let place = ScopedSymbolId::from_u32(0).into();
         builder.record_place_use(c, outer, c_id, place);
         builder.record_place_use(a, outer, a_id, place);

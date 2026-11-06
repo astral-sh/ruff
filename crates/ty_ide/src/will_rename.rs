@@ -87,7 +87,7 @@ use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::statement_visitor::{self, StatementVisitor};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, ExprKind, StmtKind};
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -253,7 +253,7 @@ fn edits_for_file(
     }
 
     let parsed_module = ruff_db::parsed::parsed_module(db, program_file.python_file(db)).load(db);
-    let root = AnyNodeRef::from(parsed_module.syntax());
+    let root = parsed_module.syntax();
     let model = SemanticModel::new(db, program_file);
     let mut analyzer = ImportAnalyzer::new(db, module_name_changes);
 
@@ -325,8 +325,8 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
     }
 
     /// Computes imported name edits for a plain import statement, such as `import old` to `import new`.
-    fn edit_plain_import(&mut self, statement: &ast::StmtImport) {
-        for alias in &statement.names {
+    fn edit_plain_import(&mut self, statement: ast::StmtImport<'_>) {
+        for alias in statement.names() {
             if let EditDecision::Yes(new_imported_name) = self
                 .analyzer
                 .should_edit_imported_name_for_plain_import(self.model, alias)
@@ -340,10 +340,10 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
     ///
     /// For example, `from pkg import old` becomes `from pkg import new`, and
     /// `from pkg.old import C` becomes `from pkg.new import C`.
-    fn edit_import_from(&mut self, statement: &ast::StmtImportFrom) {
+    fn edit_import_from(&mut self, statement: ast::StmtImportFrom<'_>) {
         let Some(resolved_module) = self.model.resolve_module(
-            statement.module.as_ref().map(ast::Identifier::as_str),
-            statement.level,
+            statement.module().map(ast::Identifier::as_str),
+            statement.level(),
         ) else {
             return;
         };
@@ -353,7 +353,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
             .module_name_changes
             .new_module_name(resolved_module.name(self.model.db()))
         {
-            let Some(module) = statement.module.as_ref() else {
+            let Some(module) = statement.module() else {
                 return;
             };
 
@@ -362,7 +362,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
             None
         };
 
-        for alias in &statement.names {
+        for alias in statement.names() {
             if let EditDecision::Yes(new_imported_name) = self
                 .analyzer
                 .should_edit_imported_name_for_import_from(self.model, alias, resolved_module)
@@ -383,7 +383,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
     /// For example, `from ..pkg.old import C` becomes `from ..pkg.new import C`.
     fn import_from_module_edit(
         &self,
-        module: &ast::Identifier,
+        module: ast::Identifier<'_>,
         new_module_name: &ModuleName,
     ) -> FileRenameEdit {
         let replacement = if let Some((prefix, _)) = module.as_str().rsplit_once('.') {
@@ -391,7 +391,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
         } else {
             new_module_name.last_component().to_string()
         };
-        self.source_edit(module.range, replacement)
+        self.source_edit(module.range(), replacement)
     }
 
     /// Records an imported name edit and any resulting bound name change.
@@ -400,7 +400,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
     /// `import pkg.old` to `pkg.new`, but keeps the bound name `pkg`. Conversely, the same rename
     /// changes the imported name `old` in `from pkg import old` to `new` and also changes the bound
     /// name.
-    fn record_imported_name_edit(&mut self, alias: &ast::Alias, new_imported_name: String) {
+    fn record_imported_name_edit(&mut self, alias: ast::Alias<'_>, new_imported_name: String) {
         if let Some(new_bound_name) = bound_name_replacement(alias, &new_imported_name) {
             let definition =
                 ty_python_core::semantic_index(self.model.db(), self.model.program_file())
@@ -412,7 +412,7 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
 
         self.changes
             .edits
-            .push(self.source_edit(alias.name.range, new_imported_name));
+            .push(self.source_edit(alias.name().range(), new_imported_name));
     }
 
     /// Constructs a source edit, such as replacing the imported name `old` with `new`.
@@ -425,27 +425,27 @@ impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
 }
 
 impl<'a> StatementVisitor<'a> for ImportStatementVisitor<'a, '_> {
-    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
-        match statement {
-            ast::Stmt::Import(statement) => self.edit_plain_import(statement),
-            ast::Stmt::ImportFrom(statement) => self.edit_import_from(statement),
-            _ => statement_visitor::walk_stmt(self, statement),
+    fn visit_stmt(&mut self, statement: ast::Stmt<'a>) {
+        match statement.classify() {
+            StmtKind::Import(statement) => self.edit_plain_import(statement),
+            StmtKind::ImportFrom(statement) => self.edit_import_from(statement),
+            kind => statement_visitor::walk_stmt(self, kind),
         }
     }
 }
 
 /// Returns the new bound name if changing the imported name also changes its binding.
 fn bound_name_replacement<'name>(
-    alias: &ast::Alias,
+    alias: ast::Alias<'_>,
     new_imported_name: &'name str,
 ) -> Option<&'name str> {
-    if alias.asname.is_some() {
+    if alias.asname().is_some() {
         return None;
     }
 
     // `import pkg.old` binds `pkg`, while `from pkg import old` binds `old`.
     // The first component of the imported name gives the bound name in both cases.
-    let old_bound_name = first_component(alias.name.as_str());
+    let old_bound_name = first_component(alias.name().as_str());
     let new_bound_name = first_component(new_imported_name);
     (old_bound_name != new_bound_name).then_some(new_bound_name)
 }
@@ -495,9 +495,9 @@ impl<'db> ImportAnalyzer<'db> {
     fn should_edit_imported_name_for_plain_import(
         &self,
         model: &SemanticModel<'db>,
-        alias: &ast::Alias,
+        alias: ast::Alias<'_>,
     ) -> EditDecision {
-        let Some(resolved_module) = model.resolve_module(Some(alias.name.as_str()), 0) else {
+        let Some(resolved_module) = model.resolve_module(Some(alias.name().as_str()), 0) else {
             return EditDecision::No;
         };
 
@@ -508,7 +508,7 @@ impl<'db> ImportAnalyzer<'db> {
             return EditDecision::No;
         };
 
-        EditDecision::replace_if_changed(alias.name.as_str(), new_module_name.as_str())
+        EditDecision::replace_if_changed(alias.name().as_str(), new_module_name.as_str())
     }
 
     /// Chooses an imported name edit for an import-from statement, including re-exports.
@@ -518,12 +518,12 @@ impl<'db> ImportAnalyzer<'db> {
     fn should_edit_imported_name_for_import_from(
         &mut self,
         model: &SemanticModel<'db>,
-        alias: &ast::Alias,
+        alias: ast::Alias<'_>,
         resolved_module: Module<'db>,
     ) -> EditDecision {
         if !self
             .module_name_changes
-            .is_old_module_last_component(alias.name.as_str())
+            .is_old_module_last_component(alias.name().as_str())
         {
             return EditDecision::No;
         }
@@ -539,12 +539,12 @@ impl<'db> ImportAnalyzer<'db> {
             };
 
             return EditDecision::replace_if_changed(
-                alias.name.as_str(),
+                alias.name().as_str(),
                 new_module_name.last_component(),
             );
         }
 
-        self.should_edit_module_member(model, resolved_module, alias.name.as_str())
+        self.should_edit_module_member(model, resolved_module, alias.name().as_str())
     }
 
     /// Identifies an imported name that resolves to a direct submodule.
@@ -553,15 +553,15 @@ impl<'db> ImportAnalyzer<'db> {
     fn directly_imported_submodule(
         &self,
         model: &SemanticModel<'db>,
-        alias: &ast::Alias,
+        alias: ast::Alias<'_>,
         resolved_module: Module<'db>,
     ) -> Option<Module<'db>> {
         let db = self.db;
         let module_name = resolved_module.name(db);
-        let imported_module = resolved_module_for_node(model, alias)?;
+        let imported_module = resolved_module_for_node(model, &alias)?;
         let imported_module_name = imported_module.name(db);
 
-        if alias.name.as_str() != imported_module_name.last_component()
+        if alias.name().as_str() != imported_module_name.last_component()
             || imported_module_name.parent().as_ref() != Some(module_name)
         {
             return None;
@@ -570,7 +570,7 @@ impl<'db> ImportAnalyzer<'db> {
         // Without a package definition for `old`, `from pkg import old` imports `pkg.old`
         // directly (for example, when `pkg/__init__.py` is empty).
         if model
-            .definitions_for_module_global(resolved_module, alias.name.as_str())
+            .definitions_for_module_global(resolved_module, alias.name().as_str())
             .is_none()
         {
             return Some(imported_module);
@@ -686,8 +686,8 @@ impl<'db> ImportAnalyzer<'db> {
                 let alias = import.alias(&parsed_module);
                 self.should_edit_import_definition(definition, alias, |analyzer| {
                     let Some(resolved_module) = model.resolve_module(
-                        statement.module.as_ref().map(ast::Identifier::as_str),
-                        statement.level,
+                        statement.module().map(ast::Identifier::as_str),
+                        statement.level(),
                     ) else {
                         return EditDecision::Omit;
                     };
@@ -713,7 +713,7 @@ impl<'db> ImportAnalyzer<'db> {
     fn should_edit_import_definition(
         &mut self,
         import_definition: Definition<'db>,
-        alias: &ast::Alias,
+        alias: ast::Alias<'_>,
         should_edit_imported_name: impl FnOnce(&mut Self) -> EditDecision,
     ) -> EditDecision {
         if self.import_cycle_detected {
@@ -805,7 +805,7 @@ impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
 
     /// Chooses a reference edit for a name by considering the definitions that connect that name
     /// to a bound name change from an import statement.
-    fn edit_name_reference(&mut self, name: &ast::ExprName) {
+    fn edit_name_reference(&mut self, name: ast::ExprName<'_>) {
         let Some(resolution) = self.model.reaching_definitions(name) else {
             return;
         };
@@ -842,15 +842,15 @@ impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
     /// Both the attribute and its receiver must resolve to modules.
     /// For attributes defined in the receiver's module, [`ImportAnalyzer`] determines
     /// whether their names change.
-    fn edit_attribute_reference(&mut self, attribute: &ast::ExprAttribute) {
-        if !attribute.ctx.is_load() {
+    fn edit_attribute_reference(&mut self, attribute: ast::ExprAttribute<'_>) {
+        if !attribute.ctx().is_load() {
             // Do not rewrite an attribute name that is assigned to or deleted.
             // The visitor still traverses the receiver, so renaming `pkg.old` to `pkg.new`
             // can change `pkg.old.VALUE = 1` to `pkg.new.VALUE = 1`.
             return;
         }
 
-        let Some(attribute_module) = resolved_module_for_node(self.model, attribute) else {
+        let Some(attribute_module) = resolved_module_for_node(self.model, &attribute) else {
             return;
         };
         let old_module_name = attribute_module.name(self.db);
@@ -861,11 +861,11 @@ impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
         else {
             return;
         };
-        let Some(receiver_module) = resolved_module_for_node(self.model, &*attribute.value) else {
+        let Some(receiver_module) = resolved_module_for_node(self.model, &attribute.value()) else {
             return;
         };
 
-        let attribute_name = attribute.attr.as_str();
+        let attribute_name = attribute.attr().as_str();
 
         // Computes a necessary condition for rewriting a direct submodule reference.
         //
@@ -891,31 +891,31 @@ impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
 
         let decision = if self
             .model
-            .definitions_for_module_global(receiver_module, attribute.attr.as_str())
+            .definitions_for_module_global(receiver_module, attribute.attr().as_str())
             .is_some()
         {
             self.analyzer.should_edit_module_member(
                 self.model,
                 receiver_module,
-                attribute.attr.as_str(),
+                attribute.attr().as_str(),
             )
         } else if attribute_matches_old_module_name {
             EditDecision::replace_if_changed(
-                attribute.attr.as_str(),
+                attribute.attr().as_str(),
                 new_module_name.last_component(),
             )
         } else {
             EditDecision::No
         };
 
-        self.record_reference_edit(attribute.attr.range, decision);
+        self.record_reference_edit(attribute.attr().range(), decision);
     }
 
     /// Computes reference edits in string annotations, such as `value: 'old.C'`.
     ///
     /// Ordinary strings in `__all__ = ["old"]` or `importlib.import_module("pkg.old")`
     /// are left unchanged.
-    fn edit_string_annotation_references(&mut self, string: &ast::ExprStringLiteral) {
+    fn edit_string_annotation_references(&mut self, string: ast::ExprStringLiteral<'_>) {
         // Skip strings that cannot mention the last component of an old module name before
         // `SemanticModel::enter_string_annotation` queries the inferred types for the enclosing scope.
         if !self
@@ -953,33 +953,34 @@ impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for ModuleReferenceVisitor<'a, '_> {
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        match expr {
-            ast::Expr::Name(name)
-                if name.ctx.is_load()
+    fn visit_expr(&mut self, expr: ast::Expr<'a>) {
+        let kind = expr.classify();
+        match kind {
+            ExprKind::Name(name)
+                if name.ctx().is_load()
                     && !self.bound_name_changes.is_empty()
                     && self
                         .analyzer
                         .module_name_changes
-                        .is_old_module_last_component(name.id.as_str()) =>
+                        .is_old_module_last_component(name.id().as_str()) =>
             {
                 self.edit_name_reference(name);
             }
-            ast::Expr::Attribute(attribute)
+            ExprKind::Attribute(attribute)
                 if self
                     .analyzer
                     .module_name_changes
-                    .is_old_module_last_component(attribute.attr.as_str()) =>
+                    .is_old_module_last_component(attribute.attr().as_str()) =>
             {
                 self.edit_attribute_reference(attribute);
             }
-            ast::Expr::StringLiteral(string) => {
+            ExprKind::StringLiteral(string) => {
                 self.edit_string_annotation_references(string);
                 return;
             }
             _ => {}
         }
-        source_order::walk_expr(self, expr);
+        source_order::walk_expr(self, kind);
     }
 }
 

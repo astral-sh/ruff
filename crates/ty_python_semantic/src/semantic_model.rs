@@ -468,7 +468,10 @@ impl<'db> SemanticModel<'db> {
     ///
     /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
     /// target, or inference skipped the name inside a string annotation.
-    pub fn reaching_definitions(&self, name: ast::ExprName<'_>) -> Option<DefinitionResolution<'db>> {
+    pub fn reaching_definitions(
+        &self,
+        name: ast::ExprName<'_>,
+    ) -> Option<DefinitionResolution<'db>> {
         if name.ctx().is_del() {
             return None;
         }
@@ -1795,7 +1798,7 @@ mod tests {
                 nested.visit_expr(parsed.expr());
                 self.resolutions.extend(nested.resolutions);
             }
-            walk_expr(self, expression);
+            walk_expr(self, kind);
         }
     }
 }

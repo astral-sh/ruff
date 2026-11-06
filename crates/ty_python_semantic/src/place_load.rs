@@ -1225,10 +1225,9 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     return None;
                 }
 
-                let use_id = self.local_operand.map_or_else(
-                    || self.index.scoped_use_id(expr),
-                    |operand| operand.use_id,
-                );
+                let use_id = self
+                    .local_operand
+                    .map_or_else(|| self.index.scoped_use_id(expr), |operand| operand.use_id);
                 Some((
                     PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),

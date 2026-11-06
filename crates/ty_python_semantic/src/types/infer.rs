@@ -1058,12 +1058,10 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
-    pub(crate) fn is_deferred_name_load(&self, name: ast::ExprName<'_>) -> bool {
-        self.extra.as_deref().is_some_and(|extra| {
-            extra
-                .deferred_name_loads
-                .contains(&name.into())
-        })
+    pub(crate) fn is_deferred_name_load(&self, name: ruff_python_ast::ExprName<'_>) -> bool {
+        self.extra
+            .as_deref()
+            .is_some_and(|extra| extra.deferred_name_loads.contains(&name.into()))
     }
 
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
