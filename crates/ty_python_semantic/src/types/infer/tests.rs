@@ -10,7 +10,10 @@ use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_db::testing::{
+    assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    assert_function_query_was_run, find_will_execute_event_by_name,
+};
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
@@ -123,7 +126,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     settings.python_version.version = PythonVersion::PY312;
     let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
-    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+    let check = |file, expected_type, expect_invalid_syntax, expect_import_not_found| {
         let diagnostics = crate::check_file_unwrap(&db, file);
 
         assert_eq!(
@@ -137,7 +140,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
             diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.headline_message().contains("zipfile._path")),
-            expect_unresolved_import,
+            expect_import_not_found,
             "{diagnostics:#?}"
         );
 
@@ -149,7 +152,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
         assert_eq!(
             diagnostics.len(),
-            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_import_not_found),
             "{diagnostics:#?}"
         );
     };
@@ -344,6 +347,28 @@ fn multiplied_literal_string() -> anyhow::Result<()> {
             assert_type((-100)*"{y}", Literal[""])
             "#,
         y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
+fn concatenated_bytes_literal_size_limit() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let limit = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE;
+    let content = format!(
+        r#"
+            from typing_extensions import Literal, assert_type
+
+            value = b"{prefix}" + b"x"
+            assert_type(len(value), Literal[{limit}])
+            value += b"x"
+            assert_type(value, bytes)
+            "#,
+        prefix = "x".repeat(limit - 1),
     );
     db.write_dedented("src/a.py", &content)?;
 
@@ -1069,6 +1094,36 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/main.py", "from dependency import x"),
+        ("/src/dependency.py", "x: int = 1\nlist\ndict\nlist"),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let assert_imported_type = |db: &TestDb| {
+        let ty = global_symbol(db, main, "x").place.expect_type();
+        assert_eq!(ty.display(db, &db.program_environment()).to_string(), "int");
+    };
+    let query_name = "place_by_id";
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert!(
+        find_will_execute_event_by_name(&db, query_name, None, &events).is_some(),
+        "Expected the first lookup to run {query_name}"
+    );
+
+    db.write_file("/src/dependency.py", "x: int = 1\nlist\ndict\ndict")?;
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query_name, None, &events);
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
@@ -1215,6 +1270,42 @@ fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Res
         );
         db.write_file("/src/main.py", fixed)?;
         assert_file_diagnostics(&db, "/src/main.py", &[]);
+    }
+    Ok(())
+}
+
+#[test]
+fn overload_signatures_track_imported_annotations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/api.pyi",
+        r#"
+        from typing import overload
+        from payload import Result
+
+        @overload
+        def parse(value: int) -> Result: ...
+        @overload
+        def parse(value: bytes) -> bytes: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from api import parse
+
+        reveal_type((parse(1), parse(b"x")))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, bytes]"),
+        ("str", "tuple[str, bytes]"),
+        ("int", "tuple[int, bytes]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Result = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
     }
     Ok(())
 }
@@ -1568,6 +1659,44 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
         first_public_binding(&db, a, "x"),
         &events,
     );
+    Ok(())
+}
+
+#[test]
+fn specialized_alias_values_track_imported_types() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from typing import TypeAliasType, TypeVar
+        from payload import Payload
+
+        type Declared[T] = tuple[T, Payload]
+        T = TypeVar("T")
+        Manual = TypeAliasType("Manual", tuple[T, Payload], type_params=(T,))
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from aliases import Declared, Manual
+
+        def check(declared: Declared[int], manual: Manual[bytes]):
+            reveal_type((declared[1], manual[1]))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, int]"),
+        ("str", "tuple[str, str]"),
+        ("int", "tuple[int, int]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Payload = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
     Ok(())
 }
 

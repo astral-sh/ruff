@@ -661,8 +661,8 @@ reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 
 ### Failed constructor inference
 
-A failed constructor call reports its argument error without exposing an unsolved class type
-parameter or producing an additional assignment error.
+A failed constructor call reports an assignability error without exposing an unsolved class type
+parameter or producing an additional argument error.
 
 ```py
 from collections.abc import Callable
@@ -676,7 +676,8 @@ class Consumer[T]:
 
 def accepts_dog(value: Dog) -> None: ...
 
-consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`"
+consumer: Consumer[Animal] = Consumer(accepts_dog)
 ```
 
 ### Constrained constructor inference uses argument evidence
@@ -707,13 +708,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
+        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
@@ -908,6 +909,25 @@ reveal_type(D(1))  # revealed: D[int]
 # TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
+```
+
+### Reordered type arguments in `__new__`
+
+```py
+class Pair[T, U]:
+    first: T
+
+    def __new__(cls, x: T, y: U) -> "Pair[U, T]":
+        raise NotImplementedError
+
+    def check(self, x: int, y: str) -> int:
+        # revealed: Pair[str, int]
+        reveal_type(Pair(x, y))
+        return Pair(x, y).first  # error: [invalid-return-type]
+
+def check(x: int, y: str) -> None:
+    # revealed: Pair[str, int]
+    reveal_type(Pair(x, y))
 ```
 
 ### Type variable defaults across `__new__` and `__init__`
@@ -2260,13 +2280,59 @@ class Pair[T, U]:
     def __init__(self, first: T, second: U):
         self.first: T = first
         self.second: U = second
+        self.values: list[T] = [first]
 
     def swapped(self, other: "Pair[U, T]"):
         reveal_type(other.first)  # revealed: U@Pair
         reveal_type(other.second)  # revealed: T@Pair
+        # revealed: list[U@Pair]
+        reveal_type(other.values)
 
     def nested(self, other: "Pair[list[T], U]"):
         reveal_type(other.first)  # revealed: list[T@Pair]
+        # revealed: list[list[T@Pair]]
+        reveal_type(other.values)
+```
+
+## Inferred attributes preserve captured type variables
+
+Specializing a local generic class replaces its own type variables in inferred attributes. Type
+variables captured from the enclosing function retain that function's binding.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        def __init__(self, value: U) -> None:
+            self.value = (value,)
+            self.captured = (captured,)
+
+    local = Local[int](1)
+    # revealed: tuple[int]
+    reveal_type(local.value)
+    unchanged: tuple[T] = local.captured  # ok
+```
+
+## Annotated attributes preserve captured type variables
+
+A local class's attribute and method annotations capture the enclosing function's type variables.
+The class's own parameters remain available for specialization.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        value: U
+        captured: T
+
+        def __init__(self, value: U, captured: T) -> None:
+            self.value = value  # ok
+            self.captured = captured  # ok
+
+    local = Local[int](1, captured)
+    # revealed: int
+    reveal_type(local.value)
+    unchanged: T = local.captured  # ok
+    Local[int]("wrong", captured)  # error: [invalid-argument-type]
+    Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
 
 ## Materialized `TypeIs` return types
@@ -2975,6 +3041,27 @@ def accepts(value: Required) -> None: ...
 def check(broad: Broad, incompatible: Incompatible):
     accepts(broad)  # ok
     accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Receiver requirements in constructor overloads
+
+Each constructor overload checks its receiver restriction together with its arguments. The receiver
+restriction also applies when every explicit argument has a default.
+
+```py
+from typing import overload
+
+class Required[T]:
+    @overload
+    def __init__(self: "Required[int]", value: int = 0) -> None: ...
+    @overload
+    def __init__(self: "Required[str]", value: str = "") -> None: ...
+    def __init__(self, value: object = 0) -> None: ...
+
+Required[int]()  # ok
+Required[str]()  # ok
+Required[bytes]()  # error: [no-matching-overload]
+Required[int]("wrong")  # error: [no-matching-overload]
 ```
 
 ## Aliased `Self` in explicit receivers

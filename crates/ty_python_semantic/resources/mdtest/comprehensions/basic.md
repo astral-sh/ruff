@@ -546,7 +546,7 @@ y3: list[Person] = [{"name": n} for n in ["Alice", "Bob"]]
 reveal_type(y3)  # revealed: list[Person]
 
 # error: [invalid-assignment]
-# error: [invalid-key] "Unknown key "misspelled" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "misspelled" for TypedDict `Person`"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```

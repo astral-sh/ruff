@@ -1,5 +1,6 @@
 use anyhow::Result;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::open_mode::OpenMode;
@@ -58,17 +59,15 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins" | "aiofiles", "open"]
-            )
-        })
-    {
+pub(crate) fn redundant_open_modes(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(
+        qualified_name.segments(),
+        ["" | "builtins" | "aiofiles", "open"]
+    ) {
         return;
     }
 

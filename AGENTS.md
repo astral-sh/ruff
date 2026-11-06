@@ -29,7 +29,7 @@ available labels or a Rooster configuration could not be inspected, say so when 
 ## Code Review Rules
 
 For security reviews of Ruff and ty runtime changes, use the
-[threat models](agents/references/threat-models.md) to assess trust boundaries and
+[threat models](.agents/references/threat-models.md) to assess trust boundaries and
 calibrate severity.
 
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
@@ -45,7 +45,7 @@ meaningful violations introduced by the changes; do not apply agent-only workflo
 instructions to PR authors or flag unrelated pre-existing issues.
 
 For security reviews of repository, CI, and release changes, use the
-[repository threat model](agents/references/repository-threat-model.md) to assess
+[repository threat model](.agents/references/repository-threat-model.md) to assess
 trust boundaries and calibrate severity.
 
 ## Writing for human readers

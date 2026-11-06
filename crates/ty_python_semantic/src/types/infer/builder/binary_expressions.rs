@@ -343,9 +343,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
     ///
-    /// The normal path's bidirectional inference would emit spurious typed-dict diagnostics
-    /// (e.g., `missing-typed-dict-key`, `invalid-key`) when the RHS doesn't exactly match
-    /// the `TypedDict` schema. We probe here to decide the outcome without those side effects.
+    /// The normal path's bidirectional inference would report missing or unknown constructor keys
+    /// when the RHS doesn't exactly match the `TypedDict` schema. We probe here to decide the
+    /// outcome without those side effects.
     ///
     /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
@@ -885,8 +885,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bytes(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let bytes = [lhs.value(db), rhs.value(db)].concat();
-                        Some(Type::bytes_literal(db, &bytes))
+                        let lhs = lhs.value(db);
+                        let rhs = rhs.value(db);
+                        let new_length = lhs.len().saturating_add(rhs.len());
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            Type::bytes_literal(db, &[lhs, rhs].concat())
+                        } else {
+                            KnownClass::Bytes.to_instance(db, env)
+                        };
+                        Some(ty)
                     }
 
                     (

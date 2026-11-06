@@ -15,8 +15,9 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget, Sol
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
-    SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution,
+    ReportDiagnostics, Solution, SolutionPaths, SolutionViolation, SolutionViolationKind,
+    Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -554,6 +555,14 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
         self.variables_inner(db).values().copied()
+    }
+
+    pub(super) fn variable_index(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<usize> {
+        self.variables_inner(db).get_index_of(&typevar)
     }
 
     pub(crate) fn contains(
@@ -1381,8 +1390,7 @@ impl<'db> Specialization<'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
+            .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
     }
 
@@ -2581,6 +2589,17 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Whether inference supplied a type for this variable, before applying defaults.
+    pub(super) fn has_inferred_type(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        self.generic_context(db)
+            .variable_index(db, typevar)
+            .is_some_and(|index| self.merged_types(db)[index].is_some())
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -2883,12 +2902,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Returns an error if the call-wide pending constraints are unsatisfiable.
     pub(crate) fn build_inference_with(
         &mut self,
+        report_diagnostics: ReportDiagnostics,
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             Option<&CandidateTypeVarSolution<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
     ) -> Result<TypeVarInference<'db>, Vec<SpecializationError<'db>>> {
-        self.solve_pending_with(SolutionBudget::default(), &mut choose)
+        self.solve_pending_with(SolutionBudget::default(), report_diagnostics, &mut choose)
     }
 
     /// Build a diagnostic specialization after the call-wide constraints were unsatisfiable.
@@ -2982,6 +3002,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_pending_with(
         &mut self,
         budget: SolutionBudget,
+        report_diagnostics: ReportDiagnostics,
         choose: &mut impl FnMut(
             BoundTypeVarInstance<'db>,
             Option<&CandidateTypeVarSolution<'db>>,
@@ -2995,6 +3016,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 builder.env,
                 builder.inferable,
                 budget,
+                report_diagnostics,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
                         CandidateSolutions::default_solve(
@@ -3008,7 +3030,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             )?;
             Ok(match solutions {
                 Solutions::Unsatisfiable(solutions) => {
-                    if let SolutionPaths::Complete(paths) = solutions {
+                    if report_diagnostics.is_yes() && let SolutionPaths::Complete(paths) = solutions {
                         specialization_errors = paths
                             .iter()
                             .flat_map(Solution::violations)
@@ -3419,8 +3441,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     Some(mapped_ty) => {
                         // The legacy map has already merged its solutions and discarded their
                         // directional bounds. Treat the resulting mapping as an exact equality.
-                        let candidate =
-                            CandidateTypeVarSolution::from_equivalence(*variable, mapped_ty);
+                        let candidate = CandidateTypeVarSolution::from_equivalence(
+                            *variable,
+                            mapped_ty,
+                            self.inferable,
+                        );
                         choose(*variable, Some(&candidate)).unwrap_or(mapped_ty)
                     }
                     None => choose(*variable, None)?,
@@ -3557,7 +3582,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3565,7 +3590,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3573,7 +3598,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3590,6 +3615,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.env,
             self.inferable,
             SolutionBudget::default(),
+            ReportDiagnostics::Yes,
             |_variance, path_bound| {
                 CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
             },
@@ -3885,9 +3911,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 env,
                 &element.when_constraint_set_assignable_to_owned(db, env, formal),
             );
-            element_when
-                .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env, self.inferable)
+            element_when.is_equivalent_to(db, env, mapping_when, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
@@ -5130,7 +5154,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
-                        ConstraintProvenance::Evidence,
+                        ConstraintProvenance::INFERRED,
                         typevar,
                         ty,
                     )
@@ -5160,7 +5184,7 @@ mod tests {
             ));
 
             let inference = builder
-                .build_inference_with(|_, _| None)
+                .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
                 .map_err(|_| anyhow::anyhow!("expected satisfiable alternatives"))?;
             let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
                 anyhow::bail!(
@@ -5207,10 +5231,8 @@ mod tests {
                 ));
 
                 let inference = builder
-                    .build_inference_with(|typevar, bounds| {
-                        let lower = bounds
-                            .as_ref()
-                            .and_then(|bounds| bounds.inference_lower(db, &env));
+                    .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                        let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                         (typevar == t && lower == Some(str))
                             .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
@@ -5258,7 +5280,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
         ));
@@ -5271,6 +5293,7 @@ mod tests {
                     type_terms: 1,
                     ..SolutionBudget::default()
                 },
+                ReportDiagnostics::Yes,
                 &mut |_, _| None,
             )
             .map_err(|_| anyhow::anyhow!("expected a single solution"))?;
@@ -5301,7 +5324,7 @@ mod tests {
         let str = KnownClass::Str.to_instance(db, &env);
 
         let unconstrained = builder
-            .build_inference_with(|_, _| None)
+            .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
             .map_err(|_| anyhow::anyhow!("unconstrained inference should recover"))?;
         assert_eq!(
             unconstrained.solutions(db),
@@ -5314,12 +5337,16 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             ));
         }
-        assert!(builder.build_inference_with(|_, _| None).is_err());
+        assert!(
+            builder
+                .build_inference_with(ReportDiagnostics::Yes, |_, _| None)
+                .is_err()
+        );
 
         let diagnostic = builder.build_diagnostic_inference_with(
             [(Type::TypeVar(t), int), (Type::TypeVar(t), str)],
@@ -5351,7 +5378,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5384,7 +5411,7 @@ mod tests {
             builder.record_constraint_set(relation);
             let mut choices = 0;
             let inference = builder
-                .solve_pending_with(budget, &mut |_, _| {
+                .solve_pending_with(budget, ReportDiagnostics::Yes, &mut |_, _| {
                     choices += 1;
                     None
                 })
@@ -5417,7 +5444,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5434,6 +5461,7 @@ mod tests {
                         type_terms,
                         ..SolutionBudget::default()
                     },
+                    ReportDiagnostics::Yes,
                     &mut |_, _| None,
                 )
                 .map_err(|_| anyhow::anyhow!("alternative storage exhaustion should recover"))?;
@@ -5492,17 +5520,15 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
         }));
 
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let lower = bounds
-                    .as_ref()
-                    .and_then(|bounds| bounds.inference_lower(db, &env));
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                 (typevar == t && lower == Some(str))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
@@ -5548,8 +5574,8 @@ mod tests {
         // Select T = list[U], U = T on one path and T = U = object on the other. Only the
         // individual path still contains the cycle after merging with object.
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let lower = bounds?.inference_lower(db, &env);
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, bounds| {
+                let lower = bounds?.inference_lower();
                 let ty = match (typevar, lower) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
@@ -5608,7 +5634,7 @@ mod tests {
         builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int, int]]));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|_| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
@@ -5643,14 +5669,14 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
             int,
         ));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|_| anyhow::anyhow!("a missing dependency remains satisfiable"))?;
@@ -5677,7 +5703,7 @@ mod tests {
         builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int, int]]));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 Some(PathBoundSolution::Solved(Type::TypeVar(if typevar == t {
                     u
                 } else {
@@ -5719,7 +5745,7 @@ mod tests {
         // The merged specialization needs recovery for T = list[U], U = T. That does not
         // discard the original alternative or the independent, resolved binding V = int.
         let inference = builder
-            .build_inference_with(|variable, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |variable, _| {
                 if variable == t {
                     Some(PathBoundSolution::Solved(list_of_u))
                 } else if variable == u {
@@ -5777,7 +5803,7 @@ mod tests {
         ));
 
         let inference = builder
-            .build_inference_with(|typevar, _| {
+            .build_inference_with(ReportDiagnostics::Yes, |typevar, _| {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(outer)))
             })
             .map_err(|_| anyhow::anyhow!("an outer dependency remains satisfiable"))?;
@@ -5815,7 +5841,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
@@ -5862,7 +5888,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             ty,
         );
@@ -5909,7 +5935,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5917,7 +5943,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5925,7 +5951,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );

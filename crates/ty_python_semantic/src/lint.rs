@@ -369,7 +369,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -406,7 +406,7 @@ impl LintRegistryBuilder {
         );
     }
 
-    pub(crate) fn build(self) -> LintRegistry {
+    pub fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,
@@ -456,6 +456,19 @@ impl LintRegistry {
     /// Returns all registered, non-removed lints.
     pub fn lints(&self) -> &[LintId] {
         &self.lints
+    }
+
+    /// Returns whether `name` is a registered alias for a lint.
+    pub fn is_alias(&self, name: &str) -> bool {
+        self.alias_target(name).is_some()
+    }
+
+    /// Returns the target of a registered alias.
+    pub fn alias_target(&self, name: &str) -> Option<LintId> {
+        match self.by_name.get(name)? {
+            LintEntry::Alias(lint) => Some(*lint),
+            _ => None,
+        }
     }
 
     /// Returns an iterator over all known aliases and to their target lints.

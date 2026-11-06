@@ -2835,6 +2835,39 @@ class BadChild(Base):
     def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
+## Incompatible returns in an overloaded override
+
+The overloads accept both argument types from the base method, but only one returns a string. The
+diagnostic identifies the incompatible return type.
+
+```pyi
+from typing import overload
+
+class Base:
+    def get(self, x: int | bytes) -> str: ...
+
+class Child(Base):
+    @overload
+    def get(self, x: int) -> bytes: ...
+    @overload
+    def get(self, x: bytes) -> str: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `get`
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def get(self, x: bytes) -> str: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.get`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def get(self, x: int | bytes) -> str: ...
+   |         -------------------------------- `Base.get` defined here
+info: element `bytes` of union `bytes | str` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
@@ -3294,6 +3327,65 @@ class CompatibleAttribute(MethodBase):
 
 class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
+```
+
+## Methods overriding annotated callable defaults
+
+PyTorch's `Module` annotates (or used to) its default `forward` as `Callable[..., Any]`. In this
+scenario, we allow a subclass to override it with a method that declares its own parameters and
+return type ([ty #4823](https://github.com/astral-sh/ty/issues/4823)). This might be seen as a
+subclass limitation in the sense that *writes* to the `forward` attribute are now restricted, but
+since we allow shadowing of methods with instance attributes, it seems consistent to allow this as
+well:
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+from typing import Any, Callable
+
+def default_forward(self, *args: Any, **kwargs: Any) -> Any:
+    raise NotImplementedError
+
+class Module:
+    forward: Callable[..., Any] = default_forward
+
+class Model(Module):
+    def forward(self, x: int) -> int:  # ok
+        return x
+```
+
+## Callable attributes overriding class methods
+
+Both `@classmethod` and `classmethod(impl)` expose the same bound signature. A subclass callable
+attribute that narrows the return type should pass the override check in both cases.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+from collections.abc import Callable
+
+class DecoratedBase:
+    @classmethod
+    def f(cls) -> object:
+        return object()
+
+class DecoratedChild(DecoratedBase):
+    f: Callable[[], str]  # ok
+
+def impl(cls: type) -> object:
+    return object()
+
+class WrappedBase:
+    f = classmethod(impl)
+
+class WrappedChild(WrappedBase):
+    f: Callable[[], str]  # ok
 ```
 
 ## Methods replacing inferred callable defaults

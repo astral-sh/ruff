@@ -294,6 +294,41 @@ def foo() -> str:
 }
 
 #[test]
+fn conflicting_rule_alias_in_editor_settings() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let content = "import missing\nundefined";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration: Some(
+                        Map::from_iter([(
+                            "rules".to_string(),
+                            json!({
+                                "import-not-found": "ignore",
+                                "unresolved-import": "error",
+                                "unresolved-reference": "warn",
+                            }),
+                        )])
+                        .into(),
+                    ),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(main, content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main, content, 1);
+    let diagnostics = server.document_diagnostic_request(main, None);
+    insta::assert_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @"1:0..1:9[WARNING]: Name `undefined` used when not defined");
+    Ok(())
+}
+
+#[test]
 fn unsupported_editor_python_version() -> Result<()> {
     let _filter = filter_result_id();
 

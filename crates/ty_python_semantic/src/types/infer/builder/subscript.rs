@@ -13,10 +13,10 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_not_subscriptable,
+    report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
@@ -27,7 +27,7 @@ use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
+    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictField, TypedDictKeyAssignment,
 };
 use crate::types::typevar::{BindingContext, TypeVarKind, TypeVarSet};
 use crate::types::{
@@ -39,7 +39,6 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
-use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
 
@@ -219,10 +218,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut constraint_keys = vec![];
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
-        if !value_ty.is_unknown() {
-            if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) =
-                    self.infer_place_load(&expr, ast::ExprRef::Subscript(subscript));
+        let source_place = (!value_ty.is_unknown())
+            .then(|| self.source_place(ast::ExprRef::Subscript(subscript)))
+            .flatten();
+        {
+            if let Some(expr) = &source_place {
+                let (place, keys) = self.infer_place_load(expr, ast::ExprRef::Subscript(subscript));
                 constraint_keys.extend(keys);
                 if let Place::Defined(DefinedPlace {
                     ty,
@@ -497,13 +498,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
         self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
-            .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
+            .map(|ty| self.narrow_source_place(source_place.as_ref(), ty, &constraint_keys))
             .map_err(|recovery_ty| {
-                self.narrow_expr_with_applicable_constraints(
-                    subscript,
-                    recovery_ty,
-                    &constraint_keys,
-                )
+                self.narrow_source_place(source_place.as_ref(), recovery_ty, &constraint_keys)
             })
     }
 
@@ -1781,7 +1778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .place
             {
-                let mut identity_bindings = dunder_callable
+                let identity_bindings = dunder_callable
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -1801,11 +1798,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // for simplicity.
                             builder.infer_maybe_standalone_expression(expr, tcx)
                         },
-                        &mut identity_bindings,
+                        identity_bindings,
                         TypeContext::default(),
                     );
 
-                if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
+                if let Ok(inferred) = call_result
+                    && boundness == Definedness::AlwaysDefined
+                {
+                    let identity_bindings = inferred.into_bindings();
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
@@ -2003,10 +2003,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             attach_original_type_info(&mut diagnostic);
                         }
                     } else {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_KEY, target.slice.as_ref())
+                        // With explicit extra items, a string key reaches this branch if it might
+                        // overwrite a read-only item. Keep that error under `invalid-typed-dict-key`.
+                        // A closed TypedDict with no writable fields also has no valid destination.
+                        let openness = typed_dict.openness(db);
+                        let lint = if openness.explicit_extra_items().is_some()
+                            || (openness.is_closed()
+                                && typed_dict
+                                    .items(db)
+                                    .values()
+                                    .all(TypedDictField::is_read_only))
                         {
+                            &INVALID_TYPED_DICT_KEY
+                        } else {
+                            typed_dict_subscript_key_lint(&self.context, slice_ty)
+                        };
+                        if let Some(builder) = self.context.report_lint(lint, &*target.slice) {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "TypedDict `{value_d}` can only be subscripted \
                                 with a string literal key, got key of type `{}`.",

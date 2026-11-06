@@ -14,10 +14,10 @@ use ruff_index::{IndexVec, newtype_index};
 use crate::types::constraints::sequents::{
     GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
 };
-use crate::types::constraints::variables::AtomicConstraint;
 use crate::types::constraints::variables::AtomicConstraint::{
     ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
 };
+use crate::types::constraints::variables::{AtomicConstraint, UnspecializedTypeVarPolicy};
 use crate::types::constraints::{
     Assignment, AtomicConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
     TypeVarId,
@@ -327,6 +327,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_true(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -352,6 +353,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_unconstrained(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -377,6 +379,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_false(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -437,6 +440,7 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         assignment: Assignment<AtomicConstraintId>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
     ) -> R {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -464,7 +468,13 @@ impl PathAssignments {
             .push_back((assignment, AssignmentFuel::origin()));
         let source_constraint = assignment.constraint();
         let found_conflict = self
-            .drain_assignment_queue(db, env, storage, source_constraint)
+            .drain_assignment_queue(
+                db,
+                env,
+                storage,
+                source_constraint,
+                unspecialized_type_var_policy,
+            )
             .is_err();
         if !found_conflict {
             tracing::trace!(
@@ -833,6 +843,7 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_constraint: AtomicConstraintId,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
@@ -841,12 +852,22 @@ impl PathAssignments {
         // evidence until the replacement actually holds, including when another derivation
         // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
         for (original, replacement) in self.pending_substitutions.drain(..) {
-            if self
+            if !self
                 .positive_assignment_indices
                 .get(replacement)
                 .is_some_and(Option::is_some)
-                && !self.substituted_constraints.contains(&replacement)
+                || self.substituted_constraints.contains(&replacement)
             {
+                continue;
+            }
+
+            let replacement = storage.atomic_constraint_data(replacement);
+            if replacement.provides_candidate_bound(
+                db,
+                env,
+                replacement.as_concrete().map(|(_, bound)| bound),
+                unspecialized_type_var_policy,
+            ) {
                 self.substituted_constraints.insert(original);
             }
         }
@@ -1223,7 +1244,7 @@ mod tests {
             db,
             &env,
             builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             bound_typevar,
             ty,
         )
@@ -1252,7 +1273,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1260,7 +1281,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -1328,6 +1349,7 @@ mod tests {
             set.node,
             inferable,
             set.source_order,
+            UnspecializedTypeVarPolicy::Ignore,
         );
 
         // Both limits interrupt an edge with path-local assignments: the visit limit stops

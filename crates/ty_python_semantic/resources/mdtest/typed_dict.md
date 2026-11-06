@@ -29,7 +29,7 @@ alice: Person = {"name": "Alice", "age": 30}
 reveal_type(alice["name"])  # revealed: Literal["Alice"]
 reveal_type(alice["age"])  # revealed: Literal[30]
 
-# error: [invalid-key] "Unknown key "non_existing" for TypedDict `Person`"
+# error: [invalid-typed-dict-key] "Unknown key "non_existing" for TypedDict `Person`"
 reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
@@ -41,7 +41,7 @@ bob = Person(name="Bob", age=25)
 reveal_type(bob["name"])  # revealed: str
 reveal_type(bob["age"])  # revealed: int | None
 
-# error: [invalid-key] " key "non_existing" for TypedDict `Person`"
+# error: [invalid-typed-dict-key] " key "non_existing" for TypedDict `Person`"
 reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
@@ -107,7 +107,7 @@ bob.update(name_update, age="bad")
 bob.update(name_update, other=1)
 
 # error: [invalid-argument-type]
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 bob.update({"other": 1})
 
 # error: [invalid-argument-type]
@@ -286,7 +286,7 @@ def name_or_age() -> Literal["name", "age"]:
 carol: Person = {NAME: "Carol", AGE: 20}
 
 reveal_type(carol[NAME])  # revealed: str
-# error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
+# error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
 reveal_type(carol[non_literal()])  # revealed: Unknown
 reveal_type(carol[name_or_age()])  # revealed: str | int | None
 
@@ -298,7 +298,7 @@ def _():
 
 CAPITALIZED_NAME = "Name"
 
-# error: [invalid-key] "Unknown key "Name" for TypedDict `Person` - did you mean "name"?"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "Name" for TypedDict `Person` - did you mean "name"?"
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 dave: Person = {CAPITALIZED_NAME: "Dave", "age": 20}
 
@@ -329,10 +329,10 @@ eve2b = Person(age=22)
 reveal_type(eve2a)  # revealed: Person
 reveal_type(eve2b)  # revealed: Person
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 eve3b = Person(name="Eve", age=25, extra=True)
 
 reveal_type(eve3a)  # revealed: Person
@@ -421,10 +421,10 @@ bob["name"] = None
 Assignments to non-existing keys are disallowed:
 
 ```py
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [invalid-typed-dict-key] "Unknown key "extra" for TypedDict `Person`"
 alice["extra"] = True
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [invalid-typed-dict-key] "Unknown key "extra" for TypedDict `Person`"
 bob["extra"] = True
 ```
 
@@ -485,10 +485,10 @@ alice: Person = {"inner": {"name": "Alice", "age": 30}}
 reveal_type(alice["inner"]["name"])  # revealed: Literal["Alice"]
 reveal_type(alice["inner"]["age"])  # revealed: Literal[30]
 
-# error: [invalid-key] "Unknown key "non_existing" for TypedDict `Inner`"
+# error: [invalid-typed-dict-key] "Unknown key "non_existing" for TypedDict `Inner`"
 reveal_type(alice["inner"]["non_existing"])  # revealed: Unknown
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Inner`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Inner`"
 alice: Person = {"inner": {"name": "Alice", "age": 30, "extra": 1}}
 
 class Box(TypedDict):
@@ -631,7 +631,7 @@ KeywordTD(**{"in": 1})
 # error: [invalid-argument-type] "Invalid argument to key "in" with declared type `int` on TypedDict `KeywordTD`: value of type `Literal["bad"]`"
 KeywordTD(**{"in": "bad", "x-y": 2})
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `KeywordTD`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `KeywordTD`"
 KeywordTD(**{"in": 1, "x-y": 2, "extra": 3})
 ```
 
@@ -644,7 +644,7 @@ class SharedKwargsTD(TypedDict):
     x: int
 
 # error: [invalid-argument-type]
-# error: [invalid-key] "TypedDict `SharedKwargsTD` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `SharedKwargsTD` requires string keys, got key of type `Literal[1]`"
 SharedKwargsTD(**{"x": 1, 1: 2})
 
 # error: [invalid-argument-type]
@@ -730,7 +730,8 @@ Person({"name": "Alice"})
 # error: [invalid-argument-type]
 accepts_person({"name": "Alice"})
 
-# TODO: this should be an invalid-key error, similar to the above
+# TODO: this should report the missing required key, as above
+#
 # error: [invalid-assignment]
 house.owner = {"name": "Alice"}
 
@@ -789,7 +790,8 @@ Person({"name": None, "age": 30})
 # error: [invalid-argument-type]
 accepts_person({"name": None, "age": 30})
 
-# TODO: this should be an invalid-key error
+# TODO: this should report the invalid value for "name", as above
+#
 # error: [invalid-assignment]
 house.owner = {"name": None, "age": 30}
 
@@ -804,28 +806,29 @@ a_person = {"name": None, "age": 30}
 All of these have an extra field that is not defined in the `TypedDict`:
 
 ```py
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 alice4: Person = {"name": "Alice", "age": 30, "extra": True}
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 Person(name="Alice", age=30, extra=True)
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 Person({"name": "Alice", "age": 30, "extra": True})
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 # error: [invalid-argument-type]
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 
-# TODO: this should be an invalid-key error
+# TODO: this should report the unknown key, as above
+#
 # error: [invalid-assignment]
 house.owner = {"name": "Alice", "age": 30, "extra": True}
 
 a_person: Person
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 a_person = {"name": "Alice", "age": 30, "extra": True}
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `Person`"
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
@@ -853,10 +856,10 @@ def _(source: MergeSource):
     MergeTarget({**source, "ccc": 3})
 
 def _(source: MergeExtraSource):
-    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `MergeTarget`"
     merged: MergeTarget = {**source, "ccc": 3}
 
-    # error: [invalid-key] "Unknown key "extra" for TypedDict `MergeTarget`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `MergeTarget`"
     MergeTarget({**source, "ccc": 3})
 ```
 
@@ -1010,7 +1013,7 @@ reveal_type(x1)  # revealed: Foo
 # A union with no dict-compatible fallback should still validate eagerly against the
 # TypedDict arm.
 # error: [missing-typed-dict-key] "Missing required key 'foo' in TypedDict `Foo` constructor"
-# error: [invalid-key] "Unknown key "bar" for TypedDict `Foo`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "bar" for TypedDict `Foo`"
 x1_bad: Foo | None = {"bar": 1}
 reveal_type(x1_bad)  # revealed: Foo | None
 
@@ -1103,17 +1106,70 @@ x2: TypedDictOrMapping = {1: 5.2}
 
 # A `Mapping` fallback should only suppress `TypedDict` diagnostics when it accepts the literal.
 # error: [missing-typed-dict-key]
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 x3: TypedDictOrMapping = {"y": 5.2}
 
 # error: [missing-typed-dict-key]
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 x4: TypedDictOrMapping = {1: "bad"}
 
 def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
     pass
 
 takes_td_or_iterable({42: 42})
+```
+
+When no `TypedDict` element matches, the items are inferred against a dictionary alternative with
+type context:
+
+```py
+x1: Foo | Bar | dict[str, list[int | str]] = {"other": [1]}
+reveal_type(x1)  # revealed: dict[str, list[int | str]]
+
+x2: Foo | dict[str, list[int]] | dict[str, list[int | str]] = {"other": [1]}
+reveal_type(x2)  # revealed: dict[str, list[int]] | dict[str, list[int | str]]
+
+def takes_mapping(value: Foo | Mapping[str, list[float]]): ...
+
+takes_mapping({"other": [1]})  # ok
+```
+
+When the dictionary literal is narrowed to a single matching `TypedDict` element, any diagnostics
+emitted use the types inferred using that element as type context.
+
+```py
+from typing import Callable, TypedDict
+
+class IntCallback(TypedDict):
+    f: Callable[[int], object]
+
+# revealed: int
+x1: IntCallback | str = {"f": lambda value: reveal_type(value)}
+reveal_type(x1)  # revealed: IntCallback
+
+class Inner(TypedDict):
+    value: int
+
+class Outer(TypedDict):
+    inner: Inner
+
+x2: Outer | str = {"inner": reveal_type({"value": 1})}  # revealed: Inner
+reveal_type(x2)  # revealed: Outer
+
+x3: Outer | dict[str, object] = {"inner": reveal_type({"value": 1})}  # revealed: Inner
+reveal_type(x3)  # revealed: Outer
+```
+
+When a literal instead produces a union of `TypedDict` types, diagnostics fall back to the types
+inferred without type context.
+
+```py
+class StrCallback(TypedDict):
+    f: Callable[[str], object]
+
+# revealed: Unknown
+x1: IntCallback | StrCallback = {"f": lambda value: reveal_type(value)}
+reveal_type(x1)  # revealed: IntCallback | StrCallback
 ```
 
 ## Union of `TypedDict` behind a type alias
@@ -1164,7 +1220,7 @@ reveal_type(constructed)  # revealed: Person
 Keys are still validated against the aliased `TypedDict`:
 
 ```py
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
 ```
 
@@ -1181,13 +1237,13 @@ reveal_type(collapsed)  # revealed: Person
 collapsed_constructor: FirstPerson | SecondPerson = dict(name="Alice", age=30)
 reveal_type(collapsed_constructor)  # revealed: Person
 
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 collapsed_unknown_key: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}
 
 collapsed_constructor_unknown_key: FirstPerson | SecondPerson = dict(
     name="Alice",
     age=30,
-    # error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
     nickname="Ali",
 )
 ```
@@ -1198,10 +1254,10 @@ The same holds where the annotation is a parameter default or a nested field:
 class Team(TypedDict):
     lead: FirstPerson | SecondPerson
 
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}): ...
 
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
 ```
 
@@ -1212,7 +1268,7 @@ without aliases; expansion only exposes the existing limitation:
 # TODO: The `dict[str, str]` fallback should accept this constructor without errors.
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
 
 # TODO: This should reveal `dict[str, str]`, not `Person`.
@@ -1230,20 +1286,20 @@ def takes_fallback(value: PersonOrId | dict[str, str]) -> None: ...
 # TODO: The `dict[str, str]` fallback should accept this argument without errors.
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 takes_fallback(dict(other="x"))
 
 def returns_fallback() -> PersonOrId | dict[str, str]:
     # TODO: The `dict[str, str]` fallback should accept this return without errors.
     # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
     # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-    # error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
     return dict(other="x")
 
 # TODO: The `dict[str, str]` fallback should accept this nested value without errors.
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 nested_fallback: Roster = {"lead": dict(other="x")}
 ```
 
@@ -1255,13 +1311,13 @@ from typing import Any, Mapping
 # TODO: The `Any` fallback should accept this constructor without errors.
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 any_fallback: PersonOrId | Any = dict(other="x")
 
 # TODO: The `Mapping[str, str]` fallback should accept this constructor without errors.
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 mapping_fallback: PersonOrId | Mapping[str, str] = dict(other="x")
 ```
 
@@ -1271,12 +1327,12 @@ dictionary fallback, whether the alias appears directly or in a larger union:
 ```py
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 no_fallback: PersonOrId = dict(other="x")
 
 # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
-# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "other" for TypedDict `Person`"
 invalid_constructor: PersonOrId | str = dict(other="x")
 ```
 
@@ -1342,10 +1398,10 @@ reveal_type(constructed)  # revealed: Person
 Both dictionary literals and constructors reject unknown keys:
 
 ```py
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
 
-# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "nickname" for TypedDict `Person`"
 invalid_constructor: PersonOrId | str = dict(name="Alice", age=30, nickname="Ali")
 ```
 
@@ -1395,7 +1451,7 @@ user2 = User({"name": "Bob"})
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `User`: value of type `None`"
 user3 = User({"name": None, "age": 25})
 
-# error: [invalid-key] "Unknown key "extra" for TypedDict `User`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `User`"
 user4 = User({"name": "Charlie", "age": 30, "extra": True})
 ```
 
@@ -1521,7 +1577,7 @@ class Employee(Person):
     employee_id: int
 
 def get_person_from_employee(emp: Employee) -> Person:
-    # error: [invalid-key] "Unknown key "employee_id" for TypedDict `Person`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "employee_id" for TypedDict `Person`"
     return Person(**emp)
 ```
 
@@ -1695,8 +1751,8 @@ def construct_from_intersection(data: Intersection[TdA, TdB]) -> NameOnly:
 
 # Unpacking form flags extra keys as errors
 def construct_from_intersection_unpacking(data: Intersection[TdA, TdB]) -> NameOnly:
-    # error: [invalid-key] "Unknown key "a_only" for TypedDict `NameOnly`"
-    # error: [invalid-key] "Unknown key "b_only" for TypedDict `NameOnly`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "a_only" for TypedDict `NameOnly`"
+    # error: [unknown-typed-dict-constructor-key] "Unknown key "b_only" for TypedDict `NameOnly`"
     return NameOnly(**data)
 ```
 
@@ -1733,7 +1789,7 @@ invalid = OptionalPerson(name=123)
 Extra fields are still not allowed, even with `total=False`:
 
 ```py
-# error: [invalid-key] "Unknown key "extra" for TypedDict `OptionalPerson`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "extra" for TypedDict `OptionalPerson`"
 invalid_extra = OptionalPerson(name="George", extra=True)
 ```
 
@@ -2515,10 +2571,10 @@ def _(
 
     reveal_type(person[union_of_keys])  # revealed: int | None | str
 
-    # error: [invalid-key] "Unknown key "non_existing" for TypedDict `Person`"
+    # error: [invalid-typed-dict-key] "Unknown key "non_existing" for TypedDict `Person`"
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # Direct calls to the synthesized method accept any string key, including keys not declared
@@ -2529,20 +2585,20 @@ def _(
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
-    # error: [invalid-key] "got key of type `list[RecursiveKey | None]`"
-    # error: [invalid-key] "got key of type `None`"
+    # error: [invalid-typed-dict-key] "got key of type `list[RecursiveKey | None]`"
+    # error: [invalid-typed-dict-key] "got key of type `None`"
     reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
-    # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
+    # error: [invalid-typed-dict-key] "Unknown key "anything" for TypedDict `Animal`"
     reveal_type(animal["anything"])  # revealed: Unknown
 
     reveal_type(being["name"])  # revealed: str
 
-    # error: [invalid-key] "Unknown key "age" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
+    # error: [invalid-typed-dict-key] "Unknown key "age" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     reveal_type(being["age"])  # revealed: int | None | Unknown
 
-    # error: [invalid-key]
-    # error: [invalid-key]
+    # error: [invalid-typed-dict-key]
+    # error: [invalid-typed-dict-key]
     reveal_type(being["legs"])  # revealed: Unknown
 ```
 
@@ -2569,7 +2625,7 @@ def _(person: Person):
     person["name"] = "Alice"
     person["age"] = 30
 
-    # error: [invalid-key] "Unknown key "nane" for TypedDict `Person` - did you mean "name"?"
+    # error: [invalid-typed-dict-key] "Unknown key "nane" for TypedDict `Person` - did you mean "name"?"
     person["nane"] = "Alice"
 
 def _(person: Person):
@@ -2593,7 +2649,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
+    # error: [invalid-typed-dict-key] "Unknown key "leg" for TypedDict `Animal` (subscripted object has type `Person | Animal`)"
     being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
@@ -2601,7 +2657,7 @@ def _(centaur: Intersection[Person, Animal]):
     centaur["age"] = 100
     centaur["legs"] = 4
 
-    # error: [invalid-key] "Unknown key "unknown" for TypedDict `Person` (subscripted object has type `Person & Animal`)"
+    # error: [invalid-typed-dict-key] "Unknown key "unknown" for TypedDict `Person` (subscripted object has type `Person & Animal`)"
     centaur["unknown"] = "value"
 
 def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
@@ -2611,15 +2667,102 @@ def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any)
     person[union_of_keys] = None
 
 def _(person: Person, str_key: str, literalstr_key: LiteralString):
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `str`."
     person[str_key] = None
 
-    # error: [invalid-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
+    # error: [non-literal-typed-dict-key] "TypedDict `Person` can only be subscripted with a string literal key, got key of type `LiteralString`."
     person[literalstr_key] = None
 
 def _(person: Person, unknown_key: Any):
     # No error here:
     person[unknown_key] = "Eve"
+```
+
+### Suppressing non-literal key errors
+
+A read with a `str | int` key can report both `non-literal-typed-dict-key` and
+`invalid-typed-dict-key`. Ignoring either rule leaves the error for the other key type visible.
+
+```py
+from typing import Any
+from typing_extensions import ReadOnly, TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(movie: Movie, key: str | int):
+    # error: [invalid-typed-dict-key] "got key of type `int`"
+    movie[key]  # ty: ignore[non-literal-typed-dict-key]
+
+    # error: [non-literal-typed-dict-key] "got key of type `str`"
+    movie[key]  # ty: ignore[invalid-typed-dict-key]
+
+    # TODO: Report each rejected key type separately on writes, like for reads, i.e.
+    # do not report `unused-ignore-comment`, and change the message in the first
+    # assertion
+    # error: [invalid-typed-dict-key] "got key of type `str | int`"
+    # error: [unused-ignore-comment]
+    movie[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+
+    # TODO: Still report `non-literal-typed-dict-key` for the `str` member.
+    movie[key] = "Alien"  # ty: ignore[invalid-typed-dict-key]
+```
+
+For a gradual `str | Any` key type, ignoring `non-literal-typed-dict-key` suppresses the read error.
+
+```py
+def _(movie: Movie, key: str | Any):
+    # no diagnostic
+    movie[key]  # ty: ignore[non-literal-typed-dict-key]
+
+    # error: [non-literal-typed-dict-key] "got key of type `str`"
+    # error: [unused-ignore-comment]
+    movie[key]  # ty: ignore[invalid-typed-dict-key]
+
+    # TODO: see above
+    # error: [invalid-typed-dict-key] "got key of type `str | Any`"
+    # error: [unused-ignore-comment]
+    movie[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+
+    # TODO: see above
+    movie[key] = "Alien"  # ty: ignore[invalid-typed-dict-key]
+```
+
+For a closed `TypedDict` with a writable field, a caller can suppress the non-literal key error:
+
+```py
+class ClosedMovie(TypedDict, closed=True):
+    title: str
+
+def _(mutable: ClosedMovie, key: str):
+    mutable[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+```
+
+However, in the following two examples, suppressing `non-literal-typed-dict-key` would not help,
+since the write to all keys is invalid:
+
+```py
+class ClosedReadOnlyMovie(TypedDict, closed=True):
+    title: ReadOnly[str]
+
+class MovieWithReadOnlyExtras(TypedDict, extra_items=ReadOnly[str]):
+    title: ReadOnly[str]
+
+def _(mutable: ClosedMovie, closed: ClosedReadOnlyMovie, extra: MovieWithReadOnlyExtras, key: str):
+    # error: [invalid-typed-dict-key] "got key of type `str`"
+    closed[key] = "Alien"
+
+    # error: [invalid-typed-dict-key] "got key of type `str`"
+    extra[key] = "Alien"
+```
+
+The old `invalid-key` name still suppresses an invalid subscript key, and ty suggests using the new
+rule name.
+
+```py
+def _(movie: Movie):
+    # error: [renamed-rule-in-ignore-comment] "Rule `invalid-key` has been renamed to `invalid-typed-dict-key`"
+    movie["titel"]  # ty: ignore[invalid-key]
 ```
 
 ## `ReadOnly`
@@ -2951,7 +3094,7 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("name", "Alice"))  # revealed: str
     reveal_type(p.setdefault("extra", "default"))  # revealed: str
 
-    # error: [invalid-key] "Unknown key "extraz" for TypedDict `Person` - did you mean "extra"?"
+    # error: [invalid-typed-dict-key] "Unknown key "extraz" for TypedDict `Person` - did you mean "extra"?"
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
@@ -3561,22 +3704,7 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
-    # TODO: This should not error.
-    # snapshot: invalid-argument-type
-    takes_int(set_and_get(value, "a", 1))
-```
-
-```snapshot
-error[invalid-argument-type]: Argument to function `takes_int` is incorrect
-   --> src/mdtest_snippet.py:346:15
-    |
-346 |     takes_int(set_and_get(value, "a", 1))
-    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
-info: Function defined here
-   --> src/mdtest_snippet.py:342:5
-    |
-342 | def takes_int(value: int) -> None: ...
-    |     ^^^^^^^^^ ---------- Parameter declared here
+    takes_int(set_and_get(value, "a", 1))  # ok
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
@@ -4270,7 +4398,7 @@ class Box[T](TypedDict):
     value: T
 
 Box()  # error: [missing-typed-dict-key]
-Box(value=1, extra=2)  # error: [invalid-key]
+Box(value=1, extra=2)  # error: [unknown-typed-dict-constructor-key]
 ```
 
 An invalid field value points to the field declaration and retains the usual `TypedDict`
@@ -4663,8 +4791,8 @@ reveal_type(IntBound(value=1))  # revealed: IntBound[int]
 
 ### Constructor inference with callable parameters
 
-Like other generic constructors, a callback must accept the promoted type inferred from another
-field.
+A callback that accepts a literal type can prevent literal promotion for other arguments to a
+constructor:
 
 ```toml
 [environment]
@@ -4680,7 +4808,8 @@ class Box[T](TypedDict):
 
 def accepts_one(value: Literal[1]) -> None: ...
 
-Box(value=1, callback=accepts_one)  # error: [invalid-argument-type]
+box = Box(value=1, callback=accepts_one)
+reveal_type(box)  # revealed: Box[Literal[1]]
 ```
 
 ### Constructor inference with an expected type
@@ -4780,12 +4909,13 @@ def accepts_dog(value: Dog) -> None: ...
 dog_consumer: Consumer[Dog] = Consumer(callback=accepts_animal)
 ```
 
-An incompatible callback reports its argument error without producing an additional assignment
+An incompatible callback reports an assignability error without producing an additional argument
 error.
 
 ```py
+# error: [invalid-assignment]
 animal_consumer: Consumer[Animal] = Consumer(
-    callback=accepts_dog,  # error: [invalid-argument-type]
+    callback=accepts_dog,
 )
 ```
 
@@ -5048,7 +5178,7 @@ invalid_type = Film({"title": "Bad", "year": "not a year"})
 # error: [missing-typed-dict-key] "Missing required key 'year' in TypedDict `Film` constructor"
 missing_key = Film({"title": "Incomplete"})
 
-# error: [invalid-key] "Unknown key "director" for TypedDict `Film`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "director" for TypedDict `Film`"
 extra_key = Film({"title": "Extra", "year": 2020, "director": "Someone"})
 ```
 
@@ -5908,12 +6038,12 @@ key = get_name()
 Bad = TypedDict("Bad", {key: int})
 
 # No known fields, so keyword arguments are rejected
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 b = Bad(x=1)
 reveal_type(b)  # revealed: Bad
 
 # Field access reports unknown keys
-# error: [invalid-key]
+# error: [invalid-typed-dict-key]
 reveal_type(b["x"])  # revealed: Unknown
 ```
 
@@ -6209,30 +6339,30 @@ class Person(TypedDict):
     age: int | None
 
 def access_invalid_literal_string_key(person: Person):
-    person["nane"]  # error: [invalid-key]
+    person["nane"]  # error: [invalid-typed-dict-key]
 
 NAME_KEY: Final = "nane"
 
 def access_invalid_key(person: Person):
-    person[NAME_KEY]  # error: [invalid-key]
+    person[NAME_KEY]  # error: [invalid-typed-dict-key]
 
 def access_with_str_key(person: Person, str_key: str):
-    person[str_key]  # error: [invalid-key]
+    person[str_key]  # error: [non-literal-typed-dict-key]
 
 def write_to_key_with_wrong_type(person: Person):
     person["age"] = "42"  # error: [invalid-assignment]
 
 def write_to_non_existing_key(person: Person):
-    person["nane"] = "Alice"  # error: [invalid-key]
+    person["nane"] = "Alice"  # error: [invalid-typed-dict-key]
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
-    person[str_key] = "Alice"  # error: [invalid-key]
+    person[str_key] = "Alice"  # error: [non-literal-typed-dict-key]
 
 def create_with_invalid_string_key():
-    # error: [invalid-key]
+    # error: [unknown-typed-dict-constructor-key]
     alice: Person = {"name": "Alice", "age": 30, "unknown": "Foo"}
 
-    # error: [invalid-key]
+    # error: [unknown-typed-dict-constructor-key]
     bob = Person(name="Bob", age=25, unknown="Bar")
 ```
 
@@ -6253,7 +6383,7 @@ If the key uses single quotes, the autofix preserves that quoting style:
 
 ```py
 def write_to_non_existing_key_single_quotes(person: Person):
-    # error: [invalid-key]
+    # error: [invalid-typed-dict-key]
     person['nane'] = "Alice"  # fmt: skip
 ```
 
@@ -6874,7 +7004,7 @@ class IntegerTag(TypedDict):
 def enum_tag(u: EnumTag | IntegerTag | Foo):
     if u["tag"] == 1:
         reveal_type(u)  # revealed: EnumTag | IntegerTag
-        u["integer_only"]  # error: [invalid-key]
+        u["integer_only"]  # error: [invalid-typed-dict-key]
     else:
         reveal_type(u)  # revealed: EnumTag | Foo
 ```
@@ -7046,7 +7176,7 @@ _: StrTagTD = {"tag": MatchesInteger("other")}
 def broad_string_tag(u: StrTagTD | IntegerTag):
     if u["tag"] == 1:
         reveal_type(u)  # revealed: StrTagTD | IntegerTag
-        u["integer_only"]  # error: [invalid-key]
+        u["integer_only"]  # error: [invalid-typed-dict-key]
     else:
         reveal_type(u)  # revealed: StrTagTD
 ```
@@ -7640,7 +7770,7 @@ class ConditionalField(TypedDict):
     if sys.version_info >= (3, 12):
         y: str
 
-# error: [invalid-key] "Unknown key "y" for TypedDict `ConditionalField`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "y" for TypedDict `ConditionalField`"
 ConditionalField(x=1, y="hello")
 ```
 
@@ -8057,7 +8187,7 @@ class Closed(TypedDict, closed=True):
     age: int
 
 def _(td: Closed, key: str) -> None:
-    # error: [invalid-key]
+    # error: [non-literal-typed-dict-key]
     reveal_type(td[key])  # revealed: int | str
 ```
 
@@ -8186,10 +8316,10 @@ Movie(name="Blade Runner", year=1982)
 class ClosedMovie(TypedDict, closed=True):
     name: str
 
-# error: [invalid-key] "Unknown key "year" for TypedDict `ClosedMovie`"
+# error: [unknown-typed-dict-constructor-key] "Unknown key "year" for TypedDict `ClosedMovie`"
 c: ClosedMovie = {"name": "Blade Runner", "year": 1982}
 
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 ClosedMovie(name="Blade Runner", year=1982)
 ```
 
@@ -8204,22 +8334,22 @@ class ClosedEmpty(TypedDict, closed=True): ...
 class OpenSource(TypedDict):
     name: str
 
-# error: [invalid-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
 extra: ExtraOnly = {1: 1}
 
-# error: [invalid-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
 closed: ClosedEmpty = {1: 1}
 
-# error: [invalid-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
 ExtraOnly({1: 1})
 
-# error: [invalid-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
 ClosedEmpty({1: 1})
 
-# error: [invalid-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
 open_source: OpenSource = {"name": "x", 1: 1}
 
-# error: [invalid-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
+# error: [unknown-typed-dict-constructor-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
 OpenSource({"name": "x", 1: 1})
 
 def _(int_keys: dict[int, int]) -> None:
@@ -8905,13 +9035,13 @@ def _(
     accepts_optional_int_label(**open_source)
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
 
-    OpenTarget(name="ok", **extra_only)  # error: [invalid-key]
-    copied_into_open: OpenTarget = {"name": "ok", **extra_only}  # error: [invalid-key]
+    OpenTarget(name="ok", **extra_only)  # error: [unknown-typed-dict-constructor-key]
+    copied_into_open: OpenTarget = {"name": "ok", **extra_only}  # error: [unknown-typed-dict-constructor-key]
 
     IntTarget(**ints)
     IntTarget(**strings)  # error: [invalid-argument-type]
     IntTarget(**open_source)  # error: [invalid-argument-type]
-    ClosedTarget(**ints)  # error: [invalid-key]
+    ClosedTarget(**ints)  # error: [unknown-typed-dict-constructor-key]
 
     copied: IntTarget = {**open_source}  # error: [invalid-argument-type]
 
@@ -8920,8 +9050,8 @@ def _(
     copied_from_int_key_dict: ExtraOnly = {**int_key_dict}  # error: [invalid-argument-type]
     copied_from_int_key_mapping: ExtraOnly = {**int_key_mapping}  # error: [invalid-argument-type]
 
-    ClosedOnly(**int_mapping)  # error: [invalid-key]
-    copied_into_closed: ClosedOnly = {**int_mapping}  # error: [invalid-key]
+    ClosedOnly(**int_mapping)  # error: [unknown-typed-dict-constructor-key]
+    copied_into_closed: ClosedOnly = {**int_mapping}  # error: [unknown-typed-dict-constructor-key]
 
     # An arbitrary mapping key may collide with the target's declared `label` item.
     OptionalTarget(**int_mapping)  # error: [invalid-argument-type]
@@ -8966,16 +9096,43 @@ def _(key: str) -> None:
     }
 ```
 
-### Non-literal keys in a closed TypedDict constructor are rejected
+### Non-literal strings and unions of literal keys in a closed TypedDict
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import Literal, TypedDict
 
-class Closed(TypedDict, closed=True): ...
+class Closed(TypedDict, closed=True, total=False):
+    name: int
 
 def _(key: str) -> None:
-    assigned: Closed = {key: 1}  # error: [invalid-key]
-    Closed({key: 1})  # error: [invalid-key]
+    assigned: Closed = {key: 1}  # error: [unknown-typed-dict-constructor-key]
+    Closed({key: 1})  # error: [unknown-typed-dict-constructor-key]
+```
+
+Reads and writes through a union of literal keys report `invalid-typed-dict-key` if one of the
+possible keys is undeclared.
+
+```py
+def _(record: Closed, key: Literal["name", "typo"]) -> None:
+    record[key]  # error: [invalid-typed-dict-key]
+    record[key] = 1  # error: [invalid-typed-dict-key]
+```
+
+### Constructing a closed TypedDict with a union of declared keys
+
+A single entry is sufficient when both possible fields are optional and accept the supplied value.
+
+```py
+from typing_extensions import Literal, TypedDict
+
+class Dimensions(TypedDict, closed=True, total=False):
+    width: int
+    height: int
+
+def _(key: Literal["width", "height"]) -> None:
+    # TODO: Accept this constructor by checking each literal key in the union.
+    # error: [unknown-typed-dict-constructor-key] "Non-literal string key may be unknown for TypedDict `Dimensions`"
+    Dimensions({key: 1})
 ```
 
 ### Mixed constructors validate source-only keys against `extra_items`
@@ -9008,7 +9165,7 @@ def _(
 ) -> None:
     Target(good, keyword=1)
     Target(bad, keyword=1)  # error: [invalid-argument-type]
-    ClosedTarget(closed, keyword=1)  # error: [invalid-key]
+    ClosedTarget(closed, keyword=1)  # error: [unknown-typed-dict-constructor-key]
     AllKeywordsTarget(bad_mapping, keyword=1)  # error: [invalid-argument-type]
 
     # An explicit keyword shadows the source key.

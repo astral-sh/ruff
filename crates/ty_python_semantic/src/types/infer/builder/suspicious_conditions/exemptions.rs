@@ -29,8 +29,8 @@ use crate::{
         place_from_bindings,
     },
     place_load::{
-        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionProcedure,
-        PlaceLoadResolutionStep, PlaceLoadSourceKind,
+        ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep,
+        PlaceLoadSourceKind,
     },
     types::{
         Type, TypeContext,
@@ -415,15 +415,7 @@ fn place_condition_definition_info<'db>(
             let source = match step {
                 PlaceLoadResolutionStep::Source(source) => source,
                 PlaceLoadResolutionStep::MemberResolutionCondition(prefixes) => {
-                    let use_def = use_def_map(db, prefixes.scope());
-                    if prefixes.iter().any(|prefix| {
-                        let bindings = match prefix {
-                            PlaceExprPrefixLoad::AtUse(id) => use_def.bindings_at_use(id),
-                            PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
-                            PlaceExprPrefixLoad::DefinitelyBound => return true,
-                        };
-                        !place_from_bindings(db, &env, bindings).place.is_undefined()
-                    }) {
+                    if prefixes.has_bound_prefix(db, &env, None) {
                         break;
                     }
                     continue;

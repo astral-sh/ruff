@@ -1,7 +1,7 @@
-use crate::config::{Analysis, Rules, ScriptOptions};
+use crate::config::{Analysis, Rules, ScriptMetadata};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, LintName, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -12,16 +12,16 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::dependency::DependencyMetadata;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, LintStatus, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
-    default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap, declare_lint,
+    register_lints,
 };
 
 #[salsa::db]
@@ -164,7 +164,7 @@ impl SemanticDb for Db {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
+        mdtest_lint_registry()
     }
 
     fn verbose(&self) -> bool {
@@ -182,6 +182,7 @@ impl SemanticDb for Db {
     fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
         match file_settings(self, file) {
             FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
+            FileSettings::InheritProjectConfig => None,
             FileSettings::File {
                 dependency_metadata,
                 ..
@@ -216,8 +217,11 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     if source.is_notebook() {
         return FileSettings::Global;
     }
-    let Some(options) = ScriptOptions::from_source(&source) else {
+    let Some(metadata) = ScriptMetadata::from_source(&source) else {
         return FileSettings::Global;
+    };
+    let Some(options) = metadata.into_options() else {
+        return FileSettings::InheritProjectConfig;
     };
 
     FileSettings::File {
@@ -230,6 +234,8 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum FileSettings {
     Global,
+    /// A script without `[tool.ty]` inherits settings but has its own dependency metadata.
+    InheritProjectConfig,
     File {
         rules: MdtestRuleSelection,
         analysis: AnalysisSettings,
@@ -240,14 +246,14 @@ enum FileSettings {
 impl FileSettings {
     fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
         match self {
-            Self::Global => db.settings().rule_selection(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().rule_selection(db),
             Self::File { rules, .. } => rules,
         }
     }
 
     fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
         match self {
-            Self::Global => db.settings().analysis(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().analysis(db),
             Self::File { analysis, .. } => analysis,
         }
     }
@@ -346,6 +352,26 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
     }
 }
 
+/// Includes a no-op rule for testing renamed rules in suppression comments.
+fn mdtest_lint_registry() -> &'static LintRegistry {
+    declare_lint! {
+        /// A rule that never emits a diagnostic.
+        static NEW_RULE_NAME = {
+            summary: "example of a renamed rule",
+            status: LintStatus::stable("0.0.0"),
+        }
+    }
+
+    static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
+        registry.register_lint(&NEW_RULE_NAME);
+        registry.register_alias(LintName::of("old-rule-name"), &NEW_RULE_NAME);
+        registry.build()
+    });
+    &REGISTRY
+}
+
 fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
     // In general (as shown by the initialization of `selection` below), we enable even rules that
     // are ignored by default in mdtests so that their behaviour is covered alongside the default
@@ -366,7 +392,7 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         "redundant-condition-strict",
     ];
 
-    let registry = default_lint_registry();
+    let registry = mdtest_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
     for rule in DISABLED_IN_MDTESTS {

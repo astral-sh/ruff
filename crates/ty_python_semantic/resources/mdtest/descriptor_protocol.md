@@ -251,7 +251,7 @@ on the class still makes it a descriptor, but we do not assume that `Unknown` su
 
 ```py
 from typing import Literal
-from unknown_module import UnknownBase  # error: [unresolved-import]
+from unknown_module import UnknownBase  # error: [import-not-found]
 
 class NotADescriptor(UnknownBase): ...
 

@@ -55,9 +55,10 @@ pub fn run() -> anyhow::Result<ExitStatus> {
         Command::Server(server_args) => server::run(&server_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
-            use std::io::stdout;
-
-            shell.generate(&mut Cli::command(), &mut stdout());
+            // The generator panics on write errors. Handle stdout errors in the CLI instead.
+            let mut completions = Vec::new();
+            shell.generate(&mut Cli::command(), &mut completions);
+            io::stdout().lock().write_all(&completions)?;
             Ok(ExitStatus::Success)
         }
         Command::Explain { command } => match command {
@@ -249,7 +250,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => {}
     }
 
-    std::mem::forget(db);
+    db.forget_storage_on_exit();
 
     if matches!(exit_status, ExitStatus::Interrupted) {
         return Ok(ExitStatus::Interrupted);

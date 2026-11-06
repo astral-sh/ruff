@@ -677,7 +677,7 @@ where the combination of narrowing and augmented assignment on a nested attribut
 positive.
 
 ```py
-from unknown_module import unknown  # error: [unresolved-import]
+from unknown_module import unknown  # error: [import-not-found]
 
 class Inner:
     value: int = 0
@@ -3964,7 +3964,6 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -5420,7 +5419,7 @@ would cause the attribute to pollute class-level lookups and potentially overrid
 declarations.
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from unknown_library import unknown_decorator
 
 class C:

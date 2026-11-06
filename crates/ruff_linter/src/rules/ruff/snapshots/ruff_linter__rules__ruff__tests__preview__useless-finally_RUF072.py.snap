@@ -323,11 +323,11 @@ help: Remove the `finally` clause
     |
 174 | # Bare try finally with line starting with a formfeed
     - try:
-    -     1
+    - ␌    1
     -     2
     - finally:
     -     pass
-175 + 1
+175 + ␌1
 176 + 2
 177 |
     |
@@ -343,7 +343,7 @@ RUF072 [*] Empty `finally` clause
 help: Remove the `finally` clause
     |
 183 | # (`try` is preceded by a form feed below)
-    - try:
+    - ␌try:
     -     1
     - finally:
     -     pass

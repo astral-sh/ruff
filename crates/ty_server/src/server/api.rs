@@ -115,6 +115,9 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::WillRenameFilesHandler::METHOD => background_request_task::<
+            requests::WillRenameFilesHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
             requests::PrepareTypeHierarchyRequestHandler,
         >(
@@ -258,7 +261,7 @@ where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
-    let (id, params) = cast_request::<R>(req)?;
+    let (id, mut params) = cast_request::<R>(req)?;
 
     Ok(Task::background(schedule, move |session: &Session| {
         let cancellation_token = session
@@ -266,6 +269,8 @@ where
             .incoming()
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
+
+        R::prepare_params(session, &mut params);
 
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.

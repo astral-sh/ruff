@@ -117,7 +117,7 @@ from b import Y
 from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
-from c import Y  # error: [unresolved-import]
+from c import Y  # error: [import-not-found]
 ```
 
 ## Esoteric definitions and redefinitions
@@ -1620,7 +1620,7 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 
 ```py
 # TODO: not a great error message
-from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
+from foo import *  # error: [import-not-found] "Cannot resolve imported module `foo`"
 ```
 
 ### Nested scope

@@ -440,7 +440,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -524,6 +524,16 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        // For example, if `Base.f` accepts `bytes`, overloads of `Child.f` for `int` and `str`
+        // both fail the original check. The checker suppresses notes for individual alternatives,
+        // so trying those overloads again would leave the error context empty.
+        if let (Type::Callable(source), Type::Callable(target)) = (self, target)
+            && !source
+                .signatures(db)
+                .may_explain_relation_to(target.signatures(db))
+        {
+            return ErrorContextTree::new(relation);
+        }
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             env,
@@ -532,7 +542,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -577,7 +587,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Subtyping,
                     TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                 )
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
@@ -669,8 +679,7 @@ impl<'db> Type<'db> {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
             (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
+                self.materialized_divergent_fallback().is_none() && union.contains_member(db, self)
             }
             (Type::Intersection(intersection), _) => {
                 target.materialized_divergent_fallback().is_none()
@@ -715,7 +724,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                 )
             })
         }
@@ -743,7 +752,7 @@ impl<'db> Type<'db> {
             env,
             target,
             constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -861,7 +870,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             TypeVarEvaluation::Eager,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -1052,7 +1061,7 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             typevar_evaluation,
             relation_visitor: &relation_visitor,
@@ -1106,7 +1115,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1130,7 +1139,7 @@ impl<'db> Type<'db> {
             constraints: &constraints,
             inferable: TypeVarSet::None,
             context_tree: Some(context.clone()),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&constraints),
             disjointness_visitor: &IsDisjointVisitor::default(&constraints),
@@ -1161,7 +1170,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1267,7 +1276,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1335,7 +1344,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1359,7 +1368,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1522,6 +1531,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
+        let elements = union.elements(db);
         let check_expanded_source = || {
             // Normally non-unions cannot directly contain unions in our model due to the fact that
             // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
@@ -1539,6 +1549,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::Intersection(intersection)
                     if self.should_expand_intersection(db, intersection) =>
                 {
+                    // A plain type-variable arm already records the required lower bound if all
+                    // other arms are disjoint. Expanding `int & U` to `int` when matching
+                    // `T | None` can erase `U`.
+                    let is_plain_typevar = |element: Type<'db>| {
+                        element
+                            .as_typevar()
+                            .is_some_and(|variable| variable.domain(db) == TypeVarDomain::Type)
+                    };
+                    if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                        && elements.iter().copied().any(is_plain_typevar)
+                        && elements
+                            .iter()
+                            .copied()
+                            .filter(|&element| {
+                                !self
+                                    .as_disjointness_checker()
+                                    .check_type_pair(db, source, element)
+                                    .is_trivially_always_satisfied()
+                            })
+                            .at_most_one()
+                            .is_ok_and(|overlapping| overlapping.is_none_or(is_plain_typevar))
+                    {
+                        return self.never();
+                    }
+
                     self.check_type_pair(
                         db,
                         intersection.with_expanded_typevars_and_newtypes(db, self.env),
@@ -1560,7 +1595,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let mut elements_context = vec![];
         let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
-        let elements = union.elements(db);
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
@@ -2411,7 +2445,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `T` will always be a subtype of any union containing `T`.
             (_, Type::Union(union))
                 if self.relation.can_safely_assume_reflexivity(source)
-                    && union.elements(db).contains(&source) =>
+                    && union.contains_member(db, source) =>
             {
                 self.always()
             }
@@ -3442,7 +3476,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             disjointness_visitor,
             relation_visitor,
@@ -3804,6 +3838,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
+                    // Fast-path: If the type is inhabited and an exact member of the union,
+                    // the types cannot be disjoint.
+                    if self.report_context().is_none()
+                        && union.contains_member(db, other)
+                        && self
+                            .check_type_pair(db, other, other)
+                            .is_trivially_never_satisfied()
+                    {
+                        return self.never();
+                    }
+
                     let mut children = Vec::new();
                     let result = union
                         .elements(db)

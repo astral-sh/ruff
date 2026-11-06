@@ -269,7 +269,7 @@ class C: ...
 <!-- snapshot-diagnostics -->
 
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
+import zqzqzqzqzqzqzq  # error: [import-not-found] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
 ```
 
 ## Unresolvable submodule imports
@@ -278,10 +278,10 @@ import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported mod
 
 ```py
 # Topmost component resolvable, submodule not resolvable:
-import a.foo  # error: [unresolved-import] "Cannot resolve imported module `a.foo`"
+import a.foo  # error: [import-not-found] "Cannot resolve imported module `a.foo`"
 
 # Topmost component unresolvable:
-import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
+import b.foo  # error: [import-not-found] "Cannot resolve imported module `b.foo`"
 ```
 
 `a/__init__.py`:
@@ -321,7 +321,7 @@ If multiple members are imported from a module that cannot be resolved, only a s
 emitted for the `import from` statement:
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from does_not_exist import foo, bar, baz
 ```
 
@@ -335,9 +335,9 @@ python-version = "3.10"
 ```
 
 ```py
-import tomllib  # error: [unresolved-import]
-from string.templatelib import Template  # error: [unresolved-import]
-from importlib.resources import abc  # error: [unresolved-import]
+import tomllib  # error: [import-not-found]
+from string.templatelib import Template  # error: [import-not-found]
+from importlib.resources import abc  # error: [import-not-found]
 ```
 
 ## Attempting to import a stdlib submodule when both parts haven't yet been added
@@ -354,10 +354,10 @@ python-version = "3.10"
 ```
 
 ```py
-import compression.zstd  # error: [unresolved-import]
-from compression import zstd  # error: [unresolved-import]
-import compression.fakebutwhocansay  # error: [unresolved-import]
-from compression import fakebutwhocansay  # error: [unresolved-import]
+import compression.zstd  # error: [import-not-found]
+from compression import zstd  # error: [import-not-found]
+import compression.fakebutwhocansay  # error: [import-not-found]
+from compression import fakebutwhocansay  # error: [import-not-found]
 ```
 
 ## Attempting to import a stdlib module that was previously removed
@@ -370,8 +370,8 @@ python-version = "3.13"
 ```
 
 ```py
-import aifc  # error: [unresolved-import]
-from distutils import sysconfig  # error: [unresolved-import]
+import aifc  # error: [import-not-found]
+from distutils import sysconfig  # error: [import-not-found]
 ```
 
 ## Cannot shadow core standard library modules
@@ -383,7 +383,7 @@ x: int
 ```
 
 ```py
-# error: [unresolved-import]
+# error: [import-not-found]
 from types import x
 
 from types import FunctionType

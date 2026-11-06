@@ -39,15 +39,11 @@ jobs:
           ref: ${{ inputs.ref }}
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: $/.github/actions/setup-ruff-workspace
         with:
           # Pin to 3.13 to match the docs build in ci.yaml and to avoid missing wheel errors when
           # uv's default Python version changes.
           python-version: "3.13"
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
-          enable-cache: false
 
       - name: "Set docs version"
         env:

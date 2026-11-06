@@ -773,7 +773,14 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     };
     let callee = definition_expression_type(db, definition, &call.func);
     if !callee.as_class_literal().is_some_and(|class| {
-        class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
+        class.is_known(db, KnownClass::Dict)
+            || class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|base| {
+                    base.is_known(db, KnownClass::PydanticConfigDict)
+                        || base.is_known(db, KnownClass::PydanticSettingsConfigDict)
+                })
     }) {
         return Some(ModelConfig::unknown());
     }
@@ -1313,6 +1320,10 @@ fn lax_alias<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) ->
 enum ModelInitBehavior {
     /// The model inherits Pydantic's ordinary `BaseModel` initializer.
     BaseModel,
+    /// The model inherits `BaseSettings.__init__`, which accepts settings control parameters
+    /// such as `_env_file` as well as model fields. The model's `extra` configuration determines
+    /// whether other keyword arguments are stored, discarded, or rejected.
+    BaseSettings,
     /// The first custom initializer in the MRO accepts arbitrary keyword arguments.
     CustomVariadic,
     /// The first custom initializer in the MRO has a fixed parameter list.
@@ -1332,10 +1343,12 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
             return ModelInitBehavior::BaseModel;
         }
 
-        // These constructors use variadic keywords for specialized inputs, not arbitrary extras.
-        if base.is_known(db, KnownClass::PydanticRootModel)
-            || base.is_known(db, KnownClass::PydanticBaseSettings)
-        {
+        if base.is_known(db, KnownClass::PydanticBaseSettings) {
+            return ModelInitBehavior::BaseSettings;
+        }
+
+        // Root models use variadic keywords for specialized inputs, not arbitrary extras.
+        if base.is_known(db, KnownClass::PydanticRootModel) {
             return ModelInitBehavior::Other;
         }
 
@@ -1380,7 +1393,9 @@ pub(in crate::types) fn model_init_accepts_extra(
     metadata.accepts_extra(db)
         && matches!(
             model_init_behavior(db, class),
-            ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
+            ModelInitBehavior::BaseModel
+                | ModelInitBehavior::BaseSettings
+                | ModelInitBehavior::CustomVariadic
         )
 }
 
@@ -1390,7 +1405,11 @@ fn model_init_discards_extra(
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
+    metadata.discards_extra(db)
+        && matches!(
+            model_init_behavior(db, class),
+            ModelInitBehavior::BaseModel | ModelInitBehavior::BaseSettings
+        )
 }
 
 /// Report keyword arguments that the Pydantic model constructor silently discards.

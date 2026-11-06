@@ -68,7 +68,7 @@ of some kind. As such, the type of `x.__class__` is `type[Any]` rather than `Any
 
 ```py
 from typing import Any
-from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+from does_not_exist import SomethingUnknown  # error: [import-not-found]
 
 reveal_type(SomethingUnknown)  # revealed: Unknown
 
@@ -84,7 +84,7 @@ def test(x: Any, y: SomethingUnknown):
 ```py
 import abc
 from typing import Any
-from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+from does_not_exist import SomethingUnknown  # error: [import-not-found]
 
 has_unknown_type = SomethingUnknown.__class__
 reveal_type(has_unknown_type)  # revealed: type[Unknown]

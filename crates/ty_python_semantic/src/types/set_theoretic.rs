@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use std::convert::Infallible;
 
@@ -30,6 +31,48 @@ pub struct UnionType<'db> {
     /// If `Yes`, union literal widening is performed early.
     #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
+}
+
+// Whole-input memoization pays for its key on wider unions, where the individual
+// ordered redundancy comparisons would otherwise be repeated quadratically.
+const WIDE_UNION: usize = 8;
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct OrderedUnionInput<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(deref)]
+    elements: Box<[Type<'db>]>,
+    #[returns(copy)]
+    unpack_aliases: bool,
+    #[returns(copy)]
+    recursively_defined: RecursivelyDefined,
+}
+
+impl<'db> OrderedUnionInput<'db> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the normalization query is resolving a cycle"
+    )]
+    fn normalize(self, db: &'db dyn Db) -> Type<'db> {
+        fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(input.program(db));
+            let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
+            for &ty in input.elements(db) {
+                builder.add_in_place(ty);
+            }
+            builder
+                .or_recursively_defined(input.recursively_defined(db))
+                .build()
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
+            Some(build(db, input))
+        }
+
+        normalized(db, self).unwrap_or_else(|| build(db, self))
+    }
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -62,6 +105,17 @@ impl<'db> UnionType<'db> {
         T: Into<Type<'db>>,
     {
         let mut iter_elements = elements.into_iter();
+        if iter_elements.size_hint().0 >= WIDE_UNION {
+            let elements = iter_elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
@@ -116,11 +170,41 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let elements = elements.into_iter();
+        if elements.size_hint().0 >= WIDE_UNION {
+            let elements = elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                false,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
             builder.add_in_place(element.into());
         }
         builder.build()
+    }
+
+    /// Returns `true` if the union contains exactly the provided type as a member.
+    ///
+    /// Note that this method constructs and Salsa-memoizes an index for large unions to avoid
+    /// repeated linear scans.
+    pub(super) fn contains_member(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn element_set<'db>(db: &'db dyn Db, union: UnionType<'db>) -> FxHashSet<Type<'db>> {
+            union.elements(db).iter().copied().collect()
+        }
+
+        let elements = self.elements(db);
+        if elements.len() >= WIDE_UNION {
+            element_set(db, self).contains(&ty)
+        } else {
+            elements.contains(&ty)
+        }
     }
 
     /// Returns `true` if any direct element of this union is a type alias.
@@ -325,6 +409,22 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
+                if elements.len() >= WIDE_UNION {
+                    let mapped = elements[..i]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::once(new_ty))
+                        .chain(iter.map(|(_, element)| transform_fn(element)))
+                        .collect::<Box<[_]>>();
+                    return OrderedUnionInput::new(
+                        db,
+                        env.program(db),
+                        mapped,
+                        false,
+                        self.recursively_defined(db),
+                    )
+                    .normalize(db);
+                }
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
@@ -1207,6 +1307,21 @@ impl<'db> IntersectionType<'db> {
             builder.add_negative_in_place(*ty);
         }
         builder.build()
+    }
+
+    /// Filter-map the positive members and intersect the results. Return `None` if no members
+    /// map successfully or the intersection exceeds the expansion budget.
+    pub(crate) fn bounded_filter_map_positive(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mapped: SmallVec<[_; 1]> = self.iter_positive(db).filter_map(transform_fn).collect();
+        if mapped.is_empty() {
+            return None;
+        }
+        Self::bounded_from_elements(db, env, mapped.iter().copied())
     }
 
     /// Compute the `__class__` type for class-backed protocols and `TypedDict` instances,

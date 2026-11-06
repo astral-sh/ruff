@@ -51,13 +51,11 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
-use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
-use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
@@ -83,6 +81,9 @@ mod expression_truthiness;
 pub(crate) use expression_truthiness::TruthinessAnalyzer;
 #[cfg(test)]
 mod tests;
+mod type_context;
+pub(crate) use type_context::TypeContext;
+pub(super) use type_context::TypeContextKind;
 
 /// The inferred alias type, or a cycle error retaining a type for recovery.
 pub(super) type LegacyTypeAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
@@ -116,8 +117,12 @@ pub(super) struct CyclicTypeAliasError<'db> {
             legacy_aliases: Box::default(),
         }
     },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+    cycle_fn=|db, cycle: &salsa::Cycle, previous: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        let previous = match previous.ty {
+            Ok(ty) => ty,
+            Err(error) => error.fallback_type,
+        };
+        let recover = |ty| RecursiveType::recover(db, definition, cycle, parameters, ty, previous);
         result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
             fallback_type: recover(error.fallback_type),
         });
@@ -352,6 +357,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     legacy_aliases: Box<[Definition<'db>]>,
@@ -819,7 +825,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.declared_type().is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)
@@ -854,7 +860,7 @@ pub(super) struct ScopeWithContext<'db> {
 
 impl<'db> InferScope<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.declared_type().is_some() {
             InferScope::WithContext(ScopeWithContext::new(db, scope, tcx))
         } else {
             InferScope::Bare(scope)
@@ -868,111 +874,6 @@ impl<'db> InferScope<'db> {
                 (scope_with_context.scope(db), scope_with_context.tcx(db))
             }
         }
-    }
-}
-
-/// The kind of type context constraint being provided.
-#[derive(
-    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
-)]
-enum TypeContextKind {
-    /// A direct declared type annotation.
-    #[default]
-    Declared,
-
-    /// The declared upper bound of a type variable.
-    ///
-    /// Note that unlike a declared type, the upper bound of a type variable acts only as a validity
-    /// constraint, and does not provide a preferred specialization during generic call inference.
-    Validity,
-}
-
-/// The type context for a given expression, e.g., the type annotation
-/// in an annotated assignment.
-///
-/// Knowing the outer type context when inferring an expression can enable
-/// more precise inference results, aka "bidirectional type inference".
-#[derive(
-    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
-)]
-pub(crate) struct TypeContext<'db> {
-    pub(crate) annotation: Option<Type<'db>>,
-    kind: TypeContextKind,
-}
-
-impl<'db> TypeContext<'db> {
-    pub(crate) fn declared(annotation: Option<Type<'db>>) -> Self {
-        Self {
-            annotation,
-            kind: TypeContextKind::Declared,
-        }
-    }
-
-    pub(crate) fn validity(annotation: Type<'db>) -> Self {
-        Self {
-            annotation: Some(annotation),
-            kind: TypeContextKind::Validity,
-        }
-    }
-
-    pub(crate) fn is_declared(self) -> bool {
-        matches!(self.kind, TypeContextKind::Declared)
-    }
-
-    /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
-    /// specialization.
-    fn known_specialization(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        known_class: KnownClass,
-    ) -> Option<Specialization<'db>> {
-        self.annotation
-            .and_then(|ty| ty.known_specialization(db, env, known_class))
-    }
-
-    fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        self.with_annotation(self.annotation.map(f))
-    }
-
-    pub(crate) fn with_annotation(self, annotation: Option<Type<'db>>) -> Self {
-        Self { annotation, ..self }
-    }
-
-    fn is_typealias(&self) -> bool {
-        self.annotation
-            .is_some_and(|ty| ty.is_typealias_special_form())
-    }
-
-    /// If the type annotation is a union, returns the target elements that it can be narrowed to.
-    fn narrow_targets(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Cow<'db, [Type<'db>]>> {
-        let union = self.annotation?.as_union_like(db)?;
-
-        let targets = if union.has_aliases(db) {
-            let expanded = union.expand_aliases(db, env);
-            if let Some(union) = expanded.as_union_like(db) {
-                Cow::Borrowed(union.elements(db))
-            } else {
-                Cow::Owned(vec![expanded])
-            }
-        } else {
-            Cow::Borrowed(union.elements(db))
-        };
-
-        // TODO: We could theoretically attempt to narrow to every element of
-        // the power set of this union. However, this leads to an exponential
-        // explosion of inference attempts, and is rarely needed in practice.
-        Some(targets)
-    }
-}
-
-impl<'db> From<Type<'db>> for TypeContext<'db> {
-    fn from(annotation: Type<'db>) -> Self {
-        Self::declared(Some(annotation))
     }
 }
 
@@ -1129,6 +1030,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 
@@ -1154,6 +1058,14 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
+    pub(crate) fn is_deferred_name_load(&self, name: &ast::ExprName) -> bool {
+        self.extra.as_deref().is_some_and(|extra| {
+            extra
+                .deferred_name_loads
+                .contains(&ast::ExprRef::Name(name).into())
+        })
+    }
+
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
@@ -1545,6 +1457,8 @@ enum DefinitionInferenceExtra<'db> {
 
     StringAnnotations(FrozenSet<ExpressionNodeKey>),
 
+    DeferredNameLoads(FrozenSet<ExpressionNodeKey>),
+
     DiscardsDictKeyAssignments,
 
     Other(Box<OtherDefinitionInferenceExtra<'db>>),
@@ -1567,6 +1481,9 @@ struct OtherDefinitionInferenceExtra<'db> {
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
+
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
@@ -1651,6 +1568,10 @@ impl<'db> DefinitionInferenceExtra<'db> {
             },
             Self::StringAnnotations(string_annotations) => OtherDefinitionInferenceExtra {
                 string_annotations,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::DeferredNameLoads(deferred_name_loads) => OtherDefinitionInferenceExtra {
+                deferred_name_loads,
                 ..OtherDefinitionInferenceExtra::default()
             },
             Self::DiscardsDictKeyAssignments => OtherDefinitionInferenceExtra {
@@ -2074,6 +1995,9 @@ struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
+
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -2327,6 +2251,9 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
+
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
