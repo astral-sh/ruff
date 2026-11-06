@@ -15,7 +15,7 @@ fn rule_default_output() {
     ----- stdout -----
     # invalid-return-statement
 
-    Default level: error | Stable (since 0.0.97)
+    Default level: error | Stable (since 0.0.100)
 
     ## What it does
 
@@ -70,7 +70,7 @@ fn rule_json_output() {
       "default_level": "error",
       "status": {
         "type": "stable",
-        "since": "0.0.97"
+        "since": "0.0.100"
       }
     }
     ----- stderr -----
