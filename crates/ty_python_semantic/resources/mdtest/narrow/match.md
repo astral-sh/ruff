@@ -3614,6 +3614,37 @@ def narrow_after_as_capture(value: int | str, flag: bool) -> None:
             reveal_type(value)  # revealed: str
 ```
 
+### Positional class patterns
+
+`str(value)` binds the subject itself. If the guard fails, later cases can still narrow that
+binding.
+
+```py
+def guarded_positional_capture(value: int | str, enabled: bool) -> None:
+    match value:
+        case str(value) if enabled:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int
+```
+
+A subclass that defines `__match_args__` can capture an attribute instead. Later cases match the
+original string while the name retains the captured integer.
+
+```py
+class Text(str):
+    __match_args__ = ("item",)
+    item: int
+
+def guarded_attribute_capture(subject: Text, enabled: bool) -> None:
+    value = subject
+    match value:
+        case Text(value) if enabled:
+            pass
+        case str():
+            reveal_type(value)  # revealed: int
+```
+
 ### Or pattern alternatives
 
 Each alternative can capture the whole subject under its original name.
@@ -3650,6 +3681,8 @@ def reassign_capture(value: int | str, flag: bool) -> None:
     match value:
         case value if (value := "changed") and flag:
             pass
+        case str():
+            reveal_type(value)  # revealed: Literal["changed"]
         case int():
             reveal_type(value)  # revealed: Literal["changed"]
 ```

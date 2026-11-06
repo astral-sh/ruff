@@ -202,6 +202,8 @@ pub enum PredicateNode<'db> {
     /// Currently, this predicate is only emitted for direct `range(...)` calls. It is resolved
     /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
     IsNonEmptyIterable(Expression<'db>),
+    /// Whether a class pattern's single positional subpattern receives the match subject.
+    ClassPatternMatchesSelf(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     /// Whether control flow takes one branch of an OR pattern instead of its remaining
     /// alternatives. The selected branch is unknown, but recording a predicate and its negation

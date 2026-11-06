@@ -290,6 +290,22 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
+/// A binding that can still refer to the value initially read by a `match` statement.
+pub(super) struct MatchSubjectBinding {
+    definition: ScopedDefinitionId,
+    /// If a positional class pattern extracted an attribute, later cases test a different value.
+    pub(super) when_extracted: ScopedNarrowingConstraint,
+}
+
+impl MatchSubjectBinding {
+    pub(super) fn new(definition: ScopedDefinitionId) -> Self {
+        Self {
+            definition,
+            when_extracted: ScopedNarrowingConstraint::ALWAYS_FALSE,
+        }
+    }
+}
+
 /// Summarizes whether the live control-flow paths leave a symbol bound.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum LiveBindingStatus {
@@ -2412,36 +2428,57 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    /// Records a narrowing constraint on the current live bindings selected by definition ID.
-    pub(super) fn record_narrowing_constraint_for_bindings(
+    /// Record the path where a case matched or failed. The path applies to every place, but the
+    /// pattern narrows only bindings that still refer to the saved subject.
+    pub(super) fn record_match_branch(
         &mut self,
         predicate: ScopedPredicateId,
-        place: ScopedPlaceId,
-        bindings: &[ScopedDefinitionId],
+        subjects: &[(ScopedPlaceId, SmallVec<[MatchSubjectBinding; 2]>)],
+        is_positive: bool,
     ) {
-        if predicate == ScopedPredicateId::ALWAYS_TRUE
+        let entry = self.pending_reachability.current;
+        let reachability = self.reachability_constraints.add_atom(predicate);
+        let reachability = if is_positive {
+            reachability
+        } else {
+            self.reachability_constraints
+                .add_not_constraint(reachability)
+        };
+        self.record_reachability_constraint(reachability);
+
+        if subjects.is_empty()
+            || predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
             return;
         }
 
-        self.predicate_narrowing_targets.push((predicate, place));
-
-        let constraint = self.narrowing_constraints.add_atom(predicate);
-        let pending = self.pending_reachability.current;
-        let state =
-            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
-        let state = self.pending_reachability.materialize(
-            state,
-            pending,
-            &mut self.narrowing_constraints,
-            &mut self.reachability_constraints,
-        );
-        state.record_narrowing_constraint_for_bindings(
-            &mut self.narrowing_constraints,
-            constraint,
-            bindings,
-        );
+        let constraint = if is_positive {
+            self.predicate_narrowing_targets
+                .extend(subjects.iter().map(|(place, _)| (predicate, *place)));
+            self.narrowing_constraints.add_atom(predicate)
+        } else {
+            self.narrowing_constraints.add_negated_atom(predicate)
+        };
+        for (place, bindings) in subjects {
+            let state =
+                pending_place_state_mut(*place, &mut self.symbol_states, &mut self.member_states);
+            self.pending_reachability
+                .materialize(
+                    state,
+                    entry,
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                )
+                .record_narrowing_constraint_for_bindings(
+                    &mut self.narrowing_constraints,
+                    constraint,
+                    bindings,
+                );
+            // A later merge must not apply the same pattern a second time to every binding,
+            // including an attribute capture or an assignment made in an earlier guard.
+            state.narrowing = self.pending_reachability.current;
+        }
     }
 
     /// Records a negated narrowing constraint for only the specified places.

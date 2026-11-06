@@ -876,7 +876,8 @@ fn predicate_contains_special_cased_condition<'db>(
         // These predicates describe implicit control flow rather than a tested value. In
         // particular, a statement such as `print(sys.platform)` should not make every later
         // definition environment-dependent merely because it is reached after that call returns.
-        PredicateNode::IsNonTerminalCall(_)
+        PredicateNode::ClassPatternMatchesSelf(_)
+        | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)

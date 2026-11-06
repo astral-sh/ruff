@@ -5,6 +5,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 use ty_python_core::Truthiness;
+use ty_python_core::expression::Expression;
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
     SequencePatternPredicateKind,
@@ -373,7 +374,9 @@ fn class_pattern_is_exhaustive<'pattern, 'db>(
 /// `PossiblyUndefined` is distinct from `Undefined` because a conditional definition can take
 /// precedence over match-self behavior at runtime, so that behavior cannot be assumed.
 enum ClassMatchArgs<'db> {
-    /// The class and its metaclass hierarchy do not define `__match_args__`.
+    /// The class has no `__match_args__` and uses the built-in match-self behavior.
+    MatchSelf,
+    /// Lookup found neither `__match_args__` nor match-self behavior.
     Undefined,
     /// `__match_args__` is definitely bound.
     Defined {
@@ -430,6 +433,7 @@ fn class_match_args_type<'db>(
             },
         },
         Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
+        Place::Undefined if class_has_match_self_flag(db, class) => ClassMatchArgs::MatchSelf,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
 }
@@ -478,9 +482,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
     match class_match_args_type(db, env, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
-            Some(ClassPatternPositionalResult::Limit(1))
-        }
+        ClassMatchArgs::MatchSelf => Some(ClassPatternPositionalResult::Limit(1)),
         ClassMatchArgs::Undefined
             if class.known(db).is_some()
                 || class
@@ -504,6 +506,26 @@ pub(crate) fn class_pattern_positional_result<'db>(
             }
         }
         ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+    }
+}
+
+/// Whether every possible pattern class passes the entire subject to its positional capture.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn class_pattern_matches_self<'db>(db: &'db dyn Db, class: Expression<'db>) -> bool {
+    let env = ProgramEnvironment::from_scope(class.scope(db));
+    let ty =
+        infer_same_file_expression_type(db, class, TypeContext::default()).resolve_type_alias(db);
+    let matches_self = |ty: Type<'db>| {
+        ty.as_class_literal().is_some_and(|class| {
+            matches!(
+                class_match_args_type(db, &env, class),
+                ClassMatchArgs::MatchSelf
+            )
+        })
+    };
+    match ty {
+        Type::Union(union) => union.elements(db).iter().copied().all(matches_self),
+        ty => matches_self(ty),
     }
 }
 
@@ -534,7 +556,7 @@ pub(crate) fn class_pattern_positional_sources(
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
     let fixed = match class_match_args_type(db, env, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+        ClassMatchArgs::MatchSelf => {
             return (0..positional_count)
                 .map(|index| {
                     if index == 0 {
