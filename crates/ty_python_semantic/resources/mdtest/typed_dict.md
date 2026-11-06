@@ -8774,6 +8774,35 @@ def _(closed: Closed) -> None:
     wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
 ```
 
+### Contextual return types for undeclared `get` keys
+
+An implicitly open `TypedDict` can contain an unknown value at an undeclared key. The return type
+also includes the independently inferred type of the default.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    name: str
+    count: int
+
+class WithEntry(TypedDict):
+    entry: list[str]
+
+def undeclared(row: Record):
+    # error: [unsound-assignment]
+    result: list[str] = reveal_type(row.get("entry", []))  # revealed: Unknown | list[Unknown]
+
+def sometimes_declared(row: Record | WithEntry):
+    # error: [unsound-assignment]
+    result: list[str] = reveal_type(row.get("entry", []))  # revealed: Unknown | list[Unknown] | list[str]
+```
+
 ### `get` default types for non-required items
 
 For a declared non-required item, we infer the type of an empty list from the item's type, even when

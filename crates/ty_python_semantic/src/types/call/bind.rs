@@ -1054,25 +1054,32 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         key: &str,
     ) {
-        for element in &mut self.elements {
+        // A missing key only matches the fallback. Removing its other candidates can
+        // change how the return type context specializes a generic default argument.
+        let every_receiver_declares_key = self.elements.iter().all(|element| {
             let Type::BoundMethod(method) = element.callable_type else {
-                continue;
+                return false;
             };
-            let [CallableItem::Regular(callable)] = element.items.as_mut_slice() else {
-                continue;
+            let [CallableItem::Regular(callable)] = element.items.as_slice() else {
+                return false;
             };
             let receiver = method.self_instance(db);
-            // An attribute named `get` can hold a different bound method. Only the
-            // synthesized getter has the fallback that accepts every string key.
-            if !receiver.is_typed_dict()
-                || method.func(db).as_callable().is_none()
-                || callable.bound_type.is_some()
-                || callable.signature_type != element.callable_type
-                || receiver.member(db, env, "get").ignore_possibly_undefined()
-                    != Some(element.callable_type)
-            {
-                continue;
-            }
+            let Type::TypedDict(typed_dict) = receiver else {
+                return false;
+            };
+            // An attribute named `get` can hold a different bound method.
+            method.func(db).as_callable().is_some()
+                && callable.bound_type.is_none()
+                && callable.signature_type == element.callable_type
+                && typed_dict.items(db).contains_key(key)
+                && receiver.member(db, env, "get").ignore_possibly_undefined()
+                    == Some(element.callable_type)
+        });
+        if !every_receiver_declares_key {
+            return;
+        }
+
+        for callable in self.iter_flat_mut() {
             callable.overloads.retain(|overload| {
                 overload
                     .signature
