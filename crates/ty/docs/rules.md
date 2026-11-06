@@ -297,10 +297,6 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 
 Checks for calls to non-callable objects.
 
-Before ty 0.0.97, this rule also covered direct instantiation of abstract classes and protocols. To
-keep a custom severity for those calls, set [`instantiate-abstract-class`](#instantiate-abstract-class) to that severity too. For
-an inline ignore that suppresses such a call, use `# ty: ignore[instantiate-abstract-class]`.
-
 **Why is this bad?**
 
 
@@ -313,6 +309,12 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 # TypeError: 'int' object is not callable
 4()  # error
 ```
+
+**See also**
+
+
+- [`instantiate-abstract-class`](#instantiate-abstract-class) reports attempts to instantiate a protocol class or a class with
+    unimplemented abstract methods.
 
 ## `call-top-callable`
 
@@ -1477,7 +1479,7 @@ will produce instances with an atypical memory layout.
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22instantiate-abstract-class%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1085" target="_blank">View source</a>
 </small>
@@ -1487,19 +1489,13 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a
 
 
 Checks for direct instantiation of protocol classes and classes with unimplemented abstract methods.
-These methods can be explicitly decorated with `@abstractmethod`. A subclass can also inherit an
-abstract method from a protocol that declares the method without implementing it.
 
 **Why is this bad?**
 
 
 Abstract methods describe behavior that a subclass must implement before it can be instantiated.
-Classes using `ABCMeta` enforce this at runtime. ty also enforces it for classes without `ABCMeta`.
-Protocol classes define interfaces and cannot be instantiated directly, even if they have no
-abstract methods.
-
-A parameter annotated with `type[Base]` can refer to a concrete subclass, so ty allows calls through
-the parameter even when `Base` is abstract.
+Classes using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and
+rejects direct instantiation of protocols.
 
 **Examples**
 

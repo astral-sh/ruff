@@ -1086,7 +1086,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/instantiate-abstract-class.md")]
     pub(crate) static INSTANTIATE_ABSTRACT_CLASS = {
         summary: "detects direct instantiation of abstract classes and protocols",
-        status: LintStatus::stable("0.0.97"),
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }

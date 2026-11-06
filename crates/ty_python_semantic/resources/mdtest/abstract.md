@@ -344,31 +344,6 @@ construct(Concrete)  # ok
 construct(Abstract)  # ok
 ```
 
-## Suppressing instantiation errors
-
-Disabling `call-non-callable` still allows ty to report calls to abstract classes and protocols. An
-inline `instantiate-abstract-class` ignore suppresses the error for an individual call:
-
-```toml
-[rules]
-call-non-callable = "ignore"
-```
-
-```py
-from abc import ABC, abstractmethod
-from typing import Protocol
-
-class Base(ABC):
-    @abstractmethod
-    def method(self) -> None: ...
-
-class P(Protocol): ...
-
-Base()  # error: [instantiate-abstract-class]
-P()  # error: [instantiate-abstract-class]
-Base()  # ty: ignore[instantiate-abstract-class]
-```
-
 ## Abstract property accessors
 
 A property remains abstract if its setter or deleter is abstract, even when its getter has a

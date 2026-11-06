@@ -448,7 +448,7 @@
         },
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\nBefore ty 0.0.97, this rule also covered direct instantiation of abstract classes and protocols. To\nkeep a custom severity for those calls, set `instantiate-abstract-class` to that severity too. For\nan inline ignore that suppresses such a call, use `# ty: ignore[instantiate-abstract-class]`.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `instantiate-abstract-class` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.",
           "default": "error",
           "oneOf": [
             {
@@ -698,7 +698,7 @@
         },
         "instantiate-abstract-class": {
           "title": "detects direct instantiation of abstract classes and protocols",
-          "description": "## What it does\n\nChecks for direct instantiation of protocol classes and classes with unimplemented abstract methods.\nThese methods can be explicitly decorated with `@abstractmethod`. A subclass can also inherit an\nabstract method from a protocol that declares the method without implementing it.\n\n## Why is this bad?\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime. ty also enforces it for classes without `ABCMeta`.\nProtocol classes define interfaces and cannot be instantiated directly, even if they have no\nabstract methods.\n\nA parameter annotated with `type[Base]` can refer to a concrete subclass, so ty allows calls through\nthe parameter even when `Base` is abstract.\n\n## Examples\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```\n\n```python\nfrom typing import Protocol\n\n\nclass HasName(Protocol):\n    name: str\n\n\nHasName()  # error\n```",
+          "description": "## What it does\n\nChecks for direct instantiation of protocol classes and classes with unimplemented abstract methods.\n\n## Why is this bad?\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and\nrejects direct instantiation of protocols.\n\n## Examples\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```\n\n```python\nfrom typing import Protocol\n\n\nclass HasName(Protocol):\n    name: str\n\n\nHasName()  # error\n```",
           "default": "error",
           "oneOf": [
             {
