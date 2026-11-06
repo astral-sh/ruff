@@ -876,7 +876,30 @@ def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
 
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
-    reveal_type(f("x", upper))  # revealed: list[str | int]
+    reveal_type(f("x", upper))  # revealed: list[Literal["x"] | int]
+```
+
+A nested callable argument prevents promotion if the promoted type would not satisfy its upper
+bound.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    count: int
+
+def keys_for[T](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def keys_for_paramspec[T, **P](get: Callable[[T], int]) -> list[T]:
+    return []
+
+def _(data: Payload):
+    keys = keys_for(data.__getitem__)
+    reveal_type(keys)  # revealed: list[Literal["count"]]
+
+    paramspec_keys = keys_for_paramspec(data.__getitem__)
+    reveal_type(paramspec_keys)  # revealed: list[Literal["count"]]
 ```
 
 ## Literal annotations from declaration are respected

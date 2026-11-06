@@ -1372,7 +1372,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 ```
 
@@ -1502,10 +1502,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        # TODO: The incompatible return type also causes a spurious constructor receiver error.
-        # error: [invalid-argument-type]
-        # error: [invalid-return-type]
-        return Box[T, Self](value, self)
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Constructing through a classmethod receiver

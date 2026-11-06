@@ -1543,6 +1543,26 @@ def _(consumer: Consumer[Callable[[object], None]]):
     reveal_type(use(empty, consumer, 1))  # revealed: object
 ```
 
+### Return context respects a callback's parameter type
+
+The declared result allows `list[object]`, but the callback only accepts `int`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, Sequence, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+
+def f(callback: Callable[Concatenate[T, P], None], x: U) -> tuple[list[T], list[U]]:
+    raise NotImplementedError
+
+def takes_int(x: int) -> None: ...
+
+result: tuple[list[object] | list[int], list[str] | Sequence[int]] = f(takes_int, 0)
+reveal_type(result)  # revealed: tuple[list[int], list[int]]
+```
+
 ### Repeated parameter lists combine callback constraints
 
 Both callbacks constrain `P`. Comparable signatures simplify regardless of argument order.

@@ -11905,13 +11905,6 @@ impl DynamicType<'_> {
     fn is_todo(&self) -> bool {
         matches!(self, Self::Todo(_))
     }
-
-    const fn is_provisional_marker(self) -> bool {
-        matches!(
-            self,
-            Self::UnspecializedTypeVar | Self::UnknownLambdaParameter
-        )
-    }
 }
 
 impl std::fmt::Display for DynamicType<'_> {

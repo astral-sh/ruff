@@ -151,10 +151,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
-            ty.as_dynamic()
-                .is_some_and(DynamicType::is_provisional_marker)
-        })
+        any_over_type(db, env, self, false, Self::is_provisional_marker)
+    }
+
+    pub(super) const fn is_provisional_marker(self) -> bool {
+        matches!(
+            self,
+            Self::Dynamic(DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter)
+        )
     }
 }
 

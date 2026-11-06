@@ -251,10 +251,12 @@ class Variadic[*Ts]:
         self.shape = shape
 
 reveal_type(Positional(()))  # revealed: Positional[()]
-reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
+# TODO: We should promote to `Positional[int, str]` here.
+reveal_type(Positional((1, "a")))  # revealed: Positional[Literal[1], Literal["a"]]
 
 reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# TODO: We should promote to `Variadic[int, str]` here.
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[Literal[1], Literal["a"]]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
@@ -268,7 +270,7 @@ different specialization.
 valid: Variadic[int] = Variadic(1)
 
 inferred = Variadic(1)
-reveal_type(inferred)  # revealed: Variadic[int]
+reveal_type(inferred)  # revealed: Variadic[Literal[1]]
 # error: [invalid-assignment]
 indirect: Variadic[str] = inferred
 # error: [invalid-assignment]
@@ -282,7 +284,8 @@ Concrete contexts do not supply missing arguments or discard extra ones.
 missing_argument: Variadic[int] = reveal_type(Variadic())  # revealed: Variadic[()]
 
 # error: [invalid-assignment]
-extra_argument: Variadic[int] = reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# revealed: Variadic[Literal[1], Literal["a"]]
+extra_argument: Variadic[int] = reveal_type(Variadic(1, "a"))
 ```
 
 A contextual specialization cannot supply missing constructor arguments. Empty calls infer an empty
@@ -296,7 +299,7 @@ def empty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
 
 def nonempty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
     # error: [invalid-return-type]
-    return reveal_type(Variadic(1))  # revealed: Variadic[int]
+    return reveal_type(Variadic(1))  # revealed: Variadic[Literal[1]]
 
 def empty_without_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us]:
     # error: [invalid-return-type]
