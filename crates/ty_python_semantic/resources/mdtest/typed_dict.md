@@ -2684,7 +2684,8 @@ A read with a `str | int` key can report both `non-literal-typed-dict-key` and
 `invalid-typed-dict-key`. Ignoring either rule leaves the error for the other key type visible.
 
 ```py
-from typing import Any, TypedDict
+from typing import Any
+from typing_extensions import ReadOnly, TypedDict
 
 class Movie(TypedDict):
     title: str
@@ -2725,6 +2726,34 @@ def _(movie: Movie, key: str | Any):
 
     # TODO: see above
     movie[key] = "Alien"  # ty: ignore[invalid-typed-dict-key]
+```
+
+For a closed `TypedDict` with a writable field, a caller can suppress the non-literal key error:
+
+```py
+class ClosedMovie(TypedDict, closed=True):
+    title: str
+
+def _(mutable: ClosedMovie, key: str):
+    mutable[key] = "Alien"  # ty: ignore[non-literal-typed-dict-key]
+```
+
+However, in the following two examples, suppressing `non-literal-typed-dict-key` would not help,
+since the write to all keys is invalid:
+
+```py
+class ClosedReadOnlyMovie(TypedDict, closed=True):
+    title: ReadOnly[str]
+
+class MovieWithReadOnlyExtras(TypedDict, extra_items=ReadOnly[str]):
+    title: ReadOnly[str]
+
+def _(mutable: ClosedMovie, closed: ClosedReadOnlyMovie, extra: MovieWithReadOnlyExtras, key: str):
+    # error: [invalid-typed-dict-key] "got key of type `str`"
+    closed[key] = "Alien"
+
+    # error: [invalid-typed-dict-key] "got key of type `str`"
+    extra[key] = "Alien"
 ```
 
 The old `invalid-key` name still suppresses an invalid subscript key, and ty suggests using the new
