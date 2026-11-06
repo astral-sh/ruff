@@ -7190,17 +7190,16 @@ impl<'db> CallInference<'_, 'db> {
             let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
             if let Some(bounds) = bounds {
+                let lower = bounds.inference_lower()?;
                 // Transitivity can introduce unsolved typevars into a lower bound. For example,
                 // `dict(m)` with a recursive value type can acquire `dict[str, _VT]` as a bound
                 // on `_VT` through the constructor's `Self`. Check that bound with the proposed
                 // contextual types substituted, rather than rejecting the preference because
                 // `_VT` is still unsolved. Variables without a preference retain their identity.
                 if preferred_ty.is_none_or(|ty| {
-                    bounds.inference_lower().is_some_and(|inferred| {
-                        !inferred
-                            .apply_optional_specialization(db, preferred_specialization)
-                            .is_assignable_to(db, self.env, ty)
-                    })
+                    !lower
+                        .apply_optional_specialization(db, preferred_specialization)
+                        .is_assignable_to(db, self.env, ty)
                 }) {
                     return Some(self.solve_typevar(constraints, bounds));
                 }
