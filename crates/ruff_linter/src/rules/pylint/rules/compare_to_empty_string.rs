@@ -1,5 +1,4 @@
-use anyhow::bail;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprCompare};
+use ruff_python_ast::{CmpOp, Expr, ExprCompare};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -60,8 +59,11 @@ impl Violation for CompareToEmptyString {
 
 /// PLC1901
 pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) {
-    // Omit string comparison rules within subscripts. This is mostly commonly used within
-    // DataFrame and np.ndarray indexing.
+    if !compare.operands.iter().any(is_empty_string) {
+        return;
+    }
+
+    // Omit string comparisons within subscripts used for DataFrame and ndarray indexing.
     if checker
         .semantic()
         .current_expressions()
@@ -72,44 +74,40 @@ pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) 
 
     let mut first = true;
     for (lhs, op, rhs) in compare.iter() {
-        if let Ok(op) = EmptyStringCmpOp::try_from(op) {
-            if std::mem::take(&mut first) {
-                // Check the left-most expression.
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &lhs {
-                    if value.is_empty() {
-                        let literal = checker.generator().expr(lhs);
-                        let expr = checker.generator().expr(rhs);
-                        let existing = format!("{literal} {op} {expr}");
-                        let replacement = format!("{}{expr}", op.into_unary());
-                        checker.report_diagnostic(
-                            CompareToEmptyString {
-                                existing,
-                                replacement,
-                            },
-                            lhs.range(),
-                        );
-                    }
-                }
-            }
-
-            // Check all right-hand expressions.
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &rhs {
-                if value.is_empty() {
-                    let expr = checker.generator().expr(lhs);
-                    let literal = checker.generator().expr(rhs);
-                    let existing = format!("{expr} {op} {literal}");
-                    let replacement = format!("{}{expr}", op.into_unary());
-                    checker.report_diagnostic(
-                        CompareToEmptyString {
-                            existing,
-                            replacement,
-                        },
-                        rhs.range(),
-                    );
-                }
-            }
+        let Some(op) = EmptyStringCmpOp::from_operator(*op) else {
+            continue;
+        };
+        if std::mem::take(&mut first) && is_empty_string(lhs) {
+            let literal = checker.generator().expr(lhs);
+            let expr = checker.generator().expr(rhs);
+            let existing = format!("{literal} {op} {expr}");
+            let replacement = format!("{}{expr}", op.into_unary());
+            checker.report_diagnostic(
+                CompareToEmptyString {
+                    existing,
+                    replacement,
+                },
+                lhs.range(),
+            );
+        }
+        if is_empty_string(rhs) {
+            let expr = checker.generator().expr(lhs);
+            let literal = checker.generator().expr(rhs);
+            let existing = format!("{expr} {op} {literal}");
+            let replacement = format!("{}{expr}", op.into_unary());
+            checker.report_diagnostic(
+                CompareToEmptyString {
+                    existing,
+                    replacement,
+                },
+                rhs.range(),
+            );
         }
     }
+}
+
+fn is_empty_string(expr: &Expr) -> bool {
+    matches!(expr, Expr::StringLiteral(literal) if literal.value.is_empty())
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -120,21 +118,17 @@ enum EmptyStringCmpOp {
     NotEq,
 }
 
-impl TryFrom<&CmpOp> for EmptyStringCmpOp {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &CmpOp) -> Result<Self, Self::Error> {
-        match value {
-            CmpOp::Is => Ok(Self::Is),
-            CmpOp::IsNot => Ok(Self::IsNot),
-            CmpOp::Eq => Ok(Self::Eq),
-            CmpOp::NotEq => Ok(Self::NotEq),
-            _ => bail!("{value:?} cannot be converted to EmptyStringCmpOp"),
+impl EmptyStringCmpOp {
+    fn from_operator(op: CmpOp) -> Option<Self> {
+        match op {
+            CmpOp::Is => Some(Self::Is),
+            CmpOp::IsNot => Some(Self::IsNot),
+            CmpOp::Eq => Some(Self::Eq),
+            CmpOp::NotEq => Some(Self::NotEq),
+            _ => None,
         }
     }
-}
 
-impl EmptyStringCmpOp {
     fn into_unary(self) -> &'static str {
         match self {
             Self::Is | Self::Eq => "not ",
