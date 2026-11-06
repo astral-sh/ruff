@@ -7138,9 +7138,12 @@ impl<'db> CallInference<'_, 'db> {
                 return solution;
             }
 
-            // The promoted type must still be compatible with the declared constraints.
-            if bounds.has_declared_evidence()
-                && promoted != solution
+            // The promoted type must still be compatible with the constraints on this type variable.
+            //
+            // Note that legacy mappings are stored as equivalence mappings and so generally cannot
+            // be promoted, as we do not have access to the original constraints to validate the
+            // promotion.
+            if promoted != solution
                 && !bounds.accepts_candidate(db, self.env, constraints, promoted)
             {
                 solution

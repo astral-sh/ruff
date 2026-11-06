@@ -648,10 +648,12 @@ class Variadic(Generic[*Ts]):
         self.shape = shape
 
 reveal_type(Positional(()))  # revealed: Positional[()]
-reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
+# TODO: We should promote to `Positional[int, str]` here.
+reveal_type(Positional((1, "a")))  # revealed: Positional[Literal[1], Literal["a"]]
 
 reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# TODO: We should promote to `Variadic[int, str]` here.
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[Literal[1], Literal["a"]]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]

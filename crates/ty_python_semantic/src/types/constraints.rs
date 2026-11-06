@@ -3403,10 +3403,6 @@ impl<'db> CandidateTypeVarSolution<'db> {
         self.evidence_lower
     }
 
-    pub(crate) fn has_declared_evidence(&self) -> bool {
-        self.has_declared_evidence
-    }
-
     fn lower_bound(&self, source: EvidenceSource) -> Option<Type<'db>> {
         match source {
             EvidenceSource::All => self.evidence_lower,
@@ -3455,7 +3451,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     }
 
     /// Checks whether a given candidate solution satisfies this path.
-    pub(crate) fn accepts_candidate(
+    pub(super) fn accepts_candidate(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4188,7 +4184,7 @@ impl<'db> CandidateSolutions<'db> {
             return PathBoundSolution::Unsatisfiable;
         }
 
-        if !path_bound.has_declared_evidence() {
+        if !path_bound.has_declared_evidence {
             return default_solution;
         }
 
