@@ -580,7 +580,7 @@ impl MemberNames {
     pub(super) fn bits(name: &str) -> (usize, u64) {
         let hash = FxBuildHasher.hash_one(name);
         (
-            (hash as usize >> 12) & 15,
+            usize::try_from((hash >> 12) & 15).expect("four bits fit in usize"),
             (1 << (hash & 63)) | (1 << ((hash >> 6) & 63)),
         )
     }
