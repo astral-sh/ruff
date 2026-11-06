@@ -3538,6 +3538,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "strum_macros",
  "thin-vec",
  "thiserror 2.0.21",
 ]
@@ -5094,6 +5095,8 @@ version = "0.0.21"
 dependencies = [
  "path-slash",
  "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
  "static_assertions",
  "walkdir",
  "zip",

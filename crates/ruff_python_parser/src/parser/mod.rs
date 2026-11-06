@@ -238,7 +238,7 @@ impl<'src> Parser<'src> {
         if lex_errors.is_empty() {
             return Parsed {
                 syntax,
-                tokens: Tokens::new(tokens),
+                tokens: crate::ParsedTokens::Eager(Tokens::new(tokens)),
                 errors: parse_errors,
                 unsupported_syntax_errors: self.unsupported_syntax_errors,
             };
@@ -270,7 +270,7 @@ impl<'src> Parser<'src> {
 
         Parsed {
             syntax,
-            tokens: Tokens::new(tokens),
+            tokens: crate::ParsedTokens::Eager(Tokens::new(tokens)),
             errors: merged,
             unsupported_syntax_errors: self.unsupported_syntax_errors,
         }

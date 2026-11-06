@@ -29,7 +29,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true, features = ["stacker"] }
 ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
-ty_project = { workspace = true, features = ["zstd", "junit"] }
+ty_project = { workspace = true, features = ["bundled-syntax", "zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_server = { workspace = true }
 ty_site_packages = { workspace = true }

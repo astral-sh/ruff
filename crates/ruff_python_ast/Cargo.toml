@@ -37,9 +37,11 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
+strum_macros = { workspace = true, optional = true }
 thin-vec = { workspace = true }
 
 [features]
+stub-archive = ["dep:strum_macros"]
 schemars = ["dep:schemars", "dep:serde_json"]
 cache = ["dep:ruff_cache", "dep:ruff_macros"]
 serde = [

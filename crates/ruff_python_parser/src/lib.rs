@@ -384,9 +384,74 @@ pub fn parse_cells_unchecked(
             range: TextRange::up_to(source.text_len()),
             body,
         },
-        tokens: Tokens::new(tokens),
+        tokens: ParsedTokens::Eager(Tokens::new(tokens)),
         errors,
         unsupported_syntax_errors,
+    }
+}
+
+#[derive(Clone, get_size2::GetSize)]
+enum ParsedTokens {
+    Eager(Tokens),
+    #[cfg(feature = "stub-archive")]
+    Packaged(Box<PackagedTokens>),
+}
+
+#[cfg(feature = "stub-archive")]
+#[derive(Clone, get_size2::GetSize)]
+struct PackagedTokens {
+    #[get_size(ignore)]
+    image: &'static [u8],
+    tokens: std::sync::OnceLock<Tokens>,
+}
+
+#[cfg(feature = "stub-archive")]
+fn packaged_tokens(image: &[u8]) -> Tokens {
+    ruff_python_ast::stub_archive::decode_tokens(image)
+        .expect("the bundled token stream was checked at build time")
+}
+
+impl std::ops::Deref for ParsedTokens {
+    type Target = Tokens;
+    fn deref(&self) -> &Tokens {
+        match self {
+            Self::Eager(tokens) => tokens,
+            #[cfg(feature = "stub-archive")]
+            Self::Packaged(data) => data.tokens.get_or_init(|| packaged_tokens(data.image)),
+        }
+    }
+}
+
+impl std::fmt::Debug for ParsedTokens {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&**self, formatter)
+    }
+}
+
+impl PartialEq for ParsedTokens {
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
+impl ParsedTokens {
+    fn into_tokens(self) -> Tokens {
+        match self {
+            Self::Eager(tokens) => tokens,
+            #[cfg(feature = "stub-archive")]
+            Self::Packaged(data) => data
+                .tokens
+                .into_inner()
+                .unwrap_or_else(|| packaged_tokens(data.image)),
+        }
+    }
+}
+
+impl IntoIterator for ParsedTokens {
+    type Item = ruff_python_ast::token::Token;
+    type IntoIter = <Tokens as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_tokens().into_iter()
     }
 }
 
@@ -394,7 +459,7 @@ pub fn parse_cells_unchecked(
 #[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct Parsed<T> {
     syntax: T,
-    tokens: Tokens,
+    tokens: ParsedTokens,
     errors: Vec<ParseError>,
     unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
@@ -628,5 +693,29 @@ pub struct ModeParseError;
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
+    }
+}
+
+#[cfg(feature = "stub-archive")]
+impl Parsed<ModModule> {
+    pub fn encode_stub(&self) -> Option<Vec<u8>> {
+        if !self.has_no_syntax_errors() {
+            return None;
+        }
+        ruff_python_ast::stub_archive::encode(self.syntax(), self.tokens())
+    }
+
+    /// Loads a bundled syntax image whose complete token stream was verified at build time.
+    pub fn decode_packaged_stub(image: &'static [u8]) -> Option<Self> {
+        let (syntax, token_image) = ruff_python_ast::stub_archive::decode(image)?;
+        Some(Self {
+            syntax,
+            tokens: ParsedTokens::Packaged(Box::new(PackagedTokens {
+                image: token_image,
+                tokens: std::sync::OnceLock::new(),
+            })),
+            errors: Vec::new(),
+            unsupported_syntax_errors: Vec::new(),
+        })
     }
 }

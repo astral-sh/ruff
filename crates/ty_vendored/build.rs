@@ -5,6 +5,10 @@
 //! whenever the script itself changes, or whenever any files
 //! in `crates/ty_vendored/vendor/typeshed` change.
 
+#[cfg(feature = "bundled-syntax")]
+#[path = "build_syntax.rs"]
+mod stub_archive;
+
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -112,4 +116,6 @@ fn main() {
 
     let zipped_typeshed_file = File::create(zipped_typeshed_location).unwrap();
     write_zipped_typeshed_to(zipped_typeshed_file).unwrap();
+    #[cfg(feature = "bundled-syntax")]
+    stub_archive::write(Path::new(&out_dir));
 }

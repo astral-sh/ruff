@@ -36,9 +36,28 @@ type Result<T> = io::Result<T>;
 #[derive(Clone)]
 pub struct VendoredFileSystem {
     inner: Arc<VendoredZipArchive>,
+    syntax: Option<StubSyntaxProvider>,
 }
 
+type StubSyntaxProvider = fn(
+    &VendoredPath,
+    ruff_python_ast::PythonVersion,
+) -> Option<ruff_python_parser::Parsed<ruff_python_ast::ModModule>>;
+
 impl VendoredFileSystem {
+    pub fn with_stub_syntax(mut self, provider: StubSyntaxProvider) -> Self {
+        self.syntax = Some(provider);
+        self
+    }
+
+    pub(crate) fn stub_syntax(
+        &self,
+        path: &VendoredPath,
+        version: ruff_python_ast::PythonVersion,
+    ) -> Option<ruff_python_parser::Parsed<ruff_python_ast::ModModule>> {
+        self.syntax?(path, version)
+    }
+
     pub fn new_static(raw_bytes: &'static [u8]) -> Result<Self> {
         Self::new_impl(ArchiveData::Static(raw_bytes))
     }
@@ -50,6 +69,7 @@ impl VendoredFileSystem {
     fn new_impl(data: ArchiveData) -> Result<Self> {
         Ok(Self {
             inner: Arc::new(VendoredZipArchive::new(data)?),
+            syntax: None,
         })
     }
 

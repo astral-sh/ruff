@@ -12,11 +12,15 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true }
+ruff_python_ast = { workspace = true, optional = true }
+ruff_python_parser = { workspace = true, optional = true, features = ["stub-archive"] }
 static_assertions = { workspace = true }
 zip = { workspace = true }
 
 [build-dependencies]
 path-slash = { workspace = true }
+ruff_python_ast = { workspace = true, optional = true }
+ruff_python_parser = { workspace = true, optional = true, features = ["stub-archive"] }
 walkdir = { workspace = true }
 zip = { workspace = true }
 
@@ -24,6 +28,7 @@ zip = { workspace = true }
 walkdir = { workspace = true }
 
 [features]
+bundled-syntax = ["dep:ruff_python_ast", "dep:ruff_python_parser"]
 zstd = ["zip/zstd"]
 deflate = ["zip/deflate-flate2-zlib-rs"]
 
