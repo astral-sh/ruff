@@ -84,9 +84,9 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
-    TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    is_property_method, list_members,
+    StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1046,12 +1046,25 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
-    /// Discard overloads that the caller can rule out before matching arguments.
-    pub(crate) fn retain_overloads(&mut self, mut keep: impl FnMut(&Signature<'db>) -> bool) {
+    /// Discard overloads that require a different string literal at this argument position.
+    /// Broader annotations, such as `str`, still participate in argument inference.
+    pub(crate) fn retain_overloads_for_string_literal(
+        &mut self,
+        db: &'db dyn Db,
+        position: usize,
+        value: &str,
+    ) {
+        let argument = StringLiteralType::new(db, value);
         for callable in self.iter_flat_mut() {
-            callable
-                .overloads
-                .retain(|overload| keep(&overload.signature));
+            let parameter_index = position + usize::from(callable.bound_type.is_some());
+            callable.overloads.retain(|overload| {
+                let literal = overload
+                    .signature
+                    .parameters()
+                    .get_positional(parameter_index)
+                    .and_then(|parameter| parameter.annotated_type().as_string_literal());
+                literal.is_none_or(|literal| literal == argument)
+            });
         }
     }
 
