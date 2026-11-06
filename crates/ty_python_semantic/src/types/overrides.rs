@@ -30,12 +30,13 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_MUTABLE_OVERRIDE,
-            INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
-            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_incompatible_base_method, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_METHOD_OVERRIDE,
+            INCOMPATIBLE_MUTABLE_OVERRIDE, INCOMPATIBLE_PROPERTY_OVERRIDE, INVALID_ASSIGNMENT,
+            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
+            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_incompatible_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
@@ -762,7 +763,7 @@ fn check_class_declaration<'db>(
         );
         if !type_on_subclass_instance.is_assignable_to(db, env, expected)
             && let Some(builder) = context.report_lint(
-                &INVALID_METHOD_OVERRIDE,
+                &INCOMPATIBLE_METHOD_OVERRIDE,
                 first_reachable_definition.focus_range(db, context.module()),
             )
         {
@@ -1277,7 +1278,7 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            report_invalid_method_override(
+            report_incompatible_method_override(
                 context,
                 &member.name,
                 class,
@@ -1796,7 +1797,7 @@ fn report_invalid_attribute_override<'db>(
     let db = context.db();
 
     let Some(builder) = context.report_lint(
-        &INVALID_ATTRIBUTE_OVERRIDE,
+        &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
         subclass_definition.focus_range(db, context.module()),
     ) else {
         return;
@@ -1868,16 +1869,16 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
 
         let mut config = OverrideRulesConfig::empty();
 
-        if rule_selection.is_enabled(LintId::of(&INVALID_METHOD_OVERRIDE)) {
+        if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_METHOD_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_METHODS;
         }
-        if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {
+        if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_ATTRIBUTE_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_ATTRIBUTES;
         }
-        if rule_selection.is_enabled(LintId::of(&INVALID_PROPERTY_TYPE_OVERRIDE)) {
+        if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_PROPERTY_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_PROPERTIES;
         }
-        if rule_selection.is_enabled(LintId::of(&INVALID_MUTABLE_OVERRIDE)) {
+        if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_MUTABLE_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_MUTABLE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {

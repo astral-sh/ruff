@@ -108,7 +108,7 @@ class Grandchild(OtherChild):
     # error: [override-of-final-method]
     def foo(): ...
     @property
-    # error: [invalid-property-type-override]
+    # error: [incompatible-property-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
@@ -1346,7 +1346,7 @@ class Base(ABC):
 @final
 # snapshot: abstract-method-in-final-class
 class Bad(Base):
-    method: int  # error: [invalid-attribute-override]
+    method: int  # error: [incompatible-attribute-override]
 ```
 
 ```snapshot
@@ -1366,7 +1366,7 @@ info: The instance-attribute annotation for `method` does not override the abstr
 help: Either assign a value or add `ClassVar` to this declaration
   --> src/mdtest_snippet.py:11:5
    |
-11 |     method: int  # error: [invalid-attribute-override]
+11 |     method: int  # error: [incompatible-attribute-override]
    |     ------ Instance-attribute declaration
 ```
 

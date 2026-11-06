@@ -1314,7 +1314,7 @@ from typing import Literal
 class Custom:
     declared: str
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(self, name: Literal["dynamic"], value: int) -> None:
         pass
 

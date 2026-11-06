@@ -2141,7 +2141,7 @@ class Base:
 
 class Invalid(Base):
     @override
-    def __new__(cls, value: str) -> Self:  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self:  # error: [incompatible-method-override]
         raise NotImplementedError
 ```
 

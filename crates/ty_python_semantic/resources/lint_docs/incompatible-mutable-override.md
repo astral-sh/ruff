@@ -15,7 +15,7 @@ class Base:
 
 
 class Child(Base):
-    value: bool  # error: [invalid-mutable-override]
+    value: bool  # error: [incompatible-mutable-override]
 
 
 def reset(obj: Base) -> None:

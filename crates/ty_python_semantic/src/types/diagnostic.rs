@@ -190,10 +190,26 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
-    registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
-    registry.register_lint(&INVALID_PROPERTY_TYPE_OVERRIDE);
-    registry.register_lint(&INVALID_MUTABLE_OVERRIDE);
-    registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&INCOMPATIBLE_ATTRIBUTE_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-attribute-override"),
+        &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_PROPERTY_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-property-type-override"),
+        &INCOMPATIBLE_PROPERTY_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_MUTABLE_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-mutable-override"),
+        &INCOMPATIBLE_MUTABLE_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_METHOD_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-method-override"),
+        &INCOMPATIBLE_METHOD_OVERRIDE,
+    );
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -1362,8 +1378,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-attribute-override.md")]
-    pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-attribute-override.md")]
+    pub(crate) static INCOMPATIBLE_ATTRIBUTE_OVERRIDE = {
         summary: "detects attribute overrides that violate inherited type or access requirements",
         status: LintStatus::stable("0.0.33"),
         default_level: Level::Error,
@@ -1371,8 +1387,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-property-type-override.md")]
-    pub(crate) static INVALID_PROPERTY_TYPE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-property-override.md")]
+    pub(crate) static INCOMPATIBLE_PROPERTY_OVERRIDE = {
         summary: "detects incompatible overrides involving properties",
         status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
@@ -1380,8 +1396,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-mutable-override.md")]
-    pub(crate) static INVALID_MUTABLE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-mutable-override.md")]
+    pub(crate) static INCOMPATIBLE_MUTABLE_OVERRIDE = {
         summary: "detects overrides that narrow writable attribute types",
         status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
@@ -1389,8 +1405,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
-    pub(crate) static INVALID_METHOD_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-method-override.md")]
+    pub(crate) static INCOMPATIBLE_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
         default_level: Level::Error,
@@ -5127,7 +5143,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
 // I tried refactoring this function to placate Clippy,
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]
-pub(super) fn report_invalid_method_override<'db>(
+pub(super) fn report_incompatible_method_override<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
     subclass: ClassType<'db>,
@@ -5160,7 +5176,7 @@ pub(super) fn report_invalid_method_override<'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
+    let Some(builder) = context.report_lint(&INCOMPATIBLE_METHOD_OVERRIDE, diagnostic_range) else {
         return;
     };
 
@@ -5331,7 +5347,7 @@ pub(super) fn report_incompatible_base_method<'db>(
     error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
+    let Some(builder) = context.report_lint(&INCOMPATIBLE_METHOD_OVERRIDE, class.header_range(db))
     else {
         return;
     };
