@@ -2318,17 +2318,21 @@ def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     return future
 ```
 
-Variadic arguments are inferred using their matching parameter as type context.
+When overloads share a variadic tuple annotation, a positional argument can match different elements
+of that tuple. In the second overload, the label comes before `*groups`, so the empty list is
+inferred as `list[int]`.
 
 ```py
+type Groups = tuple[list[int], *tuple[list[str], ...]]
+
 @overload
-def pair[T: int, U](*args: *tuple[list[T], list[U]]) -> tuple[T, U]: ...
+def pick(*groups: *Groups) -> int: ...
 @overload
-def pair(first: list[str], second: list[int], /) -> tuple[str, int]: ...
-def pair(*args: object) -> object:
+def pick(label: str, /, *groups: *Groups) -> str: ...
+def pick(*args: object) -> int | str:
     raise NotImplementedError
 
-reveal_type(pair([42], ["x"]))  # revealed: tuple[int, str]
+reveal_type(pick("label", []))  # revealed: str
 ```
 
 ## Class constructor parameters

@@ -1528,9 +1528,11 @@ impl<'db> Bindings<'db> {
         // its declared type.
         if let Some(binding) = self.single_element()
             && let Ok((_, overload)) = binding.matching_overloads().exactly_one()
-            && let [parameter] = *overload.argument_matches[argument_index].parameters
+            && let Some(matched) =
+                overload.matched_argument_for_call_argument(binding, argument_index)
+            && let [parameter] = *matched.parameters
         {
-            let declared_type = overload.signature.parameters()[parameter.index].annotated_type();
+            let declared_type = parameter.declared_type(overload.signature.parameters());
             return argument_types.get_for_declared_type(declared_type);
         }
 
@@ -4086,9 +4088,7 @@ impl<'db> CallableBinding<'db> {
                         return true;
                     }
 
-                    let parameter_type = matched_parameter
-                        .expected_type
-                        .unwrap_or_else(|| parameter.annotated_type());
+                    let parameter_type = matched_parameter.declared_type(overload.signature.parameters());
                     let argument_type = call_argument
                         .matched_type(parameter_type, matched_parameter.argument_type)
                         .unwrap_or(Type::unknown());
@@ -4356,20 +4356,19 @@ impl<'db> CallableBinding<'db> {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
-                            let raw_parameter_type = overload.signature.parameters()
-                                [matched_parameter.index]
-                                .annotated_type();
-                            let parameter_type = raw_parameter_type.apply_optional_specialization(
+                            let declared_type =
+                                matched_parameter.declared_type(overload.signature.parameters());
+                            let parameter_type = declared_type.apply_optional_specialization(
                                 db,
                                 overload.merged_specialization(db),
                             );
                             OverloadFilterSlot {
                                 parameter: parameter_type,
-                                // Argument types are cached by the raw parameter type, even when
+                                // Argument types are cached by the unspecialized type, even when
                                 // they were inferred using a return-context specialization.
                                 argument: argument
                                     .source_types()
-                                    .get_for_declared_type(raw_parameter_type),
+                                    .get_for_declared_type(declared_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -5773,7 +5772,7 @@ impl<'db> ArgumentRelation<'db> {
     fn new(
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
-        parameter: &Parameter<'db>,
+        parameters: &Parameters<'db>,
         matched_parameter: MatchedParameter<'db>,
         argument_type: Type<'db>,
     ) -> Self {
@@ -5781,11 +5780,9 @@ impl<'db> ArgumentRelation<'db> {
             argument_index,
             adjusted_argument_index,
             matched_parameter,
-            declared_type: matched_parameter
-                .expected_type
-                .unwrap_or_else(|| parameter.annotated_type()),
+            declared_type: matched_parameter.declared_type(parameters),
             argument_type,
-            has_starred_annotation: parameter.has_starred_annotation(),
+            has_starred_annotation: parameters[matched_parameter.index].has_starred_annotation(),
         }
     }
 }
@@ -6111,18 +6108,15 @@ impl<'a, 'db> CallInference<'a, 'db> {
                             return None;
                         }
 
-                        let parameter = &parameters[parameter_index];
-                        // Note that the inferred type of a positional argument is stored under
-                        // the variadic parameter type, rather than the matched parameter.
                         let argument_type = argument_types.matched_type(
-                            parameter.annotated_type(),
+                            matched_parameter.declared_type(parameters),
                             matched_parameter.argument_type,
                         )?;
 
                         Some(ArgumentRelation::new(
                             argument_index,
                             adjusted_argument_index,
-                            parameter,
+                            parameters,
                             matched_parameter,
                             argument_type,
                         ))
@@ -6198,7 +6192,7 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
                     .iter()
                     .find_map(|matched_parameter| {
                         let declared_type =
-                            self.signature.parameters()[matched_parameter.index].annotated_type();
+                            matched_parameter.declared_type(self.signature.parameters());
                         let argument_type = argument_types
                             .source_types()
                             .get_for_declared_type(declared_type);
@@ -7114,7 +7108,7 @@ impl<'db> CallInference<'_, 'db> {
         }
 
         let Some((actual, argument_indices)) =
-            self.collect_typevartuple_arguments(parameter_index, parameter, formal)
+            self.collect_typevartuple_arguments(parameter_index, formal)
         else {
             return true;
         };
@@ -7234,7 +7228,6 @@ impl<'db> CallInference<'_, 'db> {
     fn collect_typevartuple_arguments(
         &self,
         parameter_index: usize,
-        parameter: &Parameter<'db>,
         formal: Type<'db>,
     ) -> Option<(Type<'db>, Option<(usize, usize)>)> {
         let db = self.db;
@@ -7279,9 +7272,7 @@ impl<'db> CallInference<'_, 'db> {
                 .iter()
                 .filter(|matched| matched.index == parameter_index)
             {
-                let declared_type = matched
-                    .expected_type
-                    .unwrap_or_else(|| parameter.annotated_type());
+                let declared_type = matched.declared_type(self.signature.parameters());
                 actual.push(
                     argument_types
                         .matched_type(declared_type, matched.argument_type)
@@ -7698,14 +7689,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             continue;
                         }
 
-                        let parameter = &self.signature.parameters()[parameter_index];
+                        let parameters = self.signature.parameters();
                         let argument_type = argument_types
-                            .matched_type(parameter.annotated_type(), None)
+                            .matched_type(matched_parameter.declared_type(parameters), None)
                             .unwrap_or(Type::unknown());
                         let relation = ArgumentRelation::new(
                             argument_index,
                             adjusted_argument_index,
-                            parameter,
+                            parameters,
                             matched_parameter,
                             argument_type,
                         );
@@ -7892,7 +7883,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let relation = ArgumentRelation::new(
                 argument_index,
                 adjusted_argument_index,
-                &self.signature.parameters()[parameter_index],
+                self.signature.parameters(),
                 matched_parameter,
                 matched_parameter
                     .argument_type
@@ -7966,7 +7957,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let relation = ArgumentRelation::new(
                 argument_index,
                 adjusted_argument_index,
-                &self.signature.parameters()[parameter_index],
+                self.signature.parameters(),
                 matched_parameter,
                 value_type,
             );
@@ -8023,6 +8014,15 @@ pub struct MatchedParameter<'db> {
     provenance: InvalidArgumentTypeProvenance,
 }
 
+impl<'db> MatchedParameter<'db> {
+    /// The unspecialized type expected at this argument's position. Two overloads can use the
+    /// same variadic tuple annotation but match the argument to different elements.
+    fn declared_type(self, parameters: &Parameters<'db>) -> Type<'db> {
+        self.expected_type
+            .unwrap_or_else(|| parameters[self.index].annotated_type())
+    }
+}
+
 impl<'db> MatchedArgument<'db> {
     /// Returns an iterator over the matched parameters.
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
@@ -8056,8 +8056,9 @@ impl<'db> ArgumentContextSpecialization<'db> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ArgumentTypeContext<'db> {
     Standard {
-        /// The raw parameter type from the overload signature.
-        raw_parameter_type: Type<'db>,
+        /// The unspecialized type matched by this argument, including its tuple element for an
+        /// unpacked variadic parameter.
+        declared_type: Type<'db>,
         /// The expected parameter type, possibly specialized from the call expression's context.
         context: TypeContext<'db>,
     },
@@ -8073,11 +8074,11 @@ pub(crate) enum ArgumentTypeContext<'db> {
 impl<'db> ArgumentTypeContext<'db> {
     /// Creates a context for ordinary parameter annotations.
     ///
-    /// `raw_parameter_type` is the lookup key used by later type checking. `context` is the
+    /// `declared_type` is the lookup key used by later type checking. `context` is the
     /// possibly-specialized context used to infer the argument expression.
-    fn standard(raw_parameter_type: Type<'db>, context: TypeContext<'db>) -> Self {
+    fn standard(declared_type: Type<'db>, context: TypeContext<'db>) -> Self {
         Self::Standard {
-            raw_parameter_type,
+            declared_type,
             context,
         }
     }
@@ -8104,16 +8105,15 @@ impl<'db> ArgumentTypeContext<'db> {
 
     /// Returns the key used to deduplicate speculative inference attempts.
     ///
-    /// Standard parameters are cached by their raw parameter type, since later type checking asks
-    /// for that type. `ParamSpec` arguments are cached by the concrete forwarded parameter type,
-    /// but still inserted through their full context so the original `P.args` or `P.kwargs` lookup
-    /// key is populated too.
+    /// For ordinary arguments, later type checking looks up the unspecialized type matched by
+    /// the argument. Forwarded `ParamSpec` arguments use the concrete forwarded parameter type
+    /// and also populate the original `P.args` or `P.kwargs` lookup key.
     pub(crate) fn inference_cache_key(self) -> TypeContext<'db> {
         match self {
             Self::Standard {
-                raw_parameter_type,
+                declared_type,
                 context,
-            } => context.with_declared_type(Some(raw_parameter_type)),
+            } => context.with_declared_type(Some(declared_type)),
             Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
         }
     }
@@ -8130,10 +8130,8 @@ impl<'db> ArgumentTypeContext<'db> {
         inferred_ty: Type<'db>,
     ) {
         match self {
-            Self::Standard {
-                raw_parameter_type, ..
-            } => {
-                arguments_types.insert_type(argument_index, raw_parameter_type, inferred_ty);
+            Self::Standard { declared_type, .. } => {
+                arguments_types.insert_type(argument_index, declared_type, inferred_ty);
             }
             Self::ParamSpec {
                 paramspec_parameter_type,
@@ -8490,9 +8488,8 @@ impl<'db> Binding<'db> {
                     return None;
                 };
 
-                let parameter_type = specialized_overload.signature.parameters()
-                    [specialized_parameter.index]
-                    .annotated_type();
+                let parameter_type = specialized_parameter
+                    .declared_type(specialized_overload.signature.parameters());
                 // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
                 // type variables in the same way as for arguments to an ordinary generic call.
                 contexts.push(
@@ -8631,9 +8628,8 @@ impl<'db> Binding<'db> {
 
         let parameter = &self.signature.parameters()[matched_parameter.index];
         let original_parameter_type = parameter.annotated_type();
-        let mut parameter_type = matched_parameter
-            .expected_type
-            .unwrap_or(original_parameter_type);
+        let declared_type = matched_parameter.declared_type(self.signature.parameters());
+        let mut parameter_type = declared_type;
         let paramspec_value = |paramspec| {
             self.merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
@@ -8654,7 +8650,7 @@ impl<'db> Binding<'db> {
                 typevar.typevar(db).bound_or_constraints(db, env)
         {
             return Some(ArgumentTypeContext::standard(
-                original_parameter_type,
+                declared_type,
                 TypeContext::validity(bound),
             ));
         }
@@ -8730,7 +8726,7 @@ impl<'db> Binding<'db> {
         }
 
         Some(ArgumentTypeContext::standard(
-            original_parameter_type,
+            declared_type,
             TypeContext::new(Some(parameter_type), tcx_kind),
         ))
     }
@@ -9228,18 +9224,15 @@ impl<'db> Binding<'db> {
         call_arguments
             .iter()
             .zip(&self.argument_matches)
-            .filter(move |(_, argument_matches)| {
-                argument_matches
-                    .parameters
+            .filter_map(move |(argument, argument_matches)| {
+                let matched = argument_matches
                     .iter()
-                    .any(|parameter| parameter.index == parameter_index)
-            })
-            .map(move |(argument, _)| {
-                let declared_type = self.signature.parameters()[parameter_index].annotated_type();
-                (
+                    .find(|parameter| parameter.index == parameter_index)?;
+                let declared_type = matched.declared_type(self.signature.parameters());
+                Some((
                     argument.kind(),
                     argument.source_types().get_for_declared_type(declared_type),
-                )
+                ))
             })
     }
 

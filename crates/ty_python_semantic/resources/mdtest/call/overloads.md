@@ -1142,6 +1142,26 @@ def _(foo: Foo, ab: A | B, a: int | Any):
     )
 ```
 
+### Argument expansion with unpacked tuple parameters
+
+Arity rules out the zero-argument overload. The other overloads both accept `[1]` when their first
+tuple element provides its type context, so we expand `tail` and match both calls.
+
+```py
+from typing import overload
+from typing_extensions import Unpack
+
+@overload
+def parse(*args: Unpack[tuple[list[int | str], int]]) -> int: ...
+@overload
+def parse(*args: Unpack[tuple[list[int | bytes], str]]) -> str: ...
+@overload
+def parse() -> None: ...
+def parse(*args: object) -> object: ...
+def _(tail: tuple[int] | tuple[str]) -> None:
+    reveal_type(parse([1], *tail))  # revealed: int | str
+```
+
 ### Optimization: Limit expansion size
 
 To prevent combinatorial explosion, ty limits the number of argument lists created by expanding a
