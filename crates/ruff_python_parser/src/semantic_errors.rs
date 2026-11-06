@@ -939,8 +939,8 @@ impl SemanticSyntaxChecker {
     }
 
     /// Checks an expression using its enclosing scope and evaluation context.
-    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: Expr<'_>, ctx: &Ctx) {
-        match expr.classify() {
+    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, kind: ExprKind<'_>, ctx: &Ctx) {
+        match kind {
             ExprKind::ListComp(node) => {
                 Self::check_eager_comprehension(node.elt(), node.generators(), ctx);
             }
@@ -1021,14 +1021,14 @@ impl SemanticSyntaxChecker {
                 // PLE0118
                 if let Some(stmt) = ctx.global(id) {
                     let start = stmt.start();
-                    if expr.start() < start {
+                    if range.start() < start {
                         Self::add_error(
                             ctx,
                             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: id.to_string(),
                                 start,
                             },
-                            expr.range(),
+                            range,
                         );
                     }
                 }
@@ -1041,7 +1041,11 @@ impl SemanticSyntaxChecker {
                     // def f(): yield *x
                     Self::invalid_star_expression(value, ctx);
                 }
-                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+                Self::yield_outside_function(
+                    ctx,
+                    expr_yield.into(),
+                    YieldOutsideFunctionKind::Yield,
+                );
             }
             ExprKind::Attribute(attribute) if attribute.attr() == "__debug__" => {
                 // test_err write_to_debug_attribute_py313
@@ -1073,8 +1077,8 @@ impl SemanticSyntaxChecker {
                 };
                 Self::add_error(ctx, SemanticSyntaxErrorKind::WriteToDebug(kind), range);
             }
-            ExprKind::YieldFrom(_) => {
-                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+            ExprKind::YieldFrom(node) => {
+                Self::yield_outside_function(ctx, node.into(), YieldOutsideFunctionKind::YieldFrom);
                 if ctx.in_function_scope() && ctx.in_async_context() {
                     // test_err yield_from_in_async_function
                     // async def f(): yield from x
@@ -1082,13 +1086,13 @@ impl SemanticSyntaxChecker {
                     Self::add_error(
                         ctx,
                         SemanticSyntaxErrorKind::YieldFromInAsyncFunction,
-                        expr.range(),
+                        node.range(),
                     );
                 }
             }
-            ExprKind::Await(_) => {
-                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
-                Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
+            ExprKind::Await(node) => {
+                Self::yield_outside_function(ctx, node.into(), YieldOutsideFunctionKind::Await);
+                Self::await_outside_async_function(ctx, node, AwaitOutsideAsyncFunctionKind::Await);
             }
             ExprKind::Tuple(node) => {
                 Self::multiple_star_expression(ctx, node.ctx(), node.elts(), node.range());

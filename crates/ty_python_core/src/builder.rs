@@ -3478,9 +3478,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: Expr<'ast>, context: ExpressionContext) {
-        self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
-
         let kind = expr.classify();
+        self.with_semantic_checker(|semantic, builder| semantic.visit_expr(kind, builder));
+
         // A place use records its scope together with its reaching-definition ID,
         // after child expressions have been evaluated. Other expressions have only a scope.
         if !matches!(

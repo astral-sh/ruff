@@ -1758,7 +1758,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        let kind = expr.classify();
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(kind, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -1781,7 +1782,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 || self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
-            if let Some(string_literal) = expr.as_string_literal_expr() {
+            if let ExprKind::StringLiteral(string_literal) = kind {
                 self.visit
                     .string_type_definitions
                     .push((string_literal, self.semantic.snapshot()));
@@ -1801,7 +1802,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
-        let kind = expr.classify();
         let inherits_boolean_test = match kind {
             ExprKind::BoolOp(_) => true,
             ExprKind::UnaryOp(unary) => unary.op() == UnaryOp::Not,
