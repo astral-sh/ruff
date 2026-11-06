@@ -231,17 +231,396 @@ class C:
     def other_method(self):
         self.x = get_str()
 
-        # TODO: this redeclaration should be an error
-        self.y: str = "a"
+        self.y: str = "a"  # error: [conflicting-declarations]
 
-        # TODO: this redeclaration should be an error
-        self.z: str = "a"
+        self.z: str = "a"  # error: [conflicting-declarations]
 
 c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: int | str
 reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
+```
+
+#### Diagnostic for conflicting attribute declarations
+
+The diagnostic points at the first method declaration that disagrees with the earliest declaration
+and marks every other declaration involved in the conflict.
+
+```py
+class C:
+    x: int
+
+    def __init__(self) -> None:
+        self.x: str = ""  # snapshot: conflicting-declarations
+
+    def reset(self) -> None:
+        self.x: bytes = b""
+```
+
+```snapshot
+error[conflicting-declarations]: Conflicting declared types for `x`: `int`, `str` and `bytes`
+ --> src/mdtest_snippet.py:5:9
+  |
+2 |     x: int
+  |     - declared as `int` here
+3 |
+4 |     def __init__(self) -> None:
+5 |         self.x: str = ""  # snapshot: conflicting-declarations
+  |         ^^^^^^ declared as `str` here
+6 |
+7 |     def reset(self) -> None:
+8 |         self.x: bytes = b""
+  |         ------ declared as `bytes` here
+```
+
+#### Narrower declarations in methods
+
+Declared types conflict unless they are equivalent. A method declaration that narrows the class-body
+declaration therefore conflicts with it, even though every value of the narrower type is also valid
+for the wider type.
+
+```py
+class C:
+    x: list[int] | None
+
+    def __init__(self) -> None:
+        self.x: list[int] = []  # error: [conflicting-declarations]
+```
+
+#### Gradual declarations in methods
+
+`Any` is not equivalent to any other type, so a declaration as `Any` conflicts with a declaration as
+`int`, as it does for other symbols.
+
+```py
+from typing import Any
+
+class C:
+    x: Any
+
+    def __init__(self) -> None:
+        self.x: int = 1  # error: [conflicting-declarations]
+```
+
+#### `Self` in declarations
+
+`Self` in a method refers to the same type as `Self` in the class body or in another method, so
+these declarations do not conflict.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+
+class C:
+    x: Self
+    y: list[Self]
+
+    def __init__(self) -> None:
+        self.x: Self = self  # no diagnostic
+        self.y: list[Self] = []  # no diagnostic
+        self.z: Self | None = None
+
+    def reset(self) -> None:
+        self.z: Self | None = None  # no diagnostic
+```
+
+This also holds in a generic class.
+
+```py
+class Box[T]:
+    item: T
+    parent: Self | None
+
+    def __init__(self, item: T) -> None:
+        self.item: T = item  # no diagnostic
+        self.parent: Self | None = None  # no diagnostic
+```
+
+`Self` still differs from the class itself, since `Self` refers to a subclass when the method is
+called on one.
+
+```py
+class D:
+    x: "D"
+
+    def __init__(self) -> None:
+        self.x: Self = self  # error: [conflicting-declarations]
+```
+
+#### Type qualifiers are not compared
+
+Only the declared types are compared, not type qualifiers such as `ClassVar`.
+
+```py
+from typing import ClassVar
+
+class C:
+    x: ClassVar[int]
+
+    def set_value(self) -> None:
+        self.x: int = 1  # no diagnostic
+```
+
+#### Conflicts among class-body declarations
+
+When only declarations in the class body disagree, the conflict is reported by the checks for
+class-body symbols, as for any other symbol. A method declaration that agrees with the earliest
+class-body declaration does not cause a second diagnostic for the same conflict.
+
+```py
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        x: int
+    else:
+        x: str
+    x = 1  # error: [conflicting-declarations]
+
+    def set_value(self) -> None:
+        self.x: int = 1
+```
+
+A method declaration that disagrees with the earliest class-body declaration is reported in the
+method.
+
+```py
+class D:
+    if flag():
+        x: int
+    else:
+        x: str
+
+    def set_value(self) -> None:
+        self.x: str = ""  # error: [conflicting-declarations]
+```
+
+#### Several declarations in one method
+
+As for other symbols, a later declaration of an attribute in the same method replaces an earlier
+one. Only the declarations that can still be in effect when the method finishes take part in
+conflict checking.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+        self.x: str = "a"  # no diagnostic
+```
+
+The replaced declaration is also not compared with declarations in other methods.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+        self.x: str = "a"
+
+    def reset_value(self) -> None:
+        self.x: str = ""  # no diagnostic
+```
+
+A declaration followed by `return` is compared like any other declaration.
+
+```py
+class C:
+    def get_value(self) -> int:
+        self.x: int = 1
+        return self.x
+
+    def reset_value(self) -> None:
+        self.x: str = ""  # error: [conflicting-declarations]
+```
+
+Declarations on different control-flow paths conflict with each other.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> None:
+        if flag:
+            self.x: int = 1
+        else:
+            self.x: str = "a"  # error: [conflicting-declarations]
+```
+
+A declaration in a branch that returns early is still in effect after the method returns, but we do
+not detect this yet.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> None:
+        if flag:
+            self.x: int = 1
+            return
+        self.x: str = "a"  # TODO: error: [conflicting-declarations]
+
+    def reset_value(self, flag: bool) -> None:
+        if flag:
+            self.y: int = 1
+            return
+
+    def clear_value(self) -> None:
+        self.y: str = ""  # TODO: error: [conflicting-declarations]
+```
+
+When every branch returns, only the declarations from the last branch are compared, so a conflict
+between the branches is not detected yet either.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> int:
+        if flag:
+            self.x: int = 1
+            return 1
+        else:
+            self.x: str = "a"  # TODO: error: [conflicting-declarations]
+            return 2
+```
+
+Statically unreachable declarations do not participate in conflict checking.
+
+```py
+class C:
+    def set_value(self) -> None:
+        if False:
+            self.x: int = 1
+        self.x: str = "a"
+```
+
+#### Replaced and unreachable methods
+
+Declarations in a statically unreachable method definition do not participate in conflict checking.
+
+```py
+class C:
+    if 1 > 2:
+        def set_value(self) -> None:
+            self.x: int = 1
+
+    def reset_value(self) -> None:
+        self.x: str = "a"  # no diagnostic
+```
+
+A method can still run after a later binding replaces its name. For example, the getter of a
+property still runs when `value` is read, even though the setter rebinds `value`. Declarations in
+such methods are therefore compared like any other.
+
+```py
+class C:
+    @property
+    def value(self) -> int:
+        self._cache: int = 1
+        return self._cache
+
+    @value.setter
+    def value(self, new_value: int) -> None:
+        self._cache: str = ""  # error: [conflicting-declarations]
+```
+
+The same holds for a method that is assigned to another name before its own name is deleted.
+
+```py
+class C:
+    def _init(self) -> None:
+        self.x: int = 1
+
+    __init__ = _init
+    del _init
+
+    def reset_value(self) -> None:
+        self.x: str = ""  # error: [conflicting-declarations]
+```
+
+A method that is redefined with the same name is compared as well.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+
+    def set_value(self) -> None:
+        self.x: str = "a"  # error: [conflicting-declarations]
+```
+
+#### Class-method declaration conflicts
+
+Declarations in class methods are compared with other class-method declarations, but not with
+instance-attribute declarations in ordinary methods.
+
+```py
+class C:
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: int = 1
+
+    @classmethod
+    def reset_class_value(cls) -> None:
+        cls.x: str = "a"  # error: [conflicting-declarations]
+
+    def set_instance_value(self) -> None:
+        self.x: bytes = b"a"
+```
+
+Conflicts among instance-method declarations and among class-method declarations are reported
+separately.
+
+```py
+class D:
+    def set_instance_value(self) -> None:
+        self.x: int = 1
+
+    def reset_instance_value(self) -> None:
+        self.x: str = "a"  # error: [conflicting-declarations]
+
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: int = 1
+
+    @classmethod
+    def reset_class_value(cls) -> None:
+        cls.x: bytes = b"a"  # error: [conflicting-declarations]
+```
+
+A class-body declaration applies to both kinds of attribute, so it is also compared with
+class-method declarations.
+
+```py
+class E:
+    x: int
+
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: str = ""  # error: [conflicting-declarations]
+```
+
+Methods that are implicitly class methods, such as `__init_subclass__`, are treated like methods
+decorated with `@classmethod`.
+
+```py
+class F:
+    x: int
+
+    def __init_subclass__(cls) -> None:
+        cls.x: str = ""  # error: [conflicting-declarations]
+```
+
+Static methods have no `self` or `cls` parameter, so an annotated assignment to an attribute of
+their first parameter is rejected. It does not declare an attribute and is not compared with other
+declarations.
+
+```py
+class G:
+    x: int
+
+    @staticmethod
+    def set_value(obj) -> None:
+        obj.x: str = ""  # error: [invalid-type-form]
 ```
 
 #### Singleton promotion happens after unioning implicit assignments
