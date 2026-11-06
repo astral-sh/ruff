@@ -67,9 +67,7 @@ fn generate_markdown() -> String {
     let _ = writeln!(&mut output, "# Rules\n");
 
     let mut aliases: FxHashMap<LintId, Vec<LintName>> = FxHashMap::default();
-
-    // Map of {<rule ID>: <aliases for that rule>}
-    for (name, lint) in registry.aliases() {
+    for (name, lint) in registry.aliases().sorted_by_key(|(name, _)| *name) {
         aliases.entry(lint).or_default().push(name);
     }
 
@@ -79,10 +77,9 @@ fn generate_markdown() -> String {
 
     for &lint in registry.lints().iter().sorted_by_key(|lint| lint.name()) {
         // Keep links to the old rule heading working after a rename.
-        let mut names = aliases.remove(&lint).unwrap_or_default();
-        names.sort_unstable();
+        let names = aliases.get(&lint).map(Vec::as_slice).unwrap_or_default();
         if !names.is_empty() {
-            for name in &names {
+            for name in names {
                 let _ = writeln!(output, r#"<a id="{name}"></a>"#);
             }
             output.push('\n');
@@ -148,7 +145,7 @@ fn generate_markdown() -> String {
             quoted_name(lint.name())
         } else {
             let terms = std::iter::once(lint.name())
-                .chain(names)
+                .chain(names.iter().copied())
                 .map(quoted_name)
                 .join(" OR ");
             format!("({terms})")
