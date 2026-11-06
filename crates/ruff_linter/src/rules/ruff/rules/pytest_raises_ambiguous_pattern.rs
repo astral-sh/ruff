@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -81,8 +82,12 @@ impl Violation for PytestRaisesAmbiguousPattern {
 }
 
 /// RUF043
-pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::ExprCall) {
-    if !is_pytest_raises(&call.func, checker.semantic()) {
+pub(crate) fn pytest_raises_ambiguous_pattern(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !is_pytest_raises(qualified_name) {
         return;
     }
 
