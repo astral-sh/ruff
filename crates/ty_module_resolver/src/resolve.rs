@@ -110,6 +110,34 @@ pub fn resolve_module_confident<'db>(
     resolve_module_query(db, interned_name)
 }
 
+/// Returns the system directories that supply the package with this name on configured search paths.
+///
+/// A regular package has one directory. A namespace package can span several directories, returned
+/// in search order. Returns `None` if the name resolves to a file module, if any of the package's
+/// directories are vendored, or if the name cannot be resolved.
+pub fn package_locations<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<Vec<SystemPathBuf>> {
+    let candidates = resolve_name(db, resolver_environment, name, mode)?;
+    let first = candidates.first()?;
+    if matches!(first.module, ResolvedModule::Module(_)) {
+        return None;
+    }
+
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    if candidates.len() > 1 && first.is_any_namespace_package(&context) {
+        candidates
+            .iter()
+            .map(|candidate| candidate.directory.path().to_system_path())
+            .collect()
+    } else {
+        Some(vec![first.directory.path().to_system_path()?])
+    }
+}
+
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
@@ -1887,6 +1915,40 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
+
+    #[test]
+    fn package_locations_distinguish_namespaces_and_regular_packages() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("shared/left.py", ""),
+                ("regular/left.py", ""),
+                ("shadowed/child.py", ""),
+            ])
+            .with_site_packages_files(&[
+                ("shared/right.py", ""),
+                ("regular/__init__.py", ""),
+                ("shadowed.py", ""),
+            ])
+            .build();
+
+        let locations = |name| {
+            package_locations(
+                &db,
+                db.resolver_environment(),
+                &ModuleName::new_static(name).unwrap(),
+                ModuleResolveMode::Runtime,
+            )
+        };
+        assert_eq!(
+            locations("shared"),
+            Some(vec!["/src/shared".into(), "/site-packages/shared".into()])
+        );
+        assert_eq!(
+            locations("regular"),
+            Some(vec!["/site-packages/regular".into()])
+        );
+        assert_eq!(locations("shadowed"), None);
+    }
 
     fn resolve_module_confident<'db>(
         db: &'db TestDb,
