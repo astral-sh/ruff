@@ -246,9 +246,9 @@ reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: [possibly-missing-submodule] "Submodule `nested` might not have been imported"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: [unresolved-attribute] "has no member `nested`"
+# error: [missing-attribute] "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
-# error: [unresolved-attribute] "has no member `nested`"
+# error: [missing-attribute] "has no member `nested`"
 reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
@@ -322,9 +322,9 @@ reveal_type(mypackage.submodule)  # revealed: <module 'mypackage.submodule'>
 reveal_type(mypackage.submodule.nested)  # revealed: Unknown
 # error: [possibly-missing-submodule] "Submodule `nested` might not have been imported"
 reveal_type(mypackage.submodule.nested.X)  # revealed: Unknown
-# error: [unresolved-attribute] "has no member `nested`"
+# error: [missing-attribute] "has no member `nested`"
 reveal_type(mypackage.nested)  # revealed: Unknown
-# error: [unresolved-attribute] "has no member `nested`"
+# error: [missing-attribute] "has no member `nested`"
 reveal_type(mypackage.nested.X)  # revealed: Unknown
 ```
 
@@ -462,7 +462,7 @@ import mypackage
 
 # error: [possibly-missing-submodule] "Submodule `imported` might not have been imported"
 reveal_type(mypackage.imported.X)  # revealed: Unknown
-# error: [unresolved-attribute] "has no member `imported_m`"
+# error: [missing-attribute] "has no member `imported_m`"
 reveal_type(mypackage.imported_m.X)  # revealed: Unknown
 ```
 
@@ -737,7 +737,7 @@ import mypackage
 from mypackage import imported
 
 reveal_type(imported.X)  # revealed: int
-# error: [unresolved-attribute] "has no member `fails`"
+# error: [missing-attribute] "has no member `fails`"
 reveal_type(imported.fails.Y)  # revealed: Unknown
 # error: [possibly-missing-submodule] "Submodule `fails` might not have been imported"
 reveal_type(mypackage.fails.Y)  # revealed: Unknown

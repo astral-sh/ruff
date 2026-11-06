@@ -327,7 +327,7 @@ reveal_type(bar)  # revealed: str
 import builtins
 
 builtins.foo = 123
-builtins.bar = 456  # error: [unresolved-attribute]
+builtins.bar = 456  # error: [missing-attribute]
 builtins.baz = 789  # error: [invalid-assignment]
 builtins.chr = lambda x: str(x)  # error: [invalid-assignment]
 builtins.chr = 10

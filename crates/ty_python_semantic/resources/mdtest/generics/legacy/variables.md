@@ -929,7 +929,7 @@ from typing_extensions import TypeVar
 
 T = TypeVar("T", default=int)
 # TODO: should not error, should reveal `int`
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(T.__default__)  # revealed: Unknown
 ```
 

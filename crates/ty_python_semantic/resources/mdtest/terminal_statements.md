@@ -1274,7 +1274,7 @@ if bool(input()):
     Example().method()  # error: [no-matching-overload]
 
 reveal_type(value)  # revealed: Literal[1, "reachable"]
-value.bit_count()  # error: [unresolved-attribute]
+value.bit_count()  # error: [missing-union-attribute]
 ```
 
 ### Possibly unresolved diagnostics

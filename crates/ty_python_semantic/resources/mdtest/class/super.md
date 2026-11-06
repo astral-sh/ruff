@@ -44,15 +44,15 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'objec
 
 super(C, C()).a
 super(C, C()).b
-super(C, C()).c  # error: [unresolved-attribute]
+super(C, C()).c  # error: [missing-attribute]
 
 super(B, C()).a
-super(B, C()).b  # error: [unresolved-attribute]
-super(B, C()).c  # error: [unresolved-attribute]
+super(B, C()).b  # error: [missing-attribute]
+super(B, C()).c  # error: [missing-attribute]
 
-super(A, C()).a  # error: [unresolved-attribute]
-super(A, C()).b  # error: [unresolved-attribute]
-super(A, C()).c  # error: [unresolved-attribute]
+super(A, C()).a  # error: [missing-attribute]
+super(A, C()).b  # error: [missing-attribute]
+super(A, C()).c  # error: [missing-attribute]
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
 reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -373,7 +373,7 @@ class B(A): ...
 
 reveal_type(super(B))  # revealed: super
 
-# error: [unresolved-attribute] "Object of type `super` has no attribute `a`"
+# error: [missing-attribute] "Object of type `super` has no attribute `a`"
 super(B).a
 ```
 
@@ -512,7 +512,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
+    # error: [missing-union-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
 def f(x: Literal["", "hello"]):
@@ -550,7 +550,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
+    # error: [missing-union-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -745,10 +745,10 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
+        # error: [missing-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
 
-# error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
+# error: [missing-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 

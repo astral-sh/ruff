@@ -193,10 +193,10 @@ class DC:
 
 dc = DC(name="Alice")
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 dc.sentinel
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 DC.sentinel
 ```
 

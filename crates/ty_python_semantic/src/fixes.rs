@@ -877,7 +877,7 @@ mod tests {
 
         ```py
         import sys
-        a = b + 10 + sys.veeersion  # ty: ignore[unresolved-attribute, unresolved-reference]
+        a = b + 10 + sys.veeersion  # ty: ignore[missing-attribute, unresolved-reference]
         ```
         ");
     }
@@ -1105,7 +1105,7 @@ class B(A):
             def test(
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[invalid-method-override, unresolved-attribute]
+            ) -> A.b:  # ty: ignore[invalid-method-override, missing-attribute]
                 pass
         ```
         "#);
@@ -1141,7 +1141,7 @@ class B(A):
             def test(  # ty:ignore[unresolved-reference, invalid-method-override]
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[unresolved-attribute]
+            ) -> A.b:  # ty: ignore[missing-attribute]
                 pass
         ```
 
