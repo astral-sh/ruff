@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
@@ -11,6 +12,7 @@ use regex::{Captures, Regex};
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::LintName;
+use ty_python_semantic::default_lint_registry;
 use ty_python_semantic::lint::LintId;
 
 use crate::ROOT_DIR;
@@ -56,7 +58,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 }
 
 fn generate_markdown() -> String {
-    let registry = ty_python_semantic::default_lint_registry();
+    let registry = default_lint_registry();
 
     let mut output = String::new();
 
@@ -70,10 +72,6 @@ fn generate_markdown() -> String {
     for (name, lint) in registry.aliases().sorted_by_key(|(name, _)| *name) {
         aliases.entry(lint).or_default().push(name);
     }
-
-    // Replace `rule-name` with [`rule-name`](url) for any known rule names,
-    // turning them into inline links automatically.
-    let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
     for &lint in registry.lints().iter().sorted_by_key(|lint| lint.name()) {
         // Keep links to the old rule heading working after a rename.
@@ -102,14 +100,7 @@ fn generate_markdown() -> String {
                             line = line.trim_start_matches('#').trim_start()
                         ))
                     } else {
-                        rule_link_re.replace_all(line, |caps: &Captures| {
-                            let name = &caps[1];
-                            if registry.get(name).is_ok() {
-                                format!("[`{name}`](#{name})")
-                            } else {
-                                caps[0].to_string()
-                            }
-                        })
+                        link_rule_names(line)
                     }
                 } else {
                     Cow::Borrowed(line)
@@ -173,6 +164,20 @@ Default level: <a href="../../rules#rule-levels" title="This lint has a default 
     }
 
     output
+}
+
+// Replace `rule-name` with [`rule-name`](url) for any known rule names,
+// turning them into inline links automatically.
+fn link_rule_names(text: &str) -> Cow<'_, str> {
+    static RULE_LINK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`([^`]+)`").unwrap());
+    RULE_LINK.replace_all(text, |caps: &Captures| {
+        let name = &caps[1];
+        if default_lint_registry().get(name).is_ok() {
+            format!("[`{name}`](#{name})")
+        } else {
+            caps[0].to_string()
+        }
+    })
 }
 
 #[cfg(test)]
