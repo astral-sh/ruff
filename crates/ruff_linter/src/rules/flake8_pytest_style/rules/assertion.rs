@@ -323,15 +323,42 @@ pub(crate) fn unittest_assertion(
         && !checker.comment_ranges().intersects(expr.range())
     {
         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().stmt(&stmt),
-                parenthesized_range(
-                    expr.into(),
-                    checker.semantic().current_statement().into(),
-                    checker.tokens(),
-                )
-                .unwrap_or(expr.range()),
-            )));
+            diagnostic.try_set_fix(|| {
+                if matches!(
+                    unittest_assert,
+                    UnittestAssert::Regex
+                        | UnittestAssert::RegexpMatches
+                        | UnittestAssert::NotRegex
+                        | UnittestAssert::NotRegexpMatches
+                ) {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("re", "search"),
+                        func.start(),
+                        checker.semantic(),
+                    )?;
+                    let replacement = checker.generator().stmt(&stmt).replace("re.search", &binding);
+                    let replace_assertion = Edit::range_replacement(
+                        replacement,
+                        parenthesized_range(
+                            expr.into(),
+                            checker.semantic().current_statement().into(),
+                            checker.tokens(),
+                        )
+                        .unwrap_or(expr.range()),
+                    );
+                    return Ok(Fix::unsafe_edits(import_edit, iter::once(replace_assertion)));
+                }
+
+                Ok(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().stmt(&stmt),
+                    parenthesized_range(
+                        expr.into(),
+                        checker.semantic().current_statement().into(),
+                        checker.tokens(),
+                    )
+                    .unwrap_or(expr.range()),
+                )))
+            });
         }
     }
 }
