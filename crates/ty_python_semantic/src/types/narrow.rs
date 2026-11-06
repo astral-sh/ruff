@@ -594,8 +594,8 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
-            Type::Recursive(recursive) => {
-                self.generate(db, recursive.unfold(db, env).into_unfolded()?)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                self.generate(db, recursive.expose(db, env).into_unfolded()?)
             }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -5539,7 +5539,10 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
         Type::Recursive(recursive) => recursive
-            .unfold(db, &recursive.environment(db))
+            .unfold(db)
+            .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
+        Type::Mapped(mapped) => mapped
+            .expose(db, &mapped.environment(db))
             .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
 
         Type::Dynamic(_)
@@ -5684,8 +5687,8 @@ fn visit_matching_typeddict_field_types<'db>(
                 visit,
             );
         }
-        Type::Recursive(recursive) => {
-            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+        recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+            if let UnfoldResult::Unfolded(unfolded) = recursive.expose(db, env) {
                 visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
             }
             return;

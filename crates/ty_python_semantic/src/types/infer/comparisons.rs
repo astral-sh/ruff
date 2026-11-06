@@ -314,12 +314,14 @@ impl<'db> Type<'db> {
             visitor: &UpcastingVisitor<'db>,
         ) -> UpcastResult<'db> {
             match ty {
-                Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
-                    recursive
-                        .unfold(db, env)
-                        .map(|unfolded| upcast(db, env, unfolded, visitor))
-                        .unwrap_or(UpcastResult::unstable(ty))
-                }),
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                    visit_type(db, ty, visitor, || {
+                        recursive
+                            .expose(db, env)
+                            .map(|unfolded| upcast(db, env, unfolded, visitor))
+                            .unwrap_or(UpcastResult::unstable(ty))
+                    })
+                }
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
@@ -1010,7 +1012,7 @@ fn infer_binary_type_comparison_inner<'db>(
             }),
         ),
 
-        (Type::TypeAlias(_) | Type::Recursive(_), right) => {
+        (Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_), right) => {
             Some(visitor.visit(db, (left, op, right), || {
                 infer_binary_type_comparison_inner(
                     context,
@@ -1023,7 +1025,7 @@ fn infer_binary_type_comparison_inner<'db>(
             }))
         }
 
-        (left, Type::TypeAlias(_) | Type::Recursive(_)) => {
+        (left, Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_)) => {
             Some(visitor.visit(db, (left, op, right), || {
                 infer_binary_type_comparison_inner(
                     context,

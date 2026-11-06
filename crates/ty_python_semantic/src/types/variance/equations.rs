@@ -15,9 +15,11 @@ use std::collections::VecDeque;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
+use crate::types::cyclic::TypeIdentity;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
-    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
-    TypeAliasType, TypeVarVariance, TypedDictType,
+    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, MappedType, RecursiveType,
+    StaticClassLiteral, Type, TypeAliasType, TypeVarVariance, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -121,6 +123,22 @@ impl<'db> VarianceTerm<'db> {
             }
         }
     }
+
+    fn visit_variables(self, db: &'db dyn Db, mut visit: impl FnMut(VarianceVariable<'db>)) {
+        let mut pending = vec![self];
+        let mut visited = FxHashSet::default();
+        while let Some(term) = pending.pop() {
+            if !visited.insert(term) {
+                continue;
+            }
+            match term {
+                Self::Constant(_) => {}
+                Self::Variable(variable) => visit(variable),
+                Self::Join(sum) => pending.extend(sum.terms(db).iter().copied()),
+                Self::Compose(product) => pending.extend([product.left(db), product.right(db)]),
+            }
+        }
+    }
 }
 
 impl From<TypeVarVariance> for VarianceTerm<'_> {
@@ -156,6 +174,7 @@ pub(crate) enum VarianceOrigin<'db> {
     GenericAlias(GenericAlias<'db>),
     TypeAlias(TypeAliasType<'db>),
     Recursive(RecursiveType<'db>),
+    Mapped(MappedType<'db>),
     Function(FunctionType<'db>),
     TypedDict(ClassType<'db>),
 }
@@ -172,14 +191,82 @@ pub(crate) struct VarianceVariable<'db> {
 
 impl get_size2::GetSize for VarianceVariable<'_> {}
 
+/// Growing recursive applications can differ structurally while contributing the
+/// same argument variances. Keep both mapping polarities in their equation key.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum VarianceKey<'db> {
+    Exact(VarianceVariable<'db>),
+    Recursive {
+        identity: TypeIdentity<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+        arguments: Box<[TypeVarVariance]>,
+    },
+}
+
 #[salsa::tracked]
 impl<'db> VarianceVariable<'db> {
+    fn key(self, db: &'db dyn Db) -> VarianceKey<'db> {
+        match self.origin(db) {
+            VarianceOrigin::Mapped(mapped)
+                if let Some(identity) = mapped.recursive_identity(db) =>
+            {
+                VarianceKey::Recursive {
+                    identity,
+                    typevar: self.typevar(db),
+                    arguments: mapped.argument_variances(db, self.typevar(db)),
+                }
+            }
+            VarianceOrigin::Recursive(recursive)
+                if recursive.may_have_unbounded_specialization(db) =>
+            {
+                let env = recursive.environment(db);
+                VarianceKey::Recursive {
+                    identity: Type::Recursive(recursive).to_type_identity(db),
+                    typevar: self.typevar(db),
+                    arguments: recursive
+                        .arguments(db)
+                        .into_iter()
+                        .flat_map(|arguments| arguments.types(db))
+                        .map(|argument| {
+                            argument
+                                .variance_of(db, &env, self.typevar(db))
+                                .evaluate(db)
+                        })
+                        .collect(),
+                }
+            }
+            _ => VarianceKey::Exact(self),
+        }
+    }
+
     /// Honor the protocol declaration attached to this reference even when its equation infers
     /// a different variance. References without a declaration are evaluated from their equations.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
             declared
+        } else if matches!(self.key(db), VarianceKey::Recursive { .. }) {
+            let mut pending = vec![self];
+            let mut visited = FxHashSet::default();
+            let mut variables = Vec::new();
+            while let Some(variable) = pending.pop() {
+                if matches!(variable.origin(db), VarianceOrigin::ProtocolParameter(..))
+                    || !visited.insert(variable.key(db))
+                {
+                    continue;
+                }
+                variable
+                    .equation(db)
+                    .visit_variables(db, |dependency| pending.push(dependency));
+                variables.push(variable);
+            }
+            variables.sort_unstable_by_key(AsId::as_id);
+            let index = variables.binary_search_by_key(&self.as_id(), AsId::as_id);
+            let component = VarianceComponent::new(db, variables.into_boxed_slice());
+            index
+                .ok()
+                .and_then(|index| component.solution(db).get(index).copied())
+                .unwrap_or(TypeVarVariance::Bivariant)
         } else {
             self.equation(db).evaluate(db)
         }
@@ -207,6 +294,7 @@ impl<'db> VarianceVariable<'db> {
             VarianceOrigin::GenericAlias(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::TypeAlias(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::Recursive(recursive) => recursive.variance_equation(db, typevar),
+            VarianceOrigin::Mapped(mapped) => mapped.variance_equation(db, typevar),
             VarianceOrigin::Function(function) => function.variance_equation(db, typevar),
             VarianceOrigin::TypedDict(class) => {
                 let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
@@ -247,19 +335,19 @@ impl<'db> VarianceComponent<'db> {
         let indices: FxHashMap<_, _> = variables
             .iter()
             .enumerate()
-            .map(|(index, variable)| (*variable, index))
+            .map(|(index, variable)| (variable.key(db), index))
             .collect();
         let equations: Vec<_> = variables
             .iter()
             .map(|variable| variable.equation(db))
             .collect();
         let mut dependents = vec![Vec::new(); variables.len()];
-        for (index, variable) in variables.iter().enumerate() {
-            for dependency in variable.dependencies(db) {
-                if let Some(&dependency_index) = indices.get(dependency) {
+        for (index, equation) in equations.iter().enumerate() {
+            equation.visit_variables(db, |dependency| {
+                if let Some(&dependency_index) = indices.get(&dependency.key(db)) {
                     dependents[dependency_index].push(index);
                 }
-            }
+            });
         }
 
         let mut values = vec![TypeVarVariance::Bivariant; variables.len()];
@@ -270,7 +358,7 @@ impl<'db> VarianceComponent<'db> {
         while let Some(index) = pending.pop_front() {
             queued[index] = false;
             let variance = equations[index].evaluate_with(db, &|dependency| {
-                indices.get(&dependency).map_or_else(
+                indices.get(&dependency.key(db)).map_or_else(
                     || dependency.effective_variance(db),
                     |&dependency_index| values[dependency_index],
                 )
@@ -324,11 +412,15 @@ pub(crate) fn infer_protocol_variance<'db>(
     let mut variables = Vec::new();
 
     while let Some(variable) = pending.pop() {
-        if !visited.insert(variable) {
+        let key = variable.key(db);
+        if !visited.insert(key.clone()) {
             continue;
         }
         for &dependency in variable.dependencies(db) {
-            incoming.entry(dependency).or_default().push(variable);
+            incoming
+                .entry(dependency.key(db))
+                .or_default()
+                .push(variable);
             pending.push(dependency);
         }
         variables.push(variable);
@@ -339,13 +431,14 @@ pub(crate) fn infer_protocol_variance<'db>(
     let mut component = FxHashSet::default();
     pending.push(root);
     while let Some(variable) = pending.pop() {
-        if component.insert(variable)
-            && let Some(predecessors) = incoming.get(&variable)
+        let key = variable.key(db);
+        if component.insert(key.clone())
+            && let Some(predecessors) = incoming.get(&key)
         {
             pending.extend(predecessors.iter().copied());
         }
     }
-    variables.retain(|variable| component.contains(variable));
+    variables.retain(|variable| component.contains(&variable.key(db)));
     variables.sort_unstable_by_key(AsId::as_id);
     let root_index = variables.binary_search_by_key(&root.as_id(), AsId::as_id);
     let component = VarianceComponent::new(db, variables.into_boxed_slice());

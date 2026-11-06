@@ -9,10 +9,10 @@ use ty_python_core::definition::Definition;
 
 use crate::types::{
     BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
-    TypeIsType, TypedDictType, UnionType,
+    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, MappedType,
+    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
+    TypeGuardType, TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -161,9 +161,17 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
         if self.should_visit_lazy_type_attributes() {
+            self.visit_type(db, recursive.unfold(db).into_type());
+        } else {
+            self.notify_skipped_lazy_type_attributes();
+        }
+    }
+
+    fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+        if self.should_visit_lazy_type_attributes() {
             self.visit_type(
                 db,
-                recursive.unfold(db, self.program_environment()).into_type(),
+                mapped.expose(db, self.program_environment()).into_type(),
             );
         } else {
             self.notify_skipped_lazy_type_attributes();
@@ -196,6 +204,7 @@ pub(super) enum NonAtomicType<'db> {
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
     Recursive(super::RecursiveType<'db>),
+    Mapped(MappedType<'db>),
     NewTypeInstance(NewType<'db>),
 }
 
@@ -274,6 +283,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
             Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
+            Type::Mapped(mapped) => TypeKind::NonAtomic(NonAtomicType::Mapped(mapped)),
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
@@ -349,6 +359,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::Recursive(recursive) => {
             visitor.visit_recursive_type(db, recursive);
         }
+        NonAtomicType::Mapped(mapped) => visitor.visit_mapped_type(db, mapped),
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
         }
@@ -511,6 +522,7 @@ pub(super) fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
+        active_mapped_types: ActiveRecursionDetector<TypeIdentity<'db>>,
         content: Cell<DynamicContent>,
         mode: DynamicContentMode,
     }
@@ -607,8 +619,18 @@ pub(super) fn dynamic_content_impl<'db>(
             self.active_recursive_types.visit(
                 &recursive.constructor(db),
                 || self.record(DynamicContent::Indeterminate),
-                || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                || self.visit_type(db, recursive.unfold(db).into_type()),
             );
+        }
+
+        fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+            if !mapped.is_fully_materialized(db) {
+                self.active_mapped_types.visit(
+                    &Type::Mapped(mapped).to_type_identity(db),
+                    || self.record(DynamicContent::Indeterminate),
+                    || self.visit_type(db, mapped.expose(db, self.env).into_type()),
+                );
+            }
         }
 
         fn visit_protocol_instance_type(
@@ -673,6 +695,7 @@ pub(super) fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector::default(),
         active_type_aliases: ActiveRecursionDetector::default(),
         active_recursive_types: ActiveRecursionDetector::default(),
+        active_mapped_types: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
         mode,
     };
@@ -769,7 +792,16 @@ pub(super) fn may_contain_typevar_from<'db>(
                         walk_specialization_types(db, arguments, self);
                     }
                 },
-                || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                || self.visit_type(db, recursive.unfold(db).into_type()),
+            );
+        }
+
+        fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+            self.visit_guarded(
+                db,
+                Type::Mapped(mapped),
+                || mapped.visit_arguments(db, self),
+                || self.visit_type(db, mapped.expose(db, self.env).into_type()),
             );
         }
 
@@ -888,6 +920,7 @@ pub(super) fn contains_growing_type<'db>(
             let is_generic = match ty {
                 Type::TypeAlias(alias) => alias.generic_context(db).is_some(),
                 Type::Recursive(recursive) => recursive.parameters(db).is_some(),
+                Type::Mapped(mapped) => mapped.recursive_identity(db).is_some(),
                 Type::ProtocolInstance(protocol) => protocol
                     .class_origin(db)
                     .and_then(|class| class.class_literal(db).generic_context(db))
@@ -905,6 +938,7 @@ pub(super) fn contains_growing_type<'db>(
                         | TypeIdentity::GrowingRecursive(_)
                         | TypeIdentity::GrowingProtocol(_)
                         | TypeIdentity::GrowingTypedDict(_)
+                        | TypeIdentity::Mapped(..)
                 )
             {
                 self.found.set(true);
@@ -1021,6 +1055,12 @@ where
                 return;
             }
             if self.mode.should_visit_alias_arguments() {
+                if let Type::Mapped(mapped) = ty {
+                    if !self.recursion_guard.type_was_already_seen(ty) {
+                        mapped.visit_types(db, self);
+                    }
+                    return;
+                }
                 let arguments = match ty {
                     Type::TypeAlias(alias) => Some(alias.specialization(db)),
                     Type::Recursive(recursive) => Some(recursive.arguments(db)),
@@ -1112,14 +1152,14 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                         || true,
                         || search(db, env, alias.value_type(db), query, active_aliases),
                     ),
-                    Type::Recursive(recursive) => active_aliases.visit(
+                    recursive @ (Type::Recursive(_) | Type::Mapped(_)) => active_aliases.visit(
                         &nested.to_type_identity(db),
                         || true,
                         || {
                             search(
                                 db,
                                 env,
-                                recursive.unfold(db, env).into_type(),
+                                recursive.expose(db, env).into_type(),
                                 query,
                                 active_aliases,
                             )

@@ -365,6 +365,7 @@ impl<'db> Type<'db> {
             | Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Recursive(_)
+            | Type::Mapped(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -1626,7 +1627,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // allowed in this relation.
                 let materialization_visitor = ApplyTypeMappingVisitor {
                     materialize_typevar_bounds_and_defaults: false,
-                    ..self.materialization_visitor.for_new_materialization_root()
+                    ..self.materialization_visitor.for_new_mapping_root()
                 };
                 let materialized = UnionType::from_elements(
                     db,
@@ -2085,21 +2086,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
+            (Type::Mapped(source_mapped), _) => {
+                self.with_recursion_guard(db, source, target, || {
+                    self.when_recursive_types_relate_by_arguments(db, source, target)
+                        .or(db, self.constraints, || {
+                            source_mapped
+                                .expose_with_visitor(db, self.materialization_visitor)
+                                .map(|source| self.check_type_pair(db, source, target))
+                                .unwrap_or(ConstraintSet::from_bool(
+                                    self.constraints,
+                                    self.relation.is_assignability(),
+                                ))
+                        })
+                })
+            }
+            (_, Type::Mapped(target_mapped)) => {
+                self.with_recursion_guard(db, source, target, || {
+                    self.when_recursive_types_relate_by_arguments(db, source, target)
+                        .or(db, self.constraints, || {
+                            target_mapped
+                                .expose_with_visitor(db, self.materialization_visitor)
+                                .map(|target| self.check_type_pair(db, source, target))
+                                .unwrap_or(ConstraintSet::from_bool(
+                                    self.constraints,
+                                    self.relation.is_assignability(),
+                                ))
+                        })
+                })
+            }
+
             (Type::Recursive(source_recursive), _) => {
                 // Both comparing arguments and unfolding can revisit this pair.
                 self.with_recursion_guard(db, source, target, || {
-                    let by_arguments = if let Type::Recursive(target_recursive) = target {
-                        self.when_recursive_types_relate_by_arguments(
-                            db,
-                            source_recursive,
-                            target_recursive,
-                        )
-                    } else {
-                        self.never()
-                    };
+                    let by_arguments =
+                        self.when_recursive_types_relate_by_arguments(db, source, target);
                     by_arguments.or(db, self.constraints, || {
                         source_recursive
-                            .unfold(db, self.env)
+                            .unfold(db)
                             .map(|source_unfolded| {
                                 self.check_type_pair(db, source_unfolded, target)
                             })
@@ -2114,7 +2137,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::Recursive(target_recursive)) => {
                 self.with_recursion_guard(db, source, target, || {
                     target_recursive
-                        .unfold(db, self.env)
+                        .unfold(db)
                         .map(|target_unfolded| self.check_type_pair(db, source, target_unfolded))
                         .unwrap_or(ConstraintSet::from_bool(
                             self.constraints,
@@ -3429,12 +3452,12 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         // pass needs fresh materialization caches. Nested equivalence checks still share the
         // materialization-equivalence recursion guard to avoid re-entering the same comparison.
         let left_to_right_materialization_visitor =
-            self.materialization_visitor.for_new_materialization_root();
+            self.materialization_visitor.for_new_mapping_root();
         self.as_relation_checker(&left_to_right_materialization_visitor)
             .check_type_pair(db, left, right)
             .and(db, self.constraints, || {
                 let right_to_left_materialization_visitor =
-                    self.materialization_visitor.for_new_materialization_root();
+                    self.materialization_visitor.for_new_mapping_root();
                 self.as_relation_checker(&right_to_left_materialization_visitor)
                     .check_type_pair(db, right, left)
             })
@@ -3728,8 +3751,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::Recursive(left_recursive), _) => left_recursive
-                .unfold(db, env)
+            (left_recursive @ (Type::Recursive(_) | Type::Mapped(_)), _) => left_recursive
+                .expose(db, env)
                 .map(|left_unfolded| {
                     self.with_recursion_guard(db, left, right, || {
                         self.check_type_pair(db, left_unfolded, right)
@@ -3737,8 +3760,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
                 .unwrap_or(self.never()),
 
-            (_, Type::Recursive(right_recursive)) => right_recursive
-                .unfold(db, env)
+            (_, right_recursive @ (Type::Recursive(_) | Type::Mapped(_))) => right_recursive
+                .expose(db, env)
                 .map(|right_unfolded| {
                     self.with_recursion_guard(db, left, right, || {
                         self.check_type_pair(db, left, right_unfolded)

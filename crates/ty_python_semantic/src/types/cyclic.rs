@@ -36,7 +36,7 @@ use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MappedType, ProtocolInstanceType, RecursiveType,
     StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
@@ -50,6 +50,7 @@ pub enum TypeIdentity<'db> {
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
     GrowingRecursive(Definition<'db>),
+    Mapped(MappedType<'db>, &'db [bool]),
     Other(Type<'db>),
 }
 
@@ -78,6 +79,9 @@ impl<'db> Type<'db> {
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
             (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
+            (Type::Mapped(a), Type::Mapped(b)) => {
+                a.inner(db).may_share_type_identity(db, b.inner(db))
+            }
             _ => false,
         }
     }
@@ -86,6 +90,7 @@ impl<'db> Type<'db> {
     #[inline(always)]
     fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
         match self {
+            Type::Mapped(mapped) => mapped.recursive_identity(db),
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
             Type::FunctionLiteral(function) => {
@@ -586,7 +591,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
             RecursiveDefinition::Structural(recursive) => {
-                self.visit_type(db, recursive.unfold(db, &self.env).into_type());
+                self.visit_type(db, recursive.unfold(db).into_type());
             }
             RecursiveDefinition::TypeAlias(alias) => {
                 self.visit_type(db, alias.raw_value_type(db));
@@ -887,6 +892,11 @@ where
             fallback,
             _tag: PhantomData,
         }
+    }
+
+    /// Whether no recursive visits are currently active.
+    pub(super) fn is_empty(&self) -> bool {
+        self.seen.borrow().is_empty()
     }
 }
 

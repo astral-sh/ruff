@@ -13,8 +13,8 @@ use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
-    TypeContext, TypeMapping,
+    BoundTypeVarInstance, CallableType, KnownInstanceType, MappedType, RecursiveType, Type,
+    TypeAliasType, TypeContext, TypeMapping,
 };
 use crate::{Db, FxOrderMap, ProgramEnvironment};
 
@@ -176,6 +176,9 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
         if !self.satisfied.get() {
             return;
         }
+        if let Type::Mapped(mapped) = ty {
+            mapped.visit_arguments(db, self);
+        }
         // Recursive specialization can introduce dependencies in an alias's changing arguments.
         // Inspect them even when the recursion guard skips another visit to the alias's body.
         let specialization = match ty {
@@ -209,7 +212,11 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        self.visit_type(db, recursive.unfold(db, self.env).into_type());
+        self.visit_type(db, recursive.unfold(db).into_type());
+    }
+
+    fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+        self.visit_type(db, mapped.expose(db, self.env).into_type());
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {

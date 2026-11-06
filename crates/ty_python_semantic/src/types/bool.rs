@@ -239,8 +239,8 @@ impl<'db> Type<'db> {
 
             Type::Never => Truthiness::Uninhabited,
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
                 .unwrap_or(Ok(Truthiness::Ambiguous))?,
 

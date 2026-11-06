@@ -84,7 +84,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && inference.ty.is_ok()
             && inference.context.has_invalid_type_form
             && !any_over_type(db, self.program_environment(), ty, false, |ty| {
-                matches!(ty, Type::Recursive(_))
+                matches!(ty, Type::Recursive(_) | Type::Mapped(_))
             })
         {
             // Reject an invalid definition before converting its runtime value to a type.

@@ -2341,7 +2341,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None),
             )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
@@ -3145,9 +3145,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         match object_ty {
-            Type::Recursive(recursive) => recursive.unfold(db, env).is_unchanged_or(|unfolded| {
-                self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
-            }),
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                recursive.expose(db, env).is_unchanged_or(|unfolded| {
+                    self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+                })
+            }
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -4254,7 +4256,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 name,
                 definition,
                 typing_module,
-                None,
                 None,
             )),
         ))
@@ -5702,8 +5703,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kind: CallableTypeKind,
         ) -> Option<Type<'d>> {
             match ty {
-                Type::Recursive(recursive) => {
-                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                    let unfolded = recursive.expose(db, env).into_unfolded()?;
                     propagate_callable_kind(db, env, unfolded, kind)
                 }
                 Type::RecursiveVar(_) => {
@@ -7278,7 +7279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(self.db())
                 .any(|ty| self.has_string_literal_completion_candidates(ty)),
-            Type::TypeAlias(_) | Type::Recursive(_) => true,
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => true,
             _ => false,
         }
     }
@@ -11731,7 +11732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 Type::from_truthiness(db, env, original_truthiness.negate())
             }
-            (_, Type::Recursive(_)) => fallback_unary_expression_type(),
+            (_, Type::Recursive(_) | Type::Mapped(_)) => fallback_unary_expression_type(),
             // Handle constrained TypeVars specially: check each constraint individually.
             //
             // TODO: We expect to replace this with more general support once we migrate to the new

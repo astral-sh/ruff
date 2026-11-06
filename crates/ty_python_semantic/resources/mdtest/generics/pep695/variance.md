@@ -2397,6 +2397,40 @@ static_assert(not is_subtype_of(DerivedContravariant[B], DerivedContravariant[A]
 static_assert(is_subtype_of(DerivedContravariant[A], DerivedContravariant[B]))
 ```
 
+## Promoted recursive aliases with growing arguments
+
+Promotion preserves covariance when recursive arguments grow through tuples. Removing negative
+intersection members can also remove a contravariant occurrence of the parameter.
+
+```py
+from typing import Any, cast
+from ty_extensions import Not, static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+type Growing[T] = tuple[T, None, Growing[tuple[T]]]
+type Promoted[T] = TypeOf[[cast(Growing[T], cast(Any, None))][0]]
+
+class Container[T]:
+    def get(self) -> Promoted[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Container[int], Container[object]))
+static_assert(not is_subtype_of(Container[object], Container[int]))
+
+type Negative[T] = tuple[Not[T], Negative[tuple[T]]]
+type PromotedNegative[T] = TypeOf[[cast(Negative[T], cast(Any, None))][0]]
+
+class WithoutNegative[T]:
+    def get(self) -> PromotedNegative[T]:
+        raise NotImplementedError
+
+    def direct(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(WithoutNegative[int], WithoutNegative[object]))
+static_assert(not is_subtype_of(WithoutNegative[object], WithoutNegative[int]))
+```
+
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
 [typeis-spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis

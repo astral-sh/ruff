@@ -109,13 +109,17 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         let env = self.env;
         let first = *types.first()?;
 
-        if types
-            .iter()
-            .any(|ty| matches!(ty, Type::TypeAlias(_) | Type::Recursive(_)))
-        {
+        if types.iter().any(|ty| {
+            matches!(
+                ty,
+                Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_)
+            )
+        }) {
             return Some(self.merge_column(types.iter().map(|ty| match ty {
                 Type::TypeAlias(alias) => alias.value_type(db),
-                Type::Recursive(recursive) => recursive.unfold(db, env).into_type(),
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                    recursive.expose(db, env).into_type()
+                }
                 _ => *ty,
             })));
         }

@@ -1617,8 +1617,11 @@ Both branches retain the requested materialization polarity.
 
 ```py
 def recursive_materializations(top: Top[Recursive], bottom: Bottom[Recursive]) -> None:
-    reveal_type(top)  # revealed: Covariant[Top[Recursive]] | Top[Invariant[Any]]
-    reveal_type(bottom)  # revealed: Covariant[Bottom[Recursive]] | Bottom[Invariant[Any]]
+    reveal_type(top)  # revealed: Top[Recursive]
+    reveal_type(bottom)  # revealed: Bottom[Recursive]
+
+static_assert(is_equivalent_to(Top[Recursive], Covariant[Top[Recursive]] | Top[Invariant[Any]]))
+static_assert(is_equivalent_to(Bottom[Recursive], Covariant[Bottom[Recursive]] | Bottom[Invariant[Any]]))
 ```
 
 Nested recursive aliases preserve their materialization polarity in displays and diagnostics.
@@ -3281,15 +3284,15 @@ def recursive_top_materialization(top: Top[RecursiveProtocol]) -> None:
     reveal_type(top.marker)  # revealed: object
     top.marker = 1  # error: [invalid-assignment]
 
-    reveal_type(top.child)  # revealed: Top[RecursiveProtocol]
-    reveal_type(top.child.child)  # revealed: Top[RecursiveProtocol]
+    reveal_type(top.child)  # revealed: Top[RecursiveAlias]
+    reveal_type(top.child.child)  # revealed: Top[RecursiveAlias]
     reveal_type(top.child.marker)  # revealed: object
     top.child.marker = 1  # error: [invalid-assignment]
 
 def recursive_bottom_children(bottom: Bottom[RecursiveProtocol]) -> None:
     reveal_type(bottom)  # revealed: Bottom[RecursiveProtocol]
-    reveal_type(bottom.child)  # revealed: Bottom[RecursiveProtocol]
-    reveal_type(bottom.child.child)  # revealed: Bottom[RecursiveProtocol]
+    reveal_type(bottom.child)  # revealed: Bottom[RecursiveAlias]
+    reveal_type(bottom.child.child)  # revealed: Bottom[RecursiveAlias]
     bottom.child.marker = object()
     reveal_type(bottom.child.marker)  # revealed: Never
 

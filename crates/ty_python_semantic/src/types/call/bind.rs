@@ -11328,6 +11328,12 @@ impl<'db> ClassInfoValidator<'_, 'db> {
                 Type::Recursive(recursive) if recursive.may_have_unbounded_specialization(db) => {
                     Type::Recursive(recursive.constructor(db))
                 }
+                Type::Mapped(mapped)
+                    if let Some(TypeIdentity::Mapped(constructor, _)) =
+                        mapped.recursive_identity(db) =>
+                {
+                    Type::Mapped(constructor)
+                }
                 _ => ty,
             };
         self.constructors.visit(db, ty, || {
@@ -11345,7 +11351,9 @@ impl<'db> ClassInfoValidator<'_, 'db> {
             Type::SpecialForm(special) if special.is_valid_isinstance_target() => true,
             Type::Union(union) => union.elements(db).iter().copied().all(validate),
             Type::TypeAlias(alias) => validate(alias.value_type(db)),
-            Type::Recursive(recursive) => recursive.unfold(db, self.env).is_unfolded_and(validate),
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                recursive.expose(db, self.env).is_unfolded_and(validate)
+            }
             _ => {
                 if let Some(tuple) = ty.tuple_instance_spec(db, self.env) {
                     tuple.iter_element_types(db).all(validate)

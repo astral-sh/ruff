@@ -2187,4 +2187,44 @@ static_assert(is_assignable_to(ClassContainer[object], ClassContainer[int]))
 static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
 ```
 
+## Promoted recursive aliases with growing arguments
+
+Promotion preserves covariance when recursive arguments grow through tuples. Removing negative
+intersection members can also remove a contravariant occurrence of the parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from ty_extensions import Not, static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+Growing = tuple[T, None, "Growing[tuple[T]]"]
+Promoted = TypeOf[[cast(Growing[T], cast(Any, None))][0]]
+
+class Container(Generic[T]):
+    def get(self) -> Promoted[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Container[int], Container[object]))
+static_assert(not is_subtype_of(Container[object], Container[int]))
+
+Negative = tuple[Not[T], "Negative[tuple[T]]"]
+PromotedNegative = TypeOf[[cast(Negative[T], cast(Any, None))][0]]
+
+class WithoutNegative(Generic[T]):
+    def get(self) -> PromotedNegative[T]:
+        raise NotImplementedError
+
+    def direct(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(WithoutNegative[int], WithoutNegative[object]))
+static_assert(not is_subtype_of(WithoutNegative[object], WithoutNegative[int]))
+```
+
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance

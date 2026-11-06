@@ -1849,3 +1849,23 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Generic callbacks inside recursive returns
+
+A returned callback can acquire its own type parameters inside a recursive alias. The same callback
+signature is treated consistently even when growing arguments produce it at a later step.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+Callbacks = tuple[Callable[[T], T], "Callbacks[tuple[T]]"]
+
+def factory() -> tuple[Callable[[tuple[tuple[T]]], tuple[tuple[T]]], Callbacks[T]]:
+    raise NotImplementedError
+
+callbacks = factory()[1]
+# revealed: [T'return](tuple[tuple[T'return]], /) -> tuple[tuple[T'return]]
+reveal_type(callbacks[1][1][0])
+reveal_type(callbacks[1][1][0](((1,),)))  # revealed: tuple[tuple[Literal[1]]]
+```

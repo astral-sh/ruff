@@ -11,7 +11,8 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, walk_type_var_bounds};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    IntersectionType, KnownInstanceType, RecursiveType, Type, TypeAliasType, UnionBuilder,
+    IntersectionType, KnownInstanceType, MappedType, RecursiveType, Type, TypeAliasType,
+    UnionBuilder,
 };
 
 /// Return whether the outer type may be a tuple, without searching nested arguments or members.
@@ -59,6 +60,7 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'d
                     | Type::Intersection(_)
                     | Type::TypeAlias(_)
                     | Type::Recursive(_)
+                    | Type::Mapped(_)
                     | Type::NewTypeInstance(_)
                     | Type::TypeVar(_)
             ) {
@@ -80,7 +82,13 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'d
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
             self.visit_guarded(db, Type::Recursive(recursive), || {
-                self.visit_type(db, recursive.unfold(db, self.env).into_type());
+                self.visit_type(db, recursive.unfold(db).into_type());
+            });
+        }
+
+        fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+            self.visit_guarded(db, Type::Mapped(mapped), || {
+                self.visit_type(db, mapped.expose(db, self.env).into_type());
             });
         }
 

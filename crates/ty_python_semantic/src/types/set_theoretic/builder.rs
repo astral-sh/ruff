@@ -1312,8 +1312,9 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             } else if !self.cycle_recovery
-                && let (alias @ Type::Recursive(_), Type::Intersection(negated))
-                | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
+                && let (alias @ (Type::Recursive(_) | Type::Mapped(_)), Type::Intersection(negated))
+                | (Type::Intersection(negated), alias @ (Type::Recursive(_) | Type::Mapped(_))) =
+                    (ty, element_type)
                 && negated.is_simple_negation(db)
                 && negated.negative(db).contains(&alias)
                 && !alias.has_unguarded_alias_cycle(db)
@@ -1581,7 +1582,7 @@ impl<'db> IntersectionBuilder<'db> {
         let mut seen_aliases = FxHashSet::default();
         while let Some((ty, negated)) = pending.pop() {
             match ty {
-                Type::TypeAlias(_) | Type::Recursive(_) => {
+                Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                     if seen_aliases.insert((ty, negated)) {
                         pending.push((ty.resolve_type_alias(db), negated));
                     }
@@ -1628,7 +1629,7 @@ impl<'db> IntersectionBuilder<'db> {
         let db = self.db;
         let original = ty;
         let ty = match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1642,7 +1643,7 @@ impl<'db> IntersectionBuilder<'db> {
             _ => ty,
         };
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                 self.add_positive_impl::<L>(ty, seen_aliases)?;
             }
             Type::Union(union) => {
@@ -1679,12 +1680,11 @@ impl<'db> IntersectionBuilder<'db> {
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
-                let element =
-                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
-                        original
-                    } else {
-                        ty
-                    };
+                let element = if self.preserve_positive_aliases && original.is_alias_like() {
+                    original
+                } else {
+                    ty
+                };
                 for inner in &mut self.intersections {
                     inner.add_positive(db, &self.env, element);
                 }
@@ -1721,7 +1721,7 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         let original = ty;
         let ty = match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1735,7 +1735,7 @@ impl<'db> IntersectionBuilder<'db> {
             _ => ty,
         };
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                 self.add_negative_impl::<L>(ty, seen_aliases)?;
             }
             // Retain recursive unions of instance types: their negations expose no positive
@@ -1745,7 +1745,7 @@ impl<'db> IntersectionBuilder<'db> {
             Type::Union(union)
                 if !union.elements(db).iter().all(|element| {
                     matches!(element.resolve_type_alias(db), Type::NominalInstance(_))
-                }) || (!matches!(original, Type::Recursive(_))
+                }) || (!matches!(original, Type::Recursive(_) | Type::Mapped(_))
                     && !matches!(original, Type::TypeAlias(alias) if alias.is_recursive(db))) =>
             {
                 for elem in union.elements(db) {

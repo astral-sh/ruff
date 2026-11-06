@@ -26,6 +26,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
+use crate::types::mapped::{DeferredSpecialization, DeferredTypeMapping, MappedType};
 use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
@@ -705,6 +706,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::Mapped(mapped) => mapped.visit_types(db, self),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -1000,7 +1002,7 @@ impl<'db> Type<'db> {
                     definition,
                     name,
                     constructor.parameters(db),
-                    constructor.unfold(db, env).into_type(),
+                    constructor.unfold(db).into_type(),
                 )
             }
             _ => return None,
@@ -1034,18 +1036,8 @@ impl<'db> TypeAliasDisplay<'db> {
         &self,
         env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
-        materialization: Option<MaterializationKind>,
         f: &mut TypeWriter<'_, '_, 'db>,
     ) -> fmt::Result {
-        if let Some(kind) = materialization {
-            let (name, form) = match kind {
-                MaterializationKind::Top => ("Top", SpecialFormType::Top),
-                MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
-            };
-            f.with_type(Type::SpecialForm(form)).write_str(name)?;
-            f.write_char('[')?;
-        }
-
         self.fmt_detailed(f)?;
         if let Some(specialization) = specialization {
             specialization
@@ -1053,9 +1045,6 @@ impl<'db> TypeAliasDisplay<'db> {
                 .fmt_detailed(f)?;
         }
 
-        if materialization.is_some() {
-            f.write_char(']')?;
-        }
         Ok(())
     }
 }
@@ -1816,12 +1805,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::TypeAlias(alias) => alias
                 .display_with(db, self.settings.clone())
-                .fmt_specialized(
-                    self.env,
-                    alias.specialization(db),
-                    alias.materialization_kind(db),
-                    f,
-                ),
+                .fmt_specialized(self.env, alias.specialization(db), f),
             Type::Recursive(recursive) => TypeAliasDisplay {
                 db,
                 ty: self.ty,
@@ -1829,14 +1813,160 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 name: recursive.name(db),
                 settings: self.settings.clone(),
             }
-            .fmt_specialized(
-                self.env,
-                recursive.arguments(db),
-                recursive.materialization_kind(db),
-                f,
-            ),
+            .fmt_specialized(self.env, recursive.arguments(db), f),
+            Type::Mapped(mapped) => {
+                if let Some(kind) = mapped.materialization_kind(db) {
+                    let form = match kind {
+                        MaterializationKind::Top => SpecialFormType::Top,
+                        MaterializationKind::Bottom => SpecialFormType::Bottom,
+                    };
+                    f.with_type(Type::SpecialForm(form))
+                        .write_str(mapped.mapping_name(db))?;
+                    f.write_char('[')?;
+                } else {
+                    f.set_invalid_type_annotation();
+                    f.write_str("Mapped[")?;
+                    mapped.fmt_mapping(db, self.env, &self.settings, f)?;
+                    f.write_str(", ")?;
+                }
+                mapped
+                    .inner(db)
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(']')
+            }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
+    }
+}
+
+impl<'db> MappedType<'db> {
+    fn fmt_mapping(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        settings: &DisplaySettings<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        f.write_str(self.mapping_name(db))?;
+        match self.mapping(db) {
+            DeferredTypeMapping::ApplySpecialization(specialization)
+            | DeferredTypeMapping::ApplySpecializationWithMaterialization {
+                specialization, ..
+            } => specialization.fmt_bindings(db, env, settings, f),
+            DeferredTypeMapping::BindSelf(binding) => {
+                f.write_char('(')?;
+                binding
+                    .self_type()
+                    .display_with(db, env, settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(')')
+            }
+            DeferredTypeMapping::ReplaceSelf {
+                new_upper_bound, ..
+            } => {
+                f.write_char('(')?;
+                new_upper_bound
+                    .display_with(db, env, settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(')')
+            }
+            DeferredTypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta,
+            } => {
+                write!(f, "({}, {delta})", generic_context.display(db))
+            }
+            DeferredTypeMapping::BindLegacyTypevars(context) => {
+                write!(f, "({})", context.name(db).as_deref().unwrap_or("<module>"))
+            }
+            DeferredTypeMapping::GeneralizeLocalTypes(scope) => {
+                let names = qualified_name_components_from_scope(
+                    db,
+                    scope.program_file(db),
+                    scope.file_scope_id(db),
+                    0,
+                );
+                write!(f, "({})", names.join("."))
+            }
+            DeferredTypeMapping::RescopeReturnCallables(replacements) => {
+                f.write_char('(')?;
+                for (index, &(from, to)) in replacements.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    Type::Callable(from)
+                        .display_with(db, env, settings.clone())
+                        .fmt_detailed(f)?;
+                    f.write_str(" => ")?;
+                    Type::Callable(to)
+                        .display_with(db, env, settings.clone())
+                        .fmt_detailed(f)?;
+                }
+                f.write_char(')')
+            }
+            DeferredTypeMapping::Promote(..)
+            | DeferredTypeMapping::Materialize { .. }
+            | DeferredTypeMapping::ReplaceParameterDefaults => Ok(()),
+        }
+    }
+}
+
+impl<'db> DeferredSpecialization<'db> {
+    fn fmt_bindings(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        settings: &DisplaySettings<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        let bindings: Vec<_> = match self {
+            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(specialization.types(db).iter().copied())
+                    .collect()
+            }
+            Self::Partial {
+                generic_context,
+                types,
+                ..
+            } => generic_context
+                .variables(db)
+                .zip(types.iter().copied())
+                .collect(),
+            Self::Single(variable, ty) => vec![(*variable, *ty)],
+            Self::ReturnCallables(replacements) => replacements
+                .iter()
+                .map(|&(from, to)| (from, Type::TypeVar(to)))
+                .collect(),
+        };
+        f.write_char('(')?;
+        for (index, (variable, ty)) in bindings.into_iter().enumerate() {
+            if index > 0 {
+                f.write_str(", ")?;
+            }
+            Type::TypeVar(variable)
+                .display_with(db, env, settings.clone())
+                .fmt_detailed(f)?;
+            f.write_str(" = ")?;
+            ty.display_with(db, env, settings.clone()).fmt_detailed(f)?;
+        }
+        if let Self::Partial {
+            skip: Some(skip), ..
+        } = self
+        {
+            write!(f, "; skip {skip}")?;
+        }
+        if let Self::Specialization {
+            specialize_self_domain: true,
+            ..
+        } = self
+        {
+            f.write_str("; Self bounds")?;
+        }
+        f.write_char(')')
     }
 }
 

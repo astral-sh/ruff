@@ -17,6 +17,7 @@ use crate::reachability::DeclarationsIteratorExtension;
 use crate::types::call::Bindings;
 use crate::types::class::{CodeGeneratorKind, FieldKind};
 use crate::types::context::InferContext;
+use crate::types::cyclic::TypeIdentity;
 use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
 use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
 use crate::types::infer::{function_known_decorators, infer_definition_types};
@@ -1052,29 +1053,20 @@ fn lax_input_type_impl<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
-    expanding_types: &mut FxHashSet<Type<'db>>,
+    expanding_types: &mut FxHashSet<TypeIdentity<'db>>,
 ) -> Type<'db> {
     if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
         return field_type;
     }
 
-    if let Type::TypeAlias(alias) = field_type {
-        if !expanding_types.insert(field_type) {
-            return Type::any();
-        }
-        let result = lax_input_type_impl(db, env, alias.value_type(db), expanding_types);
-        expanding_types.remove(&field_type);
-        return result;
-    }
-
-    if let Type::Recursive(recursive) = field_type {
+    if field_type.is_alias_like() {
         // Guard the constructor: recursive arguments can grow without repeating a specialization.
-        let constructor = Type::Recursive(recursive.constructor(db));
+        let constructor = field_type.to_type_identity(db);
         if !expanding_types.insert(constructor) {
             return Type::any();
         }
-        let result = recursive
-            .unfold(db, env)
+        let result = field_type
+            .expose(db, env)
             .map(|unfolded| lax_input_type_impl(db, env, unfolded, expanding_types))
             .unwrap_or(Type::any());
         expanding_types.remove(&constructor);
@@ -1217,7 +1209,7 @@ fn root_model_input_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
-    expanding_types: &mut FxHashSet<Type<'db>>,
+    expanding_types: &mut FxHashSet<TypeIdentity<'db>>,
 ) -> Option<Type<'db>> {
     let (class, specialization) = field_type
         .nominal_class(db, env)?
@@ -1235,12 +1227,12 @@ fn root_model_input_type<'db>(
         return Some(Type::any());
     };
 
-    if !expanding_types.insert(field_type) {
+    if !expanding_types.insert(field_type.to_type_identity(db)) {
         return Some(Type::any());
     }
     let root_input_type = lax_input_type_impl(db, env, root_field.declared_ty, expanding_types);
 
-    expanding_types.remove(&field_type);
+    expanding_types.remove(&field_type.to_type_identity(db));
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen
     // to a gradual specialization here. Widening to `Box[LaxStr]` would only work for
     // covariant generics.

@@ -16,8 +16,8 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
         GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
-        MaterializationKind, Parameter, Parameters, RecursiveType, Specialization, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        MappedType, MaterializationKind, Parameter, Parameters, RecursiveType, Specialization,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
@@ -599,18 +599,17 @@ impl<'db> TypeVarInstance<'db> {
                 Type::TypeAlias(alias) => {
                     type_alias_is_self_referential(state, alias, self_identity)
                 }
-                Type::Recursive(recursive) => {
-                    if recursive.arguments(db).is_some_and(|arguments| {
-                        arguments
-                            .types(db)
-                            .iter()
-                            .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
-                    }) {
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                    if recursive
+                        .mapping_arguments(db, &ApplyTypeMappingVisitor::new(state.env))
+                        .into_iter()
+                        .any(|ty| type_is_self_referential_impl(state, ty, self_identity))
+                    {
                         return true;
                     }
                     {
                         let mut seen_types = state.seen_types.borrow_mut();
-                        let identity = Type::Recursive(recursive).to_type_identity(db);
+                        let identity = recursive.to_type_identity(db);
                         if seen_types.contains(&identity) {
                             return false;
                         }
@@ -618,7 +617,7 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     type_is_self_referential_impl(
                         state,
-                        recursive.unfold(db, state.env).into_type(),
+                        recursive.expose(db, state.env).into_type(),
                         self_identity,
                     )
                 }
@@ -1003,6 +1002,10 @@ pub(super) fn freshening_delta<'db>(
             if let Some(arguments) = recursive.arguments(db) {
                 walk_specialization_types(db, arguments, self);
             }
+        }
+
+        fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+            mapped.visit_types(db, self);
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1428,7 +1431,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         let env = visitor.env;
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_materialization_root();
+                        let materialization_visitor = visitor.for_new_mapping_root();
                         let materialized =
                             mapped.materialize(db, *materialization_kind, &materialization_visitor);
 

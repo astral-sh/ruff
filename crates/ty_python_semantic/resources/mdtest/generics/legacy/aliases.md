@@ -152,6 +152,180 @@ def f(x: A):
     assert_type(x[0], WithIterable[A])
 ```
 
+## Promotion through recursive aliases
+
+Collection inference promotes the contents of a recursive alias at every depth.
+
+```py
+from typing import TypeVar
+from ty_extensions import AlwaysFalsy, Intersection, Not
+
+class Item: ...
+
+T = TypeVar("T")
+Repeated = tuple[T, "Repeated[T]"]
+
+def promote_recursive(value: Repeated[Intersection[Item, Not[AlwaysFalsy]]]) -> None:
+    promoted = [value][0]
+    reveal_type(promoted[0])  # revealed: Item
+    reveal_type(promoted[1][0])  # revealed: Item
+    reveal_type(promoted[1][1][0])  # revealed: Item
+```
+
+Promotion reverses direction in callable parameters, including at recursive references.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+Narrow = Intersection[Item, Not[AlwaysFalsy]]
+Source = Callable[["Source"], Narrow]
+Promoted = Callable[["Unpromoted"], Item]
+Unpromoted = Callable[[Promoted], Narrow]
+
+def promote_callable(value: Source) -> None:
+    promoted = [value][0]
+    static_assert(is_equivalent_to(TypeOf[promoted], Promoted))
+```
+
+Materialization and promotion both reach every recursive layer. Promotion can introduce `Unknown`,
+so reversing the order changes the result.
+
+```py
+from typing import Any, cast
+from ty_extensions import Top
+
+Gradual = tuple[Any, None, "Gradual"]
+
+def materialize_then_promote(value: Top[Gradual]) -> None:
+    promoted = [value][0]
+    reveal_type(promoted[0])  # revealed: object
+    reveal_type(promoted[1])  # revealed: None | Unknown
+    reveal_type(promoted[2][2][0])  # revealed: object
+    reveal_type(promoted[2][2][1])  # revealed: None | Unknown
+
+def promote_then_materialize(value: Gradual) -> None:
+    promoted = [value][0]
+    top = cast(Top[TypeOf[promoted]], promoted)
+    reveal_type(top[0])  # revealed: object
+    reveal_type(top[1])  # revealed: object
+    reveal_type(top[2][2][0])  # revealed: object
+    reveal_type(top[2][2][1])  # revealed: object
+```
+
+## Singleton promotion with growing arguments
+
+Each recursive step adds a list around the type argument. Singleton promotion follows the variance
+of those lists, just as it does in the corresponding finite tuple.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Growing = tuple[T, "Growing[list[T]]"]
+
+def promote_growing(value: Growing[None]) -> None:
+    promoted = [value][0]
+    reveal_type(promoted[0])  # revealed: None | Unknown
+    reveal_type(promoted[1][0])  # revealed: list[None]
+    reveal_type(promoted[1][1][0])  # revealed: list[list[None | Unknown]]
+    reveal_type(promoted[1][1][1][0])  # revealed: list[list[list[None]]]
+```
+
+## Specializing promoted recursive aliases
+
+Specialization after promotion does not promote the newly substituted argument. A fixed `None`
+element is promoted, while an element that becomes `None` only after specialization is unchanged.
+This agrees with the corresponding finite tuple.
+
+```py
+from typing import Any, TypeVar, cast
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+Repeated = tuple[T, None, "Repeated[T]"]
+Promoted = TypeOf[[cast(Repeated[T], cast(Any, None))][0]]
+FinitePromoted = TypeOf[[cast(tuple[T, None], cast(Any, None))][0]]
+
+def specialize(recursive: Promoted[None], finite: FinitePromoted[None]) -> None:
+    reveal_type(finite[0])  # revealed: None
+    reveal_type(finite[1])  # revealed: None | Unknown
+    reveal_type(recursive[0])  # revealed: None
+    reveal_type(recursive[1])  # revealed: None | Unknown
+    reveal_type(recursive[2][2][0])  # revealed: None
+    reveal_type(recursive[2][2][1])  # revealed: None | Unknown
+```
+
+## Materialized specialization of recursive aliases
+
+Reading a method from a materialized generic class substitutes its type arguments with the polarity
+of each occurrence. Recursive return types follow the same rules as finite tuples, including
+invariant lists introduced by later recursive steps.
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+Pairs = tuple[T, Callable[[T], T], "Pairs[T]"]
+Growing = tuple[T, "Growing[list[T]]"]
+
+class Box(Generic[T]):
+    value: T
+
+    def finite(self) -> tuple[T, Callable[[T], T], list[T], list[list[T]]]:
+        raise NotImplementedError
+
+    def pairs(self) -> Pairs[T]:
+        raise NotImplementedError
+
+    def growing(self) -> Growing[T]:
+        raise NotImplementedError
+
+def read(value: Top[Box[Any]]) -> None:
+    # revealed: tuple[object, (Never, /) -> object, Top[list[Any]], Top[list[list[Any]]]]
+    reveal_type(value.finite())
+    reveal_type(value.pairs()[0])  # revealed: object
+    reveal_type(value.pairs()[1])  # revealed: (Never, /) -> object
+    reveal_type(value.pairs()[2][2][0])  # revealed: object
+    reveal_type(value.pairs()[2][2][1])  # revealed: (Never, /) -> object
+    reveal_type(value.growing()[0])  # revealed: object
+    reveal_type(value.growing()[1][0])  # revealed: Top[list[Any]]
+    reveal_type(value.growing()[1][1][0])  # revealed: Top[list[list[Any]]]
+```
+
+## Repeated materialization and specialization
+
+Each specialization introduces another tuple containing `Any`. Materializing the result removes
+those dynamic elements at every recursive depth and preserves the original type argument.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+Repeated = tuple[T, Any, "Repeated[T]"]
+Level0 = Top[Repeated[T]]
+Level1 = Top[Level0[tuple[T, Any]]]
+Level2 = Top[Level1[tuple[T, Any]]]
+Level3 = Top[Level2[tuple[T, Any]]]
+Level4 = Top[Level3[tuple[T, Any]]]
+Level5 = Top[Level4[tuple[T, Any]]]
+Level6 = Top[Level5[tuple[T, Any]]]
+Level7 = Top[Level6[tuple[T, Any]]]
+Level8 = Top[Level7[tuple[T, Any]]]
+Level9 = Top[Level8[tuple[T, Any]]]
+Level10 = Top[Level9[tuple[T, Any]]]
+Level11 = Top[Level10[tuple[T, Any]]]
+
+def read(value: Level11[int]) -> None:
+    reveal_type(value[1])  # revealed: object
+    reveal_type(value[0][1])  # revealed: object
+    reveal_type(value[0][0][0][0][0][0][0][0][0][0][0][0])  # revealed: int
+    reveal_type(value[2][2][0][1])  # revealed: object
+```
+
 ## Boolean aliases after substitution
 
 Subtracting `True` from `bool` leaves only `False`. Using aliases for the arguments to `Minus` does

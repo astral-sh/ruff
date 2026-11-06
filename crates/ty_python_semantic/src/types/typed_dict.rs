@@ -1924,8 +1924,8 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
     match ty {
-        Type::Recursive(recursive) => {
-            let unfolded = recursive.unfold(db, env).into_unfolded()?;
+        recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+            let unfolded = recursive.expose(db, env).into_unfolded()?;
             extract_unpacked_typed_dict_from_value_type(db, env, unfolded)
         }
         Type::RecursiveVar(_) => {

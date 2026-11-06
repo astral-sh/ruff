@@ -42,10 +42,10 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
-    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    KnownInstanceType, MappedType, MaterializationKind, RecursiveType, SelfTypeVarOrigin,
+    SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -867,7 +867,15 @@ impl<'db> GenericContext<'db> {
                 self.active_aliases.visit(
                     &Type::Recursive(recursive).to_type_identity(db),
                     || (),
-                    || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                    || self.visit_type(db, recursive.unfold(db).into_type()),
+                );
+            }
+
+            fn visit_mapped_type(&self, db: &'db dyn Db, mapped: MappedType<'db>) {
+                self.active_aliases.visit(
+                    &Type::Mapped(mapped).to_type_identity(db),
+                    || (),
+                    || self.visit_type(db, mapped.expose(db, self.env).into_type()),
                 );
             }
 
@@ -2237,9 +2245,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // Retain that guard while starting fresh transformation caches.
                     let materialization_visitor = ApplyTypeMappingVisitor {
                         materialize_typevar_bounds_and_defaults: false,
-                        ..checker
-                            .materialization_visitor
-                            .for_new_materialization_root()
+                        ..checker.materialization_visitor.for_new_mapping_root()
                     };
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     checker.materialization_visitor = &materialization_visitor;
@@ -2500,6 +2506,14 @@ impl<'db> InferSpecialization<'db> {
         let identity = ty.to_type_identity(db);
         if matches!(identity, TypeIdentity::Other(_)) {
             return (identity, Box::default());
+        }
+        if let Type::Mapped(mapped) = ty {
+            let variances = self
+                .generic_context
+                .variables(db)
+                .flat_map(|typevar| mapped.argument_variances(db, typevar.identity(db)))
+                .collect();
+            return (identity, variances);
         }
         let env = ProgramEnvironment::from_program(self.generic_context.program(db));
         let specialization = match ty {
@@ -4070,11 +4084,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     pending.push(alias.value_type(db));
                 }
-                Type::Recursive(recursive) => {
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
                     if !seen_recursive_types.insert(actual.to_type_identity(db)) {
                         return true;
                     }
-                    pending.push(recursive.unfold(db, self.env).into_type());
+                    pending.push(recursive.expose(db, self.env).into_type());
                 }
                 Type::Union(union) => pending.extend(union.elements(db).iter().copied()),
                 Type::Intersection(intersection) => pending.extend(intersection.iter_positive(db)),
@@ -4214,7 +4228,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if formal.resolve_type_alias(db).is_union()
             && !has_variadic
             && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
-                matches!(nested, Type::Recursive(_))
+                matches!(nested, Type::Recursive(_) | Type::Mapped(_))
             })
             && !self.has_gradual_union_evidence(formal, actual)
         {
@@ -4283,9 +4297,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(db), actual, polarity, visitor);
             }
-            (Type::Recursive(recursive), _) => {
+            (recursive @ (Type::Recursive(_) | Type::Mapped(_)), _) => {
                 return self.infer_map_impl(
-                    recursive.unfold(db, self.env).into_type(),
+                    recursive.expose(db, self.env).into_type(),
                     actual,
                     polarity,
                     visitor,
@@ -5072,10 +5086,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal, Type::TypeAlias(alias)) => {
                 return self.infer_map_impl(formal, alias.value_type(db), polarity, visitor);
             }
-            (formal, Type::Recursive(recursive)) => {
+            (formal, recursive @ (Type::Recursive(_) | Type::Mapped(_))) => {
                 return self.infer_map_impl(
                     formal,
-                    recursive.unfold(db, self.env).into_type(),
+                    recursive.expose(db, self.env).into_type(),
                     polarity,
                     visitor,
                 );

@@ -258,8 +258,8 @@ impl<'db> Type<'db> {
                 Signature::dynamic(self),
             ))),
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .into_unfolded()?
                 .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 

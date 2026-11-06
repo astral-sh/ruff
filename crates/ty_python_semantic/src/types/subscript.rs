@@ -667,16 +667,16 @@ impl<'db> Type<'db> {
             }
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::Recursive(recursive), _) => Some(
+            (recursive @ (Type::Recursive(_) | Type::Mapped(_)), _) => Some(
                 recursive
-                    .unfold(db, env)
+                    .expose(db, env)
                     .map(|unfolded| unfolded.subscript(db, env, slice_ty, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),
 
-            (_, Type::Recursive(recursive)) => Some(
+            (_, recursive @ (Type::Recursive(_) | Type::Mapped(_))) => Some(
                 recursive
-                    .unfold(db, env)
+                    .expose(db, env)
                     .map(|unfolded| value_ty.subscript(db, env, unfolded, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),

@@ -2301,7 +2301,7 @@ fn is_instance_tuple_covers<'db>(
     recursion_guard: &ActiveRecursionDetector<Type<'db>>,
 ) -> bool {
     match ty {
-        Type::TypeAlias(_) | Type::Recursive(_) => recursion_guard.visit(
+        Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => recursion_guard.visit(
             &ty,
             || true,
             || is_instance_tuple_covers(db, env, tuple, ty.resolve_type_alias(db), recursion_guard),
@@ -2360,8 +2360,8 @@ fn is_instance_truthiness<'db>(
     };
 
     match ty {
-        Type::Recursive(recursive) => recursive
-            .unfold(db, env)
+        recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+            .expose(db, env)
             .map(|unfolded| is_instance_truthiness(db, env, unfolded, class))
             .unwrap_or(Truthiness::Ambiguous),
         Type::RecursiveVar(_) => {

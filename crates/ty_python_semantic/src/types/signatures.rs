@@ -2878,7 +2878,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         any_over_type(db, self.env, ty, false, |ty| {
                             matches!(
                                 ty,
-                                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+                                Type::TypeVar(_)
+                                    | Type::TypeAlias(_)
+                                    | Type::Recursive(_)
+                                    | Type::Mapped(_)
                             )
                         })
                     })

@@ -105,7 +105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, env, keys))
                 }
-                Type::TypeAlias(_) | Type::Recursive(_) => {
+                Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_) => {
                     visitor.visit(db, ty, || imp(db, env, ty.resolve_type_alias(db), visitor))
                 }
                 _ => None,

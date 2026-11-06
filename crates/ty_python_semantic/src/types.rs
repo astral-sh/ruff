@@ -95,6 +95,7 @@ pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
+use crate::types::mapped::MappingEffects;
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -126,6 +127,7 @@ pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
+pub use mapped::MappedType;
 pub use special_form::SpecialFormType;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
@@ -159,6 +161,7 @@ mod iteration;
 mod known_instance;
 pub mod list_members;
 mod literal;
+mod mapped;
 mod match_pattern;
 mod member;
 mod method;
@@ -523,6 +526,7 @@ struct DependentMaterialization<'db> {
 /// reuse the result of another.
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
+    mapping_effects: Option<&'env MappingEffects<'db>>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
@@ -543,6 +547,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     fn new(env: &'env ProgramEnvironment<'db>) -> Self {
         Self {
             env,
+            mapping_effects: None,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
@@ -675,7 +680,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             })
     }
 
-    fn for_new_materialization_root(&self) -> Self {
+    fn for_new_mapping_root(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
         let was_empty =
             materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
@@ -685,7 +690,27 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             materialization_equivalence,
             recursion_context: self.recursion_context,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            mapping_effects: self.mapping_effects,
             ..Self::new(self.env)
+        }
+    }
+
+    fn for_mapping_probe<'a>(
+        &'a self,
+        effects: &'a MappingEffects<'db>,
+    ) -> ApplyTypeMappingVisitor<'a, 'db> {
+        ApplyTypeMappingVisitor {
+            mapping_effects: Some(effects),
+            recursion_context: self.recursion_context,
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            ..ApplyTypeMappingVisitor::new(self.env)
+        }
+    }
+
+    fn without_mapping_probe(&self) -> Self {
+        Self {
+            mapping_effects: None,
+            ..self.for_new_mapping_root()
         }
     }
 }
@@ -784,9 +809,9 @@ impl TypingModule {
 /// This type is harder to make sense of in a set-theoretic framework, but
 /// it is a subtype of all materializations of `list[Any]`.
 ///
-/// Recursive type aliases also retain their materialization kind so that materializing the alias
-/// body preserves stable recursive references.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+/// Recursive types retain this operation in a [`MappedType`], preserving its polarity at each
+/// recursive reference.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum MaterializationKind {
     Top,
     Bottom,
@@ -2063,6 +2088,8 @@ pub enum Type<'db> {
     /// A recursive type whose references are bound by its body.
     /// See the module documentation in `recursive.rs` for details.
     Recursive(RecursiveType<'db>),
+    /// A transformation applied lazily to a recursive type.
+    Mapped(MappedType<'db>),
     /// A variable in a recursive type body, with no standalone type semantics.
     ///
     /// This is syntax, not a dynamic type or an inference variable. It must remain
@@ -2720,7 +2747,10 @@ impl<'db> Type<'db> {
 
     /// Whether this type wraps an alias body that can be unfolded.
     const fn is_alias_like(self) -> bool {
-        matches!(self, Type::TypeAlias(_) | Type::Recursive(_))
+        matches!(
+            self,
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_)
+        )
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
@@ -3088,7 +3118,11 @@ impl<'db> Type<'db> {
                 }
                 Type::Recursive(recursive) => {
                     seen.push(ty);
-                    ty = recursive.unfold(db, &recursive.environment(db)).into_type();
+                    ty = recursive.unfold(db).into_type();
+                }
+                Type::Mapped(mapped) => {
+                    seen.push(ty);
+                    ty = mapped.expose(db, &mapped.environment(db)).into_type();
                 }
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
@@ -3489,6 +3523,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(_)
             | Type::Recursive(_)
+            | Type::Mapped(_)
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::EnumComplement(_) => IntersectionBuilder::new(db, env)
@@ -3528,7 +3563,7 @@ impl<'db> Type<'db> {
             // types without a declared alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
-            Type::Intersection(_) => false,
+            Type::Intersection(_) | Type::Mapped(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
             | Type::SpecialForm(_)
@@ -3566,7 +3601,8 @@ impl<'db> Type<'db> {
             | Type::TypeAlias(_)
             | Type::Recursive(_) => true,
 
-            Type::Intersection(_)
+            Type::Mapped(_)
+            | Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
             | Type::SpecialForm(_)
@@ -3944,7 +3980,11 @@ impl<'db> Type<'db> {
         if nested
             && matches!(
                 self,
-                Type::TypeAlias(_) | Type::Recursive(_) | Type::TypedDict(_) | Type::TypeVar(_)
+                Type::TypeAlias(_)
+                    | Type::Recursive(_)
+                    | Type::Mapped(_)
+                    | Type::TypedDict(_)
+                    | Type::TypeVar(_)
             )
             && any_over_type_including_alias_arguments(db, env, self, |ty| {
                 ty.is_pending_narrowing()
@@ -4005,7 +4045,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::GenericAlias),
-            Type::Recursive(_) => Some(self),
+            Type::Recursive(_) | Type::Mapped(_) => Some(self),
             Type::ClassLiteral(class) => class
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ClassLiteral),
@@ -4098,8 +4138,8 @@ impl<'db> Type<'db> {
                     Type::TypeAlias(alias) => alias
                         .value_type(db)
                         .visit_specialization_impl(db, env, polarity, f, visitor),
-                    Type::Recursive(recursive) => {
-                        if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                    recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                        if let UnfoldResult::Unfolded(unfolded) = recursive.expose(db, env) {
                             unfolded.visit_specialization_impl(db, env, polarity, f, visitor);
                         }
                     }
@@ -4146,8 +4186,8 @@ impl<'db> Type<'db> {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .is_unfolded_and(|unfolded| unfolded.is_singleton(db, env)),
 
             Type::LiteralValue(literal) => match literal.kind() {
@@ -4309,8 +4349,8 @@ impl<'db> Type<'db> {
                 Some(Place::Undefined.into())
             }
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.find_name_in_mro_with_policy(db, env, name, policy))
                 .unwrap_or(Some(Place::bound(self).into())),
 
@@ -4910,8 +4950,8 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.instance_member(db, env, name))
                 .unwrap_or(Place::bound(self).into()),
 
@@ -5568,9 +5608,11 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .is_definitely_non_data_descriptor_impl(db, program),
-            Type::Recursive(recursive) => recursive.unfold(db, env).is_unchanged_or(|unfolded| {
-                unfolded.is_definitely_non_data_descriptor_impl(db, program)
-            }),
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                recursive.expose(db, env).is_unchanged_or(|unfolded| {
+                    unfolded.is_definitely_non_data_descriptor_impl(db, program)
+                })
+            }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 false
             }
@@ -5613,8 +5655,8 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .is_data_descriptor_impl(db, program, any_of_union)
             }
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.is_data_descriptor_impl(db, program, any_of_union))
                 .unwrap_or(!any_of_union),
             _ => {
@@ -6132,8 +6174,8 @@ impl<'db> Type<'db> {
             }
 
             match this {
-                Type::Recursive(recursive) => recursive
-                    .unfold(db, env)
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                    .expose(db, env)
                     .map(|unfolded| {
                         unfolded.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
@@ -7103,8 +7145,8 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.bindings_with_receiver(db, env, recursion_guard, receiver))
                 .unwrap_or_else(|| CallableBinding::not_callable(self).into()),
             Type::RecursiveVar(_) => {
@@ -8815,8 +8857,8 @@ impl<'db> Type<'db> {
                 }),
             Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
             // A provisional recursive body may unfold to itself without exposing a generator.
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .into_unfolded()?
                 .generator_types(db, env, mode),
             Type::Union(union) => {
@@ -8980,8 +9022,8 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| unfolded.to_instance(db, env))
                 .unwrap_or(Some(InstanceProjection::Exact(self))),
             Type::RecursiveVar(_) => {
@@ -9083,8 +9125,8 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         let env = &ProgramEnvironment::from_scope(scope_id);
         match self {
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+                .expose(db, env)
                 .map(|unfolded| {
                     unfolded.in_type_expression_impl(
                         db,
@@ -9369,7 +9411,11 @@ impl<'db> Type<'db> {
         ) -> Type<'db> {
             match ty {
                 Type::Recursive(recursive) => recursive
-                    .unfold(db, env)
+                    .unfold(db)
+                    .map(|unfolded| to_meta_type_inner(db, env, unfolded, context, visitor))
+                    .into_type(),
+                Type::Mapped(mapped) => mapped
+                    .expose_with_recursion(db, env, Some(context))
                     .map(|unfolded| to_meta_type_inner(db, env, unfolded, context, visitor))
                     .into_type(),
                 Type::RecursiveVar(_) => {
@@ -9885,13 +9931,14 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
-        // and specialized generics). For all other types, return early.
+        // Singleton promotion descends through nominal types and their lazy representations.
         if matches!(
             type_mapping,
             TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
-        ) && !matches!(self, Type::NominalInstance(_))
-        {
+        ) && !matches!(
+            self,
+            Type::NominalInstance(_) | Type::TypeAlias(_) | Type::Recursive(_) | Type::Mapped(_)
+        ) {
             return self;
         }
 
@@ -10026,6 +10073,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => {
                 recursive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
+            Type::Mapped(mapped) => mapped.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             Type::RecursiveVar(reference) => {
                 reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
@@ -10385,7 +10433,16 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db) {
+                    unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+                }
+            }),
+
+            Type::Mapped(mapped) => visitor.visit(db, self, || {
+                for argument in self.mapping_arguments(db, &ApplyTypeMappingVisitor::new(env)) {
+                    argument.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+                }
+                if let UnfoldResult::Unfolded(unfolded) = mapped.expose(db, env) {
                     unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
                 }
             }),
@@ -10849,8 +10906,8 @@ impl<'db> Type<'db> {
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
-            Self::Recursive(recursive) => recursive
-                .unfold(db, env)
+            recursive @ (Self::Recursive(_) | Self::Mapped(_)) => recursive
+                .expose(db, env)
                 .into_unfolded()?
                 .definition(db, env),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
@@ -11325,6 +11382,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::ClassLiteral(class_literal) => class_literal.variance_of(db, env, typevar),
             Type::Recursive(recursive) => recursive.variance_of(db, env, typevar),
+            Type::Mapped(mapped) => mapped.variance_of(db, env, typevar),
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
@@ -11452,7 +11510,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PromotionMode {
     On,
     Off,
@@ -11467,7 +11525,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
@@ -11507,7 +11565,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses the binding context and MRO-based matching against the class recorded in a `Self`
 /// typevar's origin.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,

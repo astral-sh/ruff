@@ -338,8 +338,8 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, env, alias.value_type(db));
             }
 
-            Type::Recursive(recursive) => {
-                let unfolded = recursive.unfold(db, env).unwrap_or_else(Type::object);
+            recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                let unfolded = recursive.expose(db, env).unwrap_or_else(Type::object);
                 self.extend_with_type(db, env, unfolded);
             }
 

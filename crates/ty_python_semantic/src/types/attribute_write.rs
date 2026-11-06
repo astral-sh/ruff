@@ -372,8 +372,8 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute, receiver)
         }
-        Type::Recursive(recursive) => recursive
-            .unfold(db, env)
+        recursive @ (Type::Recursive(_) | Type::Mapped(_)) => recursive
+            .expose(db, env)
             .map(|unfolded| attribute_write_requirement(db, env, unfolded, attribute, receiver))
             .unwrap_or(AttributeWriteRequirement::Unconstrained),
 
@@ -1120,6 +1120,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::Intersection(..)
             | Type::TypeAlias(..)
             | Type::Recursive(_)
+            | Type::Mapped(_)
             | Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never

@@ -307,8 +307,8 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),
-                Type::Recursive(recursive) => {
-                    non_async_special_case(db, env, recursive.unfold(db, env).into_unfolded()?)
+                recursive @ (Type::Recursive(_) | Type::Mapped(_)) => {
+                    non_async_special_case(db, env, recursive.expose(db, env).into_unfolded()?)
                 }
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
