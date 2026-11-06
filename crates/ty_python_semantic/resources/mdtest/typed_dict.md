@@ -8776,8 +8776,9 @@ def _(closed: Closed) -> None:
 
 ### Contextual return types for undeclared `get` keys
 
-An implicitly open `TypedDict` can contain an unknown value at an undeclared key. The return type
-also includes the independently inferred type of the default.
+Calling `get` directly or through a saved reference gives the same type when a key is missing from
+one or more receivers. The type variable supplies a `list[str]` context and preserves the inferred
+type for comparison.
 
 ```toml
 [rules]
@@ -8785,7 +8786,14 @@ unsound-assignment = "error"
 ```
 
 ```py
-from typing import TypedDict
+from typing import TypedDict, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+T = TypeVar("T", bound=list[str])
+
+def with_list_context(value: T) -> T:
+    return value
 
 class Record(TypedDict):
     name: str
@@ -8795,12 +8803,20 @@ class WithEntry(TypedDict):
     entry: list[str]
 
 def undeclared(row: Record):
+    get = row.get
     # error: [unsound-assignment]
-    result: list[str] = reveal_type(row.get("entry", []))  # revealed: Unknown | list[Unknown]
+    result: list[str] = row.get("entry", [])
+    direct = with_list_context(row.get("entry", []))
+    saved = with_list_context(get("entry", []))
+    static_assert(is_equivalent_to(TypeOf[direct], TypeOf[saved]))
 
 def sometimes_declared(row: Record | WithEntry):
+    get = row.get
     # error: [unsound-assignment]
-    result: list[str] = reveal_type(row.get("entry", []))  # revealed: Unknown | list[Unknown] | list[str]
+    result: list[str] = row.get("entry", [])
+    direct = with_list_context(row.get("entry", []))
+    saved = with_list_context(get("entry", []))
+    static_assert(is_equivalent_to(TypeOf[direct], TypeOf[saved]))
 ```
 
 ### `get` default types for non-required items
