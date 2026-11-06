@@ -9,20 +9,26 @@ fn ty_cmd() -> Command {
 
 #[test]
 fn rule_default_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type"]), @r#"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-statement"]), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-    # invalid-return-type
+    # invalid-return-statement
 
-    Default level: error | Stable (since 0.0.1-alpha.1)
+    Default level: error | Stable (since 0.0.100)
 
     ## What it does
 
-    Detects returned values that can't be assigned to the function's annotated return type.
+    Checks whether the value in a `return` statement is assignable to the function's annotated return
+    type.
 
-    Note that the special case of a function with a non-`None` return type and an empty body is handled
-    by the separate `empty-body` error code.
+    A bare `return` statement is equivalent to `return None` and is checked by this rule. However, cases
+    where a code path is missing a `return` statement entirely -- leading to execution "falling off" the
+    end of a function and the function implicitly returning `None` in that code path -- are reported by
+    either `missing-return-statement` or `empty-body`.
+
+    In a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the value of a
+    `return` statement must be assignable to `ReturnType`.
 
     ## Why is this bad?
 
@@ -32,8 +38,19 @@ fn rule_default_output() {
     ## Examples
 
     ```python
-    def func() -> int:
-        return "a"  # error: [invalid-return-type]
+    from collections.abc import Generator, AsyncGenerator
+
+
+    def func(coinflip: bool) -> int:
+        if coinflip:
+            return "a"  # error: [invalid-return-statement]
+        else:
+            return  # error: [invalid-return-statement]
+
+
+    def gen_func() -> Generator[int, None, str]:
+        yield 42
+        return b"oops, a bytestring"  # error: [invalid-return-statement]
     ```
 
     ----- stderr -----
@@ -42,18 +59,18 @@ fn rule_default_output() {
 
 #[test]
 fn rule_json_output() {
-    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-type", "--output-format", "json"]), @r###"
+    assert_cmd_snapshot!(ty_cmd().args(["explain", "rule", "invalid-return-statement", "--output-format", "json"]), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
     {
-      "name": "invalid-return-type",
-      "summary": "detects returned values that can't be assigned to the function's annotated return type",
-      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body is handled\nby the separate `empty-body` error code.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+      "name": "invalid-return-statement",
+      "summary": "detects return statements whose value is incompatible with the expected return type",
+      "documentation": "## What it does\n\nChecks whether the value in a `return` statement is assignable to the function's annotated return\ntype.\n\nA bare `return` statement is equivalent to `return None` and is checked by this rule. However, cases\nwhere a code path is missing a `return` statement entirely -- leading to execution \"falling off\" the\nend of a function and the function implicitly returning `None` in that code path -- are reported by\neither `missing-return-statement` or `empty-body`.\n\nIn a generator function annotated with `Generator[YieldType, SendType, ReturnType]`, the value of a\n`return` statement must be assignable to `ReturnType`.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\nfrom collections.abc import Generator, AsyncGenerator\n\n\ndef func(coinflip: bool) -> int:\n    if coinflip:\n        return \"a\"  # error: [invalid-return-statement]\n    else:\n        return  # error: [invalid-return-statement]\n\n\ndef gen_func() -> Generator[int, None, str]:\n    yield 42\n    return b\"oops, a bytestring\"  # error: [invalid-return-statement]\n```",
       "default_level": "error",
       "status": {
         "type": "stable",
-        "since": "0.0.1-alpha.1"
+        "since": "0.0.100"
       }
     }
     ----- stderr -----

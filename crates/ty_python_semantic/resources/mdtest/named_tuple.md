@@ -1386,11 +1386,11 @@ class B(NamedTuple):
     x: int
 
 def choose(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return A._replace if flag else B._replace
 
 def reversed_order(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return B._replace if flag else A._replace
 
 def either_class(flag: bool) -> Callable[..., A | B]:
@@ -1404,7 +1404,7 @@ DynamicA = NamedTuple("DynamicA", [("x", int)])
 DynamicB = NamedTuple("DynamicB", [("x", int)])
 
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return DynamicA._replace if flag else DynamicB._replace
 ```
 

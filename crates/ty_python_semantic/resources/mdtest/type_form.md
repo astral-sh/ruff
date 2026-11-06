@@ -363,7 +363,7 @@ def returned_union() -> TypeForm[int | str]:
     return identity(int | str)
 
 def returned_incompatible_class() -> TypeForm[str]:
-    return identity(int)  # error: [invalid-return-type]
+    return identity(int)  # error: [invalid-return-statement]
 
 async def async_identity[T](value: T) -> T:
     return value

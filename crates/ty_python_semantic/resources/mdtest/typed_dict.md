@@ -931,10 +931,10 @@ def return_unpack(src: TD) -> TD:
     return dict(**src)
 
 def return_invalid_literal() -> TD:
-    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the
-    # `return_invalid_dict` case below).
+    # TODO: Report only the missing key here, as in `return_invalid_dict` below.
+    #
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-    # error: [invalid-return-type]
+    # error: [invalid-return-statement]
     return {}
 
 def return_invalid_dict() -> TD:
@@ -2157,10 +2157,10 @@ def b_from_c(c: C) -> B:
     return c  # allowed
 
 def a_from_b(b: B) -> A:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `A`, found `B`"
     return b
 
-# The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
+# The error on the return statement above prevents us from assigning an invalid value to c['y'].
 c: C = {"x": 1, "y": "hello"}
 a: A = a_from_b(b_from_c(c))
 a["y"] = 42
@@ -2185,7 +2185,7 @@ class A3(TypedDict):
     y: NotRequired[ReadOnly[int]]  # not assignable from `object`
 
 def a3_from_b(b: B) -> A3:
-    return b  # error: [invalid-return-type]
+    return b  # error: [invalid-return-statement]
 ```
 
 ## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
@@ -9529,7 +9529,7 @@ def as_mapping(value: Recursive) -> Mapping[str, object]:
     return value
 
 def as_dict(value: Recursive) -> dict[str, bool]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-return-statement]
 
 def update(value: Recursive) -> None:
     value.update({"child": value})

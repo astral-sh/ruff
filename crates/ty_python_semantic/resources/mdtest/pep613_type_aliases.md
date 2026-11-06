@@ -581,7 +581,7 @@ Even: TypeAlias = T | list["Odd[T]"]
 Odd: TypeAlias = T | tuple["Even[T]"]
 
 def invalid_even() -> Even[int]:
-    return [("bad",)]  # error: [invalid-return-type]
+    return [("bad",)]  # error: [invalid-return-statement]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -1170,7 +1170,7 @@ class C:
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
-        return self.attribute  # error: [invalid-return-type]
+        return self.attribute  # error: [invalid-return-statement]
 
 C().takes(1)
 ```
@@ -1194,7 +1194,7 @@ def inspect(value: Forwarded[int]):
         reveal_type(tail[0])  # revealed: int
 
 def invalid() -> Forwarded[int]:
-    return (1, ("bad", None))  # error: [invalid-return-type]
+    return (1, ("bad", None))  # error: [invalid-return-statement]
 ```
 
 An unsubscripted reference fixes the default throughout the recursive type:
@@ -1209,7 +1209,7 @@ def inspect_default(value: DefaultNode):
         reveal_type(tail[0])  # revealed: str
 
 def invalid_default() -> DefaultNode:
-    return ("root", (1, None))  # error: [invalid-return-type]
+    return ("root", (1, None))  # error: [invalid-return-statement]
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ## mdtest_snippet.py
 
 ```
-1 | # error: [invalid-return-type]
+1 | # error: [missing-return-statement]
 2 | def f() -> int:
 3 |     print("hello")
 ```
@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `int`
+error[missing-return-statement]: Function always implicitly returns `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.py:2:12
   |
 2 | def f() -> int:

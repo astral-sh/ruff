@@ -2708,7 +2708,7 @@ def valid_tree() -> Tree:
     return (((1,),),)
 
 def invalid_tree() -> Tree:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-return-statement]
 ```
 
 ### Displaying aliases with the same name
@@ -3058,10 +3058,10 @@ def valid_odd() -> Odd:
     return (("leaf",),)
 
 def invalid_even() -> Even:
-    return (("leaf",),)  # error: [invalid-return-type]
+    return (("leaf",),)  # error: [invalid-return-statement]
 
 def invalid_odd() -> Odd:
-    return ((1,),)  # error: [invalid-return-type]
+    return ((1,),)  # error: [invalid-return-statement]
 ```
 
 ### Self-recursion within mutually recursive aliases
@@ -3090,10 +3090,10 @@ def valid() -> Outer:
     return (1, ("inner", (2, None), ("inner", None, None)))
 
 def invalid_outer() -> Outer:
-    return (1, ("inner", ("bad", None), None))  # error: [invalid-return-type]
+    return (1, ("inner", ("bad", None), None))  # error: [invalid-return-statement]
 
 def invalid_inner() -> Outer:
-    return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
+    return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-statement]
 ```
 
 ### A recursive union with a self-recursive tuple member
@@ -3147,7 +3147,7 @@ def valid() -> A[int]:
     return [({"leaf": [({"leaf": 1},)]},)]
 
 def invalid() -> A[int]:
-    return [({"leaf": "bad"},)]  # error: [invalid-return-type]
+    return [({"leaf": "bad"},)]  # error: [invalid-return-statement]
 ```
 
 ### Self-recursion within three mutually recursive generic aliases
@@ -3229,7 +3229,7 @@ def valid() -> Root:
     return (1, None, (None, (((2, None, None), None),)))
 
 def invalid() -> Root:
-    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-type]
+    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-statement]
 ```
 
 ### Shared references with changing type arguments
@@ -3270,7 +3270,7 @@ def valid() -> Root[int]:
     return (1, None, (None, ((([2], None, None), None),)))
 
 def invalid() -> Root[int]:
-    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-type]
+    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-statement]
 ```
 
 ### Generic recursion through different paths
@@ -3310,7 +3310,7 @@ def valid() -> Root[int]:
     return (1, (2, None), (3, ([4], None)))
 
 def invalid() -> Root[int]:
-    return (1, None, (2, ("bad", None)))  # error: [invalid-return-type]
+    return (1, None, (2, ("bad", None)))  # error: [invalid-return-statement]
 ```
 
 ### Recursive callable parameters
@@ -3372,13 +3372,13 @@ def valid_first() -> First:
     return (((1,),),)
 
 def invalid_first() -> First:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-return-statement]
 
 def valid_second() -> Second:
     return (((1,),),)
 
 def invalid_second() -> Second:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-return-statement]
 ```
 
 ### Unguarded recursion through generic aliases
@@ -3441,7 +3441,7 @@ def valid() -> Tree[int]:
     return (((1,),),)
 
 def invalid() -> Tree[int]:
-    return ((("bad",),),)  # error: [invalid-return-type]
+    return ((("bad",),),)  # error: [invalid-return-statement]
 ```
 
 Type arguments can themselves be recursive aliases; their display preserves each application.
@@ -3624,7 +3624,7 @@ def valid() -> Forwarded[int]:
     return (1, (2, None))
 
 def invalid() -> Forwarded[int]:
-    return (1, ("bad", None))  # error: [invalid-return-type]
+    return (1, ("bad", None))  # error: [invalid-return-statement]
 ```
 
 ### Generic mutually recursive aliases
@@ -3643,10 +3643,10 @@ def valid() -> Even[int]:
     return [(1,)]
 
 def invalid_even() -> Even[int]:
-    return [("bad",)]  # error: [invalid-return-type]
+    return [("bad",)]  # error: [invalid-return-statement]
 
 def invalid_odd() -> Odd[int]:
-    return ([("bad",)],)  # error: [invalid-return-type]
+    return ([("bad",)],)  # error: [invalid-return-statement]
 ```
 
 ### Changing recursive type arguments
@@ -3664,7 +3664,7 @@ def valid() -> Growing[int]:
     return [[1]]
 
 def invalid() -> Growing[int]:
-    return [["bad"]]  # error: [invalid-return-type]
+    return [["bad"]]  # error: [invalid-return-statement]
 
 def inspect(value: Growing[int]):
     if isinstance(value, list):
@@ -3755,7 +3755,7 @@ def valid() -> Tree[int]:
     return [[1]]
 
 def invalid() -> tree.Tree[int]:
-    return [["bad"]]  # error: [invalid-return-type]
+    return [["bad"]]  # error: [invalid-return-statement]
 
 def inspect(value: Tree[int]):
     if isinstance(value, list):
@@ -3778,7 +3778,7 @@ def valid() -> Tree[int]:
     return (("T",),)
 
 def invalid() -> Tree[int]:
-    return (("bad",),)  # error: [invalid-return-type]
+    return (("bad",),)  # error: [invalid-return-statement]
 ```
 
 ### Specialized aliases do not introduce type parameters

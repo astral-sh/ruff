@@ -818,7 +818,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 @register
@@ -848,7 +848,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 @dataclass
@@ -879,7 +879,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 def identity(cls: type[SchemaT]) -> type[SchemaT]:

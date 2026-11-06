@@ -1992,7 +1992,7 @@ type RecursiveT = int | tuple[RecursiveT, ...]
 
 def foo(a: int, b: int) -> RecursiveT:
     some_intermediate_var = (a, b)
-    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    # error: [invalid-return-statement] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
 ```
 
