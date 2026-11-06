@@ -976,8 +976,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     env: &ProgramEnvironment<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
     base_ty: Type<'db>,
-    place: ScopedPlaceId,
-    captured_by: Option<PatternPredicate<'db>>,
+    target: impl FnOnce() -> (ScopedPlaceId, Option<PatternPredicate<'db>>),
 ) -> Type<'db> {
     let id = evaluator.constraint();
     match id {
@@ -986,6 +985,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
+    let (place, captured_by) = target();
     let mut projector = NarrowingProjector::new(
         db,
         env,

@@ -5019,7 +5019,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .iter_mut()
                         .find(|(place, _)| Some(*place) == subject_place)
                     {
+                        let use_def = self.current_use_def_map();
                         if case.guard.is_some()
+                            && use_def.next_definition_id() != first_capture
                             && match_pattern_predicate
                                 .kind(self.db)
                                 .may_capture_subject_positionally(
@@ -5028,14 +5030,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         {
                             // A later case can distinguish which value a positional pattern or one
                             // of its alternatives captured when the guard failed.
-                            let use_def = self.current_use_def_map();
-                            if use_def.next_definition_id() != first_capture {
-                                bindings.extend(
-                                    use_def
-                                        .symbol_binding_definition_ids(*symbol)
-                                        .filter(|id| *id >= first_capture),
-                                );
-                            }
+                            bindings.extend(
+                                use_def
+                                    .symbol_binding_definition_ids(*symbol)
+                                    .filter(|id| *id >= first_capture),
+                            );
                         } else {
                             self.extend_match_subject_bindings(&case.pattern, *symbol, bindings);
                         }

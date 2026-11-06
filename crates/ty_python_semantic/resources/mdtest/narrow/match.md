@@ -3613,6 +3613,29 @@ def narrow_after_positional_capture(value: int | str, flag: bool) -> None:
             reveal_type(value)  # revealed: int
 ```
 
+When the positional capture extracts an attribute, a later case can still exclude the original
+class. Here both integer cases see the original integer binding.
+
+```py
+from typing import final
+
+@final
+class WrappedText:
+    __match_args__ = ("text",)
+    text: str
+
+def narrow_after_attribute_capture(subject: int | WrappedText, flag: bool) -> int:
+    value = subject
+    match value:
+        case WrappedText(value) if flag:
+            return 0
+        case 0:
+            return value
+        case int() as number:
+            return value
+    return 0
+```
+
 ### Constrained `as` patterns
 
 If the first pattern matches but its guard fails, the captured integer cannot reach the string case.

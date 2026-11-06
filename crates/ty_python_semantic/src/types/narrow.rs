@@ -249,8 +249,8 @@ fn structural_capture_place<'db>(
 }
 
 /// Interpret a case test on the saved subject as a constraint on the value an earlier
-/// pattern captured. A class or singleton test can distinguish subject alternatives without
-/// carrying transient length or element facts into a mutable capture.
+/// pattern captured. The later pattern's binding type discards transient facts about mutable
+/// subjects, such as which element a list contained when it matched.
 pub(crate) fn match_capture_constraints<'db>(
     db: &'db dyn Db,
     capture: PatternPredicate<'db>,
@@ -260,12 +260,7 @@ pub(crate) fn match_capture_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
     Option<NarrowingConstraint<'db>>,
 ) {
-    let stable = match tested.kind(db) {
-        PatternPredicateKind::Class(class) => class.is_empty(),
-        PatternPredicateKind::Singleton(_) => true,
-        _ => false,
-    };
-    if capture == tested || !stable {
+    if capture == tested {
         return (None, None);
     }
     let constraint = |positive| {
@@ -562,7 +557,9 @@ fn pattern_capture_types<'db>(
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let incoming_subject_ty = narrowed_by.map_or(incoming_subject_ty, |(later, positive)| {
         if positive {
-            analyzer.matched_subject_type(later.kind(db), incoming_subject_ty)
+            analyzer
+                .analyze_successful_pattern(later.kind(db), incoming_subject_ty)
+                .binding_subject_ty
         } else {
             pattern_binding_fallthrough_type(db, &env, later.kind(db), incoming_subject_ty)
         }
@@ -5821,7 +5818,7 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_type_by_constraint(db, env, self, base_type, place, None)
+        narrow_type_by_constraint(db, env, self, base_type, || (place, None))
     }
 
     fn narrow_binding(
@@ -5831,13 +5828,11 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         definition: Definition<'db>,
     ) -> Type<'db> {
-        narrow_type_by_constraint(
-            db,
-            env,
-            self,
-            base_type,
-            definition.place(db),
-            projected_match_capture(db, definition),
-        )
+        narrow_type_by_constraint(db, env, self, base_type, || {
+            (
+                definition.place(db),
+                projected_match_capture(db, definition),
+            )
+        })
     }
 }

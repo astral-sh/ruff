@@ -2027,14 +2027,9 @@ fn place_from_bindings_impl<'db>(
                 _ if matches!(binding_kind, DefinitionKind::MatchPattern(_))
                     && let Some(capture) = projected_match_capture(db, binding) =>
                 {
-                    narrow_type_by_constraint(
-                        db,
-                        env,
-                        &narrowing_constraint,
-                        binding_ty,
-                        binding.place(db),
-                        Some(capture),
-                    )
+                    narrow_type_by_constraint(db, env, &narrowing_constraint, binding_ty, || {
+                        (binding.place(db), Some(capture))
+                    })
                 }
                 constraint => narrowing_projector
                     .get_or_insert_with(|| {
