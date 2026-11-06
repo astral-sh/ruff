@@ -6,6 +6,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
+use ruff_workspace::uv::UvImportDiscovery;
 
 use crate::args::ConfigArguments;
 use crate::diagnostics::{Diagnostics, lint_stdin};
@@ -14,12 +15,22 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 /// Run the linter over a single file, read from `stdin`.
 pub(crate) fn check_stdin(
     filename: Option<&Path>,
-    pyproject_config: &PyprojectConfig,
+    pyproject_config: PyprojectConfig,
     overrides: &ConfigArguments,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let mut resolver = Resolver::new(pyproject_config);
+    let uv = overrides.use_uv.then(UvImportDiscovery::default);
+    let directory = filename
+        .and_then(Path::parent)
+        .unwrap_or_else(|| Path::new("."));
+    let pyproject_config = PyprojectConfig {
+        settings: pyproject_config
+            .settings
+            .with_uv_imports(uv.as_ref(), directory),
+        ..pyproject_config
+    };
+    let mut resolver = Resolver::new(&pyproject_config);
 
     if resolver.force_exclude() {
         if let Some(filename) = filename {
