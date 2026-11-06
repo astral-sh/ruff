@@ -465,6 +465,16 @@ impl<'db> OverloadLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
+    /// Overload sets ending at different declarations share their earlier links.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn previous_overload_in_chain(self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
+        Some(self.previous_overload(db)?.last_definition)
+    }
+
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
     /// previous overload.
     fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
@@ -915,10 +925,9 @@ impl<'db> FunctionLiteral<'db> {
             let mut current = self_overload;
             let mut overloads = vec![];
 
-            while let Some(previous) = current.previous_overload(db) {
-                let overload = previous.last_definition;
-                overloads.push(overload);
-                current = overload;
+            while let Some(previous) = current.previous_overload_in_chain(db) {
+                overloads.push(previous);
+                current = previous;
             }
 
             // Overloads are inserted in reverse order, from bottom to top.
