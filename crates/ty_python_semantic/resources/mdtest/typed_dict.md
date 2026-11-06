@@ -8742,7 +8742,7 @@ record: Record = {"name": "name", "count": 1}
 class Setter:
     get = record.__setitem__
 
-Setter().get("missing", 1)  # error: [no-matching-overload]
+Setter().get("name", 1)  # error: [no-matching-overload]
 
 class Count:
     get = partial(record.get, "count")

@@ -1046,48 +1046,12 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
-    /// A synthesized `TypedDict.get` has separate overloads for its literal keys, followed
-    /// by a fallback accepting `str`. A string literal cannot match another key's overloads.
-    pub(crate) fn retain_typed_dict_get_overloads(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        key: &str,
-    ) {
-        // A missing key only matches the fallback. Removing its other candidates can
-        // change how the return type context specializes a generic default argument.
-        let every_receiver_declares_key = self.elements.iter().all(|element| {
-            let Type::BoundMethod(method) = element.callable_type else {
-                return false;
-            };
-            let [CallableItem::Regular(callable)] = element.items.as_slice() else {
-                return false;
-            };
-            let receiver = method.self_instance(db);
-            let Type::TypedDict(typed_dict) = receiver else {
-                return false;
-            };
-            // An attribute named `get` can hold a different bound method.
-            method.func(db).as_callable().is_some()
-                && callable.bound_type.is_none()
-                && callable.signature_type == element.callable_type
-                && typed_dict.items(db).contains_key(key)
-                && receiver.member(db, env, "get").ignore_possibly_undefined()
-                    == Some(element.callable_type)
-        });
-        if !every_receiver_declares_key {
-            return;
-        }
-
+    /// Discard overloads that the caller can rule out before matching arguments.
+    pub(crate) fn retain_overloads(&mut self, mut keep: impl FnMut(&Signature<'db>) -> bool) {
         for callable in self.iter_flat_mut() {
-            callable.overloads.retain(|overload| {
-                overload
-                    .signature
-                    .parameters()
-                    .get(0)
-                    .and_then(|parameter| parameter.annotated_type().as_string_literal())
-                    .is_none_or(|literal| literal.value(db) == key)
-            });
+            callable
+                .overloads
+                .retain(|overload| keep(&overload.signature));
         }
     }
 

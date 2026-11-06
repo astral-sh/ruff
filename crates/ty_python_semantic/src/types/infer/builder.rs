@@ -7359,11 +7359,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(self.db(), literal.value.to_str())
-        } else {
-            Type::literal_string()
-        }
+        Self::precise_string_literal_value(literal).map_or_else(Type::literal_string, |value| {
+            Type::string_literal(self.db(), value)
+        })
+    }
+
+    fn precise_string_literal_value(literal: &ast::ExprStringLiteral) -> Option<&str> {
+        (literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE).then(|| literal.value.to_str())
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
@@ -10022,21 +10024,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let mut bindings = self.bindings_for_call(callable_type);
-        if let ast::Expr::Attribute(attribute) = func.as_ref()
-            && attribute.attr.id == "get"
-            && arguments.keywords.is_empty()
-            && matches!(arguments.args.len(), 1 | 2)
-            && let Some(ast::Expr::StringLiteral(key)) = arguments.args.first()
-            && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
-            && arguments
-                .args
-                .get(1)
-                .is_none_or(|arg| !arg.is_starred_expr())
-            // Completions in an open file need the expected keys of every overload.
-            && !self.collects_expected_types()
-        {
-            bindings.retain_typed_dict_get_overloads(db, env, key.value.to_str());
-        }
+        self.narrow_typed_dict_get_overloads(call_expression, callable_type, &mut bindings);
         let bindings = bindings.match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
