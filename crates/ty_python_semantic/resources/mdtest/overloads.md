@@ -1545,7 +1545,7 @@ class CheckStaticMethod:
     @overload
     def method1(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
     def method1(self, x: int | str) -> int | str:
         return x
 
@@ -1555,7 +1555,7 @@ class CheckStaticMethod:
     @staticmethod
     def method2(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def method2(self, x: int | str) -> int | str:
         return x
 
@@ -1565,7 +1565,7 @@ class CheckStaticMethod:
     @overload
     @staticmethod
     def method3(self, x: str) -> str: ...
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def method3(self, x: int | str) -> int | str:
         return x
 
@@ -1610,13 +1610,13 @@ class Widget:
     @staticmethod
     def method(source: str, index: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
     def method(self, index: int) -> str: ...
     @overload
     def reversed(self, index: int) -> str: ...
     @overload
     @staticmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def reversed(source: str, index: int) -> int: ...
 ```
 
@@ -1656,7 +1656,7 @@ class CheckClassMethod:
     @overload
     def try_from1(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1668,7 +1668,7 @@ class CheckClassMethod:
     @classmethod
     def try_from2(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1680,7 +1680,7 @@ class CheckClassMethod:
     @overload
     @classmethod
     def try_from3(cls, x: str) -> None: ...
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             # error: [call-non-callable]
@@ -1755,13 +1755,13 @@ class Factory:
     @classmethod
     def method(cls: type[Factory], value: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
     def method(self, value: int) -> str: ...
     @overload
     def reversed(self, value: int) -> str: ...
     @overload
     @classmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def reversed(cls: type[Factory], value: int) -> int: ...
 ```
 
