@@ -5,7 +5,7 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
-use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
+use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute, MemberNames};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
@@ -2262,18 +2262,11 @@ impl<'db> ClassType<'db> {
                 enum_lit.instance_member(db, env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                if class.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
                 class.instance_member(db, env, None, name)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = Some(generic.specialization(db));
-
-                if class_literal.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
 
                 // MRO lookup already specializes each member in the class that defines it.
                 // Applying the receiver's specialization again would also substitute type
@@ -3155,6 +3148,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// allowing the caller to handle this case specially.
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
+        let bits = MemberNames::bits(name);
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
@@ -3173,6 +3167,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    if pending_augmented_bindings.is_empty()
+                        && let Some((literal, _)) = class.static_class_literal(db)
+                        && !literal
+                            .member_sources(db)
+                            .instance_names
+                            .contains_bits(bits)
+                    {
+                        continue;
+                    }
                     let member = class.own_instance_member(db, &self.env, name);
                     let definitely_declared = matches!(
                         member.inner.place,

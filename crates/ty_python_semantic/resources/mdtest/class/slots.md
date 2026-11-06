@@ -219,6 +219,19 @@ EllipsisAnnotation().value = "valid"
 EllipsisAnnotation().value = 1  # error: [invalid-assignment]
 ```
 
+A method declared in a stub can shadow an inherited slot. Instance lookup considers both the bound
+method and the value stored in the slot.
+
+```pyi
+class Base:
+    __slots__ = ("process",)
+
+class Child(Base):
+    def process(self, arg: int) -> bytes: ...
+
+reveal_type(Child().process)  # revealed: (bound method Child.process(arg: int) -> bytes) | (def process(self, arg: int) -> bytes)
+```
+
 ## Generic slots use the instance's type arguments
 
 A slot in a generic class uses the type arguments of the instance.

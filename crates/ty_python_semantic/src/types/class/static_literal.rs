@@ -1579,7 +1579,23 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let code_generator = CodeGeneratorKind::from_static_class(db, self);
+        let code_generator = if let Some(names) = self.ordinary_class_member_names(db) {
+            if !names.might_contain(name) {
+                return self
+                    .own_synthesized_member_with_kind(
+                        db,
+                        env,
+                        specialization,
+                        inherited_generic_context,
+                        name,
+                        || None,
+                    )
+                    .map_or_else(Member::unbound, Member::definitely_declared);
+            }
+            None
+        } else {
+            CodeGeneratorKind::from_static_class(db, self)
+        };
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
@@ -2966,7 +2982,12 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if self.is_typed_dict(db) || self.lacks_instance_storage(db, name) {
+        if self
+            .instance_member_names(db, specialization)
+            .is_some_and(|names| !names.might_contain(name))
+            || self.is_typed_dict(db)
+            || self.lacks_instance_storage(db, name)
+        {
             return Place::Undefined.into();
         }
 
@@ -3006,6 +3027,9 @@ impl<'db> StaticClassLiteral<'db> {
         // - Proper diagnostics
 
         let sources = self.member_sources(db);
+        if !sources.instance_names.might_contain(name) {
+            return Member::unbound();
+        }
         let body_scope = sources.scope;
         let table = &sources.table;
 
