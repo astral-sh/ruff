@@ -1061,6 +1061,7 @@ mod tests {
         	rule-codes-in-suppression-comments (RUF106),
         	shared-clock-mock,
         	unnecessary-regular-expression-compile,
+        	conditional-global-or-nonlocal,
         ]
 
         Removed in preview:
