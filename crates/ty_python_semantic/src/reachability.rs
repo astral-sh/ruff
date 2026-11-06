@@ -217,7 +217,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationWithConstraint,
-    DeclarationsIterator, EvaluationMode, FileScopeId, LiveBinding, NarrowingEvaluator,
+    DeclarationsIterator, EvaluationMode, FileScopeId, NarrowingEvaluator,
     PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::{DefinitionKind, DefinitionState},
     expression::Expression,
@@ -741,19 +741,6 @@ fn analyze_non_terminal_call_range<'db>(
     analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
-/// Evaluates a reachability constraint, first caching complete blocks of statement calls up to its
-/// root predicate when the scope has many calls.
-///
-/// Large scopes reuse canonical call ranges and sparse decision-diagram checkpoints; small scopes
-/// retain the direct evaluation path without creating either cached index.
-fn evaluate_reachability_constraint<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    id: ScopedReachabilityConstraintId,
-) -> Truthiness {
-    evaluate_reachability_frontier(db, scope, id, BindingCursor::new(id), &mut [])
-}
-
 #[derive(Clone, Copy)]
 struct BindingCursor {
     id: ScopedReachabilityConstraintId,
@@ -764,51 +751,61 @@ impl BindingCursor {
     fn new(id: ScopedReachabilityConstraintId) -> Self {
         Self { id, visited: 0 }
     }
-    fn pending(&self) -> bool {
-        terminal_reachability(self.id).is_none()
-    }
 }
 
-/// Progress through the remaining bindings of one place lookup. Cursors are allocated only
-/// after two neighboring bindings reach the same decision in the primary scope.
-pub(crate) struct SiblingBindings<'map> {
-    live: &'map [LiveBinding],
-    remaining: usize,
+/// Tracks the predicates that earlier bindings have already evaluated in this lookup.
+/// During cycle recovery the next iteration starts a fresh lookup, so it can see new results.
+pub(crate) struct BindingReachability<'map, 'db> {
+    bindings: BindingWithConstraintsIterator<'map, 'db>,
+    cache: Option<&'map ReachabilityEvaluationCache<'db>>,
     cursors: SmallVec<[BindingCursor; 4]>,
 }
 
-impl<'map> SiblingBindings<'map> {
-    pub(crate) fn new(bindings: &BindingWithConstraintsIterator<'map, '_>) -> Self {
-        // Bound the work per predicate even when a wide join has distinct decisions at every leaf.
-        const MAX_BATCHED_BINDINGS: usize = 32;
-        let live = if (2..=MAX_BATCHED_BINDINGS).contains(&bindings.len()) {
-            bindings.live_bindings()
-        } else {
-            &[]
-        };
+impl<'map, 'db> BindingReachability<'map, 'db> {
+    pub(crate) fn new(
+        bindings: BindingWithConstraintsIterator<'map, 'db>,
+        cache: Option<&'map ReachabilityEvaluationCache<'db>>,
+    ) -> Self {
         Self {
-            live,
-            remaining: bindings.len(),
+            bindings,
+            cache,
             cursors: SmallVec::new(),
         }
     }
 
-    pub(crate) fn next_binding(&mut self) {
-        self.remaining -= 1;
+    pub(crate) fn evaluate(
+        &mut self,
+        db: &'db dyn Db,
+        index: usize,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        let constraints = self.bindings.reachability_constraints();
+        let predicates = self.bindings.predicates();
+        let Some(cache) = self.cache else {
+            return constraints.evaluate(db, predicates, id);
+        };
+        cache.evaluate(db, constraints, predicates, id, |scope| {
+            self.shared_walk(index, id)
+                .unwrap_or_else(|| ReachabilityWalk::new(id))
+                .evaluate(db, scope)
+        })
     }
 
-    fn walk(
+    fn shared_walk(
         &mut self,
-        constraints: &ReachabilityConstraints,
+        index: usize,
         id: ScopedReachabilityConstraintId,
-    ) -> Option<(BindingCursor, &mut [BindingCursor])> {
+    ) -> Option<ReachabilityWalk<'_>> {
         if self.cursors.is_empty() {
-            if self.live.is_empty() || self.remaining == 0 {
+            // Only track siblings once two adjacent, distinct constraints share a root predicate.
+            // Limit the group size because every decision can visit all remaining bindings.
+            const MAX_BATCHED_BINDINGS: usize = 32;
+            let roots = self.bindings.reachability_constraint_ids();
+            if roots.clone().nth(MAX_BATCHED_BINDINGS).is_some() {
                 return None;
             }
-            // The optional synthetic unbound binding always precedes the live bindings.
-            let tail = &self.live[self.live.len() - self.remaining..];
-            let next = tail[0].reachability_constraint();
+            let constraints = self.bindings.reachability_constraints();
+            let next = roots.clone().nth(index + 1)?;
             if next == id
                 || terminal_reachability(next).is_some()
                 || constraints.get_interior_node(next).atom()
@@ -816,62 +813,86 @@ impl<'map> SiblingBindings<'map> {
             {
                 return None;
             }
-            self.cursors.push(BindingCursor::new(id));
-            self.cursors.extend(
-                tail.iter()
-                    .map(|binding| BindingCursor::new(binding.reachability_constraint())),
-            );
+            self.cursors.extend(roots.map(BindingCursor::new));
         }
-        let at = self.cursors.len() - self.remaining - 1;
-        let (first, rest) = self.cursors[at..].split_first_mut()?;
-        Some((*first, rest))
-    }
 
-    pub(crate) fn evaluate<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        cache: Option<&ReachabilityEvaluationCache<'db>>,
-        constraints: &ReachabilityConstraints,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        id: ScopedReachabilityConstraintId,
-    ) -> Truthiness {
-        if let Some(cache) = cache {
-            cache.evaluate(db, constraints, predicates, id, Some(self))
-        } else {
-            constraints.evaluate(db, predicates, id)
-        }
+        Some(ReachabilityWalk {
+            root: id,
+            current: self.cursors[index],
+            siblings: &mut self.cursors[index + 1..],
+        })
     }
 }
 
-fn evaluate_reachability_frontier<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    id: ScopedReachabilityConstraintId,
-    cursor: BindingCursor,
-    remaining: &mut [BindingCursor],
-) -> Truthiness {
-    if let Some(reachability) = terminal_reachability(id) {
-        return reachability;
+struct ReachabilityWalk<'a> {
+    root: ScopedReachabilityConstraintId,
+    current: BindingCursor,
+    siblings: &'a mut [BindingCursor],
+}
+
+impl ReachabilityWalk<'_> {
+    fn new(id: ScopedReachabilityConstraintId) -> Self {
+        Self {
+            root: id,
+            current: BindingCursor::new(id),
+            siblings: &mut [],
+        }
     }
 
-    let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    let predicates = use_def.predicates();
-    let root = constraints.get_interior_node(id);
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    /// Warm the call predicates up to the original root, even when a sibling has already
+    /// evaluated part of the path.
+    fn evaluate<'db>(self, db: &'db dyn Db, scope: ScopeId<'db>) -> Truthiness {
+        if let Some(reachability) = terminal_reachability(self.root) {
+            return reachability;
+        }
 
-    evaluate_reachability_path(
-        db,
-        scope,
-        constraints,
-        predicates,
-        call_predicates,
-        cursor.id,
-        true,
-        cursor.visited,
-        remaining,
-    )
+        let use_def = use_def_map(db, scope);
+        let constraints = use_def.reachability_constraints();
+        let predicates = use_def.predicates();
+        let root = constraints.get_interior_node(self.root);
+        let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
+        let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+
+        evaluate_reachability_path(
+            db,
+            scope,
+            constraints,
+            predicates,
+            call_predicates,
+            self,
+            true,
+        )
+    }
+
+    /// Follow the edge selected by this predicate in each binding waiting on it. A sibling
+    /// at a checkpoint must evaluate that checkpoint itself.
+    fn follow(
+        &mut self,
+        constraints: &ReachabilityConstraints,
+        call_predicates: Option<&[ScopedPredicateId]>,
+        node: InteriorNode,
+        outcome: Truthiness,
+    ) -> Option<ScopedReachabilityConstraintId> {
+        let branch: fn(InteriorNode) -> _ = match outcome {
+            Truthiness::AlwaysTrue => InteriorNode::if_true,
+            Truthiness::AlwaysFalse => InteriorNode::if_false,
+            Truthiness::Ambiguous => InteriorNode::if_ambiguous,
+            Truthiness::Uninhabited => return None,
+        };
+        for sibling in &mut *self.siblings {
+            if terminal_reachability(sibling.id).is_some() {
+                continue;
+            }
+            let other = constraints.get_interior_node(sibling.id);
+            if other.atom() == node.atom()
+                && !is_reachability_checkpoint(call_predicates, other.atom(), sibling.visited)
+            {
+                sibling.id = branch(other);
+                sibling.visited += 1;
+            }
+        }
+        Some(branch(node))
+    }
 }
 
 /// Evaluates the normal continuation captured by a deferred `finally` predicate.
@@ -883,7 +904,7 @@ fn evaluate_reachability_frontier<'db>(
 ///
 /// Other expensive predicates already use tracked queries, while ordinary reachability
 /// constraints are cached within each inference region and at sparse checkpoints. Tracking
-/// [`evaluate_reachability_constraint`] itself would instead retain a Salsa query key and memo for
+/// [`ReachabilityWalk::evaluate`] itself would instead retain a Salsa query key and memo for
 /// every constraint.
 #[salsa::tracked(
     returns(copy),
@@ -895,7 +916,7 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation)
+    ReachabilityWalk::new(continuation).evaluate(db, scope)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -943,18 +964,19 @@ fn is_reachability_checkpoint(
 /// General checkpoints are created only after traversing a genuinely long path. Their positions
 /// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
 /// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
-#[expect(clippy::too_many_arguments)]
 fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     call_predicates: Option<&[ScopedPredicateId]>,
-    mut id: ScopedReachabilityConstraintId,
+    mut walk: ReachabilityWalk<'_>,
     mut use_checkpoint: bool,
-    mut visited: usize,
-    remaining: &mut [BindingCursor],
 ) -> Truthiness {
+    let BindingCursor {
+        mut id,
+        mut visited,
+    } = walk.current;
     let env = ProgramEnvironment::from_scope(scope);
     let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
     let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
@@ -972,41 +994,15 @@ fn evaluate_reachability_path<'db>(
                 evaluate_reachability_checkpoint(db, scope, id)
             } else {
                 let outcome = analyze_single(db, &env, &predicates[node.atom()]);
-                if !remaining.is_empty() && !outcome.is_uninhabited() {
-                    for sibling in &mut *remaining {
-                        if !sibling.pending() {
-                            continue;
-                        }
-                        let other = constraints.get_interior_node(sibling.id);
-                        if other.atom() == node.atom()
-                            && !is_reachability_checkpoint(
-                                call_predicates,
-                                other.atom(),
-                                sibling.visited,
-                            )
-                        {
-                            sibling.id = match outcome {
-                                Truthiness::AlwaysTrue => other.if_true(),
-                                Truthiness::AlwaysFalse => other.if_false(),
-                                Truthiness::Ambiguous => other.if_ambiguous(),
-                                Truthiness::Uninhabited => unreachable!(),
-                            };
-                            sibling.visited += 1;
-                        }
-                    }
-                }
-                id = match outcome {
-                    Truthiness::AlwaysTrue => node.if_true(),
-                    Truthiness::Ambiguous => node.if_ambiguous(),
-                    Truthiness::AlwaysFalse => node.if_false(),
-                    Truthiness::Uninhabited => {
+                id = walk
+                    .follow(constraints, call_predicates, node, outcome)
+                    .unwrap_or_else(|| {
                         // An uninhabited condition cannot take either branch. Retain only paths
                         // that bypass the condition, which are represented in both branches.
                         pending.push(node.if_false());
                         seen.get_or_insert_with(FxHashSet::default);
                         node.if_true()
-                    }
-                };
+                    });
                 use_checkpoint = true;
                 visited += 1;
                 continue;
@@ -1056,10 +1052,8 @@ fn evaluate_reachability_checkpoint<'db>(
         use_def.reachability_constraints(),
         predicates,
         call_predicates,
-        id,
+        ReachabilityWalk::new(id),
         false,
-        0,
-        &mut [],
     )
 }
 
@@ -1093,10 +1087,8 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             self,
             predicates,
             None,
-            id,
+            ReachabilityWalk::new(id),
             true,
-            0,
-            &mut [],
         )
     }
 }
@@ -2290,7 +2282,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         constraints: &ReachabilityConstraints,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
-        siblings: Option<&mut SiblingBindings>,
+        evaluate_primary: impl FnOnce(ScopeId<'db>) -> Truthiness,
     ) -> Truthiness {
         match id {
             ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
@@ -2309,7 +2301,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id);
+            let result = ReachabilityWalk::new(id).evaluate(db, scope);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
@@ -2319,13 +2311,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let result = if let Some((cursor, remaining)) =
-            siblings.and_then(|siblings| siblings.walk(constraints, id))
-        {
-            evaluate_reachability_frontier(db, self.primary_scope, id, cursor, remaining)
-        } else {
-            evaluate_reachability_constraint(db, self.primary_scope, id)
-        };
+        let result = evaluate_primary(self.primary_scope);
         let mut entries = self.primary_entries.borrow_mut();
         if entries.len() <= index {
             entries.resize(index + 1, None);
@@ -2344,7 +2330,9 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     if let Some(cache) = cache {
-        cache.evaluate(db, constraints, predicates, id, None)
+        cache.evaluate(db, constraints, predicates, id, |scope| {
+            ReachabilityWalk::new(id).evaluate(db, scope)
+        })
     } else {
         constraints.evaluate(db, predicates, id)
     }
@@ -2509,7 +2497,8 @@ class TargetB:
             let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
-                evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
+                ReachabilityWalk::new(use_def.end_of_scope_reachability())
+                    .evaluate(&db, scope)
                     .may_be_true()
             );
         }
@@ -2523,7 +2512,8 @@ class TargetB:
         let scope = function_scope.to_scope_id(&db, program_file);
         let use_def = use_def_map(&db, scope);
         assert!(
-            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
+            ReachabilityWalk::new(use_def.end_of_scope_reachability())
+                .evaluate(&db, scope)
                 .is_always_false()
         );
         Ok(())

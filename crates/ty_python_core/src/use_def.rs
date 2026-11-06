@@ -1532,9 +1532,14 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
-    /// Remaining live bindings, excluding the optional synthetic leading unbound entry.
-    pub fn live_bindings(&self) -> &'map [LiveBinding] {
-        self.inner.as_slice()
+    /// The reachability roots in the same order as the bindings, including the implicit
+    /// unbound entry when present.
+    pub fn reachability_constraint_ids(
+        &self,
+    ) -> impl Iterator<Item = ScopedReachabilityConstraintId> + Clone {
+        self.initial_unbound
+            .into_iter()
+            .chain(self.inner.clone().map(LiveBinding::reachability_constraint))
     }
 
     pub const fn predicates(&self) -> &'map Predicates<'db> {
@@ -1552,11 +1557,6 @@ impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
 
 impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
     type Item = BindingWithConstraints<'map, 'db>;
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.inner.len() + usize::from(self.initial_unbound.is_some());
-        (len, Some(len))
-    }
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(reachability_constraint) = self.initial_unbound.take() {
@@ -1584,8 +1584,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             })
     }
 }
-
-impl ExactSizeIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 

@@ -11,7 +11,7 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    NarrowingProjector, ReachabilityEvaluationCache, SiblingBindings, evaluate_reachability,
+    BindingReachability, NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
     evaluate_reachability_with_cache,
 };
 use crate::types::{
@@ -1859,7 +1859,8 @@ fn place_from_bindings_impl<'db>(
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
-    let mut siblings = SiblingBindings::new(&bindings_with_constraints);
+    let mut reachability =
+        BindingReachability::new(bindings_with_constraints.clone(), reachability_cache);
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
@@ -1897,14 +1898,15 @@ fn place_from_bindings_impl<'db>(
     let mut only_non_shadowing_bindings = true;
     let mut narrowing_projector = None;
 
-    let mut types = bindings_with_constraints.filter_map(
-        |BindingWithConstraints {
-             binding,
-             narrowing_constraint,
-             reachability_constraint,
-             ..
-         }| {
-            siblings.next_binding();
+    let mut types = bindings_with_constraints
+        .enumerate()
+        .filter_map(|(index, binding)| {
+            let BindingWithConstraints {
+                binding,
+                narrowing_constraint,
+                reachability_constraint,
+                ..
+            } = binding;
             let binding = match binding {
                 DefinitionState::Defined(binding)
                     if is_discarded_dict_key_assignment(db, binding) =>
@@ -1936,13 +1938,7 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
-            let static_reachability = siblings.evaluate(
-                db,
-                reachability_cache,
-                reachability_constraints,
-                predicates,
-                reachability_constraint,
-            );
+            let static_reachability = reachability.evaluate(db, index, reachability_constraint);
 
             if static_reachability.is_always_false() {
                 // If the static reachability evaluates to false, the binding is either not reachable
@@ -2040,8 +2036,7 @@ fn place_from_bindings_impl<'db>(
                     .narrow(constraint, binding_ty),
             };
             Some((narrowed, static_reachability))
-        },
-    );
+        });
 
     let place = if let Some((first, first_reachability)) = types.next() {
         let ty = if let Some((second, second_reachability)) = types.next() {
