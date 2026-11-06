@@ -66,9 +66,6 @@ fn generate_markdown() -> String {
     );
     let _ = writeln!(&mut output, "# Rules\n");
 
-    let mut lints: Vec<_> = registry.lints().iter().collect();
-    lints.sort_by_key(|a| a.name());
-
     let mut aliases: FxHashMap<LintId, Vec<LintName>> = FxHashMap::default();
 
     // Map of {<rule ID>: <aliases for that rule>}
@@ -80,9 +77,9 @@ fn generate_markdown() -> String {
     // turning them into inline links automatically.
     let rule_link_re = Regex::new(r"`([^`]+)`").unwrap();
 
-    for lint in lints {
+    for &lint in registry.lints().iter().sorted_by_key(|lint| lint.name()) {
         // Keep links to the old rule heading working after a rename.
-        let mut names = aliases.remove(lint).unwrap_or_default();
+        let mut names = aliases.remove(&lint).unwrap_or_default();
         names.sort_unstable();
         if !names.is_empty() {
             for name in &names {
