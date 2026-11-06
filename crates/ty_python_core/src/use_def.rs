@@ -3651,6 +3651,7 @@ impl FlowInputs {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
@@ -3658,6 +3659,56 @@ mod tests {
     use crate::db::tests::TestDbBuilder;
     use crate::scope::FileScopeId;
     use crate::{TestProgramDb as _, semantic_index};
+
+    static DEPENDENT_EXECUTIONS: AtomicUsize = AtomicUsize::new(0);
+
+    #[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
+    fn count_scope_definitions<'db>(
+        db: &'db dyn crate::Db,
+        scope: crate::scope::ScopeId<'db>,
+    ) -> usize {
+        DEPENDENT_EXECUTIONS.fetch_add(1, Ordering::Relaxed);
+        crate::use_def_map(db, scope)
+            .definitions_with_usage()
+            .count()
+    }
+
+    #[test]
+    fn recorded_scope_backdates_across_unrelated_edits() -> anyhow::Result<()> {
+        let path = "/src/mod.py";
+        let observed = "def observed(x):\n    return x\n";
+        let other = "\ndef other(x):\n    return x\n";
+        let initial = format!("{observed}{other}");
+        let mut db = TestDbBuilder::new().with_file(path, &initial).build()?;
+        let file = system_path_to_file(&db, path)?;
+        let inspect = |db: &crate::db::tests::TestDb| {
+            let index = semantic_index(db, db.program().program_file(db, file));
+            let (scope, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+            (
+                count_scope_definitions(db, index.scope_id(scope)),
+                matches!(index.use_def_maps[scope], super::ScopeMap::Recorded(..)),
+                DEPENDENT_EXECUTIONS.load(Ordering::Relaxed),
+            )
+        };
+
+        let (definitions, recorded, executions) = inspect(&db);
+        assert!(recorded);
+        let changed_other = other.replace("return x", "y = x\n    return y");
+        db.write_file(path, format!("{observed}{changed_other}"))?;
+        assert_eq!(inspect(&db), (definitions, true, executions));
+
+        let changed_observed = observed.replace("return x", "y = x\n    return y");
+        db.write_file(path, format!("{changed_observed}{changed_other}"))?;
+        assert_eq!(inspect(&db), (definitions + 1, true, executions + 1));
+
+        let branched = observed.replace("return x", "if x:\n        return x");
+        db.write_file(path, format!("{branched}{changed_other}"))?;
+        assert_eq!(inspect(&db), (definitions, false, executions + 2));
+
+        db.write_file(path, format!("{observed}{changed_other}"))?;
+        assert_eq!(inspect(&db), (definitions, true, executions + 3));
+        Ok(())
+    }
 
     #[test]
     fn recorded_scope_is_shared_and_replayed_after_an_edit() -> anyhow::Result<()> {
