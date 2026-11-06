@@ -2869,6 +2869,7 @@ impl<'a> Checker<'a> {
         }
 
         // Create the `Binding`.
+        let is_annotation = kind.is_annotation();
         let binding_id = self.semantic.push_binding(name, range, kind, flags);
 
         // If the name is private, mark is as such.
@@ -2876,16 +2877,15 @@ impl<'a> Checker<'a> {
             self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_DECLARATION;
         }
 
-        // If there's an existing binding in this scope, copy its references.
-        if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
-            // If this is an annotation, and we already have an existing value in the same scope,
-            // don't treat it as an assignment, but track it as a delayed annotation.
-            if self.semantic.binding(binding_id).kind.is_annotation() {
-                self.semantic
-                    .add_delayed_annotation(shadowed_id, binding_id);
-                return binding_id;
-            }
+        // An annotation on an existing value is delayed and leaves the binding in place.
+        if is_annotation && let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
+            self.semantic
+                .add_delayed_annotation(shadowed_id, binding_id);
+            return binding_id;
+        }
 
+        // If this binding replaces an existing one, copy its references.
+        if let Some(shadowed_id) = self.semantic.scopes[scope_id].add(name, binding_id) {
             // Avoid shadowing builtins.
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
@@ -2921,10 +2921,6 @@ impl<'a> Checker<'a> {
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
         }
-
-        // Add the binding to the scope.
-        let scope = &mut self.semantic.scopes[scope_id];
-        scope.add(name, binding_id);
 
         binding_id
     }
