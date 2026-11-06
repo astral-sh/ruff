@@ -3764,6 +3764,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let has_named_expression = values
             .iter()
             .any(|value| any_over_expr(value, &ast::Expr::is_named_expr));
+        // Each operand sees the narrowing from the preceding operands. If the expression
+        // introduces no bindings, none of that narrowing survives the short-circuit paths
+        // rejoining. Restore their common entry state after visiting the operands.
+        let entry = (!has_named_expression
+            && !self
+                .exception_context_stack_manager
+                .has_active_exception_handler(self))
+        .then(|| self.flow_snapshot());
         let mut reachability_constraints = SmallVec::<[ScopedReachabilityConstraintId; 1]>::new();
         let mut last_condition_flow_snapshots = None;
 
@@ -3795,21 +3803,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .current_reachability_constraints_mut()
                     .add_atom(predicate_id);
 
-                let continuation = if let Some(condition_flow_snapshots) = condition_flow_snapshots
-                {
-                    let (short_circuit, continuation) =
-                        condition_flow_snapshots.into_short_circuit_and_continuation(*op);
-                    self.flow_restore(short_circuit);
-                    continuation
-                } else {
-                    self.flow_snapshot()
-                };
+                if entry.is_none() {
+                    let continuation =
+                        if let Some(condition_flow_snapshots) = condition_flow_snapshots {
+                            let (short_circuit, continuation) =
+                                condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                            self.flow_restore(short_circuit);
+                            continuation
+                        } else {
+                            self.flow_snapshot()
+                        };
 
-                // This path reaches the current operand and then short-circuits.
-                self.record_negated_reachability_constraint(reachability_constraint);
-                snapshots.push(self.flow_snapshot());
+                    // This path reaches the current operand and then short-circuits.
+                    self.record_negated_reachability_constraint(reachability_constraint);
+                    snapshots.push(self.flow_snapshot());
 
-                self.flow_restore(continuation);
+                    self.flow_restore(continuation);
+                }
                 self.record_narrowing_constraint_id_for_places(predicate_id, &possibly_narrowed);
                 // The continuation carries the conditions that led to this operand. Named
                 // expressions can introduce new bindings that still need the earlier gates.
@@ -3820,6 +3830,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             } else {
                 last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
             }
+        }
+
+        if let Some(entry) = entry {
+            self.flow_restore(entry);
+            return;
         }
 
         let has_specialized_last = last_condition_flow_snapshots.is_some();
