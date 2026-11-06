@@ -8647,7 +8647,7 @@ def _(f: type[GenericFoo[int]]) -> None:
 ```
 
 For a covariant protocol, inference combines the specializations contributed by each class object in
-a union.
+a union, including the specialization from a type variable's upper bound.
 
 ```py
 class Producer[T](Protocol):
@@ -8659,6 +8659,9 @@ def infer_producer[T](cls: type[Producer[T]]) -> T:
 def _(flag: bool) -> None:
     cls = GenericFooImpl[int] if flag else GenericFooImpl[str]
     reveal_type(infer_producer(cls))  # revealed: int | str
+
+def bounded[C: type[Producer[str]]](cls: C | type[Producer[int]]) -> None:
+    reveal_type(infer_producer(cls))  # revealed: str | int
 ```
 
 ## Default specialization of generic meta-protocol constructors

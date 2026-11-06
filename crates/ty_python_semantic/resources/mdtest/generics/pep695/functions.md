@@ -3477,8 +3477,6 @@ For a covariant parameter, the inferred type must include the element type of ev
 member. The result is the union of those types, regardless of member order.
 
 ```py
-from typing import assert_type
-
 class Source[T]:
     def get(self) -> T:
         raise NotImplementedError
@@ -3487,8 +3485,22 @@ def from_source[T](value: Source[T] | None) -> T:
     raise NotImplementedError
 
 def check_source(value: Source[int] | Source[str], reverse: Source[str] | Source[int]):
-    assert_type(from_source(value), int | str)
-    assert_type(from_source(reverse), int | str)
+    reveal_type(from_source(value))  # revealed: int | str
+    reveal_type(from_source(reverse))  # revealed: str | int
+```
+
+A plain `Source[T]` parameter also infers the union. An `Any` member leaves the element type
+unknown.
+
+```py
+from typing import Any
+
+def read[T](value: Source[T]) -> T:
+    return value.get()
+
+def check(value: Source[int] | Source[str], gradual: Source[int] | Any):
+    reveal_type(read(value))  # revealed: int | str
+    reveal_type(read(gradual))  # revealed: Unknown
 ```
 
 For a contravariant parameter, the inferred type must be accepted by every argument union member.
@@ -3503,6 +3515,25 @@ def from_sink[T](value: Sink[T] | None) -> T:
 
 def check_sink(value: Sink[int] | Sink[str]):
     reveal_type(from_sink(value))  # revealed: Never
+```
+
+Both `list[T]` and `list[T] | None` require one `T` shared by all list members of the argument
+union.
+
+```py
+def take_list[T](value: list[T]) -> None: ...
+def take_optional_list[T](value: list[T] | None) -> None: ...
+def check_lists(value: list[int] | list[str]):
+    take_list(value)  # error: [invalid-argument-type]
+    take_optional_list(value)  # error: [invalid-argument-type]
+```
+
+The key type is invariant even when the dictionary's value type is `Any`.
+
+```py
+def take_dict[T](value: dict[T, Any]) -> None: ...
+def check_keys(value: dict[int, Any] | dict[str, Any]):
+    take_dict(value)  # error: [invalid-argument-type]
 ```
 
 ## Union inference preserves outer type variables
