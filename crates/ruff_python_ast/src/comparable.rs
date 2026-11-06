@@ -881,7 +881,7 @@ pub struct ComparableDictItem<'a> {
 }
 
 impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
-    fn from(ast::DictItem { key, value }: &'a ast::DictItem) -> Self {
+    fn from(ast::DictItem { key, value, .. }: &'a ast::DictItem) -> Self {
         Self {
             key: key.as_ref().map(ComparableExpr::from),
             value: value.into(),

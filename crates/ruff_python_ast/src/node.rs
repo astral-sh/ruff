@@ -23,23 +23,15 @@ impl ast::ElifElseClause {
     }
 }
 
-impl ast::ExprDict {
+impl ast::DictItem {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprDict {
-            items,
-            range: _,
-            node_index: _,
-        } = self;
-
-        for ast::DictItem { key, value } in items {
-            if let Some(key) = key {
-                visitor.visit_expr(key);
-            }
-            visitor.visit_expr(value);
+        if let Some(key) = &self.key {
+            visitor.visit_expr(key);
         }
+        visitor.visit_expr(&self.value);
     }
 }
 

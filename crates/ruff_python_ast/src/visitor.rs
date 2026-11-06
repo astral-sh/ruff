@@ -5,7 +5,7 @@ pub mod transformer;
 
 use crate::{
     self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
-    Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPartRef,
+    Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPartRef,
     InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
     PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam, TypeParamParamSpec,
     TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
@@ -69,6 +69,11 @@ pub trait Visitor<'a> {
     fn visit_alias(&mut self, alias: &'a Alias) {
         walk_alias(self, alias);
     }
+    fn visit_dict_item(&mut self, dict_item: &'a DictItem) {
+        walk_dict_item(self, dict_item);
+    }
+
+    #[inline]
     fn visit_with_item(&mut self, with_item: &'a WithItem) {
         walk_with_item(self, with_item);
     }
@@ -428,11 +433,8 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _,
             node_index: _,
         }) => {
-            for ast::DictItem { key, value } in items {
-                if let Some(key) = key {
-                    visitor.visit_expr(key);
-                }
-                visitor.visit_expr(value);
+            for item in items {
+                visitor.visit_dict_item(item);
             }
         }
         Expr::Set(ast::ExprSet {
@@ -689,6 +691,13 @@ pub fn walk_parameter<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameter: &
 
 pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
     visitor.visit_expr(&keyword.value);
+}
+
+pub fn walk_dict_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, dict_item: &'a DictItem) {
+    if let Some(key) = &dict_item.key {
+        visitor.visit_expr(key);
+    }
+    visitor.visit_expr(&dict_item.value);
 }
 
 pub fn walk_with_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, with_item: &'a WithItem) {
