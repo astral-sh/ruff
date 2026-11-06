@@ -51,7 +51,9 @@ pub(crate) fn check_function_definition<'db>(
     // ordinary callable signature already has both, including for async functions whose
     // public return type is wrapped in a coroutine.
     let raw_signature;
-    let signature = if function_type.updated_signature(db).is_none()
+    let signature = if last_definition.is_overload(db) {
+        last_definition.public_overload_signature(db)
+    } else if function_type.updated_signature(db).is_none()
         && let ([], Some(_)) = function_type.overloads_and_implementation(db)
         && let [signature] = function_type.signature(db).overloads.as_slice()
         && signature.definition == Some(definition)
