@@ -1162,6 +1162,19 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Looking up a method on a union of literals binds it to each receiver.
+            // Different singleton receivers rule out redundancy in both directions via
+            // `__self__`; neither method can cover the complement of the other either.
+            if let (Type::BoundMethod(left), Type::BoundMethod(right)) = (ty, element_type)
+                && let (Type::LiteralValue(left), Type::LiteralValue(right)) =
+                    (left.self_instance(db), right.self_instance(db))
+                && !left.is_literal_string()
+                && !right.is_literal_string()
+                && left.kind() != right.kind()
+            {
+                continue;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
