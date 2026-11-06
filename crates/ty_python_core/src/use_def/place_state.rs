@@ -492,7 +492,7 @@ impl Bindings {
     }
 
     /// Add given reachability constraint to all live bindings.
-    fn record_reachability_constraint(
+    pub(super) fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
