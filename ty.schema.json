@@ -706,6 +706,16 @@
             }
           ]
         },
+        "inconsistent-overload-implementation": {
+          "title": "detects implementations that are inconsistent with their overloads",
+          "description": "## What it does\n\nChecks for overload implementations that are incompatible with one or more overloads.\n\nAfter decorators are applied, the implementation must accept every call allowed by the overloads.\nEach overload's return type must be assignable to the implementation's return type.\n\n## Why is this bad?\n\nCallers rely on the overloads to know which arguments they can pass and what type to expect in\nreturn.\n\n## Examples\n\n### Incompatible parameters\n\n```py\nfrom typing import overload\n\n\n@overload\ndef read() -> str: ...  # error\n@overload\ndef read(size: int) -> str: ...\ndef read(size: int) -> str:\n    return \"x\" * size\n```\n\nThe first overload allows `read()`. At runtime, that call raises `TypeError` because the\nimplementation requires a `size` argument.\n\n### Incompatible return type\n\n```py\nfrom typing import overload\n\n\n@overload\ndef double(value: int) -> int: ...  # error\n@overload\ndef double(value: str) -> str: ...\ndef double(value: int | str) -> str:\n    return str(value) * 2\n```\n\nThe first overload promises an `int`, but `double(3)` returns the string `\"33\"`.\n\n### A decorator makes the implementation uncallable\n\n```py\nfrom collections.abc import Callable\nfrom typing import overload\n\nhandlers: list[Callable[..., str]] = []\n\n\ndef register(func: Callable[..., str]) -> None:\n    handlers.append(func)\n\n\n@overload\ndef greet() -> str: ...\n@overload\ndef greet(name: str) -> str: ...\n@register\ndef greet(name: str = \"world\") -> str:  # error\n    return f\"Hello, {name}!\"\n```\n\n`register` returns `None`, so `@register` leaves `greet` bound to `None`. Calling `greet()` raises\n`TypeError`.\n\n## References\n\n- [Typing specification: Implementation consistency](https://typing.python.org/en/latest/spec/overload.html#implementation-consistency)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "index-out-of-bounds": {
           "title": "detects index out of bounds errors",
           "description": "## What it does\n\nChecks for attempts to use an out of bounds index to get an item from a container.\n\n## Why is this bad?\n\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n\n```python\nt = (0, 1, 2)\n# IndexError: tuple index out of range\nt[3]  # error\n```",
