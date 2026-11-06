@@ -733,6 +733,63 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
     ");
 }
 
+#[test_case::test_case("check"; "lint")]
+#[test_case::test_case("format"; "format")]
+fn notebook_rewrites_preserve_numbers(subcommand: &str) -> Result<()> {
+    let original = r#"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/json": [
+       0.022936753928661346,
+       0.16423597931861877
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "import os\n",
+    "print( 1 )"
+   ]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+"#;
+    let temp_dir = TempDir::new()?;
+    let path = temp_dir.path().join("notebook.ipynb");
+    fs::write(&path, original)?;
+
+    let mut command = ruff_cmd();
+    command.args([subcommand, "--isolated", "--no-cache"]);
+    let expected = if subcommand == "check" {
+        command.args(["--select", "F401", "--fix"]);
+        original.replace("    \"import os\\n\",\n", "")
+    } else {
+        original.replace("    \"print( 1 )\"", "    \"\\n\",\n    \"print(1)\"")
+    };
+    command.arg(&path);
+
+    let output = command.output()?;
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(fs::read_to_string(&path)?, expected);
+
+    // A second pass must leave the saved data unchanged too.
+    let output = command.output()?;
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(fs::read_to_string(&path)?, expected);
+    Ok(())
+}
+
 #[test]
 fn stdin_format_jupyter() {
     assert_cmd_snapshot!(ruff_cmd()
