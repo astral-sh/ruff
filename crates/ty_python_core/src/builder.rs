@@ -105,7 +105,6 @@ struct NarrowingAlias<'ast> {
 
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
-    has_seen_match: bool,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
@@ -535,7 +534,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
-            has_seen_match: false,
             current_loop: None,
             narrowing_aliases: saved_aliases,
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
@@ -3782,10 +3780,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .any(|value| any_over_expr(value, &ast::Expr::is_named_expr));
         // Each operand sees the narrowing from the preceding operands. If the expression
         // introduces no bindings, none of that narrowing survives the short-circuit paths
-        // rejoining. After a match, merging can still apply pending narrowing to a rebound
-        // subject, even outside the case body.
+        // rejoining. Restore their common entry state after visiting the operands.
         let entry = (!has_named_expression
-            && !self.current_scope_info().has_seen_match
             && !self
                 .exception_context_stack_manager
                 .has_active_exception_handler(self))
@@ -4937,7 +4933,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 node_index: _,
             }) => {
                 debug_assert_eq!(self.current_match_case, None);
-                self.current_scope_info_mut().has_seen_match = true;
 
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);

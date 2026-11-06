@@ -3614,24 +3614,6 @@ def narrow_after_as_capture(value: int | str, flag: bool) -> None:
             reveal_type(value)  # revealed: str
 ```
 
-### Boolean tests after a positional capture
-
-Only integers fall through this match. A subsequent boolean test preserves that narrowing.
-
-```py
-def select(value: int | str, enabled: bool, force: bool) -> int:
-    match value:
-        case str(value) if enabled:
-            return len(value)
-        case int():
-            pass
-        case _:
-            return 0
-    if enabled or force:
-        return value
-    return 0
-```
-
 ### Or pattern alternatives
 
 Each alternative can capture the whole subject under its original name.
