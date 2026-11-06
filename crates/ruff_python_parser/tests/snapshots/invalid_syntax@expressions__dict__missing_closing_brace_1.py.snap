@@ -20,6 +20,8 @@ Module(
                             range: 0..10,
                             items: [
                                 DictItem {
+                                    range: 1..10,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {

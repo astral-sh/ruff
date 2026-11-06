@@ -158,7 +158,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
     let mut seen_keys = FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
     let mut seen_values = FxHashMap::default();
 
-    for (i, ast::DictItem { key, value }) in dict.iter().enumerate() {
+    for (i, ast::DictItem { key, value, .. }) in dict.iter().enumerate() {
         let Some(key) = key else {
             continue;
         };

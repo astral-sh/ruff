@@ -747,6 +747,8 @@ Module(
                                         range: 319..325,
                                         items: [
                                             DictItem {
+                                                range: 320..324,
+                                                node_index: NodeIndex(None),
                                                 key: Some(
                                                     Name(
                                                         ExprName {
