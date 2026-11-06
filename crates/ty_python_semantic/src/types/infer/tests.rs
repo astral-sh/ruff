@@ -1490,6 +1490,53 @@ class Model(ModelBase):
 }
 
 #[test]
+fn inherited_protocol_requirements_track_member_edits() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/reader.pyi",
+        r#"
+        from typing import Protocol
+        from base import Base
+
+        class Reader[T](Base[T], Protocol): ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from reader import Reader
+
+        class ReaderImpl:
+            def load(self, item: int, /) -> None: pass
+
+        value: Reader[int] = ReaderImpl()
+        "#,
+    )?;
+
+    let load = "def load(self, item: T, /) -> None: ...";
+    let incompatible = &["Object of type `ReaderImpl` is not assignable to `Reader[int]`"][..];
+    for (members, diagnostics) in [
+        (load, &[][..]),
+        (
+            "def load(self, item: T, /) -> None: ...\n    def flush(self) -> None: ...",
+            incompatible,
+        ),
+        ("def load_all(self, item: T, /) -> None: ...", incompatible),
+        ("def load(self, item: str, /) -> None: ...", incompatible),
+        (load, &[][..]),
+    ] {
+        db.write_file(
+            "/src/base.pyi",
+            format!("from typing import Protocol\n\nclass Base[T](Protocol):\n    {members}\n"),
+        )?;
+        assert_file_diagnostics(&db, "/src/main.py", diagnostics);
+    }
+    Ok(())
+}
+
+#[test]
 fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
     // Changing an imported type must invalidate the cached proof even when the protocol and its
     // consumer are unchanged. Cover both direct inspection and the type-parameter proof needed
