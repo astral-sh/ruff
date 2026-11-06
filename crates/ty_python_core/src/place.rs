@@ -231,6 +231,14 @@ impl PlaceTable {
         self.symbols.iter()
     }
 
+    /// Symbols bound or declared in this scope, together with their use-def map IDs.
+    pub fn defined_symbols(&self) -> impl Iterator<Item = (ScopedSymbolId, &Symbol)> {
+        self.symbols()
+            .enumerate()
+            .filter(|(_, symbol)| symbol.is_bound() || symbol.is_declared())
+            .map(|(index, symbol)| (ScopedSymbolId::from_usize(index), symbol))
+    }
+
     /// Iterator over all members in this scope.
     pub fn members(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()
