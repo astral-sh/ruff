@@ -1,6 +1,9 @@
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
-use std::{collections::BTreeMap, ops::Deref};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Deref,
+};
 
 use itertools::Itertools;
 
@@ -87,20 +90,20 @@ impl<'db> ProtocolClass<'db> {
             .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
     }
 
-    /// Returns the interface before an invariant specialization is materialized.
+    /// Returns the origin used to build the interface before an invariant specialization is materialized.
     ///
     /// A materialized generic origin retains its specialization for nominal identity and display.
     /// Building member requirements from that specialization, however, would first materialize an
     /// invariant type variable as a read and then reuse that result as its write. Strip only the
     /// pending marker while constructing the shared interface so reads and writes can each apply
     /// the original materialization in their own variance position.
-    pub(super) fn unmaterialized_interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    pub(super) fn unmaterialized_origin(self, db: &'db dyn Db) -> Self {
         let ClassType::Generic(alias) = *self else {
-            return self.interface(db);
+            return self;
         };
         let specialization = alias.specialization(db);
         if specialization.materialization_kind(db).is_none() {
-            return self.interface(db);
+            return self;
         }
 
         let alias = GenericAlias::new(
@@ -108,7 +111,7 @@ impl<'db> ProtocolClass<'db> {
             alias.origin(db),
             specialization.with_materialization_kind(db, None),
         );
-        ProtocolClass(ClassType::Generic(alias)).interface(db)
+        ProtocolClass(ClassType::Generic(alias))
     }
 
     /// Walk the effective non-method member types declared by this protocol.
@@ -536,12 +539,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         name: &str,
     ) -> bool {
         self.includes_member(db, name)
-            || !matches!(name, "__hash__" | "__dict__")
-                && object_member_names(db, self.interface.program(db)).contains(name)
-                && matches!(
-                    Type::object().member(db, env, name).place,
-                    Place::Defined(place) if place.is_definitely_defined()
-                )
+            || object_provides_protocol_member(db, env, self.interface.program(db), name)
     }
 
     /// Compare the original and materialized forms of members required by `required`.
@@ -3499,6 +3497,61 @@ fn object_member_names<'db>(db: &'db dyn Db, program: Program<'db>) -> FxHashSet
     names
 }
 
+fn object_provides_protocol_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    program: Program<'db>,
+    name: &str,
+) -> bool {
+    !matches!(name, "__hash__" | "__dict__")
+        && object_member_names(db, program).contains(name)
+        && matches!(
+            Type::object().member(db, env, name).place,
+            Place::Defined(place) if place.is_definitely_defined()
+        )
+}
+
+impl<'db> ProtocolInstanceType<'db> {
+    /// Return the required names without specializing their readable and writable types.
+    pub(super) fn member_names(self, db: &'db dyn Db) -> &'db BTreeSet<Name> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, ()| BTreeSet::new(), heap_size=ruff_memory_usage::heap_size)]
+        fn required_names<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> BTreeSet<Name> {
+            let Some(class) = protocol.class_origin(db) else {
+                return protocol
+                    .interface(db)
+                    .base()
+                    .inner(db)
+                    .keys()
+                    .cloned()
+                    .collect();
+            };
+            let class = if protocol.materialization_kind(db).is_some() {
+                class.unmaterialized_origin(db)
+            } else {
+                class
+            };
+            let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+            let mut names = BTreeSet::new();
+            class.for_each_member_candidate(db, &env, |name, _, _| {
+                names.insert(name.clone());
+            });
+            names
+        }
+        required_names(db, self, ())
+    }
+
+    pub(super) fn interface_program(self, db: &'db dyn Db) -> Program<'db> {
+        self.class_origin(db).map_or_else(
+            || self.interface(db).base().program(db),
+            |class| class.class_literal(db).program_file(db).program(db),
+        )
+    }
+}
+
 /// Count protocol requirements that cannot be supplied by inherited `object` members.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn non_object_protocol_member_count<'db>(
@@ -3737,32 +3790,26 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let target_interface = protocol.interface(db);
+    let target_names = protocol.member_names(db);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(db);
-
-            (source_interface.member_count(db) >= target_interface.member_count(db)
-                || source_interface.member_count(db)
-                    >= non_object_protocol_member_count(db, target_interface.interface))
-                && target_interface.members(db).all(|member| {
-                    source_interface.includes_member_or_object_fallback(db, env, member.name())
-                })
+            let source_names = source_protocol.member_names(db);
+            target_names.iter().all(|name| {
+                source_names.contains(name)
+                    || object_provides_protocol_member(
+                        db,
+                        env,
+                        source_protocol.interface_program(db),
+                        name,
+                    )
+            })
         }
-        _ => target_interface.members(db).all(|member| {
-            ty.member_lookup_with_policy(
-                db,
-                env,
-                member.name(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-            .is_definitely_bound()
-                || ty
-                    .member(db, env, member.name())
-                    .place
-                    .is_definitely_bound()
+        _ => target_names.iter().all(|name| {
+            ty.member_lookup_with_policy(db, env, name, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+                .place
+                .is_definitely_bound()
+                || ty.member(db, env, name).place.is_definitely_bound()
         }),
     }
 }

@@ -1894,18 +1894,16 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            let interface = protocol.interface(db);
+            let names = protocol.member_names(db);
 
             // Neither hashability nor instance-dictionary storage is guaranteed for every object.
             // Subclasses can replace `object.__hash__` with `None`, while slotted instances can
             // omit the `__dict__` that typeshed broadly declares on `object`.
-            if interface.includes_member(db, "__hash__")
-                || interface.includes_member(db, "__dict__")
-            {
+            if names.contains("__hash__") || names.contains("__dict__") {
                 return false;
             }
 
-            let env = ProgramEnvironment::from_program(interface.base().program(db));
+            let env = ProgramEnvironment::from_program(protocol.interface_program(db));
             // A protocol equivalent to `object` must be satisfied by every possible receiver type.
             // Use an unconstrained type variable so `Self` remains specific to the receiver:
             // `object.__class__` accepts `type[Self]`, and a concrete return type cannot satisfy
@@ -2119,7 +2117,10 @@ impl<'db> Protocol<'db> {
                 ProtocolInterfaceView::new(synthesized.interface(), None)
             }
             Self::Materialized(materialized) => ProtocolInterfaceView::new(
-                materialized.origin(db).unmaterialized_interface(db),
+                materialized
+                    .origin(db)
+                    .unmaterialized_origin(db)
+                    .interface(db),
                 Some(materialized.materialization_kind(db)),
             ),
         }
