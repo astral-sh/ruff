@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#ebec9bd301f36aa1308fc2e0c743129ff23581fc" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#966714453cc6fd34bedae5090a4e2db984fca1fc" }
 dependencies = [
     { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" } },
     { name = "jinja2" },
@@ -1029,7 +1029,7 @@ wheels = [
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=e1f6fe93da5de0cbaf0ab00341d05968a0331fae#e1f6fe93da5de0cbaf0ab00341d05968a0331fae" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=4bec1e883f8f9900d8ccfd682a0b2ed7f34b7acd#4bec1e883f8f9900d8ccfd682a0b2ed7f34b7acd" }
 dependencies = [
     { name = "tomlkit" },
 ]
