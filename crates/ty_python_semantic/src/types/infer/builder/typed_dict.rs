@@ -499,9 +499,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             callable_type
         };
-        let bindings =
-            self.bindings_for_call(binding_callable)
-                .match_parameters(db, env, &call_arguments);
+        let bindings = self
+            .scoped_call_bindings(binding_callable)
+            .match_parameters(db, env, &call_arguments);
 
         if can_infer && !bindings.satisfies(|_| true) {
             self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
