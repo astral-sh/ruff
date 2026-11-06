@@ -681,14 +681,6 @@ reason = "lint status constructors intentionally cover every lifecycle state"
 [[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_semantic"
-item = "lint::LintRegistry::removed"
-kind = "inherent_method"
-level = "expect"
-reason = "lint registry queries intentionally cover aliases and removed rules"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_python_semantic"
 item = "lint::RuleSelection::enabled"
 kind = "inherent_method"
 level = "expect"

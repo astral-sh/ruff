@@ -77,6 +77,14 @@ fn generate_markdown() -> String {
         write_rule(&mut output, lint, &aliases);
     }
 
+    let removed = registry.removed().sorted_by_key(|lint| lint.name());
+    if !removed.as_slice().is_empty() {
+        output.push_str("## Removed rules\n\n");
+        for lint in removed {
+            write_rule(&mut output, lint, &aliases);
+        }
+    }
+
     output
 }
 
@@ -89,31 +97,6 @@ fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec
         }
         output.push('\n');
     }
-
-    let status_text = match lint.status() {
-        LintStatus::Preview { since } => {
-            format!(
-                r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-        LintStatus::Stable { since } => {
-            format!(
-                r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
-            )
-        }
-        LintStatus::Deprecated { since, .. } => {
-            format!(
-                r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-        LintStatus::Removed { since, .. } => {
-            format!(
-                r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
-            )
-        }
-    };
-
-    let _ = writeln!(output, "## `{rule_name}`\n", rule_name = lint.name());
 
     // Reformat headers as bold text
     let mut in_code_fence = false;
@@ -138,6 +121,37 @@ fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec
             }
         })
         .join("\n");
+
+    let status_text = match lint.status() {
+        LintStatus::Preview { since } => {
+            format!(
+                r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        LintStatus::Stable { since } => {
+            format!(
+                r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
+            )
+        }
+        LintStatus::Deprecated { since, .. } => {
+            format!(
+                r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+            )
+        }
+        LintStatus::Removed { since, reason } => {
+            let name = lint.name();
+            let reason = link_rule_names(reason);
+            let _ = writeln!(output, "### `{name}`\n");
+            let _ = writeln!(
+                output,
+                "Removed in [{since}](https://github.com/astral-sh/ty/releases/tag/{since}).\n\n**Why was this rule removed?**\n\n{reason}\n"
+            );
+            let _ = writeln!(output, "{documentation}\n");
+            return;
+        }
+    };
+
+    let _ = writeln!(output, "## `{rule_name}`\n", rule_name = lint.name());
 
     let quoted_name = |name: LintName| format!("\"{name}\"");
     let search_terms = if names.is_empty() {
