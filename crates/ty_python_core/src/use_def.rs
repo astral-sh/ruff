@@ -1135,6 +1135,26 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
+    /// Returns the definition that unconditionally binds `symbol` at the end of this scope
+    /// when no other binding or declaration contributes. A separate annotation can govern a
+    /// symbol's type even when only one binding reaches the end of the scope.
+    pub fn unconditional_end_of_scope_definition(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Option<Definition<'db>> {
+        let state = self.symbol_states[symbol].end_of_scope;
+        let [binding] = &self.interned_bindings[state.bindings_id()] else {
+            return None;
+        };
+        if binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            return None;
+        }
+        let definition = self.definition(binding.binding()).definition()?;
+        self.end_of_scope_symbol_declarations(symbol)
+            .all(|declaration| declaration.declaration.definition() == Some(definition))
+            .then_some(definition)
+    }
+
     fn end_of_scope_member_bindings(
         &self,
         member: ScopedMemberId,

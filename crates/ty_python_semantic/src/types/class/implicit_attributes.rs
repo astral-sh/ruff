@@ -1,19 +1,17 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
-use std::{convert::Infallible, hash::BuildHasher, ops::ControlFlow, sync::Arc};
+use std::{convert::Infallible, ops::ControlFlow};
 
-use rustc_hash::FxBuildHasher;
-
-use super::{CodeGeneratorKind, MethodDecorator, static_literal::StaticClassLiteral};
+use super::{
+    MethodDecorator, member_sources::ClassMemberSources, static_literal::StaticClassLiteral,
+};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        ClassBase, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
-        definition_expression_type,
+        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        generics::Specialization,
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
         member::Member,
@@ -22,10 +20,8 @@ use crate::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    reachability_constraints::ScopedReachabilityConstraintId,
     scope::{Scope, ScopeId},
     semantic_index, use_def_map,
 };
@@ -57,103 +53,6 @@ impl<'db> StaticClassLiteral<'db> {
                 },
                 |attribute| Self::implicit_attribute_inner(db, attribute),
             )
-    }
-
-    /// Names assigned to a method's receiver, in sorted order.
-    pub(in crate::types) fn implicit_attribute_definition_names(
-        self,
-        db: &'db dyn Db,
-    ) -> &'db [Name] {
-        &self.member_sources(db).implicit_names
-    }
-
-    /// The class-body table and receiver assignments used by lookups on this class.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn member_sources(self, db: &'db dyn Db) -> ClassMemberSources<'db> {
-        let scope = self.body_scope(db);
-        let index = semantic_index(db, scope.program_file(db));
-        let file_scope = scope.file_scope_id(db);
-        let table = index.shared_place_table(file_scope);
-        let implicit_names = collect_implicit_attribute_names(db, scope, true);
-        let mut instance_names = MemberNames::default();
-        let use_def = index.use_def_map(file_scope);
-        let is_stub = scope.file(db).is_stub(db);
-        for (id, mut bindings) in use_def.all_end_of_scope_symbol_bindings() {
-            let symbol = table.symbol(id);
-            if !symbol.is_bound() && !symbol.is_declared() {
-                continue;
-            }
-            // An unconditional method lives on the class. In a stub, the method can
-            // also declare an instance member by shadowing an inherited slot.
-            if !is_stub
-                && let Some(binding) = bindings.next()
-                && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
-                && bindings.next().is_none()
-                && let Some(definition) = binding.binding.definition()
-                && matches!(definition.kind(db), DefinitionKind::Function(function) if !function.has_decorators())
-                && use_def
-                    .end_of_scope_symbol_declarations(id)
-                    .all(|declaration| declaration.declaration.definition() == Some(definition))
-            {
-                continue;
-            }
-            instance_names.insert(symbol.name());
-        }
-        for name in &implicit_names {
-            instance_names.insert(name);
-        }
-        ClassMemberSources {
-            scope,
-            table,
-            implicit_names,
-            instance_names,
-        }
-    }
-
-    /// Ordinary classes can supply class members through their namespace, slots, or
-    /// receiver assignments. Member synthesis is consulted separately on a miss.
-    #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn ordinary_class_member_names(self, db: &'db dyn Db) -> Option<MemberNames> {
-        if CodeGeneratorKind::from_static_class(db, self).is_some() {
-            return None;
-        }
-        let sources = self.member_sources(db);
-        let mut names = MemberNames::default();
-        for symbol in sources.table.symbols() {
-            if symbol.is_bound() || symbol.is_declared() {
-                names.insert(symbol.name());
-            }
-        }
-        for name in sources
-            .implicit_names
-            .iter()
-            .chain(self.slot_names(db).unwrap_or_default())
-        {
-            names.insert(name);
-        }
-        Some(names)
-    }
-
-    /// A class body or a receiver assignment must supply an instance attribute. Inspect
-    /// the same specialized MRO as lookup and defer to it for dynamic bases and recovery.
-    #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn instance_member_names(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Option<MemberNames> {
-        let mut names = MemberNames::default();
-        for base in self.iter_mro(db, specialization) {
-            match base {
-                ClassBase::Class(class) => {
-                    let (literal, _) = class.static_class_literal(db)?;
-                    names.extend(&literal.member_sources(db).instance_names);
-                }
-                ClassBase::Generic | ClassBase::Protocol => {}
-                _ => return None,
-            }
-        }
-        Some(names)
     }
 
     #[salsa::tracked(
@@ -554,57 +453,6 @@ fn implicit_attribute_binding_type<'db>(
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, false)
-}
-
-/// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ClassMemberSources<'db> {
-    pub(super) scope: ScopeId<'db>,
-    pub(super) table: Arc<ty_python_core::place::PlaceTable>,
-    implicit_names: Box<[Name]>,
-    pub(super) instance_names: MemberNames,
-}
-
-/// A fixed-size name filter keeps the cost per class independent of how many
-/// attributes its ancestors define. Collisions fall back to ordinary member lookup.
-#[derive(Default, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct MemberNames([u64; 16]);
-
-impl MemberNames {
-    pub(super) fn bits(name: &str) -> (usize, u64) {
-        let hash = FxBuildHasher.hash_one(name);
-        (
-            usize::try_from((hash >> 12) & 15).expect("four bits fit in usize"),
-            (1 << (hash & 63)) | (1 << ((hash >> 6) & 63)),
-        )
-    }
-
-    fn insert(&mut self, name: &str) {
-        let (index, mask) = Self::bits(name);
-        self.0[index] |= mask;
-    }
-
-    fn extend(&mut self, other: &Self) {
-        for (word, other_word) in self.0.iter_mut().zip(other.0) {
-            *word |= other_word;
-        }
-    }
-
-    pub(super) fn might_contain(&self, name: &str) -> bool {
-        self.contains_bits(Self::bits(name))
-    }
-
-    pub(super) fn contains_bits(&self, (index, mask): (usize, u64)) -> bool {
-        self.0[index] & mask == mask
-    }
-}
-
 impl<'db> ClassMemberSources<'db> {
     fn implicit_attribute_name(
         &self,
@@ -612,16 +460,8 @@ impl<'db> ClassMemberSources<'db> {
         name: &str,
         decorator: MethodDecorator,
     ) -> Option<ImplicitAttributeName<'db>> {
-        let index = self
-            .implicit_names
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .ok()?;
-        Some(ImplicitAttributeName::new(
-            db,
-            self.scope,
-            &self.implicit_names[index],
-            decorator,
-        ))
+        let name = self.receiver_attribute_name(name)?;
+        Some(ImplicitAttributeName::new(db, self.scope, name, decorator))
     }
 
     /// Does a method establish instance storage for an attribute already typed by the class?
@@ -647,32 +487,6 @@ impl<'db> ClassMemberSources<'db> {
                 StaticClassLiteral::implicit_attribute_inner(db, attribute).member
             })
     }
-}
-
-fn collect_implicit_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    defined_only: bool,
-) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.program_file(db));
-    let mut names = Vec::new();
-
-    for function_scope_id in attribute_scopes(db, class_body_scope) {
-        let table = index.place_table(function_scope_id);
-        if defined_only {
-            names.extend(table.defined_instance_attribute_names().map(Name::new));
-        } else {
-            names.extend(
-                table
-                    .members()
-                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-            );
-        }
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
 }
 
 fn implicit_attribute_cycle_recover<'db>(

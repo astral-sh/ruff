@@ -5,7 +5,7 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
-use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute, MemberNames};
+use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
@@ -74,6 +74,7 @@ mod dynamic_literal;
 mod enum_literal;
 mod implicit_attributes;
 mod known;
+mod member_sources;
 mod named_tuple;
 mod slots;
 mod static_literal;
@@ -2303,7 +2304,7 @@ impl<'db> ClassType<'db> {
     /// Names assigned through a method receiver in this class, excluding inherited names.
     pub(super) fn own_instance_attribute_names(self, db: &'db dyn Db) -> &'db [Name] {
         self.static_class_literal(db).map_or(&[], |(literal, _)| {
-            implicit_attributes::implicit_attribute_names(db, literal.body_scope(db))
+            member_sources::implicit_attribute_names(db, literal.body_scope(db))
         })
     }
 
@@ -3148,7 +3149,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// allowing the caller to handle this case specially.
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
-        let bits = MemberNames::bits(name);
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
@@ -3167,12 +3167,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    // An augmented assignment can still read a class attribute from this base.
                     if pending_augmented_bindings.is_empty()
-                        && let Some((literal, _)) = class.static_class_literal(db)
-                        && !literal
-                            .member_sources(db)
-                            .instance_names
-                            .contains_bits(bits)
+                        && !class.may_define_own_instance_member(db, name)
                     {
                         continue;
                     }
