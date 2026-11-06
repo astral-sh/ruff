@@ -1258,12 +1258,12 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
 /// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
 /// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
 fn benchmark_recursive_callable_materialization(criterion: &mut Criterion) {
-    for depth in [8, 12] {
+    for (leaf_depth, cycle_depth) in [(8, 8), (12, 10)] {
         // Implicit aliases in the leaf case expose shared callables directly, without an
         // intervening cache for each named type alias.
-        for (name, recursive_target, alias_prefix) in [
-            ("leaf", "Recursive".to_string(), ""),
-            ("cycle", format!("A{depth}"), "type "),
+        for (name, depth, recursive_target, alias_prefix) in [
+            ("leaf", leaf_depth, "Recursive".to_string(), ""),
+            ("cycle", cycle_depth, format!("A{cycle_depth}"), "type "),
         ] {
             let mut code = format!(
                 "
