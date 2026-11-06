@@ -120,11 +120,11 @@ class Article(models.Model):
 article = Article(view_count=1)
 
 # TODO: Should not be an error, and the type should be `int`.
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(article.view_count)  # revealed: Unknown
 
 # The original field name is not available as an attribute.
-# TODO: Should be an unresolved-attribute error.
+# TODO: Should be an missing-attribute error.
 article.views
 
 # This is correct:
@@ -178,7 +178,7 @@ def _(book: Book):
     reveal_type(book.pk)  # revealed: str
 
     # This is an error now, `id` is not created when a custom primary key is defined.
-    book.id  # error: [unresolved-attribute]
+    book.id  # error: [missing-attribute]
 ```
 
 Subclassing a model with a custom primary key inherits the primary key behavior and does not
@@ -190,7 +190,7 @@ class Ebook(Book):
 
 def _(ebook: Ebook):
     reveal_type(ebook.isbn)  # revealed: str
-    ebook.id  # error: [unresolved-attribute]
+    ebook.id  # error: [missing-attribute]
 ```
 
 ### Explicit `id` field
@@ -234,12 +234,12 @@ def _(ebook: Ebook, review: Review):
     reveal_type(ebook.book)  # revealed: Book
     reveal_type(ebook.book_id)  # revealed: UUID
     reveal_type(ebook.pk)  # revealed: UUID
-    ebook.id  # error: [unresolved-attribute]
+    ebook.id  # error: [missing-attribute]
 
     reveal_type(review.book)  # revealed: Book
     reveal_type(review.book_id)  # revealed: UUID
     reveal_type(review.pk)  # revealed: UUID
-    review.id  # error: [unresolved-attribute]
+    review.id  # error: [missing-attribute]
 ```
 
 With `to_field`, both `pk` and `<field>_id` have the referenced field's value type, even when it
@@ -299,11 +299,11 @@ source model name followed by `_set`. The `related_name` parameter overrides thi
 ```py
 def _(author: Author):
     # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     reveal_type(author.book_set.all())  # revealed: Unknown
 
     # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     reveal_type(author.edited_books.all())  # revealed: Unknown
 ```
 
@@ -314,7 +314,7 @@ class Review(models.Model):
     reviewer = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="+")
 
 def _(author: Author):
-    author.review_set  # error: [unresolved-attribute]
+    author.review_set  # error: [missing-attribute]
 ```
 
 ### Custom primary key
@@ -388,7 +388,7 @@ An explicit `name` determines the names of generated methods, overriding the ass
 reveal_type(article.get_access_display())  # revealed: str
 
 # A `get_<field>_display()` method for the original field name is not available.
-article.get_visibility_display()  # error: [unresolved-attribute]
+article.get_visibility_display()  # error: [missing-attribute]
 ```
 
 ## Date navigation
@@ -410,8 +410,8 @@ def _(article: Article):
     reveal_type(article.get_previous_by_published())  # revealed: Article
 
     # Date fields with `null=True` do not generate these methods.
-    article.get_next_by_reviewed()  # error: [unresolved-attribute]
-    article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+    article.get_next_by_reviewed()  # error: [missing-attribute]
+    article.get_previous_by_reviewed()  # error: [missing-attribute]
 ```
 
 `DateTimeField` also generates these methods:
@@ -467,7 +467,7 @@ class Book(AbstractBook):
 
 def _(abstract: AbstractBook, ebook: Ebook, book: Book):
     # Abstract models do not have an automatic primary key.
-    abstract.id  # error: [unresolved-attribute]
+    abstract.id  # error: [missing-attribute]
 
     # Concrete models without an explicit primary key have an automatic integer key.
     reveal_type(ebook.id)  # revealed: int
@@ -476,7 +476,7 @@ def _(abstract: AbstractBook, ebook: Ebook, book: Book):
     reveal_type(ebook.file_size)  # revealed: int
 
     # The explicit ISBN primary key prevents an automatic `id`.
-    book.id  # error: [unresolved-attribute]
+    book.id  # error: [missing-attribute]
     reveal_type(book.pk)  # revealed: str
     reveal_type(book.title)  # revealed: str
     reveal_type(book.isbn)  # revealed: str
@@ -507,7 +507,7 @@ class AbstractBook(models.Model):
         abstract = True
 
 def _(abstract: AbstractBook):
-    abstract.id  # error: [unresolved-attribute]
+    abstract.id  # error: [missing-attribute]
 ```
 
 ### Inherited Meta configuration
@@ -535,7 +535,7 @@ def _(not_abstract: NotAbstract, abstract: Abstract):
     not_abstract.id
 
     # abstract models do not:
-    abstract.id  # error: [unresolved-attribute]
+    abstract.id  # error: [missing-attribute]
 ```
 
 Configuration inherited from an ordinary class retains its `abstract` setting.
@@ -549,7 +549,7 @@ class InheritedAbstract(models.Model):
         pass
 
 def _(abstract: InheritedAbstract):
-    abstract.id  # error: [unresolved-attribute]
+    abstract.id  # error: [missing-attribute]
 ```
 
 ### Multiple inheritance

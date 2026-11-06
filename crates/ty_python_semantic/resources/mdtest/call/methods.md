@@ -338,14 +338,14 @@ class E1:
 class E2: ...
 
 def _(union_12: E1 | E2, union_21: E2 | E1, intersection_12: E1 & E2, intersection_21: E2 & E1):
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_12.f)  # revealed: bound method E1.f() -> list[E1]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_12.f())  # revealed: list[E1]
 
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_21.f)  # revealed: bound method E1.f() -> list[E1]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_21.f())  # revealed: list[E1]
 
     reveal_type(intersection_12.f)  # revealed: bound method (E1 & E2).f() -> list[E1 & E2]
@@ -361,9 +361,9 @@ intersection:
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
     # revealed: bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union.f)
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union.f())  # revealed: list[U@generic_bounds & E1]
 
     # revealed: bound method I@generic_bounds.f() -> list[I@generic_bounds]
@@ -391,14 +391,14 @@ def _(
     intersection_external: type[E1] & type[E2],
     intersection_internal: type[E1 & E2],
 ):
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_external.f)  # revealed: bound method type[E1].f() -> list[E1]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_external.f())  # revealed: list[E1]
 
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_internal.f)  # revealed: bound method type[E1].f() -> list[E1]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_internal.f())  # revealed: list[E1]
 
     # revealed: bound method (type[E1] & type[E2]).f() -> list[E1 & E2]
@@ -427,16 +427,16 @@ def _(
     intersection_external: type[P1] & type[Other],
     intersection_internal: type[P1 & Other],
 ):
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     # revealed: () -> list[P1]
     reveal_type(union_external.f)
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_external.f())  # revealed: list[P1]
 
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     # revealed: () -> list[P1]
     reveal_type(union_internal.f)
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(union_internal.f())  # revealed: list[P1]
 
     # TODO: this should not leak the Self@f type variable
@@ -1081,7 +1081,7 @@ reveal_type(C.f(1))  # revealed: str
 The method `f` cannot be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
+# error: [missing-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -1859,7 +1859,7 @@ class Item:
     def __new__(cls) -> Self:
         result = object.__new__(cls)
         reveal_type(result)  # revealed: Self@__new__
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         result.nonexistent()
         return result
 ```
@@ -1888,7 +1888,7 @@ class Baz(Bar):
     def __new__(cls) -> Self:
         result = Bar.__new__(cls)
         reveal_type(result)  # revealed: Self@__new__
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         result.nonexistent()
         return result
 ```

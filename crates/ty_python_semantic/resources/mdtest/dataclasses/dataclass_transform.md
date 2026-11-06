@@ -480,7 +480,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots:
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 Conversely, an explicit `slots=True` overrides `slots_default=False`:
@@ -493,7 +493,7 @@ def unslotted_model(*, slots: bool = False): ...
 class WithoutSlots:
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 
 @unslotted_model(slots=True)
 class WithSlots:
@@ -525,7 +525,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots(ModelBase, slots=False):
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 #### Base-class-based transformers
@@ -547,7 +547,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots(ModelBase, slots=False):
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 #### Overriding abstract properties
@@ -1100,7 +1100,7 @@ def fancy_model(*, slots: bool = False) -> Callable[[T], T]:
 class NoSlots:
     name: str
 
-NoSlots.__slots__  # error: [unresolved-attribute]
+NoSlots.__slots__  # error: [missing-attribute]
 
 @fancy_model(slots=True)
 class WithSlots:
@@ -1125,7 +1125,7 @@ class FancyBase(metaclass=FancyMeta): ...
 class NoSlots(FancyBase):
     name: str
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 NoSlots.__slots__
 
 class WithSlots(FancyBase, slots=True):
@@ -1148,7 +1148,7 @@ class FancyBase:
 class NoSlots(FancyBase):
     name: str
 
-NoSlots.__slots__  # error: [unresolved-attribute]
+NoSlots.__slots__  # error: [missing-attribute]
 
 class WithSlots(FancyBase, slots=True):
     name: str
@@ -2182,7 +2182,7 @@ reveal_type(C)  # revealed: <class 'C'>
 reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
 
 # TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
-C.f()  # error: [unresolved-attribute]
+C.f()  # error: [missing-attribute]
 ```
 
 ## `__dataclass_transform__` compatibility

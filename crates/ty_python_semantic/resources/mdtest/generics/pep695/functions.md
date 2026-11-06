@@ -144,7 +144,7 @@ result = extract(identity)
 # revealed: str | int
 reveal_type(result)
 
-# error: [unresolved-attribute] "Object of type `str | int` has no attribute `nonexistent`"
+# error: [missing-attribute] "Object of type `str | int` has no attribute `nonexistent`"
 result.nonexistent()
 ```
 
@@ -582,13 +582,13 @@ invariant_callback = InvariantCallback(original)
 invariant_remaining = invariant_tail(invariant_callback)  # error: [invalid-argument-type]
 reveal_type(invariant_remaining)  # revealed: (value: str) -> int
 invariant_remaining(1)  # error: [invalid-argument-type]
-invariant_remaining("valid").missing_attribute  # error: [unresolved-attribute]
+invariant_remaining("valid").missing_attribute  # error: [missing-attribute]
 
 contravariant_callback = ContravariantCallback(original)
 contravariant_remaining = contravariant_tail(contravariant_callback)  # error: [invalid-argument-type]
 reveal_type(contravariant_remaining)  # revealed: (value: str) -> int
 contravariant_remaining(1)  # error: [invalid-argument-type]
-contravariant_remaining("valid").missing_attribute  # error: [unresolved-attribute]
+contravariant_remaining("valid").missing_attribute  # error: [missing-attribute]
 ```
 
 A higher-order callback must retain its inferred parameter list under both outer variances, even
@@ -1045,8 +1045,8 @@ def _(unknown, any_: Any) -> None:
     reveal_type(unknown_result)  # revealed: Literal[1] | str
     # TODO: revealed: Literal[1] | (Any & str)
     reveal_type(any_result)  # revealed: Literal[1] | str
-    unknown_result.bit_length()  # error: [unresolved-attribute]
-    any_result.bit_length()  # error: [unresolved-attribute]
+    unknown_result.bit_length()  # error: [missing-union-attribute]
+    any_result.bit_length()  # error: [missing-union-attribute]
 ```
 
 Gradual specializations inherited through concrete subclasses can satisfy bounds and constraints
@@ -3855,16 +3855,16 @@ def decorated[T](t: T) -> None:
 from typing import Any, Callable
 
 def my_decorator[T: Callable[..., Any]](f: T) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever = 1
 
 class Box[T: Callable[..., Any]]:
     cls: type[T]
 
 def specialized(box: Box[Callable[..., Any]]) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     box.cls.whatever
 ```
 

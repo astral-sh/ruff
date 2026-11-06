@@ -438,7 +438,7 @@ def f():
 
 ### Attributes
 
-When attribute expressions appear in unreachable code, we should not emit `unresolved-attribute`
+When attribute expressions appear in unreachable code, we should not emit `missing-attribute`
 diagnostics:
 
 ```py

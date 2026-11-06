@@ -3732,18 +3732,18 @@ Also, the "attributes" on the class definition cannot be accessed. Neither on th
 on inhabitants of the type defined by the class:
 
 ```py
-# error: [unresolved-attribute] "Class `Person` has no attribute `name`"
+# error: [missing-attribute] "Class `Person` has no attribute `name`"
 Person.name
 
 def _(P: type[Person]):
-    # error: [unresolved-attribute] "Object of type `type[Person]` has no attribute `name`"
+    # error: [missing-attribute] "Object of type `type[Person]` has no attribute `name`"
     P.name
 
 def _(p: Person) -> None:
-    # error: [unresolved-attribute] "Object of type `Person` has no attribute `name`"
+    # error: [missing-attribute] "Object of type `Person` has no attribute `name`"
     p.name
 
-    type(p).name  # error: [unresolved-attribute] "Class `dict[str, object]` has no attribute `name`"
+    type(p).name  # error: [missing-attribute] "Class `dict[str, object]` has no attribute `name`"
 ```
 
 ## Special properties
@@ -3780,10 +3780,10 @@ class Employee(Person):
 class GenericPerson[T](TypedDict):
     value: T
 
-StdlibPerson.__closed__  # error: [unresolved-attribute]
-StdlibPerson.__readonly_keys__  # error: [unresolved-attribute]
-StdlibFunctionalPerson.__closed__  # error: [unresolved-attribute]
-DynamicStdlibPerson.__closed__  # error: [unresolved-attribute]
+StdlibPerson.__closed__  # error: [missing-attribute]
+StdlibPerson.__readonly_keys__  # error: [missing-attribute]
+StdlibFunctionalPerson.__closed__  # error: [missing-attribute]
+DynamicStdlibPerson.__closed__  # error: [missing-attribute]
 
 reveal_type(Person.__total__)  # revealed: bool
 reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
@@ -3802,22 +3802,22 @@ These attributes cannot be accessed on inhabitants:
 
 ```py
 def _(person: Person) -> None:
-    person.__total__  # error: [unresolved-attribute]
-    person.__required_keys__  # error: [unresolved-attribute]
-    person.__optional_keys__  # error: [unresolved-attribute]
-    person.__closed__  # error: [unresolved-attribute]
-    person.__extra_items__  # error: [unresolved-attribute]
+    person.__total__  # error: [missing-attribute]
+    person.__required_keys__  # error: [missing-attribute]
+    person.__optional_keys__  # error: [missing-attribute]
+    person.__closed__  # error: [missing-attribute]
+    person.__extra_items__  # error: [missing-attribute]
 ```
 
 Also, they cannot be accessed on `type(person)`, as that would be `dict` at runtime:
 
 ```py
 def _(person: Person) -> None:
-    type(person).__total__  # error: [unresolved-attribute]
-    type(person).__required_keys__  # error: [unresolved-attribute]
-    type(person).__optional_keys__  # error: [unresolved-attribute]
-    type(person).__closed__  # error: [unresolved-attribute]
-    type(person).__extra_items__  # error: [unresolved-attribute]
+    type(person).__total__  # error: [missing-attribute]
+    type(person).__required_keys__  # error: [missing-attribute]
+    type(person).__optional_keys__  # error: [missing-attribute]
+    type(person).__closed__  # error: [missing-attribute]
+    type(person).__extra_items__  # error: [missing-attribute]
 ```
 
 But they _can_ be accessed on `type[Person]`, because this function would accept the class object
@@ -3834,7 +3834,7 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
 accepts_typed_dict_class(Person)
 
 def accepts_stdlib_typed_dict_class(t_person: type[StdlibPerson]) -> None:
-    t_person.__closed__  # error: [unresolved-attribute]
+    t_person.__closed__  # error: [missing-attribute]
 ```
 
 ### Python 3.13
@@ -3854,7 +3854,7 @@ class Foo(TypedDict):
     x: int
 
 reveal_type(Foo.__readonly_keys__)  # revealed: frozenset[str]
-Foo.__closed__  # error: [unresolved-attribute]
+Foo.__closed__  # error: [missing-attribute]
 ```
 
 ### Python 3.15
@@ -4968,7 +4968,7 @@ class Box[T](TypedDict):
     value: T
     callback: Callable[[T], int]
 
-Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
+Box(value=1, callback=lambda x: x.upper())  # error: [missing-attribute]
 ```
 
 ### Constructor inference with a contextual callable
@@ -4986,9 +4986,9 @@ from typing import Callable, TypedDict
 class Box[T](TypedDict):
     value: T
 
-direct: Box[Callable[[int], int]] = Box(value=lambda x: x.upper())  # error: [unresolved-attribute]
+direct: Box[Callable[[int], int]] = Box(value=lambda x: x.upper())  # error: [missing-attribute]
 optional: Box[Callable[[int], int]] | None = Box(
-    value=lambda x: x.upper(),  # error: [unresolved-attribute]
+    value=lambda x: x.upper(),  # error: [missing-attribute]
 )
 ```
 
@@ -6450,7 +6450,7 @@ class ErrorMessage(CompatTypedDict):
     payload: FormattedError
 
 # `__closed__` is only available on the `typing_extensions` branch for Python 3.12.
-FormattedError.__closed__  # error: [unresolved-attribute]
+FormattedError.__closed__  # error: [missing-attribute]
 
 error = ErrorMessage(payload={"message": "Subscription limit reached"})
 reveal_type(error["payload"])  # revealed: FormattedError
@@ -8718,8 +8718,8 @@ def _(
     reveal_type(functional.popitem())  # revealed: tuple[str, str | int]
     del functional[key]
 
-    required.clear()  # error: [unresolved-attribute]
-    read_only.clear()  # error: [unresolved-attribute]
+    required.clear()  # error: [missing-attribute]
+    read_only.clear()  # error: [missing-attribute]
 ```
 
 ### `get` on closed TypedDicts

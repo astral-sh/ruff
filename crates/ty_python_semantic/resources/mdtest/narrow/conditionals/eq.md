@@ -871,7 +871,7 @@ The comparison narrows a `str | int` to the matching builtin type. A plain strin
 def compare_with_enum_member(value: str | int):
     if value == String.X:
         reveal_type(value)  # revealed: str
-        value.name  # error: [unresolved-attribute]
+        value.name  # error: [missing-attribute]
 
     if Integer.X == value:
         reveal_type(value)  # revealed: int
@@ -1794,7 +1794,7 @@ from ty_extensions import Intersection, Not
 def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
     if value == "hello":
         reveal_type(value)  # revealed: str & ~LiteralString
-        value.definitely_missing_attribute  # error: [unresolved-attribute]
+        value.definitely_missing_attribute  # error: [missing-attribute]
 
     if "hello" == value:
         reveal_type(value)  # revealed: str & ~LiteralString

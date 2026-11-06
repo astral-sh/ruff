@@ -2103,6 +2103,6 @@ def f() -> None:
     pass
 
 p = partial(f)
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 p.__name__ = "renamed"
 ```

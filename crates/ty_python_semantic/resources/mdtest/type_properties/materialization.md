@@ -2202,12 +2202,12 @@ on `type[Top[MutableAny]]` or `type[Bottom[MutableAny]]`.
 
 ```py
 def class_instance_attributes(top: Top[MutableAny], bottom: Bottom[MutableAny]) -> None:
-    type(top).value  # error: [unresolved-attribute]
-    type(bottom).value  # error: [unresolved-attribute]
+    type(top).value  # error: [missing-attribute]
+    type(bottom).value  # error: [missing-attribute]
 
 def annotated_class_instance_attributes(top: type[Top[MutableAny]], bottom: type[Bottom[MutableAny]]) -> None:
-    top.value  # error: [unresolved-attribute]
-    bottom.value  # error: [unresolved-attribute]
+    top.value  # error: [missing-attribute]
+    bottom.value  # error: [missing-attribute]
 ```
 
 ### Writable properties

@@ -77,7 +77,7 @@ Product(name="Laptop", internal_price_cent=999_00)
 Conversely, accessing a field through the alias is also not allowed:
 
 ```py
-product.price_cent  # error: [unresolved-attribute]
+product.price_cent  # error: [missing-attribute]
 ```
 
 ## Usage of ellipsis in `Field`
@@ -2024,9 +2024,9 @@ RequiredAfterDefault(required=1)
 Pydantic models do not expose some of the special attributes of dataclasses:
 
 ```py
-RequiredAfterDefault.__dataclass_fields__  # error: [unresolved-attribute]
-RequiredAfterDefault.__dataclass_params__  # error: [unresolved-attribute]
-RequiredAfterDefault.__match_args__  # error: [unresolved-attribute]
+RequiredAfterDefault.__dataclass_fields__  # error: [missing-attribute]
+RequiredAfterDefault.__dataclass_params__  # error: [missing-attribute]
+RequiredAfterDefault.__match_args__  # error: [missing-attribute]
 ```
 
 They do, however, expose various Pydantic-specific fields (inherited from `BaseModel`), for example:

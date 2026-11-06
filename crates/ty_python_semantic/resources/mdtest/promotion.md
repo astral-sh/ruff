@@ -1047,5 +1047,5 @@ import module1
 
 my_modules = [module1]
 reveal_type(my_modules)  # revealed: list[<module 'module1'>]
-my_modules[0].flibbertigibbet  # error: [unresolved-attribute]
+my_modules[0].flibbertigibbet  # error: [missing-attribute]
 ```

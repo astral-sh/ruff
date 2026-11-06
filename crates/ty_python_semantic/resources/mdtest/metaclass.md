@@ -1038,7 +1038,7 @@ class Child(WeakSet[object]): ...
 reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
 
 def f(child: Child):
-    child.__abstractmethods__  # error: [unresolved-attribute]
+    child.__abstractmethods__  # error: [missing-attribute]
 ```
 
 The fallback also does not constrain the types of attributes defined in the class namespace. For

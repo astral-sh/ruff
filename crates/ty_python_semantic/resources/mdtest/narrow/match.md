@@ -1722,7 +1722,7 @@ def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
             # revealed: int | str
             reveal_type(item)
 
-            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            # error: [missing-attribute] "Object of type `int | str` has no attribute `nonexistent`"
             item.nonexistent()
 ```
 

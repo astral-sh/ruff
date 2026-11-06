@@ -2829,7 +2829,7 @@ def consume[T](callback: Callable[[T, int], int]) -> None:
     pass
 
 consume(id(lambda x, y: reveal_type(y)))  # revealed: int
-consume(id(lambda x, y: y.upper()))  # error: [unresolved-attribute]
+consume(id(lambda x, y: y.upper()))  # error: [missing-attribute]
 ```
 
 ## Lambda contextual inference through type aliases

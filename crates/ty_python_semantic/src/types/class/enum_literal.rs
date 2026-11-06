@@ -253,7 +253,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// Look up a class member by name, checking own members, mixin, and base class.
     ///
     /// If members are unknown and nothing was found in the MRO, returns `Unknown`
-    /// as a last resort to avoid false `unresolved-attribute` errors.
+    /// as a last resort to avoid false `missing-attribute` errors.
     ///
     /// `policy` is forwarded to the mixin and enum-base lookups so that those lookups resolve the
     /// same way they would on an equivalent class-syntax enum. For example, a caller asking for
@@ -261,7 +261,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// describe the enum as defining its own equality and hide its real comparison semantics.
     ///
     /// The unknown-member fallback at the end does not consult `policy`. It exists to avoid false
-    /// `unresolved-attribute` errors when the member names are not statically known, which is a
+    /// `missing-attribute` errors when the member names are not statically known, which is a
     /// property of the enum rather than of the lookup being performed.
     pub(crate) fn class_member(
         self,

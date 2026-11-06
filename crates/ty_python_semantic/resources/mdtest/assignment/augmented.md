@@ -424,7 +424,7 @@ assignment is attempted.
 class Missing: ...
 
 missing = Missing()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 missing.value += 1
 ```
 
@@ -435,7 +435,7 @@ class Counter:
     count: int
 
 def update(counter: Counter | None) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     counter.count += 1
 ```
 
@@ -445,10 +445,10 @@ an existing value before writing its result.
 ```py
 class UninitializedCounter:
     def increment(self) -> None:
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(UninitializedCounter().value)  # revealed: Unknown
 ```
 
@@ -465,7 +465,7 @@ class DynamicCounter:
 
     def increment(self) -> None:
         # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
 reveal_type(DynamicCounter().value)  # revealed: int
@@ -480,7 +480,7 @@ class InterceptedCounter:
 
     def increment(self) -> None:
         # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
 reveal_type(InterceptedCounter().value)  # revealed: int
@@ -535,7 +535,7 @@ errors.
 class Missing: ...
 
 missing = Missing()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 # error: [unresolved-reference]
 missing.value += missing_attribute_operand
 ```

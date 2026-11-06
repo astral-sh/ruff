@@ -1087,7 +1087,7 @@ reveal_type(ExplicitSubclass.x)  # revealed: int
 
 def f(arg: HasXWithDefault):
     # `arg` may be an implicit subtype that does not define `x` on its class object.
-    type(arg).x  # error: [unresolved-attribute]
+    type(arg).x  # error: [missing-attribute]
 ```
 
 Assignments in a class body of a protocol -- of any kind -- are not permitted by ty unless the
@@ -1246,7 +1246,7 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 
@@ -8229,7 +8229,7 @@ class Foo(Protocol):
 
 def _(f: type[Foo]):
     reveal_type(f)  # revealed: type[Foo]
-    f.x  # error: [unresolved-attribute]
+    f.x  # error: [missing-attribute]
     f.x = 1  # error: [invalid-assignment]
     reveal_type(f.y)  # revealed: str
     f.y = "foo"  # fine
@@ -8421,7 +8421,7 @@ class MissingProperty: ...
 static_assert(not is_assignable_to(TypeOf[MissingProperty], type[PropertyProtocol]))
 
 def _(cls: type[PropertyProtocol]) -> None:
-    cls.value  # error: [unresolved-attribute]
+    cls.value  # error: [missing-attribute]
 ```
 
 Protocol and abstract class objects are accepted as inhabitants of `type[Foo]`. This is
