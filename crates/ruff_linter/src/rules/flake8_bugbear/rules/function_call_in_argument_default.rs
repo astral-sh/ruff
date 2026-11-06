@@ -11,7 +11,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::rules::ruff::helpers::is_frozen_dataclass_instantiation;
+use crate::rules::ruff::rules::is_frozen_dataclass_instantiation;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.

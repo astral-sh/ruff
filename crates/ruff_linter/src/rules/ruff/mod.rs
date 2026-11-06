@@ -1,6 +1,6 @@
 //! Ruff-specific rules.
 
-pub(crate) mod helpers;
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub(crate) mod typing;
