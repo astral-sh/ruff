@@ -557,6 +557,14 @@ pub(crate) fn server_capabilities(
                             None,
                         ),
                     ),
+                    types::FileOperationFilter::new(
+                        Some("file".to_string()),
+                        types::FileOperationPattern::new(
+                            "**/*".to_string(),
+                            Some(types::FileOperationPatternKind::Folder),
+                            None,
+                        ),
+                    ),
                 ])),
                 ..types::FileOperationOptions::default()
             }),
