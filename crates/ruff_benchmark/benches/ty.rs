@@ -224,6 +224,54 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
     });
 }
 
+/// Shared recursive references should reuse constructor bodies when aliases are unfolded.
+fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
+    // Cover both sparse and dense references between specialized aliases.
+    for (aliases, references) in [(16, 3), (8, 8)] {
+        let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
+        for alias in 0..aliases {
+            write!(code, "A{alias} = tuple[T").unwrap();
+            for target in 0..aliases {
+                if (target + aliases - alias) % aliases < references {
+                    write!(code, ", 'A{target}[T] | None'").unwrap();
+                }
+            }
+            writeln!(code, "]").unwrap();
+        }
+        for alias in 0..aliases {
+            writeln!(
+                code,
+                "def inspect_{alias}(value: A{alias}[int]) -> int:\n    return value[0]"
+            )
+            .unwrap();
+        }
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[mutually_recursive_aliases_{aliases}_{references}]"),
+            &code,
+        );
+    }
+}
+
+/// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
+fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
+    let aliases = 8;
+    let mut code = String::new();
+    for alias in 0..aliases {
+        write!(code, "A{alias} = tuple[int").unwrap();
+        for target in 0..aliases {
+            write!(code, ", 'A{target}'").unwrap();
+        }
+        writeln!(code, "]").unwrap();
+    }
+    // Only define aliases: using them would also measure recursive unfolding.
+    benchmark_micro_case(
+        criterion,
+        &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
+        &code,
+    );
+}
+
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     // This is a micro benchmark, but it is effectively identical to a code sample
     // observed "in the wild":
@@ -2811,6 +2859,8 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_mutually_recursive_aliases,
+    benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,

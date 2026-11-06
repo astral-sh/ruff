@@ -117,8 +117,12 @@ pub(super) struct CyclicTypeAliasError<'db> {
             legacy_aliases: Box::default(),
         }
     },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+    cycle_fn=|db, cycle: &salsa::Cycle, previous: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        let previous = match previous.ty {
+            Ok(ty) => ty,
+            Err(error) => error.fallback_type,
+        };
+        let recover = |ty| RecursiveType::recover(db, definition, cycle, parameters, ty, previous);
         result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
             fallback_type: recover(error.fallback_type),
         });
