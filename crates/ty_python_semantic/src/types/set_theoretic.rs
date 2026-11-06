@@ -58,8 +58,11 @@ impl<'db> OrderedUnionInput<'db> {
         fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
             let env = ProgramEnvironment::from_program(input.program(db));
             let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
-            for &ty in input.elements(db) {
-                builder.add_in_place(ty);
+            let elements = input.elements(db);
+            if !builder.try_extend_nominal_instances(elements) {
+                for &ty in elements {
+                    builder.add_in_place(ty);
+                }
             }
             builder
                 .or_recursively_defined(input.recursively_defined(db))

@@ -38,8 +38,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
-    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
-    VarianceTerm,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, StaticClassLiteral, TypeContext, TypeMapping,
+    VarianceInferable, VarianceTerm,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -238,6 +238,15 @@ impl<'db> NominalInstanceType<'db> {
         Self(NominalInstanceInner::NonTuple(
             NominalInstanceClass::from_class(db, class),
         ))
+    }
+
+    pub(super) const fn plain_static_class(self) -> Option<StaticClassLiteral<'db>> {
+        match self.0 {
+            NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(ClassType::NonGeneric(
+                ClassLiteral::Static(class),
+            ))) => Some(class),
+            _ => None,
+        }
     }
 
     /// Return whether this instance's class inherits from an explicit `Any` base.
