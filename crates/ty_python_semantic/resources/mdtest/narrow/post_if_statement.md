@@ -523,3 +523,21 @@ def _(condition: bool, number: int, text: str):
     reveal_type(text)  # revealed: str
     return pair
 ```
+
+## An unreachable path stays unreachable after a loop and branch merge
+
+The assertion rules out every value of `value`. It also makes a read of an unrelated parameter after
+the loop unreachable.
+
+```py
+def _(value: int, other: int, condition: bool):
+    assert isinstance(value, str)
+    for flag in (condition,):
+        if isinstance(value, str):
+            continue
+        reveal_type(value)  # revealed: Never
+        if flag:
+            pass
+    if condition:
+        reveal_type(other)  # revealed: Never
+```

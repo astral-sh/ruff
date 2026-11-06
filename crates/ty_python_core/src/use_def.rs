@@ -1950,9 +1950,8 @@ struct BranchPaths {
 }
 
 impl PendingReachability {
-    /// Builds the pending path after a branch join. A place shared by both branches has
-    /// only seen constraints up to their common ancestor. Keeping the joined suffix on
-    /// the tree lets all such places share it until their next use or mutation.
+    /// Builds the pending path after a branch join. Shared places use the same joined
+    /// suffix to update their narrowing at the merge and their reachability when needed.
     fn merged_path(
         &mut self,
         branch: PendingReachabilityId,
@@ -2017,12 +2016,15 @@ impl PendingReachability {
                 continue;
             };
 
-            // Both cursors precede the fork. The joined path will apply the common
-            // prefix and the merged suffix to this state when they are needed.
+            // Bindings exposed by reads carry narrowing from earlier branch joins. Apply the
+            // joined narrowing path before those reads, while leaving reachability pending.
             if current.reachability == branch_state.reachability
                 && current.narrowing == branch_state.narrowing
                 && Rc::ptr_eq(&current.state, &branch_state.state)
             {
+                if self.current != branch {
+                    self.materialize_narrowing(current, joined, narrowing_constraints);
+                }
                 continue;
             }
 
