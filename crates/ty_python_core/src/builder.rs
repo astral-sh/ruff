@@ -23,7 +23,7 @@ use ruff_python_parser::semantic_errors::{
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 use ty_module_resolver::{
-    ImportingFile, KnownModule, ModuleName, ResolverEnvironment, resolve_module,
+    ImportingFile, KnownModule, ModuleName, ResolverEnvironment, resolve_module_confident,
     resolve_module_for_import_from,
 };
 
@@ -2342,12 +2342,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if import.alias(self.module).name.as_str() != "sys" {
             return false;
         }
-        resolve_module(
-            self.db,
-            ImportingFile::File(file, self.resolver_environment),
-            &KnownModule::Sys.name(),
-        )
-        .is_some_and(|module| module.is_known(self.db, KnownModule::Sys))
+        resolve_module_confident(self.db, self.resolver_environment, &KnownModule::Sys.name())
+            .is_some_and(|module| module.is_known(self.db, KnownModule::Sys))
     }
 
     fn build_predicate(
