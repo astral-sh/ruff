@@ -72,8 +72,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         call: &ast::ExprCall,
         callee: Type<'db>,
+        result_context: TypeContext<'db>,
         bindings: &mut Bindings<'db>,
     ) {
+        // A return annotation or an enclosing call can use the full overload set
+        // to specialize the default argument, even when the key is declared.
+        if result_context.declared_type().is_some() {
+            return;
+        }
         let Some(key) = Self::literal_get_key(call) else {
             return;
         };
@@ -81,7 +87,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if self.collects_expected_types() {
             return;
         }
-        // A missing key needs the full overload set to infer the default from the return context.
+        // An undeclared key relies on the fallback overloads to infer its default.
         if !self.is_typed_dict_get_for_declared_key(callee, key) {
             return;
         }

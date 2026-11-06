@@ -8819,6 +8819,37 @@ def sometimes_declared(row: Record | WithEntry):
     static_assert(is_equivalent_to(TypeOf[direct], TypeOf[saved]))
 ```
 
+### `get` with a callable default
+
+When the key is present, `get` can return `None` even if its default is a callable.
+
+```py
+from typing import Callable, NotRequired, TypedDict
+
+class Options(TypedDict):
+    handler: NotRequired[None]
+    enabled: bool
+
+def handler(options: Options) -> Callable[[str], int]:
+    # error: [invalid-return-type]
+    return options.get("handler", lambda name: len(name))
+```
+
+### Contextual types for nested `get` defaults
+
+The inner call infers an empty list as `list[str]` when used as the default for another `get` call.
+
+```py
+from typing import NotRequired, TypedDict, assert_type
+
+class Settings(TypedDict):
+    numbers: NotRequired[list[int]]
+    names: list[str]
+
+def use(settings: Settings):
+    settings.get("numbers", settings.get("names", assert_type([], list[str])))
+```
+
 ### `get` default types for non-required items
 
 For a declared non-required item, we infer the type of an empty list from the item's type, even when
