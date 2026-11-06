@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
@@ -7,9 +8,10 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{
-    self as ast, Alias, Expr, ExprContext, ExprKind, PySourceType, PythonVersion, Stmt, StmtKind,
-    SyntaxNode,
+    self as ast, Alias, Ast, AstNode, Expr, ExprContext, ExprKind, PySourceType, PythonVersion,
+    Stmt, StmtKind, SyntaxNode,
 };
+use ruff_python_parser::Parsed;
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -203,11 +205,12 @@ pub struct SemanticModel<'a> {
     pub handled_exceptions: Vec<Exceptions>,
 
     /// The binding resolved at each use of a name.
-    resolved_names: FxHashMap<NameId, BindingId>,
+    resolved_names: ResolvedNames<'a>,
 }
 
 impl<'a> SemanticModel<'a> {
     pub fn new(
+        parsed: &'a Parsed<ast::kind::ModModule>,
         typing_modules: &'a [String],
         custom_builtins: &'a [String],
         target_version: PythonVersion,
@@ -240,7 +243,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             lazy_modules: None,
             handled_exceptions: Vec::default(),
-            resolved_names: FxHashMap::default(),
+            resolved_names: ResolvedNames::new(parsed),
         };
 
         let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
@@ -523,7 +526,7 @@ impl<'a> SemanticModel<'a> {
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
-                    self.resolved_names.insert(name.into(), binding_id);
+                    self.resolved_names.insert(name, binding_id);
                     return ReadResult::Resolved(binding_id);
                 }
             }
@@ -676,7 +679,7 @@ impl<'a> SemanticModel<'a> {
                                         name.range(),
                                     );
                                     self.bindings[shadowed_id].references.push(reference_id);
-                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    self.resolved_names.insert(name, shadowed_id);
                                     return ReadResult::Resolved(shadowed_id);
                                 }
                             }
@@ -741,7 +744,7 @@ impl<'a> SemanticModel<'a> {
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
@@ -758,13 +761,13 @@ impl<'a> SemanticModel<'a> {
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
                     _ => {
                         // Otherwise, treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
                 }
@@ -803,7 +806,7 @@ impl<'a> SemanticModel<'a> {
                 name.range(),
             );
             self.bindings[binding_id].references.push(reference_id);
-            self.resolved_names.insert(name.into(), binding_id);
+            self.resolved_names.insert(name, binding_id);
             return ReadResult::Resolved(binding_id);
         }
 
@@ -1169,7 +1172,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if any.
     pub fn resolve_name(&self, name: ast::ExprName<'_>) -> Option<BindingId> {
-        self.resolved_names.get(&name.into()).copied()
+        self.resolved_names.get(name)
     }
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
@@ -3211,13 +3214,195 @@ impl Ranged for ImportedName {
     }
 }
 
-/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
-/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
-#[derive(Debug, Hash, PartialEq, Eq)]
-struct NameId(TextSize);
+/// Bindings for names in the current module are indexed by their AST row. Each
+/// slot stores the binding index plus one, with zero reserved for unresolved names.
+/// Allocate the row table on the first recorded binding. Switch to source offsets
+/// if a binding outgrows its slot or a separately parsed node is accessed. Offsets
+/// identify the same name across syntax trees.
+struct ResolvedNames<'a> {
+    ast: &'a Ast,
+    by_row: Box<[u16]>,
+    by_offset: OnceLock<FxHashMap<TextSize, BindingId>>,
+}
 
-impl From<ast::ExprName<'_>> for NameId {
-    fn from(name: ast::ExprName<'_>) -> Self {
-        Self(name.start())
+impl<'a> ResolvedNames<'a> {
+    fn new(parsed: &'a Parsed<ast::kind::ModModule>) -> Self {
+        // Recovery can create distinct name expressions at the same source offset.
+        let by_offset = if parsed.has_invalid_syntax() {
+            OnceLock::from(FxHashMap::default())
+        } else {
+            OnceLock::new()
+        };
+        Self {
+            ast: parsed.ast(),
+            by_row: Box::default(),
+            by_offset,
+        }
+    }
+
+    fn decode(raw: u16) -> Option<BindingId> {
+        u32::from(raw).checked_sub(1).map(BindingId::from_u32)
+    }
+
+    fn offsets(&self) -> &FxHashMap<TextSize, BindingId> {
+        self.by_offset.get_or_init(|| {
+            (0u32..)
+                .zip(self.by_row.iter())
+                .filter_map(|(slot, id)| {
+                    let binding = Self::decode(*id)?;
+                    Some((self.ast.row(slot)?.start(), binding))
+                })
+                .collect()
+        })
+    }
+
+    #[inline]
+    fn get(&self, name: ast::ExprName<'_>) -> Option<BindingId> {
+        if std::ptr::eq(self.ast, name.ast()) && self.by_offset.get().is_none() {
+            self.by_row
+                .get(name.node_id().index())
+                .copied()
+                .and_then(Self::decode)
+        } else {
+            self.offsets().get(&name.start()).copied()
+        }
+    }
+
+    #[inline]
+    fn insert(&mut self, name: ast::ExprName<'_>, binding: BindingId) {
+        if std::ptr::eq(self.ast, name.ast())
+            && self.by_offset.get().is_none()
+            && let Ok(raw) = u16::try_from(binding.as_u32() + 1)
+        {
+            let row = name.node_id().index();
+            if let Some(slot) = self.by_row.get_mut(row) {
+                *slot = raw;
+            } else {
+                self.allocate_rows(row, raw);
+            }
+            return;
+        }
+
+        self.offsets();
+        if let Some(map) = self.by_offset.get_mut() {
+            // A foreign lookup can initialize the offset map through a shared reference.
+            // The next write can release the row table.
+            self.by_row = Box::default();
+            map.insert(name.start(), binding);
+        }
+    }
+
+    #[cold]
+    fn allocate_rows(&mut self, row: usize, raw: u16) {
+        self.by_row = vec![0; self.ast.len()].into_boxed_slice();
+        self.by_row[row] = raw;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_parser::typing::parse_type_annotation;
+    use ruff_python_parser::{Mode, parse_expression_range, parse_module, parse_unchecked};
+    use ruff_text_size::Ranged;
+
+    use super::{BindingId, ResolvedNames};
+
+    #[test]
+    fn reparsed_name_recovers_its_binding_at_the_same_offset() {
+        let source = "left; right";
+        let module = parse_module(source).unwrap();
+        let [left, right] = module.suite().as_array().unwrap();
+        let left = left.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let right = right
+            .as_expr_stmt()
+            .unwrap()
+            .value()
+            .as_name_expr()
+            .unwrap();
+        let reparsed = parse_expression_range(source, right.range()).unwrap();
+        let reparsed_right = reparsed.expr().as_name_expr().unwrap();
+
+        let mut names = ResolvedNames::new(&module);
+        assert_eq!(names.get(left), None);
+        assert!(names.by_row.is_empty());
+        let left_binding = BindingId::from_usize(0);
+        let right_binding = BindingId::from_usize(1);
+        names.insert(left, left_binding);
+        names.insert(right, right_binding);
+        assert_eq!(names.get(reparsed_right), Some(right_binding));
+
+        names.insert(right, left_binding);
+        assert!(names.by_row.is_empty());
+        assert_eq!(names.get(reparsed_right), Some(left_binding));
+        names.insert(reparsed_right, right_binding);
+        assert_eq!(names.get(right), Some(right_binding));
+        assert_eq!(names.get(left), Some(left_binding));
+    }
+
+    #[test]
+    fn quoted_annotation_bindings_survive_reparsing() {
+        let source = "keep; 'Some' 'Type'";
+        let module = parse_module(source).unwrap();
+        let [keep, string] = module.suite().as_array().unwrap();
+        let keep = keep.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let string = string
+            .as_expr_stmt()
+            .unwrap()
+            .value()
+            .as_string_literal_expr()
+            .unwrap();
+        let first_parse = parse_type_annotation(string, source).unwrap();
+        let second_parse = parse_type_annotation(string, source).unwrap();
+        let first = first_parse.expression().as_name_expr().unwrap();
+        let second = second_parse.expression().as_name_expr().unwrap();
+        assert_eq!(first.range(), string.range());
+
+        let mut names = ResolvedNames::new(&module);
+        let keep_binding = BindingId::from_usize(0);
+        let annotation_binding = BindingId::from_usize(1);
+        names.insert(keep, keep_binding);
+        names.insert(first, annotation_binding);
+        assert_eq!(names.get(second), Some(annotation_binding));
+        assert_eq!(names.get(keep), Some(keep_binding));
+    }
+
+    #[test]
+    fn binding_ids_beyond_the_compact_range_preserve_recorded_bindings() {
+        let module = parse_module("a; b").unwrap();
+        let [a, b] = module.suite().as_array().unwrap();
+        let a = a.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let b = b.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let max_compact = BindingId::from_u32(u32::from(u16::MAX) - 1);
+        let first_wide = max_compact + 1;
+
+        let mut names = ResolvedNames::new(&module);
+        assert_eq!(names.get(a), None);
+        names.insert(a, max_compact);
+        assert_eq!(names.get(a), Some(max_compact));
+        assert_eq!(names.get(b), None);
+        names.insert(b, first_wide);
+        assert_eq!(names.get(a), Some(max_compact));
+        assert_eq!(names.get(b), Some(first_wide));
+    }
+
+    #[test]
+    fn recovered_names_at_one_offset_share_the_latest_binding() {
+        let module = parse_unchecked("x if\n", Mode::Module.into())
+            .try_into_module()
+            .unwrap();
+        let [stmt] = module.suite().as_array().unwrap();
+        let conditional = stmt.as_expr_stmt().unwrap().value().as_if_expr().unwrap();
+        let test = conditional.test().as_name_expr().unwrap();
+        let otherwise = conditional.orelse().as_name_expr().unwrap();
+        assert!(module.has_invalid_syntax());
+        assert_eq!(test.range(), otherwise.range());
+
+        let mut names = ResolvedNames::new(&module);
+        let first = BindingId::from_usize(0);
+        let second = BindingId::from_usize(1);
+        names.insert(test, first);
+        assert_eq!(names.get(otherwise), Some(first));
+        names.insert(otherwise, second);
+        assert_eq!(names.get(test), Some(second));
     }
 }
