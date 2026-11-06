@@ -119,6 +119,13 @@ expression: initialization_result
                 "glob": "**/*.{py,pyi}",
                 "matches": "file"
               }
+            },
+            {
+              "scheme": "file",
+              "pattern": {
+                "glob": "**/*",
+                "matches": "folder"
+              }
             }
           ]
         }

@@ -14,7 +14,7 @@ use crate::server::api::traits::{
 use crate::session::client::Client;
 use crate::session::{Session, SessionSnapshot};
 
-/// Handles `workspace/willRenameFiles` for Python module files.
+/// Handles `workspace/willRenameFiles` for Python module files and package directories.
 pub(crate) struct WillRenameFilesHandler;
 
 impl RequestHandler for WillRenameFilesHandler {
@@ -37,14 +37,13 @@ impl BackgroundRequestHandler for WillRenameFilesHandler {
         _client: &Client,
         params: RenameFilesParams,
     ) -> crate::server::Result<Option<WorkspaceEdit>> {
+        let renames: Vec<_> = params.files.iter().filter_map(prepare_rename).collect();
+        if renames.is_empty() {
+            return Ok(None);
+        }
+
         let mut changes = HashMap::new();
-
         for db in snapshot.projects() {
-            let renames: Vec<_> = params.files.iter().filter_map(prepare_rename).collect();
-            if renames.is_empty() {
-                continue;
-            }
-
             let result = will_rename_files(db, &renames);
             extend_lsp_edits(db, snapshot.position_encoding(), result, &mut changes);
         }
