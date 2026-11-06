@@ -4704,6 +4704,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "jiff",
+ "mimalloc",
  "rayon",
  "regex",
  "ruff_command_line",

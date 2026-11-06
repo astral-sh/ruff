@@ -3,6 +3,7 @@ use std::io;
 use ty::{ExitStatus, run};
 
 #[cfg(all(
+    not(target_os = "linux"),
     not(target_os = "macos"),
     not(target_os = "windows"),
     not(target_os = "openbsd"),
@@ -17,6 +18,18 @@ use ty::{ExitStatus, run};
 ))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+#[cfg(all(
+    target_os = "linux",
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
+    )
+))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() -> ExitStatus {
     run().unwrap_or_else(|error| {
