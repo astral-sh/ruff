@@ -831,6 +831,26 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Missing annotations do not supply declared type context
+
+A missing annotation does not supply type context for a return or argument expression:
+
+```py
+from ty_extensions._internal import Unknown
+
+def identity[T](x: T) -> T:
+    return x
+
+def unannotated(x):
+    return reveal_type(identity(1))  # revealed: Literal[1]
+
+def annotated(x: Unknown) -> Unknown:
+    return reveal_type(identity(1))  # revealed: Unknown
+
+unannotated(reveal_type(identity(1)))  # revealed: Literal[1]
+annotated(reveal_type(identity(1)))  # revealed: Unknown
+```
+
 ## Upper-bound type context
 
 The declared upper bound of a type variable provides type context for a nested generic call:

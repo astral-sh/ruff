@@ -8699,7 +8699,7 @@ impl<'db> Binding<'db> {
 
                 let parameter_type = specialized_overload.signature.parameters()
                     [specialized_parameter.index]
-                    .annotated_type();
+                    .argument_context_type()?;
                 // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
                 // type variables in the same way as for arguments to an ordinary generic call.
                 contexts.push(
@@ -8840,7 +8840,7 @@ impl<'db> Binding<'db> {
         let original_parameter_type = parameter.annotated_type();
         let mut parameter_type = matched_parameter
             .expected_type
-            .unwrap_or(original_parameter_type);
+            .or_else(|| parameter.argument_context_type())?;
         let paramspec_value = |paramspec| {
             self.merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))

@@ -5530,11 +5530,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = lexical_return_type(
+                    let Some(return_ty) = lexical_return_type(
                         db,
                         func.definition(db),
                         func.node(db, self.file(), self.module()),
-                    );
+                    ) else {
+                        return TypeContext::default();
+                    };
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
