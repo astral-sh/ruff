@@ -981,17 +981,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str) -> None: ...
     def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str) -> None: ...
@@ -1025,17 +1025,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str, later: str) -> None: ...
     def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str, later: str) -> None: ...
