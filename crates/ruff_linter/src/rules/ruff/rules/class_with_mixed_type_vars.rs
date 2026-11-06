@@ -151,6 +151,13 @@ fn convert_type_vars(
         return Ok(None);
     };
 
+    if converted_type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return Ok(None);
+    }
+
     type_vars.extend(converted_type_vars);
 
     let source = checker.source();
