@@ -1373,6 +1373,139 @@ def ab(a: int, *, c: int): ...
     }
 
     #[test]
+    fn goto_definition_overloaded_function_call() {
+        let test = cursor_test(
+            r#"
+from typing import overload
+
+@overload
+def foo(x: int) -> int: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> int | str:
+    return x
+
+f<CURSOR>oo(1)
+"#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:1
+           |
+        11 | foo(1)
+           | ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:8:5
+          |
+        8 | def foo(x: int | str) -> int | str:
+          |     ---
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_function_reference() {
+        let test = cursor_test(
+            r#"
+from typing import overload
+
+@overload
+def foo(x: int) -> int: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> int | str:
+    return x
+
+callback = f<CURSOR>oo
+"#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:12
+           |
+        11 | callback = foo
+           |            ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:8:5
+          |
+        8 | def foo(x: int | str) -> int | str:
+          |     ---
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_method_call() {
+        let test = cursor_test(
+            r#"
+from typing import overload
+
+class A:
+    @overload
+    def foo(self, x: int) -> int: ...
+    @overload
+    def foo(self, x: str) -> str: ...
+    def foo(self, x: int | str) -> int | str:
+        return x
+
+A().f<CURSOR>oo("a")
+"#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+          --> main.py:12:5
+           |
+        12 | A().foo("a")
+           |     ^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:9:9
+          |
+        9 |     def foo(self, x: int | str) -> int | str:
+          |         ---
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overloaded_function_call_without_implementation() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int) -> int: ...
+
+@overload
+def ab(a: str) -> str: ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:4:1
+          |
+        4 | ab(1)
+          | ^^ Clicking here
+        info: Found 1 definition
+         --> mymodule.pyi:5:5
+          |
+        5 | def ab(a: int) -> int: ...
+          |     --
+        ");
+    }
+
+    #[test]
     fn goto_definition_binary_operator() {
         let test = CursorTest::builder()
             .source(
