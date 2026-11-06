@@ -603,16 +603,8 @@ pub(crate) fn infer_predicate_truthiness<'db>(
 /// Reachability walks can revisit the same predicate for many different bindings.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
-        // A predicate can guard one of its own inputs. Keep both outcomes when iterations
-        // disagree, but give the initial ambiguous result a chance to resolve first.
-        if cycle.iteration() > crate::TAINTED_CYCLES {
-            previous.union(current)
-        } else {
-            current
-        }
-    },
+    cycle_initial = |_, _, _| Truthiness::Uninhabited,
+    cycle_fn = |_, _, previous: &Truthiness, current: Truthiness, _| previous.union(current),
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
