@@ -751,6 +751,15 @@ fn evaluate_reachability_constraint<'db>(
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
+    evaluate_reachability_with_suffixes(db, scope, id, None)
+}
+
+fn evaluate_reachability_with_suffixes<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    local_entries: Option<&RefCell<Vec<Option<Truthiness>>>>,
+) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
     }
@@ -769,7 +778,7 @@ fn evaluate_reachability_constraint<'db>(
         predicates,
         call_predicates,
         id,
-        true,
+        ReachabilityPathStart::Root(local_entries),
     )
 }
 
@@ -828,6 +837,13 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
+/// A root can use checkpoints and optionally share suffixes with other roots in this region.
+/// A checkpoint must evaluate its own first node directly.
+enum ReachabilityPathStart<'a> {
+    Root(Option<&'a RefCell<Vec<Option<Truthiness>>>>),
+    Checkpoint,
+}
+
 /// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
 ///
 /// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
@@ -836,8 +852,8 @@ fn is_reachability_checkpoint(
 /// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
 /// Stop as soon as any required branch is unreachable.
 ///
-/// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
-/// node is evaluated directly to prevent the query from immediately calling itself again.
+/// On entry from a checkpoint query, the first node is evaluated directly to prevent the query
+/// from immediately calling itself again.
 ///
 /// General checkpoints are created only after traversing a genuinely long path. Their positions
 /// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
@@ -849,13 +865,20 @@ fn evaluate_reachability_path<'db>(
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     call_predicates: Option<&[ScopedPredicateId]>,
     mut id: ScopedReachabilityConstraintId,
-    mut use_checkpoint: bool,
+    start: ReachabilityPathStart<'_>,
 ) -> Truthiness {
+    let (mut use_checkpoint, local_entries) = match start {
+        ReachabilityPathStart::Root(entries) => (true, entries),
+        ReachabilityPathStart::Checkpoint => (false, None),
+    };
     let env = ProgramEnvironment::from_scope(scope);
     let mut visited = 0;
     let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
     let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
     let mut result = Truthiness::AlwaysTrue;
+    // Until an uninhabited predicate splits the walk, every node has the same result as
+    // the root. Save that prefix so a later binding can reuse the shared suffix.
+    let mut prefix = SmallVec::<[ScopedReachabilityConstraintId; 8]>::new();
 
     loop {
         let reachability = if seen.as_mut().is_some_and(|seen| !seen.insert(id)) {
@@ -863,7 +886,14 @@ fn evaluate_reachability_path<'db>(
             Truthiness::AlwaysTrue
         } else if let Some(reachability) = terminal_reachability(id) {
             reachability
+        } else if let Some(reachability) =
+            local_entries.and_then(|entries| entries.borrow().get(id.index()).copied().flatten())
+        {
+            reachability
         } else {
+            if local_entries.is_some() && seen.is_none() {
+                prefix.push(id);
+            }
             let node = constraints.get_interior_node(id);
             if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
                 evaluate_reachability_checkpoint(db, scope, id)
@@ -888,15 +918,27 @@ fn evaluate_reachability_path<'db>(
 
         result = result.and(reachability);
         if result.is_always_false() {
-            return result;
+            break;
         }
         let Some(next) = pending.pop() else {
-            return result;
+            break;
         };
         id = next;
         use_checkpoint = true;
         visited = 0;
     }
+
+    if let Some(entries) = local_entries {
+        let mut entries = entries.borrow_mut();
+        for id in prefix {
+            let index = id.index();
+            if index >= entries.len() {
+                entries.resize(index + 1, None);
+            }
+            entries[index] = Some(result);
+        }
+    }
+    result
 }
 
 /// Evaluates a canonical suffix of a reachability decision diagram.
@@ -930,7 +972,7 @@ fn evaluate_reachability_checkpoint<'db>(
         predicates,
         call_predicates,
         id,
-        false,
+        ReachabilityPathStart::Checkpoint,
     )
 }
 
@@ -965,7 +1007,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             predicates,
             None,
             id,
-            true,
+            ReachabilityPathStart::Root(None),
         )
     }
 }
@@ -2187,13 +2229,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let result = evaluate_reachability_constraint(db, self.primary_scope, id);
-        let mut entries = self.primary_entries.borrow_mut();
-        if entries.len() <= index {
-            entries.resize(index + 1, None);
-        }
-        entries[index] = Some(result);
-        result
+        evaluate_reachability_with_suffixes(db, self.primary_scope, id, Some(&self.primary_entries))
     }
 }
 
@@ -2388,6 +2424,68 @@ class TargetB:
             evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
                 .is_always_false()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cached_reachability_suffixes_preserve_uninhabited_branches() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/test.py",
+            r#"
+            from typing import Never
+
+            def f(outer: bool, inner: bool, stop: Never) -> None:
+                if outer:
+                    value = 1
+                else:
+                    value = 2
+                if inner:
+                    if stop:
+                        value = 3
+                    else:
+                        value = 4
+                result = value
+            "#,
+        )?;
+
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let index = semantic_index(&db, program_file);
+        let local_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+        let scope = local_scope.to_scope_id(&db, program_file);
+        let use_def = index.use_def_map(local_scope);
+        let graph = use_def.reachability_constraints();
+        let predicates = use_def.predicates();
+        let env = ProgramEnvironment::from_scope(scope);
+        assert!(
+            predicates
+                .iter()
+                .any(|predicate| analyze_single(&db, &env, predicate).is_uninhabited())
+        );
+
+        let value = index.place_table(local_scope).symbol_id("value").unwrap();
+        let mut roots: Vec<_> = use_def
+            .end_of_scope_symbol_bindings(value)
+            .map(|binding| binding.reachability_constraint)
+            .collect();
+        for node in graph.used_interiors() {
+            roots.extend([node.if_true(), node.if_ambiguous(), node.if_false()]);
+        }
+
+        // A root that splits at an uninhabited predicate combines both continuations.
+        // Either continuation can later be requested as a root in its own right.
+        for _ in 0..2 {
+            let cache = ReachabilityEvaluationCache::new(scope, graph);
+            for &id in &roots {
+                assert_eq!(
+                    cache.evaluate(&db, graph, predicates, id),
+                    evaluate_reachability_constraint(&db, scope, id),
+                    "reachability of {id:?}",
+                );
+            }
+            roots.reverse();
+        }
         Ok(())
     }
 
