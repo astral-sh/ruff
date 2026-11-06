@@ -503,6 +503,39 @@ class Concrete(Interface):
 Concrete()  # ok
 ```
 
+## Class-object fields in stubs
+
+A field declared as `type[Base]` holds a class object even when `Base` has abstract methods. The
+same spelling can describe an abstract method if the class rebinds `type`.
+
+`fields.pyi`:
+
+```pyi
+from abc import abstractmethod
+
+class Base:
+    @abstractmethod
+    def method(self) -> int: ...
+
+class HasClassObjects:
+    implementation: type[Base]
+    default: type[Base] = ...
+
+class HasAbstractMethod:
+    from ty_extensions._internal import TypeOf as type
+
+    implementation: type[Base.method]
+```
+
+`main.py`:
+
+```py
+from fields import HasAbstractMethod, HasClassObjects
+
+HasClassObjects()  # ok
+HasAbstractMethod()  # error: [call-non-callable] "unimplemented abstract method `implementation`"
+```
+
 ## Abstract overloads
 
 An abstract overload keeps a method abstract even when its implementation is not decorated with

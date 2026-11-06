@@ -6,17 +6,19 @@ use ruff_db::{
 };
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    definition::{Definition, DefinitionKind},
+    definition::{AnnotatedAssignmentDefinitionKind, Definition, DefinitionKind},
     place_table, use_def_map,
 };
 
 use crate::{
-    Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
+    Db, FxIndexMap, ProgramEnvironment, SemanticModel, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{
+        DefinedPlace, Place, implicit_builtins_symbol, place_from_bindings, place_from_declarations,
+    },
     types::{
-        ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
-        binding_type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, LintDiagnosticGuard, Parameters, Signature,
+        Type, binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
         function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
@@ -383,13 +385,61 @@ impl<'db> ClassType<'db> {
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let DefinitionKind::Function(function) = definition.kind(db) else {
-        return true;
-    };
-    if !function.has_decorators() {
+    match definition.kind(db) {
+        DefinitionKind::Function(function) => {
+            function.has_decorators()
+                && function_known_decorators(db, definition).may_produce_abstract_method()
+        }
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            !is_stub_class_object_declaration(db, definition, assignment)
+        }
+        _ => true,
+    }
+}
+
+/// A stub field declared as `type[T]` without a value, or with an ellipsis placeholder,
+/// holds a class object. Its type argument cannot introduce an abstract method.
+fn is_stub_class_object_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    assignment: &AnnotatedAssignmentDefinitionKind,
+) -> bool {
+    if !definition.file(db).is_stub(db) {
         return false;
     }
-    function_known_decorators(db, definition).may_produce_abstract_method()
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let Some(name) = assignment
+        .annotation(&module)
+        .as_subscript_expr()
+        .and_then(|subscript| subscript.value.as_name_expr())
+    else {
+        return false;
+    };
+    if name.id != "type"
+        || assignment
+            .value(&module)
+            .is_some_and(|value| !value.is_ellipsis_literal_expr())
+    {
+        return false;
+    }
+
+    let model = SemanticModel::new(db, definition.program_file(db));
+    if !model.definitely_has_builtin_binding("type", name.into()) {
+        return false;
+    }
+    // A custom typeshed can replace the builtin itself. Use the same class identity as
+    // type-expression inference when deciding how to interpret the subscript.
+    let Place::Defined(binding) =
+        implicit_builtins_symbol(db, &model.program_environment(), "type").place
+    else {
+        return false;
+    };
+    let Type::ClassLiteral(ClassLiteral::Static(class)) = binding.ty else {
+        return false;
+    };
+    binding.is_definitely_defined()
+        && class.known(db) == Some(KnownClass::Type)
+        && binding.provenance.definition() == Some(class.definition(db))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
