@@ -109,9 +109,9 @@ impl Server {
             }),
         )?;
 
-        // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
-        // some responses before blocking.
-        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        // An edit can wait for database snapshots held by queued jobs. Workers must be
+        // able to return their results while the main loop waits for those snapshots.
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::unbounded();
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         let unknown_options = &initialization_options.options.unknown;

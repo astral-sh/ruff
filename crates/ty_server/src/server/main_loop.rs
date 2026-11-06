@@ -169,8 +169,7 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
-        // Drain worker actions before dispatching more deferred requests. Otherwise, workers
-        // can block on the full action channel while this thread blocks on the full job queue.
+        // Deliver ready worker responses before replaying more deferred requests.
         if let Ok(event) = self.main_loop_receiver.try_recv() {
             return Ok(Some(event));
         }
@@ -254,8 +253,6 @@ struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
     /// Waits for a main-loop action, project wakeup, or client message, in that order.
-    /// Polling uv can wait for worker database snapshots, so drain the bounded action
-    /// channel before applying uv results. Handle both before accepting new requests.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,

@@ -67,12 +67,7 @@ impl LazyWorkDoneProgress {
         )
     }
 
-    /// Returns a progress reporter that displays an indicator if the main-loop action queue has
-    /// capacity.
-    ///
-    /// Server-initiated progress requires sending a request to the client through the main loop.
-    /// If the queue is full, the progress indicator is not shown. Waiting for capacity would
-    /// deadlock because the main loop cannot drain its own queue until this call returns.
+    /// Creates a progress reporter from the main loop using best-effort delivery.
     pub(crate) fn new_on_main_loop(
         client: &Client,
         begin: WorkDoneProgressBegin,
