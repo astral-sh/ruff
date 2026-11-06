@@ -19,6 +19,7 @@ use super::{
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
+    literal::{LiteralComparisonKind, WideLiteralComparison},
 };
 
 mod enums;
@@ -324,6 +325,11 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
+        if let Some(comparison) = WideLiteralComparison::new(db, &self.evaluator.env, left, right) {
+            // Builtin literal equality is reflexive and returns a boolean, so neither identity
+            // nor a rich-comparison method call can add an outcome here.
+            return Ok(comparison.truthiness(db, LiteralComparisonKind::Equality));
+        }
         let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
@@ -610,6 +616,30 @@ fn evaluate_comparison_once<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if let Some(comparison) = WideLiteralComparison::new(evaluator.db, &evaluator.env, left, right)
+    {
+        if evaluator.goal == ComparisonGoal::Constraint
+            && operator.condition_expects_equality(branch)
+        {
+            return match comparison.positive_constraint(
+                evaluator.db,
+                &evaluator.env,
+                LiteralComparisonKind::Equality,
+            ) {
+                Some(Type::Never) => operator.result_from_equality(false),
+                Some(constraint) => ComparisonResult::CanNarrow(constraint),
+                None => ComparisonResult::Ambiguous,
+            };
+        }
+        return if comparison
+            .truthiness(evaluator.db, LiteralComparisonKind::Equality)
+            .is_always_false()
+        {
+            operator.result_from_equality(false)
+        } else {
+            ComparisonResult::Ambiguous
+        };
+    }
     evaluate_enum_comparison(evaluator, left, right, branch, operator)
         .or_else(|| evaluate_dynamic_comparison(evaluator, left, right, branch, operator))
         .or_else(|| evaluate_finite_comparison(evaluator, left, right, branch, operator))

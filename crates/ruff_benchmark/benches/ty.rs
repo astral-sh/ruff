@@ -814,6 +814,66 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4924>.
+fn benchmark_string_literal_union_comparison(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let literal_members = |start| {
+            (start..start + num_members)
+                .map(|index| format!("'k{index}'"))
+                .join(", ")
+        };
+        let members = literal_members(0);
+        let other_members = literal_members(num_members / 2);
+        let overlapping_generator_filter = format!(
+            "
+        OtherKind = Literal[{other_members}]
+
+        class Target:
+            kind: OtherKind
+
+        def find(items: list[Item], target: Target) -> str | None:
+            return next((item.kind for item in items if item.kind == target.kind), None)
+            "
+        );
+        for (name, body) in [
+            (
+                "equality",
+                "
+        def compare(left: Item, right: Item) -> bool:
+            return left.kind == right.kind
+                ",
+            ),
+            (
+                "generator_filter",
+                "
+        def find(items: list[Item], target: Item) -> Item | None:
+            return next((item for item in items if item.kind == target.kind), None)
+                ",
+            ),
+            (
+                "overlapping_generator_filter",
+                overlapping_generator_filter.as_str(),
+            ),
+        ] {
+            let code = format!(
+                "
+        from typing import Literal
+
+        Kind = Literal[{members}]
+
+        class Item:
+            kind: Kind
+        {body}"
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[string_literal_union_{name}_{num_members}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -2767,6 +2827,7 @@ criterion_group!(
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
     benchmark_mixed_str_enum_comparison,
+    benchmark_string_literal_union_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
