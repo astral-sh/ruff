@@ -8300,9 +8300,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Consecutive elements often contribute the same lower bound after literal promotion.
+        // Track keys and values separately for dictionaries.
+        let mut previous_evidence = [None; N];
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
+                previous_evidence = [None; N];
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
@@ -8417,9 +8421,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
-                builder
-                    .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
-                    .ok()?;
+                if previous_evidence[i] != Some(inferred_type_for_typevar) {
+                    builder
+                        .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
+                        .ok()?;
+                    previous_evidence[i] = Some(inferred_type_for_typevar);
+                }
             }
         }
 
