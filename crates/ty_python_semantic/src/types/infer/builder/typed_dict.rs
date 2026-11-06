@@ -66,7 +66,8 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// In `record.get("name", default)`, skip overloads for other keys before inferring `default`.
+    /// For `record.get("name", default)`, only the overloads for `"name"` and the string
+    /// fallbacks can match. Skip the other keys before inferring `default`.
     pub(super) fn narrow_typed_dict_get_overloads(
         &self,
         call: &ast::ExprCall,
@@ -80,18 +81,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if self.collects_expected_types() {
             return;
         }
-        // If any receiver lacks the key, the full overload set supplies the type context for the default.
+        // A missing key needs the full overload set to infer the default from the return context.
         if !self.is_typed_dict_get_for_declared_key(callee, key) {
             return;
         }
 
-        bindings.retain_overloads(|signature| {
-            let literal_key = signature
-                .parameters()
-                .positional_only_by_name("key")
-                .and_then(|(_, parameter)| parameter.annotated_type().as_string_literal());
-            literal_key.is_none_or(|literal| literal.value(self.db()) == key)
-        });
+        bindings.retain_overloads_for_string_literal(self.db(), 0, key);
     }
 
     /// Recognize `obj.get("key")` and `obj.get("key", default)`.
