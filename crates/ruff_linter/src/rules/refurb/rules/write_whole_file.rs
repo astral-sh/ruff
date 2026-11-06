@@ -216,7 +216,7 @@ fn generate_fix(
         return None;
     };
 
-    if value.as_ref() != call_expr {
+    if value.range() != call_expr.range() {
         return None;
     }
 
