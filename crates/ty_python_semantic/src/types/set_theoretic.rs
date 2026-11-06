@@ -162,6 +162,24 @@ impl<'db> UnionType<'db> {
         union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
+    /// Normalize a pair without unpacking aliases. Repeated annotations often share the
+    /// same operand types even when their enclosing function signatures differ.
+    pub(crate) fn from_two_elements_leave_aliases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Type<'db> {
+        OrderedUnionInput::new(
+            db,
+            env.program(db),
+            [left, right].as_slice(),
+            false,
+            RecursivelyDefined::No,
+        )
+        .normalize(db)
+    }
+
     /// Create a union from a list of elements without unpacking type aliases.
     pub(crate) fn from_elements_leave_aliases<I, T>(
         db: &'db dyn Db,
