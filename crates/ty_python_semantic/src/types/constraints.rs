@@ -791,6 +791,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    /// Returns whether the two constraint sets hold for exactly the same assignments.
+    pub(super) fn is_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        other.verify_builder(self.builder);
+        // Look for a counterexample in each direction. Building the full equivalence diagram
+        // combines both sets of paths before the solver can rule either direction out.
+        let is_subset = |left: Self, right: Self| {
+            left.and(db, self.builder, || right.negate(db, self.builder))
+                .is_never_satisfied(db, env, inferable)
+        };
+        self.node == other.node || (is_subset(self, other) && is_subset(other, self))
+    }
+
     /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
     /// were inferable when this constraint set was created, and which should be abstracted away.
     /// Those typevars will be removed from the constraint set, and the constraint set will return
@@ -6644,6 +6662,10 @@ class E: ...
         let tdd = t_int.or(db, &builder, || u_str);
         let negated = tdd.negate(db, &builder);
         let double_negated = negated.negate(db, &builder);
+        assert!(tdd.is_equivalent_to(db, &env, double_negated, TypeVarSet::None));
+        assert!(!tdd.is_equivalent_to(db, &env, t_int, TypeVarSet::None));
+        assert!(!t_int.is_equivalent_to(db, &env, tdd, TypeVarSet::None));
+
         let equivalent = tdd.iff(db, &builder, double_negated);
         assert!(equivalent.is_always_satisfied(db, &env, TypeVarSet::None));
     }
