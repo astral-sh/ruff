@@ -250,7 +250,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => {}
     }
 
-    std::mem::forget(db);
+    db.forget_storage_on_exit();
 
     if matches!(exit_status, ExitStatus::Interrupted) {
         return Ok(ExitStatus::Interrupted);
