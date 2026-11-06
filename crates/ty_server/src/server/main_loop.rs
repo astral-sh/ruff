@@ -33,7 +33,7 @@ impl Server {
 
             match next_event {
                 Event::Message(msg) => {
-                    let Some(msg) = self.session.should_defer_message(msg) else {
+                    let Some(msg) = self.session.should_defer_message(msg, &client) else {
                         continue;
                     };
 

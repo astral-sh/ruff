@@ -33,7 +33,7 @@ pub(crate) use main_loop::{
 pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-/// Maximum number of requests waiting for a worker.
+/// Maximum number of requests waiting for a worker or for workspace initialization, per queue.
 pub(crate) const MAX_QUEUED_REQUESTS: usize = 2048;
 
 pub(crate) fn log_queue_size(queue: &str, queued: usize) {
