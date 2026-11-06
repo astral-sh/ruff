@@ -5,12 +5,14 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::Parameter;
+use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
+use crate::types::signatures::{Parameter, Signature};
 use crate::types::typevar::TypeVarNonceGenerator;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
+    NominalInstanceType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -836,6 +838,55 @@ fn constructor_returns_instance<'db>(
 }
 
 impl<'db> Binding<'db> {
+    /// Bind the implicit `__new__` receiver when its bare `Self` return already means the
+    /// constructed nominal instance.
+    pub(super) fn new_inference_signature(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Signature<'db>> {
+        let context = self.constructor_context?;
+        if context.kind() != ConstructorCallableKind::New {
+            return None;
+        }
+        let instance = context.instance_type();
+        let signature = &self.signature;
+        let returned = signature.return_ty.as_typevar()?;
+        let receiver = signature.parameters().get(0)?;
+        let Type::NominalInstance(nominal) = instance else {
+            return None;
+        };
+        if !receiver.inferred_annotation
+            || !returned.typevar(db).is_self(db)
+            || !matches!(receiver.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(returned))
+        {
+            return None;
+        }
+
+        let receiver_instance = if nominal.is_definition_generic(db) {
+            signature.generic_new_receiver(db, env, nominal, returned)?
+        } else {
+            instance
+        };
+        // A later constructor projection can still use the stored signature's `Self` return.
+        let signature = signature.clone().with_return_type(instance);
+
+        // Argument matches index the original parameters. Replacing only the receiver keeps
+        // a keyword-only parameter after an unpacked `*args` tuple at its original index.
+        if signature
+            .parameters()
+            .iter()
+            .any(Parameter::has_starred_annotation)
+        {
+            if returned.typevar(db).upper_bound(db, env)? != instance {
+                return None;
+            }
+            return signature.with_unused_self_upper_bound(db, env);
+        }
+
+        signature.bind_unused_self(db, env, receiver_instance)
+    }
+
     /// Is a type variable returned from a constructor method a representation of the self type?
     ///
     /// Handles `typing.Self` annotations and `__new__` methods returning `T` where `self:
@@ -924,5 +975,99 @@ impl<'db> Binding<'db> {
             }
             _ => Some(self.signature.return_ty),
         }
+    }
+}
+
+impl<'db> Signature<'db> {
+    /// Returns the instance to bind to a generic allocator's `cls` argument before inference.
+    ///
+    /// For example, `Child[K, V]` can inherit `__new__(cls, *args: Any, **kwargs: Any) -> Self`
+    /// from `Base[K, V]`. If both classes use `K` and `V` invariantly, matching the receiver
+    /// against the bound of `Self` relates each type variable to itself. A covariant parameter
+    /// or a base such as `Base[K | V, V]` can supply additional constraints.
+    fn generic_new_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: NominalInstanceType<'db>,
+        self_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        if self
+            .parameters()
+            .iter()
+            .skip(1)
+            .any(|parameter| parameter.annotated_type() != Type::any())
+        {
+            return None;
+        }
+        let self_bound = self_typevar
+            .typevar(db)
+            .upper_bound(db, env)
+            .and_then(Type::as_nominal_instance)?;
+        let receiver_instance = receiver;
+        let (ClassType::Generic(receiver), ClassType::Generic(bound)) =
+            (receiver.class(db, env), self_bound.class(db, env))
+        else {
+            return None;
+        };
+        let mut instance = Type::NominalInstance(receiver_instance);
+        let receiver = receiver.specialization(db);
+        let bound = bound.specialization(db);
+        let arguments = receiver.types(db);
+        if arguments != bound.types(db)
+            || receiver
+                .generic_context(db)
+                .variables(db)
+                .chain(bound.generic_context(db).variables(db))
+                .any(|parameter| parameter.variance(db) != TypeVarVariance::Invariant)
+        {
+            return None;
+        }
+
+        // Apart from `Self`, every signature variable must be a distinct class argument.
+        // A fixed upper bound such as `Hashable` is fine. Dependent bounds can tie two
+        // arguments together, and defaults, constraints and variadics have their own inference rules.
+        let variables = self.generic_context?;
+        if variables.len(db) != arguments.len() + 1 {
+            return None;
+        }
+        for variable in variables
+            .variables(db)
+            .filter(|var| !var.is_same_typevar_as(db, self_typevar))
+        {
+            if !arguments.contains(&Type::TypeVar(variable))
+                || variable.is_paramspec(db)
+                || variable.is_typevartuple(db)
+                || variable.default_type(db).is_some()
+            {
+                return None;
+            }
+            match variable.typevar(db).bound_or_constraints(db, env) {
+                None => {}
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
+                Some(TypeVarBoundOrConstraints::UpperBound(upper)) if upper.is_never() => {
+                    // Matching `cls` normally infers `Never` even when the call has no arguments.
+                    // Keep that evidence on the receiver so the return type can still use a
+                    // specialization from the call's expected type.
+                    instance = instance.apply_type_mapping(
+                        db,
+                        env,
+                        &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                            variable,
+                            Type::Never,
+                        )),
+                        TypeContext::default(),
+                    );
+                }
+                Some(TypeVarBoundOrConstraints::UpperBound(upper)) => {
+                    if any_over_type_expanding_aliases(db, env, upper, |ty| {
+                        ty.is_type_var() || ty.is_never()
+                    }) {
+                        return None;
+                    }
+                }
+            }
+        }
+        Some(instance)
     }
 }
