@@ -618,7 +618,7 @@ impl<'db> SemanticIndex<'db> {
         })
     }
 
-    /// Return `true` if `expression` is an outermost "boolean test".
+    /// Return `true` if `expression` is an outermost "boolean test" in a file checked for diagnostics.
     ///
     /// A boolean test is an expression that Python tests for truthiness, such as an `if`
     /// condition or the operand of a `not` expression. ty's `redundant-condition` and

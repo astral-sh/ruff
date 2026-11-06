@@ -240,6 +240,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     file: ProgramFile<'db>,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
+    /// Whether to run diagnostic checks and collect the metadata used only by those checks.
+    should_check_file: bool,
     scope_stack: Vec<ScopeInfo<'ast>>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
@@ -329,6 +331,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             file,
             source_type: file.file(db).source_type(db),
             module: module_ref,
+            should_check_file: db.should_check_file(file.file(db)),
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
@@ -2310,6 +2313,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// `lambda` needs its own entry. This field is temporary visitor state; only the recorded
     /// expression node IDs are retained in the semantic index.
     fn visit_boolean_test(&mut self, test: &'ast ast::Expr, context: ExpressionContext) {
+        if !self.should_check_file {
+            self.visit_expr_with_context(test, context);
+            return;
+        }
+
         let scope = self.current_scope();
         let previous = self.active_boolean_test_scope.replace(scope);
         if previous != Some(scope) {
@@ -3462,6 +3470,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        if !self.should_check_file {
+            return;
+        }
+
         let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
         self.semantic_checker = checker;
@@ -6007,7 +6019,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             return;
         }
 
-        if self.db.should_check_file(self.file.file(self.db)) {
+        if self.should_check_file {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }

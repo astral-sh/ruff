@@ -1190,9 +1190,11 @@ mod tests {
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ty_python_core::semantic_index;
     use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
 
@@ -1237,6 +1239,36 @@ mod tests {
             vec![] as Vec<String>
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn opening_a_dependency_enables_diagnostic_indexing() -> anyhow::Result<()> {
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/project"));
+        let mut db = TestDb::new(metadata);
+        let path = "/deps/library.py";
+        db.write_file(path, "if (value := 1):\n    return\n")?;
+        let file = system_path_to_file(&db, path)?;
+        let module = parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
+        let condition = &module.syntax().body[0].as_if_stmt().unwrap().test;
+
+        let check_index = |db: &TestDb, checked: bool| {
+            let index = semantic_index(db, db.program_file(file));
+            assert!(
+                index
+                    .try_definition(condition.as_named_expr().unwrap())
+                    .is_some()
+            );
+            assert_eq!(index.is_boolean_test_root(condition), checked);
+            assert_eq!(index.semantic_syntax_errors().len(), usize::from(checked));
+        };
+
+        let project = db.project();
+        check_index(&db, false);
+        project.open_file(&mut db, file);
+        check_index(&db, true);
+        project.close_file(&mut db, file);
+        check_index(&db, false);
         Ok(())
     }
 
