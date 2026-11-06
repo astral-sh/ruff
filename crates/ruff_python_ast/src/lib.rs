@@ -160,3 +160,6 @@ impl<P: AsRef<Path>> From<P> for PySourceType {
         Self::try_from_path(path).unwrap_or_default()
     }
 }
+
+#[cfg(feature = "stub-archive")]
+pub mod stub_archive;

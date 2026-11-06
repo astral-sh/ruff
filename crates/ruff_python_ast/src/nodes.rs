@@ -2764,6 +2764,7 @@ impl<'a> IntoIterator for &'a ExprTuple {
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum ExprContext {
     Load,
     Store,
@@ -2774,6 +2775,7 @@ pub enum ExprContext {
 /// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum BoolOp {
     And,
     Or,
@@ -2797,6 +2799,7 @@ impl fmt::Display for BoolOp {
 /// See also [operator](https://docs.python.org/3/library/ast.html#ast.operator)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum Operator {
     Add,
     Sub,
@@ -2899,6 +2902,7 @@ impl fmt::Display for Operator {
 /// See also [unaryop](https://docs.python.org/3/library/ast.html#ast.unaryop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum UnaryOp {
     Invert,
     Not,
@@ -2926,6 +2930,7 @@ impl fmt::Display for UnaryOp {
 /// See also [cmpop](https://docs.python.org/3/library/ast.html#ast.cmpop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum CmpOp {
     Eq,
     NotEq,
@@ -4101,6 +4106,26 @@ impl From<bool> for Singleton {
         } else {
             Singleton::False
         }
+    }
+}
+
+#[cfg(feature = "stub-archive")]
+impl crate::stub_archive::Codec for StringLiteralFlags {
+    fn write(&self, out: &mut Vec<u8>) -> Option<()> {
+        self.0.bits().write(out)
+    }
+    fn read(input: &mut &[u8]) -> Option<Self> {
+        Some(Self(StringLiteralFlagsInner::from_bits(u8::read(input)?)?))
+    }
+}
+
+#[cfg(feature = "stub-archive")]
+impl crate::stub_archive::Codec for BytesLiteralFlags {
+    fn write(&self, out: &mut Vec<u8>) -> Option<()> {
+        self.0.bits().write(out)
+    }
+    fn read(input: &mut &[u8]) -> Option<Self> {
+        Some(Self(BytesLiteralFlagsInner::from_bits(u8::read(input)?)?))
     }
 }
 

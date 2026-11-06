@@ -47,6 +47,12 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
 }
 
 fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
+    if let Some(path) = file.path(db).as_vendored_path()
+        && file.source_text_override(db).is_none()
+        && let Some(parsed) = db.vendored().stub_syntax(path, target_version)
+    {
+        return parsed;
+    }
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
@@ -1090,6 +1096,55 @@ else:
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+    }
+
+    #[test]
+    fn packaged_stub_syntax_follows_a_source_text_override() -> crate::system::Result<()> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use crate::files::{File, FilePath};
+        use crate::source::source_text;
+        use ruff_python_ast::PySourceType;
+        use ruff_python_parser::{ParseOptions, parse_unchecked};
+        use salsa::Setter;
+
+        const CONTENTS: &str = "original: int";
+        static LOADS: AtomicUsize = AtomicUsize::new(0);
+        let mut db = TestDb::new();
+        let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        builder.add_file("original.pyi", CONTENTS).unwrap();
+        db.with_vendored(builder.finish().unwrap().with_stub_syntax(|path, version| {
+            assert_eq!(path.as_str(), "original.pyi");
+            LOADS.fetch_add(1, Ordering::Relaxed);
+            parse_unchecked(
+                CONTENTS,
+                ParseOptions::from(PySourceType::Stub).with_target_version(version),
+            )
+            .try_into_module()
+        }));
+
+        // Regular packaged files are immutable. Use a mutable input here to exercise
+        // the override and the return to the packaged source in one database.
+        let file = File::builder(FilePath::from(VendoredPath::new("original.pyi"))).new(&db);
+        let has_valid_syntax = |db: &TestDb| {
+            parsed_module(db, PythonFile::new(db, file, PythonVersion::PY311))
+                .load(db)
+                .has_valid_syntax()
+        };
+        assert!(has_valid_syntax(&db));
+        assert_eq!(LOADS.load(Ordering::Relaxed), 1);
+
+        db.write_file("edited.py", "if")?;
+        let edited = system_path_to_file(&db, "edited.py").unwrap();
+        let modified = source_text(&db, edited);
+        file.set_source_text_override(&mut db).to(Some(modified));
+        assert!(!has_valid_syntax(&db));
+        assert_eq!(LOADS.load(Ordering::Relaxed), 1);
+
+        file.set_source_text_override(&mut db).to(None);
+        assert!(has_valid_syntax(&db));
+        assert_eq!(LOADS.load(Ordering::Relaxed), 2);
+        Ok(())
     }
 
     #[test]

@@ -49,6 +49,7 @@ name = "fixtures"
 harness = false
 
 [features]
+stub-archive = ["ruff_python_ast/stub-archive"]
 stacker = ["dep:stacker"]
 
 [lints]

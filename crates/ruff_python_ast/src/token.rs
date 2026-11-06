@@ -34,6 +34,11 @@ pub struct Token {
 }
 
 impl Token {
+    #[cfg(feature = "stub-archive")]
+    pub(crate) fn archive_flags(&self) -> TokenFlags {
+        self.flags
+    }
+
     pub fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
         Self { kind, range, flags }
     }
@@ -132,6 +137,7 @@ impl fmt::Debug for Token {
 /// A kind of a token.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "stub-archive", derive(strum_macros::FromRepr))]
 pub enum TokenKind {
     /// Token kind for an identifier.
     ///

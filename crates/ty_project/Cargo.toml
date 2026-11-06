@@ -71,6 +71,7 @@ tempfile = { workspace = true }
 
 [features]
 default = ["zstd"]
+bundled-syntax = ["ty_vendored/bundled-syntax"]
 deflate = ["ty_vendored/deflate"]
 schemars = [
     "dep:schemars",
