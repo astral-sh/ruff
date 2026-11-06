@@ -747,6 +747,25 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
 /// different definitions at each read, but share the index of their original assignment guards.
 /// Rebuilding that index for every condition would make these examples quadratic even if their
 /// diagnostics were unchanged. Attribute fallback lookup also shares its definition summary.
+/// Repeated captures of the whole subject share narrowing constraints. Building a separate
+/// constraint for every pair of cases can exhaust the narrowing budget before the final case.
+#[test]
+fn many_guarded_match_captures() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let mut source =
+        String::from("def f(x: int | str | tuple[str], flags: list[bool]) -> int:\n    match x:\n");
+    for index in 0..512 {
+        writeln!(
+            source,
+            "        case str() as x if flags[{index}]: return 0"
+        )?;
+    }
+    source.push_str("        case int(): return x\n    return 0\n");
+    db.write_dedented("src/a.py", &source)?;
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+    Ok(())
+}
+
 /// Lazy closure reads share both the summary and boundness analysis of their outer bindings.
 /// Conditions on distinct names also share the reachability summaries for preceding calls,
 /// rather than traversing an increasingly long call prefix for each name.

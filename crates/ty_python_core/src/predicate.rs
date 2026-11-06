@@ -203,8 +203,6 @@ pub enum PredicateNode<'db> {
     /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
-    /// The types a successful pattern extracts into a capture, excluding the subject itself.
-    PatternExtractedCapture(PatternPredicate<'db>),
     /// Whether control flow takes one branch of an OR pattern instead of its remaining
     /// alternatives. The selected branch is unknown, but recording a predicate and its negation
     /// preserves the fact that exactly one branch is taken.
@@ -300,6 +298,34 @@ pub enum PatternPredicateKind<'db> {
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Star(Option<Name>),
+}
+
+impl PatternPredicateKind<'_> {
+    /// Could a positional class pattern bind the subject itself to `name`, as in `str(name)`?
+    /// Resolving the class and its `__match_args__` requires type information.
+    pub fn may_capture_subject_positionally(&self, name: &Name) -> bool {
+        fn visit(pattern: &PatternPredicateKind<'_>, name: &Name, positional: bool) -> bool {
+            match pattern {
+                PatternPredicateKind::As(inner, capture) => {
+                    if capture.as_ref() == Some(name) {
+                        positional
+                    } else {
+                        inner
+                            .as_deref()
+                            .is_some_and(|inner| visit(inner, name, positional))
+                    }
+                }
+                PatternPredicateKind::Or(alternatives) => {
+                    alternatives.iter().any(|alt| visit(alt, name, positional))
+                }
+                PatternPredicateKind::Class(class) => {
+                    matches!(class.positional.as_ref(), [pattern] if visit(pattern, name, true))
+                }
+                _ => false,
+            }
+        }
+        visit(self, name, false)
+    }
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]

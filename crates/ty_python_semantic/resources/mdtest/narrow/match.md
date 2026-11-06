@@ -3601,7 +3601,8 @@ def narrow_after_capture(value: int | str | bytes) -> None:
             reveal_type(value)  # revealed: bytes
 ```
 
-A positional capture of the subject also keeps its value when the guard fails.
+A positional capture in a built-in class pattern such as `str(value)` binds the whole string. A
+later integer case can only see the original integer binding.
 
 ```py
 def narrow_after_positional_capture(value: int | str, flag: bool) -> None:
@@ -3661,10 +3662,54 @@ def reassign_capture(value: int | str, flag: bool) -> None:
     match value:
         case value if (value := "changed") and flag:
             pass
-        case str():
-            reveal_type(value)  # revealed: Literal["changed"]
         case int():
             reveal_type(value)  # revealed: Literal["changed"]
+```
+
+When a guard assigns a stripped string, either a string case returns or the original subject was an
+integer.
+
+```py
+def narrow_after_strip(value: int | str) -> int:
+    match value:
+        case str() if value := value.strip():
+            return len(value)
+        case str():
+            return 0
+    return value
+```
+
+### Mutable captures
+
+A list can change after its pattern succeeds. Checking one item before mutating the list cannot
+establish the type of that item afterward.
+
+```py
+def mutate_capture(value: list[int | str], flag: bool) -> int:
+    match value:
+        case list([int()] as value) if flag:
+            value[:] = ["changed"]
+            return value[0]  # error: [invalid-return-type]
+    return 0
+
+def mutate_after_guard(value: list[int | str], flag: bool) -> int:
+    match value:
+        case list(value) if flag:
+            return 0
+        case [int()]:
+            value[:] = ["changed"]
+            return value[0]  # error: [invalid-return-type]
+    return 0
+```
+
+An unguarded pattern can still narrow an item read immediately in the same case.
+
+```py
+def read_item(value: list[int | str]) -> int:
+    match value:
+        case [int()] as value:
+            return value[0]
+    return 0
 ```
 
 ### Member subjects

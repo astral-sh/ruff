@@ -102,10 +102,6 @@ pub(crate) fn infer_narrowing_constraints<'db>(
                 .and_then(|constraints| constraints.get(&place).cloned());
             (positive, negative)
         }
-        PredicateNode::PatternExtractedCapture(pattern) => {
-            let ty = pattern_capture_types(db, pattern, Captures::Extracted).binding_type(place);
-            (Some(NarrowingConstraint::intersection(ty)), None)
-        }
         PredicateNode::SubjectElementPattern(subject_element) => {
             let positive = all_narrowing_constraints_for_subject_element_pattern(
                 db,
@@ -215,6 +211,69 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
         true,
     )
     .finish()
+}
+
+/// Return the guarded pattern that rebound its subject name through a structural subpattern.
+pub(crate) fn projected_match_capture<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<PatternPredicate<'db>> {
+    let DefinitionKind::MatchPattern(capture) = definition.kind(db) else {
+        return None;
+    };
+    let pattern = capture.predicate();
+    (pattern.guard(db).is_some()
+        && structural_capture_place(db, pattern) == Some(definition.place(db)))
+    .then_some(pattern)
+}
+
+#[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
+fn structural_capture_place<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> Option<ScopedPlaceId> {
+    let module = parsed_module(db, pattern.python_file(db)).load(db);
+    let subject = pattern.subject(db).node_ref(db).node(&module);
+    let PlaceExpr::Symbol(symbol) = PlaceExpr::try_from_expr(subject)? else {
+        return None;
+    };
+    if !pattern
+        .kind(db)
+        .may_capture_subject_positionally(symbol.name())
+    {
+        return None;
+    }
+    place_table(db, pattern.scope(db))
+        .symbol_id(symbol.name())
+        .map(Into::into)
+}
+
+/// Interpret a case test on the saved subject as a constraint on the value an earlier
+/// pattern captured. A class or singleton test can distinguish subject alternatives without
+/// carrying transient length or element facts into a mutable capture.
+pub(crate) fn match_capture_constraints<'db>(
+    db: &'db dyn Db,
+    capture: PatternPredicate<'db>,
+    tested: PatternPredicate<'db>,
+    place: ScopedPlaceId,
+) -> (
+    Option<NarrowingConstraint<'db>>,
+    Option<NarrowingConstraint<'db>>,
+) {
+    let stable = match tested.kind(db) {
+        PatternPredicateKind::Class(class) => class.is_empty(),
+        PatternPredicateKind::Singleton(_) => true,
+        _ => false,
+    };
+    if capture == tested || !stable {
+        return (None, None);
+    }
+    let constraint = |positive| {
+        Some(NarrowingConstraint::intersection(
+            pattern_capture_types(db, capture, Some((tested, positive))).binding_type(place),
+        ))
+    };
+    (constraint(true), constraint(false))
 }
 
 /// The types produced when a match pattern succeeds.
@@ -479,13 +538,7 @@ pub(crate) fn pattern_success_types<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> &'db PatternSuccessTypes<'db> {
-    pattern_capture_types(db, pattern, Captures::All)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum Captures {
-    All,
-    Extracted,
+    pattern_capture_types(db, pattern, None)
 }
 
 #[salsa::tracked(
@@ -500,24 +553,26 @@ enum Captures {
 fn pattern_capture_types<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-    captures: Captures,
+    narrowed_by: Option<(PatternPredicate<'db>, bool)>,
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
     let env = ProgramEnvironment::from_scope(subject.scope(db));
     let incoming_subject_ty =
         type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
+    let incoming_subject_ty = narrowed_by.map_or(incoming_subject_ty, |(later, positive)| {
+        if positive {
+            analyzer.matched_subject_type(later.kind(db), incoming_subject_ty)
+        } else {
+            pattern_binding_fallthrough_type(db, &env, later.kind(db), incoming_subject_ty)
+        }
+    });
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     PatternSuccessTypes {
         bindings: result
             .bindings
             .into_iter()
-            .map(|(place, mut binding)| {
-                if captures == Captures::Extracted {
-                    binding.contributions.retain(|part| !part.aliases_subject);
-                }
-                (place, binding.ty(db, &env))
-            })
+            .map(|(place, binding)| (place, binding.ty(db, &env)))
             .collect(),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
@@ -1742,8 +1797,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 self.evaluate_subject_element_pattern(subject_element)
             }
-            PredicateNode::PatternExtractedCapture(_)
-            | PredicateNode::ContextManagerSuppresses { .. }
+            PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
@@ -1894,11 +1948,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 // A different binding need not prevent narrowing if it cannot produce this
                 // outcome: `if not check: check = x is None` still narrows `x` when `check` is false.
-                let ty = binding.narrowing_constraint.narrow(
+                let ty = binding.narrowing_constraint.narrow_binding(
                     db,
                     &self.env,
                     binding_type(db, definition),
-                    definition.place(db),
+                    definition,
                 );
                 !ty.bool(db, &self.env).negate_if(!is_positive).may_be_true()
             })
@@ -3552,9 +3606,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match self.predicate {
             PredicateNode::Expression(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
-            PredicateNode::Pattern(pattern) | PredicateNode::PatternExtractedCapture(pattern) => {
-                pattern.scope(db)
-            }
+            PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
             PredicateNode::OrPatternAlternative(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {
@@ -5750,6 +5802,15 @@ pub(crate) trait NarrowingEvaluatorExtension<'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db>;
+
+    /// Narrow a specific binding, accounting for the pattern that produced its value.
+    fn narrow_binding(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        base_type: Type<'db>,
+        definition: Definition<'db>,
+    ) -> Type<'db>;
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
@@ -5760,6 +5821,23 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_type_by_constraint(db, env, self, base_type, place)
+        narrow_type_by_constraint(db, env, self, base_type, place, None)
+    }
+
+    fn narrow_binding(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        base_type: Type<'db>,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        narrow_type_by_constraint(
+            db,
+            env,
+            self,
+            base_type,
+            definition.place(db),
+            projected_match_capture(db, definition),
+        )
     }
 }

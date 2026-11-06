@@ -43,7 +43,6 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
-use crate::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -68,8 +67,8 @@ use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, MatchSubjectBindings, PreviousDefinitions, ScopedDefinitionId,
-    ScopedEnclosingSnapshotId, UseDefMapBuilder, UseDefMapInterner,
+    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
+    UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -2386,8 +2385,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::PatternExtractedCapture(_)
-                    | PredicateNode::SubjectElementPattern(_)
+                    PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
@@ -2821,13 +2819,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         )
     }
 
-    fn record_matched_pattern(
+    fn add_pattern_narrowing_constraint(
         &mut self,
         pattern_predicate: PatternPredicate<'db>,
-        subject_targets: &[MatchSubjectBindings],
+        subject_targets: &[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>)],
         sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         is_catchall: bool,
-    ) -> ScopedPredicateId {
+    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
@@ -2845,6 +2843,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_narrowing_constraint(predicate)
         } else {
             let predicate_id = self.add_predicate(predicate);
+            for (place, bindings) in subject_targets {
+                self.current_use_def_map_mut()
+                    .record_narrowing_constraint_for_bindings(predicate_id, *place, bindings);
+            }
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
                     self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
@@ -2865,9 +2867,43 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             predicate_id
         };
-        self.current_use_def_map_mut()
-            .record_match_branch(predicate_id, subject_targets, true);
-        predicate_id
+        (predicate, predicate_id)
+    }
+
+    /// Retain captures that bind the entire subject to its original name. These definitions
+    /// still refer to the saved subject if a guard fails, so later cases can narrow them.
+    fn extend_match_subject_bindings(
+        &self,
+        pattern: &ast::Pattern,
+        symbol: ScopedSymbolId,
+        bindings: &mut SmallVec<[ScopedDefinitionId; 2]>,
+    ) {
+        match pattern {
+            ast::Pattern::MatchAs(pattern) => {
+                if let Some(name) = &pattern.name
+                    && let Some(definition) = self
+                        .definitions_by_node
+                        .get(&name.into())
+                        .and_then(|definitions| definitions.first())
+                {
+                    let use_def = self.current_use_def_map();
+                    bindings.extend(use_def.symbol_binding_definition_ids(symbol).filter(
+                        |binding| use_def.definition(*binding).definition() == Some(*definition),
+                    ));
+                }
+                if let Some(pattern) = &pattern.pattern {
+                    self.extend_match_subject_bindings(pattern, symbol, bindings);
+                }
+            }
+            ast::Pattern::MatchOr(pattern) => {
+                for pattern in &pattern.patterns {
+                    self.extend_match_subject_bindings(pattern, symbol, bindings);
+                }
+            }
+            // Structural patterns can capture extracted values. Identifying whole-subject
+            // captures in class patterns requires type information.
+            _ => {}
+        }
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -4905,7 +4941,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ))
                     })
                     .collect::<SmallVec<[_; 2]>>();
-                let mut subject_targets = SmallVec::<[MatchSubjectBindings; 2]>::new();
+                let mut subject_targets =
+                    SmallVec::<[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>); 2]>::new();
                 for &(place, use_id) in &subject_places {
                     let bindings = if let Some(use_id) = use_id {
                         self.current_use_def_map()
@@ -4917,14 +4954,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // one, so snapshot the binding that was just created.
                         self.current_use_def_map_mut()
                             .current_bindings(place)
-                            .map(|binding| binding.binding())
+                            .map(|binding| LiveBinding::binding(&binding))
                             .collect()
                     };
-                    subject_targets.push(MatchSubjectBindings {
-                        place,
-                        definitions: bindings,
-                        extracted: ScopedNarrowingConstraint::ALWAYS_FALSE,
-                    });
+                    subject_targets.push((place, bindings));
                 }
                 let subject_place = PlaceExpr::try_from_expr(subject.as_ref())
                     .and_then(|place| self.current_place_table().place_id((&place).into()));
@@ -4982,28 +5015,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let first_capture = self.current_use_def_map().next_definition_id();
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    if case.guard.is_some()
-                        && let Some(ScopedPlaceId::Symbol(symbol)) = subject_place
-                        && let Some(captures) = self.current_use_def_map_mut().match_captures(
-                            match_pattern_predicate,
-                            symbol,
-                            first_capture,
-                        )
+                    if let Some((ScopedPlaceId::Symbol(symbol), bindings)) = subject_targets
+                        .iter_mut()
+                        .find(|(place, _)| Some(*place) == subject_place)
                     {
-                        subject_targets.push(captures);
+                        if case.guard.is_some()
+                            && match_pattern_predicate
+                                .kind(self.db)
+                                .may_capture_subject_positionally(
+                                    self.current_place_table().symbol(*symbol).name(),
+                                )
+                        {
+                            // A later case can distinguish which value a positional pattern or one
+                            // of its alternatives captured when the guard failed.
+                            let use_def = self.current_use_def_map();
+                            if use_def.next_definition_id() != first_capture {
+                                bindings.extend(
+                                    use_def
+                                        .symbol_binding_definition_ids(*symbol)
+                                        .filter(|id| *id >= first_capture),
+                                );
+                            }
+                        } else {
+                            self.extend_match_subject_bindings(&case.pattern, *symbol, bindings);
+                        }
                     }
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
                     let is_catchall = has_catchall && i == cases.len() - 1;
-                    let match_narrowing_id = self.record_matched_pattern(
-                        match_pattern_predicate,
-                        &subject_targets,
-                        &sequence_subject_targets,
-                        is_catchall,
-                    );
+                    let (match_predicate, match_narrowing_id) = self
+                        .add_pattern_narrowing_constraint(
+                            match_pattern_predicate,
+                            &subject_targets,
+                            &sequence_subject_targets,
+                            is_catchall,
+                        );
                     previous_pattern = Some(match_pattern_predicate);
+                    let reachability_constraint =
+                        self.record_reachability_constraint_id(match_narrowing_id);
+
                     // For a pattern `P` and guard `G`, the case body is reached through `P && G`,
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
@@ -5048,11 +5100,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // one. The last one will just become the state that we merge the other
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
-                        self.current_use_def_map_mut().record_match_branch(
+                        self.record_negated_narrowing_constraint(
+                            match_predicate,
                             match_narrowing_id,
-                            &subject_targets,
-                            false,
                         );
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         } else {

@@ -148,8 +148,8 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind,
-    LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
-    ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -1481,8 +1481,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::TypeVarTuple(node) => {
                 self.infer_typevartuple_definition(node.node(self.module()), definition);
             }
-            DefinitionKind::LoopHeader(loop_header) => {
-                self.infer_loop_header_definition(loop_header, definition);
+            DefinitionKind::LoopHeader(_) => {
+                self.infer_loop_header_definition(definition);
             }
             DefinitionKind::NestedBindings(nested_bindings) => {
                 self.infer_nested_bindings_definition(nested_bindings, definition);
@@ -2692,11 +2692,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// The loop header sees all the bindings that originate in the loop and are visible at a
     /// loop-back edge (either the end of the loop body or a `continue` statement). See `struct
     /// LoopHeader` in the semantic index for more on how all this fits together.
-    fn infer_loop_header_definition(
-        &mut self,
-        loop_header_kind: &LoopHeaderDefinitionKind,
-        definition: Definition<'db>,
-    ) {
+    fn infer_loop_header_definition(&mut self, definition: Definition<'db>) {
         // This cutoff was chosen by benchmarking real isort to keep loop analysis
         // overhead minimal while preserving diagnostics.
         const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
@@ -2717,7 +2713,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let place = loop_header_kind.place();
         let env = self.program_environment();
         let mut union = UnionBuilder::new(db, env).or_recursively_defined(RecursivelyDefined::Yes);
 
@@ -2725,7 +2720,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let binding_ty = binding_type(db, reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
-                .narrow(db, env, binding_ty, place);
+                .narrow_binding(db, env, binding_ty, reachable_binding.definition);
 
             union.add_in_place(narrowed_ty);
         }
@@ -2776,12 +2771,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     };
                     let ty = binding_type(db, source);
-                    union.add_in_place(binding.narrowing_constraint.narrow(
-                        db,
-                        env,
-                        ty,
-                        source.place(db),
-                    ));
+                    union.add_in_place(
+                        binding
+                            .narrowing_constraint
+                            .narrow_binding(db, env, ty, source),
+                    );
                 }
                 continue;
             }
@@ -10583,7 +10577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 union.add_in_place(
                                     binding
                                         .narrowing_constraint
-                                        .narrow(db, env, binding_ty, place),
+                                        .narrow_binding(db, env, binding_ty, definition),
                                 );
                             }
                             DefinitionState::Defined(_)
