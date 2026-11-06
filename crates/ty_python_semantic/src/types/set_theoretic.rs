@@ -66,7 +66,9 @@ impl<'db> OrderedUnionInput<'db> {
                 .build()
         }
 
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        // A provisional redundancy check can drop a union member on one iteration and retain it
+        // on the next. Build the union in the caller when normalization participates in a cycle.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
             Some(build(db, input))
         }
