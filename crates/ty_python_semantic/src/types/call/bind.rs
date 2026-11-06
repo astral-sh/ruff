@@ -1046,24 +1046,17 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
-    /// Discard overloads that require a different string literal at this argument position.
-    /// Broader annotations, such as `str`, still participate in argument inference.
-    pub(crate) fn retain_overloads_for_string_literal(
-        &mut self,
-        db: &'db dyn Db,
-        position: usize,
-        value: &str,
-    ) {
-        let argument = StringLiteralType::new(db, value);
+    /// Keep the overloads for `key` and the string fallbacks of a bound `TypedDict.get`.
+    pub(crate) fn narrow_typed_dict_get_overloads(&mut self, key: StringLiteralType<'db>) {
         for callable in self.iter_flat_mut() {
-            let parameter_index = position + usize::from(callable.bound_type.is_some());
+            let key_index = usize::from(callable.bound_type.is_some());
             callable.overloads.retain(|overload| {
                 let literal = overload
                     .signature
                     .parameters()
-                    .get_positional(parameter_index)
+                    .get_positional(key_index)
                     .and_then(|parameter| parameter.annotated_type().as_string_literal());
-                literal.is_none_or(|literal| literal == argument)
+                literal.is_none_or(|literal| literal == key)
             });
         }
     }

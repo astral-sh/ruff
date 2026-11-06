@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 
 use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
-use crate::types::call::{Bindings, CallError};
+use crate::types::call::CallError;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -20,8 +20,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
-    TypingModule, any_over_type,
+    ClassType, IntersectionType, KnownClass, StringLiteralType, Type, TypeAndQualifiers,
+    TypeContext, TypedDictType, TypingModule, any_over_type,
 };
 use ty_python_core::definition::Definition;
 
@@ -66,33 +66,27 @@ impl<'expr> TypedDictConstructorForm<'expr> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// For `record.get("name", default)`, only the overloads for `"name"` and the string
-    /// fallbacks can match. Skip the other keys before inferring `default`.
-    pub(super) fn narrow_typed_dict_get_overloads(
+    /// Return the key in `record.get("name", default)` when we can skip the other keys'
+    /// overloads before inferring `default`.
+    pub(super) fn typed_dict_get_key_for_narrowing(
         &self,
         call: &ast::ExprCall,
         callee: Type<'db>,
         result_context: TypeContext<'db>,
-        bindings: &mut Bindings<'db>,
-    ) {
+    ) -> Option<StringLiteralType<'db>> {
         // A return annotation or an enclosing call can use the full overload set
         // to specialize the default argument, even when the key is declared.
         if result_context.declared_type().is_some() {
-            return;
+            return None;
         }
-        let Some(key) = Self::literal_get_key(call) else {
-            return;
-        };
+        let key = Self::literal_get_key(call)?;
         // Completions need every declared key, even when the cursor is inside a literal.
         if self.collects_expected_types() {
-            return;
+            return None;
         }
         // An undeclared key relies on the fallback overloads to infer its default.
-        if !self.is_typed_dict_get_for_declared_key(callee, key) {
-            return;
-        }
-
-        bindings.retain_overloads_for_string_literal(self.db(), 0, key);
+        self.is_typed_dict_get_for_declared_key(callee, key)
+            .then(|| StringLiteralType::new(self.db(), key))
     }
 
     /// Recognize `obj.get("key")` and `obj.get("key", default)`.

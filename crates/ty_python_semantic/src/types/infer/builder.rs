@@ -10024,12 +10024,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let mut bindings = self.bindings_for_call(callable_type);
-        self.narrow_typed_dict_get_overloads(
+        if let Some(key) = self.typed_dict_get_key_for_narrowing(
             call_expression,
             callable_type,
             call_expression_tcx,
-            &mut bindings,
-        );
+        ) {
+            bindings.narrow_typed_dict_get_overloads(key);
+        }
         let bindings = bindings.match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
