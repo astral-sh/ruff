@@ -322,9 +322,13 @@ impl Violation for LoggingStringConcat {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if the message,
-/// or the parentheses around it, contain comments,
-/// since the rewrite replaces that whole range and would delete them.
+/// This rule's fix is always marked as unsafe because formatting an object in an f-string
+/// evaluates its `__format__` method, whereas `%s` formatting evaluates its
+/// `__str__` method. If an object implements both methods with different behaviors,
+/// converting from an f-string to `%s` formatting can alter the logged message.
+///
+/// Additionally, if the message or the parentheses around it contain comments,
+/// the comments will be deleted.
 ///
 /// ## Options
 /// - `lint.logger-objects`
