@@ -3374,7 +3374,7 @@ struct ConstraintInputs {
 }
 
 impl FlowInputs {
-    fn finish(mut self: Box<Self>) -> FlowTables {
+    fn finish(mut self) -> FlowTables {
         let ConstraintInputs {
             mut reachability,
             mut narrowing,
