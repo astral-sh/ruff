@@ -3911,9 +3911,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 env,
                 &element.when_constraint_set_assignable_to_owned(db, env, formal),
             );
-            element_when
-                .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env, self.inferable)
+            element_when.is_equivalent_to(db, env, mapping_when, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
