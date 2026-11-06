@@ -151,6 +151,12 @@ impl ProjectDatabase {
         project.freeze_open_files(self);
     }
 
+    /// Skips dropping cached Salsa data when the CLI is about to exit. The remaining fields
+    /// drop normally so the uv worker pool receives its shutdown signal.
+    pub fn forget_storage_on_exit(self) {
+        std::mem::forget(self.storage);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
