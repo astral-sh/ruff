@@ -64,9 +64,8 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        fn new(vendored: VendoredFileSystem) -> Self {
             let events = Events::default();
-            let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -157,7 +156,14 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
-            let mut db = TestDb::new();
+            self.build_with_vendored(ty_vendored::file_system().clone())
+        }
+
+        pub(crate) fn build_with_vendored(
+            self,
+            vendored: VendoredFileSystem,
+        ) -> anyhow::Result<TestDb> {
+            let mut db = TestDb::new(vendored);
 
             let src_root = SystemPathBuf::from("/src");
             db.memory_file_system().create_directory_all(&src_root)?;

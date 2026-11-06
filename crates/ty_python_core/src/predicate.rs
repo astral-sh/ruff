@@ -74,12 +74,26 @@ impl<'db> PredicatesBuilder<'db> {
     pub(crate) fn build(self) -> Predicates<'db> {
         self.predicates.into()
     }
+
+    pub(crate) fn known_environment_value(&self, id: ScopedPredicateId) -> Option<bool> {
+        self.predicates[id].known_environment_value()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct Predicate<'db> {
     pub node: PredicateNode<'db>,
     pub is_positive: bool,
+}
+
+impl Predicate<'_> {
+    /// The outcome of a bundled environment check, including negation on an `else` path.
+    pub const fn known_environment_value(self) -> Option<bool> {
+        match self.node {
+            PredicateNode::EnvironmentGuard { value, .. } => Some(value == self.is_positive),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
@@ -162,6 +176,12 @@ impl<'ast> StatementCall<'ast> {
 pub enum PredicateNode<'db> {
     /// The truthiness of an expression in its evaluation context.
     Expression(Expression<'db>),
+    /// A bundled stub guard with a known outcome for the target. Retain its origin so
+    /// diagnostics can recognize values selected by the Python version or platform.
+    EnvironmentGuard {
+        expression: Expression<'db>,
+        value: bool,
+    },
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

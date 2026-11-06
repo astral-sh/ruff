@@ -161,3 +161,37 @@ reveal_type(sys.implementation.version.minor)  # revealed: int
 reveal_type(sys.implementation.version[:2])  # revealed: tuple[int, int]
 reveal_type(sys.implementation.version >= (3, 9))  # revealed: bool
 ```
+
+## Conditional exports in bundled stubs
+
+The `asyncio` stub re-exports different names depending on both Python version and platform.
+
+### Python 3.10 on Linux
+
+```toml
+[environment]
+python-version = "3.10"
+python-platform = "linux"
+```
+
+```py
+import asyncio
+
+asyncio.TaskGroup  # error: "Module `asyncio` has no member `TaskGroup`"
+asyncio.WindowsSelectorEventLoopPolicy  # error: "Module `asyncio` has no member `WindowsSelectorEventLoopPolicy`"
+```
+
+### Python 3.11 on Windows
+
+```toml
+[environment]
+python-version = "3.11"
+python-platform = "win32"
+```
+
+```py
+import asyncio
+
+reveal_type(asyncio.TaskGroup)  # revealed: <class 'TaskGroup'>
+reveal_type(asyncio.WindowsSelectorEventLoopPolicy)  # revealed: <class 'WindowsSelectorEventLoopPolicy'>
+```

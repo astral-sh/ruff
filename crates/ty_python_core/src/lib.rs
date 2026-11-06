@@ -1171,12 +1171,14 @@ mod tests {
     use std::{assert_matches, cell::Cell};
 
     use ruff_db::{
-        files::{File, system_path_to_file},
+        files::{File, system_path_to_file, vendored_path_to_file},
         parsed::ParsedModuleRef,
+        vendored::VendoredFileSystemBuilder,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
     use test_case::test_case;
+    use zip::CompressionMethod;
 
     use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
     use super::*;
@@ -1296,6 +1298,40 @@ mod tests {
         assert!(!Uninhabited.may_be_true());
         assert!(!Uninhabited.may_be_false());
         assert_eq!(Uninhabited.negate(), Uninhabited);
+    }
+
+    #[test_case("import sys as runtime\nif runtime.version_info >= (0, 0):", Some(true); "stdlib alias")]
+    #[test_case("import sys\nif sys.version_info < (0, 0):", Some(false); "older version")]
+    #[test_case("import unrelated as sys\nif sys.version_info >= (0, 0):", None; "different module")]
+    #[test_case("from unrelated import sys\nif sys.version_info >= (0, 0):", None; "imported member")]
+    #[test_case("import sys\nsys = other\nif sys.version_info >= (0, 0):", None; "rebound name")]
+    #[test_case("import sys\nif flag: sys = other\nif sys.version_info >= (0, 0):", None; "ambiguous binding")]
+    #[test_case("import sys\nsys.version_info = version\nif sys.version_info >= (0, 0):", None; "rebound member")]
+    #[test_case("import sys\nclass C:\n    sys = other\n    if sys.version_info >= (0, 0):", None; "class shadow")]
+    #[test_case("import sys\ndef f(sys):\n    if sys.version_info >= (0, 0):", None; "function shadow")]
+    fn bundled_environment_guard(header: &str, expected: Option<bool>) -> anyhow::Result<()> {
+        // Only bundled stubs may fold these guards. Use that filesystem so a negative case
+        // exercises import resolution and does not pass just because the file is user code.
+        let source = format!("{header}\n        marker: int\n");
+        let mut vendored = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        vendored.add_directory("stdlib/")?;
+        vendored.add_file("stdlib/VERSIONS", "_guard: 3.0-\nsys: 3.0-\n")?;
+        vendored.add_file("stdlib/sys.pyi", "")?;
+        vendored.add_file("stdlib/_guard.pyi", &source)?;
+        let db = TestDbBuilder::new().build_with_vendored(vendored.finish()?)?;
+        let file = vendored_path_to_file(&db, "stdlib/_guard.pyi")?;
+        let index = semantic_index(&db, program_file(&db, file));
+        let folded = index
+            .scope_ids()
+            .flat_map(|scope| {
+                index
+                    .use_def_map(scope.file_scope_id(&db))
+                    .predicates()
+                    .iter()
+            })
+            .find_map(|predicate| predicate.known_environment_value());
+        assert_eq!(folded, expected);
+        Ok(())
     }
 
     #[test]

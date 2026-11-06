@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use crate::interned_nodes::InternedNodes;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
-use crate::predicate::ScopedPredicateId;
+use crate::predicate::{PredicatesBuilder, ScopedPredicateId};
 use crate::rank::{RankBitBox, RankBitBoxVec};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -242,7 +242,8 @@ impl ReachabilityConstraintsBuilder {
     /// runtime-true or runtime-false path of each predicate.
     pub(crate) fn narrowing_gate(
         &self,
-        root: ScopedReachabilityConstraintId,
+        mut root: ScopedReachabilityConstraintId,
+        predicates: &PredicatesBuilder<'_>,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) -> ScopedNarrowingConstraint {
         enum Action {
@@ -261,11 +262,18 @@ impl ReachabilityConstraintsBuilder {
             _ => None,
         };
 
-        if let Some(root) = terminal(root) {
-            return root;
-        }
-
-        let root_node = self.interiors[root];
+        // Narrowing needs only the guard's value. Its predicate stays in the reachability
+        // graph so diagnostics can still follow the condition that selected a binding.
+        let root_node = loop {
+            if let Some(result) = terminal(root) {
+                return result;
+            }
+            let node = self.interiors[root];
+            let Some(value) = predicates.known_environment_value(node.atom) else {
+                break node;
+            };
+            root = if value { node.if_true } else { node.if_false };
+        };
         if let (Some(if_true), Some(if_false)) =
             (terminal(root_node.if_true), terminal(root_node.if_false))
         {

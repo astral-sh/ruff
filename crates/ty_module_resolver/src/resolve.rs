@@ -2114,6 +2114,29 @@ mod tests {
     }
 
     #[test]
+    fn resolving_sys_does_not_read_the_stub_package_index() {
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_vendored_typeshed()
+            .with_src_files(&[("sys.py", "")])
+            .with_site_packages_files(&[("sys-stubs/__init__.pyi", "")])
+            .build();
+
+        db.clear_salsa_events();
+        let sys = crate::KnownModule::Sys;
+        assert!(
+            resolve_module_confident(&db, &sys.name())
+                .is_some_and(|module| module.is_known(&db, sys))
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            stub_package_index,
+            db.resolver_environment(),
+            &events,
+        );
+    }
+
+    #[test]
     fn builtins_custom() {
         const TYPESHED: MockedTypeshed = MockedTypeshed {
             stdlib_files: &[("builtins.pyi", "def min(a, b): ...")],
