@@ -471,7 +471,7 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    value: int  # error: [invalid-mutable-override]
+    value: int  # error: [incompatible-mutable-override]
 
 reveal_type(Child().value)  # revealed: int
 Child().value = 2
@@ -483,7 +483,7 @@ An annotation on an assignment in the subclass's initializer establishes the sam
 ```py
 class InitializedChild(Base):
     def __init__(self) -> None:
-        self.value: int = 1  # error: [invalid-mutable-override]
+        self.value: int = 1  # error: [incompatible-mutable-override]
 
     def get(self) -> int:
         return self.value
@@ -497,7 +497,7 @@ As with an ordinary instance attribute, an overriding annotation replaces the in
 ```py
 class StringChild(Base):
     def __init__(self) -> None:
-        self.value: str = "valid"  # error: [invalid-attribute-override]
+        self.value: str = "valid"  # error: [incompatible-attribute-override]
 
 reveal_type(StringChild().value)  # revealed: str
 StringChild().value = 1  # error: [invalid-assignment]

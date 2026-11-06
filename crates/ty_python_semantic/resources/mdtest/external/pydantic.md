@@ -1941,7 +1941,7 @@ class Parent(BaseModel):
     name: str
 
 class Child(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
 Child(name="child")  # ok
@@ -1963,7 +1963,7 @@ A `ClassVar` declaration without a value also excludes the inherited field.
 
 ```py
 class AnnotationOnly(Parent):
-    params: ClassVar[int]  # error: [invalid-attribute-override]
+    params: ClassVar[int]  # error: [incompatible-attribute-override]
 
 reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
 AnnotationOnly(name="child")  # ok
@@ -1981,7 +1981,7 @@ class Parent:
     params: int
 
 class Child(BaseModel, Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
 child = Child()  # ok
@@ -1992,7 +1992,7 @@ The overriding `ClassVar` can itself be inherited from an ordinary class.
 
 ```py
 class Mixin(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 class Model(BaseModel, Mixin):
     pass
