@@ -883,6 +883,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let typevartuple_start = expanded_type_arguments.len().min(typevartuple_index);
+            // At most one of the arguments assigned to this `TypeVarTuple` may itself be
+            // unbounded (an unpacked `TypeVarTuple`, or an unpacked tuple of unknown length):
+            // with two such arguments, there is no way to know how many elements each one
+            // contributes, so the underlying tuple shape is ambiguous. A fixed-length unpacked
+            // tuple never causes this ambiguity, since its element count is known statically.
+            let mut first_unpacked_variadic_argument: Option<&ast::Expr> = None;
             for type_argument in &expanded_type_arguments
                 [typevartuple_start..expanded_type_arguments.len().min(typevartuple_end)]
             {
@@ -899,14 +905,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_arguments[type_argument.source_index] = Some(provided_type);
                     provided_type
                 });
+                let mut report_multiple_unpacked_variadic_tuples = || {
+                    if let Some(first) = first_unpacked_variadic_argument {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(
+                                "Multiple unpacked variadic tuples are not allowed when specializing a `TypeVarTuple`",
+                            );
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(first)
+                                    .message("First unpacked variadic tuple"),
+                            );
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(type_argument.node)
+                                    .message("Later unpacked variadic tuple"),
+                            );
+                        }
+                    } else {
+                        first_unpacked_variadic_argument = Some(type_argument.node);
+                    }
+                };
                 if type_argument.is_unpack
                     && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
                 {
                     tuple_builder = tuple_builder.concat(db, env, &tuple);
+                    if tuple.is_variadic() {
+                        report_multiple_unpacked_variadic_tuples();
+                    }
                 } else if type_argument.is_unpack
                     && let Type::TypeVar(typevar) = provided_type
                     && typevar.is_typevartuple(db)
                 {
+                    report_multiple_unpacked_variadic_tuples();
                     tuple_builder = tuple_builder.concat_variadic_typevar(db, env, typevar);
                 } else if let Type::TypeVar(typevar) = provided_type
                     && typevar.is_paramspec(db)
