@@ -845,7 +845,7 @@ type LiteralListOfInt = TypeOf[list[int]]
 
 assert_type(list[int], LiteralListOfInt)
 
-static_assert(is_subtype_of(LiteralListOfInt, type))
+static_assert(not is_subtype_of(LiteralListOfInt, type))
 
 static_assert(not is_subtype_of(LiteralListOfInt, type[Any]))
 ```
