@@ -1209,6 +1209,24 @@ def check(
     reveal_type(bounded(*extra_boundaries))  # revealed: tuple[bool, *tuple[str, ...], bytes]
 ```
 
+### Inferring a fixed prefix in an overloaded call
+
+The second argument selects the first overload, so the empty list takes its element type from `T`'s
+`list[int]` bound. The remaining argument supplies the type variable tuple.
+
+```py
+from typing import overload
+
+@overload
+def pack[T: list[int], *Ts](*args: *tuple[T, *Ts]) -> tuple[T, *Ts]: ...
+@overload
+def pack(items: list[str], tail: str, /) -> str: ...
+def pack(*args: object) -> object:
+    raise NotImplementedError
+
+reveal_type(pack([], 1))  # revealed: tuple[list[int], Literal[1]]
+```
+
 ### Callable inference
 
 `Callable` accepts unpacked `TypeVarTuple`s in its positional parameter list.

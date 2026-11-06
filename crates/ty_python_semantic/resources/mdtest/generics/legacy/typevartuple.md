@@ -823,6 +823,27 @@ def bounded(head: int, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
     raise NotImplementedError
 ```
 
+### Inferring a fixed prefix in an overloaded call
+
+The second argument selects the first overload, so the empty list takes its element type from `T`'s
+`list[int]` bound. The remaining argument supplies the type variable tuple.
+
+```py
+from typing import TypeVar, TypeVarTuple, overload
+
+T = TypeVar("T", bound=list[int])
+Ts = TypeVarTuple("Ts")
+
+@overload
+def pack(*args: *tuple[T, *Ts]) -> tuple[T, *Ts]: ...
+@overload
+def pack(items: list[str], tail: str, /) -> str: ...
+def pack(*args: object) -> object:
+    raise NotImplementedError
+
+reveal_type(pack([], 1))  # revealed: tuple[list[int], Literal[1]]
+```
+
 ### Starred variadic methods on specialized classes
 
 TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred

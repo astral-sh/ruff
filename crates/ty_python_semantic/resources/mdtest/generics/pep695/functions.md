@@ -2928,6 +2928,24 @@ def equal_dictionary_tags[T: (Literal[0], Literal[2])](value: FalseTag | TwoTag,
         value["two_only"]  # error: [invalid-key] "Unknown key "two_only" for TypedDict `FalseTag`"
 ```
 
+## Inferring type variables from fixed-length starred parameters
+
+Each positional argument receives its corresponding tuple element as type context when matching an
+overload.
+
+```py
+from typing import overload
+
+@overload
+def pair[T: int, U](*args: *tuple[list[T], list[U]]) -> tuple[T, U]: ...
+@overload
+def pair(first: list[str], second: list[int], /) -> tuple[str, int]: ...
+def pair(*args: object) -> object:
+    raise NotImplementedError
+
+reveal_type(pair([42], ["x"]))  # revealed: tuple[int, str]
+```
+
 ## Fixed-length starred parameters on generic methods
 
 ```py
