@@ -839,6 +839,7 @@ fn is_reachability_checkpoint(
 
 /// A root can use checkpoints and optionally share suffixes with other roots in this region.
 /// A checkpoint must evaluate its own first node directly.
+#[derive(Clone, Copy)]
 enum ReachabilityPathStart<'a> {
     Root(Option<&'a RefCell<Vec<Option<Truthiness>>>>),
     Checkpoint,
