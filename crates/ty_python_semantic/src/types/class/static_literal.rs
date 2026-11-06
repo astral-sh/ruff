@@ -327,8 +327,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Following `functools.total_ordering` precedence, we prefer `__lt__` > `__le__` > `__gt__` >
     /// `__ge__`, regardless of whether the method is defined locally or inherited.
     ///
-    /// Note: We use direct scope lookups here to avoid infinite recursion
-    /// through `own_class_member` -> `own_synthesized_member`.
+    /// Direct scope lookups avoid recursively synthesizing the same ordering method.
     fn total_ordering_root_method(
         self,
         db: &'db dyn Db,
@@ -1665,7 +1664,7 @@ impl<'db> StaticClassLiteral<'db> {
         if member.is_undefined()
             || name == "__slots__" && self.has_generated_slots(db) && !self.has_explicit_slots(db)
         {
-            if let Some(synthesized_member) = self.own_synthesized_member_with_kind(
+            if let Some(synthesized_member) = self.own_generated_member(
                 db,
                 env,
                 specialization,
@@ -1675,8 +1674,30 @@ impl<'db> StaticClassLiteral<'db> {
             ) {
                 return Member::definitely_declared(synthesized_member);
             }
+            if let Some(hash) = self.implicit_hash(db, env, name) {
+                return Member { inner: hash };
+            }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
             return sources.implicit_attribute(db, name, MethodDecorator::ClassMethod);
+        }
+
+        // If an explicit hash is conditional, the synthesized hash fills the other paths.
+        // If both methods are conditional, we cannot tell whether they are defined together.
+        if name == "__hash__"
+            && !member.inner.place.is_definitely_bound()
+            && let Some(hash) = self.own_synthesized_member(
+                db,
+                env,
+                specialization,
+                inherited_generic_context,
+                name,
+            )
+        {
+            return Member {
+                inner: member
+                    .inner
+                    .or_fall_back_to(db, env, || Place::declared(hash).into()),
+            };
         }
 
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
@@ -1715,8 +1736,34 @@ impl<'db> StaticClassLiteral<'db> {
         member
     }
 
-    /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
-    /// a synthesized `__new__` method for a `NamedTuple`.
+    /// A missing `__hash__` defaults to `None` on paths where the class body binds `__eq__`.
+    /// Named tuples install their methods after class creation.
+    fn implicit_hash(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        if name != "__hash__" {
+            return None;
+        }
+        let scope = self.body_scope(db);
+        let eq = place_table(db, scope).symbol_id("__eq__")?;
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
+            return None;
+        }
+        let bindings = use_def_map(db, scope).end_of_scope_symbol_bindings(eq);
+        let Place::Defined(eq) = place_from_bindings(db, env, bindings).place else {
+            return None;
+        };
+        Some(Type::with_definedness(
+            Place::declared(Type::none(db, env)).into(),
+            eq.definedness,
+        ))
+    }
+
+    /// Returns a definitely synthesized class member, such as a dataclass's `__init__`,
+    /// a named tuple's `__new__`, or the implicit `__hash__ = None`.
     pub(crate) fn own_synthesized_member(
         self,
         db: &'db dyn Db,
@@ -1725,7 +1772,7 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        self.own_synthesized_member_with_kind(
+        self.own_generated_member(
             db,
             env,
             specialization,
@@ -1733,9 +1780,15 @@ impl<'db> StaticClassLiteral<'db> {
             name,
             || CodeGeneratorKind::from_static_class(db, self),
         )
+        .or_else(|| {
+            self.implicit_hash(db, env, name)?
+                .into_lookup_result(db, env)
+                .ok()
+                .map(|member| member.inner_type())
+        })
     }
 
-    fn own_synthesized_member_with_kind(
+    fn own_generated_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1755,8 +1808,7 @@ impl<'db> StaticClassLiteral<'db> {
         // inherited from a superclass, excluding `object`).
         //
         // Only synthesize methods that are not already defined in the MRO.
-        // Note: We use direct scope lookups here to avoid infinite recursion
-        // through `own_class_member` -> `own_synthesized_member`.
+        // Direct scope lookups avoid recursively synthesizing the same ordering method.
         if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
             && self.total_ordering(db)
             && !self
@@ -2124,6 +2176,9 @@ impl<'db> StaticClassLiteral<'db> {
 
                 Some(Type::function_like_callable(db, signature))
             }
+            (CodeGeneratorKind::Pydantic(metadata), "__hash__") => {
+                metadata.generated_hash(db, self, specialization)
+            }
             (field_policy @ CodeGeneratorKind::DataclassLike(_), "__hash__") => {
                 let unsafe_hash =
                     self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
@@ -2143,7 +2198,7 @@ impl<'db> StaticClassLiteral<'db> {
                 } else if eq && !frozen {
                     Some(Type::none(db, env))
                 } else {
-                    // No `__hash__` is generated, fall back to `object.__hash__`
+                    // Class creation and inheritance determine the hash when the decorator leaves it alone.
                     None
                 }
             }
