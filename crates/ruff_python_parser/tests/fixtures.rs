@@ -817,52 +817,34 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
-        match expr.fields() {
-            ast::ExprFields::Lambda(_) => {
+        let kind = expr.classify();
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(kind, context));
+        let (key, value, generators) = match kind {
+            ast::ExprKind::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });
-                ruff_python_ast::visitor::walk_expr(self, expr.classify());
+                ruff_python_ast::visitor::walk_expr(self, kind);
                 self.scopes.pop().unwrap();
+                return;
             }
-            ast::ExprFields::ListComp(ast::ExprListCompFields {
-                elt, generators, ..
-            })
-            | ast::ExprFields::SetComp(ast::ExprSetCompFields {
-                elt, generators, ..
-            })
-            | ast::ExprFields::Generator(ast::ExprGeneratorFields {
-                elt, generators, ..
-            }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(Comprehension::is_async),
-                });
-                self.visit_expr(elt);
-                self.scopes.pop().unwrap();
-            }
-            ast::ExprFields::DictComp(ast::ExprDictCompFields {
-                key,
-                value,
-                generators,
-                ..
-            }) => {
-                for comprehension in generators {
-                    self.visit_comprehension(comprehension);
-                }
-                self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(Comprehension::is_async),
-                });
-                if let Some(key) = key {
-                    self.visit_expr(key);
-                }
-                self.visit_expr(value);
-                self.scopes.pop().unwrap();
-            }
+            ast::ExprKind::ListComp(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::SetComp(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::Generator(node) => (None, node.elt(), node.generators()),
+            ast::ExprKind::DictComp(node) => (node.key(), node.value(), node.generators()),
             _ => {
-                ruff_python_ast::visitor::walk_expr(self, expr.classify());
+                ruff_python_ast::visitor::walk_expr(self, kind);
+                return;
             }
+        };
+        for comprehension in generators {
+            self.visit_comprehension(comprehension);
         }
+        self.scopes.push(Scope::Comprehension {
+            is_async: generators.iter().any(Comprehension::is_async),
+        });
+        if let Some(key) = key {
+            self.visit_expr(key);
+        }
+        self.visit_expr(value);
+        self.scopes.pop().unwrap();
     }
 }
