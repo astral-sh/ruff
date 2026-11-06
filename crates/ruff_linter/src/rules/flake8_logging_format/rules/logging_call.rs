@@ -13,7 +13,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
-use crate::{Applicability, Edit, Fix};
+use crate::{Edit, Fix};
 
 fn logging_f_string(
     checker: &Checker,
@@ -112,16 +112,10 @@ fn logging_f_string(
 
     let replacement = format!("{format_string}, {}", args.join(", "));
 
-    let applicability = if checker.comment_ranges().intersects(target) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    diagnostic.set_fix(Fix::applicable_edit(
-        Edit::range_replacement(replacement, target),
-        applicability,
-    ));
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        replacement,
+        target,
+    )));
 }
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`

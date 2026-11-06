@@ -29,6 +29,7 @@ help: Convert to lazy `%` formatting
   - logging.info(f"plain {value}")  # snapshot: logging-f-string
 5 + logging.info("plain %s", value)  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Escape sequences
@@ -58,6 +59,7 @@ help: Convert to lazy `%` formatting
 5 + logging.warning("\n%s", value)  # snapshot: logging-f-string
 6 | logging.warning(f"C:\\{value}")  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 
 
 error[G004]: Logging statement uses f-string
@@ -71,6 +73,7 @@ help: Convert to lazy `%` formatting
   - logging.warning(f"C:\\{value}")  # snapshot: logging-f-string
 6 + logging.warning("C:\\%s", value)  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Raw f-strings
@@ -100,6 +103,7 @@ help: Convert to lazy `%` formatting
 5 + logging.warning("\\'%s", value)  # snapshot: logging-f-string
 6 | logging.warning(Rf"\d+ {value}")  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 
 
 error[G004]: Logging statement uses f-string
@@ -113,6 +117,7 @@ help: Convert to lazy `%` formatting
   - logging.warning(Rf"\d+ {value}")  # snapshot: logging-f-string
 6 + logging.warning("\\d+ %s", value)  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Quote style
@@ -142,6 +147,7 @@ help: Convert to lazy `%` formatting
 5 + logging.warning('"%s"', value)  # snapshot: logging-f-string
 6 | logging.warning(f"'{value}'")  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 
 
 error[G004]: Logging statement uses f-string
@@ -155,6 +161,7 @@ help: Convert to lazy `%` formatting
   - logging.warning(f"'{value}'")  # snapshot: logging-f-string
 6 + logging.warning("'%s'", value)  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Parenthesized messages
@@ -185,6 +192,7 @@ help: Convert to lazy `%` formatting
 5 + logging.warning("%s", value)  # snapshot: logging-f-string
 6 | logging.warning(((f"{value}")))  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 
 
 error[G004]: Logging statement uses f-string
@@ -198,6 +206,7 @@ help: Convert to lazy `%` formatting
   - logging.warning(((f"{value}")))  # snapshot: logging-f-string
 6 + logging.warning("%s", value)  # snapshot: logging-f-string
   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Self-documenting interpolations
@@ -311,8 +320,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Comments outside the replaced range
 
-Only the message and the parentheses around it are replaced, so a comment elsewhere in the call
-leaves the fix safe.
+The fix preserves comments outside the message and its surrounding parentheses.
 
 ```py
 import logging
@@ -337,4 +345,5 @@ help: Convert to lazy `%` formatting
 6 +     "%s", value  # snapshot: logging-f-string
 7 | )
   |
+note: This is an unsafe fix and may change runtime behavior
 ```

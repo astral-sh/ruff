@@ -16,6 +16,7 @@ help: Convert to lazy `%` formatting
 4 + logging.info("Hello %s", name)
 5 | logging.log(logging.INFO, f"Hello {name}")
   |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
  --> G004.py:5:27
@@ -34,6 +35,7 @@ help: Convert to lazy `%` formatting
 5 + logging.log(logging.INFO, "Hello %s", name)
 6 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
   --> G004.py:8:14
@@ -51,6 +53,7 @@ help: Convert to lazy `%` formatting
 8 + _LOGGER.info("%s", __name__)
 9 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
   --> G004.py:10:26
@@ -69,6 +72,7 @@ help: Convert to lazy `%` formatting
 10 + logging.getLogger().info("%s", name)
 11 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
   --> G004.py:14:6
@@ -86,6 +90,7 @@ help: Convert to lazy `%` formatting
 14 + info("%s", name)
 15 | info(f"{__name__}")
    |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
   --> G004.py:15:6
@@ -103,6 +108,7 @@ help: Convert to lazy `%` formatting
 15 + info("%s", __name__)
 16 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 [*] Logging statement uses f-string
   --> G004.py:24:14
@@ -118,6 +124,7 @@ help: Convert to lazy `%` formatting
 24 + logging.info("%s out of %s files in %s checked", count, total, directory_path)
 25 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 G004 Logging statement uses f-string
   --> G004.py:30:13
