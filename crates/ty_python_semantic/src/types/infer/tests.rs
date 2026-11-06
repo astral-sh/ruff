@@ -12,7 +12,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{
     assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
-    assert_function_query_was_run,
+    assert_function_query_was_run, find_will_execute_event_by_name,
 };
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
@@ -1106,13 +1106,20 @@ fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<
         let ty = global_symbol(db, main, "x").place.expect_type();
         assert_eq!(ty.display(db, &db.program_environment()).to_string(), "int");
     };
+    let query_name = "place_by_id";
+    db.clear_salsa_events();
     assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert!(
+        find_will_execute_event_by_name(&db, query_name, None, &events).is_some(),
+        "Expected the first lookup to run {query_name}"
+    );
 
     db.write_file("/src/dependency.py", "x: int = 1\nlist\ndict\ndict")?;
     db.clear_salsa_events();
     assert_imported_type(&db);
     let events = db.take_salsa_events();
-    assert_function_query_was_not_run_by_name(&db, "place_by_id", None, &events);
+    assert_function_query_was_not_run_by_name(&db, query_name, None, &events);
     Ok(())
 }
 

@@ -312,15 +312,24 @@ impl<K> Default for FrozenSet<K> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{FrozenMap, FrozenValueMap, PackedIds};
 
     #[test]
     fn packed_ids_preserve_values_at_width_boundaries() {
-        for max in [255, 256, 65_535, 65_536, u32::MAX] {
+        let pack = |max| {
             let ids = PackedIds::from(vec![max, 0]);
             assert_eq!(ids.get(0), max);
             assert_eq!(ids.get(1), 0);
-        }
+            ids
+        };
+
+        assert_matches!(pack(255), PackedIds::U8(_));
+        assert_matches!(pack(256), PackedIds::U16(_));
+        assert_matches!(pack(65_535), PackedIds::U16(_));
+        assert_matches!(pack(65_536), PackedIds::Full(_));
+        assert_matches!(pack(u32::MAX), PackedIds::Full(_));
     }
 
     #[test]
