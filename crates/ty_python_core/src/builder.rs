@@ -854,6 +854,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "FrozenMap::from_entries sorts snapshots by their unique keys"
+        )]
         for (name, lazy) in self.lazy_snapshots.drain() {
             let last_nonlocal = last_nonlocal_binding.get(&name);
             snapshots.extend(lazy.into_iter().filter(|(key, _)| {
