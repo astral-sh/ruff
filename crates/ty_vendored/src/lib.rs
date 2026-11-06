@@ -134,7 +134,7 @@ mod tests {
                 comparisons += 1;
             }
         }
-        println!("{comparisons} packaged module and version pairs matched");
+        assert!(comparisons > 0, "expected at least one packaged stub");
     }
 
     #[cfg(feature = "bundled-syntax")]
