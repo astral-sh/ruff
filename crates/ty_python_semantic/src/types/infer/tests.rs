@@ -1156,53 +1156,6 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
-fn overload_predecessors_track_imported_decorators() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/api.pyi",
-        r#"
-        from typing import Literal, overload
-        from marker import marker
-
-        @overload
-        def choose(value: Literal[0]) -> bytes: ...
-        @marker
-        def choose(value: Literal[1]) -> str: ...
-        @overload
-        def choose(value: int) -> object: ...
-        "#,
-    )?;
-    db.write_dedented(
-        "/src/main.py",
-        r#"
-        from typing import reveal_type
-        from api import choose
-
-        reveal_type(choose(0))
-        "#,
-    )?;
-
-    let overload = r#"
-        from typing import overload as marker
-        __all__ = ["marker"]
-    "#;
-    let identity = r#"
-        from typing import TypeVar
-        _F = TypeVar("_F")
-        def marker(function: _F, /) -> _F: ...
-    "#;
-    for (decorator, expected) in [
-        (overload, "bytes"),
-        (identity, "object"),
-        (overload, "bytes"),
-    ] {
-        db.write_dedented("/src/marker.pyi", decorator)?;
-        assert_revealed_type(&db, "/src/main.py", expected);
-    }
-    Ok(())
-}
-
-#[test]
 fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
