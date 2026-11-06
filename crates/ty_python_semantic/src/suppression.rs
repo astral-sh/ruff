@@ -201,7 +201,10 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
 
     for unknown in &context.suppressions.unknown {
         if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
-            diag.into_diagnostic(&unknown.reason);
+            let mut diag = diag.into_diagnostic(&unknown.reason);
+            if let Some(info) = unknown.reason.info() {
+                diag.info(info);
+            }
         }
     }
 }
