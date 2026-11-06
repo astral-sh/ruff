@@ -303,7 +303,7 @@ pub enum PatternPredicateKind<'db> {
 impl PatternPredicateKind<'_> {
     /// Could a positional class pattern bind the subject itself to `name`, as in `str(name)`?
     /// Resolving the class and its `__match_args__` requires type information.
-    pub fn may_capture_subject_positionally(&self, name: &Name) -> bool {
+    pub(crate) fn may_capture_subject_positionally(&self, name: &Name) -> bool {
         fn visit(pattern: &PatternPredicateKind<'_>, name: &Name, positional: bool) -> bool {
             match pattern {
                 PatternPredicateKind::As(inner, capture) => {
@@ -344,6 +344,10 @@ pub struct PatternPredicate<'db> {
 
     #[returns(copy)]
     pub guard: Option<Expression<'db>>,
+
+    /// The subject name when a guarded positional pattern can bind that name to the subject.
+    #[returns(copy)]
+    pub positional_capture: Option<ScopedSymbolId>,
 
     /// A reference to the pattern of the previous match case
     #[returns(as_deref)]

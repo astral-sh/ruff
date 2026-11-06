@@ -222,30 +222,8 @@ pub(crate) fn projected_match_capture<'db>(
         return None;
     };
     let pattern = capture.predicate();
-    (pattern.guard(db).is_some()
-        && structural_capture_place(db, pattern) == Some(definition.place(db)))
-    .then_some(pattern)
-}
-
-#[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
-fn structural_capture_place<'db>(
-    db: &'db dyn Db,
-    pattern: PatternPredicate<'db>,
-) -> Option<ScopedPlaceId> {
-    let module = parsed_module(db, pattern.python_file(db)).load(db);
-    let subject = pattern.subject(db).node_ref(db).node(&module);
-    let PlaceExpr::Symbol(symbol) = PlaceExpr::try_from_expr(subject)? else {
-        return None;
-    };
-    if !pattern
-        .kind(db)
-        .may_capture_subject_positionally(symbol.name())
-    {
-        return None;
-    }
-    place_table(db, pattern.scope(db))
-        .symbol_id(symbol.name())
-        .map(Into::into)
+    let symbol = pattern.positional_capture(db)?;
+    (definition.place(db) == ScopedPlaceId::Symbol(symbol)).then_some(pattern)
 }
 
 /// Interpret a case test on the saved subject as a constraint on the value an earlier
@@ -264,11 +242,35 @@ pub(crate) fn match_capture_constraints<'db>(
         return (None, None);
     }
     let constraint = |positive| {
-        Some(NarrowingConstraint::intersection(
-            pattern_capture_types(db, capture, Some((tested, positive))).binding_type(place),
-        ))
+        let subject = pattern_subject_for_capture(db, tested, positive);
+        let ty = if subject.is_never() {
+            Type::Never
+        } else {
+            pattern_capture_types(db, capture, Some(subject)).binding_type(place)
+        };
+        Some(NarrowingConstraint::intersection(ty))
     };
     (constraint(true), constraint(false))
+}
+
+/// If the original capture fixes the outcome of this case, its binding can follow one branch.
+pub(crate) fn known_capture_outcome<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    capture: PatternPredicate<'db>,
+    tested: PatternPredicate<'db>,
+) -> Option<bool> {
+    if capture == tested {
+        return Some(true);
+    }
+    let original = pattern_subject_for_capture(db, capture, true);
+    if original.is_disjoint_from(db, env, pattern_subject_for_capture(db, tested, true)) {
+        Some(false)
+    } else if original.is_disjoint_from(db, env, pattern_subject_for_capture(db, tested, false)) {
+        Some(true)
+    } else {
+        None
+    }
 }
 
 /// The types produced when a match pattern succeeds.
@@ -536,6 +538,31 @@ pub(crate) fn pattern_success_types<'db>(
     pattern_capture_types(db, pattern, None)
 }
 
+/// The subject type that a case establishes for bindings, shared across all earlier captures.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, pattern: PatternPredicate<'db>, _| {
+        result.cycle_normalized(db, &ProgramEnvironment::from_scope(pattern.scope(db)), *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn pattern_subject_for_capture<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+    positive: bool,
+) -> Type<'db> {
+    let subject = type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
+    if positive {
+        PatternSuccessAnalyzer::new(db, pattern.scope(db))
+            .analyze_successful_pattern(pattern.kind(db), subject)
+            .binding_subject_ty
+    } else {
+        let env = ProgramEnvironment::from_scope(pattern.scope(db));
+        pattern_binding_fallthrough_type(db, &env, pattern.kind(db), subject)
+    }
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
@@ -548,23 +575,15 @@ pub(crate) fn pattern_success_types<'db>(
 fn pattern_capture_types<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-    narrowed_by: Option<(PatternPredicate<'db>, bool)>,
+    narrowed_subject: Option<Type<'db>>,
 ) -> PatternSuccessTypes<'db> {
-    let subject = pattern.subject(db);
-    let env = ProgramEnvironment::from_scope(subject.scope(db));
-    let incoming_subject_ty =
-        type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
+    let env = ProgramEnvironment::from_scope(pattern.scope(db));
+    let subject = type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
-    let incoming_subject_ty = narrowed_by.map_or(incoming_subject_ty, |(later, positive)| {
-        if positive {
-            analyzer
-                .analyze_successful_pattern(later.kind(db), incoming_subject_ty)
-                .binding_subject_ty
-        } else {
-            pattern_binding_fallthrough_type(db, &env, later.kind(db), incoming_subject_ty)
-        }
+    let subject = narrowed_subject.map_or(subject, |narrowed| {
+        analyzer.intersect_types(subject, narrowed)
     });
-    let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
+    let result = analyzer.analyze_successful_pattern(pattern.kind(db), subject);
     PatternSuccessTypes {
         bindings: result
             .bindings

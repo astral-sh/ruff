@@ -194,7 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
-use crate::types::narrow::match_capture_constraints;
+use crate::types::narrow::{known_capture_outcome, match_capture_constraints};
 use std::cell::RefCell;
 
 use crate::{
@@ -1531,25 +1531,32 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         continue;
                     }
                     let predicate = self.predicates[node.atom];
-                    if !matches!(
-                        predicate.node,
+                    let truthiness = match predicate.node {
                         PredicateNode::IsNonTerminalCall(_)
-                            | PredicateNode::ContextManagerSuppresses { .. }
-                            | PredicateNode::FinallyNormalPathImpossible { .. }
-                    ) {
-                        actions.push(Action::FinishPredicate(id));
-                        actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_true));
-                        continue;
-                    }
-                    let branch = match analyze_single(db, self.env, &predicate) {
+                        | PredicateNode::ContextManagerSuppresses { .. }
+                        | PredicateNode::FinallyNormalPathImpossible { .. } => {
+                            analyze_single(db, self.env, &predicate)
+                        }
+                        PredicateNode::Pattern(tested)
+                            if let Some(capture) = self.captured_by
+                                && capture.subject(db) == tested.subject(db) =>
+                        {
+                            known_capture_outcome(db, self.env, capture, tested)
+                                .map_or(Truthiness::Ambiguous, |matched| {
+                                    Truthiness::from(matched == predicate.is_positive)
+                                })
+                        }
+                        _ => Truthiness::Ambiguous,
+                    };
+                    let branch = match truthiness {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
                         Truthiness::Ambiguous => {
-                            unreachable!(
-                                "statically decidable predicates should never be Ambiguous"
-                            )
+                            actions.push(Action::FinishPredicate(id));
+                            actions.push(Action::Visit(node.if_false));
+                            actions.push(Action::Visit(node.if_true));
+                            continue;
                         }
                     };
 

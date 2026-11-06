@@ -2789,6 +2789,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn create_pattern_predicate(
         &mut self,
         subject: Expression<'db>,
+        subject_place: Option<ScopedPlaceId>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
@@ -2805,6 +2806,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
 
         let kind = self.predicate_kind(pattern);
+        let positional_capture =
+            subject_place
+                .and_then(ScopedPlaceId::as_symbol)
+                .filter(|symbol| {
+                    guard.is_some()
+                        && kind.may_capture_subject_positionally(
+                            self.current_place_table().symbol(*symbol).name(),
+                        )
+                });
         let guard =
             guard.map(|guard| self.add_predicate_expression(guard, ExpressionContext::Condition));
 
@@ -2815,6 +2825,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             subject,
             kind,
             guard,
+            positional_capture,
             previous_pattern.map(Box::new),
         )
     }
@@ -5003,6 +5014,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for (i, case) in cases.iter().enumerate() {
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
+                        subject_place,
                         &case.pattern,
                         case.guard.as_deref(),
                         previous_pattern,
@@ -5020,13 +5032,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .find(|(place, _)| Some(*place) == subject_place)
                     {
                         let use_def = self.current_use_def_map();
-                        if case.guard.is_some()
-                            && use_def.next_definition_id() != first_capture
-                            && match_pattern_predicate
-                                .kind(self.db)
-                                .may_capture_subject_positionally(
-                                    self.current_place_table().symbol(*symbol).name(),
-                                )
+                        if use_def.next_definition_id() != first_capture
+                            && match_pattern_predicate.positional_capture(self.db) == Some(*symbol)
                         {
                             // A later case can distinguish which value a positional pattern or one
                             // of its alternatives captured when the guard failed.
