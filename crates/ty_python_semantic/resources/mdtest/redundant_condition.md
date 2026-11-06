@@ -5667,6 +5667,22 @@ def augmented_global():
 
 ## Environment-dependent assignment guards
 
+The bundled `pickle` stub sets `DEFAULT_PROTOCOL` to 4 before Python 3.14 and 5 starting in 3.14.
+Code that supports both versions can check the default, even when its value is known for the target.
+
+```py
+import pickle
+
+reveal_type(pickle.DEFAULT_PROTOCOL)  # revealed: Literal[5]
+if pickle.DEFAULT_PROTOCOL == 5:  # ok
+    pass
+label = "protocol 5" if pickle.DEFAULT_PROTOCOL == 5 else None
+if label:  # ok
+    pass
+if pickle.HIGHEST_PROTOCOL == 5:  # error: [redundant-condition-strict]
+    pass
+```
+
 An assignment can depend on nested conditions or aliases of environment guards. The assigned value
 remains exempt when tested inside a function:
 

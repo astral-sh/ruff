@@ -586,13 +586,12 @@ pub(crate) fn infer_predicate_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Truthiness {
-    if matches!(
-        expression.kind(db),
-        ExpressionKind::Predicate { in_loop: true, .. }
-    ) {
-        evaluate_predicate_truthiness(db, expression)
-    } else {
-        cached_predicate_truthiness(db, expression)
+    match expression.kind(db) {
+        ExpressionKind::EnvironmentGuard(value) => Truthiness::from(value),
+        ExpressionKind::Predicate { in_loop: true, .. } => {
+            evaluate_predicate_truthiness(db, expression)
+        }
+        _ => cached_predicate_truthiness(db, expression),
     }
 }
 

@@ -2213,7 +2213,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (predicate, predicate_id)
     }
 
-    /// Resolve an environment guard in a bundled stub before building its two control-flow paths.
+    /// Resolve an environment guard in a bundled stub for the configured target.
     fn vendored_environment_guard(&self, expr: &ast::Expr) -> Option<bool> {
         if !self.source_type.is_stub() {
             return None;
@@ -2378,9 +2378,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        if let Some(literal) = resolve_to_literal(predicate_node)
-            .or_else(|| self.vendored_environment_guard(predicate_node))
-        {
+        if let Some(literal) = resolve_to_literal(predicate_node) {
             if registered.is_none() {
                 self.add_standalone_expression(predicate_node);
             }
@@ -3069,14 +3067,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         node: &ast::Expr,
         context: ExpressionContext,
     ) -> Expression<'db> {
-        self.add_standalone_expression_impl(
-            node,
-            ExpressionKind::Predicate {
+        let kind = match self.vendored_environment_guard(node) {
+            Some(value) => ExpressionKind::EnvironmentGuard(value),
+            None => ExpressionKind::Predicate {
                 context,
                 in_loop: self.in_loop_context(),
             },
-            None,
-        )
+        };
+        self.add_standalone_expression_impl(node, kind, None)
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa

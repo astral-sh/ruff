@@ -4,6 +4,7 @@
 use super::{ClassType, Type, TypeFormType, TypingModule, class::KnownClass};
 use crate::ProgramEnvironment;
 use crate::db::Db;
+use crate::reachability::is_reachable;
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
 use crate::types::{
@@ -17,7 +18,6 @@ use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_mod
 use ty_python_core::{
     FileScopeId, ProgramFile,
     definition::{Definition, DefinitionKind},
-    place::ScopedPlaceId,
     place_table,
     scope::ScopeId,
     semantic_index, use_def_map,
@@ -798,11 +798,14 @@ impl SpecialFormType {
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
-                use_def_map(db, scope)
-                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id))
-                    .next()?
-                    .binding
-                    .definition()
+                let use_def = use_def_map(db, scope);
+                use_def
+                    .end_of_scope_symbol_bindings(symbol_id)
+                    .find_map(|binding| {
+                        let definition = binding.binding.definition()?;
+                        is_reachable(db, use_def, binding.reachability_constraint)
+                            .then_some(definition)
+                    })
             })
             .map(TypeDefinition::SpecialForm)
     }

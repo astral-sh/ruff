@@ -1176,7 +1176,7 @@ mod tests {
         vendored::VendoredFileSystemBuilder,
     };
     use ruff_python_ast as ast;
-    use ruff_text_size::{Ranged, TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange};
     use test_case::test_case;
     use zip::CompressionMethod;
 
@@ -1190,8 +1190,9 @@ mod tests {
             DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
             ParameterDefinitionNodeKind,
         },
+        expression::ExpressionKind,
+        predicate::PredicateNode,
         program::Program,
-        reachability_constraints::ScopedReachabilityConstraintId,
     };
 
     impl UseDefMap<'_> {
@@ -1322,21 +1323,23 @@ mod tests {
         let db = TestDbBuilder::new().build_with_vendored(vendored.finish()?)?;
         let file = vendored_path_to_file(&db, "stdlib/_guard.pyi")?;
         let index = semantic_index(&db, program_file(&db, file));
-        let offset = TextSize::try_from(source.find("marker").unwrap())?;
-        let constraint = index
+        let folded = index
             .scope_ids()
             .flat_map(|scope| {
                 index
                     .use_def_map(scope.file_scope_id(&db))
-                    .range_reachability()
+                    .predicates()
+                    .iter()
             })
-            .find_map(|(range, constraint)| range.contains(offset).then_some(constraint))
-            .unwrap_or(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-        let folded = match constraint {
-            ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(true),
-            ScopedReachabilityConstraintId::ALWAYS_FALSE => Some(false),
-            _ => None,
-        };
+            .find_map(|predicate| {
+                if let PredicateNode::Expression(expression) = predicate.node
+                    && let ExpressionKind::EnvironmentGuard(value) = expression.kind(&db)
+                {
+                    Some(value)
+                } else {
+                    None
+                }
+            });
         assert_eq!(folded, expected);
         Ok(())
     }

@@ -1551,7 +1551,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::Normal | ExpressionKind::Predicate { .. } => {
+            ExpressionKind::Normal
+            | ExpressionKind::Predicate { .. }
+            | ExpressionKind::EnvironmentGuard(_) => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
