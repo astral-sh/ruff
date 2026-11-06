@@ -28,3 +28,14 @@
     }
 </script>
 {% endblock %}
+
+{% block site_nav %}
+{{ super() }}
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+  <div class="md-sidebar__scrollwrap">
+    <div class="md-sidebar__inner">
+      {% include "partials/quick-links.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}
