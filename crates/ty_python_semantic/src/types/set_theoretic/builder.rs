@@ -717,6 +717,10 @@ impl<'db> UnionAccumulator<'db> {
     }
 }
 
+/// A chain of `|` operators produces a union for each prefix. Caching a proof for
+/// every prefix can retain a cubic number of dependencies on pairwise comparisons.
+const MAX_UNION_SEED_SIZE: usize = 64;
+
 /// Whether adding this union to an empty builder reproduces its elements in order.
 /// Structural substitutions can create unnormalized unions, so the elements alone do
 /// not establish this property. Literal groups also need their specialized builder state.
@@ -857,7 +861,7 @@ impl<'db> UnionBuilder<'db> {
             Type::Union(union) => {
                 let new_elements = union.elements(db);
                 if self.elements.is_empty()
-                    && new_elements.len() >= super::WIDE_UNION
+                    && (super::WIDE_UNION..=MAX_UNION_SEED_SIZE).contains(&new_elements.len())
                     && !cycle_recovery
                     && !self.recursively_defined.is_yes()
                     && seen_aliases.is_empty()
