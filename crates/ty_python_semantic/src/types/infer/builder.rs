@@ -5977,6 +5977,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &'args mut CallArguments<'call, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: Bindings<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Result<CallArgumentInference<'args, 'call, 'db>, CallError<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let function = match bindings.callable_type() {
+            Type::FunctionLiteral(function) => Some(function),
+            Type::BoundMethod(method) => method.func(db).as_function_literal(),
+            _ => None,
+        };
+        if function.is_some_and(|function| function.known(db).is_none())
+            && argument_types.len() > 1
+            && !self.collects_expected_types()
+            && ast_arguments.clone().all(|arg| !arg.is_variadic())
+            && let Some(pruned) = ast_arguments.clone().enumerate().find_map(|(index, arg)| {
+                let value = arg.value();
+                if !is_dotted_name(value)
+                    && !matches!(
+                        value,
+                        ast::Expr::NoneLiteral(_)
+                            | ast::Expr::StringLiteral(_)
+                            | ast::Expr::NumberLiteral(_)
+                            | ast::Expr::BooleanLiteral(_)
+                    )
+                {
+                    return None;
+                }
+                bindings.prune_discriminated_call(db, env, index, || {
+                    infer_argument_ty(
+                        &mut self.speculate(),
+                        (index, value, TypeContext::default()),
+                    )
+                })
+            })
+        {
+            // Non-discriminating arguments can still reject all remaining overloads. Preserve
+            // the complete candidate set for the normal argument-expansion and diagnostic path.
+            let mut builder = self.speculate();
+            let mut arguments = argument_types.clone();
+            if let Ok(inferred) = builder.infer_undiscriminated_argument_types(
+                ast_arguments.clone(),
+                &mut arguments,
+                infer_argument_ty,
+                pruned,
+                call_expression_tcx,
+            ) {
+                self.extend(builder);
+                if inferred.rest.is_empty() {
+                    let (bindings, _) = inferred.first;
+                    *argument_types = arguments;
+                    return Ok(CallArgumentInference::new(bindings, argument_types));
+                }
+                let own = |(binding, arguments): CallAttempt<'_, 'call, 'db>| {
+                    (binding, Cow::Owned(arguments.into_owned()))
+                };
+                let first = own(inferred.first);
+                let rest = inferred.rest.into_iter().map(own).collect();
+                *argument_types = arguments;
+                return Ok(CallArgumentInference { first, rest });
+            }
+        }
+        self.infer_undiscriminated_argument_types(
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            bindings,
+            call_expression_tcx,
+        )
+    }
+
+    fn infer_undiscriminated_argument_types<'args, 'call>(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &'args mut CallArguments<'call, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         mut bindings: Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<CallArgumentInference<'args, 'call, 'db>, CallError<'db>> {

@@ -1478,6 +1478,140 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    /// Eliminate overloads whose class-object or literal parameter cannot accept this argument,
+    /// before using those overloads to infer the types of the other arguments.
+    pub(crate) fn prune_discriminated_call(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument_index: usize,
+        infer_argument: impl FnOnce() -> Type<'db>,
+    ) -> Option<Self> {
+        fn is_discriminator<'db>(db: &'db dyn Db, parameter: Type<'db>) -> bool {
+            match parameter {
+                Type::SubclassOf(subclass) => subclass.into_type_var().is_none(),
+                Type::LiteralValue(_) => true,
+                ty => ty.is_none(db),
+            }
+        }
+
+        let [element] = self.elements.as_slice() else {
+            return None;
+        };
+        let [CallableItem::Regular(binding)] = element.items.as_slice() else {
+            return None;
+        };
+        if binding.overloads.len() < 2
+            || binding
+                .overloads
+                .iter()
+                .any(|overload| overload.is_partial_application)
+        {
+            return None;
+        }
+
+        let mut discriminators = SmallVec::<[_; 4]>::new();
+        let mut candidate_count = 0;
+        for (index, overload) in binding.matching_overloads() {
+            candidate_count += 1;
+            let Some(matched) =
+                overload.matched_argument_for_call_argument(binding, argument_index)
+            else {
+                continue;
+            };
+            let [matched] = matched.parameters.as_slice() else {
+                continue;
+            };
+            let parameter = &overload.signature.parameters()[matched.index];
+            if matched.argument_type.is_some()
+                || matched.expected_type.is_some()
+                || parameter.is_variadic()
+                || parameter.is_keyword_variadic()
+                || parameter.has_starred_annotation()
+            {
+                continue;
+            }
+
+            let annotation = parameter.annotated_type().resolve_type_alias(db);
+            let eligible = match annotation {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|ty| is_discriminator(db, *ty)),
+                other => is_discriminator(db, other),
+            };
+            if eligible
+                && overload.signature.generic_context.is_none_or(|context| {
+                    inferable_typevar_occurrences(
+                        db,
+                        env,
+                        annotation,
+                        context.inferable_typevars(db),
+                    ) == 0
+                })
+            {
+                discriminators.push((index, annotation));
+            }
+        }
+        if candidate_count < 2 || discriminators.is_empty() {
+            return None;
+        }
+
+        let argument = infer_argument();
+        if let Some(class) = argument
+            .as_class_literal()
+            .filter(|class| class.generic_context(db).is_some())
+        {
+            // An expected class type can specialize a generic class literal, but it cannot
+            // change its nominal ancestors. Incomplete MROs and structural targets provide
+            // no evidence that the class is incompatible.
+            let mut ancestors = SmallVec::<[ClassLiteral; 8]>::new();
+            for base in class.iter_mro(db) {
+                match base {
+                    crate::types::ClassBase::Class(base) => ancestors.push(base.class_literal(db)),
+                    crate::types::ClassBase::Generic | crate::types::ClassBase::Protocol => {}
+                    _ => return None,
+                }
+            }
+            let excludes_class = |annotation: Type<'db>| match annotation {
+                Type::SubclassOf(subclass) => match subclass.subclass_of() {
+                    crate::types::SubclassOfInner::Class(target) => {
+                        let target = target.class_literal(db);
+                        target.known(db).is_none()
+                            && !target.is_protocol(db)
+                            && !target.is_typed_dict(db)
+                            && !ancestors.contains(&target)
+                    }
+                    _ => false,
+                },
+                Type::LiteralValue(_) => true,
+                other => other.is_none(db),
+            };
+            discriminators.retain(|(_, annotation)| match *annotation {
+                Type::Union(union) => union.elements(db).iter().copied().all(excludes_class),
+                other => excludes_class(other),
+            });
+        } else {
+            if !matches!(argument, Type::LiteralValue(_) | Type::ClassLiteral(_))
+                && !argument.is_none(db)
+            {
+                return None;
+            }
+            discriminators
+                .retain(|(_, annotation)| !argument.is_assignable_to(db, env, *annotation));
+        }
+        // Keep the original candidates to diagnose a completely unmatched call.
+        if discriminators.is_empty() || discriminators.len() == candidate_count {
+            return None;
+        }
+        let mut pruned = self.clone();
+        let binding = pruned.elements[0].items[0].callable_mut();
+        for (index, _) in discriminators {
+            binding.overloads[index].mark_as_unmatched_overload();
+        }
+        Some(pruned)
+    }
+
     /// Returns the single `CallableBinding` if this is not a union or intersection.
     pub(crate) fn single_element(&self) -> Option<&CallableBinding<'db>> {
         if self.is_single() {

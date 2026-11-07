@@ -2736,3 +2736,40 @@ def check(value: Never, alias: Bottom, nested: OtherBottom):
     reveal_type(convert(alias))  # revealed: Unknown
     reveal_type(convert(nested))  # revealed: Unknown
 ```
+
+## Class arguments with different callback contexts
+
+A generic class can satisfy a protocol without inheriting from it. The selected class argument
+determines the parameter type of the callback.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Literal, Protocol, overload, reveal_type
+
+class Named(Protocol):
+    def name(self) -> str: ...
+
+class Duck[T]:
+    def name(self) -> str:
+        return "duck"
+
+class Concrete: ...
+
+@overload
+def select(kind: type[Named], transform: Callable[[int], str]) -> Literal["name"]: ...
+@overload
+def select(kind: type[Concrete], transform: Callable[[str], int]) -> Literal["concrete"]: ...
+@overload
+def select(kind: type[object], transform: object) -> str: ...
+def select(kind: type[object], transform: object) -> str:
+    return ""
+
+reveal_type(select(Duck, lambda value: str(value)))  # revealed: Literal["name"]
+reveal_type(select(Concrete, lambda value: len(value)))  # revealed: Literal["concrete"]
+reveal_type(select(int, []))  # revealed: str
+```
