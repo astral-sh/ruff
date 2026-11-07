@@ -1,5 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::{any_over_body, any_over_expr};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -36,6 +38,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe if there's comments in the
 /// `readlines()` call, as comments may be removed.
+/// It is also unsafe if the loop reads from, writes to, repositions, or closes
+/// the same file object, or observes its position with `tell()`. These operations
+/// can behave differently when the file is read lazily instead of all at once.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
@@ -65,15 +70,27 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 
 /// FURB129
 pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &StmtFor) {
-    readlines_in_iter(checker, for_stmt.iter.as_ref());
+    readlines_in_iter(checker, for_stmt.iter.as_ref(), |file| {
+        any_over_body(&for_stmt.body, |expr| is_file_operation(expr, file))
+    });
 }
 
 /// FURB129
 pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: &Comprehension) {
-    readlines_in_iter(checker, &comprehension.iter);
+    readlines_in_iter(checker, &comprehension.iter, |file| {
+        checker.semantic().current_expression().is_some_and(|expr| {
+            any_over_expr(expr, |expr| {
+                expr.range() != comprehension.iter.range() && is_file_operation(expr, file)
+            })
+        })
+    });
 }
 
-fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
+fn readlines_in_iter(
+    checker: &Checker,
+    iter_expr: &Expr,
+    has_file_operation: impl FnOnce(&Expr) -> bool,
+) {
     let Expr::Call(expr_call) = iter_expr else {
         return;
     };
@@ -122,10 +139,41 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
     diagnostic.set_fix(Fix::applicable_edit(
         edit,
-        if checker.comment_ranges().intersects(iter_expr.range()) {
+        if checker.comment_ranges().intersects(iter_expr.range())
+            || has_file_operation(&expr_attr.value)
+        {
             Applicability::Unsafe
         } else {
             Applicability::Safe
         },
     ));
+}
+
+fn is_file_operation(expr: &Expr, file: &Expr) -> bool {
+    let Expr::Call(call) = expr else {
+        return false;
+    };
+    let Expr::Attribute(attribute) = call.func.as_ref() else {
+        return false;
+    };
+
+    matches!(
+        attribute.attr.as_str(),
+        "read"
+            | "read1"
+            | "readall"
+            | "readinto"
+            | "readinto1"
+            | "readline"
+            | "readlines"
+            | "write"
+            | "writelines"
+            | "seek"
+            | "tell"
+            | "truncate"
+            | "close"
+            | "detach"
+            | "__next__"
+            | "__exit__"
+    ) && ComparableExpr::from(attribute.value.as_ref()) == ComparableExpr::from(file)
 }
