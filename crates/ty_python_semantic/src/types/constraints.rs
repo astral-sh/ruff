@@ -3422,6 +3422,26 @@ impl<'db> CandidateTypeVarSolution<'db> {
         PathBoundSolution::Solved(candidate)
     }
 
+    /// The assignability relations that place a candidate between its lower and upper bounds.
+    fn candidate_relations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidate: Type<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = (Type<'db>, Type<'db>)> {
+        let specialize =
+            move |bound: Type<'db>| bound.apply_optional_specialization(db, specialization);
+        let lower = (!self.bound_typevar.is_paramspec(db))
+            .then(|| self.effective_lower(db, env, EvidenceSource::All))
+            .map(|bound| (specialize(bound), candidate));
+        let uppers = self
+            .upper
+            .iter_clauses(EvidenceSource::All)
+            .map(move |bound| (candidate, specialize(bound)));
+        lower.into_iter().chain(uppers)
+    }
+
     /// Checks whether a given candidate solution satisfies this path.
     pub(super) fn accepts_candidate(
         &self,
@@ -3431,49 +3451,12 @@ impl<'db> CandidateTypeVarSolution<'db> {
         candidate: Type<'db>,
     ) -> bool {
         let inferable = self.inferable;
-        let lower = self.effective_lower(db, env, EvidenceSource::All);
-        let when_lower = if self.bound_typevar.is_paramspec(db) {
-            ConstraintSet::always(builder)
-        } else {
-            lower.when_assignable_to(db, env, candidate, builder, inferable)
-        };
-
-        !when_lower
-            .and(db, builder, || {
-                self.upper
-                    .iter_clauses(EvidenceSource::All)
-                    .when_all(db, builder, |upper| {
-                        candidate.when_assignable_to(db, env, upper, builder, inferable)
-                    })
+        !self
+            .candidate_relations(db, env, candidate, None)
+            .when_all(db, builder, |(lower, upper)| {
+                lower.when_assignable_to(db, env, upper, builder, inferable)
             })
             .is_never_satisfied(db, env, inferable)
-    }
-
-    /// Check this variable's bounds with its companions fixed to the same specialization.
-    fn accepts_type_arguments(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        arguments: Specialization<'db>,
-    ) -> bool {
-        let Some(ty) = arguments.get(db, self.bound_typevar) else {
-            return false;
-        };
-        let accepts = |lower: Type<'db>, upper: Type<'db>| {
-            !lower.has_provisional_marker(db, env)
-                && !upper.has_provisional_marker(db, env)
-                && lower.is_assignable_to(db, env, upper)
-        };
-        (self.bound_typevar.is_paramspec(db)
-            || accepts(
-                self.effective_lower(db, env, EvidenceSource::All)
-                    .apply_specialization(db, arguments),
-                ty,
-            ))
-            && self
-                .upper
-                .iter_clauses(EvidenceSource::All)
-                .all(|upper| accepts(ty, upper.apply_specialization(db, arguments)))
     }
 
     /// Returns one effective upper bound without expanding factored intersections.
@@ -3693,6 +3676,30 @@ pub(crate) enum CandidateSolutions<'db> {
 pub(crate) struct CandidateSolution<'db> {
     typevars: Box<[CandidateTypeVarSolution<'db>]>,
     validity: SolutionValidity<'db>,
+}
+
+impl<'db> CandidateSolution<'db> {
+    /// Variables whose bounds fail with all sibling arguments fixed to this specialization.
+    fn incompatible_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: Specialization<'db>,
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        self.typevars.iter().filter_map(move |bounds| {
+            let variable = bounds.bound_typevar;
+            let fits = arguments.get(db, variable).is_some_and(|ty| {
+                bounds
+                    .candidate_relations(db, env, ty, Some(arguments))
+                    .all(|(lower, upper)| {
+                        !lower.has_provisional_marker(db, env)
+                            && !upper.has_provisional_marker(db, env)
+                            && lower.is_assignable_to(db, env, upper)
+                    })
+            });
+            (!fits).then_some(variable)
+        })
+    }
 }
 
 /// Whether or not to report diagnostics when the constraint solver encounters unsatisfied bounds.
@@ -4073,9 +4080,9 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         let accepts = |path: &CandidateSolution<'db>, arguments| {
-            path.typevars
-                .iter()
-                .all(|bounds| bounds.accepts_type_arguments(db, env, arguments))
+            path.incompatible_typevars(db, env, arguments)
+                .next()
+                .is_none()
         };
         let mut viable = paths
             .iter()
@@ -4084,30 +4091,28 @@ impl<'db> CandidateSolutions<'db> {
         'paths: for path in viable.clone() {
             // Start with all promotions so related variables (e.g. `T = U`) can widen together.
             let mut selected = Cow::Borrowed(widest.types(db));
-            for bounds in &path.typevars {
-                if !bounds.accepts_type_arguments(db, env, widest) {
-                    let Some(index) = context.variable_index(db, bounds.bound_typevar.identity(db))
-                    else {
-                        continue 'paths;
-                    };
-                    selected.to_mut()[index] = original.types(db)[index];
-                }
+            for variable in path.incompatible_typevars(db, env, widest) {
+                let Some(index) = context.variable_index(db, variable.identity(db)) else {
+                    continue 'paths;
+                };
+                selected.to_mut()[index] = original.types(db)[index];
             }
-            if matches!(selected, Cow::Borrowed(_)) {
+            let Cow::Owned(types) = selected else {
                 return widest;
-            }
-            let selected = context.specialize(db, selected);
+            };
+            let selected = context.specialize(db, types);
             // Restoring one variable can invalidate a dependent variable's promotion.
-            if accepts(path, selected) {
-                for (index, ty) in selected.types(db).iter().enumerate() {
-                    if *ty != original.types(db)[index] {
-                        combined[index] = *ty;
-                    }
+            if selected == original || !accepts(path, selected) {
+                continue;
+            }
+            for (index, ty) in selected.types(db).iter().enumerate() {
+                if *ty != original.types(db)[index] {
+                    combined[index] = *ty;
                 }
             }
         }
         let combined = context.specialize(db, combined);
-        if viable.any(|path| accepts(path, combined)) {
+        if combined != original && viable.any(|path| accepts(path, combined)) {
             combined
         } else {
             original
