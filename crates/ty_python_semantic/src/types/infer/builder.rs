@@ -5901,6 +5901,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_argument_ty,
                         bindings,
                         call_expression_tcx,
+                        false,
                     )
                     .map_err(|CallError(error, bindings)| {
                         CallDunderError::CallError(error, bindings, provenance)
@@ -5971,6 +5972,68 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(if can_skip_fixpoint { 0 } else { occurrences })
     }
 
+    fn infer_fixed_call_arguments<'call>(
+        &mut self,
+        ast_arguments: ArgumentsIter<'_>,
+        initial: &CallArguments<'call, 'db>,
+        infer: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        bindings: &Bindings<'db>,
+        candidates: &OverloadSet,
+    ) -> Option<(CallArguments<'call, 'db>, FullExpressionCacheEntry<'db>)> {
+        if self.collects_expected_types()
+            || self.cycle_recovery.is_some()
+            || initial.len() == 0
+            || candidates.iter().any(SmallVec::is_empty)
+            || !ast_arguments.clone().all(|argument| {
+                !argument.is_variadic()
+                    && matches!(
+                        argument.value(),
+                        ast::Expr::Name(_)
+                            | ast::Expr::Attribute(_)
+                            | ast::Expr::NumberLiteral(_)
+                            | ast::Expr::BooleanLiteral(_)
+                            | ast::Expr::NoneLiteral(_)
+                            | ast::Expr::StringLiteral(_)
+                            | ast::Expr::BytesLiteral(_)
+                            | ast::Expr::Subscript(_)
+                    )
+                    && self
+                        .index
+                        .unannotated_collection_initializer(argument.value())
+                        .is_none()
+            })
+        {
+            return None;
+        }
+        let mut inference = self.speculate();
+        let mut values = initial.clone();
+        for (index, argument) in ast_arguments.enumerate() {
+            let ty = infer(
+                &mut inference,
+                (index, argument.value(), TypeContext::default()),
+            );
+            // A bare class object can acquire type arguments from its expected type.
+            if matches!(ty, Type::ClassLiteral(_) | Type::Divergent(_)) {
+                return None;
+            }
+            values.insert_type(index, TypeContext::default(), ty);
+        }
+        if inference.cycle_recovery.is_some() {
+            return None;
+        }
+        let mut all_fixed = true;
+        bindings.visit_overload_set(candidates, &mut |overload, binding| {
+            all_fixed = all_fixed
+                && overload.has_fixed_value_contexts(
+                    self.db(),
+                    self.program_environment(),
+                    binding,
+                    &values,
+                );
+        });
+        all_fixed.then(|| (values, inference.into_expression_cache_entry()))
+    }
+
     fn infer_and_check_argument_types<'args, 'call>(
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
@@ -5978,6 +6041,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         mut bindings: Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
+        plain_value_arguments: bool,
     ) -> Result<CallArgumentInference<'args, 'call, 'db>, CallError<'db>> {
         const MAX_LITERAL_NARROWING_TARGETS: usize = 64;
 
@@ -6050,11 +6114,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             false
         };
 
+        // These expressions normally receive one context per overload, possibly repeatedly
+        // during fixpoint iteration and union narrowing. When every context leaves every
+        // value unchanged, one ordinary inference supplies all those lookups.
+        let fixed_arguments = if plain_value_arguments
+            && (fixpoint_iteration_limit > 0 || requires_overload_evaluation(&overload_candidates))
+        {
+            self.infer_fixed_call_arguments(
+                ast_arguments.clone(),
+                &initial_argument_types,
+                infer_argument_ty,
+                &bindings,
+                &overload_candidates,
+            )
+        } else {
+            None
+        };
+
         let mut infer_and_check_argument_types =
             |builder: &mut Self,
              arguments: &mut CallArguments<'call, 'db>,
              bindings: &mut Bindings<'db>,
-             tcx| {
+             tcx,
+             discard_failure| {
+                if let Some((values, inference)) = &fixed_arguments {
+                    let mut checked = bindings.clone();
+                    let result = checked.check_types_impl(
+                        db,
+                        env,
+                        &constraints,
+                        values,
+                        tcx,
+                        &builder.dataclass_field_specifiers,
+                        CheckTypesMode::Finalize,
+                    );
+                    if result.is_ok() || discard_failure {
+                        *bindings = checked;
+                        *arguments = values.clone();
+                        builder.extend_expression_cache_entry(inference);
+                        return result;
+                    }
+                    // Full argument inference selects the diagnostic and recovery type for a
+                    // failing call, including the best error when its overloads all fail.
+                }
                 if fixpoint_iteration_limit == 0 {
                     builder.infer_and_check_argument_types_simple(
                         ast_arguments.clone(),
@@ -6125,6 +6227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &mut speculative_argument_types,
                 &mut speculative_bindings,
                 target_tcx,
+                true,
             )
             .ok()?;
 
@@ -6209,6 +6312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     argument_types,
                     &mut bindings,
                     call_expression_tcx,
+                    false,
                 ) {
                     Ok(()) => Ok(CallArgumentInference::new(bindings, argument_types)),
                     Err(error) => Err(CallError(error, Box::new(bindings))),
@@ -10099,6 +10203,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
             bindings,
             call_expression_tcx,
+            cast_value.is_none() && !matches!(callable_type, Type::KnownBoundMethod(_)),
         );
 
         let inferred = match bindings_result {
@@ -10200,6 +10305,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
                         identity_bindings,
                         call_expression_tcx,
+                        true,
                     );
 
                 if let Ok(inferred) = call_result {

@@ -457,6 +457,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             bindings,
             call_expression_tcx,
+            false,
         );
 
         let return_ty = result.map(|inferred| inferred.into_bindings().return_type(db, env));

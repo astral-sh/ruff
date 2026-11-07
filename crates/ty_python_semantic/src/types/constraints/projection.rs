@@ -10,6 +10,28 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
+impl<'db> CandidateSolutions<'db> {
+    pub(in crate::types) fn project_solutions(
+        &self,
+        db: &'db dyn Db,
+        budget: SolutionBudget,
+        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
+        self.try_solve_with(choose, |solution| {
+            for violation in solution.violations() {
+                for evidence in violation.evidence_types() {
+                    type_budget.charge_type(db, *evidence)?;
+                }
+            }
+            for binding in &solution.solved_typevars {
+                type_budget.charge_type(db, binding.solution)?;
+            }
+            Ok(())
+        })
+    }
+}
+
 /// Limits for one projection, including preprocessing, path collection, and its result.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SolutionBudget {
@@ -38,7 +60,7 @@ impl Default for SolutionBudget {
 ///
 /// None of these outcomes proves that the constraint set is unsatisfiable. In particular, a
 /// caller must not use the prefix visited before a limit was reached as the complete answer.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum ProjectionError {
     PathBudgetExceeded,
     TraversalBudgetExceeded,
@@ -161,18 +183,7 @@ impl<'db> ConstraintSet<'db, '_> {
             budget,
             report_diagnostics,
         )?;
-        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
-            for violation in solution.violations() {
-                for evidence in violation.evidence_types() {
-                    type_budget.charge_type(db, *evidence)?;
-                }
-            }
-            for binding in &solution.solved_typevars {
-                type_budget.charge_type(db, binding.solution)?;
-            }
-            Ok(())
-        })
+        path_bounds.project_solutions(db, budget, choose)
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.

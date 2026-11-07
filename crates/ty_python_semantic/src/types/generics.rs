@@ -15,9 +15,9 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget, Sol
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution,
-    ReportDiagnostics, Solution, SolutionPaths, SolutionViolation, SolutionViolationKind,
-    Solutions, TypeVarSolution,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    PathBoundSolution, ReportDiagnostics, Solution, SolutionPaths, SolutionViolation,
+    SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -2548,21 +2548,67 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
 
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
-pub(crate) struct SpecializationBuilder<'db, 'c> {
+pub(crate) struct SpecializationBuilder<'db, 'c, 'env> {
     db: &'db dyn Db,
-    env: &'c ProgramEnvironment<'db>,
+    env: &'env ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
+    argument_constraints: Option<SmallVec<[ArgumentConstraintSet<'db>; 2]>>,
 }
 
 /// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
 /// Missing evidence from one argument can make the other arguments' inferred types too narrow.
 enum LegacyTypeMappings<'db> {
     Available(FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>),
+    Recording(Vec<(BoundTypeVarInstance<'db>, Type<'db>)>),
     BudgetExceeded,
+}
+
+/// The contribution of one argument, before evidence from other arguments or the
+/// expected return type is incorporated. Mapping order matters because parameter lists keep
+/// the first mapped value and type variable tuples merge elementwise.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ArgumentInferenceEvidence<'db> {
+    constraints: ArgumentDiagram<'db>,
+    mappings: Option<Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>>,
+    error: Option<SpecializationError<'db>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum ArgumentDiagram<'db> {
+    Constant(bool),
+    Constraints(ArgumentConstraintSet<'db>),
+}
+
+impl<'db> ArgumentDiagram<'db> {
+    fn new(db: &'db dyn Db, owned: OwnedConstraintSet<'db>) -> Self {
+        if owned.is_nontrivial() {
+            Self::Constraints(ArgumentConstraintSet::new(db, owned))
+        } else {
+            Self::Constant(owned.is_trivially_always_satisfied())
+        }
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ArgumentConstraintSet<'db> {
+    #[returns(ref)]
+    owned: OwnedConstraintSet<'db>,
+}
+
+impl get_size2::GetSize for ArgumentConstraintSet<'_> {}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct JointCallConstraints<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(copy)]
+    inferable: TypeVarSet<'db>,
+    #[returns(deref)]
+    arguments: Box<[ArgumentConstraintSet<'db>]>,
 }
 
 /// Correlated type-variable inference, together with the merged projection used by consumers
@@ -2790,10 +2836,10 @@ fn relation_directions<T: Copy>(
     .flatten()
 }
 
-impl<'db, 'c> SpecializationBuilder<'db, 'c> {
+impl<'db, 'c, 'env> SpecializationBuilder<'db, 'c, 'env> {
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
     ) -> Self {
@@ -2805,7 +2851,74 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
             types: LegacyTypeMappings::Available(FxHashMap::default()),
+            argument_constraints: None,
         }
+    }
+
+    /// Sharing a solver result is possible when the entire diagram was assembled from
+    /// argument evidence in a fresh arena with the same order of variable declarations.
+    pub(super) fn track_call_arguments(&mut self) {
+        if self.constraints.has_empty_arenas() {
+            self.argument_constraints = Some(SmallVec::new());
+        }
+    }
+
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the bounded solution query is resolving a cycle"
+    )]
+    fn argument_bounds(
+        &self,
+        budget: SolutionBudget,
+        diagnostics: ReportDiagnostics,
+    ) -> Option<&'db Result<CandidateSolutions<'db>, ProjectionError>> {
+        #[salsa::tracked(
+            returns(as_ref),
+            cycle_initial=|_, _, _, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn bounds<'db>(
+            db: &'db dyn Db,
+            key: JointCallConstraints<'db>,
+            paths: usize,
+            visits: usize,
+            diagnostics: bool,
+        ) -> Option<Result<CandidateSolutions<'db>, ProjectionError>> {
+            let env = ProgramEnvironment::from_program(key.program(db));
+            let arena = ConstraintSetBuilder::new();
+            let mut joint = ConstraintSet::from_bool(&arena, true);
+            for argument in key.arguments(db) {
+                joint.intersect(db, &arena, arena.load(db, &env, argument.owned(db)));
+            }
+            Some(CandidateSolutions::compute_bounded(
+                db,
+                &env,
+                joint,
+                key.inferable(db),
+                SolutionBudget {
+                    paths,
+                    visits,
+                    ..SolutionBudget::default()
+                },
+                if diagnostics {
+                    ReportDiagnostics::Yes
+                } else {
+                    ReportDiagnostics::No
+                },
+            ))
+        }
+        let arguments = self.argument_constraints.as_ref()?;
+        if arguments.is_empty() {
+            return None;
+        }
+        let db = self.db;
+        let key = JointCallConstraints::new(
+            db,
+            self.env.program(db),
+            self.inferable,
+            arguments.as_slice(),
+        );
+        bounds(db, key, budget.paths, budget.visits, diagnostics.is_yes())
     }
 
     /// Adds a constraint set to the pending specialization and projects its valid solutions into
@@ -3011,13 +3124,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let mut specialization_errors = Vec::new();
         let inference = self.solve_pending_projection(choose, |builder, choose| {
-            let solutions = builder.pending.solutions_with(
-                db,
-                builder.env,
-                builder.inferable,
-                budget,
-                report_diagnostics,
-                |_variance, path_bound| {
+            let choose_path = |_variance, path_bound: &CandidateTypeVarSolution<'db>| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
                         CandidateSolutions::default_solve(
                             db,
@@ -3026,8 +3133,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             path_bound,
                         )
                     })
-                },
-            )?;
+                };
+            let solutions = match builder.argument_bounds(budget, report_diagnostics) {
+                Some(bounds) => bounds.as_ref().map_err(|error| *error)?.project_solutions(db, budget, choose_path),
+                None => builder.pending.solutions_with(
+                    db, builder.env, builder.inferable, budget, report_diagnostics, choose_path,
+                ),
+            }?;
             Ok(match solutions {
                 Solutions::Unsatisfiable(solutions) => {
                     if report_diagnostics.is_yes() && let SolutionPaths::Complete(paths) = solutions {
@@ -3484,10 +3596,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
     ) {
         let db = self.db;
-        let identity = bound_typevar.identity(db);
-        let LegacyTypeMappings::Available(types) = &mut self.types else {
-            return;
+        let types = match &mut self.types {
+            LegacyTypeMappings::Available(types) => types,
+            LegacyTypeMappings::Recording(mappings) => {
+                mappings.push((bound_typevar, ty));
+                return;
+            }
+            LegacyTypeMappings::BudgetExceeded => return,
         };
+        let identity = bound_typevar.identity(db);
         match types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 match bound_typevar.kind(db) {
@@ -3538,6 +3655,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn intersect_pending_typevar_constraint(&mut self, constraint: ConstraintSet<'db, 'c>) {
         let db = self.db;
+        self.argument_constraints = None;
         self.pending.intersect(db, self.constraints, constraint);
     }
 
@@ -3697,7 +3815,47 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
     pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+        self.argument_constraints = None;
         self.pending.intersect(self.db, self.constraints, when);
+    }
+
+    pub(super) fn record_owned_constraint(&mut self, constraint: OwnedConstraintSet<'db>) {
+        self.record_diagram(ArgumentDiagram::new(self.db, constraint));
+    }
+
+    fn record_diagram(&mut self, diagram: ArgumentDiagram<'db>) {
+        let db = self.db;
+        match diagram {
+            ArgumentDiagram::Constant(true) => {}
+            ArgumentDiagram::Constant(false) => {
+                self.record_constraint_set(ConstraintSet::from_bool(self.constraints, false));
+            }
+            ArgumentDiagram::Constraints(part) => {
+                if let Some(sets) = &mut self.argument_constraints {
+                    sets.push(part);
+                }
+                self.pending.intersect(
+                    db,
+                    self.constraints,
+                    self.constraints.load(db, self.env, part.owned(db)),
+                );
+            }
+        }
+    }
+
+    /// Includes a speculative constraint while solving, preserving the argument evidence for a retry.
+    pub(super) fn with_additional_constraint<R>(
+        &mut self,
+        constraint: OwnedConstraintSet<'db>,
+        solve: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let arguments = self.pending;
+        let parts = self.argument_constraints.clone();
+        self.record_owned_constraint(constraint);
+        let result = solve(self);
+        self.pending = arguments;
+        self.argument_constraints = parts;
+        result
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -4016,11 +4174,75 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the argument evidence query is resolving a cycle"
+    )]
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        #[salsa::tracked(
+            returns(as_ref),
+            cycle_initial=|_, _, _, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn argument_evidence<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            context: GenericContext<'db>,
+            formal: Type<'db>,
+            actual: Type<'db>,
+        ) -> Option<ArgumentInferenceEvidence<'db>> {
+            let env = ProgramEnvironment::from_program(program);
+            let mut error = None;
+            let mut mappings = None;
+            let constraints = ConstraintSetBuilder::new().into_owned(|constraints| {
+                let mut builder = SpecializationBuilder::new(db, &env, constraints, context);
+                builder.types = LegacyTypeMappings::Recording(Vec::new());
+                error = builder
+                    .infer_map_impl(
+                        formal,
+                        actual,
+                        TypeVarVariance::Covariant,
+                        &InferSpecializationVisitor::new(Ok(())),
+                    )
+                    .err();
+                if let LegacyTypeMappings::Recording(recorded) = builder.types {
+                    mappings = Some(recorded.into_boxed_slice());
+                }
+                builder.pending
+            });
+            Some(ArgumentInferenceEvidence {
+                constraints: ArgumentDiagram::new(db, constraints),
+                mappings,
+                error,
+            })
+        }
+
+        if formal == actual {
+            return Ok(());
+        }
+        let db = self.db;
+        if let Some(evidence) = argument_evidence(
+            db,
+            self.env.program(db),
+            self.generic_context,
+            formal,
+            actual,
+        ) {
+            self.record_diagram(evidence.constraints);
+            if let Some(mappings) = &evidence.mappings {
+                for &(variable, ty) in mappings {
+                    self.insert_hash_map_type_mapping(variable, ty);
+                }
+            } else {
+                self.types = LegacyTypeMappings::BudgetExceeded;
+            }
+            return evidence.error.clone().map_or(Ok(()), Err);
+        }
+        self.argument_constraints = None;
         self.infer_map_impl(
             formal,
             actual,

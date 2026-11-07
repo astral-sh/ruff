@@ -276,6 +276,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             bindings,
             TypeContext::default(),
+            false,
         );
 
         if let Err(CallError(_, bindings)) = bindings_result {

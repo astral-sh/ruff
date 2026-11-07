@@ -6754,6 +6754,7 @@ impl<'db> CallInference<'_, 'db> {
 
         let mut specialization_errors = Vec::new();
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+        builder.track_call_arguments();
 
         self.infer_argument_constraints(
             &mut builder,
@@ -6763,21 +6764,18 @@ impl<'db> CallInference<'_, 'db> {
             &mut constraint_set_errors,
         );
 
-        let return_context = match self.call_expression_tcx.declared_type() {
-            None => None,
+        let solution = match self.call_expression_tcx.declared_type() {
+            None => self.solve(constraints, &mut builder, None),
 
             Some(tcx) if self.call_expression_tcx.is_validity() => {
-                let validity = self
-                    .return_ty
-                    .when_constraint_set_assignable_to_with_provenance(
-                        db,
-                        self.env,
-                        tcx,
-                        constraints,
-                        ConstraintProvenance::VALIDITY,
-                    );
-                builder.record_constraint_set(validity);
-                None
+                let validity = self.return_ty.constraint_set_assignability_with_provenance(
+                    db,
+                    self.env,
+                    tcx,
+                    ConstraintProvenance::VALIDITY,
+                );
+                builder.record_owned_constraint(validity.into_owned());
+                self.solve(constraints, &mut builder, None)
             }
 
             Some(tcx) => {
@@ -6793,41 +6791,27 @@ impl<'db> CallInference<'_, 'db> {
                         self.inferable_typevars,
                     )
                     .or_never();
-                let declared_constraints = return_ty
-                    .when_constraint_set_assignable_to_with_provenance(
-                        db,
-                        self.env,
-                        tcx,
-                        constraints,
-                        ConstraintProvenance::DECLARED,
-                    );
-                builder.record_constraint_set(declared_constraints);
-                Some((return_ty, tcx))
+                let declared_constraints = return_ty.constraint_set_assignability_with_provenance(
+                    db,
+                    self.env,
+                    tcx,
+                    ConstraintProvenance::DECLARED,
+                );
+                // A declared return is a preference. If it is incompatible, solve again
+                // using the same evidence from the arguments, including their diagnostics.
+                if !declared_constraints.is_nontrivial() {
+                    // An impossible preference always retries. An unconditional one adds no
+                    // evidence, so a retry would solve exactly the same argument constraints.
+                    self.solve(constraints, &mut builder, None)
+                } else {
+                    builder
+                        .with_additional_constraint(declared_constraints.into_owned(), |builder| {
+                            self.solve(constraints, builder, Some((return_ty, tcx)))
+                        })
+                        .or_else(|_| self.solve(constraints, &mut builder, None))
+                }
             }
         };
-
-        let mut solution = self.solve(constraints, &mut builder, return_context);
-
-        // If we failed to infer a compatible specialization, retry without the declared type.
-        //
-        // Note that this retry only exists to provide more precise diagnostics in cases where
-        // the declared type may partially influence the type inferred for the call, leading to
-        // confusing results.
-        if return_context.is_some() && solution.is_err() {
-            builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
-            specialization_errors.clear();
-            constraint_set_errors.fill(false);
-
-            self.infer_argument_constraints(
-                &mut builder,
-                &FxHashMap::default(),
-                &FxHashSet::default(),
-                &mut specialization_errors,
-                &mut constraint_set_errors,
-            );
-
-            solution = self.solve(constraints, &mut builder, None);
-        }
 
         let (inference, return_ty, arguments_validated) = solution.unwrap_or_else(|errors| {
             let inference = self.inference_recovery(
@@ -7065,7 +7049,7 @@ impl<'db> CallInference<'_, 'db> {
     fn solve(
         &self,
         constraints: &ConstraintSetBuilder<'db>,
-        builder: &mut SpecializationBuilder<'db, '_>,
+        builder: &mut SpecializationBuilder<'db, '_, '_>,
         return_context: Option<(Type<'db>, Type<'db>)>,
     ) -> Result<(TypeVarInference<'db>, Type<'db>, bool), Vec<SpecializationError<'db>>> {
         let db = self.db;
@@ -7173,7 +7157,7 @@ impl<'db> CallInference<'_, 'db> {
         &self,
         constraints: &ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
-        mut builder: SpecializationBuilder<'db, '_>,
+        mut builder: SpecializationBuilder<'db, '_, '_>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -7234,7 +7218,7 @@ impl<'db> CallInference<'_, 'db> {
 
     fn inference_recovery(
         &self,
-        builder: &mut SpecializationBuilder<'db, '_>,
+        builder: &mut SpecializationBuilder<'db, '_, '_>,
         errors: Vec<SpecializationError<'db>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
         choose: impl FnMut(
@@ -7284,7 +7268,7 @@ impl<'db> CallInference<'_, 'db> {
     /// ```
     fn infer_typevartuple_argument_constraints<'c>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'c, '_>,
         check_type_context: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
@@ -7544,7 +7528,7 @@ impl<'db> CallInference<'_, 'db> {
 
     fn infer_argument_constraints<'c>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'c, '_>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -8813,6 +8797,92 @@ impl<'db> Binding<'db> {
         expected
             .py_index(db, env, i32::try_from(tuple_index).ok()?)
             .ok()
+    }
+
+    /// Whether every argument context keeps its outer value-type form after specialization.
+    /// Such a context cannot reinterpret a value as a type expression or retag a literal.
+    pub(crate) fn has_fixed_value_contexts(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: &CallableBinding<'db>,
+        values: &CallArguments<'_, 'db>,
+    ) -> bool {
+        fn value_form<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            actual: Type<'db>,
+        ) -> bool {
+            match ty.resolve_type_alias(db) {
+                Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Callable(_)
+                | Type::Dynamic(_)
+                | Type::ClassLiteral(_)
+                | Type::TypedDict(_)
+                | Type::Never => true,
+                Type::LiteralValue(_) => actual.as_literal_value().is_none_or(|literal| {
+                    literal == literal.to_unpromotable() || !actual.is_assignable_to(db, env, ty)
+                }),
+                // Resolve aliases at the root only. A recursive alias in a union is
+                // conservatively context-dependent.
+                Type::Union(union) => union.elements(db).iter().all(|&arm| {
+                    !matches!(arm, Type::TypeAlias(_) | Type::Recursive(_))
+                        && value_form(db, env, arm, actual)
+                }),
+                _ => false,
+            }
+        }
+
+        if self.signature.generic_context.is_some_and(|ctx| {
+            ctx.variables(db)
+                .any(|var| var.is_paramspec(db) || var.is_typevartuple(db))
+        }) {
+            return false;
+        }
+
+        values.iter().enumerate().all(|(index, argument)| {
+            let Some(actual) = argument.source_type() else {
+                return false;
+            };
+            let Some(matched) = self.matched_argument_for_call_argument(binding, index) else {
+                return false;
+            };
+            let [matched] = matched.parameters.as_slice() else {
+                return false;
+            };
+            let parameter = &self.signature.parameters()[matched.index];
+            if matched.argument_type.is_some() || parameter.has_starred_annotation() {
+                return false;
+            }
+            let Some(formal) = matched
+                .expected_type
+                .or_else(|| parameter.argument_context_type())
+            else {
+                return true;
+            };
+            // Bound type variables provide their upper bound directly as argument context.
+            if let Type::TypeVar(variable) = formal
+                && !variable.is_paramspec(db)
+                && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+                    variable.typevar(db).bound_or_constraints(db, env)
+            {
+                return value_form(db, env, bound, actual);
+            }
+            if let Type::TypeVar(variable) = formal
+                && !variable.is_paramspec(db)
+                && !variable.is_typevartuple(db)
+                && self
+                    .signature
+                    .generic_context
+                    .is_none_or(|context| !context.contains(db, variable.identity(db)))
+            {
+                return true;
+            }
+            value_form(db, env, formal, actual)
+        })
     }
 
     /// Returns the type context to use for bidirectional inference of a source call argument.

@@ -23,6 +23,7 @@ use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::relation::TypeRelation;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
@@ -1097,12 +1098,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         provided_type
                     };
+                    // A forward-referenced bound can contain this very specialization.
+                    // Evaluate its provisional relation in the annotation query's fixed point.
+                    let violates_bound = |bound| {
+                        type_to_check
+                            .has_relation_to(
+                                db,
+                                env,
+                                bound,
+                                &constraints,
+                                TypeVarSet::None,
+                                TypeRelation::Assignability,
+                            )
+                            .is_never_satisfied(db, env, TypeVarSet::None)
+                    };
                     match bound_or_constraints {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if type_to_check
-                                .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env, TypeVarSet::None)
-                            {
+                            if violates_bound(bound) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
@@ -1130,16 +1142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
                             // constrained to `(int, str)`.
-                            if type_to_check
-                                .when_assignable_to(
-                                    db,
-                                    env,
-                                    typevar_constraints.as_type(db, env),
-                                    &constraints,
-                                    TypeVarSet::None,
-                                )
-                                .is_never_satisfied(db, env, TypeVarSet::None)
-                            {
+                            if violates_bound(typevar_constraints.as_type(db, env)) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
@@ -1800,6 +1803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         },
                         identity_bindings,
                         TypeContext::default(),
+                        false,
                     );
 
                 if let Ok(inferred) = call_result

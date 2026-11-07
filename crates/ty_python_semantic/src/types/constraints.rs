@@ -1214,6 +1214,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         Self::default()
     }
 
+    pub(super) fn has_empty_arenas(&self) -> bool {
+        let storage = self.storage.borrow();
+        storage.compacted.is_none() && storage.typevars.is_empty() && storage.constraints.is_empty()
+    }
+
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
     /// callback that constructs a [`ConstraintSet`]. We then package that constraint set up with
     /// the storage arenas from this builder.
@@ -3812,7 +3817,7 @@ impl<'db> CandidateSolutions<'db> {
     /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
     /// path allowance. No partially collected family is returned when either limit is exhausted.
-    fn compute_bounded(
+    pub(in crate::types) fn compute_bounded(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         set: ConstraintSet<'db, '_>,
