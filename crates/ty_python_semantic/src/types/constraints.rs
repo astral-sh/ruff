@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -106,6 +107,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::generics::Specialization;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
 };
@@ -313,35 +315,6 @@ impl<'db> OwnedConstraintSet<'db> {
     /// Returns `true` if this constraint set's root is not a terminal.
     pub(super) fn is_nontrivial(&self) -> bool {
         !self.node.is_terminal()
-    }
-
-    /// Checks whether these type arguments can satisfy the constraints together.
-    /// For example, if `T ≤ U`, the bindings `T = str` and `U = int` are each
-    /// possible on their own, but cannot both hold.
-    pub(super) fn accepts_type_arguments(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
-        arguments: impl Iterator<Item = (BoundTypeVarInstance<'db>, Type<'db>)>,
-    ) -> bool {
-        self.query(|builder, constraints| {
-            let pinned = arguments
-                .filter(|(variable, _)| constraints.mentions_typevar(*variable))
-                .fold(constraints, |pinned, (variable, ty)| {
-                    pinned.and(db, builder, || {
-                        ConstraintSet::constrain_typevar_equivalence_bound(
-                            db,
-                            env,
-                            builder,
-                            ConstraintProvenance::INFERRED,
-                            variable,
-                            ty,
-                        )
-                    })
-                });
-            pinned.is_never_satisfied_bounded(db, env, inferable) == Some(false)
-        })
     }
 
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
@@ -3524,6 +3497,33 @@ impl<'db> CandidateTypeVarSolution<'db> {
             .is_never_satisfied(db, env, inferable)
     }
 
+    /// Check this variable's bounds with its companions fixed to the same specialization.
+    fn accepts_type_arguments(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: Specialization<'db>,
+    ) -> bool {
+        let Some(ty) = arguments.get(db, self.bound_typevar) else {
+            return false;
+        };
+        let accepts = |lower: Type<'db>, upper: Type<'db>| {
+            !lower.has_provisional_marker(db, env)
+                && !upper.has_provisional_marker(db, env)
+                && lower.is_assignable_to(db, env, upper)
+        };
+        (self.bound_typevar.is_paramspec(db)
+            || accepts(
+                self.effective_lower(db, env, EvidenceSource::All)
+                    .apply_specialization(db, arguments),
+                ty,
+            ))
+            && self
+                .upper
+                .iter_clauses(EvidenceSource::All)
+                .all(|upper| accepts(ty, upper.apply_specialization(db, arguments)))
+    }
+
     /// Returns one effective upper bound without expanding factored intersections.
     fn as_single_upper_bound(
         &self,
@@ -4096,6 +4096,70 @@ impl<'db> CandidateSolutions<'db> {
                 solution => solution,
             }
         })
+    }
+
+    /// Widen the inferred arguments for the next pass only when one viable path permits
+    /// all the chosen promotions. If one path requires `T` to stay narrow and another
+    /// requires `U` to stay narrow, choosing which variable to widen would be arbitrary.
+    pub(super) fn promote_for_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        original: Specialization<'db>,
+        widest: Specialization<'db>,
+    ) -> Specialization<'db> {
+        let paths = match self {
+            Self::Unconstrained => return widest,
+            Self::Unsatisfiable => return original,
+            Self::Constrained(paths) => paths,
+        };
+        let context = original.generic_context(db);
+        if original == widest
+            || paths.len().saturating_mul(context.len(db)) > SolutionBudget::default().type_terms
+        {
+            return original;
+        }
+
+        let accepts = |path: &CandidateSolution<'db>, arguments| {
+            path.typevars
+                .iter()
+                .all(|bounds| bounds.accepts_type_arguments(db, env, arguments))
+        };
+        let mut viable = paths
+            .iter()
+            .filter(|path| matches!(path.validity, SolutionValidity::Valid));
+        let mut combined = original.types(db).to_vec();
+        'paths: for path in viable.clone() {
+            // Start with all promotions so related variables (e.g. `T = U`) can widen together.
+            let mut selected = Cow::Borrowed(widest.types(db));
+            for bounds in &path.typevars {
+                if !bounds.accepts_type_arguments(db, env, widest) {
+                    let Some(index) = context.variable_index(db, bounds.bound_typevar.identity(db))
+                    else {
+                        continue 'paths;
+                    };
+                    selected.to_mut()[index] = original.types(db)[index];
+                }
+            }
+            if matches!(selected, Cow::Borrowed(_)) {
+                return widest;
+            }
+            let selected = context.specialize(db, selected);
+            // Restoring one variable can invalidate a dependent variable's promotion.
+            if accepts(path, selected) {
+                for (index, ty) in selected.types(db).iter().enumerate() {
+                    if *ty != original.types(db)[index] {
+                        combined[index] = *ty;
+                    }
+                }
+            }
+        }
+        let combined = context.specialize(db, combined);
+        if viable.any(|path| accepts(path, combined)) {
+            combined
+        } else {
+            original
+        }
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting retained solutions.
