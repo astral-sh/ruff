@@ -1,0 +1,111 @@
+# Issue #2581 exact repro
+assert name.rfc4514_string(
+    {NameOID.COMMON_NAME: "CommonName", NameOID.EMAIL_ADDRESS: "E"}
+) == ("CommonName=Santa Claus,E=santa@northpole.fi")
+
+# Literals
+assert a == ("str")
+assert ("str") == a
+assert ("a") == ("b")
+assert (1) == (2)
+assert (1.5) == (2.5)
+assert (True) == (False)
+assert (None) is (None)
+x = (1) < (2) <= (3)
+
+# Identifiers
+assert (a) == (b)
+
+# Attribute access, calls, subscripts
+assert (obj.attr) == (other.attr)
+assert (fn()) == (other_fn())
+assert (obj[0]) == (other[1])
+assert (obj.method(x)) == (other.method(y))
+assert (await fn()) == (await other())
+
+# Container displays
+assert ([1, 2]) == ([3, 4])
+assert ({"a": 1}) == ({"b": 2})
+assert ({1, 2}) == ({3, 4})
+
+# Unary operators
+assert (-1) == (-2)
+assert (+x) == (~y)
+
+# Nested parentheses
+assert ((a)) == ((b))
+assert (((x))) == (((y)))
+
+# Chained comparisons
+assert (1) < (2) < (3) < (4)
+if (foo()) == (bar()) != (baz()):
+    pass
+
+# Different comparison operators
+assert (a) != (b)
+assert (a) <= (b)
+assert (a) >= (b)
+assert (a) is (b)
+assert (a) is not (b)
+assert (a) in (b)
+assert (a) not in (b)
+
+# MUST BE PRESERVED
+# Tuples
+assert (1, 2) == (3, 4)
+assert (1,) == (2,)
+assert () == ()
+assert ((1, 2)) == ((3, 4))
+
+# Generators
+assert (x for x in y) == z
+
+# Binary operators
+assert (a + b) == (c - d)
+assert (a * b) == (c / d)
+assert (a % b) == (c // d)
+assert (a | b) == (c & d)
+assert (a ^ b) == (c << d)
+assert (a >> b) == (c ** d)
+assert ((a + b)) == (c)
+
+# Lower precedence
+assert (a and b) == (c or d)
+assert (not a) == b
+assert (a if b else c) == d
+assert (lambda x: x) == fn
+assert (x := 1) == 2
+assert (a < b) == (c < d)
+
+# Comments
+assert (
+    # comment
+    a
+) == b
+assert a == (
+    # comment
+    b
+)
+
+# Multiline operands
+assert (
+    await metadata_verify(_verify_mirror_config(tmp_path), Args())  # type: ignore[arg-type]
+) == 0
+assert ifd.tobytes() == (
+    # number of tags == 1
+    b"\x01\x00"
+    # tag id (2 bytes), type (2 bytes), count (4 bytes), value (4 bytes)
+    b"\x11\x01\x04\x00\x02\x00\x00\x00\x12\x00\x00\x00"
+)
+
+# Multiline operands that fit on one line once joined
+assert offloadable_content_blocks(result=tool_result, store=FileSystemStore(root=tmp_path)) == (
+    expected
+)
+if offloadable_content_blocks(result=tool_result, store=FileSystemStore(root=tmp_path)) in (
+    self.allowed
+):
+    pass
+is_missing = offloadable_content_blocks(result=tool_result, store=FileSystemStore(root=tmp)) is (
+    None
+)

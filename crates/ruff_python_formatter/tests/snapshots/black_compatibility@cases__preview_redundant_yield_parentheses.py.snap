@@ -1,0 +1,156 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_redundant_yield_parentheses.py
+---
+## Input
+
+```python
+def redundant():
+    (yield a, b)
+    ((yield a, b))
+    (yield a, b)  # comment
+    (yield a, b,)
+    (yield a, *b)
+    x = (yield a, b)
+    x = y = (yield a, b)
+    x += (yield a, b)
+
+
+def too_long():
+    (yield abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_, abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_)
+    (yield get_first.asynq(first_argument), get_second.asynq(second_argument_name_that_is_long))
+    first, second = (yield get_first.asynq(first_argument), get_second.asynq(second_argument))
+    yield (
+        already_formatted_first_element,
+        already_formatted_second_element,
+    )
+
+
+def kept():
+    (
+        # comment
+        yield a, b
+    )
+    print((yield a, b))
+    x = (yield a, b), c
+    x: int = (yield a, b)
+    return (yield a, b)
+
+
+async def kept_async():
+    await (yield a, b)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -36,7 +36,7 @@
+     )
+     print((yield a, b))
+     x = (yield a, b), c
+-    x: int = (yield a, b)
++    x: int = yield a, b
+     return (yield a, b)
+ 
+ 
+```
+
+## Ruff Output
+
+```python
+def redundant():
+    yield a, b
+    yield a, b
+    yield a, b  # comment
+    yield (
+        a,
+        b,
+    )
+    yield a, *b
+    x = yield a, b
+    x = y = yield a, b
+    x += yield a, b
+
+
+def too_long():
+    yield (
+        abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_,
+        abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_,
+    )
+    yield get_first.asynq(first_argument), get_second.asynq(
+        second_argument_name_that_is_long
+    )
+    first, second = yield get_first.asynq(first_argument), get_second.asynq(
+        second_argument
+    )
+    yield (
+        already_formatted_first_element,
+        already_formatted_second_element,
+    )
+
+
+def kept():
+    (
+        # comment
+        yield a, b
+    )
+    print((yield a, b))
+    x = (yield a, b), c
+    x: int = yield a, b
+    return (yield a, b)
+
+
+async def kept_async():
+    await (yield a, b)
+```
+
+## Black Output
+
+```python
+def redundant():
+    yield a, b
+    yield a, b
+    yield a, b  # comment
+    yield (
+        a,
+        b,
+    )
+    yield a, *b
+    x = yield a, b
+    x = y = yield a, b
+    x += yield a, b
+
+
+def too_long():
+    yield (
+        abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_,
+        abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_,
+    )
+    yield get_first.asynq(first_argument), get_second.asynq(
+        second_argument_name_that_is_long
+    )
+    first, second = yield get_first.asynq(first_argument), get_second.asynq(
+        second_argument
+    )
+    yield (
+        already_formatted_first_element,
+        already_formatted_second_element,
+    )
+
+
+def kept():
+    (
+        # comment
+        yield a, b
+    )
+    print((yield a, b))
+    x = (yield a, b), c
+    x: int = (yield a, b)
+    return (yield a, b)
+
+
+async def kept_async():
+    await (yield a, b)
+```

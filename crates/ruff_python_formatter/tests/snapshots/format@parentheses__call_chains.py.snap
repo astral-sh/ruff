@@ -691,7 +691,42 @@ x = (
      .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk()
      .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk()
  )
-@@ -218,7 +225,8 @@
+@@ -198,12 +205,10 @@
+ )
+ 
+ (
+-    (
+-        df1_aaaaaaaaaaaa.merge().groupby(
+-            1,
+-        )
+-    ).sum()
+-)
++    df1_aaaaaaaaaaaa.merge().groupby(
++        1,
++    )
++).sum()
+ 
+ 
+ (
+@@ -217,18 +222,18 @@
+ )
+ 
+ (
+-    (
+-        df1_aaaaaaaaaaaa.merge()
+-        .groupby(
+-            1,
+-        )
+-        .bar()
+-    ).sum()
+-)
++    df1_aaaaaaaaaaaa
++    .merge()
++    .groupby(
++        1,
++    )
++    .bar()
++).sum()
  
  (
      (
@@ -701,17 +736,7 @@ x = (
          .groupby(
              1,
          )
-@@ -228,7 +236,8 @@
- 
- (
-     (
--        df1_aaaaaaaaaaaa.merge()
-+        df1_aaaaaaaaaaaa
-+        .merge()
-         .groupby(
-             1,
-         )
-@@ -255,19 +264,19 @@
+@@ -255,19 +260,19 @@
  
  
  expr = (
@@ -742,19 +767,22 @@ x = (
          .str.extract(pattern=r"\.([a-z0-9]+)$", group_index=1)
          .str.replace_all(pattern=r"cxx|cpp|cc|c|hpp|h", value="C/C++")
          .str.replace_all(pattern="^f.*$", value="Fortran")
-@@ -288,9 +297,8 @@
+@@ -288,11 +293,9 @@
          if more_nested_because_line_length:
              identical_hidden_layer_sizes = all(
                  current_hidden_layer_sizes == first_hidden_layer_sizes
 -                for current_hidden_layer_sizes in self.component_config[
 -                    HIDDEN_LAYERS_SIZES
 -                ]
-+                for current_hidden_layer_sizes in self
-+                .component_config[HIDDEN_LAYERS_SIZES]
-                 .values()
-                 .attr
+-                .values()
+-                .attr
++                for current_hidden_layer_sizes in (
++                    self.component_config[HIDDEN_LAYERS_SIZES].values().attr
++                )
              )
-@@ -302,7 +310,8 @@
+ 
+ 
+@@ -302,7 +305,8 @@
              with self.read_ctx(book_type) as cursor:
                  if (
                      entry_count := len(

@@ -502,6 +502,35 @@ If you've identified a new deviation, please [file an issue](https://github.com/
 Similar to [Black](https://black.readthedocs.io/en/stable/the_black_code_style/future_style.html#preview-style), Ruff implements formatting changes
 under the [`preview`](https://docs.astral.sh/ruff/settings/#format_preview) flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
 
+The next style includes these changes in preview:
+
+- Remove redundant parentheses around list displays and list comprehensions, such as
+    `call(([1, 2]))` becoming `call([1, 2])`. Parentheses that carry comments are retained.
+- Remove redundant parentheses around generator expressions, including a generator used as the
+    sole argument of a call. Comments and magic trailing commas can require parentheses.
+- Keep `**` unspaced for simple operands even when the power expression wraps onto multiple lines.
+- Wrap a long tuple after `yield` instead of wrapping the entire yield statement.
+- Remove redundant parentheses around standalone expressions, retaining the parentheses needed
+    for tuples, generators, assignment expressions, comments, and line breaks.
+- Remove redundant parentheses around subscript indices, such as `data[(1, 2)]` becoming
+    `data[1, 2]`, while retaining nested tuple indices and version-sensitive unpacking syntax.
+- Remove redundant parentheses in unpacking targets, while retaining nested tuple structure
+    and parentheses that affect annotated assignments.
+- Remove redundant parentheses around simple comparison operands, while retaining grouping
+    for arithmetic, Boolean expressions, nested comparisons, and comments.
+- Wrap a long comprehension iterable after `in` when parentheses help it fit, and remove
+    redundant parentheses around short names and attribute accesses.
+- Keep a lone comparison operator with its left operand when the right-hand collection or
+    call wraps onto multiple lines.
+- Keep an operator with its left operand when a following dictionary supplies the line breaks,
+    such as `message % {"name": value,}`.
+- Split operations between two collection displays symmetrically when each operand fits on
+    its own line. Collections with magic trailing commas retain their expanded layout.
+- Add a blank line after a docstring-only function in a stub file before an unrelated
+    declaration or member comment.
+- Keep same-name decorated functions together in stub files, including overloads and
+    property setters, and separate groups from unrelated declarations with a blank line.
+
 ### F-string formatting
 
 _Stabilized in Ruff 0.9.0_

@@ -572,4 +572,17 @@ result = (object[complicate_caller])("argument").a["b"].test(argument)
      .filter(
          models.Customer.account_id == 10000,
          models.Customer.email == "user@example.org",
+@@ -132,10 +133,10 @@
+ )
+ 
+ # Parenthesized and opening-parenthesis comments
+-func((x for x in y))
++func(x for x in y)
+ 
+ func(  # outer comment
+-    (x for x in y)
++    x for x in y
+ )
+ 
+ func(
 ```

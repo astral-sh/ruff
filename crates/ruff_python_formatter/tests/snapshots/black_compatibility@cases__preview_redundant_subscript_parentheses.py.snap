@@ -1,0 +1,248 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_redundant_subscript_parentheses.py
+---
+## Input
+
+```python
+a[(1)]
+a[(1, 2)]
+a[(1,)]
+a[()]
+a[(x for x in y)]
+a[(*x,)]
+a[(x := 1,)]
+a[((1, 2) + (3, 4))]
+a[
+    (
+        1,
+        2,
+    )
+]
+a[
+    (
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+    )
+]
+d[(1, 2,)]
+d[
+    (
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+    )
+]
+
+# Preserve comments
+a[
+    # comment before paren
+    (1, 2)
+]
+a[
+    (
+        # comment inside paren
+        1,
+        2,
+    )
+]
+a[(1, 2  # comment after 2
+)]
+a[
+    # comment before 1-tuple paren
+    (1,)  # comment after 1-tuple
+]
+
+# We should also handle multidimensional cases
+a[:, (1, 2)]
+a[(1, 2), :]
+a[(1, 2), (3, 4)]
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -45,15 +45,17 @@
+ # Preserve comments
+ a[
+     # comment before paren
++    1, 2
++]
++a[
++    # comment inside paren
+     1,
+     2,
+ ]
+ a[
+-    # comment inside paren
+     1,
+-    2,
++    2,  # comment after 2
+ ]
+-a[1, 2]  # comment after 2
+ a[
+     # comment before 1-tuple paren
+     1,  # comment after 1-tuple
+```
+
+## Ruff Output
+
+```python
+a[1]
+a[1, 2]
+a[1,]
+a[()]
+a[(x for x in y)]
+a[(*x,)]
+a[(x := 1,)]
+a[(1, 2) + (3, 4)]
+a[
+    1,
+    2,
+]
+a[
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+]
+d[
+    1,
+    2,
+]
+d[
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+]
+
+# Preserve comments
+a[
+    # comment before paren
+    1, 2
+]
+a[
+    # comment inside paren
+    1,
+    2,
+]
+a[
+    1,
+    2,  # comment after 2
+]
+a[
+    # comment before 1-tuple paren
+    1,  # comment after 1-tuple
+]
+
+# We should also handle multidimensional cases
+a[:, (1, 2)]
+a[(1, 2), :]
+a[(1, 2), (3, 4)]
+```
+
+## Black Output
+
+```python
+a[1]
+a[1, 2]
+a[1,]
+a[()]
+a[(x for x in y)]
+a[(*x,)]
+a[(x := 1,)]
+a[(1, 2) + (3, 4)]
+a[
+    1,
+    2,
+]
+a[
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+]
+d[
+    1,
+    2,
+]
+d[
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+]
+
+# Preserve comments
+a[
+    # comment before paren
+    1,
+    2,
+]
+a[
+    # comment inside paren
+    1,
+    2,
+]
+a[1, 2]  # comment after 2
+a[
+    # comment before 1-tuple paren
+    1,  # comment after 1-tuple
+]
+
+# We should also handle multidimensional cases
+a[:, (1, 2)]
+a[(1, 2), :]
+a[(1, 2), (3, 4)]
+```

@@ -877,6 +877,23 @@ f"aaaaaaaaaaaaaaaa \
 ```diff
 --- Stable
 +++ Preview
+@@ -1,6 +1,6 @@
+ "aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
+ 
+-("aaaaaaaaaaabbbbbbbbbbbbbbbb")  # join
++"aaaaaaaaaaabbbbbbbbbbbbbbbb"  # join
+ 
+ 
+ (
+@@ -24,7 +24,7 @@
+ 
+ b"aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
+ 
+-(b"aaaaaaaaaaabbbbbbbbbbbbbbbb")  # join
++b"aaaaaaaaaaabbbbbbbbbbbbbbbb"  # join
+ 
+ 
+ (
 @@ -288,9 +288,12 @@
  ##############################################################################
  # Use can_omit_optional_parentheses layout to avoid an instability where the formatter

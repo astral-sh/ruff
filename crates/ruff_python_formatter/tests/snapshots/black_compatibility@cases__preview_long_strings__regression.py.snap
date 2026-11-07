@@ -976,51 +976,45 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      f"<<{author.display_name}>>\n"
  )
  
--assert (
+ assert (
 -    str(suffix_arr)
 -    == "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) == (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) == "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
--assert (
+ assert (
 -    str(suffix_arr)
 -    != "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) != (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) != "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
--assert (
+ assert (
 -    str(suffix_arr)
 -    <= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) <= (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) <= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
--assert (
+ assert (
 -    str(suffix_arr)
 -    >= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) >= (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) >= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
--assert (
+ assert (
 -    str(suffix_arr)
 -    < "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) < (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) < "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
--assert (
+ assert (
 -    str(suffix_arr)
 -    > "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
-+assert str(suffix_arr) > (
-+    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
++    str(suffix_arr) > "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
      "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
      "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
@@ -1687,33 +1681,33 @@ temp_msg = (
     f"<<{author.display_name}>>\n"
 )
 
-assert str(suffix_arr) == (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) == "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
-assert str(suffix_arr) != (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) != "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
-assert str(suffix_arr) <= (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) <= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
-assert str(suffix_arr) >= (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) >= "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
-assert str(suffix_arr) < (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) < "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
-assert str(suffix_arr) > (
-    "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
+assert (
+    str(suffix_arr) > "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', "
     "'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', "
     "'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )

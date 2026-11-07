@@ -409,11 +409,11 @@ func(
 -        ]
 -    )
 -)
-+func(([
++func([
 +    1,
 +    2,
 +    3,
-+]))
++])
  
  
 -func(
@@ -469,11 +469,11 @@ func(
 -        3,
 -    ]
 -)
-+([
++[
 +    1,
 +    2,
 +    3,
-+])
++]
  
  (  # comment
      [
@@ -488,11 +488,11 @@ func(
 -        3,
 -    ]
 -)
-+([  # comment
++[  # comment
 +    1,
 +    2,
 +    3,
-+])
++]
  
  # Ensure that starred arguments are also hugged.
 -foo(

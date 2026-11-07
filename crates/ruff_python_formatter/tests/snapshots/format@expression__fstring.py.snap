@@ -778,7 +778,7 @@ nested-string-quote-style  = alternating
 ```
 
 ```python
-(f"{one}{two}")
+f"{one}{two}"
 
 
 rf"Not-so-tricky \"quote"
@@ -2398,6 +2398,19 @@ print(f"{ {}, 1 }")
 
 # The inner quotes should not be changed to double quotes before Python 3.12
 f"{f'''{'nested'} inner'''} outer"
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,4 @@
+-(f"{one}{two}")
++f"{one}{two}"
+ 
+ 
+ rf"Not-so-tricky \"quote"
 ```
 
 
