@@ -814,6 +814,15 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // Distinct class literals represent different class objects, so neither is redundant in
+        // a union containing the other. Avoid caching every pair when combining many classes.
+        if matches!(
+            (self, other),
+            (Type::ClassLiteral(_), Type::ClassLiteral(_))
+        ) {
+            return false;
+        }
+
         // Avoid creating a cached relation query for comparisons that class origins alone can
         // reject. The general relation below would also return false; this is only a shortcut.
         if let (Type::Intersection(source), Type::Intersection(target)) = (self, other)
