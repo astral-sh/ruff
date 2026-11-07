@@ -1559,7 +1559,7 @@ def _(dynamic: Any):
     x4: list[int] | dict[int, int] = reveal_type(f3(dynamic))
 ```
 
-As well as constructors of generic classes:
+An explicit `__init__` receiver fixes the constructor result even in a gradual assignment context.
 
 ```py
 class X[T]:
@@ -1573,7 +1573,7 @@ x1: X[None] = reveal_type(X())
 # revealed: X[None]
 x2: X[int | None] = reveal_type(X())
 
-# revealed: X[Any]
+# revealed: X[None]
 x3: X[Any] = reveal_type(X())
 ```
 

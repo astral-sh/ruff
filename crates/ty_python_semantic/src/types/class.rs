@@ -2464,10 +2464,7 @@ impl<'db> ClassType<'db> {
             if let Some(signature) = signature {
                 let synthesized_signature = |signature: &Signature<'db>| {
                     let self_annotation = signature
-                        .parameters()
-                        .get_positional(0)
-                        .filter(|parameter| !parameter.inferred_annotation)
-                        .map(Parameter::annotated_type)
+                        .explicit_positional_receiver_annotation()
                         .filter(|ty| {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))

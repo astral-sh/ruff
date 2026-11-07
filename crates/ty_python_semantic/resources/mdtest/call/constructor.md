@@ -1832,8 +1832,8 @@ Plain(1, "a")  # ok
 
 ## Union `self` annotations with variadic constructor parameters
 
-The `object` argument selects the `Any` constraint, even when the constructor also infers a
-`ParamSpec` or `TypeVarTuple`.
+The `object` argument rules out `str | None`, so ty selects `Any` for `T`. We can observe that
+choice in the callback's first parameter.
 
 ```toml
 [environment]
@@ -1842,21 +1842,19 @@ python-version = "3.14"
 
 ```py
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Concatenate
 
 class WithParamSpec[T: (str | None, Any)]:
-    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[P, None]) -> None: ...
+    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[Concatenate[T, P], object]) -> None: ...
     def push(self, value: T) -> None: ...
 
-def callback() -> None: ...
-
-reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+WithParamSpec(object(), lambda value: reveal_type(value))  # revealed: Any
 
 class WithTypeVarTuple[T: (str | None, Any)]:
-    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...
+    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, callback: Callable[[T, *Ts], object]) -> None: ...
     def push(self, value: T) -> None: ...
 
-reveal_type(WithTypeVarTuple(object(), (1,)))  # revealed: WithTypeVarTuple[Any]
+WithTypeVarTuple(object(), lambda value: reveal_type(value))  # revealed: Any
 ```
 
 ## `__init__` can remap constructor generic arguments via `self` annotation

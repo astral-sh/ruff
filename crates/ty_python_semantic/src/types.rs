@@ -8297,6 +8297,12 @@ impl<'db> Type<'db> {
                     if let Some(self_type) = binding.typing_self_type(db) {
                         binding.bind_unused_self(db, env, self_type);
                     }
+                    if self.is_class_literal()
+                        && binding.bound_type == Some(constructor_instance_ty)
+                        && let Some(context) = class_generic_context
+                    {
+                        binding.apply_init_self_annotation(db, env, context);
+                    }
                 }
                 bindings
             });

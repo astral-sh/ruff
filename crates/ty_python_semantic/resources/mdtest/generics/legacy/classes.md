@@ -1890,6 +1890,45 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Assignment context for a specialized `__init__` receiver
+
+The initializer fixes both type arguments. A compatible assignment preserves the nullable read type,
+and requiring a non-nullable read type is an error.
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S", contravariant=True)
+T = TypeVar("T", covariant=True)
+
+class Field(Generic[S, T]):
+    def __init__(self: "Field[bool | None, bool | None]") -> None: ...
+    def set(self, value: S) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+field: Field[bool, bool | None] = Field()
+reveal_type(field)  # revealed: Field[bool | None, bool | None]
+
+# error: [invalid-assignment] "Object of type `Field[bool | None, bool | None]`"
+narrow: Field[bool, bool] = Field()
+```
+
+Even inside a method of the subclass, the inherited initializer fixes the read type and the
+assignment can supply the label type for the new instance.
+
+```py
+U = TypeVar("U")
+
+class LabeledField(Field[object, T], Generic[T, U]):
+    label: U
+
+    def example(self):
+        # revealed: LabeledField[bool | None, str]
+        field: LabeledField[bool | None, str] = reveal_type(LabeledField())
+        narrow: LabeledField[bool, str] = LabeledField()  # error: [invalid-assignment]
+```
+
 ### Class-scoped type variables in `__init__` receiver annotations
 
 The `invalid-init-type-variable` rule rejects class-scoped type variables in explicit `__init__`
@@ -1959,7 +1998,11 @@ class's own type variables.
 class Remapped(Generic[T]):
     def __init__(self: "Remapped[list[V]]", value: V) -> None: ...
 
-reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+reveal_type(Remapped(1))  # revealed: Remapped[list[int]]
+
+class Child(Remapped[T]): ...
+
+reveal_type(Child(1))  # revealed: Child[list[int]]
 ```
 
 ### Type variables from enclosing scopes in `__init__` receiver annotations
