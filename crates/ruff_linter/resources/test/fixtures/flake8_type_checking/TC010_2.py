@@ -14,3 +14,12 @@ z: list[str, str | "int"] = []  # TC010
 type A = Value["int" | str]  # OK
 
 OldS = TypeVar('OldS', int | 'str', str)  # TC010
+
+x: ("int"  # TC010 (unsafe fix)
+    " | str" | None)
+
+OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+                        " | str" | None))
+
+x: """int |
+str""" | None  # TC010 (tricky multiline string case)
