@@ -13,19 +13,20 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true }
 static_assertions = { workspace = true }
-zip = { workspace = true }
 
 [build-dependencies]
+crc32fast = { workspace = true }
+flate2 = { workspace = true, optional = true }
 path-slash = { workspace = true }
 walkdir = { workspace = true }
-zip = { workspace = true }
+zstd = { workspace = true, optional = true }
 
 [dev-dependencies]
 walkdir = { workspace = true }
 
 [features]
-zstd = ["zip/zstd"]
-deflate = ["zip/deflate-flate2-zlib-rs"]
+zstd = ["dep:zstd", "ruff_db/zstd"]
+deflate = ["dep:flate2", "ruff_db/deflate"]
 
 [lints]
 workspace = true

@@ -734,7 +734,6 @@ mod tests {
     use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
-    use zip::CompressionMethod;
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {
@@ -815,11 +814,11 @@ mod tests {
     fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        let mut vendored_builder = VendoredFileSystemBuilder::new();
         vendored_builder
             .add_file("test.pyi", "def foo() -> str")
             .unwrap();
-        let vendored = vendored_builder.finish().unwrap();
+        let vendored = vendored_builder.finish();
         db.with_vendored(vendored);
 
         let test = vendored_path_to_file(&db, "test.pyi").expect("Vendored file to exist.");
