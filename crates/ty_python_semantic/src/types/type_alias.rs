@@ -808,6 +808,9 @@ impl<'db> TypeAliasType<'db> {
             // detection rather than the visitor's cycle detection, because the visitor tracks
             // Type values and `RecursiveList` is different from `RecursiveList[T]`.
             TypeMapping::EagerExpansion => self.raw_value_type(db).expand_eagerly(db, visitor.env),
+            TypeMapping::ApplySpecialization(
+                ApplySpecialization::Effects { .. } | ApplySpecialization::Substitution(_),
+            ) => Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor)),
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
             TypeMapping::ApplySpecialization(specialization)

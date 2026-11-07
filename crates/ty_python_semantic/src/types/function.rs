@@ -67,6 +67,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
+use crate::types::generics::ApplySpecialization;
 
 use crate::types::generics::{
     GenericContext, Specialization, typing_self, walk_specialization_types,
@@ -1465,7 +1466,14 @@ impl<'db> FunctionType<'db> {
                     // When calling `Box[int]().get()`, the inferred return type (naively inferred as `T`)
                     // should be specialized to `int`. We therefore retain the specialization here, as it
                     // cannot be recovered from the specialized signature in all cases (e.g. static methods).
-                    specialization.as_specialization(db)
+                    specialization.as_specialization(db).map(|stored| {
+                        if matches!(specialization, ApplySpecialization::Effects { .. }) {
+                            // The following substitution applies the actual arguments once.
+                            stored.generic_context(db).identity_specialization(db)
+                        } else {
+                            stored
+                        }
+                    })
                 }
                 _ => None,
             },

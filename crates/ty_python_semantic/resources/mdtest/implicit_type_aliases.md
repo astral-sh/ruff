@@ -3572,6 +3572,69 @@ def inspect(container: Container):
         reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 ```
 
+### Captured type variables in recursive aliases
+
+Specializing a class also substitutes its parameters in the body of a recursive alias, including at
+deeper levels. Equal alias arguments do not make differently specialized members interchangeable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+V = TypeVar("V")
+
+class Container[U]:
+    Tree = tuple[V, "Container.Tree[tuple[V, U]] | None"]
+    value: Tree[int]
+
+def compare(source: Container[str], target: Container[bytes]):
+    child = source.value[1]
+    if child is not None:
+        reveal_type(child[0])  # revealed: tuple[int, str]
+    other_child = target.value[1]
+    if other_child is not None:
+        reveal_type(other_child[0])  # revealed: tuple[int, bytes]
+    static_assert(not is_subtype_of(TypeOf[source.value], TypeOf[target.value]))
+```
+
+### Methods in recursive aliases
+
+Specializing a recursive alias that contains a method specializes both its receiver and its inferred
+return type. Substitution applies once even when a type argument contains the same variable.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from ty_extensions._internal import TypeOf
+
+class Container[U]:
+    member: U
+
+    def get(self):
+        return self.member
+
+    Methods = tuple[TypeOf[get], "Container.Methods"]
+    methods: Methods
+
+    def nested(self: "Container[list[U]]"):
+        reveal_type(self.methods[1][0](self))  # revealed: list[U@Container] | Unknown
+
+def inspect(value: Container[int]):
+    reveal_type(value.methods[1][0](value))  # revealed: int | Unknown
+```
+
 ### Type parameters used only in recursive references
 
 A type variable used only as an argument to a recursive reference still makes the alias generic.

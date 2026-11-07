@@ -422,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn recursive_alias_bodies_retain_captured_dependencies() -> anyhow::Result<()> {
+    fn recursive_alias_captured_dependencies() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
             "/src/a.py",
@@ -434,6 +434,9 @@ mod tests {
             class C[U]:
                 Growing = tuple[int, "C.Growing[tuple[V, U]] | None"]
                 type ExplicitGrowing[V] = tuple[int, C.ExplicitGrowing[tuple[V, U]] | None]
+                value: Growing[int]
+
+            expected: C[int]
 
             def source(
                 explicit_growing: C.ExplicitGrowing[int],
@@ -464,6 +467,12 @@ mod tests {
             .ok_or_else(|| anyhow::anyhow!("expected source's signature"))?;
         let t = create_typevar(db, "T");
         let int = KnownClass::Int.to_instance(db, &env);
+        let expected = global_symbol(db, file, "expected")
+            .place
+            .expect_type()
+            .member(db, &env, "value")
+            .place
+            .expect_type();
         for parameter in signature.parameters() {
             let alias = parameter.annotated_type();
             let inferable = TypeVarSet::from_typevars(db, [t, u]);
@@ -472,13 +481,22 @@ mod tests {
                 [SolutionType::Unresolved(alias)],
                 "{parameter:?}: missing captured dependency"
             );
-            // Specializing an alias's arguments cannot replace a variable captured in its body.
-            assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)])
-                    .as_ref(),
-                [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
-                "{parameter:?}: retained captured dependency"
-            );
+            let resolved =
+                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
+            if matches!(alias, Type::Recursive(_)) {
+                assert!(matches!(
+                    resolved.as_ref(),
+                    [SolutionType::Resolved(mapped), SolutionType::Resolved(ty)]
+                        if *ty == int && mapped.is_equivalent_to(db, &env, expected)
+                ));
+            } else {
+                // PEP 695 aliases still specialize only their arguments, not captured variables.
+                assert_eq!(
+                    resolved.as_ref(),
+                    [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
+                    "{parameter:?}: retained captured dependency"
+                );
+            }
         }
         Ok(())
     }

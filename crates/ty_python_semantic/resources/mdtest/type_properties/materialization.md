@@ -1806,6 +1806,38 @@ def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
     static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
 ```
 
+## Specialization after recursive materialization
+
+Materializing a generic alias leaves its type parameters available for later specialization.
+Substituting `Any` afterward does not materialize that new argument. This applies to recursive
+aliases at every depth, just as it does to a finite tuple.
+
+```py
+from typing import Any, TypeAlias, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Flat: TypeAlias = tuple[T, Any]
+FlatTop: TypeAlias = Top[Flat[T]]
+Recursive: TypeAlias = tuple[T, Any, "Recursive[T]"]
+RecursiveTop: TypeAlias = Top[Recursive[T]]
+RecursiveBottom: TypeAlias = Bottom[Recursive[T]]
+
+def specialize_after(flat: FlatTop[Any], top: RecursiveTop[Any], bottom: RecursiveBottom[Any]):
+    reveal_type(flat)  # revealed: tuple[Any, object]
+    reveal_type(top[0])  # revealed: Any
+    reveal_type(top[1])  # revealed: object
+    reveal_type(top[2][0])  # revealed: Any
+    reveal_type(top[2][1])  # revealed: object
+    reveal_type(bottom[0])  # revealed: Any
+    reveal_type(bottom[2][0])  # revealed: Any
+
+def materialize_after(top: Top[Recursive[Any]], bottom: Bottom[Recursive[Any]]):
+    reveal_type(top[0])  # revealed: object
+    reveal_type(top[2][0])  # revealed: object
+    reveal_type(bottom[0])  # revealed: Never
+```
+
 ## Recursive function defaults
 
 A function's type parameter default can refer to its own `__call__` method. Materializing the
