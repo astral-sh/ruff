@@ -462,3 +462,42 @@ def add_numbers(a, b):
         The sum of the two numbers.
     """
     return a + b
+
+
+# OK - custom/unknown section names (e.g. Note) should not be confused with parameters
+def custom_section_note(x: int) -> int:
+    """
+    Do something.
+
+    Parameters
+    ----------
+    x : int
+        An integer.
+
+    Note
+    ----
+    This is a custom note section.
+
+    Returns
+    -------
+    int
+        Result.
+    """
+    return x
+
+
+# OK - custom/unknown section names with '=' underlines
+def custom_section_equals(x: int) -> int:
+    """
+    Do something.
+
+    Parameters
+    ----------
+    x : int
+        An integer.
+
+    Note
+    ====
+    This is a custom note section with equal underlines.
+    """
+    return x

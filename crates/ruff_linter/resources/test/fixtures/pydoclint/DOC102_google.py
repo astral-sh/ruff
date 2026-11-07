@@ -262,3 +262,20 @@ def add_numbers(b):
         int: The sum of the two numbers.
     """
     return a + b
+
+
+# OK - custom/unknown section names (e.g. Note) should not be confused with parameters
+def custom_section_google(x: int) -> int:
+    """
+    Do something.
+
+    Args:
+        x (int): An integer.
+
+    Note:
+        This is a custom note section.
+
+    Returns:
+        int: Result.
+    """
+    return x
