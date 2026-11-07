@@ -46,3 +46,24 @@ F823 Local variable `sys` referenced before assignment
 63 |
 64 |     for sys in range(5):
    |
+
+F823 Local variable `reassigned` referenced before assignment
+  --> F823.py:88:11
+   |
+87 | def multiple_assignments():
+88 |     print(reassigned)
+   |           ^^^^^^^^^^
+89 |     reassigned = 2
+90 |     reassigned = 3
+   |
+
+F823 Local variable `counter` referenced before assignment
+  --> F823.py:98:9
+   |
+96 | def repeated_augmented_assignments():
+97 |     if True:
+98 |         counter += 1
+   |         ^^^^^^^
+99 |     if False:
+100 |         counter += 1
+   |

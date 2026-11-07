@@ -52,7 +52,10 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
     if scope.kind.is_function() {
         for (name, binding_id) in scope.bindings() {
             // If the variable shadows a binding in a parent scope...
-            if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {
+            if let Some(shadowed_id) = scope
+                .shadowed_bindings(binding_id)
+                .find_map(|binding_id| checker.semantic().shadowed_binding(binding_id))
+            {
                 let shadowed = checker.semantic().binding(shadowed_id);
                 // And that binding was referenced in the current scope...
                 if let Some(range) = shadowed.references().find_map(|reference_id| {
