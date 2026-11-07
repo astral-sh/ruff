@@ -374,3 +374,48 @@ def f(values):
     ):
         found.append(value * 2)
     return found
+
+
+# Zero-argument super() cannot move into a comprehension on Python < 3.12
+# (https://github.com/astral-sh/ruff/issues/27668)
+class Base:
+    def transform(self, x):
+        return x
+
+    def filter(self, x):
+        return True
+
+
+class TestSuper(Base):
+    def test_append_zero_arg_super(self, items):
+        result = []
+        for x in items:
+            result.append(super().transform(x))  # OK
+
+    def test_extend_zero_arg_super(self, items):
+        result = [1]
+        for x in items:
+            result.append(super().transform(x))  # OK
+
+    def test_if_zero_arg_super(self, items):
+        result = []
+        for x in items:
+            if super().filter(x):
+                result.append(x)  # OK
+
+    def test_explicit_super(self, items):
+        result = []
+        for x in items:
+            result.append(super(TestSuper, self).transform(x))  # PERF401
+
+    def test_class_cell(self, items):
+        result = []
+        for x in items:
+            result.append(__class__.transform(self, x))  # OK
+
+
+def test_shadowed_super(items):
+    super = object()
+    result = []
+    for x in items:
+        result.append(super().transform(x))  # PERF401

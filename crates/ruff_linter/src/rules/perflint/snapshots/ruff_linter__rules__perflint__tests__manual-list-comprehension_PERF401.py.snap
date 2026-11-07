@@ -345,3 +345,24 @@ PERF401 Use a list comprehension to create a transformed list
 376 |     return found
     |
 help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:409:13
+    |
+407 |         result = []
+408 |         for x in items:
+409 |             result.append(super(TestSuper, self).transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+410 |
+411 |     def test_class_cell(self, items):
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:421:9
+    |
+419 |     result = []
+420 |     for x in items:
+421 |         result.append(super().transform(x))  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension

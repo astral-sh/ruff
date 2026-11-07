@@ -1,3 +1,6 @@
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Expr, PythonVersion};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{
     BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
@@ -5,6 +8,29 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+
+/// Returns `true` when rewriting `expr` into a comprehension would break
+/// zero-argument `super()` (or an explicit `__class__` cell) on Python < 3.12.
+///
+/// Before PEP 709, comprehensions have their own scope and do not receive the
+/// enclosing method's `__class__` cell, so `super()` raises `RuntimeError`.
+pub(super) fn comprehension_breaks_super(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    target_version: PythonVersion,
+) -> bool {
+    if target_version >= PythonVersion::PY312 {
+        return false;
+    }
+
+    any_over_expr(expr, |expr| match expr {
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) if arguments.is_empty() && semantic.match_builtin_expr(func, "super") => true,
+        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "__class__" => true,
+        _ => false,
+    })
+}
 
 pub(super) fn comment_strings_in_range<'a>(
     checker: &'a Checker,

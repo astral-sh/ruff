@@ -9,7 +9,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
-use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::perflint::helpers::{
+    comment_strings_in_range, comprehension_breaks_super, statement_deletion_range,
+};
 use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -216,6 +218,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         any_over_expr(test, |expr| {
             ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
+    }) {
+        return;
+    }
+
+    // On Python < 3.12, zero-argument `super()` in the filter would move into a
+    // comprehension scope that lacks the enclosing method's `__class__` cell.
+    if if_test.is_some_and(|test| {
+        comprehension_breaks_super(test, checker.semantic(), checker.target_version())
     }) {
         return;
     }

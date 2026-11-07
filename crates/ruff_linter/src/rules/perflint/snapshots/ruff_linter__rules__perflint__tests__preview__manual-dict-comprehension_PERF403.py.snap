@@ -521,3 +521,21 @@ help: Replace for loop with dict comprehension
 275 |     return result
     |
 note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:298:17
+    |
+296 |         for idx, name in enumerate(fruit):
+297 |             if super(TestDictSuper, self).filter(idx):
+298 |                 result[idx] = name  # PERF403
+    |                 ^^^^^^^^^^^^^^^^^^
+help: Replace for loop with dict comprehension
+    |
+294 |     def test_explicit_super(self, fruit):
+    -         result = {}
+    -         for idx, name in enumerate(fruit):
+    -             if super(TestDictSuper, self).filter(idx):
+    -                 result[idx] = name  # PERF403
+295 +         result = {idx: name for idx, name in enumerate(fruit) if super(TestDictSuper, self).filter(idx)}  # PERF403
+    |
+note: This is an unsafe fix and may change runtime behavior

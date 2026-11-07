@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 
-use crate::rules::perflint::helpers::comment_strings_in_range;
+use crate::rules::perflint::helpers::{comment_strings_in_range, comprehension_breaks_super};
 use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
@@ -236,6 +236,16 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 .is_some_and(|expr| expr.id == list_name.id)
         })
     }) {
+        return;
+    }
+
+    // On Python < 3.12, zero-argument `super()` needs the enclosing method's
+    // `__class__` cell, which comprehension scopes do not receive.
+    if comprehension_breaks_super(arg, checker.semantic(), checker.target_version())
+        || if_test.is_some_and(|test| {
+            comprehension_breaks_super(test, checker.semantic(), checker.target_version())
+        })
+    {
         return;
     }
 

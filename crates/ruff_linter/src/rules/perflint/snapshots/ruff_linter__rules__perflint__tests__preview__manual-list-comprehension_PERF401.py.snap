@@ -693,3 +693,41 @@ help: Replace for loop with list comprehension
 374 |     return found
     |
 note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:409:13
+    |
+407 |         result = []
+408 |         for x in items:
+409 |             result.append(super(TestSuper, self).transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+410 |
+411 |     def test_class_cell(self, items):
+    |
+help: Replace for loop with list comprehension
+    |
+406 |     def test_explicit_super(self, items):
+    -         result = []
+    -         for x in items:
+    -             result.append(super(TestSuper, self).transform(x))  # PERF401
+407 +         result = [super(TestSuper, self).transform(x) for x in items]  # PERF401
+408 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:421:9
+    |
+419 |     result = []
+420 |     for x in items:
+421 |         result.append(super().transform(x))  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension
+    |
+418 |     super = object()
+    -     result = []
+    -     for x in items:
+    -         result.append(super().transform(x))  # PERF401
+419 +     result = [super().transform(x) for x in items]  # PERF401
+    |
+note: This is an unsafe fix and may change runtime behavior

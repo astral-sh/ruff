@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_py312.py:15:13
+   |
+13 |         result = []
+14 |         for x in items:
+15 |             result.append(super().transform(x))  # PERF401
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |
+17 |     def test_if_zero_arg_super(self, items):
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_py312.py:21:17
+   |
+19 |         for x in items:
+20 |             if super().filter(x):
+21 |                 result.append(x)  # PERF401
+   |                 ^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension
