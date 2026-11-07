@@ -6159,15 +6159,30 @@ its literal type.
 ```py
 from typing import Literal
 
-def pair[T, U](first: T, second: U, visit: Callable[[T], object]) -> tuple[tuple[T, U]]:
-    visit(first)
+def pair[T, U](first: T, second: U, visit: Callable[[T, U], object]) -> tuple[tuple[T, U]]:
+    visit(first, second)
     return ((first, second),)
 
 Result = tuple[tuple[Literal["a"] | None, object] | tuple[object, str]]
 
 def example(text: str, number: int):
-    a: Result = pair("a", text, lambda item: reveal_type(item))  # revealed: str
-    b: Result = pair("a", number, lambda item: reveal_type(item))  # revealed: Literal["a"]
+    a: Result = pair("a", text, lambda first, _: reveal_type(first))  # revealed: str
+    b: Result = pair("a", number, lambda first, _: reveal_type(first))  # revealed: Literal["a"]
+```
+
+When each alternative allows a different item to widen, the callback receives both literal types
+regardless of the order of the type variables.
+
+```py
+def pair_reversed[U, T](first: T, second: U, visit: Callable[[T, U], object]) -> tuple[tuple[T, U]]:
+    return pair(first, second, visit)
+
+Either = tuple[tuple[Literal["a"] | None, object] | tuple[object, Literal["b"] | None]]
+
+# revealed: tuple[Literal["a"], Literal["b"]]
+xy: Either = pair(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
+# revealed: tuple[Literal["a"], Literal["b"]]
+yx: Either = pair_reversed(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
 ```
 
 ## Related type variables in a callback's return context
