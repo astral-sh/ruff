@@ -48,7 +48,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `__new__`, or a method whose sole decorator is the one that makes it a `@classmethod`. A
 /// method with any other decorator (including common ones like `@property`, `@x.setter`, or
 /// `@typing.override`) is not flagged, even though such decorators typically leave the receiver
-/// binding unchanged, because an arbitrary decorator could alter it.
+/// binding unchanged, because an arbitrary decorator could alter it. Additionally, only
+/// conventional receiver names (`self`, `cls`, `mcs`, `metacls`) are flagged; a class-level
+/// function whose first parameter has another name (e.g. a decorator factory like
+/// `def error(func=None)`) is not treated as a method with a broken receiver (#29965).
 ///
 /// ## Options
 /// - `lint.pep8-naming.classmethod-decorators`
@@ -118,6 +121,16 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     else {
         return;
     };
+
+    // Only flag conventional receiver names. Any other defaulted
+    // first parameter is likely a decorator factory or similar
+    // function that is only called without its first argument
+    // (e.g. `def error(func=None)` used as `@error(...)`); removing
+    // its default breaks those call sites (#29965).
+    let receiver_name = first_param.parameter.name.id.as_str();
+    if !matches!(receiver_name, "self" | "cls" | "mcs" | "metacls") {
+        return;
+    }
 
     // Check if the receiver parameter has a default value
     let Some(default_expr) = &first_param.default else {

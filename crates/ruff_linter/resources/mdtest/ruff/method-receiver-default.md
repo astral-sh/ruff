@@ -209,4 +209,31 @@ class OverriddenInitSubclassReceiver:
 
     @override
     def __init_subclass__(cls=None): ...
+
+
+class DecoratorFactoryWithDefault:
+    # A class-level function whose first parameter is not a
+    # conventional receiver name is treated as a decorator factory,
+    # not a method with a broken receiver (#29965).
+    def error(func=None, status=400):
+        def _decorator(func):
+            def _decorated(self, *args, **kwargs):
+                return func(self, *args, **kwargs) or ()
+
+            return _decorated
+
+        if func is None:
+            return _decorator
+        return _decorator(func)
+
+    @error(status=500)
+    def missing_key(self, exc):
+        return 1
 ```
+
+## Decorator factories
+
+A class-level function whose first parameter is not a conventional receiver
+name (`self`, `cls`, `mcs`, `metacls`) is not treated as a method, so a
+decorator factory like `def error(func=None, ...)` used as `@error(...)`
+is not flagged (#29965).
