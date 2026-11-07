@@ -1,5 +1,6 @@
 use anyhow::Result;
 use insta::{assert_json_snapshot, assert_snapshot};
+use lsp_server::{ErrorCode, Message, RequestId, Response};
 use lsp_types::{
     BaseUri, FileChangeType, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
     TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
@@ -456,6 +457,79 @@ fn watches_project_without_relative_patterns() -> Result<()> {
         @r#"1:14..1:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#
     );
     Ok(())
+}
+
+#[test]
+fn falls_back_to_a_workspace_watch_after_registration_fails() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let config = SystemPath::new("src/ty.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main, "x = 1")?
+        .with_file(config, "")?
+        .with_file("deps/dep.py", "")?
+        .with_watched_file_support(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    let (initial_id, _) = watcher_registrations(&mut server)?;
+
+    server.write_file(config, r#"environment.extra-paths = ["../deps"]"#)?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    let (request, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watches.len(), 2);
+    reject_registration(&mut server, request);
+
+    let (fallback, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watcher_snapshot(&watches), ["**"]);
+    server.acknowledge_request(fallback);
+    assert_eq!(server.acknowledge_unregistration()?, initial_id);
+
+    server.open_text_document(main, "x = 1", 1);
+    server.write_file(config, "")?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    server.document_diagnostic_request(main, None);
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
+fn stops_registering_after_workspace_watch_is_rejected() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let config = SystemPath::new("src/ty.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main, "x = 1")?
+        .with_file(config, "")?
+        .with_file("deps/dep.py", "")?
+        .with_watched_file_support(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    watcher_registrations(&mut server)?;
+
+    server.write_file(config, r#"environment.extra-paths = ["../deps"]"#)?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    let (request, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watches.len(), 2);
+    reject_registration(&mut server, request);
+
+    let (fallback, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watcher_snapshot(&watches), ["**"]);
+    reject_registration(&mut server, fallback);
+
+    server.open_text_document(main, "x = 1", 1);
+    server.write_file(config, "")?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    server.document_diagnostic_request(main, None);
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+fn reject_registration(server: &mut TestServer, request: RequestId) {
+    server.send(Message::Response(Response::new_err(
+        request,
+        ErrorCode::InternalError as i32,
+        "Watch limit reached".to_owned(),
+    )));
 }
 
 fn watcher_registrations(server: &mut TestServer) -> Result<(String, Vec<FileSystemWatcher>)> {
