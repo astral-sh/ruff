@@ -94,6 +94,11 @@ reveal_type([x for x in range(42)])  # revealed: list[int]
 
 ## A single lower bound containing union aliases
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import assert_type
 

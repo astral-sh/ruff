@@ -2713,6 +2713,11 @@ takes_str_or_float(round(1.0))
 
 ## An uninhabited argument to overloads with different return types
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Never, overload
 
