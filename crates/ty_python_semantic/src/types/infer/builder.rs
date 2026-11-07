@@ -8510,6 +8510,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .clone()
                 .zip(bounds)
                 .map(|(variable, bound)| {
+                    // One bound is stored verbatim. Let the regular solver normalize
+                    // a union containing aliases just as it does for other literals.
+                    if let Some(UnionAccumulator::One(Type::Union(union))) = &bound
+                        && union
+                            .elements(db)
+                            .iter()
+                            .any(|ty| matches!(ty, Type::TypeAlias(_)))
+                    {
+                        return None;
+                    }
                     let identity = variable.identity(db);
                     let lower = bound
                         .map(|bound| bound.into_type(db, env))
