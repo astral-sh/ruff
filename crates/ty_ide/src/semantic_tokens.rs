@@ -30,6 +30,7 @@ use crate::Db;
 use bitflags::bitflags;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::script::ScriptTag;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -201,7 +202,7 @@ pub fn semantic_tokens(
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
 
-    let mut visitor = SemanticTokenVisitor::new(&model, range);
+    let mut visitor = SemanticTokenVisitor::new(&model, parsed.tokens(), range);
     visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
@@ -307,6 +308,7 @@ fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<Sema
 #[expect(clippy::struct_excessive_bools)]
 struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
+    source_tokens: &'db Tokens,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_form: bool,
@@ -317,9 +319,14 @@ struct SemanticTokenVisitor<'db> {
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
-    fn new(model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
+    fn new(
+        model: &'db SemanticModel<'db>,
+        source_tokens: &'db Tokens,
+        range_filter: Option<TextRange>,
+    ) -> Self {
         Self {
             model,
+            source_tokens,
             tokens: Vec::new(),
             in_class_scope: false,
             in_target_creating_definition: false,
@@ -723,21 +730,8 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     fn add_dotted_name_tokens(&mut self, name: &ast::Identifier, token_type: SemanticTokenType) {
-        let name_str = name.id.as_str();
-        let name_start = name.start();
-
-        // Split the dotted name and calculate positions for each part
-        let mut current_offset = TextSize::default();
-        for part in name_str.split('.') {
-            if !part.is_empty() {
-                self.add_token(
-                    TextRange::at(name_start + current_offset, part.text_len()),
-                    token_type,
-                    SemanticTokenModifier::empty(),
-                );
-            }
-            // Move past this part and the dot
-            current_offset += part.text_len() + '.'.text_len();
+        for range in name.component_ranges(self.source_tokens) {
+            self.add_token(range, token_type, SemanticTokenModifier::empty());
         }
     }
 
@@ -1150,7 +1144,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
-                    let mut sub_visitor = SemanticTokenVisitor::new(&sub_model, self.range_filter);
+                    let mut sub_visitor =
+                        SemanticTokenVisitor::new(&sub_model, sub_ast.tokens(), self.range_filter);
                     sub_visitor.visit_expr(sub_ast.expr());
                     self.tokens.extend(sub_visitor.tokens);
                 } else {
