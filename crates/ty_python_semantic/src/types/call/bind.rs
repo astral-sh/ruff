@@ -6591,7 +6591,11 @@ impl<'db> CallInference<'_, 'db> {
         let db = self.db;
         let env = self.env;
 
-        let mentions_inferable = |ty| {
+        let mentions_inferable = |ty: Type<'db>| {
+            use crate::types::visitor::EagerTypeFeatures as Features;
+            if !ty.may_contain_eager_features(db, env, Features::TYPEVAR | Features::ALIAS) {
+                return false;
+            }
             any_over_type_expanding_aliases(
                 db,
                 env,
@@ -7792,6 +7796,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
             callable.signatures(db).iter().any(|signature| {
                 signature.parameters().iter().any(|parameter| {
+                    if !parameter.annotated_type().may_contain_eager_features(
+                        db,
+                        self.env,
+                        crate::types::visitor::EagerTypeFeatures::TYPEVAR,
+                    ) {
+                        return false;
+                    }
                     any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
                         matches!(
                             ty,

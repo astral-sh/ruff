@@ -35,6 +35,96 @@ use crate::types::{
     walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
 };
 
+bitflags::bitflags! {
+    /// Features of the already-evaluated parts of a type, including explicit alias arguments.
+    /// Searches that expand alias bodies must also test `ALIAS` before skipping a walk.
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+    pub(super) struct EagerTypeFeatures: u8 {
+        const TYPEVAR = 1 << 0;
+        const SELF_TYPEVAR = 1 << 1;
+        const ALIAS = 1 << 2;
+        const PROVISIONAL = 1 << 3;
+        const UNSPECIALIZED = 1 << 4;
+        const DYNAMIC = 1 << 5;
+    }
+}
+
+impl get_size2::GetSize for EagerTypeFeatures {}
+
+impl EagerTypeFeatures {
+    fn for_node<'db>(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        match ty {
+            Type::TypeVar(variable) => {
+                let mut features = Self::TYPEVAR;
+                features.set(Self::SELF_TYPEVAR, variable.typevar(db).is_self(db));
+                features
+            }
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => Self::TYPEVAR,
+            Type::TypeAlias(_) | Type::Recursive(_) => Self::ALIAS,
+            Type::RecursiveVar(_) => Self::all(),
+            Type::Dynamic(dynamic) => {
+                let mut features = Self::DYNAMIC;
+                features.set(Self::PROVISIONAL, ty.is_provisional_marker());
+                features.set(
+                    Self::UNSPECIALIZED,
+                    matches!(dynamic, super::DynamicType::UnspecializedTypeVar),
+                );
+                features
+            }
+            Type::Divergent(_) if ty.is_dynamic() => Self::DYNAMIC,
+            _ => Self::empty(),
+        }
+    }
+}
+
+impl<'db> Type<'db> {
+    /// Cheap negative answers shared by searches for type variables and gradual types. A
+    /// positive answer keeps the caller's original predicate and alias-expansion semantics.
+    pub(super) fn may_contain_eager_features(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        wanted: EagerTypeFeatures,
+    ) -> bool {
+        // Until a query cycle settles, every feature remains possible.
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| EagerTypeFeatures::all(), heap_size=ruff_memory_usage::heap_size)]
+        fn eager_type_features<'db>(
+            db: &'db dyn Db,
+            program: crate::Program<'db>,
+            ty: Type<'db>,
+        ) -> EagerTypeFeatures {
+            let features = Cell::new(EagerTypeFeatures::empty());
+            any_over_type_including_alias_arguments(
+                db,
+                &ProgramEnvironment::from_program(program),
+                ty,
+                |nested| {
+                    let accumulated = features.get() | EagerTypeFeatures::for_node(db, nested);
+                    features.set(accumulated);
+                    accumulated.is_all()
+                },
+            );
+            features.get()
+        }
+
+        let features = match self {
+            Type::RecursiveVar(_) => EagerTypeFeatures::all(),
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => {
+                EagerTypeFeatures::empty()
+            }
+            // An eager walk of a non-generic TypedDict class only visits its class literal.
+            Type::TypedDict(TypedDictType::Class(super::ClassType::NonGeneric(_))) => {
+                EagerTypeFeatures::empty()
+            }
+            ty if matches!(TypeKind::from(ty), TypeKind::Atomic) => {
+                EagerTypeFeatures::for_node(db, ty)
+            }
+            _ => eager_type_features(db, env.program(db), self),
+        };
+        features.intersects(wanted)
+    }
+}
+
 /// A visitor trait that recurses into nested types.
 ///
 /// The trait does not guard against infinite recursion out of the box,
@@ -1259,6 +1349,68 @@ mod tests {
                     .is_absent()
             );
         }
+    }
+
+    #[test]
+    fn eager_type_features_preserve_dynamic_markers() {
+        use super::EagerTypeFeatures as Features;
+        let db = setup_db();
+        let env = db.program_environment();
+        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        assert!(divergent.may_contain_eager_features(&db, &env, Features::DYNAMIC));
+        assert!(
+            !divergent
+                .top_materialization(&db, &env)
+                .may_contain_eager_features(&db, &env, Features::DYNAMIC)
+        );
+        let marker = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+        assert!(marker.may_contain_eager_features(
+            &db,
+            &env,
+            Features::PROVISIONAL | Features::UNSPECIALIZED
+        ));
+        assert!(!Type::object().may_contain_eager_features(&db, &env, Features::all()));
+    }
+
+    #[test]
+    fn eager_type_features_follow_recursive_alias_arguments_across_edits() -> anyhow::Result<()> {
+        use super::{EagerTypeFeatures as Features, any_over_type_expanding_aliases};
+
+        let mut db = setup_db();
+        for (argument, is_dynamic) in [("int", false), ("Any", true), ("int", false)] {
+            db.write_dedented(
+                "/src/eager.py",
+                &format!(
+                    r#"
+                    from typing import Any
+
+                    type Tree[T] = tuple[T, list[Tree[T]]]
+                    type Hidden = list[Any]
+
+                    value: Tree[{argument}]
+                    hidden: Hidden
+                    "#
+                ),
+            )?;
+            let env = db.program_environment();
+            let file = system_path_to_file(&db, "/src/eager.py")?;
+            let module = ProgramFile::new(&db, file, env.program(&db));
+            let value = global_symbol(&db, module, "value").place.expect_type();
+            assert!(value.may_contain_eager_features(&db, &env, Features::ALIAS));
+            assert_eq!(
+                value.may_contain_eager_features(&db, &env, Features::DYNAMIC),
+                is_dynamic
+            );
+
+            let hidden = global_symbol(&db, module, "hidden").place.expect_type();
+            assert!(hidden.may_contain_eager_features(
+                &db,
+                &env,
+                Features::ALIAS | Features::DYNAMIC
+            ));
+            assert!(any_over_type_expanding_aliases(&db, &env, hidden, |ty| ty.is_dynamic()));
+        }
+        Ok(())
     }
 
     #[test]

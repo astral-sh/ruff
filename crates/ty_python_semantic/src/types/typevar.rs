@@ -139,6 +139,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
+        if !self.may_contain_eager_features(
+            db,
+            env,
+            super::visitor::EagerTypeFeatures::UNSPECIALIZED,
+        ) {
+            return false;
+        }
         // Contextual inference must not adopt an alias whose arguments still
         // contain placeholders from an enclosing generic call.
         any_over_type_including_alias_arguments(db, env, self, |ty| {
@@ -151,6 +158,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
+        if !self.may_contain_eager_features(db, env, super::visitor::EagerTypeFeatures::PROVISIONAL)
+        {
+            return false;
+        }
         any_over_type(db, env, self, false, Self::is_provisional_marker)
     }
 
