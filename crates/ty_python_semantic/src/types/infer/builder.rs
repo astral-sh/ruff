@@ -9558,7 +9558,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let [arg @ ast::Expr::Attribute(_)] = args.args.as_ref() else {
             return None;
         };
-        if !args.keywords.is_empty() || tcx != TypeContext::default() {
+        // A failed probe retries ordinary inference. Keep calls in the receiver out of
+        // the probe so nested wrappers cannot re-infer each other on every retry.
+        if !is_dotted_name(arg) || !args.keywords.is_empty() || tcx != TypeContext::default() {
             return None;
         }
         let Type::FunctionLiteral(function) = callable else {

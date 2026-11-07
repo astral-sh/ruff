@@ -1047,6 +1047,43 @@ class Form(Ui):
 }
 
 #[test]
+fn nested_callable_attribute_arguments_scale_linearly() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY313)
+        .build()?;
+
+    let mut check_chain = |depth: usize| -> anyhow::Result<usize> {
+        let expression = (0..depth).fold(String::from("seed"), |inner, _| {
+            format!("wrap({inner}).__call__")
+        });
+        let source = format!(
+            r#"from typing import Callable
+
+def wrap[T](f: Callable[[], int]) -> Callable[[], int]: return f
+def seed() -> int: return 1
+
+result = {expression}
+"#
+        );
+
+        db.write_file("/src/main.py", source)?;
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
+        Ok(db.take_salsa_events().len())
+    };
+
+    // Warm the typeshed queries before comparing the work for two chain lengths.
+    check_chain(1)?;
+    let shallow = check_chain(6)?;
+    let deep = check_chain(12)?;
+    assert!(
+        deep < 4 * shallow,
+        "doubling the wrapper chain increased Salsa events from {shallow} to {deep}"
+    );
+    Ok(())
+}
+
+#[test]
 fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
     let mut db = setup_db();
     let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);
