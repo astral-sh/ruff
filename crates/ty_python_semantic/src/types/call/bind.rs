@@ -42,8 +42,8 @@ use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, ReportDiagnostics, SolutionPaths,
-    Solutions,
+    ConstraintSet, ConstraintSetBuilder, OwnedConstraintSet, PathBoundSolution, ReportDiagnostics,
+    SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
@@ -6025,6 +6025,8 @@ fn inferred_parameter_specialization<'db>(
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
     inference: TypeVarInference<'db>,
+    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    return_constraints: Option<&OwnedConstraintSet<'db>>,
 ) -> Specialization<'db> {
     // The marker distinguishes unsolved type variables without defaults from gradual types
     // inferred from arguments. Only the former are ignored during fixpoint iteration.
@@ -6040,6 +6042,7 @@ fn inferred_parameter_specialization<'db>(
     // approach would be to propagate constraint sets as type context, making bidirectional
     // inference constraint-set-aware, or to infer constraint sets directly for argument types,
     // and avoid the need to construct type context before call inference has completed.
+    let mut promotions = FxHashMap::default();
     generic_context.specialize_recursive(
         db,
         generic_context.variables(db).map(|typevar| {
@@ -6050,24 +6053,50 @@ fn inferred_parameter_specialization<'db>(
                 return Some(unsolved);
             };
             let promoted = ty.promote(db, env);
-            let Some(bound) = typevar.typevar(db).upper_bound(db, env) else {
-                return Some(promoted);
-            };
-            let bound = bound.apply_specialization(db, argument_specialization);
-
             // Context for other arguments must still satisfy the type variable's
             // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
             // promoting it to `str` would violate that bound.
-            Some(if promoted.is_assignable_to(db, env, bound) {
-                promoted
-            } else if ty.is_assignable_to(db, env, bound) {
-                ty
-            } else {
+            if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                && let bound = bound.apply_specialization(db, argument_specialization)
+                && !promoted.is_assignable_to(db, env, bound)
+            {
                 // TODO: Diagnostic recovery can sometimes solve a type variable to
                 // a type incompatible with its bound, and so we avoid using an incompatible
                 // inference as type context.
-                bound
-            })
+                return Some(if ty.is_assignable_to(db, env, bound) {
+                    ty
+                } else {
+                    bound
+                });
+            }
+            // A union in the expected return type can relate multiple type variables.
+            // One alternative must allow this promotion together with the other arguments.
+            if promoted != ty
+                && let Some(constraints) = return_constraints
+                && return_type_solutions.contains_key(&typevar.identity(db))
+            {
+                let arguments = generic_context.variables(db).filter_map(|var| {
+                    let ty = if var == typevar {
+                        promoted
+                    } else {
+                        promotions
+                            .get(&var)
+                            .copied()
+                            .or_else(|| argument_specialization.get(db, var))?
+                    };
+                    Some((var, ty))
+                });
+                if !constraints.accepts_type_arguments(
+                    db,
+                    env,
+                    generic_context.inferable_typevars(db),
+                    arguments,
+                ) {
+                    return Some(ty);
+                }
+                promotions.insert(typevar, promoted);
+            }
+            Some(promoted)
         }),
     )
 }
@@ -6081,9 +6110,17 @@ fn parameter_context_specialization<'db>(
     inference: Option<TypeVarInference<'db>>,
     return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
     return_context_kind: TypeContextKind,
+    return_constraints: Option<&OwnedConstraintSet<'db>>,
 ) -> ArgumentContextSpecialization<'db> {
     let specialization = if let Some(inference) = inference {
-        inferred_parameter_specialization(db, env, generic_context, inference)
+        inferred_parameter_specialization(
+            db,
+            env,
+            generic_context,
+            inference,
+            return_type_solutions,
+            return_constraints,
+        )
     } else {
         // Mark variables without a solution so the concrete parts of the parameter type can
         // still provide context for argument inference.
@@ -8847,6 +8884,7 @@ impl<'db> Binding<'db> {
                         db,
                         env,
                         generic,
+                        specialized_overload.inference,
                         constraints,
                         call_expression_tcx,
                     );
@@ -9003,6 +9041,7 @@ impl<'db> Binding<'db> {
                         db,
                         env,
                         generic_context,
+                        self.inference,
                         constraints,
                         call_expression_tcx,
                     )
@@ -9196,9 +9235,17 @@ impl<'db> Binding<'db> {
         {
             return None;
         }
-        Some(inferred_parameter_specialization(
-            db, env, generic, inference,
-        ))
+        Some(
+            self.argument_type_context_specialization(
+                db,
+                env,
+                generic,
+                Some(inference),
+                constraints,
+                tcx,
+            )
+            .specialization,
+        )
     }
 
     /// Returns the specialization that should be applied to the parameters of this overload for
@@ -9216,6 +9263,7 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
+        inference: Option<TypeVarInference<'db>>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
@@ -9255,6 +9303,7 @@ impl<'db> Binding<'db> {
                 Some(inference),
                 &FxHashMap::default(),
                 TypeContextKind::Declared,
+                None,
             ))
         }
 
@@ -9269,7 +9318,6 @@ impl<'db> Binding<'db> {
                 declared_return_ty,
                 inferable,
             );
-
             let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
@@ -9294,18 +9342,26 @@ impl<'db> Binding<'db> {
         if return_type_solutions.is_empty()
             && let Some(specialization) = inferred_parameter_context(
                 db,
-                ParameterContextKey::new(db, env, generic_context, self.inference),
+                ParameterContextKey::new(db, env, generic_context, inference),
             )
         {
             return Cow::Borrowed(specialization);
         }
+        let return_constraints =
+            inference
+                .and(call_expression_tcx.declared_type())
+                .map(|expected| {
+                    self.unspecialized_return_type(db)
+                        .when_constraint_set_assignable_to_owned(db, env, expected)
+                });
         Cow::Owned(parameter_context_specialization(
             db,
             env,
             generic_context,
-            self.inference,
+            inference,
             &return_type_solutions,
             call_expression_tcx.kind(),
+            return_constraints.as_deref(),
         ))
     }
 

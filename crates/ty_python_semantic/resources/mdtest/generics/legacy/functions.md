@@ -5814,6 +5814,57 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     return reveal_type(identity_callback(value))
 ```
 
+When the second item is a string, the pair fits `tuple[object, str]`, so the callback's parameter
+can widen to `str`. An integer second item rules out that alternative, so the first item must retain
+its literal type.
+
+```py
+from typing import Literal
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def pair(first: T, second: U, visit: Callable[[T], object]) -> tuple[tuple[T, U]]:
+    visit(first)
+    return ((first, second),)
+
+Result = tuple[tuple[Literal["a"] | None, object] | tuple[object, str]]
+
+def example(text: str, number: int):
+    a: Result = pair("a", text, lambda item: reveal_type(item))  # revealed: str
+    b: Result = pair("a", number, lambda item: reveal_type(item))  # revealed: Literal["a"]
+```
+
+## Related type variables in a callback's return context
+
+`Wrap` returns a list with the same element type as its argument. For a runner to accept a `Wrap`,
+the input type `X` must therefore be assignable to the output element type `Y`. Widening `"a"` to
+`str` would break that relationship when the output only accepts two literals.
+
+```py
+from collections.abc import Callable
+from typing import Literal, Protocol, TypeVar
+
+X = TypeVar("X")
+Y = TypeVar("Y")
+V = TypeVar("V")
+
+class Wrap(Protocol):
+    def __call__(self, value: V, /) -> list[V]: ...
+
+Runner = Callable[[Callable[[X], list[Y]]], None]
+
+def make_runner(value: X, output: list[Y], visit: Callable[[X], None]) -> Runner[X, Y]:
+    def run(wrap: Callable[[X], list[Y]]) -> None:
+        visit(value)
+        output.extend(wrap(value))
+
+    return run
+
+def example(output: list[Literal["a", "b"]]):
+    run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
+```
+
 ## Inferring a recursive protocol from a factory's return context
 
 The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the

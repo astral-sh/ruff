@@ -311,6 +311,35 @@ impl<'db> OwnedConstraintSet<'db> {
         !self.node.is_terminal()
     }
 
+    /// Checks whether these type arguments can satisfy the constraints together.
+    /// For example, if `T ≤ U`, the bindings `T = str` and `U = int` are each
+    /// possible on their own, but cannot both hold.
+    pub(super) fn accepts_type_arguments(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        arguments: impl Iterator<Item = (BoundTypeVarInstance<'db>, Type<'db>)>,
+    ) -> bool {
+        self.query(|builder, constraints| {
+            let pinned = arguments
+                .filter(|(variable, _)| constraints.mentions_typevar(*variable))
+                .fold(constraints, |pinned, (variable, ty)| {
+                    pinned.and(db, builder, || {
+                        ConstraintSet::constrain_typevar_equivalence_bound(
+                            db,
+                            env,
+                            builder,
+                            ConstraintProvenance::INFERRED,
+                            variable,
+                            ty,
+                        )
+                    })
+                });
+            pinned.is_never_satisfied_bounded(db, env, inferable) == Some(false)
+        })
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
