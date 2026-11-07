@@ -868,7 +868,7 @@ impl<'db> StaticClassLiteral<'db> {
             || enum_metadata(db, ClassLiteral::Static(self)).is_some()
     }
 
-    /// Attempt to resolve the [method resolution order] ("MRO") for this class.
+    /// Return this class's ancestors in [method resolution order] ("MRO"), excluding the class itself.
     /// If the MRO is unresolvable, return an error indicating why the class's MRO
     /// cannot be accurately determined. The error returned contains a fallback MRO
     /// that will be used instead for the purposes of type inference.
@@ -877,15 +877,18 @@ impl<'db> StaticClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(in crate::types) fn try_mro(
+    pub(in crate::types) fn try_mro_ancestors(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
+    ) -> Result<&'db [ClassBase<'db>], &'db StaticMroError<'db>> {
         match specialization {
-            None => self.try_mro_unspecialized(db),
-            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
+            None => self.try_mro_ancestors_unspecialized(db),
+            Some(specialization) => {
+                GenericAlias::new(db, self, specialization).try_mro_ancestors(db)
+            }
         }
+        .map(Box::as_ref)
         .map_err(Box::as_ref)
     }
 
@@ -900,16 +903,19 @@ impl<'db> StaticClassLiteral<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
-        tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, None).map_err(Box::new)
+    fn try_mro_ancestors_unspecialized(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
+        tracing::trace!("StaticClassLiteral::try_mro_ancestors: {}", self.name(db));
+        Mro::ancestors_of_static_class(db, self, None).map_err(Box::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
     ///
     /// If the MRO could not be accurately resolved, this method falls back to iterating
     /// over an MRO that has the class directly inheriting from `Unknown`. Use
-    /// [`StaticClassLiteral::try_mro`] if you need to distinguish between the success and failure
+    /// [`StaticClassLiteral::try_mro_ancestors`] if you need to distinguish between the success and failure
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
@@ -1261,7 +1267,9 @@ impl<'db> StaticClassLiteral<'db> {
             let mut base_classes = class.metaclass_bases(db).peekable();
 
             if (base_classes.peek().is_some() && class.inheritance_cycle(db).is_some())
-                || class.try_mro(db, None).is_err_and(StaticMroError::is_cycle)
+                || class
+                    .try_mro_ancestors(db, None)
+                    .is_err_and(StaticMroError::is_cycle)
             {
                 // We emit diagnostics for cyclic class definitions elsewhere.
                 // Avoid attempting to infer the metaclass if the class is cyclically defined.

@@ -488,7 +488,7 @@ fn inherited_conflict_mro<'db>(
             _ => return None,
         }
     }
-    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+    if direct_bases.len() < 2 || class.try_mro_ancestors(db, None).is_err() {
         return None;
     }
 

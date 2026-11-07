@@ -482,7 +482,7 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(db, specialization)
+                    .try_mro_ancestors(db, specialization)
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Any
