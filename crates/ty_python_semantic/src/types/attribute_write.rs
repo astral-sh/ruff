@@ -15,7 +15,7 @@ use super::call::{Bindings, CallArguments, CallDunderError};
 use super::callable::CallableTypeKind;
 use super::class::FrozenDataclassDispatch;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
-use super::dedicated::pydantic;
+use super::dedicated::{django, pydantic};
 use super::relation::TypeRelationChecker;
 use super::visitor::may_contain_typevar_from;
 use super::{
@@ -785,6 +785,17 @@ fn explicit_attribute_write_requirement<'db>(
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
+        // Django permits clearing a generated primary key before saving a copy of the model.
+        if django::is_automatic_primary_key_member(db, env, object_ty, attribute, attr_ty)
+            && let DescriptorSetterDomain::Known(write_ty) =
+                descriptor_setter_domain(db, env, attr_ty, object_ty)
+        {
+            return ExplicitAttributeWriteRequirement::AssignableTo {
+                ty: UnionType::from_two_elements(db, env, write_ty, Type::none(db, env)),
+                qualifiers,
+            };
+        }
+
         ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty: attr_ty,
             // Keep the original receiver's identity while selecting this alternative's
