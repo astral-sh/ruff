@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtAssign,
+        range: 1..6,
+        source: `a = 1`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# a-b 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# a-b 2",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# a-b 3",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtAssign,
+        range: 41..46,
+        source: `b = 2`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# a-b 4",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: ExprName,
+        range: 67..68,
+        source: `x`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# x-y 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# x-y 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExprName,
+        range: 148..149,
+        source: `y`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# x-y 3",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# x-y 4",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtPass,
+        range: 169..173,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# if-else 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# if-else 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ElifElseClause,
+        range: 232..246,
+        source: `else:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# if-else 3",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# if-else 4",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}
