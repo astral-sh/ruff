@@ -791,10 +791,14 @@ impl<'db> TypeAliasType<'db> {
                     // definition can also capture outer typevars. Expand only when those
                     // captures change; changing arguments alone must retain the alias.
                     let raw = self.raw_value_type(db);
+                    let previous = visitor.freshening_expanded_alias.get();
                     let mapped = raw.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    // The raw value was only inspected for captures.
+                    visitor.freshening_expanded_alias.set(previous);
                     if mapped == raw || mapped == ty {
                         Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
                     } else {
+                        visitor.freshening_expanded_alias.set(true);
                         self.value_type_with_recursion(db, visitor.recursion_context)
                             .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                     }
