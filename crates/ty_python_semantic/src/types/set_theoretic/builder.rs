@@ -717,6 +717,49 @@ impl<'db> UnionAccumulator<'db> {
     }
 }
 
+/// Whether adding this union to an empty builder reproduces its elements in order.
+/// Structural substitutions can create unnormalized unions, so the elements alone do
+/// not establish this property. Literal groups also need their specialized builder state.
+/// A provisional relation can drop an alternative and retain it on a later cycle
+/// iteration. Let the caller do the ordinary comparison whenever the proof is cyclic.
+#[salsa::tracked(returns(copy), cycle_result=|_, _, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn can_seed_union_builder<'db>(
+    db: &'db dyn Db,
+    union: UnionType<'db>,
+    program: crate::Program<'db>,
+    unpack_aliases: bool,
+) -> bool {
+    let elements = union.elements(db);
+    if elements.iter().any(|ty| {
+        matches!(
+            ty,
+            Type::Union(_)
+                | Type::TypeAlias(_)
+                | Type::Recursive(_)
+                | Type::RecursiveVar(_)
+                | Type::Divergent(_)
+                | Type::LiteralValue(_)
+        )
+    }) {
+        return false;
+    }
+    let env = ProgramEnvironment::from_program(program);
+    let mut builder = UnionBuilder::new(db, &env).unpack_aliases(unpack_aliases);
+    let mut seen_aliases = Vec::new();
+    for &ty in elements {
+        builder.add_in_place_impl(ty, &mut seen_aliases);
+    }
+    // Visited aliases can also affect later siblings in an enclosing union.
+    seen_aliases.is_empty()
+        && !builder.recursively_defined.is_yes()
+        && builder.elements.len() == elements.len()
+        && builder
+            .elements
+            .iter()
+            .zip(elements)
+            .all(|(built, &original)| matches!(built, UnionElement::Type(ty) if *ty == original))
+}
+
 impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self {
@@ -813,6 +856,18 @@ impl<'db> UnionBuilder<'db> {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(db);
+                if self.elements.is_empty()
+                    && new_elements.len() >= super::WIDE_UNION
+                    && !cycle_recovery
+                    && !self.recursively_defined.is_yes()
+                    && seen_aliases.is_empty()
+                    && can_seed_union_builder(db, union, self.env.program(db), self.unpack_aliases)
+                {
+                    self.elements
+                        .extend(new_elements.iter().copied().map(UnionElement::Type));
+                    self.recursively_defined = union.recursively_defined(db);
+                    return;
+                }
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
@@ -2682,6 +2737,24 @@ mod tests {
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
     use ty_python_core::ProgramFile;
+
+    #[test]
+    fn extending_an_unnormalized_wide_union() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let mut elements = vec![int; super::super::WIDE_UNION];
+        elements.push(Type::object());
+        // Structural substitutions can intern a union directly, without running a builder.
+        let raw = Type::Union(UnionType::new(
+            db,
+            elements.into_boxed_slice(),
+            RecursivelyDefined::No,
+        ));
+        let built = UnionBuilder::new(db, &env).add(raw).add(int).build();
+        assert_eq!(built, Type::object());
+    }
 
     #[test]
     fn build_union_no_elements() {
