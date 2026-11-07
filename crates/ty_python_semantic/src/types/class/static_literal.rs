@@ -3006,120 +3006,214 @@ impl<'db> StaticClassLiteral<'db> {
         // - Proper diagnostics
 
         let sources = self.member_sources(db);
+        let Some(symbol) = sources.table.symbol_id(name) else {
+            return sources.implicit_attribute(db, name, MethodDecorator::None);
+        };
+
+        // Key positive class-body lookups by their existing scoped symbol. Missing names can
+        // still be supplied by assignments inside methods.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, result: PlaceAndQualifiers<'db>, _, program, _| {
+                result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn own_instance_member_by_symbol<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+            program: crate::Program<'db>,
+            symbol: ty_python_core::symbol::ScopedSymbolId,
+        ) -> PlaceAndQualifiers<'db> {
+            class
+                .instance_member_for_symbol(db, &ProgramEnvironment::from_program(program), symbol)
+                .inner
+        }
+
+        Member {
+            inner: own_instance_member_by_symbol(db, self, env.program(db), symbol),
+        }
+    }
+
+    fn instance_member_for_symbol(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        symbol_id: ty_python_core::symbol::ScopedSymbolId,
+    ) -> Member<'db> {
+        let sources = self.member_sources(db);
         let body_scope = sources.scope;
         let table = &sources.table;
+        let name = table.symbol(symbol_id).name().as_str();
+        // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
+        // as instance attributes here causes inherited fields to leak through after a subclass
+        // shadows the name with a normal class attribute.
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into())
+            && self
+                .own_fields(db, None, CodeGeneratorKind::NamedTuple)
+                .contains_key(name)
+        {
+            return Member::unbound();
+        }
 
-        if let Some(symbol_id) = table.symbol_id(name) {
-            // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
-            // as instance attributes here causes inherited fields to leak through after a subclass
-            // shadows the name with a normal class attribute.
-            if CodeGeneratorKind::NamedTuple.matches(db, self.into())
-                && self
-                    .own_fields(db, None, CodeGeneratorKind::NamedTuple)
-                    .contains_key(name)
-            {
-                return Member::unbound();
-            }
+        let use_def = use_def_map(db, body_scope);
 
-            let use_def = use_def_map(db, body_scope);
+        let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
+        let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+            .with_imported_final(
+                db,
+                env,
+                use_def.end_of_scope_imported_final_candidates(symbol_id.into()),
+            )
+            .ignore_conflicting_declarations();
 
-            let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
-                .with_imported_final(
-                    db,
-                    env,
-                    use_def.end_of_scope_imported_final_candidates(symbol_id.into()),
-                )
-                .ignore_conflicting_declarations();
+        match declared_and_qualifiers {
+            PlaceAndQualifiers {
+                place:
+                    mut declared @ Place::Defined(DefinedPlace {
+                        ty: declared_ty,
+                        definedness: declaredness,
+                        provenance: declared_provenance,
+                        ..
+                    }),
+                qualifiers,
+            } => {
+                // For the purpose of finding instance attributes, ignore `ClassVar`
+                // declarations:
+                if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                    declared = Place::Undefined;
+                }
 
-            match declared_and_qualifiers {
-                PlaceAndQualifiers {
-                    place:
-                        mut declared @ Place::Defined(DefinedPlace {
-                            ty: declared_ty,
-                            definedness: declaredness,
-                            provenance: declared_provenance,
-                            ..
-                        }),
-                    qualifiers,
-                } => {
-                    // For the purpose of finding instance attributes, ignore `ClassVar`
-                    // declarations:
-                    if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                        declared = Place::Undefined;
-                    }
-
-                    if qualifiers.contains(TypeQualifiers::INIT_VAR) {
-                        // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
-                        // by an implicit assignment in a method
-                        if sources
-                            .implicit_attribute(db, name, MethodDecorator::None)
-                            .is_undefined()
-                        {
-                            return Member::unbound();
-                        }
-                    }
-
-                    // `KW_ONLY` sentinels are markers, not real instance attributes.
-                    if declared_ty.is_instance_of(db, KnownClass::KwOnly)
-                        && CodeGeneratorKind::from_static_class(db, self)
-                            .is_some_and(CodeGeneratorKind::is_dataclass_like)
+                if qualifiers.contains(TypeQualifiers::INIT_VAR) {
+                    // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
+                    // by an implicit assignment in a method
+                    if sources
+                        .implicit_attribute(db, name, MethodDecorator::None)
+                        .is_undefined()
                     {
                         return Member::unbound();
                     }
+                }
 
-                    // The attribute is declared in the class body.
+                // `KW_ONLY` sentinels are markers, not real instance attributes.
+                if declared_ty.is_instance_of(db, KnownClass::KwOnly)
+                    && CodeGeneratorKind::from_static_class(db, self)
+                        .is_some_and(CodeGeneratorKind::is_dataclass_like)
+                {
+                    return Member::unbound();
+                }
 
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let inferred = place_from_bindings(db, env, bindings).place;
-                    // Stub assignments to slots describe instance storage, not runtime class
-                    // attributes.
-                    let has_binding = !(inferred.is_undefined()
-                        || self.file(db).is_stub(db) && self.has_instance_slot(db, name));
+                // The attribute is declared in the class body.
 
-                    if has_binding {
-                        // The attribute is declared and bound in the class body.
-                        if declared_ty.is_function_like(db) {
-                            return match declaredness {
-                                Definedness::AlwaysDefined => {
-                                    // We reach this branch when we look for instance attributes named `foo`, but
-                                    // there is also an actual `def foo(..)` function definition on the class body.
-                                    // In this case, we pretend that there is no instance attribute with the same
-                                    // name, i.e. we don't look for `self.foo = ...` assignments and just return
-                                    // "unbound". This allows the function definition to take precedence over any
-                                    // instance attribute, which enables use cases where a method is deliberately
-                                    // shadowed by an instance attribute (e.g. `self.foo = replacement_method`).
-                                    // We check the validity of that assignment elsewhere, but when looking up
-                                    // `foo`, we simply use the function definition as the source of truth.
-                                    Member::unbound()
-                                }
-                                Definedness::PossiblyUndefined => {
-                                    // For possibly-undefined functions, we still look for instance attributes.
-                                    sources.implicit_attribute(db, name, MethodDecorator::None)
-                                }
-                            };
-                        }
+                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                let inferred = place_from_bindings(db, env, bindings).place;
+                // Stub assignments to slots describe instance storage, not runtime class
+                // attributes.
+                let has_binding = !(inferred.is_undefined()
+                    || self.file(db).is_stub(db) && self.has_instance_slot(db, name));
 
-                        let implicit = match declaredness {
-                            Definedness::AlwaysDefined
-                                if sources.has_implicit_instance_attribute(db, name) =>
-                            {
-                                // A method assigns to this attribute, but its declared type
-                                // already determines what an instance can read.
-                                return Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                };
+                if has_binding {
+                    // The attribute is declared and bound in the class body.
+                    if declared_ty.is_function_like(db) {
+                        return match declaredness {
+                            Definedness::AlwaysDefined => {
+                                // We reach this branch when we look for instance attributes named `foo`, but
+                                // there is also an actual `def foo(..)` function definition on the class body.
+                                // In this case, we pretend that there is no instance attribute with the same
+                                // name, i.e. we don't look for `self.foo = ...` assignments and just return
+                                // "unbound". This allows the function definition to take precedence over any
+                                // instance attribute, which enables use cases where a method is deliberately
+                                // shadowed by an instance attribute (e.g. `self.foo = replacement_method`).
+                                // We check the validity of that assignment elsewhere, but when looking up
+                                // `foo`, we simply use the function definition as the source of truth.
+                                Member::unbound()
                             }
-                            Definedness::AlwaysDefined => Member::unbound(),
                             Definedness::PossiblyUndefined => {
+                                // For possibly-undefined functions, we still look for instance attributes.
                                 sources.implicit_attribute(db, name, MethodDecorator::None)
                             }
                         };
+                    }
+
+                    let implicit = match declaredness {
+                        Definedness::AlwaysDefined
+                            if sources.has_implicit_instance_attribute(db, name) =>
+                        {
+                            // A method assigns to this attribute, but its declared type
+                            // already determines what an instance can read.
+                            return Member {
+                                inner: declared.with_qualifiers(qualifiers),
+                            };
+                        }
+                        Definedness::AlwaysDefined => Member::unbound(),
+                        Definedness::PossiblyUndefined => {
+                            sources.implicit_attribute(db, name, MethodDecorator::None)
+                        }
+                    };
+                    if let Place::Defined(DefinedPlace {
+                        ty: implicit_ty,
+                        provenance: implicit_provenance,
+                        ..
+                    }) = implicit.inner.place
+                    {
+                        Member {
+                            inner: Place::Defined(DefinedPlace {
+                                ty: UnionType::from_two_elements(db, env, declared_ty, implicit_ty),
+                                origin: TypeOrigin::Declared,
+                                definedness: declaredness,
+                                public_type_policy: PublicTypePolicy::Raw,
+                                provenance: implicit_provenance.or(declared_provenance),
+                            })
+                            .with_qualifiers(qualifiers),
+                        }
+                    } else if self.is_own_dataclass_instance_field(db, name)
+                        && declared_ty
+                            .class_member(db, env, "__get__")
+                            .place
+                            .is_undefined()
+                    {
+                        // For dataclass-like classes, declared fields are assigned
+                        // by the synthesized `__init__`, so they are instance
+                        // attributes even without an explicit `self.x = ...`
+                        // assignment in a method body.
+                        //
+                        // However, if the declared type is a descriptor (has
+                        // `__get__`), we return unbound so that the descriptor
+                        // protocol in `member_lookup_with_policy` can resolve
+                        // the attribute type through `__get__`.
+                        Member {
+                            inner: declared.with_qualifiers(qualifiers),
+                        }
+                    } else {
+                        // The symbol is declared and bound in the class body,
+                        // but we did not find any attribute assignments in
+                        // methods of the class. This means that the attribute
+                        // has a class-level default value, but it would not be
+                        // found in a `__dict__` lookup.
+
+                        Member::unbound()
+                    }
+                } else {
+                    // The attribute is declared but not bound in the class body.
+                    // We take this as a sign that this is intended to be a pure
+                    // instance attribute, and we trust the declared type, unless
+                    // it is possibly-undeclared. In the latter case, we also
+                    // union with the inferred type from attribute assignments.
+
+                    if declaredness == Definedness::AlwaysDefined {
+                        Member {
+                            inner: declared.with_qualifiers(qualifiers),
+                        }
+                    } else {
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
                             ..
-                        }) = implicit.inner.place
+                        }) = sources
+                            .implicit_attribute(db, name, MethodDecorator::None)
+                            .inner
+                            .place
                         {
                             Member {
                                 inner: Place::Defined(DefinedPlace {
@@ -3136,93 +3230,24 @@ impl<'db> StaticClassLiteral<'db> {
                                 })
                                 .with_qualifiers(qualifiers),
                             }
-                        } else if self.is_own_dataclass_instance_field(db, name)
-                            && declared_ty
-                                .class_member(db, env, "__get__")
-                                .place
-                                .is_undefined()
-                        {
-                            // For dataclass-like classes, declared fields are assigned
-                            // by the synthesized `__init__`, so they are instance
-                            // attributes even without an explicit `self.x = ...`
-                            // assignment in a method body.
-                            //
-                            // However, if the declared type is a descriptor (has
-                            // `__get__`), we return unbound so that the descriptor
-                            // protocol in `member_lookup_with_policy` can resolve
-                            // the attribute type through `__get__`.
+                        } else {
                             Member {
                                 inner: declared.with_qualifiers(qualifiers),
-                            }
-                        } else {
-                            // The symbol is declared and bound in the class body,
-                            // but we did not find any attribute assignments in
-                            // methods of the class. This means that the attribute
-                            // has a class-level default value, but it would not be
-                            // found in a `__dict__` lookup.
-
-                            Member::unbound()
-                        }
-                    } else {
-                        // The attribute is declared but not bound in the class body.
-                        // We take this as a sign that this is intended to be a pure
-                        // instance attribute, and we trust the declared type, unless
-                        // it is possibly-undeclared. In the latter case, we also
-                        // union with the inferred type from attribute assignments.
-
-                        if declaredness == Definedness::AlwaysDefined {
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
-                            }
-                        } else {
-                            if let Place::Defined(DefinedPlace {
-                                ty: implicit_ty,
-                                provenance: implicit_provenance,
-                                ..
-                            }) = sources
-                                .implicit_attribute(db, name, MethodDecorator::None)
-                                .inner
-                                .place
-                            {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_two_elements(
-                                            db,
-                                            env,
-                                            declared_ty,
-                                            implicit_ty,
-                                        ),
-                                        origin: TypeOrigin::Declared,
-                                        definedness: declaredness,
-                                        public_type_policy: PublicTypePolicy::Raw,
-                                        provenance: implicit_provenance.or(declared_provenance),
-                                    })
-                                    .with_qualifiers(qualifiers),
-                                }
-                            } else {
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
                             }
                         }
                     }
                 }
-
-                PlaceAndQualifiers {
-                    place: Place::Undefined,
-                    qualifiers: _,
-                } => {
-                    // The attribute is not *declared* in the class body. It could still be declared/bound
-                    // in a method.
-
-                    sources.implicit_attribute(db, name, MethodDecorator::None)
-                }
             }
-        } else {
-            // This attribute is neither declared nor bound in the class body.
-            // It could still be implicitly defined in a method.
 
-            sources.implicit_attribute(db, name, MethodDecorator::None)
+            PlaceAndQualifiers {
+                place: Place::Undefined,
+                qualifiers: _,
+            } => {
+                // The attribute is not *declared* in the class body. It could still be declared/bound
+                // in a method.
+
+                sources.implicit_attribute(db, name, MethodDecorator::None)
+            }
         }
     }
 
