@@ -130,6 +130,7 @@ use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
     tuple_literal_needs_promotion,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet, InternedType,
@@ -7498,14 +7499,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // exponential blowup.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut narrowed = Vec::new();
-        for narrowed_ty in narrowed_tys.iter().filter(|ty| {
+        let fixed_literal = tuple.elts.iter().all(|elt| !elt.is_starred_expr())
+            && !tuple_literal_needs_promotion(&tuple.elts);
+        'candidates: for narrowed_ty in narrowed_tys.iter().filter(|ty| {
             ty.known_specialization(db, env, KnownClass::Tuple)
                 .is_some()
         }) {
             let mut speculative_builder = self.speculate();
 
-            let inferred_ty = speculative_builder
-                .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)));
+            let inferred_ty = if fixed_literal
+                && let Some(spec) = narrowed_ty.exact_tuple_instance_spec(db)
+                && let Tuple::Fixed(expected) = spec.as_ref()
+            {
+                if expected.len() != tuple.elts.len() {
+                    continue;
+                }
+                let mut elements = Vec::with_capacity(expected.len());
+                for (index, (elt, expected_ty)) in tuple
+                    .elts
+                    .iter()
+                    .zip(expected.iter_all_elements())
+                    .enumerate()
+                {
+                    let ty = speculative_builder
+                        .infer_expression(elt, tcx.with_declared_type(Some(expected_ty)));
+                    if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
+                        continue 'candidates;
+                    }
+                    elements.push(ty);
+                }
+                Type::heterogeneous_tuple(db, env, elements)
+            } else {
+                speculative_builder
+                    .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)))
+            };
             if inferred_ty.is_assignable_to(db, env, *narrowed_ty) {
                 narrowed.push((inferred_ty, speculative_builder));
             }
@@ -8252,6 +8279,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // For plain element type variables, compatible lower bounds can be combined
+        // independently. Preserve the ordered evidence for the general solver if an
+        // unpack, a use of the literal, or an ineligible element introduces a dependency.
+        let mut independent_bounds = !has_dict_unpack
+            && !elts.is_empty()
+            && elt_tys.len() == N
+            && elt_tys.clone().all(|var| var.typevar(db).is_simple(db));
+        let mut pending_elements = Vec::new();
+
         if tcx.declared_type().is_none()
             && let Some(collection_expr) = collection_expr
             && let InferenceRegion::Expression(current_expr, _) = self.region
@@ -8280,6 +8316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .repeat_specialization(self.db(), Type::Divergent(divergent))
                         });
 
+                    independent_bounds = false;
                     builder
                         .infer(
                             identity_instance,
@@ -8294,6 +8331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
+                        independent_bounds = false;
                         builder.infer(identity_instance, *constraint).ok()?;
                     }
                 }
@@ -8422,12 +8460,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
 
                 if previous_evidence[i] != Some(inferred_type_for_typevar) {
-                    builder
-                        .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
-                        .ok()?;
+                    if independent_bounds || !pending_elements.is_empty() {
+                        independent_bounds &= !matches!(
+                            inferred_type_for_typevar,
+                            Type::Never
+                                | Type::Divergent(_)
+                                | Type::TypeVar(_)
+                                | Type::TypeAlias(_)
+                                | Type::Intersection(_)
+                        ) && !any_over_type_expanding_aliases(
+                            db,
+                            env,
+                            inferred_type_for_typevar,
+                            |part| {
+                                part.is_provisional_marker()
+                                    || matches!(
+                                        part,
+                                        Type::Divergent(_)
+                                            | Type::Recursive(_)
+                                            | Type::RecursiveVar(_)
+                                    )
+                                    || part
+                                        .as_typevar()
+                                        .is_some_and(|var| var.is_inferable(db, inferable))
+                            },
+                        ) && elt_tcx
+                            .is_none_or(|_| elt_tcx_variance[&elt_ty_identity].is_covariant());
+                        pending_elements.push((i, elt_ty, inferred_type_for_typevar));
+                    } else {
+                        builder
+                            .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
+                            .ok()?;
+                    }
                     previous_evidence[i] = Some(inferred_type_for_typevar);
                 }
             }
+        }
+
+        if independent_bounds {
+            let mut bounds: [Option<UnionAccumulator<'db>>; N] = std::array::from_fn(|_| None);
+            for &(i, _, ty) in &pending_elements {
+                if let Some(merged) = &mut bounds[i] {
+                    merged.add(db, env, ty);
+                } else {
+                    bounds[i] = Some(UnionAccumulator::new(ty));
+                }
+            }
+            let solutions = elt_tys
+                .clone()
+                .zip(bounds)
+                .map(|(variable, bound)| {
+                    let identity = variable.identity(db);
+                    let lower = bound
+                        .map(|bound| bound.into_type(db, env))
+                        .or_else(|| elt_tcx_constraints.get(&identity).copied())?;
+                    Some(lower.promote_collection_element_type(
+                        db,
+                        env,
+                        tuple_size_promotion_constraints.allow(identity),
+                        tcx.declared_type().is_none(),
+                    ))
+                })
+                .collect::<Option<Vec<_>>>();
+            if let Some(solutions) = solutions {
+                let class = collection_alias
+                    .origin(db)
+                    .apply_specialization(db, |context| {
+                        context.specialize_recursive(db, solutions.into_iter().map(Some))
+                    });
+                return Type::from(class).to_instance_approximation(db, env);
+            }
+        }
+        for (_, variable, element) in pending_elements {
+            builder.infer(Type::TypeVar(variable), element).ok()?;
         }
 
         let class_type = collection_alias
