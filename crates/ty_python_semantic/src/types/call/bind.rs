@@ -4784,12 +4784,10 @@ impl<'db> CallableBinding<'db> {
         match self.overloads.as_slice() {
             [] => {}
             [overload] => {
-                let callable_description = CallableDescription::new(db, self.signature_type);
                 overload.report_diagnostics(
                     context,
                     node,
                     self.signature_type,
-                    callable_description.as_ref(),
                     compound_diag,
                     None,
                 );
@@ -4816,7 +4814,6 @@ impl<'db> CallableBinding<'db> {
 
                 // If only one overload passed arity check, report its errors directly.
                 if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
-                    let callable_description = CallableDescription::new(db, self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4828,7 +4825,6 @@ impl<'db> CallableBinding<'db> {
                         context,
                         node,
                         self.signature_type,
-                        callable_description.as_ref(),
                         compound_diag,
                         matching_overload.as_ref(),
                     );
@@ -4839,7 +4835,6 @@ impl<'db> CallableBinding<'db> {
                 // (possibly with semantic errors), report its errors directly instead
                 // of the generic "no matching overload" message.
                 if let Ok((matching_overload_index, _)) = self.matching_overloads().exactly_one() {
-                    let callable_description = CallableDescription::new(db, self.signature_type);
                     let matching_overload =
                         function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
                             index: self.overloads[matching_overload_index].source_overload_index(),
@@ -4851,7 +4846,6 @@ impl<'db> CallableBinding<'db> {
                         context,
                         node,
                         self.signature_type,
-                        callable_description.as_ref(),
                         compound_diag,
                         matching_overload.as_ref(),
                     );
@@ -9467,7 +9461,6 @@ impl<'db> Binding<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_description: Option<&CallableDescription>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
@@ -9488,7 +9481,6 @@ impl<'db> Binding<'db> {
                 context,
                 node,
                 callable_ty,
-                callable_description,
                 compound_diag,
                 matching_overload,
                 self.source_parameter_index_offset,
@@ -10288,19 +10280,18 @@ impl<'db> BindingError<'db> {
         }
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn report_diagnostic(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_description: Option<&CallableDescription>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
         source_parameter_index_offset: usize,
     ) {
         let db = context.db();
         let env = context.program_environment();
+        let describe_callable = || CallableDescription::new(db, callable_ty);
         let callable_kind = match callable_ty {
             Type::FunctionLiteral(_) => "Function",
             Type::BoundMethod(_) => "Method",
@@ -10337,7 +10328,7 @@ impl<'db> BindingError<'db> {
                     .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = CallableDescription::new_with_settings(
+                let callable_description = CallableDescription::new_with_settings(
                     db,
                     callable_ty,
                     Some(&display_settings),
@@ -10348,9 +10339,7 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    qualified_callable_description
-                        .as_ref()
-                        .or(callable_description)
+                    callable_description
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
@@ -10522,7 +10511,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" to {description}"))
                             .unwrap_or_default()
                     ));
@@ -10548,7 +10537,7 @@ impl<'db> BindingError<'db> {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
@@ -10592,7 +10581,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
@@ -10614,7 +10603,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Unpacked argument may contain keyword arguments that do not match any known parameter{}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
@@ -10641,7 +10630,7 @@ impl<'db> BindingError<'db> {
                 {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Positional-only parameter {parameter} passed as keyword argument{}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
@@ -10666,7 +10655,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
@@ -10711,14 +10700,14 @@ impl<'db> BindingError<'db> {
                     .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = constraint_evidence.and_then(|_| {
-                    CallableDescription::new_with_settings(db, callable_ty, Some(&display_settings))
-                });
+                let callable_description = CallableDescription::new_with_settings(
+                    db,
+                    callable_ty,
+                    constraint_evidence.map(|_| &display_settings),
+                );
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    qualified_callable_description
-                        .as_ref()
-                        .or(callable_description)
+                    callable_description
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
@@ -10850,7 +10839,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
@@ -10862,7 +10850,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
@@ -10874,7 +10861,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
@@ -10895,7 +10881,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
-                        callable_description
+                        describe_callable()
                             .map(|description| format!(" of {description}"))
                             .unwrap_or_default()
                     ));
