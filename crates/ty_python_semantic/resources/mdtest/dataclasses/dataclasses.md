@@ -28,7 +28,7 @@ reveal_type(alice1.age)  # revealed: int | None
 reveal_type(repr(alice1))  # revealed: str
 
 reveal_type(alice1 == alice2)  # revealed: bool
-reveal_type(alice1 == "Alice")  # revealed: Literal[False]
+reveal_type(alice1 == "Alice")  # revealed: bool
 
 bob = Person("Bob")
 bob2 = Person("Bob", None)
@@ -400,17 +400,57 @@ reveal_type(WithoutRepr(1).__repr__)  # revealed: bound method WithoutRepr.__rep
 
 ### `eq`
 
-The same is true for `__eq__`. Setting `eq=False` disables the generated `__eq__` method, but
-`__eq__` is still available via `object.__eq__`:
+Dataclasses generate an `__eq__` method by default. The method accepts any object, including when
+`other` is passed by keyword:
 
 ```py
 from dataclasses import dataclass
 
+@dataclass
+class WithEq:
+    x: int
+
+reveal_type(WithEq.__eq__)  # revealed: (self: WithEq, other: object) -> bool
+reveal_type(WithEq(1).__eq__)  # revealed: (other: object) -> bool
+reveal_type(WithEq(1).__eq__(other=WithEq(2)))  # revealed: bool
+reveal_type(WithEq(1) == WithEq(2))  # revealed: bool
+reveal_type(WithEq(1) != WithEq(2))  # revealed: bool
+reveal_type(WithEq(1) == object())  # revealed: bool
+```
+
+Setting `eq=False` disables generation, leaving `object.__eq__` available through inheritance:
+
+```py
 @dataclass(eq=False)
 class WithoutEq:
     x: int
 
 reveal_type(WithoutEq(1) == WithoutEq(2))  # revealed: bool
+reveal_type(WithoutEq.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+```
+
+An explicitly defined `__eq__` is preserved even with `eq=True`:
+
+```py
+from typing import Literal
+
+@dataclass(eq=True)
+class CustomEq:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+reveal_type(CustomEq() == object())  # revealed: Literal[True]
+reveal_type(CustomEq().__eq__)  # revealed: bound method CustomEq.__eq__(other: object) -> Literal[True]
+```
+
+Assigning an existing method to `__eq__` also prevents generation:
+
+```py
+@dataclass
+class IdentityEq:
+    __eq__ = object.__eq__
+
+reveal_type(IdentityEq.__eq__)  # revealed: (self, value: object, /) -> bool
 ```
 
 ### `order`
@@ -2301,6 +2341,49 @@ class C(Base):
 reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 10) -> None
 ```
 
+### Inheriting equality methods
+
+An undecorated subclass inherits a dataclass's generated `__eq__`. A dataclass with `eq=False` also
+inherits it, while `eq=True` generates a new method for the subclass:
+
+```py
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class Base: ...
+
+class PlainChild(Base): ...
+
+@dataclass(eq=False)
+class InheritedEq(Base): ...
+
+@dataclass(eq=True)
+class GeneratedEq(Base): ...
+
+reveal_type(PlainChild.__eq__)  # revealed: (self: Base, other: object) -> bool
+reveal_type(InheritedEq.__eq__)  # revealed: (self: Base, other: object) -> bool
+reveal_type(GeneratedEq.__eq__)  # revealed: (self: GeneratedEq, other: object) -> bool
+```
+
+Only a definition in the dataclass's own body prevents generation. A custom `__eq__` on a base class
+is replaced unless the subclass uses `eq=False`:
+
+```py
+class CustomBase:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+@dataclass
+class ReplaceCustomEq(CustomBase): ...
+
+@dataclass(eq=False)
+class InheritCustomEq(CustomBase): ...
+
+reveal_type(ReplaceCustomEq() == object())  # revealed: bool
+reveal_type(InheritCustomEq() == object())  # revealed: Literal[True]
+```
+
 ## Conditionally defined fields
 
 ### Statically known conditions
@@ -2431,6 +2514,41 @@ reveal_type(result_int)  # revealed: ChildOfParentDataclass[int]
 
 result_str = uses_dataclass("hello")
 reveal_type(result_str)  # revealed: ChildOfParentDataclass[str]
+```
+
+### Equality across specializations
+
+Dataclass equality compares instances of the same runtime class regardless of their type arguments.
+Even for a final class with invariant type parameters, different specializations can compare equal:
+
+```py
+from dataclasses import dataclass
+from typing import Generic, Self, TypeVar, final
+
+T = TypeVar("T")
+
+@final
+@dataclass
+class Box(Generic[T]):
+    def compare(self, other: Self) -> None:
+        reveal_type(self == other)  # revealed: bool
+        reveal_type(self.__eq__(other))  # revealed: bool
+
+reveal_type(Box[object]() == Box[None]())  # revealed: bool
+reveal_type(Box[object]() != Box[None]())  # revealed: bool
+reveal_type(Box[object].__eq__)  # revealed: (self: Box[object], other: object) -> bool
+reveal_type(Box[object]().__eq__(Box[None]()))  # revealed: bool
+```
+
+With `eq=False`, these disjoint specializations use identity comparison and cannot compare equal:
+
+```py
+@final
+@dataclass(eq=False)
+class IdentityBox(Generic[T]): ...
+
+reveal_type(IdentityBox[object]() == IdentityBox[None]())  # revealed: Literal[False]
+reveal_type(IdentityBox[object]() != IdentityBox[None]())  # revealed: Literal[True]
 ```
 
 ## Descriptor-typed fields
@@ -2905,7 +3023,7 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | N
 
 reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 
-reveal_type(Person.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+reveal_type(Person.__eq__)  # revealed: (self: Person, other: object) -> bool
 ```
 
 ## Function-like behavior of synthesized methods
@@ -2930,6 +3048,7 @@ class C:
 
 reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
 reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
+reveal_type(type(C.__eq__))  # revealed: <class 'FunctionType'>
 
 # We can access attributes that are defined on functions:
 reveal_type(type(C.__init__).__code__)  # revealed: CodeType
