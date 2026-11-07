@@ -1984,14 +1984,13 @@ impl KnownComparisonSemantics {
             if operator == ComparisonOperator::Inequality {
                 let equality = lookup_dunder(db, env, class, "__eq__");
                 // `tuple.__ne__` delegates to its builtin equality implementation.
-                if equality
-                    == lookup_dunder(
-                        db,
-                        env,
-                        KnownClass::Tuple.to_class_literal(db, env),
-                        "__eq__",
-                    )
-                {
+                let tuple_equality = lookup_dunder(
+                    db,
+                    env,
+                    KnownClass::Tuple.to_class_literal(db, env),
+                    "__eq__",
+                );
+                if same_member_implementation(db, equality, tuple_equality) {
                     return Some(Self::Tuple);
                 }
                 if !equality.place.is_undefined() {
