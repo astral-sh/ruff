@@ -198,6 +198,8 @@ pub fn parse_parenthesized_expression_range(
 
 /// Parses a Python expression from a string annotation.
 ///
+/// The annotation is parsed as if surrounded by parentheses.
+///
 /// # Example
 ///
 /// Parsing a string annotation:
@@ -208,13 +210,13 @@ pub fn parse_parenthesized_expression_range(
 /// use ruff_text_size::{TextRange, TextSize};
 ///
 /// let string = StringLiteral {
-///     value: "'''\n int | str'''".to_string().into_boxed_str(),
+///     value: "  int | str".into(),
 ///     flags: StringLiteralFlags::empty(),
-///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
-///     node_index: AtomicNodeIndex::NONE
+///     range: TextRange::new(TextSize::new(0), TextSize::new(13)),
+///     node_index: AtomicNodeIndex::NONE,
 /// };
-/// let parsed = parse_string_annotation("'''\n int | str'''", &string);
-/// assert!(!parsed.is_ok());
+/// let parsed = parse_string_annotation("'  int | str'", &string);
+/// assert!(parsed.is_ok());
 /// ```
 pub fn parse_string_annotation(
     source: &str,
@@ -225,11 +227,7 @@ pub fn parse_string_annotation(
         .add_start(string.flags.opener_len())
         .sub_end(string.flags.closer_len());
     let source = &source[..range.end().to_usize()];
-    if string.flags.is_triple_quoted() {
-        parse_parenthesized_expression_range(source, range)
-    } else {
-        parse_expression_range(source, range)
-    }
+    parse_parenthesized_expression_range(source, range)
 }
 
 /// Parse the given Python source code using the specified [`ParseOptions`].

@@ -72,3 +72,6 @@ F722 Syntax error in forward annotation: unexpected EOF while parsing
 43 | |         (int
 44 | | """
    | |___^
+45 |
+46 |   # Single-quoted annotations are parsed the same way, so leading whitespace is allowed
+   |

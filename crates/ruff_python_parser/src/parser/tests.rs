@@ -1,7 +1,13 @@
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::{
+    AtomicNodeIndex, Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt, StringLiteral,
+    StringLiteralFlags,
+};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
+use crate::{
+    Mode, ParseError, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module,
+    parse_string_annotation,
+};
 
 #[test]
 fn test_modes() {
@@ -51,6 +57,26 @@ fn test_expr_mode_valid_syntax() {
     let parsed = parse_expression(source).unwrap();
 
     insta::assert_debug_snapshot!(parsed.expr());
+}
+
+#[test]
+fn string_annotation_with_whitespace() -> Result<(), ParseError> {
+    let source = "a: '  list[int]  ' = []";
+    let string = StringLiteral {
+        value: "  list[int]  ".into(),
+        flags: StringLiteralFlags::empty(),
+        range: TextRange::new(TextSize::new(3), TextSize::new(18)),
+        node_index: AtomicNodeIndex::NONE,
+    };
+
+    let parsed = parse_string_annotation(source, &string)?;
+
+    assert_eq!(
+        parsed.expr().range(),
+        TextRange::new(TextSize::new(6), TextSize::new(15))
+    );
+    assert_eq!(&source[parsed.expr().range()], "list[int]");
+    Ok(())
 }
 
 #[test]

@@ -509,6 +509,19 @@ help: Wrap in `Literal[...]`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
+## Whitespace in single-quoted annotations
+
+Leading and trailing whitespace is allowed in single-quoted annotations, just as in triple-quoted
+annotations.
+
+```py
+a: "  list[int]" = []
+b: "list[int]  " = []
+
+reveal_type(a)  # revealed: list[int]
+reveal_type(b)  # revealed: list[int]
+```
+
 ## Multi line annotation
 
 Quoted type annotations should be parsed as if surrounded by parentheses.

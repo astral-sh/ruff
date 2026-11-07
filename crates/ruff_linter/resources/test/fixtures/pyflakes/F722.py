@@ -42,3 +42,7 @@ invalid3: """
 invalid4: """
 		(int
 """
+
+# Single-quoted annotations are parsed the same way, so leading whitespace is allowed
+# https://github.com/astral-sh/ty/issues/4529
+w: "  int"
