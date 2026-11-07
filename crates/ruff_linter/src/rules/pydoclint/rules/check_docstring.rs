@@ -663,6 +663,10 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                     }
                 }
             }
+        } else if !line.trim().is_empty() {
+            // If we can't strip the expected indentation, a non-blank dedented line indicates
+            // the end of the section.
+            break;
         }
     }
     entries
@@ -680,23 +684,38 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
 /// ```
 fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
     let mut entries: Vec<ParameterEntry> = Vec::new();
-    let mut lines = content.lines();
+    let mut lines = content.lines().peekable();
     let Some(dashes) = lines.next() else {
         return entries;
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
 
     let mut current_pos = content.full_line_end(dashes.text_len());
-    for potential in lines {
+    while let Some(potential) = lines.next() {
         let line_start = current_pos;
         current_pos = content.full_line_end(line_start);
 
         if let Some(entry) = potential.strip_prefix(indentation) {
+            // Check for Sphinx directives (lines starting with ..)
+            if entry.starts_with("..") {
+                break;
+            }
+
             if entry
                 .chars()
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
+                // Check if the next line is an underline (e.g., '----' or '===='), indicating the
+                // start of a new section.
+                if lines.peek().is_some_and(|next_line| {
+                    let next_trimmed = next_line.trim();
+                    next_trimmed.len() >= 2
+                        && next_trimmed.chars().all(|char| matches!(char, '-' | '='))
+                }) {
+                    break;
+                }
+
                 if let Some(before_colon) = entry.split(':').next() {
                     let param_line = before_colon.trim_end();
 
@@ -799,17 +818,26 @@ fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
 /// ```
 fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    let mut lines = content.lines();
+    let mut lines = content.lines().peekable();
     let Some(dashes) = lines.next() else {
         return entries;
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
-    for potential in lines {
+    while let Some(potential) = lines.next() {
         if let Some(entry) = potential.strip_prefix(indentation) {
             // Check for Sphinx directives (lines starting with ..) - these indicate the end of the
             // section. In numpy-style, exceptions are dedented to the same level as sphinx
             // directives.
             if entry.starts_with("..") {
+                break;
+            }
+            // Check if the next line is an underline (e.g., '----' or '===='), indicating the
+            // start of a new section.
+            if lines.peek().is_some_and(|next_line| {
+                let next_trimmed = next_line.trim();
+                next_trimmed.len() >= 2
+                    && next_trimmed.chars().all(|char| matches!(char, '-' | '='))
+            }) {
                 break;
             }
             if let Some(first_char) = entry.chars().next() {
