@@ -2301,8 +2301,9 @@ pub enum ApplySpecialization<'a, 'db> {
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
-        /// An optional typevar to _not_ substitute when applying the specialization. We use this to
-        /// avoid recursively substituting a type inside of itself.
+        /// Index of the variable whose binding we're resolving. Map it to `Never` even inside
+        /// alias arguments, so substituting `U = tuple[Tree[U], ...]` into another binding
+        /// cannot add a tuple layer on every pass.
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
@@ -2414,32 +2415,19 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
-    /// Convert this specialization mapping to a concrete specialization over its own generic
-    /// context, preserving skipped type variables in partial specializations as identity mappings.
+    /// Convert this specialization mapping to a concrete specialization over its own generic context.
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
-                generic_context,
-                types,
-                skip,
+                generic_context, ..
             } => Some(
                 generic_context.specialize(
                     db,
                     generic_context
                         .variables(db)
-                        .enumerate()
-                        .map(|(index, bound_typevar)| {
-                            if skip.is_some_and(|skip| skip == index) {
-                                Type::TypeVar(bound_typevar)
-                            } else {
-                                types
-                                    .get(index)
-                                    .copied()
-                                    .unwrap_or(Type::TypeVar(bound_typevar))
-                            }
-                        })
+                        .map(|variable| self.get(db, variable).unwrap_or(Type::TypeVar(variable)))
                         .collect::<Vec<_>>(),
                 ),
             ),

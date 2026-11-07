@@ -5762,6 +5762,27 @@ def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
+## Recursive alias in a generic call's return type
+
+We infer `Tree[V]` for `subtree(entry)` even when the caller expects `V`. This call used to
+[overflow the stack](https://github.com/astral-sh/ty/issues/4972).
+
+```py
+from typing import cast
+
+type Tree[T] = T | tuple[Tree[T], ...]
+
+def subtree[K, T](entry: tuple[K, Tree[T]]) -> Tree[T]:
+    return entry[1]
+
+def cast_leaf[V](entry: tuple[V, V]) -> V:
+    return cast(V, subtree(entry))  # ok
+
+def leaf[V](entry: tuple[V, V]) -> V:
+    # error: [invalid-return-type] "expected `V@leaf`, found `Tree[V@leaf]`"
+    return subtree(entry)
+```
+
 ## Generic property setters implementing protocols
 
 These deliberately contrived setters could use `object` and `int` directly instead of method-scoped
