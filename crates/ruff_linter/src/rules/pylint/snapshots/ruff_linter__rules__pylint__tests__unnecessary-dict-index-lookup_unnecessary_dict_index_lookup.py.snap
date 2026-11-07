@@ -103,36 +103,51 @@ help: Use existing variable
    |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
-  --> unnecessary_dict_index_lookup.py:50:51
+  --> unnecessary_dict_index_lookup.py:44:16
    |
-48 |         if mapped_label in mapped_arrays:
-49 |             for i in range(len(array)):
-50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
-   |                                                   ^^^^^^^^^^^^^^^^^^^
-51 |         else:
-52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
-   |
+42 |     for fruit_name, fruit_count in FRUITS.items():
+43 |         other[fruit_name] = 0
+44 |         assert FRUITS[fruit_name] == fruit_count  # PLR1733
+   |                ^^^^^^^^^^^^^^^^^^
 help: Use existing variable
    |
-49 |             for i in range(len(array)):
-   -                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
-50 +                 mapped_arrays[mapped_label][i] += array[i]  # PLR1733
-51 |         else:
+43 |         other[fruit_name] = 0
+   -         assert FRUITS[fruit_name] == fruit_count  # PLR1733
+44 +         assert fruit_count == fruit_count  # PLR1733
+45 |
    |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
-  --> unnecessary_dict_index_lookup.py:52:44
+  --> unnecessary_dict_index_lookup.py:65:51
    |
-50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
-51 |         else:
-52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
-   |                                            ^^^^^^^^^^^^^^^^^^^
-53 |     return mapped_arrays
+63 |         if mapped_label in mapped_arrays:
+64 |             for i in range(len(array)):
+65 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+   |                                                   ^^^^^^^^^^^^^^^^^^^
+66 |         else:
+67 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
    |
 help: Use existing variable
    |
-51 |         else:
+64 |             for i in range(len(array)):
+   -                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+65 +                 mapped_arrays[mapped_label][i] += array[i]  # PLR1733
+66 |         else:
+   |
+
+PLR1733 [*] Unnecessary lookup of dictionary value by key
+  --> unnecessary_dict_index_lookup.py:67:44
+   |
+65 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+66 |         else:
+67 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+   |                                            ^^^^^^^^^^^^^^^^^^^
+68 |     return mapped_arrays
+   |
+help: Use existing variable
+   |
+66 |         else:
    -             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
-52 +             mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
-53 |     return mapped_arrays
+67 +             mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
+68 |     return mapped_arrays
    |

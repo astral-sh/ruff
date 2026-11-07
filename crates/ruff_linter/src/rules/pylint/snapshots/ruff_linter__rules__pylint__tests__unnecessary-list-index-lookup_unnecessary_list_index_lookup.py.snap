@@ -155,48 +155,48 @@ help: Use the loop variable directly
    |
 
 PLR1736 [*] List index lookup in `enumerate()` loop
-  --> unnecessary_list_index_lookup.py:74:15
+  --> unnecessary_list_index_lookup.py:80:15
    |
-72 |     # PLR1736
-73 |     for index, list_item in enumerate(some_list, start=0):
-74 |         print(some_list[index])
+78 |     # PLR1736
+79 |     for index, list_item in enumerate(some_list, start=0):
+80 |         print(some_list[index])
    |               ^^^^^^^^^^^^^^^^
-75 |
-76 |     # PLR1736
+81 |
+82 |     # PLR1736
    |
 help: Use the loop variable directly
    |
-73 |     for index, list_item in enumerate(some_list, start=0):
+79 |     for index, list_item in enumerate(some_list, start=0):
    -         print(some_list[index])
-74 +         print(list_item)
-75 |
+80 +         print(list_item)
+81 |
    |
 
 PLR1736 [*] List index lookup in `enumerate()` loop
-  --> unnecessary_list_index_lookup.py:78:15
+  --> unnecessary_list_index_lookup.py:84:15
    |
-76 |     # PLR1736
-77 |     for index, list_item in enumerate(some_list):
-78 |         print(some_list[index])
+82 |     # PLR1736
+83 |     for index, list_item in enumerate(some_list):
+84 |         print(some_list[index])
    |               ^^^^^^^^^^^^^^^^
 help: Use the loop variable directly
    |
-77 |     for index, list_item in enumerate(some_list):
+83 |     for index, list_item in enumerate(some_list):
    -         print(some_list[index])
-78 +         print(list_item)
-79 |
+84 +         print(list_item)
+85 |
    |
 
 PLR1736 [*] List index lookup in `enumerate()` loop
-  --> unnecessary_list_index_lookup.py:85:18
+  --> unnecessary_list_index_lookup.py:91:18
    |
-83 |     column_names = ["a", "b"]
-84 |     for index, column_name in enumerate(column_names):
-85 |         _ = data[column_names[index]]  # PLR1736
+89 |     column_names = ["a", "b"]
+90 |     for index, column_name in enumerate(column_names):
+91 |         _ = data[column_names[index]]  # PLR1736
    |                  ^^^^^^^^^^^^^^^^^^^
 help: Use the loop variable directly
    |
-84 |     for index, column_name in enumerate(column_names):
+90 |     for index, column_name in enumerate(column_names):
    -         _ = data[column_names[index]]  # PLR1736
-85 +         _ = data[column_name]  # PLR1736
+91 +         _ = data[column_name]  # PLR1736
    |

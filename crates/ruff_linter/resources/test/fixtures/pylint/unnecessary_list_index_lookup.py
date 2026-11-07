@@ -52,6 +52,12 @@ def dont_fix_these():
         del index  # OK
         print(letters[index])  # OK
 
+    # reads before a mutation are also unsafe: the enumerate value is a snapshot
+    for index, letter in enumerate(letters):
+        while letters[index] != "z":  # OK
+            letters[index] += "z"
+        print(letters[index])  # OK
+
 
 def value_intentionally_unused():
     [letters[index] for index, _ in enumerate(letters)]  # OK

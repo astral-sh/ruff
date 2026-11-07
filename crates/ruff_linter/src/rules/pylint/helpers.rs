@@ -119,6 +119,17 @@ impl SequenceIndexVisitor<'_> {
             _ => false,
         }
     }
+
+    /// Mark the sequence as modified and drop any prior subscript accesses.
+    ///
+    /// The value binding from `.items()` / `enumerate()` is a snapshot of the element at the
+    /// start of the iteration. Once the sequence (or the index/value name) is mutated in the
+    /// loop body, replacing earlier `seq[index]` reads with that binding can change behavior
+    /// (for example, `while d[k] >= 2: d[k] -= 2` must keep looking up `d[k]`).
+    fn mark_modified(&mut self) {
+        self.modified = true;
+        self.accesses.clear();
+    }
 }
 
 impl Visitor<'_> for SequenceIndexVisitor<'_> {
@@ -128,21 +139,29 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.mark_modified();
+                }
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
+                    if self.is_assignment(target) {
+                        self.mark_modified();
+                    }
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
+                if self.is_assignment(target) {
+                    self.mark_modified();
+                }
                 self.visit_expr(value);
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.mark_modified();
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         }

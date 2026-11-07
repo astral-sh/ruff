@@ -28,6 +28,21 @@ def dont_fix_these():
             fruit_count = -fruit_count
         assert FRUITS[fruit_name] == 0  # OK
 
+    # reads before a mutation are also unsafe to replace: the value binding is a snapshot, and
+    # replacing `d[k]` with `v` changes loops that keep reading the updated dict entry.
+    # https://github.com/astral-sh/ruff/issues/29842
+    for fruit_name, fruit_count in FRUITS.items():
+        while FRUITS[fruit_name] >= 2:  # OK
+            FRUITS[fruit_name] -= 2
+        if FRUITS[fruit_name]:  # OK
+            pass
+
+    # mutation of a different dict must not suppress diagnostics on this dict
+    other = {}
+    for fruit_name, fruit_count in FRUITS.items():
+        other[fruit_name] = 0
+        assert FRUITS[fruit_name] == fruit_count  # PLR1733
+
 
 def value_intentionally_unused():
     [FRUITS[fruit_name] for fruit_name, _ in FRUITS.items()]  # OK
