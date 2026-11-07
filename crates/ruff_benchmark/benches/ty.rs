@@ -1496,6 +1496,25 @@ fn benchmark_paramspec_bounded_overloads(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[paramspec_bounded_overloads]", &code);
 }
 
+/// A generic wrapper should look up each callable field only once.
+fn benchmark_callable_field_arguments(criterion: &mut Criterion) {
+    let calls = "            wrap(handlers.callback)\n".repeat(256);
+    let code = format!(
+        "
+        from collections.abc import Callable
+
+        class Handlers:
+            callback: Callable[[], int]
+
+        def wrap[**P, R](f: Callable[P, R]) -> Callable[P, R]:
+            return f
+
+        def register(handlers: Handlers):
+{calls}"
+    );
+    benchmark_micro_case(criterion, "ty_micro[callable_field_arguments]", &code);
+}
+
 /// Regression benchmark for many precise arguments flowing into one variadic parameter.
 ///
 /// The declared type is intentionally non-gradual, so argument checks still run. The important
@@ -2890,6 +2909,7 @@ criterion_group!(
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
     benchmark_paramspec_bounded_overloads,
+    benchmark_callable_field_arguments,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,

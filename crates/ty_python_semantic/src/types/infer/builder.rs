@@ -6963,18 +6963,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_dict_comprehension_expression(dictcomp, tcx)
             }
             ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => {
-                let ty = self.infer_name_expression(name);
-                tcx.declared_type().map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
-            ast::Expr::Attribute(attribute) => {
-                let ty = self.infer_attribute_expression(attribute);
-                tcx.declared_type().map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
-            }
+            ast::Expr::Name(name) => self.infer_name_expression(name),
+            ast::Expr::Attribute(attribute) => self.infer_attribute_expression(attribute),
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
@@ -7022,6 +7012,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
+        if let Type::ClassLiteral(class) = ty
+            && let Some(target) = tcx.declared_type()
+            && matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+        {
+            ty = self.specialize_generic_class_from_context(class, target);
+        }
+
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.declared_type()
@@ -7186,13 +7183,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This allows `list` to be specialized to `list[str]` given the type context
     /// `type[list[str]]` or `Callable[[], list[str]]`.
-    fn specialize_generic_class_from_context(&self, ty: Type<'db>, target: Type<'db>) -> Type<'db> {
+    fn specialize_generic_class_from_context(
+        &self,
+        class: ClassLiteral<'db>,
+        target: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-
-        let Type::ClassLiteral(class) = ty else {
-            return ty;
-        };
 
         if let Some(specialized) =
             self.specialize_generic_class_from_callable_context(class, target)
@@ -7232,7 +7229,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         class_type
             .map(Type::GenericAlias)
             .filter(|class_type| !class_type.has_provisional_marker(db, env))
-            .unwrap_or(ty)
+            .unwrap_or(Type::ClassLiteral(class))
     }
 
     #[track_caller]
@@ -9547,20 +9544,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }))
     }
 
-    /// A method reference passed to a callable parameter keeps its bound method type under
-    /// every specialization of that parameter. Check the call with that argument directly.
-    fn bound_method_argument(
+    /// Look up a dotted argument such as `service.callback` once for a generic callable wrapper.
+    /// The parameter's type context can specialize the resulting value, but does not affect
+    /// lookup of the attribute or its receiver.
+    fn infer_wrapper_argument_attribute<'a>(
         &mut self,
         callable: Type<'db>,
-        args: &ast::Arguments,
+        args: &'a ast::Arguments,
         tcx: TypeContext<'db>,
-    ) -> Option<Type<'db>> {
-        let [arg @ ast::Expr::Attribute(_)] = args.args.as_ref() else {
+    ) -> Option<(&'a ast::Expr, Type<'db>)> {
+        let [arg @ ast::Expr::Attribute(attribute)] = args.args.as_ref() else {
             return None;
         };
-        // A failed probe retries ordinary inference. Keep calls in the receiver out of
-        // the probe so nested wrappers cannot re-infer each other on every retry.
-        if !is_dotted_name(arg) || !args.keywords.is_empty() || tcx != TypeContext::default() {
+        if tcx != TypeContext::default() || !args.keywords.is_empty() || !is_dotted_name(arg) {
             return None;
         }
         let Type::FunctionLiteral(function) = callable else {
@@ -9581,14 +9577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             return None;
         }
-        let mut speculative = self.speculate();
-        let method @ Type::BoundMethod(_) =
-            speculative.infer_expression(arg, TypeContext::default())
-        else {
-            return None;
-        };
-        self.extend(speculative);
-        Some(method)
+        Some((arg, self.infer_attribute_expression(attribute)))
     }
 
     fn infer_call_expression_impl(
@@ -10095,10 +10084,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None
         };
 
-        let bindings_result = if let Some(method) =
-            self.bound_method_argument(callable_type, arguments, call_expression_tcx)
+        let attribute_argument =
+            self.infer_wrapper_argument_attribute(callable_type, arguments, call_expression_tcx);
+        let bindings_result = if let Some((arg, ty @ (Type::BoundMethod(_) | Type::Callable(_)))) =
+            attribute_argument
         {
-            call_arguments.insert_type(0, TypeContext::default(), method);
+            // Callable fields and bound methods have the same type under every specialization.
+            let ty = self.finish_expression_type(arg, ty, TypeContext::default());
+            call_arguments.insert_type(0, TypeContext::default(), ty);
             bindings
                 .check_types(
                     db,
@@ -10114,6 +10107,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ArgumentsIter::from_ast(arguments),
                 &mut call_arguments,
                 &mut |builder, (_, expr, tcx)| {
+                    if let Some((_, ty)) = attribute_argument {
+                        // A class-valued attribute can specialize differently on each pass.
+                        return builder.finish_expression_type(expr, ty, tcx);
+                    }
                     if let Some(value) = cast_value
                         && std::ptr::eq(expr, value)
                     {
