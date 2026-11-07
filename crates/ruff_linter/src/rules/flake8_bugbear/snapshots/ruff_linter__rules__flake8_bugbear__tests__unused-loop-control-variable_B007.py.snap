@@ -184,3 +184,41 @@ B007 Loop control variable `line_` not used within loop body
    |     ^^^^^
 99 |     fp.readline()
    |
+
+B007 [*] Loop control variable `v` not used within loop body
+   --> B007.py:112:12
+    |
+110 | def keys_only(d: dict[str, int]) -> list[str]:
+111 |     out = []
+112 |     for k, v in d.items():
+    |            ^
+113 |         out.append(k)
+114 |     return out
+    |
+help: Use `.keys()` and iterate the used half
+    |
+111 |     out = []
+    -     for k, v in d.items():
+112 +     for k in d.keys():
+113 |         out.append(k)
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B007 [*] Loop control variable `k` not used within loop body
+   --> B007.py:119:9
+    |
+117 | def values_only(d: dict[str, int]) -> list[int]:
+118 |     out = []
+119 |     for k, v in d.items():
+    |         ^
+120 |         out.append(v)
+121 |     return out
+    |
+help: Use `.values()` and iterate the used half
+    |
+118 |     out = []
+    -     for k, v in d.items():
+119 +     for v in d.values():
+120 |         out.append(v)
+    |
+note: This is an unsafe fix and may change runtime behavior

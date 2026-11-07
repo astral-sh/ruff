@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
@@ -47,6 +48,11 @@ pub(crate) struct UnusedLoopControlVariable {
     /// The name to which the variable should be renamed, if it can be
     /// safely renamed.
     rename: Option<String>,
+    /// If the loop iterates over `dict.items()` and only one half of the
+    /// unpacked pair is used, this is `"keys"` or `"values"`; the fix then
+    /// changes the loop to iterate the corresponding dict view instead of
+    /// merely renaming the unused half (#29939).
+    dict_view: Option<String>,
     /// Whether the variable is certain to be unused in the loop body, or
     /// merely suspect. A variable _may_ be used, but undetectably
     /// so, if the loop incorporates by magic control flow (e.g.,
@@ -73,7 +79,16 @@ impl Violation for UnusedLoopControlVariable {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedLoopControlVariable { rename, name, .. } = self;
+        let UnusedLoopControlVariable {
+            rename,
+            name,
+            dict_view,
+            ..
+        } = self;
+
+        if let Some(view) = &dict_view {
+            return Some(format!("Use `.{view}()` and iterate the used half"));
+        }
 
         rename
             .as_ref()
@@ -131,10 +146,20 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             .is_match(rename.as_str())
             .then_some(rename);
 
+        let dict_items_view = unused_dict_items_view(
+            checker,
+            stmt_for,
+            &used_names,
+        )
+        .filter(|suggestion| suggestion.unused_name == name);
+
         let mut diagnostic = checker.report_diagnostic(
             UnusedLoopControlVariable {
                 name: name.to_string(),
                 rename: rename.clone(),
+                dict_view: dict_items_view
+                    .as_ref()
+                    .map(|suggestion| suggestion.view.to_string()),
                 certainty,
             },
             expr.range(),
@@ -144,7 +169,30 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
         }
 
-        if let Some(rename) = rename {
+        if let Some(dict_items_view) = dict_items_view
+            && certainty == Certainty::Certain
+        {
+            // Avoid fixing if the unused variable, or any future bindings
+            // to it, are used _after_ the loop.
+            let scope = checker.semantic().current_scope();
+            if scope
+                .get_all(name)
+                .map(|binding_id| checker.semantic().binding(binding_id))
+                .filter(|binding| binding.start() >= expr.start())
+                .all(Binding::is_unused)
+            {
+                diagnostic.set_fix(Fix::unsafe_edits(
+                    Edit::range_replacement(
+                        dict_items_view.view.to_string(),
+                        dict_items_view.attr_range,
+                    ),
+                    [Edit::range_replacement(
+                        dict_items_view.used_name.to_string(),
+                        stmt_for.target.range(),
+                    )],
+                ));
+            }
+        } else if let Some(rename) = rename {
             if certainty == Certainty::Certain {
                 // Avoid fixing if the variable, or any future bindings to the variable, are
                 // used _after_ the loop.
@@ -162,6 +210,73 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
                 }
             }
         }
+    }
+}
+
+struct DictItemsView<'a> {
+    view: &'static str,
+    used_name: &'a str,
+    unused_name: &'a str,
+    attr_range: ruff_text_size::TextRange,
+}
+
+fn unused_dict_items_view<'a>(
+    checker: &Checker,
+    stmt_for: &'a ast::StmtFor,
+    used_names: &FxHashMap<&'a str, &'a ast::ExprName>,
+) -> Option<DictItemsView<'a>> {
+    use ruff_python_semantic::analyze::typing::is_dict;
+
+    let call = stmt_for.iter.as_call_expr()?;
+    if !call.arguments.is_empty() {
+        return None;
+    }
+    let Some(attr_expr) = call.func.as_attribute_expr() else {
+        return None;
+    };
+    if attr_expr.attr.id.to_string() != "items" {
+        return None;
+    }
+    let Some(name_expr) = attr_expr.value.as_name_expr() else {
+        return None;
+    };
+    let id = name_expr.id.as_str();
+    let Some(binding_id) = checker.semantic().lookup_symbol(id).binding_id() else {
+        return None;
+    };
+    if !is_dict(checker.semantic().binding(binding_id), checker.semantic()) {
+        return None;
+    }
+    let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
+        return None;
+    };
+    let [key, value] = elts.as_slice() else {
+        return None;
+    };
+    let key = key.as_name_expr()?.id.as_str();
+    let value = value.as_name_expr()?.id.as_str();
+    if checker.settings().dummy_variable_rgx.is_match(key)
+        || checker.settings().dummy_variable_rgx.is_match(value)
+    {
+        return None;
+    }
+
+    if !used_names.contains_key(key) && used_names.contains_key(value) {
+        Some(DictItemsView {
+            view: "values",
+            used_name: value,
+            unused_name: key,
+            attr_range: attr_expr.attr.range(),
+        })
+    } else if !used_names.contains_key(value) && used_names.contains_key(key) {
+        Some(DictItemsView {
+            view: "keys",
+            used_name: key,
+            unused_name: value,
+            attr_range: attr_expr.attr.range(),
+        })
+    } else {
+        None
     }
 }
 

@@ -98,9 +98,24 @@ def f():
 for line_ in range(self.header_lines):
     fp.readline()
 
+
 # Regression test: visitor didn't walk the elif test
 for key, value in current_crawler_tags.items():
     if key:
         pass
     elif wanted_tag_value != value:
         pass
+
+
+def keys_only(d: dict[str, int]) -> list[str]:
+    out = []
+    for k, v in d.items():
+        out.append(k)
+    return out
+
+
+def values_only(d: dict[str, int]) -> list[int]:
+    out = []
+    for k, v in d.items():
+        out.append(v)
+    return out
