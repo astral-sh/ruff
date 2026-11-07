@@ -566,6 +566,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ImportOutsideTopLevel) {
                 pylint::rules::import_outside_top_level(checker, stmt);
             }
+            if checker.is_rule_enabled(Rule::LazyImport) {
+                ruff::rules::lazy_import(checker, stmt);
+            }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 for name in names {
                     if let Some(asname) = name.asname.as_ref() {
@@ -727,6 +730,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::ImportOutsideTopLevel) {
                 pylint::rules::import_outside_top_level(checker, stmt);
+            }
+            if checker.is_rule_enabled(Rule::LazyImport) {
+                ruff::rules::lazy_import(checker, stmt);
             }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 for name in names {

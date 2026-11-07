@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF078 [*] `import` inside a function can be a `lazy` import
+ --> RUF078.py:5:5
+  |
+4 | def needs_pandas():
+5 |     import pandas  # RUF078
+  |     ^^^^^^^^^^^^^
+6 |
+7 |     return pandas.DataFrame()
+  |
+help: Add the `lazy` keyword
+  |
+4 | def needs_pandas():
+  -     import pandas  # RUF078
+5 +     lazy import pandas  # RUF078
+6 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF078 [*] `import` inside a function can be a `lazy` import
+  --> RUF078.py:11:5
+   |
+10 | def needs_yaml():
+11 |     from yaml import safe_load  # RUF078
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+12 |
+13 |     return safe_load
+   |
+help: Add the `lazy` keyword
+   |
+10 | def needs_yaml():
+   -     from yaml import safe_load  # RUF078
+11 +     lazy from yaml import safe_load  # RUF078
+12 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF078 [*] `import` inside a function can be a `lazy` import
+  --> RUF078.py:24:9
+   |
+22 | class Loader:
+23 |     def load(self):
+24 |         from io import BytesIO  # RUF078
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 |         return BytesIO()
+   |
+help: Add the `lazy` keyword
+   |
+23 |     def load(self):
+   -         from io import BytesIO  # RUF078
+24 +         lazy from io import BytesIO  # RUF078
+25 |
+   |
+note: This is an unsafe fix and may change runtime behavior
