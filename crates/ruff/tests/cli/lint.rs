@@ -1373,6 +1373,24 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
 }
 
 #[test]
+fn renamed_rule_selector() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "def f(): pass")?;
+    let old_name = "missing-return-type-undocumented-public-function";
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--select", old_name]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:5: missing-return-type-public-function: Missing return type annotation for public function `f`
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn rule_category_selector_cli_preview_disabled() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
 

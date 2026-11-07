@@ -24,7 +24,7 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -50,7 +50,7 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -93,7 +93,7 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -111,7 +111,7 @@ mod tests {
             Path::new("flake8_annotations/auto_return_type.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -130,7 +130,7 @@ mod tests {
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY38.into(),
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -155,7 +155,7 @@ mod tests {
                     Rule::MissingTypeFunctionArgument,
                     Rule::MissingTypeArgs,
                     Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -190,7 +190,7 @@ mod tests {
             Path::new("flake8_annotations/allow_overload.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -208,7 +208,7 @@ mod tests {
             Path::new("flake8_annotations/allow_nested_overload.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -235,7 +235,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/shadowed_builtins.py"),
             &LinterSettings::for_rules(vec![
-                Rule::MissingReturnTypeUndocumentedPublicFunction,
+                Rule::MissingReturnTypePublicFunction,
                 Rule::MissingReturnTypePrivateFunction,
                 Rule::MissingReturnTypeSpecialMethod,
                 Rule::MissingReturnTypeStaticMethod,

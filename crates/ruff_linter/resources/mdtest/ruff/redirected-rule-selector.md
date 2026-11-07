@@ -43,3 +43,27 @@ help: Replace with `TC`
 4 + select = ['TC', 'F', 'unused-import']  # snapshot: redirected-rule-selector
   |
 ```
+
+## Renamed rules
+
+`ruff.toml`:
+
+```toml
+[lint]
+# snapshot: redirected-rule-selector
+select = ["missing-return-type-undocumented-public-function"]
+```
+
+```snapshot
+error[RUF202]: Rule selector `missing-return-type-undocumented-public-function` redirects to `missing-return-type-public-function` in `lint.select`
+ --> src/ruff.toml:3:12
+  |
+3 | select = ["missing-return-type-undocumented-public-function"]
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `missing-return-type-public-function`
+  |
+2 | # snapshot: redirected-rule-selector
+  - select = ["missing-return-type-undocumented-public-function"]
+3 + select = ["missing-return-type-public-function"]
+  |
+```
