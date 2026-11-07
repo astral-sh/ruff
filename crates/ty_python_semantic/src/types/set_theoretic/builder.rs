@@ -47,13 +47,13 @@ use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{TypeKind, any_over_type};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
     StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, Program, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -240,6 +240,32 @@ fn remove_covered_exclusions<'db>(
     Some(widened.build())
 }
 
+/// Union simplification checks each element against many partners. Whether it contains an
+/// alias depends only on that element and its environment.
+fn contains_alias<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+    if ty.is_alias_like() {
+        return true;
+    }
+    if matches!(TypeKind::from(ty), TypeKind::Atomic)
+        || matches!(ty, Type::NominalInstance(instance) if !instance.is_definition_generic(db))
+    {
+        return false;
+    }
+
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    fn contains_alias_inner<'db>(db: &'db dyn Db, program: Program<'db>, ty: Type<'db>) -> bool {
+        any_over_type(
+            db,
+            &ProgramEnvironment::from_program(program),
+            ty,
+            false,
+            Type::is_alias_like,
+        )
+    }
+
+    contains_alias_inner(db, env.program(db), ty)
+}
+
 /// Literal groups bypass pairwise union simplification. Match their exclusions in one pass so
 /// that restoring many excluded literals does not require comparing every pair of literals.
 fn normalize_covered_literal_exclusions<'db>(
@@ -263,7 +289,7 @@ fn normalize_covered_literal_exclusions<'db>(
 
     let mut changed = false;
     for ty in types {
-        if !unpack_aliases && any_over_type(db, env, *ty, false, Type::is_alias_like) {
+        if !unpack_aliases && contains_alias(db, env, *ty) {
             continue;
         }
         if let Some(widened) = remove_covered_exclusions(db, env, *ty, |excluded| {
@@ -1286,7 +1312,7 @@ impl<'db> UnionBuilder<'db> {
                 if !self.unpack_aliases
                     && [ty, element_type]
                         .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
+                        .any(|ty| contains_alias(db, &self.env, ty))
                 {
                     continue;
                 }
