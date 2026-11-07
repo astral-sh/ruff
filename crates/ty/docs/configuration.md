@@ -210,7 +210,7 @@ inferred, but we plan to change this soon.
 Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
 inference.
 
-**Default value**: `"never"`
+**Default value**: `"always"`
 
 **Type**: `"never" | "always"`
 
@@ -924,7 +924,7 @@ inferred, but we plan to change this soon.
 Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
 inference.
 
-**Default value**: `"never"`
+**Default value**: `"always"`
 
 **Type**: `"never" | "always"`
 
