@@ -1678,20 +1678,11 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
     target_ty: Type<'db>,
     source: AnyNodeRef<'_>,
 ) -> bool {
-    target_ty
-        .filter_union(db, env, Type::is_typed_dict)
-        .as_typed_dict()
-        .is_some()
-        && matches!(source, AnyNodeRef::ExprDict(_))
-}
-
-fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
-    context: &'env InferContext,
-    node: T,
-    message: std::fmt::Arguments,
-) -> Option<LintDiagnosticGuard<'db, 'env>> {
-    let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
-    Some(builder.into_diagnostic(message))
+    matches!(source, AnyNodeRef::ExprDict(_))
+        && target_ty
+            .filter_union(db, env, Type::is_typed_dict)
+            .as_typed_dict()
+            .is_some()
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
@@ -2165,22 +2156,18 @@ pub(super) fn report_invalid_assignment<'db>(
         value_ty,
         AssignmentDiagnosticKind::Invalid,
     );
-    let settings =
-        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
-
     let diagnostic_range =
         assignment_diagnostic_range(context, target_node, value_node, invalid_element.as_ref());
-    let Some(mut diag) = report_invalid_assignment_with_message(
-        context,
-        diagnostic_range,
-        format_args!(
-            "Object of type `{}` is not assignable to `{}`",
-            value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings.clone())
-        ),
-    ) else {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, diagnostic_range) else {
         return;
     };
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
+    let mut diag = builder.into_diagnostic(format_args!(
+        "Object of type `{}` is not assignable to `{}`",
+        value_ty.display_with(db, env, settings.clone()),
+        target_ty.display_with(db, env, settings.clone())
+    ));
 
     if matches!(target_node, AnyNodeRef::ExprName(_)) {
         match target_ty {
@@ -2355,19 +2342,16 @@ pub(super) fn report_invalid_attribute_assignment(
     // silenced diagnostics during attribute resolution, and rely on the assignability
     // diagnostic being emitted here.
 
-    let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
-    let Some(mut diag) = report_invalid_assignment_with_message(
-        context,
-        range,
-        format_args!(
-            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings),
-        ),
-    ) else {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, range) else {
         return;
     };
+    let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
+    let mut diag = builder.into_diagnostic(format_args!(
+        "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+        source_ty.display_with(db, env, settings.clone()),
+        target_ty.display_with(db, env, settings),
+    ));
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
     error_context.attach_to(db, env, &mut diag);

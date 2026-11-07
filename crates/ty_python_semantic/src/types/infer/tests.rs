@@ -1069,6 +1069,32 @@ value.bit_count()
 }
 
 #[test]
+fn suppressed_call_error_skips_callable_description() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    let source = "def f() -> int: return 1\nf(1)";
+    let query = "CallableDescription < 'db >::from_overload_";
+
+    db.write_file(
+        path,
+        format!("{source}  # ty: ignore[too-many-positional-arguments]"),
+    )?;
+    assert_file_diagnostics(&db, path, &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query, None, &events);
+
+    db.write_file(path, source)?;
+    assert_file_diagnostics(
+        &db,
+        path,
+        &["Too many positional arguments to function `f`: expected 0, got 1"],
+    );
+    let events = db.take_salsa_events();
+    assert!(find_will_execute_event_by_name(&db, query, None, &events).is_some());
+    Ok(())
+}
+
+#[test]
 fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
     let mut db = setup_db();
 
