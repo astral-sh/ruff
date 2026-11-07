@@ -488,20 +488,22 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some(prev_end) = prev_end {
+        // Preserve everything up to the last right paren before the modulo symbol. Each paren
+        // must only be added once, so the text is sliced after the loop rather than per paren.
+        let mut closing_parens_end = None;
         for token in checker.tokens().after(prev_end) {
             match token.kind() {
-                // If we hit a right paren, we have to preserve it.
-                TokenKind::Rpar => {
-                    contents.push_str(
-                        checker
-                            .locator()
-                            .slice(TextRange::new(prev_end, token.end())),
-                    );
-                }
-                // Break as soon as we find the modulo symbol.
+                TokenKind::Rpar => closing_parens_end = Some(token.end()),
                 TokenKind::Percent => break,
                 _ => {}
             }
+        }
+        if let Some(closing_parens_end) = closing_parens_end {
+            contents.push_str(
+                checker
+                    .locator()
+                    .slice(TextRange::new(prev_end, closing_parens_end)),
+            );
         }
     }
 
