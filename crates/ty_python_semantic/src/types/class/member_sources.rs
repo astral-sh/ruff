@@ -9,7 +9,7 @@ use ty_python_core::{
 };
 
 use super::{ClassBase, ClassType, CodeGeneratorKind, StaticClassLiteral};
-use crate::{Db, types::generics::Specialization};
+use crate::Db;
 
 /// Which sources to consult when looking up a member on this class.
 pub(super) enum ClassMemberLookup<'db> {
@@ -116,26 +116,18 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    pub(super) fn may_have_instance_member(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-        name: &str,
-    ) -> bool {
-        self.instance_member_names(db, specialization)
-            .might_contain(name)
+    pub(super) fn may_have_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.instance_member_names(db).might_contain(name)
     }
 
     /// A static base can supply an instance attribute through a class-body declaration or receiver
-    /// assignment. A dynamic base or a cycle leaves every name possible.
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| MemberNameFilter::ALL, heap_size=ruff_memory_usage::heap_size)]
-    fn instance_member_names(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> MemberNameFilter {
+    /// assignment. C3 merges bases by [class identity](ClassBase::mro_identity), so specializations
+    /// share the same member names. A possible hit still uses the specialized MRO to infer its type.
+    /// A dynamic base or an unresolved MRO leaves every name possible.
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| MemberNameFilter::ALL, heap_size=ruff_memory_usage::heap_size)]
+    fn instance_member_names(self, db: &'db dyn Db) -> MemberNameFilter {
         let mut names = MemberNameFilter::default();
-        for base in self.iter_mro(db, specialization) {
+        for base in self.iter_mro(db, None) {
             match base {
                 ClassBase::Class(class) => {
                     let Some((literal, _)) = class.static_class_literal(db) else {
@@ -197,19 +189,19 @@ fn collect_implicit_attribute_names<'db>(
 }
 
 /// A fixed-size Bloom filter for member names. A miss rules out the name. A possible hit
-/// runs ordinary lookup. Unioning two filters takes sixteen word operations.
+/// runs ordinary lookup. Unioning two filters takes eight word operations.
 #[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct MemberNameFilter([u64; 16]);
+struct MemberNameFilter([u64; 8]);
 
 impl MemberNameFilter {
-    const ALL: Self = Self([u64::MAX; 16]);
+    const ALL: Self = Self([u64::MAX; 8]);
 
     fn position(name: &str) -> (usize, u64) {
         let [low, high, ..] = FxBuildHasher.hash_one(name).to_le_bytes();
         let hash = u16::from_le_bytes([low, high]);
-        // Four bits select a word. Each remaining group of six selects a bit in that word.
+        // The three high bits select a word. Two groups of six low bits select positions in it.
         (
-            usize::from(hash >> 12),
+            usize::from(hash >> 13),
             (1 << (hash % 64)) | (1 << ((hash >> 6) % 64)),
         )
     }

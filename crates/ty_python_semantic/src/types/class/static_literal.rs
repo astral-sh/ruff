@@ -2973,7 +2973,7 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.may_have_instance_member(db, specialization, name)
+        if !self.may_have_instance_member(db, name)
             || self.is_typed_dict(db)
             || self.lacks_instance_storage(db, name)
         {
