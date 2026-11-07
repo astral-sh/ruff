@@ -249,6 +249,13 @@ pub trait WritableSystem: System {
     /// Writes the given content to the file at the given path.
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
 
+    /// Replaces the file's contents without exposing a partial write.
+    ///
+    /// OS-backed implementations replace the file after writing a temporary file in the same
+    /// directory. Symlinks and permissions are preserved, but other hard links retain the old
+    /// contents. Replacement requires write access to the parent directory.
+    fn write_file_atomic(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
+
     /// Removes the file at the given path.
     fn remove_file(&self, path: &SystemPath) -> Result<()>;
 
