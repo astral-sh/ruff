@@ -974,10 +974,8 @@ class C:
     def __init__(self) -> None:
         self.f: str = "foo"
 
-# TODO: The explicit annotation should make this a `str`.
-reveal_type(C().f)  # revealed: bound method C.f() -> int
-# TODO: This should emit `call-non-callable`.
-C().f()
+reveal_type(C().f)  # revealed: str
+C().f()  # error: [call-non-callable]
 ```
 
 ### Identity of a shadowed static method

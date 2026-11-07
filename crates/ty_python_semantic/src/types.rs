@@ -5697,15 +5697,21 @@ impl<'db> Type<'db> {
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
         let fallback_member = fallback_member.member(db);
+        let explicit_instance_attribute = fallback_member
+            .qualifiers
+            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+            && matches!(fallback_member.place, Place::Defined(place) if place.origin.is_declared()
+                || fallback_member.qualifiers.contains(TypeQualifiers::FINAL));
 
         // We do explicitly allow instance attributes to shadow methods defined on the class.
         // If we see a definitely-bound meta-attribute (the method), and if the fallback is
-        // an instance attribute (e.g. `self.method = ...`) with a compatible type, we pretend
+        // an inferred instance attribute (e.g. `self.method = ...`) with a compatible type, we pretend
         // that there is no fallback, i.e. attribute lookup simply yields the meta-attribute
         // (the actual method on the class).
         let fallback_member = if meta_attr.is_definitely_bound()
             && let Place::Defined(DefinedPlace { origin, ty, .. }) = fallback_member.place
             && !origin.is_declared()
+            && !explicit_instance_attribute
             && let Some(contract) =
                 meta_attr_ty.and_then(|method| method.method_shadowing_contract(db, env, receiver))
             && ty.is_assignable_to(db, env, contract)
@@ -5791,7 +5797,8 @@ impl<'db> Type<'db> {
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
             // now the highest priority. However, we only return the pure `fallback` type if the
-            // policy allows it. When invoked on class objects, the policy is set to `Yes`, which
+            // policy allows it or an explicit instance annotation shadows a method.
+            // When invoked on class objects, the policy is set to `Yes`, which
             // means that class-level attributes (the fallback) can shadow non-data descriptors
             // on metaclasses. However, for instances, the policy is set to `No`, because we do
             // allow instance-level attributes to shadow class-level non-data descriptors. This
@@ -5804,16 +5811,22 @@ impl<'db> Type<'db> {
                     definedness: Definedness::AlwaysDefined,
                     ..
                 }),
-            ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => member_lookup_result(
-                db,
-                fallback.with_qualifiers(fallback_qualifiers),
-                fallback_error,
-                fallback_properties,
-            ),
+            ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes
+                || explicit_instance_attribute
+                    && meta_attr_ty.is_some_and(|ty| ty.is_function_like(db)) =>
+            {
+                member_lookup_result(
+                    db,
+                    fallback.with_qualifiers(fallback_qualifiers),
+                    fallback_error,
+                    fallback_properties,
+                )
+            }
 
             // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
-            // unbound or the policy argument is `No`. In both cases, the `fallback` type does
-            // not completely shadow the non-data descriptor, so we build a union of the two.
+            // unbound or cannot take precedence under the rules above. In both cases, the
+            // `fallback` type does not completely shadow the non-data descriptor, so we build
+            // a union of the two.
             (
                 Place::Defined(DefinedPlace {
                     ty: meta_attr_ty,
