@@ -2405,6 +2405,25 @@ class Callbacks:
         self.identities = [{"x": 0}, {"x": lambda x: x}]
 ```
 
+An inferred attribute type does not provide a declared type preference to later assignments:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+class Fields:
+    class_value = None
+
+    def __init__(self, value: Any):
+        self.value = None
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Any
+
+def _(value: Any):
+    Fields.class_value = reveal_type(identity(value))  # revealed: Any
+    reveal_type(Fields.class_value)  # revealed: Any
+```
+
 ## Overload evaluation
 
 The type context of all matching overloads are considered during argument inference:

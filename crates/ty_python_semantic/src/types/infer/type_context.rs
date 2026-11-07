@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use crate::place::TypeOrigin;
 use crate::types::generics::Specialization;
 use crate::types::{DynamicType, KnownClass, Type};
 use crate::{Db, ProgramEnvironment};
@@ -9,7 +10,7 @@ use crate::{Db, ProgramEnvironment};
     Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub(in crate::types) enum TypeContextKind {
-    /// A direct declared type annotation.
+    /// An explicit declared type annotation.
     #[default]
     Declared,
 
@@ -19,10 +20,12 @@ pub(in crate::types) enum TypeContextKind {
     /// type context for subsequent inference attempts during fixpoint iteration.
     Inferred,
 
-    /// The declared upper bound of a type variable.
+    /// A declared or inferred validity constraint.
     ///
-    /// Note that unlike a declared type, the upper bound of a type variable acts only as a validity
+    /// Note that unlike a declared type, type context of this kind acts only as a validity
     /// constraint, and does not provide a preferred specialization during generic call inference.
+    /// This includes the declared upper bound of a type variable, or the inferred type of an instance
+    /// attribute.
     Validity,
 }
 
@@ -63,6 +66,16 @@ impl<'db> TypeContext<'db> {
 
     pub(crate) fn validity(declared_type: Type<'db>) -> Self {
         Self::new(Some(declared_type), TypeContextKind::Validity)
+    }
+
+    pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
+        match origin {
+            TypeOrigin::Declared => Self::declared(Some(ty)),
+            // Later assignments are validated against the type of an inferred attribute, but it
+            // does not provide a declared type preference, allowing the type of the attribute to
+            // be overwritten by a gradual type.
+            TypeOrigin::Inferred => Self::validity(ty),
+        }
     }
 
     pub(in crate::types) fn declared_type(self) -> Option<Type<'db>> {
