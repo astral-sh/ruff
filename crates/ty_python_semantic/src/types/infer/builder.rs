@@ -130,6 +130,7 @@ use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
     tuple_literal_needs_promotion,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet, InternedType,
@@ -8283,6 +8284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // unpack, a use of the literal, or an ineligible element introduces a dependency.
         let mut independent_bounds = !has_dict_unpack
             && !elts.is_empty()
+            && elt_tys.len() == N
             && elt_tys.clone().all(|var| var.typevar(db).is_simple(db));
         let mut pending_elements = Vec::new();
 
@@ -8466,10 +8468,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 | Type::TypeVar(_)
                                 | Type::TypeAlias(_)
                                 | Type::Intersection(_)
-                        ) && !inferred_type_for_typevar
-                            .has_provisional_marker(db, env)
-                            && elt_tcx
-                                .is_none_or(|_| elt_tcx_variance[&elt_ty_identity].is_covariant());
+                        ) && !any_over_type_expanding_aliases(
+                            db,
+                            env,
+                            inferred_type_for_typevar,
+                            |part| {
+                                part.is_provisional_marker()
+                                    || matches!(
+                                        part,
+                                        Type::Divergent(_)
+                                            | Type::Recursive(_)
+                                            | Type::RecursiveVar(_)
+                                    )
+                                    || part
+                                        .as_typevar()
+                                        .is_some_and(|var| var.is_inferable(db, inferable))
+                            },
+                        ) && elt_tcx
+                            .is_none_or(|_| elt_tcx_variance[&elt_ty_identity].is_covariant());
                         pending_elements.push((i, elt_ty, inferred_type_for_typevar));
                     } else {
                         builder
