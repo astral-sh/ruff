@@ -7498,14 +7498,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // exponential blowup.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut narrowed = Vec::new();
-        for narrowed_ty in narrowed_tys.iter().filter(|ty| {
+        let fixed_literal = tuple.elts.iter().all(|elt| !elt.is_starred_expr())
+            && !tuple_literal_needs_promotion(&tuple.elts);
+        'candidates: for narrowed_ty in narrowed_tys.iter().filter(|ty| {
             ty.known_specialization(db, env, KnownClass::Tuple)
                 .is_some()
         }) {
             let mut speculative_builder = self.speculate();
 
-            let inferred_ty = speculative_builder
-                .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)));
+            let inferred_ty = if fixed_literal
+                && let Some(spec) = narrowed_ty.exact_tuple_instance_spec(db)
+                && let Tuple::Fixed(expected) = spec.as_ref()
+            {
+                if expected.len() != tuple.elts.len() {
+                    continue;
+                }
+                let mut elements = Vec::with_capacity(expected.len());
+                for (index, (elt, expected_ty)) in tuple
+                    .elts
+                    .iter()
+                    .zip(expected.iter_all_elements())
+                    .enumerate()
+                {
+                    let ty = speculative_builder
+                        .infer_expression(elt, tcx.with_declared_type(Some(expected_ty)));
+                    if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
+                        continue 'candidates;
+                    }
+                    elements.push(ty);
+                }
+                Type::heterogeneous_tuple(db, env, elements)
+            } else {
+                speculative_builder
+                    .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)))
+            };
             if inferred_ty.is_assignable_to(db, env, *narrowed_ty) {
                 narrowed.push((inferred_ty, speculative_builder));
             }
