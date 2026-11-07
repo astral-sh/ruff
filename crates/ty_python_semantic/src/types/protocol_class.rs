@@ -2744,7 +2744,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_some_and(|descriptor| descriptor.function_like_kind(db).is_some())
                 && let Some(result) = self.try_check_protocol_receiver_pair(
                     db,
-                    source,
+                    &source,
                     target,
                     method.typing_self_type(db),
                     protocol_self_binding_ty,
