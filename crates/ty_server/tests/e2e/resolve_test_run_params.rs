@@ -1,0 +1,335 @@
+use anyhow::Result;
+use lsp_types::{LspRequestMethod, MessageDirection, Request};
+use ruff_db::system::SystemPath;
+use serde_json::{Value, json};
+
+use crate::{TestServer, TestServerBuilder};
+
+enum ResolveTestRunParams {}
+
+impl Request for ResolveTestRunParams {
+    type Params = Value;
+    type Result = Value;
+    const METHOD: LspRequestMethod<'static> = LspRequestMethod::Custom("ty/resolveTestRunParams");
+    const MESSAGE_DIRECTION: MessageDirection = MessageDirection::ClientToServer;
+}
+
+const MODULE: &str = "src/tests/test_module.py";
+const MODULE_CONTENT: &str = "\
+def test_one():
+    pass
+
+
+class TestThings:
+    def test_method(self):
+        pass
+";
+
+fn server_with_one_test_module() -> Result<TestServer> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(SystemPath::new(MODULE), MODULE_CONTENT)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    Ok(server)
+}
+
+/// Returns the id that `ty/discoverTests` reports for `path`, optionally qualified by the
+/// name of a test inside it.
+fn test_id(server: &TestServer, path: &str, qualified_name: Option<&str>) -> String {
+    let path = server.file_path(SystemPath::new(path));
+    match qualified_name {
+        Some(name) => format!("{path}::{name}"),
+        None => path.to_string(),
+    }
+}
+
+#[test]
+fn resolve_run_params_for_a_file() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let id = test_id(&server, MODULE, None);
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests/test_module.py"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_directory() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let id = test_id(&server, "src/tests", None);
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_function() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let id = test_id(&server, MODULE, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests/test_module.py::test_one"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_class() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let id = test_id(&server, MODULE, Some("TestThings"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests/test_module.py::TestThings"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Discovery reports tests in files that are excluded from type checking, so they resolve too.
+#[test]
+fn resolve_run_params_for_a_test_excluded_from_type_checking() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(
+            SystemPath::new("src/ty.toml"),
+            "[src]\nexclude = [\"tests\"]\n",
+        )?
+        .with_file(SystemPath::new(MODULE), MODULE_CONTENT)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(&server, MODULE, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests/test_module.py::test_one"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Discovery doesn't report the tests inside a directory that pytest skips by default, so they
+/// don't resolve.
+#[test]
+fn resolve_run_params_for_a_test_in_a_directory_that_pytest_skips() -> Result<()> {
+    let skipped_module = "src/build/test_module.py";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(SystemPath::new(skipped_module), MODULE_CONTENT)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(&server, skipped_module, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @"null");
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_path_that_is_not_in_the_project() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let id = test_id(&server, "src/tests/test_deleted.py", None);
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @"null");
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_module_with_same_relative_path_in_another_workspace() -> Result<()> {
+    let workspace_one = SystemPath::new("workspace_one");
+    let workspace_two = SystemPath::new("workspace_two");
+
+    let module_one = SystemPath::new("workspace_one/tests/test_module.py");
+    let module_one_content = "\
+def test_alpha():
+    pass
+";
+    let module_two = SystemPath::new("workspace_two/tests/test_module.py");
+    let module_two_content = "\
+def test_beta():
+    pass
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_one, None)?
+        .with_file(module_one, module_one_content)?
+        .with_workspace(workspace_two, None)?
+        .with_file(module_two, module_two_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(
+        &server,
+        "workspace_one/tests/test_module.py",
+        Some("test_alpha"),
+    );
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/workspace_one/tests/test_module.py::test_alpha"
+      ],
+      "workingDirectory": "<temp_dir>/workspace_one"
+    }
+    "#);
+
+    let id = test_id(
+        &server,
+        "workspace_two/tests/test_module.py",
+        Some("test_beta"),
+    );
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/workspace_two/tests/test_module.py::test_beta"
+      ],
+      "workingDirectory": "<temp_dir>/workspace_two"
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn resolve_run_params_for_a_test_in_a_nested_workspace() -> Result<()> {
+    let outer_module = SystemPath::new("repo/tests/test_module.py");
+    let outer_module_content = "\
+def test_alpha():
+    pass
+";
+    let inner_module = SystemPath::new("repo/inner/tests/test_module.py");
+    let inner_module_content = "\
+def test_beta():
+    pass
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("repo"), None)?
+        .with_file(outer_module, outer_module_content)?
+        .with_workspace(SystemPath::new("repo/inner"), None)?
+        .with_file(inner_module, inner_module_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(
+        &server,
+        "repo/inner/tests/test_module.py",
+        Some("test_beta"),
+    );
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/inner/tests/test_module.py::test_beta"
+      ],
+      "workingDirectory": "<temp_dir>/repo/inner"
+    }
+    "#);
+
+    let id = test_id(&server, "repo/tests/test_module.py", Some("test_alpha"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/tests/test_module.py::test_alpha"
+      ],
+      "workingDirectory": "<temp_dir>/repo"
+    }
+    "#);
+
+    let id = test_id(&server, "repo/inner", None);
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/inner"
+      ],
+      "workingDirectory": "<temp_dir>/repo/inner"
+    }
+    "#);
+
+    Ok(())
+}
