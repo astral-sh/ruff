@@ -1096,6 +1096,24 @@ x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ```
 
+## Preserving literal element types in a generic call
+
+`max(..., key=len)` returns one of its input tuples. When the result is annotated as `Colors`, ty
+preserves the literal element types while inferring the list passed to `max`.
+
+```py
+from typing import Literal
+
+Colors = tuple[Literal["red", "blue"], ...]
+left = ("red",)
+right = ("blue", "red")
+
+named: Colors = max([left, right], key=len)  # ok
+extended: Colors = max([(*left, "blue"), (*right, "red")], key=len)  # ok
+# error: [invalid-assignment]
+invalid: Colors = max([(*left, "blue"), (*right, "green")], key=len)
+```
+
 ## Covariant constructors with outer return contexts
 
 A bounded, defaulted, covariant constructor should use its outer return context instead of falling
