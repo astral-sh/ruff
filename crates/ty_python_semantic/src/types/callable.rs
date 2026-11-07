@@ -1006,6 +1006,52 @@ impl<'db> CallableType<'db> {
         Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
     }
 
+    /// Returns whether this callable can stand in for `target`. The source overloads must
+    /// collectively cover every target overload.
+    ///
+    /// In this stub, the two overloads of `Child.parse` together accept every `int | str` call
+    /// that `Base.parse` accepts. The override still fails because neither overload accepts `bytes`.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class Base:
+    ///     @overload
+    ///     def parse(self, x: int | str) -> str: ...
+    ///     @overload
+    ///     def parse(self, x: bytes) -> str: ...
+    ///
+    /// class Child(Base):
+    ///     @overload
+    ///     def parse(self, x: int) -> str: ...
+    ///     @overload
+    ///     def parse(self, x: str) -> str: ...
+    /// ```
+    ///
+    /// A boolean check can stop at the first target overload whose constraints do not hold for
+    /// every specialization. Inference needs the combined constraints for the whole callable.
+    pub(super) fn is_assignable_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+    ) -> bool {
+        let check_target = |target| {
+            Type::Callable(self).is_assignable_to_via_constraints(db, env, Type::Callable(target))
+        };
+        if self != target
+            && self.signatures(db).overloads.len() > 1
+            && target.signatures(db).overloads.len() > 1
+        {
+            return target.signatures(db).iter().all(|signature| {
+                let overload =
+                    target.with_signatures(db, CallableSignature::single(signature.clone()));
+                check_target(overload)
+            });
+        }
+        check_target(target)
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

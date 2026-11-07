@@ -15,7 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{CallableSignature, ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::{
@@ -453,20 +453,21 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        if let (Type::Callable(source), Type::Callable(target_callable)) = (self, target)
-            && source != target_callable
-            && source.signatures(db).overloads.len() > 1
-            && target_callable.signatures(db).overloads.len() > 1
-        {
-            // Each signature in the target is a separate obligation. A boolean assignability
-            // query can stop as soon as one obligation does not hold for all type variables.
-            return target_callable.signatures(db).iter().all(|signature| {
-                let single = target_callable
-                    .with_signatures(db, CallableSignature::single(signature.clone()));
-                self.when_assignable_to_owned(db, env, Type::Callable(single), TypeVarSet::None)
-                    .query(|_, when| when.is_always_satisfied(db, env, TypeVarSet::None))
-            });
+        match (self, target) {
+            (Type::Callable(source), Type::Callable(target)) => {
+                source.is_assignable_to(db, env, target)
+            }
+            _ => self.is_assignable_to_via_constraints(db, env, target),
         }
+    }
+
+    /// Checks whether the assignability constraints for this pair hold for every specialization.
+    pub(super) fn is_assignable_to_via_constraints(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
         self.when_assignable_to_owned(db, env, target, TypeVarSet::None)
             .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
