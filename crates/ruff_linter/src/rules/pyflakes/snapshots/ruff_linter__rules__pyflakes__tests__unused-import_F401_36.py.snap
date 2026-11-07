@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `os.path.join` imported but unused
+ --> F401_36.py:3:35
+  |
+1 | """Regression test for https://github.com/astral-sh/ruff/issues/29992"""
+2 |
+3 | from os.path import join, join as path_join
+  |                                   ^^^^^^^^^
+4 |
+5 | print(join("a", "b"))
+  |
+help: Remove unused import: `os.path.join`
+  |
+2 |
+  - from os.path import join, join as path_join
+3 + from os.path import join
+4 |
+  |
+
+F401 [*] `os.path.split` imported but unused
+  --> F401_36.py:8:42
+   |
+ 8 | from os.path import split as path_split, split
+   |                                          ^^^^^
+ 9 |
+10 | print(path_split("a/b"))
+   |
+help: Remove unused import: `os.path.split`
+  |
+7 |
+  - from os.path import split as path_split, split
+8 + from os.path import split as path_split
+9 |
+  |
