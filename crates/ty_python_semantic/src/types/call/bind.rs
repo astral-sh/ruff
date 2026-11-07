@@ -12,7 +12,7 @@ mod constructor;
 mod property;
 
 use std::borrow::Cow;
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Range;
@@ -9464,7 +9464,6 @@ impl<'db> Binding<'db> {
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
-        let callable_description = OnceCell::new();
         let mut reported_argument_errors: FxHashMap<_, SmallVec<[_; 1]>> = FxHashMap::default();
         for error in &self.errors {
             // Multiple elements of one starred argument can produce the same type error for a
@@ -9482,7 +9481,6 @@ impl<'db> Binding<'db> {
                 context,
                 node,
                 callable_ty,
-                &callable_description,
                 compound_diag,
                 matching_overload,
                 self.source_parameter_index_offset,
@@ -10282,24 +10280,18 @@ impl<'db> BindingError<'db> {
         }
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn report_diagnostic(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        callable_description: &OnceCell<Option<CallableDescription<'db>>>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
         source_parameter_index_offset: usize,
     ) {
         let db = context.db();
         let env = context.program_environment();
-        let describe_callable = || {
-            callable_description
-                .get_or_init(|| CallableDescription::new(db, callable_ty))
-                .as_ref()
-        };
+        let describe_callable = || CallableDescription::new(db, callable_ty);
         let callable_kind = match callable_ty {
             Type::FunctionLiteral(_) => "Function",
             Type::BoundMethod(_) => "Method",
@@ -10336,7 +10328,7 @@ impl<'db> BindingError<'db> {
                     .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = CallableDescription::new_with_settings(
+                let callable_description = CallableDescription::new_with_settings(
                     db,
                     callable_ty,
                     Some(&display_settings),
@@ -10347,9 +10339,7 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    qualified_callable_description
-                        .as_ref()
-                        .or_else(describe_callable)
+                    callable_description
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
@@ -10710,14 +10700,14 @@ impl<'db> BindingError<'db> {
                     .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = constraint_evidence.and_then(|_| {
-                    CallableDescription::new_with_settings(db, callable_ty, Some(&display_settings))
-                });
+                let callable_description = CallableDescription::new_with_settings(
+                    db,
+                    callable_ty,
+                    constraint_evidence.map(|_| &display_settings),
+                );
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    qualified_callable_description
-                        .as_ref()
-                        .or_else(describe_callable)
+                    callable_description
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
@@ -10849,7 +10839,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
@@ -10861,7 +10850,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
@@ -10873,7 +10861,6 @@ impl<'db> BindingError<'db> {
                     context,
                     node,
                     callable_ty,
-                    callable_description,
                     compound_diag,
                     matching_overload,
                     source_parameter_index_offset,
