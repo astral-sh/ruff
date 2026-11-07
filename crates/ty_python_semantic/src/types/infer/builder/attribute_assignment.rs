@@ -1,6 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
+use ty_python_core::definition::DefinitionKind;
 
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
@@ -23,6 +24,7 @@ use crate::types::{
     CallDunderError, DisplaySettings, MemberLookupPolicy, PropertyDeprecations, Type, TypeContext,
     TypeQualifiers,
 };
+use crate::types::{KnownClass, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -555,6 +557,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let setattr_member =
             attribute_setattr_member(db, env, object_ty, receiver, frozen_dataclass_dispatch);
 
+        let mut uncontextualized_value_ty = None;
         let (setattr_result, value_ty) = if matches!(member, InstanceAttributeWriteMember::SetAttr)
             || matches!(
                 frozen_dataclass_dispatch,
@@ -569,6 +572,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 _ => TypeContext::default(),
             };
             let value_ty = self.infer_value(tcx, emit_diagnostics);
+            uncontextualized_value_ty = (tcx == TypeContext::default()).then_some(value_ty);
             let setattr_result = Type::try_call_dunder_member_impl(
                 db,
                 env,
@@ -659,7 +663,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     let fallback_valid = self.evaluate_instance_fallback(
                         receiver.unwrap_or(object_ty),
                         fallback,
-                        value_ty,
+                        uncontextualized_value_ty,
                         emit_diagnostics,
                     );
                     member_valid && fallback_valid
@@ -670,7 +674,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             InstanceAttributeWriteMember::Instance(fallback) => self.evaluate_instance_fallback(
                 receiver.unwrap_or(object_ty),
                 fallback,
-                value_ty,
+                uncontextualized_value_ty,
                 emit_diagnostics,
             ),
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
@@ -933,11 +937,101 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
+    /// Return the inferred callable for a wrapper of the form
+    /// `Callable[P, R] -> Callable[P, Box[R]]`. The input can also return `Awaitable[R]`,
+    /// and the output can nest several single-argument classes around `R`.
+    fn inferred_method_wrapper(&self) -> Option<Type<'db>> {
+        let db = self.builder.db();
+        let call = self.value.as_call_expr()?;
+        let [arg @ ast::Expr::Attribute(_)] = call.arguments.args.as_ref() else {
+            return None;
+        };
+        if !call.arguments.keywords.is_empty() {
+            return None;
+        }
+        let Type::BoundMethod(method) = self.builder.try_expression_type(arg)? else {
+            return None;
+        };
+        let Type::FunctionLiteral(wrapper) = self.builder.try_expression_type(&call.func)? else {
+            return None;
+        };
+        let [signature] = wrapper.signature(db).overloads.as_slice() else {
+            return None;
+        };
+        let [parameter] = signature.parameters().as_slice() else {
+            return None;
+        };
+        let paramspec_and_return = |ty: Type<'db>| {
+            let [sig] = ty.as_callable()?.signatures(db).overloads.as_slice() else {
+                return None;
+            };
+            Some((sig.parameters().as_paramspec()?, sig.return_ty))
+        };
+        let (p, mut r) = paramspec_and_return(parameter.annotated_type())?;
+        let (output_p, mut result) = paramspec_and_return(signature.return_ty)?;
+        if output_p != p {
+            return None;
+        }
+        let env = self.builder.program_environment();
+        if matches!(r, Type::NominalInstance(_) | Type::ProtocolInstance(_))
+            && let Some(specialization) = r.known_specialization(db, env, KnownClass::Awaitable)
+        {
+            let [element] = specialization.types(db) else {
+                return None;
+            };
+            r = *element;
+        }
+        let r_var = r.as_typevar()?;
+        let context = signature.generic_context?;
+        if context.len(db) != 2
+            || !context.contains(db, r_var.identity(db))
+            || !context.contains(db, p.identity(db))
+            || !r_var.typevar(db).is_simple(db)
+        {
+            return None;
+        }
+        // Each nominal layer has one type argument, so matching the expected return
+        // cannot choose between multiple mappings for the method's return type.
+        while result != r {
+            if !matches!(result, Type::NominalInstance(_) | Type::ProtocolInstance(_)) {
+                return None;
+            }
+            let (class, specialization) = result.class_specialization(db, env)?;
+            if specialization.tuple(db).is_some()
+                || (matches!(result, Type::ProtocolInstance(_))
+                    && class.known(db) != Some(KnownClass::Awaitable))
+            {
+                return None;
+            }
+            let [inner] = specialization.types(db) else {
+                return None;
+            };
+            let typevar = specialization.generic_context(db).variables(db).next()?;
+            if !matches!(
+                typevar.variance(db),
+                TypeVarVariance::Covariant | TypeVarVariance::Invariant
+            ) {
+                return None;
+            }
+            result = *inner;
+        }
+        if method
+            .function(db)?
+            .signature(db)
+            .overloads
+            .iter()
+            .any(|sig| sig.generic_context.is_some())
+        {
+            return None;
+        }
+        self.builder.try_expression_type(self.value)
+    }
+
     fn evaluate_instance_fallback(
         &mut self,
         object_ty: Type<'db>,
         requirement: &FallbackAttributeWriteRequirement<'db>,
-        value_ty: Type<'db>,
+        uncontextualized_value_ty: Option<Type<'db>>,
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
@@ -945,15 +1039,26 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 ty,
                 qualifiers,
                 possibly_missing,
+                inferred_from,
             } => {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                // The right-hand side has already been inferred for the write. If it has
-                // exactly the expected type, the trial inference supplies no additional
-                // evidence. Speculative branches still need to record their selected context.
-                let value_ty = if emit_diagnostics && value_ty == *ty {
-                    value_ty
+                // In `self.method = wrap(resource.method)`, the wrapper call can be the
+                // sole source of the attribute's callable type. A later write or an independent
+                // annotation still supplies a separate context for the call.
+                let value_ty = if emit_diagnostics
+                    && uncontextualized_value_ty == Some(*ty)
+                    && ty.is_callable_type()
+                    && let Some(source) = inferred_from
+                    && self.builder.index.try_definition(self.target) == Some(*source)
+                    && matches!(
+                        source.kind(self.builder.db()),
+                        DefinitionKind::Assignment(_)
+                    )
+                    && self.inferred_method_wrapper() == Some(*ty)
+                {
+                    *ty
                 } else {
                     self.infer_value(TypeContext::declared(Some(*ty)), false)
                 };
@@ -982,6 +1087,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 ty,
                 qualifiers,
                 possibly_missing,
+                ..
             } => {
                 let value_ty = self.infer_value(
                     TypeContext::declared(Some(*ty)),

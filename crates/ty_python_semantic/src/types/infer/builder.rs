@@ -9547,6 +9547,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }))
     }
 
+    /// A method reference passed to a callable parameter keeps its bound method type under
+    /// every specialization of that parameter. Check the call with that argument directly.
+    fn bound_method_argument(
+        &mut self,
+        callable: Type<'db>,
+        args: &ast::Arguments,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let [arg @ ast::Expr::Attribute(_)] = args.args.as_ref() else {
+            return None;
+        };
+        if !args.keywords.is_empty() || tcx != TypeContext::default() {
+            return None;
+        }
+        let Type::FunctionLiteral(function) = callable else {
+            return None;
+        };
+        let db = self.db();
+        let [signature] = function.signature(db).overloads.as_slice() else {
+            return None;
+        };
+        let [parameter] = signature.parameters().as_slice() else {
+            return None;
+        };
+        if signature.generic_context.is_none()
+            || !parameter.is_positional()
+            || !parameter.annotated_type().is_callable_type()
+            || !signature.return_ty.is_callable_type()
+            || function.known(db).is_some()
+        {
+            return None;
+        }
+        let mut speculative = self.speculate();
+        let method @ Type::BoundMethod(_) =
+            speculative.infer_expression(arg, TypeContext::default())
+        else {
+            return None;
+        };
+        self.extend(speculative);
+        Some(method)
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -10051,55 +10093,71 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None
         };
 
-        let bindings_result = self.infer_and_check_argument_types(
-            ArgumentsIter::from_ast(arguments),
-            &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
-                if let Some(value) = cast_value
-                    && std::ptr::eq(expr, value)
-                {
-                    // The outer context can make this cast redundant, but must not introduce
-                    // errors in its value, such as missing keys in a partial `TypedDict` literal.
-                    // Redundant casts inside the value are also an intended result of propagation.
-                    return builder.infer_with_type_context_fallback(
-                        call_expression_tcx,
-                        // The value parameter of `cast` is declared as `Any`. If provided as
-                        // type context to a nested generic call, it can incorrectly make the
-                        // cast appear redundant.
-                        TypeContext::default(),
-                        |builder, tcx| builder.infer_expression(value, tcx),
-                    );
-                }
+        let bindings_result = if let Some(method) =
+            self.bound_method_argument(callable_type, arguments, call_expression_tcx)
+        {
+            call_arguments.insert_type(0, TypeContext::default(), method);
+            bindings
+                .check_types(
+                    db,
+                    env,
+                    &ConstraintSetBuilder::new(),
+                    &call_arguments,
+                    call_expression_tcx,
+                    &self.dataclass_field_specifiers,
+                )
+                .map(|bindings| CallArgumentInference::new(bindings, &call_arguments))
+        } else {
+            self.infer_and_check_argument_types(
+                ArgumentsIter::from_ast(arguments),
+                &mut call_arguments,
+                &mut |builder, (_, expr, tcx)| {
+                    if let Some(value) = cast_value
+                        && std::ptr::eq(expr, value)
+                    {
+                        // The outer context can make this cast redundant, but must not introduce
+                        // errors in its value, such as missing keys in a partial `TypedDict` literal.
+                        // Redundant casts inside the value are also an intended result of propagation.
+                        return builder.infer_with_type_context_fallback(
+                            call_expression_tcx,
+                            // The value parameter of `cast` is declared as `Any`. If provided as
+                            // type context to a nested generic call, it can incorrectly make the
+                            // cast appear redundant.
+                            TypeContext::default(),
+                            |builder, tcx| builder.infer_expression(value, tcx),
+                        );
+                    }
 
-                // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
-                // type expressions and calls retain their ordinary validation.
-                if matches!(
-                    callable_type,
-                    Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetLowerBound
-                            | KnownBoundMethodType::ConstraintSetUpperBound
-                            | KnownBoundMethodType::ConstraintSetEquality
-                            | KnownBoundMethodType::ConstraintSetRange
-                    )
-                ) && is_dotted_name(expr)
-                {
-                    let previously_allowed = builder
-                        .context
-                        .inference_flags
-                        .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
-                    let ty = builder.infer_expression(expr, tcx);
-                    builder.context.inference_flags.set(
-                        InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                        previously_allowed,
-                    );
-                    ty
-                } else {
-                    builder.infer_expression(expr, tcx)
-                }
-            },
-            bindings,
-            call_expression_tcx,
-        );
+                    // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
+                    // type expressions and calls retain their ordinary validation.
+                    if matches!(
+                        callable_type,
+                        Type::KnownBoundMethod(
+                            KnownBoundMethodType::ConstraintSetLowerBound
+                                | KnownBoundMethodType::ConstraintSetUpperBound
+                                | KnownBoundMethodType::ConstraintSetEquality
+                                | KnownBoundMethodType::ConstraintSetRange
+                        )
+                    ) && is_dotted_name(expr)
+                    {
+                        let previously_allowed = builder
+                            .context
+                            .inference_flags
+                            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                        let ty = builder.infer_expression(expr, tcx);
+                        builder.context.inference_flags.set(
+                            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                            previously_allowed,
+                        );
+                        ty
+                    } else {
+                        builder.infer_expression(expr, tcx)
+                    }
+                },
+                bindings,
+                call_expression_tcx,
+            )
+        };
 
         let inferred = match bindings_result {
             Ok(inferred) => inferred,

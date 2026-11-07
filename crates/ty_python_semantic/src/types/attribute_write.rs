@@ -266,6 +266,8 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     AssignableTo {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
+        /// The sole binding from which an unannotated instance attribute got its type.
+        inferred_from: Option<Definition<'db>>,
         possibly_missing: bool,
     },
     /// The fallback may exist, but lookup did not produce a usable write type.
@@ -848,9 +850,14 @@ fn instance_fallback_write_requirement<'db>(
     receiver: Option<Type<'db>>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                definedness,
+                origin,
+                provenance,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -860,6 +867,11 @@ fn instance_fallback_write_requirement<'db>(
     FallbackAttributeWriteRequirement::AssignableTo {
         ty: effective_write_type(db, env, object_ty, attribute, ty),
         qualifiers,
+        inferred_from: if origin.is_declared() {
+            None
+        } else {
+            provenance.definition()
+        },
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
 }
@@ -931,6 +943,7 @@ fn class_fallback_write_requirement<'db>(
     FallbackAttributeWriteRequirement::AssignableTo {
         ty,
         qualifiers,
+        inferred_from: None,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
 }

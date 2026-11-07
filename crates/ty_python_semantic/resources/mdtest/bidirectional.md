@@ -2405,6 +2405,48 @@ class Callbacks:
         self.identities = [{"x": 0}, {"x": lambda x: x}]
 ```
 
+An instance attribute's declared type can select a different operator overload even when the result
+inferred without context already matches the attribute:
+
+```py
+from typing import overload
+
+class Operator:
+    @overload
+    def __add__(self, other: list[int], /) -> list[int | str]: ...
+    @overload
+    def __add__(self, other: list[int | str], /) -> bytes: ...
+    def __add__(self, other: object, /) -> list[int | str] | bytes:
+        raise NotImplementedError
+
+class Target:
+    def __init__(self, value: list[int | str]):
+        self.value: list[int | str] = value
+
+def read(target: Target, op: Operator):
+    # error: [invalid-assignment] "Object of type `bytes`"
+    target.value = op + [1]
+```
+
+A wrapper that preserves a method's parameter list can still have multiple solutions for its return
+type. The inferred attribute type participates in checking the assignment:
+
+```py
+from typing import Callable
+
+def wrap[**P, T](method: Callable[P, T]) -> Callable[P, list[T] | list[int]]:
+    raise NotImplementedError
+
+class Methods:
+    def name(self) -> str:
+        return ""
+
+class WrappedMethods:
+    def __init__(self, methods: Methods):
+        # error: [invalid-assignment] "Object of type `() -> list[str | int] | list[int]`"
+        self.name = wrap(methods.name)
+```
+
 ## Overload evaluation
 
 The type context of all matching overloads are considered during argument inference:
