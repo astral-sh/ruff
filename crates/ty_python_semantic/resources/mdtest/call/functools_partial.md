@@ -749,8 +749,8 @@ reveal_type(bound({}))  # revealed: Any
 
 ### Partially applied ParamSpec decorator
 
-Binding a decorator's option leaves its `ParamSpec` available to capture the decorated function's
-parameters.
+Binding `attempts` with `partial` leaves `retry` generic in `P`. When the resulting decorator is
+applied to `greet`, ty infers `(name: str)` for `P` and preserves `greet`'s signature.
 
 ```py
 from functools import partial
