@@ -1879,21 +1879,6 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
-A callable field supplies its declared parameter type to a wrapper. For `builtins.list`, the
-required return type `list[str]` specializes the constructor's parameter to `Iterable[str]`.
-
-```py
-def strings[T](factory: Callable[[T], list[str]]) -> Callable[[T], list[str]]:
-    return factory
-
-class Decoder:
-    decode: Callable[[bytes], list[str]]
-
-def _(decoder: Decoder):
-    reveal_type(strings(decoder.decode))  # revealed: (bytes, /) -> list[str]
-    reveal_type(strings(builtins.list))  # revealed: (Iterable[str], /) -> list[str]
-```
-
 ## Generic class specialization through recursive callable aliases
 
 A recursive callable context specializes a generic class used as a factory. The returned container

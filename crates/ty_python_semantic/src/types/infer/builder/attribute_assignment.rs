@@ -952,26 +952,20 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let Type::BoundMethod(method) = self.builder.try_expression_type(arg)? else {
             return None;
         };
-        let Type::FunctionLiteral(wrapper) = self.builder.try_expression_type(&call.func)? else {
-            return None;
-        };
+        let wrapper = self
+            .builder
+            .try_expression_type(&call.func)?
+            .as_function_literal()?;
         let [signature] = wrapper.signature(db).overloads.as_slice() else {
             return None;
         };
         let [parameter] = signature.parameters().as_slice() else {
             return None;
         };
-        let paramspec_and_return = |ty: Type<'db>| {
-            let [sig] = ty.as_callable()?.signatures(db).overloads.as_slice() else {
-                return None;
-            };
-            Some((sig.parameters().as_paramspec()?, sig.return_ty))
-        };
-        let (p, mut r) = paramspec_and_return(parameter.annotated_type())?;
-        let (output_p, mut result) = paramspec_and_return(signature.return_ty)?;
-        if output_p != p {
-            return None;
-        }
+        let paramspec = |ty: Type<'db>| ty.as_callable()?.signatures(db).is_single_paramspec();
+        let (p, input) = paramspec(parameter.annotated_type())?;
+        let (output_p, output) = paramspec(signature.return_ty)?;
+        let mut r = input.return_ty;
         let env = self.builder.program_environment();
         if matches!(r, Type::NominalInstance(_) | Type::ProtocolInstance(_))
             && let Some(specialization) = r.known_specialization(db, env, KnownClass::Awaitable)
@@ -983,7 +977,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
         let r_var = r.as_typevar()?;
         let context = signature.generic_context?;
-        if context.len(db) != 2
+        if output_p != p
+            || context.len(db) != 2
             || !context.contains(db, r_var.identity(db))
             || !context.contains(db, p.identity(db))
             || !r_var.typevar(db).is_simple(db)
@@ -992,6 +987,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
         // Each nominal layer has one type argument, so matching the expected return
         // cannot choose between multiple mappings for the method's return type.
+        let mut result = output.return_ty;
         while result != r {
             if !matches!(result, Type::NominalInstance(_) | Type::ProtocolInstance(_)) {
                 return None;
