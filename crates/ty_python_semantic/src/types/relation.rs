@@ -453,6 +453,21 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
+        match (self, target) {
+            (Type::Callable(source), Type::Callable(target)) => {
+                source.is_assignable_to(db, env, target)
+            }
+            _ => self.is_assignable_to_via_constraints(db, env, target),
+        }
+    }
+
+    /// Checks whether the assignability constraints for this pair hold for every specialization.
+    pub(super) fn is_assignable_to_via_constraints(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
         self.when_assignable_to_owned(db, env, target, TypeVarSet::None)
             .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
