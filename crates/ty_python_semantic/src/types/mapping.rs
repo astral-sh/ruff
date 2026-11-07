@@ -15,10 +15,10 @@ use super::{
 };
 use crate::{Db, FxIndexMap};
 
-/// A transformation and its application context, independent of its original traversal.
+/// An owned mapping and its application context, retained until a recursive type is unfolded.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DeferredTypeMapping<'db> {
-    kind: DeferredMappingKind<'db>,
+    kind: OwnedTypeMapping<'db>,
     context: TypeContext<'db>,
     materialize_typevar_bounds_and_defaults: bool,
 }
@@ -32,38 +32,38 @@ impl<'db> DeferredTypeMapping<'db> {
     ) -> SmallVec<[Self; 2]> {
         let kind = match mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                DeferredMappingKind::Specialize(DeferredSpecialization::new(*specialization), None)
+                OwnedTypeMapping::Specialize(OwnedApplySpecialization::new(*specialization), None)
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
-            } => DeferredMappingKind::Specialize(
-                DeferredSpecialization::new(*specialization),
+            } => OwnedTypeMapping::Specialize(
+                OwnedApplySpecialization::new(*specialization),
                 Some(*materialization_kind),
             ),
             TypeMapping::BindLegacyTypevars(context) => {
-                DeferredMappingKind::BindLegacyTypevars(*context)
+                OwnedTypeMapping::BindLegacyTypevars(*context)
             }
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
                 delta,
-            } => DeferredMappingKind::FreshenBoundTypeVars(*generic_context, *delta),
-            TypeMapping::BindSelf(binding) => DeferredMappingKind::BindSelf(binding.clone()),
+            } => OwnedTypeMapping::FreshenBoundTypeVars(*generic_context, *delta),
+            TypeMapping::BindSelf(binding) => OwnedTypeMapping::BindSelf(binding.clone()),
             TypeMapping::ReplaceSelf {
                 new_origin,
                 new_upper_bound,
-            } => DeferredMappingKind::ReplaceSelf(*new_origin, *new_upper_bound),
-            TypeMapping::Materialize(kind) => DeferredMappingKind::Materialize(*kind),
-            TypeMapping::Promote(mode, kind) => DeferredMappingKind::Promote(*mode, *kind),
-            TypeMapping::ReplaceParameterDefaults => DeferredMappingKind::ReplaceParameterDefaults,
-            TypeMapping::EagerExpansion => DeferredMappingKind::EagerExpansion,
+            } => OwnedTypeMapping::ReplaceSelf(*new_origin, *new_upper_bound),
+            TypeMapping::Materialize(kind) => OwnedTypeMapping::Materialize(*kind),
+            TypeMapping::Promote(mode, kind) => OwnedTypeMapping::Promote(*mode, *kind),
+            TypeMapping::ReplaceParameterDefaults => OwnedTypeMapping::ReplaceParameterDefaults,
+            TypeMapping::EagerExpansion => OwnedTypeMapping::EagerExpansion,
             TypeMapping::GeneralizeLocalTypes(scope) => {
-                DeferredMappingKind::GeneralizeLocalTypes(*scope)
+                OwnedTypeMapping::GeneralizeLocalTypes(*scope)
             }
             TypeMapping::RescopeReturnCallables(replacements) => {
                 let mut replacements = (*replacements).clone();
                 replacements.shrink_to_fit();
-                DeferredMappingKind::RescopeReturnCallables(replacements)
+                OwnedTypeMapping::RescopeReturnCallables(replacements)
             }
             TypeMapping::ApplyRecursiveSubstitution(_) => return SmallVec::new(),
         };
@@ -73,7 +73,7 @@ impl<'db> DeferredTypeMapping<'db> {
             materialize_typevar_bounds_and_defaults: visitor
                 .materialize_typevar_bounds_and_defaults,
         };
-        let DeferredMappingKind::Specialize(specialization, None) = &operation.kind else {
+        let OwnedTypeMapping::Specialize(specialization, None) = &operation.kind else {
             return smallvec![operation];
         };
         let Some(substitution) = specialization.substitution(db) else {
@@ -84,8 +84,8 @@ impl<'db> DeferredTypeMapping<'db> {
         let original = specialization.borrowed();
         smallvec![
             Self {
-                kind: DeferredMappingKind::Specialize(
-                    DeferredSpecialization::Effects {
+                kind: OwnedTypeMapping::Specialize(
+                    OwnedApplySpecialization::Effects {
                         specialization: substitution,
                         specialize_self_domain: original.specialize_self_domain(),
                         evaluate_lazy_signatures: !original.preserves_lazy_signatures(),
@@ -95,8 +95,8 @@ impl<'db> DeferredTypeMapping<'db> {
                 ..operation.clone()
             },
             Self {
-                kind: DeferredMappingKind::Specialize(
-                    DeferredSpecialization::Substitution(substitution),
+                kind: OwnedTypeMapping::Specialize(
+                    OwnedApplySpecialization::Substitution(substitution),
                     None
                 ),
                 ..operation
@@ -112,12 +112,10 @@ impl<'db> DeferredTypeMapping<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) {
         if let Some(previous) = mappings.last_mut()
-            && let DeferredMappingKind::Specialize(DeferredSpecialization::Substitution(left), None) =
+            && let OwnedTypeMapping::Specialize(OwnedApplySpecialization::Substitution(left), None) =
                 &mut previous.kind
-            && let DeferredMappingKind::Specialize(
-                DeferredSpecialization::Substitution(right),
-                None,
-            ) = self.kind
+            && let OwnedTypeMapping::Specialize(OwnedApplySpecialization::Substitution(right), None) =
+                self.kind
             && previous.context == self.context
             && previous.materialize_typevar_bounds_and_defaults
                 == self.materialize_typevar_bounds_and_defaults
@@ -172,7 +170,7 @@ impl<'db> DeferredTypeMapping<'db> {
 
     pub(super) fn type_mapping(&self) -> TypeMapping<'_, 'db> {
         match &self.kind {
-            DeferredMappingKind::Specialize(specialization, materialization) => {
+            OwnedTypeMapping::Specialize(specialization, materialization) => {
                 let specialization = specialization.borrowed();
                 match materialization {
                     None => TypeMapping::ApplySpecialization(specialization),
@@ -182,30 +180,30 @@ impl<'db> DeferredTypeMapping<'db> {
                     },
                 }
             }
-            DeferredMappingKind::BindLegacyTypevars(context) => {
+            OwnedTypeMapping::BindLegacyTypevars(context) => {
                 TypeMapping::BindLegacyTypevars(*context)
             }
-            DeferredMappingKind::FreshenBoundTypeVars(generic_context, delta) => {
+            OwnedTypeMapping::FreshenBoundTypeVars(generic_context, delta) => {
                 TypeMapping::FreshenBoundTypeVars {
                     generic_context: *generic_context,
                     delta: *delta,
                 }
             }
-            DeferredMappingKind::BindSelf(binding) => TypeMapping::BindSelf(binding.clone()),
-            DeferredMappingKind::ReplaceSelf(new_origin, new_upper_bound) => {
+            OwnedTypeMapping::BindSelf(binding) => TypeMapping::BindSelf(binding.clone()),
+            OwnedTypeMapping::ReplaceSelf(new_origin, new_upper_bound) => {
                 TypeMapping::ReplaceSelf {
                     new_origin: *new_origin,
                     new_upper_bound: *new_upper_bound,
                 }
             }
-            DeferredMappingKind::Materialize(kind) => TypeMapping::Materialize(*kind),
-            DeferredMappingKind::Promote(mode, kind) => TypeMapping::Promote(*mode, *kind),
-            DeferredMappingKind::ReplaceParameterDefaults => TypeMapping::ReplaceParameterDefaults,
-            DeferredMappingKind::EagerExpansion => TypeMapping::EagerExpansion,
-            DeferredMappingKind::GeneralizeLocalTypes(scope) => {
+            OwnedTypeMapping::Materialize(kind) => TypeMapping::Materialize(*kind),
+            OwnedTypeMapping::Promote(mode, kind) => TypeMapping::Promote(*mode, *kind),
+            OwnedTypeMapping::ReplaceParameterDefaults => TypeMapping::ReplaceParameterDefaults,
+            OwnedTypeMapping::EagerExpansion => TypeMapping::EagerExpansion,
+            OwnedTypeMapping::GeneralizeLocalTypes(scope) => {
                 TypeMapping::GeneralizeLocalTypes(*scope)
             }
-            DeferredMappingKind::RescopeReturnCallables(replacements) => {
+            OwnedTypeMapping::RescopeReturnCallables(replacements) => {
                 TypeMapping::RescopeReturnCallables(replacements)
             }
         }
@@ -214,18 +212,18 @@ impl<'db> DeferredTypeMapping<'db> {
     pub(super) fn is_substitution(&self) -> bool {
         matches!(
             self.kind,
-            DeferredMappingKind::Specialize(..)
-                | DeferredMappingKind::BindLegacyTypevars(_)
-                | DeferredMappingKind::FreshenBoundTypeVars(..)
-                | DeferredMappingKind::BindSelf(_)
-                | DeferredMappingKind::ReplaceSelf(..)
+            OwnedTypeMapping::Specialize(..)
+                | OwnedTypeMapping::BindLegacyTypevars(_)
+                | OwnedTypeMapping::FreshenBoundTypeVars(..)
+                | OwnedTypeMapping::BindSelf(_)
+                | OwnedTypeMapping::ReplaceSelf(..)
         )
     }
 
     pub(super) fn substitution(&self) -> Option<Specialization<'db>> {
         match self.kind {
-            DeferredMappingKind::Specialize(
-                DeferredSpecialization::Substitution(specialization),
+            OwnedTypeMapping::Specialize(
+                OwnedApplySpecialization::Substitution(specialization),
                 None,
             ) => Some(specialization),
             _ => None,
@@ -252,8 +250,8 @@ impl<'db> DeferredTypeMapping<'db> {
             .filter_map(|(i, ty)| (i != index).then_some(*ty))
             .collect();
         Some(Self {
-            kind: DeferredMappingKind::Specialize(
-                DeferredSpecialization::Substitution(context.specialize(db, types)),
+            kind: OwnedTypeMapping::Specialize(
+                OwnedApplySpecialization::Substitution(context.specialize(db, types)),
                 None,
             ),
             ..self.clone()
@@ -275,12 +273,12 @@ impl<'db> DeferredTypeMapping<'db> {
             .context
             .with_declared_type(result.context.declared_type().map(map));
         match &mut result.kind {
-            DeferredMappingKind::Specialize(specialization, _) => {
+            OwnedTypeMapping::Specialize(specialization, _) => {
                 specialization.rewrite(db, mapping, visitor);
             }
-            DeferredMappingKind::BindSelf(binding) => binding.ty = map(binding.ty),
-            DeferredMappingKind::ReplaceSelf(_, upper_bound) => *upper_bound = map(*upper_bound),
-            DeferredMappingKind::RescopeReturnCallables(replacements) => {
+            OwnedTypeMapping::BindSelf(binding) => binding.ty = map(binding.ty),
+            OwnedTypeMapping::ReplaceSelf(_, upper_bound) => *upper_bound = map(*upper_bound),
+            OwnedTypeMapping::RescopeReturnCallables(replacements) => {
                 *replacements = replacements
                     .iter()
                     .map(|(source, target)| {
@@ -308,9 +306,11 @@ impl<'db> DeferredTypeMapping<'db> {
     }
 }
 
+/// An owned form of [`TypeMapping`] that can outlive the traversal that created it.
+/// Traversal-local recursive substitutions are applied immediately and are not stored here.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum DeferredMappingKind<'db> {
-    Specialize(DeferredSpecialization<'db>, Option<MaterializationKind>),
+enum OwnedTypeMapping<'db> {
+    Specialize(OwnedApplySpecialization<'db>, Option<MaterializationKind>),
     BindLegacyTypevars(BindingContext<'db>),
     FreshenBoundTypeVars(GenericContext<'db>, u32),
     BindSelf(SelfBinding<'db>),
@@ -323,7 +323,7 @@ enum DeferredMappingKind<'db> {
     RescopeReturnCallables(FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
 
-impl Hash for DeferredMappingKind<'_> {
+impl Hash for OwnedTypeMapping<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         discriminant(self).hash(state);
         match self {
@@ -354,9 +354,10 @@ impl Hash for DeferredMappingKind<'_> {
     }
 }
 
-/// Owns the borrowed operands of a specialization retained for a later unfolding.
+/// An owned form of [`ApplySpecialization`] for a later unfolding.
+/// Callable-local `WithBindings` selections are omitted; their underlying specialization is retained.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum DeferredSpecialization<'db> {
+enum OwnedApplySpecialization<'db> {
     Substitution(Specialization<'db>),
     Effects {
         specialization: Specialization<'db>,
@@ -370,7 +371,7 @@ enum DeferredSpecialization<'db> {
     Single(BoundTypeVarInstance<'db>, Type<'db>),
 }
 
-impl<'db> DeferredSpecialization<'db> {
+impl<'db> OwnedApplySpecialization<'db> {
     fn substitution(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             Self::Specialization(specialization, _) | Self::TypeAlias(specialization)
@@ -488,7 +489,7 @@ impl<'db> DeferredSpecialization<'db> {
     }
 }
 
-impl Hash for DeferredSpecialization<'_> {
+impl Hash for OwnedApplySpecialization<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         discriminant(self).hash(state);
         match self {
