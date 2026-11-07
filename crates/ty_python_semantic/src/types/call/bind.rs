@@ -9242,6 +9242,24 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> bool {
+        // Step 5 constructs a tuple from nonempty unions. In particular, an argument
+        // of type Never (including an alias to Never) does not occupy a slot.
+        let contributes_slot = |ty: Type<'db>| {
+            let ty = if matches!(ty, Type::TypeAlias(_)) {
+                ty.resolve_type_alias(db)
+            } else {
+                ty
+            };
+            let needs_expansion = match ty {
+                Type::Never => return false,
+                Type::TypeAlias(_) => true,
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    matches!(element, Type::Never | Type::TypeAlias(_) | Type::Union(_))
+                }),
+                _ => false,
+            };
+            !needs_expansion || !UnionBuilder::new(db, env).add(ty).is_empty()
+        };
         let specialization = self.merged_specialization(db);
         self.argument_matches
             .iter()
@@ -9256,6 +9274,9 @@ impl<'db> Binding<'db> {
                     .get_for_declared_type(raw)
                     .top_materialization(db, env);
                 let parameter = raw.apply_optional_specialization(db, specialization);
+                if !contributes_slot(argument) || !contributes_slot(parameter) {
+                    return false;
+                }
                 argument
                     .when_assignable_to(db, env, parameter, constraints, self.inferable_typevars)
                     .is_always_satisfied(db, env, self.inferable_typevars)
