@@ -24,7 +24,7 @@ use ruff_python_ast::name::Name;
 use ty_python_core::{
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{Scope, ScopeId},
+    scope::ScopeId,
     semantic_index, use_def_map,
 };
 
@@ -448,7 +448,13 @@ impl<'db> ClassMemberSources<'db> {
         initializer_only: bool,
     ) -> Option<ImplicitAttributeName<'db>> {
         let name = self.receiver_attribute_name(name)?;
-        Some(ImplicitAttributeName::new(db, self.scope, name, decorator, initializer_only))
+        Some(ImplicitAttributeName::new(
+            db,
+            self.scope,
+            name,
+            decorator,
+            initializer_only,
+        ))
     }
 
     /// Does a method establish instance storage for an attribute already typed by the class?

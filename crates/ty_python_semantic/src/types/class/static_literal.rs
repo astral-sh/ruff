@@ -1665,7 +1665,10 @@ impl<'db> StaticClassLiteral<'db> {
                 || generator,
             )
             .map(Member::definitely_declared)
-            .or_else(|| self.implicit_hash(db, env, name).map(|inner| Member { inner }))
+            .or_else(|| {
+                self.implicit_hash(db, env, name)
+                    .map(|inner| Member { inner })
+            })
         };
         let code_generator = match self.class_member_lookup(db, name) {
             ClassMemberLookup::SynthesizedOnly => {
@@ -3118,7 +3121,7 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.may_have_instance_member(db, specialization, name)
+        if !self.may_have_instance_member(db, name)
             || self.is_typed_dict(db)
             || self.lacks_instance_storage(db, name)
         {
