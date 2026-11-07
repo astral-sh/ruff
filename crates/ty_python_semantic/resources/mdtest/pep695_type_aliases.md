@@ -1431,6 +1431,42 @@ type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
+### Growing recursive alias relations through unions
+
+Comparisons terminate when recursive steps increase the type arguments and the recursive reference
+is part of a union on either or both sides. We currently cannot prove these assignability relations.
+
+```py
+type Left[T] = tuple[T, Left[list[T]] | None]
+type Right[T] = tuple[T, Right[list[T]] | None]
+type NonOptional[T] = tuple[T, NonOptional[list[T]]]
+
+def compare_optional(value: Left[int]) -> Right[int]:
+    # TODO: These aliases are equivalent.
+    return value  # error: [invalid-return-type]
+
+def compare_non_optional(value: NonOptional[int]) -> Right[int]:
+    # TODO: NonOptional[int] is a subtype of Right[int].
+    return value  # error: [invalid-return-type]
+```
+
+### Growing recursive alias relations through intersections
+
+Comparisons also terminate when an intersection excludes a recursive type whose arguments grow at
+each step. We currently cannot prove that these aliases are equivalent.
+
+```py
+from ty_extensions import Intersection, Not
+
+type Excluding[T] = Intersection[Not[T], Not[bytes]]
+type Left[T] = tuple[T, Excluding[Left[list[T]]]]
+type Right[T] = tuple[T, Excluding[Right[list[T]]]]
+
+def compare(value: Left[int]) -> Right[int]:
+    # TODO: These aliases are equivalent.
+    return value  # error: [invalid-return-type]
+```
+
 ### Recursive alias relations with finite specialization orbits
 
 A recursive specialization can change its arguments while still reaching an exact repetition after
