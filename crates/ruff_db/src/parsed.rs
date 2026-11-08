@@ -992,7 +992,6 @@ mod tests {
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use ruff_python_ast::PythonVersion;
-    use zip::CompressionMethod;
 
     #[test]
     fn python_file() -> crate::system::Result<()> {
@@ -1066,7 +1065,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        let mut vendored_builder = VendoredFileSystemBuilder::new();
         vendored_builder
             .add_file(
                 "path.pyi",
@@ -1081,7 +1080,7 @@ else:
     from posixpath import __all__ as __all__"#,
             )
             .unwrap();
-        let vendored = vendored_builder.finish().unwrap();
+        let vendored = vendored_builder.finish();
         db.with_vendored(vendored);
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();

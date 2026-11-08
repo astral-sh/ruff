@@ -30,7 +30,6 @@ memchr = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-zip = { workspace = true, features = [] }
 
 [lints]
 workspace = true
