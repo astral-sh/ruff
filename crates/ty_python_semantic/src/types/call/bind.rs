@@ -8242,12 +8242,15 @@ struct OverloadFilterSlot<'db> {
 
 /// The first-match shortcut may inspect positions that the full overload filter would discard.
 /// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a
-/// wide union or tuple. Each `t = (t, t)` doubles the number of leaf elements to materialize.
+/// wide union. Materializing a short `tuple[int, str]` takes bounded work. For nested
+/// tuples, each `t = (t, t)` doubles the number of leaf elements to materialize.
 fn may_be_expensive_to_materialize<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
 ) -> bool {
+    const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
+
     let expensive = |part: Type<'db>| match part {
         Type::TypeAlias(_)
         | Type::Recursive(_)
@@ -8255,7 +8258,14 @@ fn may_be_expensive_to_materialize<'db>(
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::NewTypeInstance(_) => true,
-        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some_and(|tuple| {
+            tuple.len().minimum() > MAX_FIXED_TUPLE_ELEMENTS
+                || tuple.iter_element_types(db).any(|element| match element {
+                    Type::LiteralValue(_) | Type::Dynamic(_) => false,
+                    Type::NominalInstance(instance) => instance.is_definition_generic(db),
+                    _ => true,
+                })
+        }),
         Type::Union(union) => union.is_wide(db),
         _ => false,
     };
