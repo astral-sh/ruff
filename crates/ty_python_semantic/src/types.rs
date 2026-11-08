@@ -7838,22 +7838,38 @@ impl<'db> Type<'db> {
 
             // Keep the argument's full type in `MethodWrapper` instead of inferring one shared
             // ParamSpec and return type, which would lose attributes and overload correlations.
-            KnownClass::Classmethod | KnownClass::Staticmethod => Some(
-                Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::standard([Parameter::positional_only(Some(Name::new_static(
-                            "f",
-                        )))
-                        .with_annotated_type(Type::single_callable(
-                            db,
-                            Signature::new(Parameters::gradual_form(), Type::object()),
-                        ))]),
-                        Type::unknown(),
-                    ),
+            known @ (KnownClass::Classmethod | KnownClass::Staticmethod) => {
+                // A classmethod always passes the class as the first positional argument, so the
+                // wrapped callable must accept one, like typeshed's
+                // `Callable[Concatenate[type[_T], _P], _R_co]`. For example, `def f(): ...` and
+                // `def f(*, x): ...` cannot be classmethods. The receiver's type is checked
+                // where the classmethod is bound, so we accept any type here.
+                let wrapped_parameters = if known == KnownClass::Classmethod {
+                    Parameters::concatenate(
+                        db,
+                        vec![Parameter::positional_only(None).with_annotated_type(Type::any())],
+                        ConcatenateTail::Gradual,
+                    )
+                } else {
+                    Parameters::gradual_form()
+                };
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::standard([Parameter::positional_only(Some(
+                                Name::new_static("f"),
+                            ))
+                            .with_annotated_type(Type::single_callable(
+                                db,
+                                Signature::new(wrapped_parameters, Type::object()),
+                            ))]),
+                            Type::unknown(),
+                        ),
+                    )
+                    .into(),
                 )
-                .into(),
-            ),
+            }
 
             KnownClass::Property => {
                 let getter_signature = Signature::new(
