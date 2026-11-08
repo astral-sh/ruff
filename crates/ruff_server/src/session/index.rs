@@ -5,10 +5,12 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
 use lsp_types::{FileEvent, Uri};
+use ruff_workspace::uv::UvImportDiscovery;
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 
 pub(crate) use ruff_settings::RuffSettings;
+pub(crate) use uv::UvImports;
 
 use crate::edit::LanguageId;
 use crate::session::Client;
@@ -16,13 +18,14 @@ use crate::session::options::Combine;
 use crate::session::settings::GlobalClientSettings;
 use crate::workspace::{Workspace, Workspaces};
 use crate::{
-    PositionEncoding, TextDocument,
+    PositionEncoding, TextDocument, WorkspaceTrust,
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
 };
 
 use super::settings::ClientSettings;
 
 mod ruff_settings;
+mod uv;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default)]
@@ -35,6 +38,7 @@ pub(crate) struct Index {
 
     /// Maps a workspace folder root to its settings.
     settings: WorkspaceSettingsIndex,
+    uv: Option<uv::UvProjects>,
 }
 
 /// Settings associated with a workspace.
@@ -71,10 +75,15 @@ pub(crate) enum DocumentQuery {
 }
 
 impl Index {
+    pub(super) fn use_uv(&self) -> bool {
+        self.uv.is_some()
+    }
+
     pub(super) fn new(
         workspaces: &Workspaces,
         global: &GlobalClientSettings,
         client: &Client,
+        trust: WorkspaceTrust,
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
         for workspace in &**workspaces {
@@ -85,6 +94,9 @@ impl Index {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
             settings,
+            uv: (trust == WorkspaceTrust::Trusted && UvImportDiscovery::enabled())
+                .then(|| uv::UvProjects::spawn(client.main_loop_sender().clone()))
+                .transpose()?,
         })
     }
 
@@ -195,6 +207,9 @@ impl Index {
         // O(n) complexity, which isn't ideal... but this is an uncommon operation.
         self.documents
             .retain(|uri, _| !Path::new(uri.path()).starts_with(&workspace_path));
+        if let Some(uv) = &mut self.uv {
+            uv.retain_open(&self.documents);
+        }
         self.notebook_cells
             .retain(|_, uri| !Path::new(uri.path()).starts_with(&workspace_path));
 
@@ -212,7 +227,10 @@ impl Index {
             .settings_for_uri(&uri)
             .map(|settings| {
                 if let Ok(file_path) = uri.to_file_path() {
-                    settings.ruff_settings.get(&file_path)
+                    self.uv
+                        .as_ref()
+                        .and_then(|uv| uv.settings(&uri).cloned())
+                        .unwrap_or_else(|| settings.ruff_settings.get(&file_path))
                 } else {
                     // For a new unsaved and untitled document, use the ruff settings from the top of the workspace
                     // but only IF:
@@ -256,21 +274,28 @@ impl Index {
     /// This method avoids re-indexing the same workspace multiple times if multiple files
     /// belonging to the same workspace have been changed.
     ///
-    /// The file events are expected to only contain paths that map to configuration files. This is
-    /// registered in [`try_register_capabilities`] method.
-    ///
-    /// [`try_register_capabilities`]: crate::server::Server::try_register_capabilities
-    pub(super) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) {
+    /// Configuration events rebuild the Ruff settings index. Changes to uv metadata or
+    /// editable import names schedule discovery for open documents.
+    pub(super) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) -> bool {
         let mut indexed = FxHashSet::default();
 
         for change in changes {
             let Ok(changed_path) = change.uri.to_file_path() else {
                 // Files that don't map to a path can't be a workspace configuration file.
-                return;
+                continue;
             };
 
+            if matches!(
+                changed_path.extension().and_then(|ext| ext.to_str()),
+                Some("py" | "pyi" | "pth")
+            ) || matches!(
+                changed_path.file_name().and_then(|name| name.to_str()),
+                Some("uv.lock" | "uv.toml" | "RECORD")
+            ) {
+                continue;
+            }
             let Some(enclosing_folder) = changed_path.parent() else {
-                return;
+                continue;
             };
 
             for (root, settings) in self
@@ -295,14 +320,36 @@ impl Index {
                 );
             }
         }
+        if let Some(uv) = &mut self.uv
+            && uv.needs_reload(changes)
+        {
+            uv.invalidate();
+            let mut uris: Vec<_> = self.documents.keys().collect();
+            uris.sort_unstable();
+            for uri in uris {
+                uv.track(uri, &self.settings);
+            }
+            return true;
+        }
+        !indexed.is_empty()
+    }
+
+    pub(super) fn update_uv_imports(&mut self, result: UvImports) -> bool {
+        self.uv.as_mut().is_some_and(|uv| uv.update(result))
     }
 
     pub(super) fn open_text_document(&mut self, uri: Uri, document: TextDocument) {
+        if let Some(uv) = &mut self.uv {
+            uv.track(&uri, &self.settings);
+        }
         self.documents
             .insert(uri, DocumentController::new_text(document));
     }
 
     pub(super) fn open_notebook_document(&mut self, notebook_uri: Uri, document: NotebookDocument) {
+        if let Some(uv) = &mut self.uv {
+            uv.track(&notebook_uri, &self.settings);
+        }
         for cell_uri in document.uris() {
             self.notebook_cells
                 .insert(cell_uri.clone(), notebook_uri.clone());
@@ -330,6 +377,9 @@ impl Index {
         let Some(_) = self.documents.remove(&uri) else {
             anyhow::bail!("tried to close document that didn't exist at {uri}")
         };
+        if let Some(uv) = &mut self.uv {
+            uv.remove(&uri);
+        }
         Ok(())
     }
 
@@ -363,7 +413,7 @@ impl Index {
 
     fn settings_for_uri(&self, uri: &Uri) -> Option<&WorkspaceSettings> {
         if let Ok(path) = uri.to_file_path() {
-            self.settings_for_path(&path)
+            self.settings.for_path(&path)
         } else {
             // If there's only a single workspace, use that configuration for an untitled document.
             if self.settings.len() == 1 {
@@ -375,13 +425,6 @@ impl Index {
                 None
             }
         }
-    }
-
-    fn settings_for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
-        self.settings
-            .range(..path.to_path_buf())
-            .rfind(|(root, _)| path.starts_with(root))
-            .map(|(_, settings)| settings)
     }
 
     /// Returns an iterator over the workspace root folders contained in this index.
@@ -409,6 +452,12 @@ struct WorkspaceSettingsIndex {
 }
 
 impl WorkspaceSettingsIndex {
+    fn for_path(&self, path: &Path) -> Option<&WorkspaceSettings> {
+        self.range(..path.to_path_buf())
+            .rfind(|(root, _)| path.starts_with(root))
+            .map(|(_, settings)| settings)
+    }
+
     /// Register a workspace folder with the given settings.
     ///
     /// If the `workspace_settings` is [`Some`], it is preferred over the global settings for the
