@@ -2710,3 +2710,29 @@ def takes_str_or_float(x: float | str): ...
 
 takes_str_or_float(round(1.0))
 ```
+
+## An uninhabited argument to overloads with different return types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, overload
+
+@overload
+def convert(value: bytes) -> str: ...
+@overload
+def convert(value: None) -> None: ...
+def convert(value: bytes | None) -> str | None:
+    return None if value is None else value.decode()
+
+type Bottom = Never
+type OtherBottom = Bottom | Never
+
+def check(value: Never, alias: Bottom, nested: OtherBottom):
+    reveal_type(convert(value))  # revealed: Unknown
+    reveal_type(convert(alias))  # revealed: Unknown
+    reveal_type(convert(nested))  # revealed: Unknown
+```

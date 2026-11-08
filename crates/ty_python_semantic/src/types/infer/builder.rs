@@ -6344,6 +6344,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut iteration = 0;
         let mut next_bindings = bindings.clone();
         let mut prev_argument_types = argument_types.clone();
+        let mode = CheckTypesMode::Provisional {
+            collect_expected_types: requires_overload_evaluation && self.collects_expected_types(),
+        };
 
         let (converged_builder, converged_argument_types) = loop {
             let mut next_argument_types = argument_types.clone();
@@ -6383,7 +6386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &next_argument_types,
                 call_expression_tcx,
                 &self.dataclass_field_specifiers,
-                CheckTypesMode::Provisional,
+                mode,
             );
 
             // The number of occurrences of inferable typevars forms an upper bound for the number
