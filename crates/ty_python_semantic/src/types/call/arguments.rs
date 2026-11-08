@@ -93,6 +93,10 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         }
     }
 
+    pub(super) fn is_variadic(&self) -> bool {
+        matches!(self, Self::Variadic(_) | Self::Keywords(_))
+    }
+
     pub(crate) fn kind(&self) -> Argument<'a> {
         match self {
             Self::Synthetic(_) => Argument::Synthetic,
@@ -691,12 +695,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     pub(crate) fn is_variadic(&self, index: usize) -> bool {
-        self.items.get(index).is_some_and(|argument| {
-            matches!(
-                argument,
-                CallArgument::Variadic(_) | CallArgument::Keywords(_)
-            )
-        })
+        self.items.get(index).is_some_and(CallArgument::is_variadic)
     }
 
     pub(crate) fn get(&self, index: usize) -> Option<&CallArgument<'a, 'db>> {
