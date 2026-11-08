@@ -906,8 +906,8 @@ impl<'db> RecursiveTypeComparison<'db> {
         left: RecursiveType<'db>,
         right: RecursiveType<'db>,
     ) -> bool {
-        const MAX_UNFOLDED_PAIRS: usize = 64;
-        const MAX_UNFOLDING_DEPTH: usize = 8;
+        const MAX_UNFOLDED_PAIRS: usize = 16;
+        const MAX_UNFOLDING_DEPTH: usize = 4;
 
         if left == right {
             return true;
