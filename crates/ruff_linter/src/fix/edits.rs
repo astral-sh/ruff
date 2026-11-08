@@ -224,9 +224,11 @@ pub(crate) fn remove_argument<T: Ranged>(
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
 
+    // A keyword's range starts at its name, while the parenthesized range of its value starts
+    // at the opening parenthesis after `name=`, so cover both.
     let parenthesized_range =
         token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
-            .unwrap_or(arg.range());
+            .map_or(arg.range(), |range| range.cover(arg.range()));
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
@@ -272,8 +274,8 @@ pub(crate) fn remove_argument<T: Ranged>(
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
-    if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
-        let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
+    if let Some(keyword) = arguments.keywords.first() {
+        // The keyword's range starts at its name, even if its value is parenthesized.
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.iter_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.

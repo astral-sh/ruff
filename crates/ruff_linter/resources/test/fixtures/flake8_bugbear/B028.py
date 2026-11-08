@@ -33,3 +33,13 @@ warnings.warn("test", skip_file_prefixes=())
 
 _my_prefixes = ("this","that")
 warnings.warn("test", skip_file_prefixes = _my_prefixes)
+
+# The first keyword argument has a parenthesized value
+warnings.warn("test", category=(DeprecationWarning))
+warnings.warn(
+    message=(
+        "a"
+        "b"
+    ),
+    category=UserWarning,
+)
