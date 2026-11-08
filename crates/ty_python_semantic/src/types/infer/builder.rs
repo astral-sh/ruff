@@ -7498,41 +7498,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // exponential blowup.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut narrowed = Vec::new();
-        let fixed_literal = tuple.elts.iter().all(|elt| !elt.is_starred_expr())
+        let can_check_elements_individually = tuple.elts.iter().all(|elt| !elt.is_starred_expr())
             && !tuple_literal_needs_promotion(&tuple.elts);
-        'candidates: for narrowed_ty in narrowed_tys.iter().filter(|ty| {
+        for &candidate in narrowed_tys.iter().filter(|ty| {
             ty.known_specialization(db, env, KnownClass::Tuple)
                 .is_some()
         }) {
             let mut speculative_builder = self.speculate();
-
-            let inferred_ty = if fixed_literal
-                && let Some(spec) = narrowed_ty.exact_tuple_instance_spec(db)
-                && let Tuple::Fixed(expected) = spec.as_ref()
-            {
-                if expected.len() != tuple.elts.len() {
-                    continue;
-                }
-                let mut elements = Vec::with_capacity(expected.len());
-                for (index, (elt, expected_ty)) in tuple
-                    .elts
-                    .iter()
-                    .zip(expected.iter_all_elements())
-                    .enumerate()
-                {
-                    let ty = speculative_builder
-                        .infer_expression(elt, tcx.with_declared_type(Some(expected_ty)));
-                    if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
-                        continue 'candidates;
-                    }
-                    elements.push(ty);
-                }
-                Type::heterogeneous_tuple(db, env, elements)
-            } else {
-                speculative_builder
-                    .infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(*narrowed_ty)))
-            };
-            if inferred_ty.is_assignable_to(db, env, *narrowed_ty) {
+            if let Some(inferred_ty) = speculative_builder.infer_tuple_for_union_member(
+                tuple,
+                tcx,
+                candidate,
+                can_check_elements_individually,
+            ) {
                 narrowed.push((inferred_ty, speculative_builder));
             }
         }
@@ -7554,6 +7532,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         result.unwrap_or_else(|| self.infer_tuple_expression_impl(tuple, tcx))
+    }
+
+    /// Infers a tuple literal against one member of its expected union. Returns `None` when
+    /// the literal cannot match that member.
+    ///
+    /// ```python
+    /// value: tuple[int, list[int]] | tuple[str, list[str]] = ("tag", [])
+    /// ```
+    ///
+    /// `"tag"` rules out the first member before we infer `[]` in that context. The
+    /// second member gives `[]` the type `list[str]`. Unpacking and literal promotion
+    /// still need whole-tuple inference.
+    fn infer_tuple_for_union_member(
+        &mut self,
+        tuple: &ast::ExprTuple,
+        tcx: TypeContext<'db>,
+        candidate: Type<'db>,
+        can_check_elements_individually: bool,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let inferred = if can_check_elements_individually
+            && let Some(spec) = candidate.exact_tuple_instance_spec(db)
+            && let Tuple::Fixed(expected) = spec.as_ref()
+        {
+            if expected.len() != tuple.elts.len() {
+                return None;
+            }
+            let mut elements = Vec::with_capacity(expected.len());
+            for (index, (elt, expected_ty)) in tuple
+                .elts
+                .iter()
+                .zip(expected.iter_all_elements())
+                .enumerate()
+            {
+                let ty = self.infer_expression(elt, tcx.with_declared_type(Some(expected_ty)));
+                // The whole-tuple check below already checks the last element.
+                if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
+                    return None;
+                }
+                elements.push(ty);
+            }
+            Type::heterogeneous_tuple(db, env, elements)
+        } else {
+            self.infer_tuple_expression_impl(tuple, tcx.with_declared_type(Some(candidate)))
+        };
+        inferred
+            .is_assignable_to(db, env, candidate)
+            .then_some(inferred)
     }
 
     fn infer_tuple_expression_impl(
