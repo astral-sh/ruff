@@ -34,10 +34,15 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+    /// A package cache can span nested uv projects with different import ownership.
+    workspace_imports: Option<u64>,
 }
 
 impl FileCacheKey {
-    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+    pub(crate) fn from_path(
+        path: &Path,
+        workspace_imports: Option<u64>,
+    ) -> io::Result<FileCacheKey> {
         // Construct a cache key for the file
         let metadata = path.metadata()?;
 
@@ -52,6 +57,7 @@ impl FileCacheKey {
         Ok(FileCacheKey {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
+            workspace_imports,
         })
     }
 }
@@ -947,7 +953,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&test_cache.package_root.join("source.py")).unwrap(),
+            &FileCacheKey::from_path(&test_cache.package_root.join("source.py"), None).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -997,7 +1003,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&source_path).unwrap(),
+            &FileCacheKey::from_path(&source_path, None).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
