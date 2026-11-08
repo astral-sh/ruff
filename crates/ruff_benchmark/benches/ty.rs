@@ -1231,18 +1231,10 @@ fn benchmark_materialized_recursive_protocol_overload(criterion: &mut Criterion)
     );
 }
 
-/// The tag selects the overload. Both signatures accept every type of `value`, whose alias
-/// would produce three times as many union members with each layer of expansion.
-fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
-    let code = "
+/// Two overloads distinguished by a literal tag. Checking `value` against `object` should
+/// take the same work regardless of the structure of its type.
+const TAGGED_OVERLOADS: &str = "
         from typing import Literal, overload
-
-        type L1[T] = list[T] | set[T] | frozenset[T]
-        type L2[T] = L1[list[T]] | L1[set[T]] | L1[frozenset[T]]
-        type L3[T] = L2[list[T]] | L2[set[T]] | L2[frozenset[T]]
-        type L4[T] = L3[list[T]] | L3[set[T]] | L3[frozenset[T]]
-        type L5[T] = L4[list[T]] | L4[set[T]] | L4[frozenset[T]]
-        type L6[T] = L5[list[T]] | L5[set[T]] | L5[frozenset[T]]
 
         @overload
         def choose(value: object, tag: Literal[0]) -> int: ...
@@ -1250,18 +1242,56 @@ fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
         def choose(value: object, tag: Literal[1]) -> str: ...
         def choose(value: object, tag: int) -> int | str:
             return 0 if tag == 0 else 'one'
+";
 
+/// Each alias adds three branches to the preceding alias. A `NewType` can hide that
+/// expansion behind its lazily evaluated base.
+fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
+    let aliases = "
+        type L1[T] = list[T] | set[T] | frozenset[T]
+        type L2[T] = L1[list[T]] | L1[set[T]] | L1[frozenset[T]]
+        type L3[T] = L2[list[T]] | L2[set[T]] | L2[frozenset[T]]
+        type L4[T] = L3[list[T]] | L3[set[T]] | L3[frozenset[T]]
+        type L5[T] = L4[list[T]] | L4[set[T]] | L4[frozenset[T]]
+        type L6[T] = L5[list[T]] | L5[set[T]] | L5[frozenset[T]]
+    ";
+    let direct = "
         def check(value: L6[str]) -> int:
             return choose(value, 0)
 
         def check_bound[T: L6[str]](value: T) -> int:
             return choose(value, 0)
     ";
+    let newtype = "
+        from typing import NewType
+
+        Payload = NewType('Payload', tuple[L6[str]])
+        def check(value: Payload) -> int:
+            return choose(value, 0)
+    ";
     benchmark_micro_case(
         criterion,
         "ty_micro[overload_with_nested_union_alias]",
-        code,
+        &format!("{TAGGED_OVERLOADS}{aliases}{direct}"),
     );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[overload_with_newtype_argument]",
+        &format!("{TAGGED_OVERLOADS}{aliases}{newtype}"),
+    );
+}
+
+/// Each tuple refers to the previous one twice. Materializing every occurrence makes the
+/// cost of selecting the overload grow exponentially with the number of assignments.
+fn benchmark_overload_with_nested_tuple(criterion: &mut Criterion) {
+    const DEPTH: usize = 20;
+    let mut code = format!("{TAGGED_OVERLOADS}\n        def check(t0: int) -> int:\n");
+    for level in 1..=DEPTH {
+        let previous = level - 1;
+        writeln!(code, "            t{level} = (t{previous}, t{previous})").ok();
+    }
+    writeln!(code, "            return choose(t{DEPTH}, 0)").ok();
+    benchmark_micro_case(criterion, "ty_micro[overload_with_nested_tuple]", &code);
 }
 
 /// Regression benchmark for subtyping between materialized recursive protocols.
@@ -2917,6 +2947,7 @@ criterion_group!(
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_overload_with_nested_union_alias,
+    benchmark_overload_with_nested_tuple,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
     benchmark_recursive_callable_materialization,

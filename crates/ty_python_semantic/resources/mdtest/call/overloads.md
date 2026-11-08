@@ -2736,3 +2736,24 @@ def check(value: Never, alias: Bottom, nested: OtherBottom):
     reveal_type(convert(alias))  # revealed: Unknown
     reveal_type(convert(nested))  # revealed: Unknown
 ```
+
+A bare `Never` drops out of the argument tuple during overload filtering. An argument of type
+`tuple[Never]` still occupies a position, as does a `NewType` with that tuple as its base.
+
+```py
+from typing import Never, NewType, overload
+
+Payload = NewType("Payload", tuple[Never])
+
+@overload
+def choose(value: object, flag: bool) -> int: ...
+@overload
+def choose(value: tuple[object, ...], flag: object) -> int | str: ...
+def choose(value: object, flag: object) -> int | str:
+    return 0
+
+def check_object_parameter(bottom: Never, items: tuple[Never], payload: Payload):
+    reveal_type(choose(bottom, True))  # revealed: Unknown
+    reveal_type(choose(items, True))  # revealed: int
+    reveal_type(choose(payload, True))  # revealed: int
+```

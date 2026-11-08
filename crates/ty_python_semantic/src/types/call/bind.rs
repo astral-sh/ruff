@@ -8241,8 +8241,8 @@ struct OverloadFilterSlot<'db> {
 }
 
 /// The first-match shortcut may inspect positions that the full overload filter would discard.
-/// Avoid forcing a function signature, expanding an alias, or rebuilding a wide union just
-/// to prove coverage at such a position.
+/// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a wide
+/// union or an exact tuple. A nested tuple can refer to the same element type many times.
 fn may_be_expensive_to_materialize<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -8253,7 +8253,9 @@ fn may_be_expensive_to_materialize<'db>(
         | Type::Recursive(_)
         | Type::RecursiveVar(_)
         | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_) => true,
+        | Type::BoundMethod(_)
+        | Type::NewTypeInstance(_) => true,
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
         Type::Union(union) => union.is_wide(db),
         _ => false,
     };
@@ -9360,6 +9362,17 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> bool {
         self.overload_filter_slots(db, arguments).all(|slot| {
+            // Every materialization of an instance is an object and still occupies a tuple
+            // slot, regardless of its type arguments or the base of a `NewType`.
+            if slot.parameter.is_object()
+                && matches!(
+                    slot.argument,
+                    Type::NominalInstance(_) | Type::NewTypeInstance(_)
+                )
+            {
+                return true;
+            }
+
             if !definitely_contributes_to_overload_filter_tuple(db, slot.parameter)
                 || may_be_expensive_to_materialize(db, env, slot.argument)
             {
