@@ -1231,22 +1231,26 @@ fn benchmark_materialized_recursive_protocol_overload(criterion: &mut Criterion)
     );
 }
 
-/// Two overloads distinguished by a literal tag. Checking `value` against `object` should
-/// take the same work regardless of the structure of its type.
-const TAGGED_OVERLOADS: &str = "
+/// Both overloads accept the same value type. The literal tag determines the return type.
+fn tagged_overloads(value_type: &str) -> String {
+    format!(
+        "
         from typing import Literal, overload
 
         @overload
-        def choose(value: object, tag: Literal[0]) -> int: ...
+        def choose(value: {value_type}, tag: Literal[0]) -> int: ...
         @overload
-        def choose(value: object, tag: Literal[1]) -> str: ...
-        def choose(value: object, tag: int) -> int | str:
+        def choose(value: {value_type}, tag: Literal[1]) -> str: ...
+        def choose(value: {value_type}, tag: int) -> int | str:
             return 0 if tag == 0 else 'one'
-";
+    "
+    )
+}
 
 /// Each alias adds three branches to the preceding alias. A `NewType` can hide that
 /// expansion behind its lazily evaluated base.
 fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
+    let overloads = tagged_overloads("object");
     let aliases = "
         type L1[T] = list[T] | set[T] | frozenset[T]
         type L2[T] = L1[list[T]] | L1[set[T]] | L1[frozenset[T]]
@@ -1272,12 +1276,12 @@ fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
     benchmark_micro_case(
         criterion,
         "ty_micro[overload_with_nested_union_alias]",
-        &format!("{TAGGED_OVERLOADS}{aliases}{direct}"),
+        &format!("{overloads}{aliases}{direct}"),
     );
     benchmark_micro_case(
         criterion,
         "ty_micro[overload_with_newtype_argument]",
-        &format!("{TAGGED_OVERLOADS}{aliases}{newtype}"),
+        &format!("{overloads}{aliases}{newtype}"),
     );
 }
 
@@ -1285,7 +1289,8 @@ fn benchmark_overload_with_nested_union_alias(criterion: &mut Criterion) {
 /// cost of selecting the overload grow exponentially with the number of assignments.
 fn benchmark_overload_with_nested_tuple(criterion: &mut Criterion) {
     const DEPTH: usize = 20;
-    let mut code = format!("{TAGGED_OVERLOADS}\n        def check(t0: int) -> int:\n");
+    let mut code = tagged_overloads("tuple[object, ...]");
+    code.push_str("\n        def check(t0: int) -> int:\n");
     for level in 1..=DEPTH {
         let previous = level - 1;
         writeln!(code, "            t{level} = (t{previous}, t{previous})").ok();
