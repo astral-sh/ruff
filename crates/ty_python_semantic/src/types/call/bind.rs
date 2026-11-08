@@ -717,12 +717,26 @@ pub(crate) enum CheckTypesMode {
     /// Generic call inference may perform fixpoint iteration in order to unify
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
-    Provisional,
+    Provisional {
+        /// The editor collects expected argument types from every candidate, including
+        /// later overloads specialized by a sibling argument.
+        collect_expected_types: bool,
+    },
 }
 
 impl CheckTypesMode {
     fn is_provisional(self) -> bool {
-        matches!(self, Self::Provisional)
+        matches!(self, Self::Provisional { .. })
+    }
+
+    fn needs_all_overload_specializations(self) -> bool {
+        match self {
+            Self::Finalize => false,
+            Self::SignatureDetails => true,
+            Self::Provisional {
+                collect_expected_types,
+            } => collect_expected_types,
+        }
     }
 }
 
@@ -4110,22 +4124,39 @@ impl<'db> CallableBinding<'db> {
             }
         };
 
-        // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
-        // whether it is compatible with the supplied argument list.
-        let check_types = |overload: &mut Binding<'db>| {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
-        };
-        // Signature details and provisional inference need the types of losing candidates too.
-        // An expandable `*args` can also change which parameters the arguments match.
-        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
-            self.check_overloads_deferring_literal_mismatches(
-                db,
-                call_arguments.as_ref(),
-                check_types,
-            );
-        } else {
-            for (_, overload) in self.matching_overloads_mut() {
-                check_types(overload);
+        // Step 2: check the remaining overloads. For ordinary arguments, step 5 discards all
+        // later matches if the first one accepts every materialization of every argument.
+        // Partial application still needs their signatures for arguments supplied later.
+        let mut check_first_match = !mode.needs_all_overload_specializations()
+            && !should_retry_after_provisional_arity
+            && (0..call_arguments.len()).all(|index| !call_arguments.is_variadic(index))
+            && self.matching_overloads().all(|(_, overload)| {
+                !overload.is_partial_application
+                    && !overload.variadic_argument_matched_to_variadic_parameter
+                    && overload.argument_matches.iter().all(|matched| {
+                        matches!(matched.parameters.as_slice(), [parameter] if parameter.argument_type.is_none())
+                    })
+            });
+        {
+            let mut overloads = self.matching_overloads_mut().peekable();
+            while let Some((_, overload)) = overloads.next() {
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+                if check_first_match && !overload.has_errors_affecting_overload_resolution() {
+                    check_first_match = false;
+                    if overloads.peek().is_some()
+                        && overload.accepts_all_argument_materializations(
+                            db,
+                            env,
+                            constraints,
+                            call_arguments.as_ref(),
+                        )
+                    {
+                        for (_, later) in overloads {
+                            later.mark_as_unmatched_overload();
+                        }
+                        return;
+                    }
+                }
             }
         }
 
@@ -10035,6 +10066,58 @@ impl<'db> Binding<'db> {
         );
         checker.check_argument_types(constraints);
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
+    }
+
+    /// Proves the first matching overload covers the call even if every argument slot is
+    /// considered by step 5. Removing slots with identical parameters preserves this result.
+    fn accepts_all_argument_materializations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        let constraints = constraints.unlimited();
+        // Step 5 constructs a tuple from nonempty unions. In particular, an argument
+        // of type Never (including an alias to Never) does not occupy a slot.
+        let contributes_slot = |ty: Type<'db>| {
+            let ty = if matches!(ty, Type::TypeAlias(_)) {
+                ty.resolve_type_alias(db)
+            } else {
+                ty
+            };
+            let needs_expansion = match ty {
+                Type::Never => return false,
+                Type::TypeAlias(_) => true,
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    matches!(element, Type::Never | Type::TypeAlias(_) | Type::Union(_))
+                }),
+                _ => false,
+            };
+            !needs_expansion || !UnionBuilder::new(db, env).add(ty).is_empty()
+        };
+        let specialization = self.merged_specialization(db);
+        self.argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .all(|(matched, argument)| {
+                let [parameter] = matched.parameters.as_slice() else {
+                    return false;
+                };
+                let declared = &self.signature.parameters()[parameter.index];
+                let raw = declared.annotated_type();
+                let argument = argument
+                    .source_types()
+                    .get_for_parameter(declared)
+                    .top_materialization(db, env);
+                let parameter = raw.apply_optional_specialization(db, specialization);
+                if !contributes_slot(argument) || !contributes_slot(parameter) {
+                    return false;
+                }
+                argument
+                    .when_assignable_to(db, env, parameter, constraints, self.inferable_typevars)
+                    .is_always_satisfied(db, env, self.inferable_typevars)
+            })
     }
 
     fn check_keyword_unpack_key_types(
