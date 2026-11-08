@@ -7498,19 +7498,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // exponential blowup.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut narrowed = Vec::new();
-        let can_check_elements_individually = tuple.elts.iter().all(|elt| !elt.is_starred_expr())
-            && !tuple_literal_needs_promotion(&tuple.elts);
+        let mode = TupleInferenceMode::for_literal(tuple);
         for &candidate in narrowed_tys.iter().filter(|ty| {
             ty.known_specialization(db, env, KnownClass::Tuple)
                 .is_some()
         }) {
             let mut speculative_builder = self.speculate();
-            if let Some(inferred_ty) = speculative_builder.infer_tuple_for_union_member(
-                tuple,
-                tcx,
-                candidate,
-                can_check_elements_individually,
-            ) {
+            if let Some(inferred_ty) =
+                speculative_builder.infer_tuple_for_union_member(tuple, tcx, candidate, mode)
+            {
                 narrowed.push((inferred_ty, speculative_builder));
             }
         }
@@ -7549,11 +7545,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tuple: &ast::ExprTuple,
         tcx: TypeContext<'db>,
         candidate: Type<'db>,
-        can_check_elements_individually: bool,
+        mode: TupleInferenceMode,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let inferred = if can_check_elements_individually
+        let inferred = if let TupleInferenceMode::CheckFixedElements = mode
             && let Some(spec) = candidate.exact_tuple_instance_spec(db)
             && let Tuple::Fixed(expected) = spec.as_ref()
         {
@@ -13196,6 +13192,24 @@ impl<'args, 'call, 'db> CallArgumentInference<'args, 'call, 'db> {
                 first.callable_type(),
                 std::iter::once(first).chain(self.rest.into_iter().map(|(bindings, _)| bindings)),
             )
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TupleInferenceMode {
+    CheckFixedElements,
+    InferWholeTuple,
+}
+
+impl TupleInferenceMode {
+    fn for_literal(tuple: &ast::ExprTuple) -> Self {
+        if tuple.elts.iter().any(ast::Expr::is_starred_expr)
+            || tuple_literal_needs_promotion(&tuple.elts)
+        {
+            Self::InferWholeTuple
+        } else {
+            Self::CheckFixedElements
         }
     }
 }
