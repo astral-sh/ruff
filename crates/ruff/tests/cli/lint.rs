@@ -59,6 +59,39 @@ inline-quotes = "single"
     Ok(())
 }
 
+#[test_case::test_case(false, "pass\n", 0; "warning_clean")]
+#[test_case::test_case(false, "import os\n", 1; "warning_violations")]
+#[test_case::test_case(true, "pass\n", 0; "verbose_clean")]
+#[test_case::test_case(true, "import os\n", 1; "verbose_violations")]
+fn logging_with_broken_stderr(verbose: bool, source: &str, exit_code: i32) -> Result<()> {
+    let case = CliTest::with_file("test.py", source)?;
+    // Top-level lint options emit a warning even without verbose logging.
+    case.write_file("ruff.toml", "select = ['F']\n")?;
+
+    let mut command = case.check_command();
+    command.arg("test.py");
+    if verbose {
+        command.arg("--verbose");
+    }
+
+    let expected = command.output()?;
+    assert_eq!(expected.status.code(), Some(exit_code));
+    let stderr = str::from_utf8(&expected.stderr)?;
+    assert!(stderr.contains("warning: The top-level linter settings are deprecated"));
+    if verbose {
+        assert!(stderr.contains("[DEBUG]"));
+    }
+
+    let (reader, writer) = std::io::pipe()?;
+    drop(reader);
+
+    let actual = command.stderr(writer).output()?;
+    assert_eq!(actual.status.code(), Some(exit_code), "{}", actual.status);
+    assert_eq!(actual.stdout, expected.stdout);
+
+    Ok(())
+}
+
 #[test]
 fn lint_options() -> Result<()> {
     let case = CliTest::with_file(
