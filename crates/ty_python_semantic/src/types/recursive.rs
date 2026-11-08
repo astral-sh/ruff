@@ -83,9 +83,9 @@ use super::visitor::{
     walk_type_with_recursion_guard,
 };
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, FunctionType, GenericContext,
-    MaterializationKind, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarInstance, TypedDictType, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+    FunctionType, GenericContext, MaterializationKind, ProtocolInstanceType, Type, TypeAliasType,
+    TypeContext, TypeMapping, TypeVarInstance, TypedDictType, VarianceTerm,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -589,7 +589,7 @@ impl<'db> RecursiveType<'db> {
             let mut targets = RecursiveSpecializationSearch::collect(db, self, self.body(db));
             if let Some(parameters) = self.parameters(db) {
                 for variable in parameters.variables(db) {
-                    targets.insert(variable.identity(db));
+                    targets.insert(db, variable);
                 }
             }
             targets.typevars.shrink_to_fit();
@@ -745,6 +745,45 @@ impl<'db> RecursiveType<'db> {
         mapped
     }
 
+    /// For the same constructor, prove equality on every variable the shared input can expose.
+    fn has_equivalent_substitution(self, db: &'db dyn Db, other: Self) -> bool {
+        let left = self.mappings(db);
+        let right = other.mappings(db);
+        let common = left
+            .iter()
+            .zip(right)
+            .take_while(|(left, right)| left == right)
+            .count();
+        let left = &left[common..];
+        let right = &right[common..];
+        let (left, right) = match (left, right) {
+            ([left], [right])
+                if left.has_same_context(right)
+                    && let Some(left) = left.substitution()
+                    && let Some(right) = right.substitution() =>
+            {
+                (Some(left), Some(right))
+            }
+            ([left], []) if let Some(left) = left.substitution() => (Some(left), None),
+            ([], [right]) if let Some(right) = right.substitution() => (None, Some(right)),
+            _ => return false,
+        };
+        let input = self.with_mappings(db, &self.mappings(db)[..common]);
+        left.into_iter()
+            .chain(right)
+            .flat_map(|substitution| substitution.generic_context(db).variables(db))
+            .all(|variable| {
+                let left = left.and_then(|substitution| substitution.get(db, variable));
+                let right = right.and_then(|substitution| substitution.get(db, variable));
+                left == right
+                    || input.specialization_targets(db).substitutions_agree(
+                        variable.identity(db),
+                        left,
+                        right,
+                    )
+            })
+    }
+
     pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
@@ -760,7 +799,8 @@ impl<'db> RecursiveType<'db> {
 /// Possible variable occurrences and callable/Self effects of specialization.
 #[derive(Clone, Debug, Default, Eq, PartialEq, salsa::SalsaValue, get_size2::GetSize)]
 struct SpecializationTargets<'db> {
-    typevars: FxHashSet<BoundTypeVarIdentity<'db>>,
+    // Keep a unique occurrence when known: identities omit materialized bounds and constraints.
+    typevars: FxHashMap<BoundTypeVarIdentity<'db>, Option<BoundTypeVarInstance<'db>>>,
     /// Unknown attributes may contain any variable. In that case `typevars` lists exclusions,
     /// so substitution can still remove variables from an otherwise unknown set.
     complement: bool,
@@ -777,20 +817,50 @@ impl<'db> SpecializationTargets<'db> {
     }
 
     fn contains(&self, variable: BoundTypeVarIdentity<'db>) -> bool {
-        self.typevars.contains(&variable) != self.complement
+        self.typevars.contains_key(&variable) != self.complement
     }
 
-    fn insert(&mut self, variable: BoundTypeVarIdentity<'db>) {
-        if self.complement {
-            self.typevars.remove(&variable);
+    /// Compare replacements; a missing replacement preserves the original occurrence.
+    fn substitutions_agree(
+        &self,
+        variable: BoundTypeVarIdentity<'db>,
+        left: Option<Type<'db>>,
+        right: Option<Type<'db>>,
+    ) -> bool {
+        if !self.contains(variable) {
+            return true;
+        }
+        let unchanged = self
+            .typevars
+            .get(&variable)
+            .copied()
+            .flatten()
+            .map(Type::TypeVar);
+        left.or(unchanged) == right.or(unchanged)
+    }
+
+    fn insert(&mut self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+        let occurrence_identity = variable.identity(db);
+        let identity = if occurrence_identity.is_paramspec(db) {
+            occurrence_identity.without_paramspec_attr(db)
         } else {
-            self.typevars.insert(variable);
+            occurrence_identity
+        };
+        // Do not treat a ParamSpec projection as the original occurrence of its lookup key.
+        let occurrence = (identity == occurrence_identity).then_some(variable);
+        if self.complement {
+            self.typevars.remove(&identity);
+        } else {
+            let previous = self.typevars.entry(identity).or_insert(occurrence);
+            if *previous != occurrence {
+                *previous = None;
+            }
         }
     }
 
     fn remove(&mut self, variable: BoundTypeVarIdentity<'db>) {
         if self.complement {
-            self.typevars.insert(variable);
+            self.typevars.insert(variable, None);
         } else {
             self.typevars.remove(&variable);
         }
@@ -798,19 +868,31 @@ impl<'db> SpecializationTargets<'db> {
 
     fn extend(&mut self, other: &Self) {
         match (self.complement, other.complement) {
-            (false, false) => self.typevars.extend(&other.typevars),
+            (false, false) =>
+            {
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "Merging occurrences is order-independent"
+                )]
+                for (identity, variable) in &other.typevars {
+                    let previous = self.typevars.entry(*identity).or_insert(*variable);
+                    if previous != variable {
+                        *previous = None;
+                    }
+                }
+            }
             (true, false) => self
                 .typevars
-                .retain(|variable| !other.typevars.contains(variable)),
+                .retain(|variable, _| !other.typevars.contains_key(variable)),
             (false, true) => {
                 let mut excluded = other.typevars.clone();
-                excluded.retain(|variable| !self.typevars.contains(variable));
+                excluded.retain(|variable, _| !self.typevars.contains_key(variable));
                 self.typevars = excluded;
                 self.complement = true;
             }
             (true, true) => self
                 .typevars
-                .retain(|variable| other.typevars.contains(variable)),
+                .retain(|variable, _| other.typevars.contains_key(variable)),
         }
         self.effects |= other.effects;
     }
@@ -899,14 +981,8 @@ impl<'db> TypeVisitor<'db> for RecursiveSpecializationSearch<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::TypeVar(typevar) => {
-                let identity = typevar.identity(db);
-                let identity = if identity.is_paramspec(db) {
-                    identity.without_paramspec_attr(db)
-                } else {
-                    identity
-                };
                 let mut targets = self.targets.borrow_mut();
-                targets.insert(identity);
+                targets.insert(db, typevar);
                 targets.effects |= typevar.typevar(db).is_self(db);
             }
             Type::RecursiveVar(reference) => {
@@ -1164,6 +1240,9 @@ impl<'db> RecursiveTypeComparison<'db> {
         // A provisional body may not expose its parameters yet. Preserve their substitutions.
         if left.arguments(db) != right.arguments(db) {
             return false;
+        }
+        if left.has_equivalent_substitution(db, right) {
+            return true;
         }
         {
             let active = self.active.borrow();

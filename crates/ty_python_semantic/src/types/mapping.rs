@@ -24,6 +24,13 @@ pub struct DeferredTypeMapping<'db> {
 }
 
 impl<'db> DeferredTypeMapping<'db> {
+    /// Whether two mappings use the same application context.
+    pub(super) fn has_same_context(&self, other: &Self) -> bool {
+        self.context == other.context
+            && self.materialize_typevar_bounds_and_defaults
+                == other.materialize_typevar_bounds_and_defaults
+    }
+
     pub(super) fn from_mapping(
         db: &'db dyn Db,
         mapping: &TypeMapping<'_, 'db>,
@@ -112,13 +119,11 @@ impl<'db> DeferredTypeMapping<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) {
         if let Some(previous) = mappings.last_mut()
+            && previous.has_same_context(&self)
             && let OwnedTypeMapping::Specialize(OwnedApplySpecialization::Substitution(left), None) =
                 &mut previous.kind
             && let OwnedTypeMapping::Specialize(OwnedApplySpecialization::Substitution(right), None) =
                 self.kind
-            && previous.context == self.context
-            && previous.materialize_typevar_bounds_and_defaults
-                == self.materialize_typevar_bounds_and_defaults
         {
             *left = left.compose_substitution(db, right, visitor);
             return;
