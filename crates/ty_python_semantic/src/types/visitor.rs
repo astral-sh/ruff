@@ -1086,12 +1086,17 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
     any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
 }
 
-/// Searches through type aliases without forcing other lazily inferred type attributes.
+/// Searches through alias bodies without forcing other lazy type attributes.
 ///
-/// Revisiting a recursive alias counts as a match because its specialization can grow on each
-/// visit. Distinct specializations of a nonrecursive alias remain separate, so nested uses such as
-/// `Identity[Identity[int]]` are still considered finite. Repeated references to the same
-/// specialization can share its expansion.
+/// ```python
+/// type Pair[T] = tuple[T, T]
+/// type Shared = Pair[Pair[int]]
+/// type Growing[T] = tuple[T, Growing[list[T]]]
+/// ```
+///
+/// When searching `Shared` for `str`, both tuple elements share the search of `Pair[int]`.
+/// Searching `Growing[int]` reaches `Growing[list[int]]` while the same definition is
+/// active. Such a cycle counts as a match even if the predicate has found nothing yet.
 pub(super) fn any_over_type_expanding_aliases<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1104,7 +1109,7 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
         ty: Type<'db>,
         query: &impl Fn(Type<'db>) -> bool,
         active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
-        visited_aliases: Option<&TypeCollector<'db>>,
+        seen_specializations: Option<&TypeCollector<'db>>,
     ) -> bool {
         any_over_type(db, env, ty, false, |nested| {
             if query(nested) {
@@ -1118,11 +1123,12 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                 &identity,
                 || true,
                 || {
-                    // Under a growing alias, a different specialization of an active
-                    // definition can end the search. That result depends on the active path.
-                    let visited_aliases =
-                        visited_aliases.filter(|_| matches!(identity, TypeIdentity::Other(_)));
-                    if visited_aliases.is_some_and(|visited| visited.type_was_already_seen(nested))
+                    // Below a growing alias, revisiting an active definition depends on the
+                    // path we took. Only share expansions outside such paths.
+                    let seen_specializations =
+                        seen_specializations.filter(|_| matches!(identity, TypeIdentity::Other(_)));
+                    if seen_specializations
+                        .is_some_and(|visited| visited.type_was_already_seen(nested))
                     {
                         return false;
                     }
@@ -1131,7 +1137,7 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                         Type::Recursive(recursive) => recursive.unfold(db, env).into_type(),
                         _ => return false,
                     };
-                    search(db, env, value, query, active_aliases, visited_aliases)
+                    search(db, env, value, query, active_aliases, seen_specializations)
                 },
             )
         })
