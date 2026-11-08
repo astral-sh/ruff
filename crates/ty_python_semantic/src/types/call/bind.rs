@@ -8693,17 +8693,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
 /// The first-match shortcut may inspect positions that the full overload filter would discard.
 /// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a
-/// wide union or tuple. A nested tuple can refer to the same element type many times.
+/// wide union or tuple. Each `t = (t, t)` doubles the number of leaf elements to materialize.
 fn may_be_expensive_to_materialize<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
 ) -> bool {
-    const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
-
-    // The visitor deduplicates types. Materialization visits a nested tuple at each
-    // occurrence, so only attempt the shortcut for one short tuple per argument.
-    let saw_tuple = Cell::new(false);
     let expensive = |part: Type<'db>| match part {
         Type::TypeAlias(_)
         | Type::Recursive(_)
@@ -8711,9 +8706,7 @@ fn may_be_expensive_to_materialize<'db>(
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::NewTypeInstance(_) => true,
-        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some_and(|tuple| {
-            tuple.len().minimum() > MAX_FIXED_TUPLE_ELEMENTS || saw_tuple.replace(true)
-        }),
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some(),
         Type::Union(union) => union.is_wide(db),
         _ => false,
     };
