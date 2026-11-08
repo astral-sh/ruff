@@ -68,8 +68,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
+use super::callable::walk_callable_type;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::generics::Specialization;
+use super::function::walk_function_type;
+use super::generics::{ApplySpecialization, Specialization};
 use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
@@ -79,8 +81,8 @@ use super::visitor::{
     walk_type_with_recursion_guard,
 };
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, FunctionType, GenericContext,
+    MaterializationKind, Type, TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -573,22 +575,41 @@ impl<'db> RecursiveType<'db> {
             })
     }
 
-    /// Conservatively find free variables without unfolding growing recursive applications.
+    /// Find specialization targets without unfolding growing recursive applications.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false)]
-    fn may_contain_typevar(self, db: &'db dyn Db, variable: BoundTypeVarIdentity<'db>) -> bool {
+    fn may_contain_specialization_target(
+        self,
+        db: &'db dyn Db,
+        target: SpecializationTarget<'db>,
+    ) -> bool {
         let Some((last, prefix)) = self.mappings(db).split_last() else {
-            return self
-                .parameters(db)
-                .is_some_and(|parameters| parameters.contains(db, variable))
-                || RecursiveTypeVarSearch::contains(db, self, self.body(db), variable);
-        };
-        let Some(substitution) = last.substitution() else {
-            // Other transformations can expose variables in lazily inferred attributes.
-            return true;
+            return matches!(target, SpecializationTarget::TypeVar(variable)
+                if self.parameters(db).is_some_and(|parameters| parameters.contains(db, variable)))
+                || RecursiveSpecializationSearch::contains(db, self, self.body(db), target);
         };
         let prefix = self.with_mappings(db, prefix);
+        if target == SpecializationTarget::Effects
+            && matches!(
+                last.type_mapping(),
+                TypeMapping::ApplySpecialization(ApplySpecialization::Effects { .. })
+            )
+        {
+            return prefix.may_contain_specialization_target(db, target);
+        }
+        let Some(substitution) = last.substitution() else {
+            // Other transformations can expose new targets in lazily inferred attributes.
+            return true;
+        };
+        let SpecializationTarget::TypeVar(variable) = target else {
+            // Substitution can introduce callables or Self through its stored values.
+            return prefix.may_contain_specialization_target(db, target)
+                || substitution
+                    .types(db)
+                    .iter()
+                    .any(|ty| RecursiveSpecializationSearch::contains(db, self, *ty, target));
+        };
         if !substitution.generic_context(db).contains(db, variable)
-            && prefix.may_contain_typevar(db, variable)
+            && prefix.may_contain_specialization_target(db, target)
         {
             return true;
         }
@@ -598,8 +619,11 @@ impl<'db> RecursiveType<'db> {
             .variables(db)
             .zip(substitution.types(db))
             .any(|(parameter, ty)| {
-                RecursiveTypeVarSearch::contains(db, self, *ty, variable)
-                    && prefix.may_contain_typevar(db, parameter.identity(db))
+                RecursiveSpecializationSearch::contains(db, self, *ty, target)
+                    && prefix.may_contain_specialization_target(
+                        db,
+                        SpecializationTarget::TypeVar(parameter.identity(db)),
+                    )
             })
     }
 
@@ -668,6 +692,13 @@ impl<'db> RecursiveType<'db> {
         // Unfolding prepends the recursive edge's mappings. Normalize that prefix before
         // comparing the final operation, so redundant cycles inside the sequence disappear.
         let prefix = self.with_mappings(db, prefix).simplified(db);
+        if matches!(
+            last.type_mapping(),
+            TypeMapping::ApplySpecialization(ApplySpecialization::Effects { .. })
+        ) && !prefix.may_contain_specialization_target(db, SpecializationTarget::Effects)
+        {
+            return prefix;
+        }
         let mut mappings = prefix.mappings(db).to_vec();
         let env = self.environment(db);
         let visitor = ApplyTypeMappingVisitor::new(&env);
@@ -693,8 +724,10 @@ impl<'db> RecursiveType<'db> {
                     candidate_mappings.push(reduced);
                 }
                 let candidate = self.with_mappings(db, &candidate_mappings);
-                if !input.may_contain_typevar(db, variable.identity(db))
-                    || RecursiveTypeComparison::default().equivalent(db, mapped, candidate)
+                if !input.may_contain_specialization_target(
+                    db,
+                    SpecializationTarget::TypeVar(variable.identity(db)),
+                ) || RecursiveTypeComparison::default().equivalent(db, mapped, candidate)
                 {
                     mappings = candidate_mappings;
                     mapped = candidate;
@@ -722,26 +755,33 @@ impl<'db> RecursiveType<'db> {
     }
 }
 
+/// The occurrences changed by substitution, or the declarations prepared before substitution.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::SalsaValue)]
+enum SpecializationTarget<'db> {
+    TypeVar(BoundTypeVarIdentity<'db>),
+    Effects,
+}
+
 /// Search open graph bodies and substitution values, preserving the scope of recursive variables.
-struct RecursiveTypeVarSearch<'db> {
+struct RecursiveSpecializationSearch<'db> {
     scope: RecursiveType<'db>,
     env: ProgramEnvironment<'db>,
-    variable: BoundTypeVarIdentity<'db>,
+    target: SpecializationTarget<'db>,
     found: Cell<bool>,
     visited: TypeCollector<'db>,
 }
 
-impl<'db> RecursiveTypeVarSearch<'db> {
+impl<'db> RecursiveSpecializationSearch<'db> {
     fn contains(
         db: &'db dyn Db,
         scope: RecursiveType<'db>,
         ty: Type<'db>,
-        variable: BoundTypeVarIdentity<'db>,
+        target: SpecializationTarget<'db>,
     ) -> bool {
         let search = Self {
             scope,
             env: scope.environment(db),
-            variable,
+            target,
             found: Cell::new(false),
             visited: TypeCollector::default(),
         };
@@ -750,7 +790,7 @@ impl<'db> RecursiveTypeVarSearch<'db> {
     }
 }
 
-impl<'db> TypeVisitor<'db> for RecursiveTypeVarSearch<'db> {
+impl<'db> TypeVisitor<'db> for RecursiveSpecializationSearch<'db> {
     fn program_environment(&self) -> &ProgramEnvironment<'db> {
         &self.env
     }
@@ -767,6 +807,22 @@ impl<'db> TypeVisitor<'db> for RecursiveTypeVarSearch<'db> {
         self.visit_type(db, ty);
     }
 
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        if self.target == SpecializationTarget::Effects {
+            self.found.set(true);
+        } else {
+            walk_callable_type(db, callable, self);
+        }
+    }
+
+    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+        if self.target == SpecializationTarget::Effects {
+            self.found.set(true);
+        } else {
+            walk_function_type(db, function, self);
+        }
+    }
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if self.found.get() {
             return;
@@ -779,13 +835,18 @@ impl<'db> TypeVisitor<'db> for RecursiveTypeVarSearch<'db> {
                 } else {
                     identity
                 };
-                identity == self.variable
+                match self.target {
+                    SpecializationTarget::TypeVar(variable) => identity == variable,
+                    SpecializationTarget::Effects => typevar.typevar(db).is_self(db),
+                }
             }
             Type::RecursiveVar(reference) => self
                 .scope
                 .reference(db, reference)
-                .may_contain_typevar(db, self.variable),
-            Type::Recursive(recursive) => recursive.may_contain_typevar(db, self.variable),
+                .may_contain_specialization_target(db, self.target),
+            Type::Recursive(recursive) => {
+                recursive.may_contain_specialization_target(db, self.target)
+            }
             _ => {
                 walk_type_with_recursion_guard(db, ty, self, &self.visited);
                 return;
