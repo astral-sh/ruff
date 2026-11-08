@@ -3232,6 +3232,31 @@ def invalid() -> Root:
     return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-type]
 ```
 
+Generic aliases can share several recursive references. Following these references preserves the
+specialized leaf type, including when a path returns to the original alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+B = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+C = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+D = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+
+def inspect(value: A[int]):
+    reveal_type(value[0])  # revealed: int
+    branch = value[2]
+    if branch is not None:
+        reveal_type(branch[0])  # revealed: int
+        shared = branch[4]
+        if shared is not None:
+            reveal_type(shared[0])  # revealed: int
+            root = shared[1]
+            if root is not None:
+                reveal_type(root[0])  # revealed: int
+```
+
 ### Shared references with changing type arguments
 
 Each alias binds its own type parameter. Traversing a branch wraps that parameter in a list, whether

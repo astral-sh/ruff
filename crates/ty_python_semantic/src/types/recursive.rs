@@ -640,7 +640,6 @@ impl<'db> RecursiveType<'db> {
         let visitor = ApplyTypeMappingVisitor::new(&env);
         last.clone().append(db, &mut mappings, &visitor);
         let mut mapped = self.with_mappings(db, &mappings);
-        let comparison = RecursiveTypeComparison::default();
         // Composition retains both domains. Drop a binding only after checking that the
         // constructor does not use it, including through captured variables in its body.
         if let Some(last) = mappings.last()
@@ -655,7 +654,7 @@ impl<'db> RecursiveType<'db> {
                     candidate_mappings.push(reduced);
                 }
                 let candidate = self.with_mappings(db, &candidate_mappings);
-                if comparison.equivalent(db, mapped, candidate) {
+                if RecursiveTypeComparison::default().equivalent(db, mapped, candidate) {
                     mappings = candidate_mappings;
                     mapped = candidate;
                 }
@@ -663,7 +662,7 @@ impl<'db> RecursiveType<'db> {
         }
         for prefix in 0..mappings.len() {
             let candidate = self.with_mappings(db, &mappings[..prefix]);
-            if comparison.equivalent(db, mapped, candidate) {
+            if RecursiveTypeComparison::default().equivalent(db, mapped, candidate) {
                 return candidate;
             }
         }
@@ -895,6 +894,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 #[derive(Debug, Default, PartialEq, Eq)]
 struct RecursiveTypeComparison<'db> {
     active: RefCell<Vec<(RecursiveType<'db>, RecursiveType<'db>)>>,
+    unfolded_pairs: Cell<usize>,
 }
 
 impl get_size2::GetSize for RecursiveTypeComparison<'_> {}
@@ -906,7 +906,8 @@ impl<'db> RecursiveTypeComparison<'db> {
         left: RecursiveType<'db>,
         right: RecursiveType<'db>,
     ) -> bool {
-        const MAX_EXPANDING_UNFOLDINGS: usize = 4;
+        const MAX_UNFOLDED_PAIRS: usize = 64;
+        const MAX_UNFOLDING_DEPTH: usize = 8;
 
         if left == right {
             return true;
@@ -920,25 +921,21 @@ impl<'db> RecursiveTypeComparison<'db> {
         }
         {
             let active = self.active.borrow();
-            if active.contains(&(left, right)) || active.contains(&(right, left)) {
-                return true;
-            }
-            // Growing arguments or deferred mappings need not repeat an exact state.
-            // Approximate equality after this many visits to one constructor; a mapping
-            // whose first observable effect lies deeper can consequently be discarded.
-            let mut previous = active.iter().filter(|(previous, _)| {
-                previous.graph(db) == left.graph(db) && previous.index(db) == left.index(db)
-            });
-            if previous.clone().count() >= MAX_EXPANDING_UNFOLDINGS
-                && (left.may_have_unbounded_specialization(db)
-                    || previous.any(|(old_left, old_right)| {
-                        left.mappings(db).len() + right.mappings(db).len()
-                            > old_left.mappings(db).len() + old_right.mappings(db).len()
-                    }))
+            // Bound stack use separately from the work shared by all branches.
+            if active.len() >= MAX_UNFOLDING_DEPTH
+                || active.contains(&(left, right))
+                || active.contains(&(right, left))
             {
                 return true;
             }
         }
+        // Bound the whole comparison, including repeated visits on different branches.
+        // A transformation first observable beyond this budget can be treated as redundant.
+        let unfolded_pairs = self.unfolded_pairs.get();
+        if unfolded_pairs >= MAX_UNFOLDED_PAIRS {
+            return true;
+        }
+        self.unfolded_pairs.set(unfolded_pairs + 1);
         self.active.borrow_mut().push((left, right));
         let env = left.environment(db);
         let references = RefCell::default();
