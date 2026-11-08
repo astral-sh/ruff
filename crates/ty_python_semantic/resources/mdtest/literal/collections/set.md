@@ -37,3 +37,28 @@ reveal_type({1, (1, 2), (1, 2, 3)})
 ```py
 reveal_type({x for x in range(42)})  # revealed: set[int]
 ```
+
+## Custom set with an additional type parameter
+
+The literal supplies the element type. The additional parameter falls back to `Unknown`.
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class type: ...
+class tuple: ...
+class int: ...
+class set[T, U]: ...
+```
+
+```py
+def f(value: int):
+    wrong: int = {value}  # error: [invalid-assignment] "Object of type `set[int, Unknown]` is not assignable to `int`"
+```

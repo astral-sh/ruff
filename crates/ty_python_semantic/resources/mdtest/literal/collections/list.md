@@ -91,3 +91,24 @@ reveal_type(Foo().mylist)  # revealed: list[None | Unknown]
 ```py
 reveal_type([x for x in range(42)])  # revealed: list[int]
 ```
+
+## A single lower bound containing union aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_type
+
+type Scalar = int | str
+
+def check(value: Scalar | bytes):
+    items = [value]
+    reveal_type(items)  # revealed: list[int | str | bytes]
+    assert_type(items, list[Scalar | bytes])
+
+def check_nested(value: list[Scalar] | list[int | str]):
+    reveal_type([value])  # revealed: list[list[Scalar]]
+```

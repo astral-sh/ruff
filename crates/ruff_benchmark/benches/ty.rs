@@ -383,6 +383,33 @@ fn benchmark_recursive_collection_use_constraints(criterion: &mut Criterion) {
     );
 }
 
+/// Each alias body refers to the same nested alias twice. A leading type variable
+/// also exercises the case where an earlier element already requires the solver.
+fn benchmark_collection_literal_nested_aliases(criterion: &mut Criterion) {
+    let definitions = "
+        type Point = tuple[int, float]
+        type Segment = tuple[Point, Point]
+        type Boundary = tuple[Segment, Segment]
+        type Region = tuple[Boundary, Boundary]
+        type Selection = tuple[Region, Region]
+        type Page = tuple[Selection, Selection]
+        type Document = tuple[Page, Page]
+
+        def collect[T](seed: T, pages: list[Document], index: dict[str, Document]):
+";
+    for (name, first) in [
+        ("ty_micro[collection_literal_nested_aliases]", "0"),
+        (
+            "ty_micro[collection_literal_nested_aliases_typevar]",
+            "seed",
+        ),
+    ] {
+        let statement = format!("            [{first}, pages, index, pages, index]\n");
+        let code = format!("{definitions}{}", statement.repeat(64));
+        benchmark_micro_case(criterion, name, &code);
+    }
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -2865,6 +2892,7 @@ criterion_group!(
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
     benchmark_recursive_collection_use_constraints,
+    benchmark_collection_literal_nested_aliases,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
