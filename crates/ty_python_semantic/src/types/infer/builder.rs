@@ -13196,6 +13196,9 @@ impl<'args, 'call, 'db> CallArgumentInference<'args, 'call, 'db> {
     }
 }
 
+/// How a tuple literal can be inferred against members of its expected union.
+/// With [`Self::FixedElements`], an incompatible element can rule out a fixed-length
+/// tuple member before we infer the remaining elements.
 #[derive(Clone, Copy)]
 enum TupleInferenceMode {
     FixedElements,
@@ -13203,6 +13206,13 @@ enum TupleInferenceMode {
 }
 
 impl TupleInferenceMode {
+    /// Selects whole-tuple inference when unpacking can change element positions or
+    /// when the tuple is large enough to require literal promotion.
+    ///
+    /// ```python
+    /// pair = (1, 2)
+    /// value = (*pair, "end")  # "end" occupies the third position.
+    /// ```
     fn for_literal(tuple: &ast::ExprTuple) -> Self {
         if tuple.elts.iter().any(ast::Expr::is_starred_expr)
             || tuple_literal_needs_promotion(&tuple.elts)
