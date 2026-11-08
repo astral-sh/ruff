@@ -51,6 +51,9 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
+    /// Inferred parameter defaults are omitted unless their stored values matter to the visitor.
+    fn visit_parameter_default(&self, _db: &'db dyn Db, _ty: Type<'db>) {}
+
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
         walk_union(db, union, self);
     }

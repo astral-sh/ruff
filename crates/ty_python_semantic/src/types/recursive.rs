@@ -74,7 +74,10 @@ use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::any_over_type_including_alias_arguments;
+use super::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+    walk_type_with_recursion_guard,
+};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
     TypeContext, TypeMapping, VarianceTerm,
@@ -570,6 +573,36 @@ impl<'db> RecursiveType<'db> {
             })
     }
 
+    /// Conservatively find free variables without unfolding growing recursive applications.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false)]
+    fn may_contain_typevar(self, db: &'db dyn Db, variable: BoundTypeVarIdentity<'db>) -> bool {
+        let Some((last, prefix)) = self.mappings(db).split_last() else {
+            return self
+                .parameters(db)
+                .is_some_and(|parameters| parameters.contains(db, variable))
+                || RecursiveTypeVarSearch::contains(db, self, self.body(db), variable);
+        };
+        let Some(substitution) = last.substitution() else {
+            // Other transformations can expose variables in lazily inferred attributes.
+            return true;
+        };
+        let prefix = self.with_mappings(db, prefix);
+        if !substitution.generic_context(db).contains(db, variable)
+            && prefix.may_contain_typevar(db, variable)
+        {
+            return true;
+        }
+        // A substituted value contributes variables only if its parameter occurs in the input.
+        substitution
+            .generic_context(db)
+            .variables(db)
+            .zip(substitution.types(db))
+            .any(|(parameter, ty)| {
+                RecursiveTypeVarSearch::contains(db, self, *ty, variable)
+                    && prefix.may_contain_typevar(db, parameter.identity(db))
+            })
+    }
+
     /// Substitute free variables and graph references, or defer transformations until unfolding.
     pub(super) fn apply_type_mapping_impl(
         self,
@@ -645,7 +678,13 @@ impl<'db> RecursiveType<'db> {
         if let Some(last) = mappings.last()
             && let Some(substitution) = last.substitution()
         {
-            for index in (0..substitution.types(db).len()).rev() {
+            let input = mapped.with_mappings(db, &mappings[..mappings.len() - 1]);
+            for (index, variable) in substitution
+                .generic_context(db)
+                .variables(db)
+                .enumerate()
+                .rev()
+            {
                 let mut candidate_mappings = mappings.clone();
                 let Some(last) = candidate_mappings.pop() else {
                     break;
@@ -654,7 +693,9 @@ impl<'db> RecursiveType<'db> {
                     candidate_mappings.push(reduced);
                 }
                 let candidate = self.with_mappings(db, &candidate_mappings);
-                if RecursiveTypeComparison::default().equivalent(db, mapped, candidate) {
+                if !input.may_contain_typevar(db, variable.identity(db))
+                    || RecursiveTypeComparison::default().equivalent(db, mapped, candidate)
+                {
                     mappings = candidate_mappings;
                     mapped = candidate;
                 }
@@ -678,6 +719,79 @@ impl<'db> RecursiveType<'db> {
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
+    }
+}
+
+/// Search open graph bodies and substitution values, preserving the scope of recursive variables.
+struct RecursiveTypeVarSearch<'db> {
+    scope: RecursiveType<'db>,
+    env: ProgramEnvironment<'db>,
+    variable: BoundTypeVarIdentity<'db>,
+    found: Cell<bool>,
+    visited: TypeCollector<'db>,
+}
+
+impl<'db> RecursiveTypeVarSearch<'db> {
+    fn contains(
+        db: &'db dyn Db,
+        scope: RecursiveType<'db>,
+        ty: Type<'db>,
+        variable: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        let search = Self {
+            scope,
+            env: scope.environment(db),
+            variable,
+            found: Cell::new(false),
+            visited: TypeCollector::default(),
+        };
+        search.visit_type(db, ty);
+        search.found.get()
+    }
+}
+
+impl<'db> TypeVisitor<'db> for RecursiveTypeVarSearch<'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        &self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn notify_skipped_lazy_type_attributes(&self) {
+        self.found.set(true);
+    }
+
+    fn visit_parameter_default(&self, db: &'db dyn Db, ty: Type<'db>) {
+        self.visit_type(db, ty);
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+        let found = match ty {
+            Type::TypeVar(typevar) => {
+                let identity = typevar.identity(db);
+                let identity = if identity.is_paramspec(db) {
+                    identity.without_paramspec_attr(db)
+                } else {
+                    identity
+                };
+                identity == self.variable
+            }
+            Type::RecursiveVar(reference) => self
+                .scope
+                .reference(db, reference)
+                .may_contain_typevar(db, self.variable),
+            Type::Recursive(recursive) => recursive.may_contain_typevar(db, self.variable),
+            _ => {
+                walk_type_with_recursion_guard(db, ty, self, &self.visited);
+                return;
+            }
+        };
+        self.found.set(found);
     }
 }
 

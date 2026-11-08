@@ -553,7 +553,8 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn variables(
         self,
         db: &'db dyn Db,
-    ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
+    ) -> impl DoubleEndedIterator<Item = BoundTypeVarInstance<'db>> + ExactSizeIterator + Clone
+    {
         self.variables_inner(db).values().copied()
     }
 
