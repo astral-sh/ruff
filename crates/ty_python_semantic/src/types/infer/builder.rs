@@ -7787,8 +7787,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .filter_map(Type::as_typed_dict)
                     .collect_vec();
 
-                // Only a single `TypedDict` candidate can produce eager diagnostics. Checking a
-                // fallback recursively infers the literal, so do it only when it affects that choice.
+                // Suppress eager `TypedDict` diagnostics only if the literal is assignable to a
+                // non-`TypedDict` arm of the union.
                 if let [typed_dict] = typed_dicts.as_slice()
                     && !union_elements
                         .filter(|element| element.as_typed_dict().is_none())
