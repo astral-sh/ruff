@@ -72,9 +72,11 @@ use super::callable::walk_callable_type;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::function::walk_function_type;
 use super::generics::{ApplySpecialization, Specialization};
+use super::instance::walk_protocol_instance_type;
 use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
-use super::type_alias::AliasCycleSummary;
+use super::type_alias::{AliasCycleSummary, walk_type_alias_arguments};
+use super::typed_dict::walk_typed_dict_type;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{
     TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
@@ -82,7 +84,8 @@ use super::visitor::{
 };
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, FunctionType, GenericContext,
-    MaterializationKind, Type, TypeContext, TypeMapping, VarianceTerm,
+    MaterializationKind, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarInstance, TypedDictType, VarianceTerm,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -806,6 +809,34 @@ impl<'db> TypeVisitor<'db> for RecursiveSpecializationSearch<'db> {
     fn visit_parameter_default(&self, db: &'db dyn Db, ty: Type<'db>) {
         self.visit_type(db, ty);
     }
+
+    // Substitution preserves generic declarations and TypeVar objects. Actual variable
+    // occurrences are handled in visit_type, without inspecting their bounds or defaults.
+    fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
+
+    // Specialization maps stored class arguments, not lazily inferred members or fields.
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        if let Some(class) = protocol.class_origin(db) {
+            self.visit_type(db, class.into());
+        } else {
+            walk_protocol_instance_type(db, protocol, self);
+        }
+    }
+
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        if let TypedDictType::Class(class) = typed_dict {
+            self.visit_type(db, class.into());
+        } else {
+            walk_typed_dict_type(db, typed_dict, self);
+        }
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        walk_type_alias_arguments(db, alias, self);
+    }
+
+    // Alias objects are unchanged by specialization, unlike aliases used as types.
+    fn visit_type_alias_object(&self, _db: &'db dyn Db, _alias: TypeAliasType<'db>) {}
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         if self.target == SpecializationTarget::Effects {
