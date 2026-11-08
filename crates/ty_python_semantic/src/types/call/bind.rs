@@ -8240,29 +8240,63 @@ struct OverloadFilterSlot<'db> {
     variadic_argument: Option<Type<'db>>,
 }
 
-/// Step 5 omits empty unions when it builds the argument and parameter tuples. `Never`
-/// and aliases that resolve to `Never` therefore contribute no tuple element.
-fn contributes_to_overload_filter_tuple<'db>(
+/// The first-match shortcut may inspect positions that the full overload filter would discard.
+/// Avoid forcing a function signature, expanding an alias, or rebuilding a wide union just
+/// to prove coverage at such a position.
+fn may_be_expensive_to_materialize<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
+    argument: Type<'db>,
 ) -> bool {
-    let ty = if matches!(ty, Type::TypeAlias(_)) {
-        ty.resolve_type_alias(db)
-    } else {
-        ty
-    };
-    // A union with even one concrete member is nonempty after alias expansion.
-    let needs_expansion = match ty {
-        Type::Never => return false,
-        Type::TypeAlias(_) => true,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| matches!(element, Type::Never | Type::TypeAlias(_) | Type::Union(_))),
+    let expensive = |part: Type<'db>| match part {
+        Type::TypeAlias(_)
+        | Type::Recursive(_)
+        | Type::RecursiveVar(_)
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_) => true,
+        Type::Union(union) => union.is_wide(db),
         _ => false,
     };
-    !needs_expansion || !UnionBuilder::new(db, env).add(ty).is_empty()
+    // Materializing a type variable also materializes its bound, constraints, and default.
+    // Stop at a second bounded variable because bounds can refer back to one another.
+    let expensive_attribute = |attribute| {
+        any_over_type(db, env, attribute, false, |part| {
+            expensive(part)
+                || part
+                    .as_typevar()
+                    .is_some_and(|var| !var.typevar(db).is_simple(db))
+        })
+    };
+    any_over_type(db, env, argument, false, |part| {
+        let Type::TypeVar(var) = part else {
+            return expensive(part);
+        };
+        let var = var.typevar(db);
+        if var.is_simple(db) {
+            return false;
+        }
+        let expensive_bound = match var.bound_or_constraints(db, env) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => expensive_attribute(bound),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .copied()
+                .any(expensive_attribute),
+            None => false,
+        };
+        expensive_bound || var.default_type(db, env).is_some_and(expensive_attribute)
+    })
+}
+
+/// Step 5 drops empty unions from its argument and parameter tuples. An alias can resolve to
+/// `Never`, so the shortcut needs a visible member to prove that the slot survives.
+fn definitely_contributes_to_overload_filter_tuple<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let is_concrete =
+        |ty: &Type<'db>| !matches!(ty, Type::Never | Type::TypeAlias(_) | Type::Union(_));
+    match ty {
+        Type::Union(union) => union.elements(db).iter().any(is_concrete),
+        _ => is_concrete(&ty),
+    }
 }
 
 /// Information about which parameter(s) an argument was matched against. This is tracked
@@ -9316,8 +9350,8 @@ impl<'db> Binding<'db> {
     ///
     /// The caller checks [`Self::supports_first_match_pruning`] before taking this shortcut.
     /// If every slot is covered, dropping slots whose parameters agree across overloads
-    /// preserves the result. An argument or parameter that disappears from the filter tuple
-    /// needs the full comparison.
+    /// preserves the result. We use the full comparison when a slot might disappear or
+    /// materializing an argument would require inspecting a complex type.
     fn accepts_all_argument_materializations(
         &self,
         db: &'db dyn Db,
@@ -9326,9 +9360,14 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> bool {
         self.overload_filter_slots(db, arguments).all(|slot| {
+            if !definitely_contributes_to_overload_filter_tuple(db, slot.parameter)
+                || may_be_expensive_to_materialize(db, env, slot.argument)
+            {
+                return false;
+            }
+
             let argument = slot.argument.top_materialization(db, env);
-            contributes_to_overload_filter_tuple(db, env, argument)
-                && contributes_to_overload_filter_tuple(db, env, slot.parameter)
+            definitely_contributes_to_overload_filter_tuple(db, argument)
                 && argument
                     .when_assignable_to(
                         db,
