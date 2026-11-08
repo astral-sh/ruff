@@ -7549,7 +7549,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let inferred = if let TupleInferenceMode::CheckFixedElements = mode
+        let inferred = if let TupleInferenceMode::FixedElements = mode
             && let Some(spec) = candidate.exact_tuple_instance_spec(db)
             && let Tuple::Fixed(expected) = spec.as_ref()
         {
@@ -13198,8 +13198,8 @@ impl<'args, 'call, 'db> CallArgumentInference<'args, 'call, 'db> {
 
 #[derive(Clone, Copy)]
 enum TupleInferenceMode {
-    CheckFixedElements,
-    InferWholeTuple,
+    FixedElements,
+    WholeTuple,
 }
 
 impl TupleInferenceMode {
@@ -13207,9 +13207,9 @@ impl TupleInferenceMode {
         if tuple.elts.iter().any(ast::Expr::is_starred_expr)
             || tuple_literal_needs_promotion(&tuple.elts)
         {
-            Self::InferWholeTuple
+            Self::WholeTuple
         } else {
-            Self::CheckFixedElements
+            Self::FixedElements
         }
     }
 }
