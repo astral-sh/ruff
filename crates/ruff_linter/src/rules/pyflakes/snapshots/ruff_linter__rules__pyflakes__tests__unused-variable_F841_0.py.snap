@@ -17,6 +17,7 @@ help: Remove assignment to unused variable `e`
 3 + except ValueError:
 4 |     pass
   |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `z` is assigned to but never used
   --> F841_0.py:16:5
@@ -262,5 +263,43 @@ help: Remove assignment to unused variable `__class__`
     -                 __class__ = cls  # F841
 182 +                 pass  # F841
 183 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `e` is assigned to but never used
+   --> F841_0.py:202:33
+    |
+200 |     try:
+201 |         1 / 0
+202 |     except ZeroDivisionError as e:
+    |                                 ^
+203 |         pass
+204 |     print(e)
+    |
+help: Remove assignment to unused variable `e`
+    |
+201 |         1 / 0
+    -     except ZeroDivisionError as e:
+202 +     except ZeroDivisionError:
+203 |         pass
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+F841 [*] Local variable `e_module` is assigned to but never used
+   --> F841_0.py:220:29
+    |
+218 | try:
+219 |     1 / 0
+220 | except ZeroDivisionError as e_module:
+    |                             ^^^^^^^^
+221 |     pass
+222 | print(e_module)
+    |
+help: Remove assignment to unused variable `e_module`
+    |
+219 |     1 / 0
+    - except ZeroDivisionError as e_module:
+220 + except ZeroDivisionError:
+221 |     pass
     |
 note: This is an unsafe fix and may change runtime behavior

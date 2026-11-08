@@ -42,7 +42,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 ///
 /// This rule's fix is marked as unsafe because removing an unused variable assignment may
-/// delete comments that are attached to the assignment.
+/// delete comments that are attached to the assignment. For `except` handler bindings (e.g.,
+/// `except ValueError as e:`), the fix is also unsafe because Python implicitly deletes the
+/// exception variable after the `except` block—removing `as e` can change program behavior
+/// when a variable with the same name is accessed afterwards.
 ///
 /// ## See also
 ///
@@ -250,6 +253,16 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 }
             }
         }
+    }
+
+    // Fourth case: bound exception (`except Exception as e:`)
+    if binding.kind.is_bound_exception() {
+        return crate::rules::pyflakes::fixes::remove_exception_handler_assignment(
+            binding,
+            checker.locator(),
+        )
+        .ok()
+        .map(Fix::unsafe_edit);
     }
 
     None

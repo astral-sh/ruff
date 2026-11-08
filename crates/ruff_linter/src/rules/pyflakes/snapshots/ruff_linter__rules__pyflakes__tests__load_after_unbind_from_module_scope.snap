@@ -17,3 +17,4 @@ help: Remove assignment to unused variable `x`
 7 +     except ValueError:
 8 |         pass
   |
+note: This is an unsafe fix and may change runtime behavior

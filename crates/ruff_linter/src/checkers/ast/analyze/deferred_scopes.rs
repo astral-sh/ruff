@@ -151,6 +151,20 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
         }
 
+        if checker.is_rule_enabled(Rule::UnusedVariable)
+            && !(scope.uses_locals() && scope.kind.is_function())
+        {
+            for (name, binding_id) in scope.all_bindings() {
+                let binding = checker.semantic().binding(binding_id);
+                if binding.kind.is_bound_exception()
+                    && binding.is_unused()
+                    && !checker.settings().dummy_variable_rgx.is_match(name)
+                {
+                    pyflakes::rules::unused_variable(checker, name, binding);
+                }
+            }
+        }
+
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
             if checker.any_rule_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable])
                 && !(scope.uses_locals() && scope.kind.is_function())

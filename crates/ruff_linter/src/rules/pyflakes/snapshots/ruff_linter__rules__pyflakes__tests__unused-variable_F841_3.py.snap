@@ -226,6 +226,7 @@ help: Remove assignment to unused variable `x1`
 40 +     except ValueError:
 41 |         pass
    |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x2` is assigned to but never used
   --> F841_3.py:45:47
@@ -243,6 +244,7 @@ help: Remove assignment to unused variable `x2`
 45 +     except (ValueError, ZeroDivisionError):
 46 |         pass
    |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> F841_3.py:50:5
@@ -561,6 +563,7 @@ help: Remove assignment to unused variable `e`
 155 +     except A:
 156 |         print("oh no!")
     |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
    --> F841_3.py:160:5

@@ -187,3 +187,37 @@ class NonlocalDunderClass:
     def foo():
         nonlocal __class__
         __class__ = 1
+
+
+# Removing `as e` in an except handler changes program behavior when a same-name variable
+# exists in an outer scope (Python 3 deletes the exception variable after the except block,
+# so `print(e)` would raise `UnboundLocalError` with the binding, but uses the outer value
+# without it). The fix must be marked unsafe. See: https://github.com/astral-sh/ruff/issues/16537
+
+# F841 – fix is unsafe: removing `as e` changes `print(e)` from `UnboundLocalError` to `None`
+def f_except_binding_in_function():
+    e = None
+    try:
+        1 / 0
+    except ZeroDivisionError as e:
+        pass
+    print(e)
+
+
+# OK: `locals()` in function scope suppresses F841 for exception handler bindings too
+def f_except_with_locals():
+    try:
+        1 / 0
+    except ZeroDivisionError as e:
+        pass
+    locals()
+
+
+# F841 – fix is unsafe at module scope: same deletion semantics apply
+e_module = None
+try:
+    1 / 0
+except ZeroDivisionError as e_module:
+    pass
+print(e_module)
+

@@ -1,11 +1,8 @@
-use ruff_text_size::Ranged;
-
-use crate::Fix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_return,
-    flake8_type_checking, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_type_checking, pylint, pyupgrade, refurb, ruff,
 };
 
 /// Run lint rules over the [`Binding`]s.
@@ -18,7 +15,6 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::UnaliasedCollectionsAbcSetImport,
         Rule::UnconventionalImportAlias,
         Rule::UnsortedDunderSlots,
-        Rule::UnusedVariable,
         Rule::UnquotedTypeAlias,
         Rule::UsedDummyVariable,
         Rule::PytestUnittestRaisesAssertion,
@@ -46,30 +42,6 @@ pub(crate) fn bindings(checker: &Checker) {
                     checker,
                     binding.statement(checker.semantic()).unwrap(),
                 );
-            }
-        }
-        if checker.is_rule_enabled(Rule::UnusedVariable) {
-            if binding.kind.is_bound_exception()
-                && binding.is_unused()
-                && !checker
-                    .settings()
-                    .dummy_variable_rgx
-                    .is_match(binding.name(checker.source()))
-            {
-                checker
-                    .report_diagnostic(
-                        pyflakes::rules::UnusedVariable {
-                            name: binding.name(checker.source()).to_string(),
-                        },
-                        binding.range(),
-                    )
-                    .try_set_fix(|| {
-                        pyflakes::fixes::remove_exception_handler_assignment(
-                            binding,
-                            checker.locator,
-                        )
-                        .map(Fix::safe_edit)
-                    });
             }
         }
         if checker.is_rule_enabled(Rule::InvalidAllFormat) {

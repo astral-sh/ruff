@@ -17,6 +17,7 @@ help: Remove assignment to unused variable `x`
 8 +         except ValueError:
 9 |             pass
   |
+note: This is an unsafe fix and may change runtime behavior
 
 F821 Undefined name `x`
   --> <filename>:13:15

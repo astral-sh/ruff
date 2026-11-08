@@ -18,6 +18,7 @@ help: Remove assignment to unused variable `x`
 7 +     except ValueError:
 8 |         pass
   |
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> <filename>:9:27
@@ -35,3 +36,4 @@ help: Remove assignment to unused variable `x`
 9  +     except ImportError:
 10 |         pass
    |
+note: This is an unsafe fix and may change runtime behavior
