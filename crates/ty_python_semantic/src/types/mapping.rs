@@ -120,36 +120,7 @@ impl<'db> DeferredTypeMapping<'db> {
             && previous.materialize_typevar_bounds_and_defaults
                 == self.materialize_typevar_bounds_and_defaults
         {
-            let mut variables: Vec<_> = left.generic_context(db).variables(db).collect();
-            for variable in right.generic_context(db).variables(db) {
-                if left
-                    .generic_context(db)
-                    .variable_index(db, variable.identity(db))
-                    .is_none()
-                {
-                    variables.push(variable);
-                }
-            }
-            let mapping =
-                TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(right));
-            let types: Vec<_> = variables
-                .iter()
-                .map(|variable| {
-                    left.get(db, *variable).map_or_else(
-                        || right.get(db, *variable).unwrap_or(Type::TypeVar(*variable)),
-                        |ty| {
-                            ty.apply_type_mapping_impl(
-                                db,
-                                &mapping,
-                                TypeContext::default(),
-                                visitor,
-                            )
-                        },
-                    )
-                })
-                .collect();
-            *left = GenericContext::from_typevar_instances(db, visitor.env, variables)
-                .specialize(db, types);
+            *left = left.compose_substitution(db, right, visitor);
             return;
         }
         mappings.push(self);

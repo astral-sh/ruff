@@ -1224,6 +1224,7 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+#[salsa::tracked]
 impl<'db> Specialization<'db> {
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
@@ -1392,6 +1393,47 @@ impl<'db> Specialization<'db> {
             .generic_context(db)
             .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
+    }
+
+    /// Compose pure substitutions in application order, retaining both domains.
+    pub(super) fn compose_substitution(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(other));
+        let types = self.map_types(db, |_, _, ty| {
+            ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor)
+        });
+        let mapped = match types {
+            Cow::Borrowed(_) => self,
+            Cow::Owned(types) => Self::new(
+                db,
+                self.generic_context(db),
+                types.into_boxed_slice(),
+                self.materialization_kind(db),
+                self.tuple_inner(db),
+            ),
+        };
+        mapped.merge_substitution(db, other)
+    }
+
+    // Only merging the tables is context-independent. Transform their values with the caller's
+    // recursion guards before caching the merge.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    fn merge_substitution(self, db: &'db dyn Db, other: Self) -> Self {
+        let left = self.generic_context(db);
+        let mut variables: Vec<_> = left.variables(db).collect();
+        let mut types = self.types(db).to_vec();
+        for (variable, ty) in other.generic_context(db).variables(db).zip(other.types(db)) {
+            if left.variable_index(db, variable.identity(db)).is_none() {
+                variables.push(variable);
+                types.push(*ty);
+            }
+        }
+        let env = ProgramEnvironment::from_program(left.program(db));
+        GenericContext::from_typevar_instances(db, &env, variables).specialize(db, types)
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
