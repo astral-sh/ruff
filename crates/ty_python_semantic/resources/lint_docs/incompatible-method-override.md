@@ -27,7 +27,7 @@ class Super:
 class Sub(Super):
     # Liskov violation: `str` is not a subtype of `int`,
     # but the supertype method promises to return an `int`.
-    def method(self, x) -> str:  # error: [invalid-method-override]
+    def method(self, x) -> str:  # error: [incompatible-method-override]
         return "foo"
 
 
@@ -43,7 +43,7 @@ accepts_super(Sub())
 class Sub2(Super):
     # Liskov violation: the superclass method can be called with a `x=`
     # keyword argument, but the subclass method does not accept it.
-    def method(self, y) -> int:  # error: [invalid-method-override]
+    def method(self, y) -> int:  # error: [incompatible-method-override]
         return 42
 
 
@@ -84,8 +84,8 @@ Ruff has several rules that will encourage you to rename a parameter, or change 
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
 parameter should either be removed or renamed to start with `_`. Applying either of these
-suggestions can cause ty to start reporting an `invalid-method-override` error if the function in
-question is a method on a subclass that overrides a method on a superclass, and the change would
+suggestions can cause ty to start reporting an `incompatible-method-override` error if the function
+in question is a method on a subclass that overrides a method on a superclass, and the change would
 cause the subclass method to no longer accept all argument combinations that the superclass method
 accepts.
 
@@ -95,6 +95,12 @@ same name on a superclass, and avoids reporting rules like ARG002 for such metho
 the changes recommended by ARG002 would violate the Liskov Substitution Principle.
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
+
+## Rule history
+
+- v0.0.100: Renamed from `invalid-method-override`.
+
+    `invalid-method-override` remains as a compatibility alias for this rule.
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override

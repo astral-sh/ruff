@@ -341,7 +341,7 @@ impl<'db> ProtocolClass<'db> {
         else {
             return;
         };
-        if class.has_pep_695_type_params(db) || class.try_mro(db, None).is_err() {
+        if class.has_pep_695_type_params(db) || class.try_mro_ancestors(db, None).is_err() {
             return;
         }
         let env = ProgramEnvironment::from_scope(class.body_scope(db));

@@ -431,6 +431,49 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn removed_rule_in_configuration_and_ignore_comment() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            invalid-type-guard-call = "ignore"
+            "#,
+        ),
+        (
+            "test.py",
+            "
+            x = 1  # ty: ignore[invalid-type-guard-call]
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[ignore-comment-unknown-rule]: Rule `invalid-type-guard-call` has been removed
+     --> test.py:2:21
+      |
+    2 | x = 1  # ty: ignore[invalid-type-guard-call]
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    warning[unknown-rule]: Rule `invalid-type-guard-call` has been removed
+     --> ty.toml:3:1
+      |
+    3 | invalid-type-guard-call = "ignore"
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
 /// ty warns about unknown rules specified in a CLI argument
 #[test]
 fn cli_unknown_rules() -> anyhow::Result<()> {

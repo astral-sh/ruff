@@ -793,7 +793,7 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenIntermediateClass(MyFrozenClass):
-    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [incompatible-method-override]
 
 class MyFrozenChildClass(MyFrozenIntermediateClass):
     y: int
@@ -1220,7 +1220,7 @@ deletion on both that subclass and its subclasses:
 
 ```py
 class ChildWithDeletionOverride(Frozen):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __delattr__(self, name: str) -> None: ...
 
 class GrandchildWithDeletionOverride(ChildWithDeletionOverride): ...
@@ -2196,7 +2196,7 @@ class DefaultedFieldBase:
 
 @dataclass
 class ClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    x: ClassVar[int] = 1  # error: [incompatible-attribute-override]
     y: int
 
 reveal_type(ClassVariableOverride.__init__)  # revealed: (self: ClassVariableOverride, y: int) -> None
@@ -2213,7 +2213,7 @@ dataclass field.
 
 ```py
 class OrdinaryClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    x: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 @dataclass
 class DataclassAfterOrdinaryOverride(OrdinaryClassVariableOverride):
@@ -2225,7 +2225,7 @@ An annotation-only class variable also masks the inherited instance field.
 ```py
 @dataclass
 class AnnotationOnlyClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int]  # error: [invalid-attribute-override]
+    x: ClassVar[int]  # error: [incompatible-attribute-override]
     y: int
 
 reveal_type(AnnotationOnlyClassVariableOverride.__init__)  # revealed: (self: AnnotationOnlyClassVariableOverride, y: int) -> None
@@ -2236,7 +2236,7 @@ Restoring an instance field in a later subclass preserves the field's original i
 ```py
 @dataclass
 class RestoredInstanceField(ClassVariableOverride):
-    x: int = field()  # error: [invalid-attribute-override]
+    x: int = field()  # error: [incompatible-attribute-override]
 
 reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, x: int, y: int) -> None
 ```

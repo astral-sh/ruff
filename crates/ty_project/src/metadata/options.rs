@@ -1224,11 +1224,18 @@ impl Rules {
                 ),
                 Ok(_) => continue,
                 // TODO: Add a note if the value was configured on the CLI.
-                Err(error) => OptionDiagnostic::new(
-                    DiagnosticId::UnknownRule,
-                    error.to_string(),
-                    Severity::Warning,
-                ),
+                Err(error) => {
+                    let mut diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::UnknownRule,
+                        error.to_string(),
+                        Severity::Warning,
+                    );
+                    if let Some(info) = error.info() {
+                        diagnostic =
+                            diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, info));
+                    }
+                    diagnostic
+                }
             };
             diagnostics.push(diagnostic.at(db, name, None));
         }

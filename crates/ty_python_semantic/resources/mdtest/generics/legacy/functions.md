@@ -5594,7 +5594,7 @@ class BoundedSetter(Base):
         return None
 
     @value.setter
-    def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
+    def value(self, value: I) -> None: ...  # error: [incompatible-property-override]
 ```
 
 ## Recursive calls preserve captured type variables

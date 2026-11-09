@@ -1332,7 +1332,7 @@ class Base:
 
 class Invalid(Base):
     @override
-    def __new__(cls, value: str) -> Self:  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self:  # error: [incompatible-method-override]
         raise NotImplementedError
 ```
 
@@ -1974,6 +1974,39 @@ class Factory(Generic[P]):
         raise NotImplementedError
 
 Factory.for_protocol(Protocol)  # ok
+```
+
+### A decorator's unsolved parameter list
+
+The parameter list of `identity` is local to that function. When there is no callback to specialize
+it, ty infers `Unknown` for the result of `return_type_of(identity)`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def identity(f: Callable[P, str]) -> Callable[P, str]:
+    return f
+
+def return_type_of(f: Callable[..., R]) -> R:
+    raise NotImplementedError
+
+reveal_type(return_type_of(identity))  # revealed: Unknown
+```
+
+Since `Word` always denotes `str`, its parameter list has no effect on the result.
+
+```py
+from typing_extensions import TypeAliasType
+
+Word = TypeAliasType("Word", str, type_params=(P,))
+
+def word(f: Callable[P, str]) -> Word[P]:
+    return "word"
+
+reveal_type(return_type_of(word))  # revealed: str
 ```
 
 ### Captured and fixed variables in a return type

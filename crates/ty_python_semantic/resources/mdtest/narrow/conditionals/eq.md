@@ -936,7 +936,7 @@ from enum import IntEnum
 from typing import Literal
 
 class AnnotatedShifted(IntEnum):
-    _value_: Literal[1]  # error: [invalid-mutable-override]
+    _value_: Literal[1]  # error: [incompatible-mutable-override]
 
     def __new__(cls, value: int) -> "AnnotatedShifted":
         member = int.__new__(cls, value + 1)
@@ -955,7 +955,7 @@ if AnnotatedShifted.MEMBER != Other.MEMBER:
     reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
 
 class AnnotatedInitialized(IntEnum):
-    _value_: Literal[2]  # error: [invalid-mutable-override]
+    _value_: Literal[2]  # error: [incompatible-mutable-override]
 
     def __init__(self, value: int) -> None:
         self._value_ = 2
@@ -998,7 +998,7 @@ from enum import IntEnum, auto
 from typing import Literal
 
 class Generated(IntEnum):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
         return "1"
 

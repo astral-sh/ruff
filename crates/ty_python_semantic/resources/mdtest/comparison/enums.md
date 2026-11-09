@@ -70,10 +70,10 @@ class NeResult: ...
 class CustomEquality(Enum):
     MEMBER = 1
 
-    def __eq__(self, other: object) -> EqResult:  # error: [invalid-method-override]
+    def __eq__(self, other: object) -> EqResult:  # error: [incompatible-method-override]
         return EqResult()
 
-    def __ne__(self, other: object) -> NeResult:  # error: [invalid-method-override]
+    def __ne__(self, other: object) -> NeResult:  # error: [incompatible-method-override]
         return NeResult()
 
 reveal_type(CustomEquality.MEMBER == CustomEquality.MEMBER)  # revealed: EqResult

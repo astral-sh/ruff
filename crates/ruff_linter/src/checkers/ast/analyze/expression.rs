@@ -721,6 +721,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::LongSleepNotForever) {
                 flake8_async::rules::long_sleep_not_forever(checker, call);
             }
+            if checker.is_rule_enabled(Rule::PytestRaisesExceptionGroup) {
+                flake8_async::rules::pytest_raises_exception_group(checker, call);
+            }
             if checker.any_rule_enabled(&[
                 Rule::SuspiciousPickleUsage,
                 Rule::SuspiciousMarshalUsage,

@@ -364,7 +364,7 @@ class Derived(Base):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `values`
+error[incompatible-method-override]: Invalid override of method `values`
   --> src/mdtest_snippet.py:10:15
    |
  6 |     async def values(self) -> AsyncIterator[int]: ...
@@ -591,7 +591,7 @@ class Derived(Base):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `values`
+error[incompatible-method-override]: Invalid override of method `values`
  --> src/override.py:6:15
   |
 6 |     async def values(self) -> AsyncIterator[int]:

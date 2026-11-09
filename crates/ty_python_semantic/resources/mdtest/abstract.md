@@ -436,7 +436,7 @@ With the bases reversed, the class remains abstract. The getter-only property al
 permitted by the mixin's slot, so the class definition receives an override error.
 
 ```py
-class StillAbstract(Abstract, SlotMixin): ...  # error: [invalid-property-type-override]
+class StillAbstract(Abstract, SlotMixin): ...  # error: [incompatible-property-override]
 
 StillAbstract()  # error: [instantiate-abstract-class]
 ```
