@@ -33,8 +33,8 @@ scale_by_two(Wrong1())  # Raise TypeError
 scale_by_two(Wrong2())  # Raise TypeError
 ```
 
-To fix this, keep `factor` as a positional-or-keyword parameter in the override so both calling
-conventions work.
+To fix this, rename `multiplier` to `factor` in `Wrong1.scale`, or remove the positional-only
+modifier `/` in `Wrong2.scale`.
 
 ## See also
 
