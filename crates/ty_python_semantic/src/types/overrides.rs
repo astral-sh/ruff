@@ -449,7 +449,7 @@ fn check_inherited_method_conflict<'db>(
         let violation = if selected_decorator == contract_decorator {
             MethodOverrideViolation::classify(db, env, selected_ty, contract_ty)
         } else {
-            MethodOverrideViolation::Incompatible
+            MethodOverrideViolation::General
         };
         if !context.is_lint_enabled(violation.rule()) {
             continue;
@@ -465,7 +465,7 @@ fn check_inherited_method_conflict<'db>(
                 || selected_ty.assignability_error_context(db, env, contract_ty),
             );
         };
-        if violation == MethodOverrideViolation::Keyword {
+        if violation == MethodOverrideViolation::DroppedKeywordParameter {
             keyword_conflict.get_or_insert(report);
             continue;
         }
@@ -1329,7 +1329,7 @@ fn check_class_declaration<'db>(
                     },
                 );
             };
-            if violation == MethodOverrideViolation::Keyword {
+            if violation == MethodOverrideViolation::DroppedKeywordParameter {
                 keyword_conflict.get_or_insert(report);
                 continue;
             }
@@ -1543,15 +1543,34 @@ fn is_assignable_method_override<'db>(
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(super) enum MethodOverrideViolation {
-    Incompatible,
-    Keyword,
+    /// A type, arity, or other incompatibility reported by `incompatible-method-override`.
+    ///
+    /// ```python
+    /// class Writer:
+    ///     def write(self, data: str | bytes) -> None: ...
+    ///
+    /// class TextWriter(Writer):
+    ///     def write(self, data: str) -> None: ...
+    /// ```
+    General,
+
+    /// An otherwise compatible override that drops a base method's keyword name.
+    ///
+    /// ```python
+    /// class Writer:
+    ///     def write(self, data: str) -> None: ...
+    ///
+    /// class LogWriter(Writer):
+    ///     def write(self, message: str) -> None: ...
+    /// ```
+    DroppedKeywordParameter,
 }
 
 impl MethodOverrideViolation {
     pub(super) const fn rule(self) -> &'static LintMetadata {
         match self {
-            Self::Incompatible => &INCOMPATIBLE_METHOD_OVERRIDE,
-            Self::Keyword => &MISSING_KEYWORD_IN_OVERRIDE,
+            Self::General => &INCOMPATIBLE_METHOD_OVERRIDE,
+            Self::DroppedKeywordParameter => &MISSING_KEYWORD_IN_OVERRIDE,
         }
     }
 
@@ -1580,10 +1599,10 @@ impl MethodOverrideViolation {
                     Type::Callable(contract.with_signatures(db, adapted)),
                 )
             {
-                return Self::Keyword;
+                return Self::DroppedKeywordParameter;
             }
         }
-        Self::Incompatible
+        Self::General
     }
 }
 

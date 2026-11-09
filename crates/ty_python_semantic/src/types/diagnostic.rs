@@ -5256,10 +5256,10 @@ pub(super) fn report_incompatible_method_override<'db>(
     };
 
     let mut diagnostic = match violation {
-        MethodOverrideViolation::Incompatible => {
+        MethodOverrideViolation::General => {
             builder.into_diagnostic(format_args!("Invalid override of method `{member}`"))
         }
-        MethodOverrideViolation::Keyword => builder.into_diagnostic(format_args!(
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
             "Override of method `{member}` drops a keyword argument"
         )),
     };
@@ -5438,10 +5438,10 @@ pub(super) fn report_incompatible_base_method<'db>(
         .display_with(db, settings.clone());
     let contract_name = contract_owner.class_literal(db).display_with(db, settings);
     let mut diagnostic = match violation {
-        MethodOverrideViolation::Incompatible => builder.into_diagnostic(format_args!(
+        MethodOverrideViolation::General => builder.into_diagnostic(format_args!(
             "Base classes for class `{class_name}` define method `{member}` incompatibly",
         )),
-        MethodOverrideViolation::Keyword => builder.into_diagnostic(format_args!(
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
             "Base classes for class `{class_name}` disagree on keywords for method `{member}`",
         )),
     };
