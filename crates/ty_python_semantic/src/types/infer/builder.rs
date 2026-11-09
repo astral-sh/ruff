@@ -50,6 +50,7 @@ use crate::reachability::{
 };
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
+use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
     ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
@@ -2146,7 +2147,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(receiver) = target.value.as_name_expr() else {
             return;
         };
-        let Some(method_scope_id) = self.receiver_method_scope(receiver) else {
+        let Some(method_scope_id) = receiver_method_scope(db, self.index, self.scope(), receiver)
+        else {
             return;
         };
         let Some(protocol) = self
@@ -4438,12 +4440,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn is_valid_receiver_annotation_target(&self, target: &ast::Expr) -> bool {
-        target
-            .as_attribute_expr()
-            .is_some_and(|target| self.is_receiver_attribute_annotation_target(target))
-    }
-
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
         let db = self.db();
         let env = self.program_environment();
@@ -4529,7 +4525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Disallow annotations on non-name targets unless they are valid receivers (e.g.
             // `self.x: int` or `cls.x: int`).
-            if !self.is_valid_receiver_annotation_target(target) {
+            if !is_valid_annotation_target(db, self.program_file(), target) {
                 let message = match target.as_ref() {
                     ast::Expr::Attribute(_) => {
                         "Type annotations are not allowed on this attribute expression"
@@ -4679,7 +4675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        if !target.is_name_expr() && !self.is_valid_receiver_annotation_target(target) {
+        if !is_valid_annotation_target(db, self.program_file(), target) {
             // Omit this definition from `self.declarations`; declaration lookup treats an absent
             // inferred declaration as rejected.
             if !definition

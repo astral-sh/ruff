@@ -25,6 +25,7 @@ use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, file_to_module, resolve_module,
 };
 
+pub use self::annotation_target::is_valid_annotation_target;
 use self::callable::CallableTypeKind;
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
@@ -133,6 +134,7 @@ use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
 mod abstract_methods;
+mod annotation_target;
 mod attribute_write;
 mod bool;
 mod bound_super;
