@@ -300,6 +300,47 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Legacy type variables in alias arguments
+
+The expanded annotation determines which legacy type variables a function binds and in which order.
+An alias can discard an argument or place its second argument first.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+type Erased[A] = object
+type Swapped[A, B] = tuple[B, A]
+
+def ignore(value: Erased[T]) -> None: ...
+def swap(value: Swapped[T, S]) -> tuple[T, S]:
+    return value[1], value[0]
+
+reveal_type(ignore)  # revealed: def ignore(value: Erased[T@ignore]) -> None
+reveal_type(swap)  # revealed: def swap[S, T](value: Swapped[T, S]) -> tuple[T, S]
+```
+
+## Function diagnostics with aliased parameters
+
+A function can introduce a legacy type variable through an alias. Its default and its position in
+the expanded annotation still affect the function declaration.
+
+```py
+from typing_extensions import TypeVar
+
+D = TypeVar("D", default=int)
+T = TypeVar("T")
+
+type Both[A, B] = tuple[A, B]
+type Erased[A] = object
+
+def mixed[A](value: Both[T, A]) -> None: ...  # error: [unbound-type-variable]
+def ordered(value: Both[D, T]) -> None: ...  # error: [invalid-type-variable-default]
+def erased[A](value: Erased[T], other: A) -> None: ...  # ok
+```
+
 ## Generic aliases in bound method receivers
 
 Checking a call to `set.clear` does not require expanding the set's element type. Expanding

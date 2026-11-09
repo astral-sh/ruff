@@ -2,8 +2,8 @@ use crate::{
     Db,
     diagnostic::format_enumeration,
     types::{
-        BoundTypeVarIdentity, KnownInstanceType, Signature, StaticClassLiteral, Type, TypeVarKind,
-        TypeVarVariance,
+        BindingContext, BoundTypeVarIdentity, KnownInstanceType, Signature, StaticClassLiteral,
+        Type, TypeVarKind, TypeVarVariance,
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
@@ -17,7 +17,7 @@ use crate::{
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
         variance::{MemberVariance, VarianceInferable},
-        visitor::find_over_type,
+        visitor::{find_over_type, may_contain_legacy_typevar},
     },
 };
 use itertools::Itertools;
@@ -47,6 +47,37 @@ pub(crate) fn check_function_definition<'db>(
     if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
         return;
     }
+    let node = last_definition.node(db, context.file(), context.module());
+
+    // The legacy ordering rules require a type variable with a default. PEP 695 functions
+    // additionally forbid introducing any legacy variable, including in a type parameter default.
+    // Refine the signature only if one of these checks or a legacy positional-only name needs it.
+    let uses_positional_only_convention = node.parameters.posonlyargs.is_empty()
+        && node
+            .parameters
+            .iter_non_variadic_params()
+            .any(ast::ParameterWithDefault::uses_pep_484_positional_only_convention);
+    let has_type_parameter_default = node
+        .type_params
+        .as_ref()
+        .is_some_and(|params| params.iter().any(|param| param.default().is_some()));
+    if !uses_positional_only_convention && !has_type_parameter_default {
+        let annotations = node
+            .parameters
+            .iter()
+            .filter_map(ast::AnyParameterRef::annotation)
+            .chain(node.returns.as_deref());
+        let env = context.program_environment();
+        if !may_contain_legacy_typevar(db, env, annotations.map(file_expression_type), |bound| {
+            let var = bound.typevar(db);
+            bound.binding_context(db) == BindingContext::Definition(definition)
+                && !var.is_self(db)
+                && (node.type_params.is_some() || var.default_type(db, env).is_some())
+        }) {
+            return;
+        }
+    }
+
     // The checks below read parameter kinds and the public generic context. A function's
     // ordinary callable signature already has both, including for async functions whose
     // public return type is wrapped in a coroutine.

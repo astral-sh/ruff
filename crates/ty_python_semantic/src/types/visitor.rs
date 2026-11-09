@@ -1,5 +1,5 @@
-use crate::Db;
 use crate::ProgramEnvironment;
+use crate::{Db, FxOrderSet};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
@@ -8,11 +8,11 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::{
-    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
-    TypeIsType, TypedDictType, UnionType,
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, DynamicType,
+    EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
+    TypeGuardType, TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -438,6 +438,124 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     const fn is_spilled(&self) -> bool {
         matches!(self, Self::Spilled(_))
     }
+}
+
+/// Collects possible legacy variables without constructing specialized alias bodies. The full
+/// traversal still determines membership and order when a candidate can affect the result.
+/// In particular, a union can lose an alternative during specialization, and an alias can
+/// ignore a type argument entirely.
+pub(super) struct LegacyTypeVarSearch<'env, 'db> {
+    env: &'env ProgramEnvironment<'db>,
+    candidates: RefCell<Option<FxOrderSet<BoundTypeVarInstance<'db>>>>,
+    seen: TypeCollector<'db>,
+}
+
+impl<'env, 'db> LegacyTypeVarSearch<'env, 'db> {
+    pub(super) fn new(
+        env: &'env ProgramEnvironment<'db>,
+        initial: &[BoundTypeVarInstance<'db>],
+    ) -> Self {
+        Self {
+            env,
+            candidates: RefCell::new(Some(initial.iter().copied().collect())),
+            seen: TypeCollector::default(),
+        }
+    }
+
+    pub(super) fn finish(self) -> Option<Box<[BoundTypeVarInstance<'db>]>> {
+        self.candidates
+            .into_inner()
+            .map(|vars| vars.into_iter().collect())
+    }
+}
+
+impl<'db> TypeVisitor<'db> for LegacyTypeVarSearch<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.candidates.borrow().is_none() {
+            return;
+        }
+        match ty {
+            Type::TypeVar(variable) => {
+                let kind = variable.typevar(db).kind(db);
+                if kind.is_paramspec() || kind.is_typevartuple() {
+                    *self.candidates.borrow_mut() = None;
+                } else if !kind.is_pep695()
+                    && let Some(candidates) = self.candidates.borrow_mut().as_mut()
+                {
+                    candidates.insert(variable);
+                }
+            }
+            Type::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            | Type::Never
+            | Type::ClassLiteral(_)
+            | Type::LiteralValue(_) => {}
+            Type::Union(_)
+            | Type::Intersection(_)
+            | Type::SubclassOf(_)
+            | Type::NominalInstance(_)
+            | Type::GenericAlias(_)
+            | Type::ProtocolInstance(_)
+            | Type::TypeAlias(_) => walk_type_with_recursion_guard(db, ty, self, &self.seen),
+            _ => *self.candidates.borrow_mut() = None,
+        }
+    }
+
+    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+        let specialization = alias.specialization(db);
+        if specialization.materialization_kind(db).is_some() {
+            *self.candidates.borrow_mut() = None;
+        } else {
+            walk_specialization_types(db, specialization, self);
+        }
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        if protocol.materialization_kind(db).is_none()
+            && let Some(class) = protocol.class_origin(db)
+        {
+            self.visit_type(db, class.into());
+        } else {
+            *self.candidates.borrow_mut() = None;
+        }
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        if let Some(vars) = alias.legacy_typevar_candidates(db) {
+            if let Some(candidates) = self.candidates.borrow_mut().as_mut() {
+                candidates.extend(vars.iter().copied());
+            }
+        } else {
+            *self.candidates.borrow_mut() = None;
+        }
+    }
+}
+
+/// Whether the given annotations could contribute a legacy variable matching `predicate`.
+pub(super) fn may_contain_legacy_typevar<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    annotations: impl Iterator<Item = Type<'db>>,
+    predicate: impl Fn(BoundTypeVarInstance<'db>) -> bool,
+) -> bool {
+    let search = LegacyTypeVarSearch::new(env, &[]);
+    for ty in annotations {
+        search.visit_type(db, ty);
+        if search.candidates.borrow().is_none() {
+            return true;
+        }
+    }
+    search
+        .candidates
+        .into_inner()
+        .is_none_or(|candidates| candidates.into_iter().any(predicate))
 }
 
 /// Whether a type contains a dynamic type matching the requested filter.

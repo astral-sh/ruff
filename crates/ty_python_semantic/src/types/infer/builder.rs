@@ -1274,7 +1274,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::typeguard::check_type_guard_definition(
                             &self.context,
                             ty,
+                            definition,
                             function.node(self.module()),
+                            &|expr| self.file_expression_type(expr),
                         );
                     }
                     DefinitionKind::Class(class_node) => {
@@ -2343,7 +2345,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, definition, None, None),
             )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);

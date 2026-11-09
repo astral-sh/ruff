@@ -13,7 +13,7 @@ use crate::{
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
         variance::{VarianceInferable, VarianceOrigin},
-        visitor,
+        visitor::{self, LegacyTypeVarSearch, TypeVisitor},
     },
 };
 use ty_python_core::{
@@ -197,6 +197,9 @@ pub struct PEP695TypeAliasType<'db> {
     rhs_scope: ScopeId<'db>,
 
     #[returns(copy)]
+    definition: Definition<'db>,
+
+    #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
 
     /// Keeps recursive references stable while their alias body is materialized lazily.
@@ -217,12 +220,6 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.program_file(db)).expect_single_definition(type_alias_stmt_node)
-    }
-
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     #[salsa::tracked(
         returns(copy),
@@ -278,6 +275,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                     db,
                     self.name(db),
                     self.rhs_scope(db),
+                    self.definition(db),
                     Some(specialization),
                     self.materialization_kind(db),
                 )
@@ -536,6 +534,50 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    /// An upper bound on the legacy variables that can appear in the specialized value.
+    /// The body is shared by all applications, but each application supplies its own arguments.
+    /// An unsupported or recursive body requires inspecting the specialized value.
+    pub(super) fn legacy_typevar_candidates(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db [BoundTypeVarInstance<'db>]> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, ()| None, heap_size=ruff_memory_usage::heap_size)]
+        fn body_candidates<'db>(
+            db: &'db dyn Db,
+            alias: TypeAliasType<'db>,
+            (): (),
+        ) -> Option<Box<[BoundTypeVarInstance<'db>]>> {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            let search = LegacyTypeVarSearch::new(&env, &[]);
+            search.visit_type(db, alias.raw_value_type(db));
+            search.finish()
+        }
+
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, ()| None, heap_size=ruff_memory_usage::heap_size)]
+        fn alias_candidates<'db>(
+            db: &'db dyn Db,
+            alias: TypeAliasType<'db>,
+            (): (),
+        ) -> Option<Box<[BoundTypeVarInstance<'db>]>> {
+            if alias.materialization_kind(db).is_some() {
+                return None;
+            }
+            let body = body_candidates(db, alias.unspecialized(db), ()).as_deref()?;
+            let Some(arguments) = alias.specialization_or_default(db) else {
+                return Some(body.into());
+            };
+            if arguments.materialization_kind(db).is_some() {
+                return None;
+            }
+
+            let env = ProgramEnvironment::from_program(arguments.generic_context(db).program(db));
+            let search = LegacyTypeVarSearch::new(&env, body);
+            walk_specialization_types(db, arguments, &search);
+            search.finish()
+        }
+        alias_candidates(db, self, ()).as_deref()
+    }
+
     /// Summarize an alias's raw definition once, sharing the result across references.
     /// Specializations reuse this summary and check their exposed arguments separately.
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
@@ -690,6 +732,7 @@ impl<'db> TypeAliasType<'db> {
                 db,
                 alias.name(db),
                 alias.rhs_scope(db),
+                alias.definition(db),
                 None,
                 None,
             )),
@@ -727,6 +770,7 @@ impl<'db> TypeAliasType<'db> {
                 db,
                 alias.name(db),
                 alias.rhs_scope(db),
+                alias.definition(db),
                 alias.specialization(db),
                 materialization_kind,
             )),
@@ -882,6 +926,7 @@ impl<'db> TypeAliasType<'db> {
                 db,
                 alias.name(db),
                 alias.rhs_scope(db),
+                alias.definition(db),
                 Some(mapped),
                 alias.materialization_kind(db),
             )),

@@ -89,6 +89,9 @@ pub struct StaticClassLiteral<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     #[returns(copy)]
+    pub(crate) definition: Definition<'db>,
+
+    #[returns(copy)]
     pub(crate) header: StaticClassHeader<'db>,
 
     /// If this class is deprecated, this holds the deprecation message.
@@ -279,6 +282,7 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             self.name(db),
             self.body_scope(db),
+            self.definition(db),
             StaticClassHeader {
                 dataclass_params,
                 ..self.header(db)
@@ -621,12 +625,6 @@ impl<'db> StaticClassLiteral<'db> {
     /// query depends on the AST of another file (bad!).
     fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class().node(module)
-    }
-
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.program_file(db));
-        index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
     pub(crate) fn apply_specialization(

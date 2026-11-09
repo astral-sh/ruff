@@ -279,6 +279,10 @@ pub struct OverloadLiteral<'db> {
     #[returns(copy)]
     pub(crate) body_scope: ScopeId<'db>,
 
+    /// The definition in the enclosing scope, also available to callers in other files.
+    #[returns(copy)]
+    definition: Definition<'db>,
+
     /// A set of special decorators that were applied to this function
     #[returns(copy)]
     pub(crate) decorators: FunctionDecorators,
@@ -312,6 +316,7 @@ impl<'db> OverloadLiteral<'db> {
             self.name(db),
             self.known(db),
             self.body_scope(db),
+            self.definition(db),
             self.decorators(db),
             Some(deprecated),
             self.dataclass_transformer_params(db),
@@ -329,6 +334,7 @@ impl<'db> OverloadLiteral<'db> {
             self.name(db),
             self.known(db),
             self.body_scope(db),
+            self.definition(db),
             self.decorators(db),
             self.deprecated(db),
             Some(params),
@@ -337,8 +343,6 @@ impl<'db> OverloadLiteral<'db> {
     }
 
     fn file(self, db: &'db dyn Db) -> File {
-        // NOTE: Do not use `self.definition(db).file(db)` here, as that could create a
-        // cross-module dependency on the full AST.
         self.body_scope(db).file(db)
     }
 
@@ -451,20 +455,6 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    /// Returns the [`Definition`] of this function.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.program_file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
-    }
-
     /// Overload sets ending at different declarations share their earlier links.
     #[salsa::tracked(
         returns(copy),
@@ -544,10 +534,8 @@ impl<'db> OverloadLiteral<'db> {
     ///
     /// ## Warning
     ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Constructing the signature reads the function's syntax. Calling this method from a
+    /// query in another file introduces a dependency on the defining file's AST.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let program_file = self.program_file(db);
@@ -607,10 +595,8 @@ impl<'db> OverloadLiteral<'db> {
     ///
     /// ## Warning
     ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Constructing the signature reads the function's syntax. Calling this method from a
+    /// query in another file introduces a dependency on the defining file's AST.
     pub(super) fn raw_signature(
         self,
         db: &'db dyn Db,
@@ -880,6 +866,7 @@ impl<'db> FunctionLiteral<'db> {
                 definition.name(db),
                 definition.known(db),
                 definition.body_scope(db),
+                definition.definition(db),
                 definition.decorators(db),
                 decorated.deprecated(db),
                 decorated.dataclass_transformer_params(db),
@@ -987,10 +974,8 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// ## Warning
     ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Constructing the signature reads the function's syntax. Calling this method from a
+    /// query in another file introduces a dependency on the defining file's AST.
     fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
@@ -1023,10 +1008,8 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// ## Warning
     ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Constructing the signature reads the function's syntax. Calling this method from a
+    /// query in another file introduces a dependency on the defining file's AST.
     fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.last_definition.signature(db)
     }
@@ -1037,10 +1020,8 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// ## Warning
     ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Constructing the signature reads the function's syntax. Calling this method from a
+    /// query in another file introduces a dependency on the defining file's AST.
     fn last_definition_raw_signature(
         self,
         db: &'db dyn Db,
@@ -1629,14 +1610,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).implementation_deprecated(db)
     }
 
-    /// Returns the [`Definition`] of the implementation or first overload of this function.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Returns the definition at the end of this function's overload chain.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.literal(db).definition(db)
     }

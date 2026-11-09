@@ -165,11 +165,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let db = self.db();
 
-        // Parameters are odd: they are Definitions in the function body scope, but have no
-        // constituent nodes that are part of the function body. In order to get diagnostics
-        // merged/emitted for them, we need to explicitly infer their definitions here.
+        // Parameter annotations and defaults belong to enclosing scopes. An annotated
+        // ordinary parameter can be checked here without computing its body binding.
+        // A use of the parameter will still query its declared and inferred types.
         for parameter in &function.parameters {
-            self.infer_definition(parameter);
+            if let ast::AnyParameterRef::NonVariadic(parameter) = parameter
+                && let Some(annotation) = parameter.parameter.annotation.as_deref()
+            {
+                self.check_annotated_parameter(parameter, annotation);
+            } else {
+                self.infer_definition(parameter);
+            }
         }
 
         validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
@@ -520,6 +526,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &name.id,
             known_function,
             body_scope,
+            definition,
             function_decorators,
             None,
             dataclass_transformer_params,
@@ -1059,6 +1066,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn check_annotated_parameter(
+        &self,
+        parameter_with_default: &ast::ParameterWithDefault,
+        annotation: &ast::Expr,
+    ) {
+        let db = self.db();
+        let env = self.program_environment();
+        let declared_ty = self.file_expression_type(annotation);
+
+        // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
+        // not on regular parameters.
+        if let Type::TypeVar(typevar) = declared_ty
+            && typevar.is_paramspec(db)
+            && let Some(attr) = typevar.paramspec_attr(db)
+        {
+            let name = typevar.name(db);
+            let (attr_name, variadic) = match attr {
+                ParamSpecAttrKind::Args => ("args", "*args"),
+                ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
+            };
+            if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
+                builder.into_diagnostic(format_args!(
+                    "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
+                ));
+            }
+        }
+
+        if let Some(default_expr) = parameter_with_default.default.as_deref() {
+            let default_ty = self.file_expression_type(default_expr);
+
+            // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
+            let suppress_invalid_default =
+                is_invalid_typed_dict_literal(db, env, declared_ty, default_expr.into());
+            if !default_ty.is_assignable_to(db, env, declared_ty)
+                && !suppress_invalid_default
+                && !((self.in_stub()
+                    || self.in_function_overload_or_abstractmethod()
+                    || self.is_in_type_checking_block(self.scope(), default_expr)
+                    || self
+                        .class_context_of_current_method()
+                        .is_some_and(|class| class.is_protocol(db)))
+                    && default_expr.is_ellipsis_literal_expr())
+            {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_PARAMETER_DEFAULT, parameter_with_default)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Default value of type `{}` is not assignable \
+                         to annotated parameter type `{}`",
+                        default_ty.display(db, env),
+                        declared_ty.display(db, env)
+                    ));
+                }
+            }
+        }
+    }
+
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
     /// in the function body scope.
     ///
@@ -1096,61 +1161,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
-
-            // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
-            // not on regular parameters.
-            if let Type::TypeVar(typevar) = declared_ty
-                && typevar.is_paramspec(db)
-                && let Some(attr) = typevar.paramspec_attr(db)
-            {
-                let name = typevar.name(db);
-                let (attr_name, variadic) = match attr {
-                    ParamSpecAttrKind::Args => ("args", "*args"),
-                    ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
-                };
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
-                {
-                    builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
-                    ));
-                }
-            }
-
-            if let Some(default_expr) = default_expr {
-                let default_expr = default_expr.as_ref();
-                let default_ty = self.file_expression_type(default_expr);
-
-                // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
-                let suppress_invalid_default =
-                    is_invalid_typed_dict_literal(db, env, declared_ty, default_expr.into());
-                if !default_ty.is_assignable_to(db, env, declared_ty)
-                    && !suppress_invalid_default
-                    && !((self.in_stub()
-                        || self.in_function_overload_or_abstractmethod()
-                        || self.is_in_type_checking_block(self.scope(), default_expr)
-                        || self
-                            .class_context_of_current_method()
-                            .is_some_and(|class| class.is_protocol(db)))
-                        && default
-                            .as_ref()
-                            .is_some_and(|d| d.is_ellipsis_literal_expr()))
-                {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_PARAMETER_DEFAULT, parameter_with_default)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Default value of type `{}` is not assignable \
-                             to annotated parameter type `{}`",
-                            default_ty.display(db, env),
-                            declared_ty.display(db, env)
-                        ));
-                    }
-                }
-            }
-
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,

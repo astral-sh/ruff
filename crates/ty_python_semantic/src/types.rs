@@ -10546,6 +10546,16 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeAlias(alias) => {
+                if alias
+                    .legacy_typevar_candidates(db)
+                    .is_some_and(|candidates| {
+                        candidates.iter().all(|var| {
+                            matching_typevar(var).is_none_or(|var| typevars.contains(&var))
+                        })
+                    })
+                {
+                    return;
+                }
                 visitor.visit(db, self, || {
                     alias.value_type(db).find_legacy_typevars_impl(
                         db,

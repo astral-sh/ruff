@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ty_python_core::definition::Definition;
 
 use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION};
 
@@ -8,7 +9,9 @@ use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_D
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
+    definition: Definition<'db>,
     node: &ast::StmtFunctionDef,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let Type::FunctionLiteral(function) = ty else {
         return;
@@ -16,6 +19,23 @@ pub(crate) fn check_type_guard_definition<'db>(
 
     let db = context.db();
     let env = context.program_environment();
+
+    let Some(returns_expr) = node.returns.as_deref() else {
+        return;
+    };
+    if function.definition(db) == definition
+        && !matches!(
+            file_expression_type(returns_expr),
+            Type::TypeGuard(_)
+                | Type::TypeIs(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_)
+                | Type::TypeVar(_)
+        )
+    {
+        return;
+    }
 
     let overload = function.literal(db).last_definition;
     let signature = overload.signature(db);
@@ -26,11 +46,6 @@ pub(crate) fn check_type_guard_definition<'db>(
         Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
         Type::TypeGuard(_) => ("TypeGuard", None),
         _ => return,
-    };
-
-    // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-    let Some(returns_expr) = node.returns.as_deref() else {
-        return;
     };
 
     // Check if this is a non-static method (first parameter is implicit `self`/`cls`).

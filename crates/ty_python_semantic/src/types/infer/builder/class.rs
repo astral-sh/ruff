@@ -175,6 +175,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     db,
                     &name.id,
                     body_scope,
+                    definition,
                     StaticClassHeader {
                         known: maybe_known_class,
                         dataclass_params,
