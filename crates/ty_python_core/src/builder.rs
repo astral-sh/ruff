@@ -3320,7 +3320,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        let unpack_source = unpackable.direct_source(target).filter(|_| {
+        let unpack_source = unpackable.direct_source().filter(|_| {
             self.exception_context_stack_manager
                 .has_active_exception_handler(self)
         });
@@ -4417,8 +4417,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                    for target in &node.targets {
-                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
+                    for (index, target) in node.targets.iter().enumerate() {
+                        let assignment = Unpackable::Assign {
+                            node,
+                            first: index == 0,
+                        };
+                        self.add_unpackable_assignment(&assignment, target, value);
                     }
                 }
             }
@@ -6125,7 +6129,10 @@ impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
 }
 
 enum Unpackable<'ast> {
-    Assign(&'ast ast::StmtAssign),
+    Assign {
+        node: &'ast ast::StmtAssign,
+        first: bool,
+    },
     For(&'ast ast::StmtFor),
     WithItem {
         item: &'ast ast::WithItem,
@@ -6140,16 +6147,16 @@ enum Unpackable<'ast> {
 impl<'ast> Unpackable<'ast> {
     /// The first target of a plain assignment receives the RHS directly. An earlier
     /// target in a chained assignment could already have mutated a list on the RHS.
-    fn direct_source(&self, target: &ast::Expr) -> Option<&'ast ast::Expr> {
-        let Self::Assign(stmt) = self else {
-            return None;
-        };
-        std::ptr::eq(stmt.targets.first()?, target).then_some(stmt.value.as_ref())
+    fn direct_source(&self) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::Assign { node, first: true } => Some(&node.value),
+            _ => None,
+        }
     }
 
     const fn kind(&self) -> UnpackKind {
         match self {
-            Unpackable::Assign(_) => UnpackKind::Assign,
+            Unpackable::Assign { .. } => UnpackKind::Assign,
             Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
                 mode: EvaluationMode::from_is_async(*is_async),
             },
@@ -6171,8 +6178,8 @@ impl<'ast> Unpackable<'ast> {
     ) -> CurrentAssignment<'ast, 'db> {
         let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
-            Unpackable::Assign(stmt) => CurrentAssignment::Assign {
-                node: stmt,
+            Unpackable::Assign { node, .. } => CurrentAssignment::Assign {
+                node,
                 unpack,
                 owner: BindingsOwner::Statement,
             },
