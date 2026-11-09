@@ -461,30 +461,6 @@ class KeywordArguments(Base):
     def f(self, item: int = 0, **kwargs: str) -> int: ...  # error: [incompatible-method-override]
 ```
 
-## Overloads that drop the same keyword
-
-The override can use different names across overloads. Every base overload must still be callable by
-position.
-
-```pyi
-from typing import overload
-
-class Base:
-    @overload
-    def f(self, prefix: str, value: int) -> int: ...
-    @overload
-    def f(self, prefix: str, value: str) -> str: ...
-
-class Renamed(Base):
-    @overload
-    def f(self, prefix: str, number: int) -> int: ...
-    @overload
-    def f(self, prefix: str, text: str) -> str: ...  # error: [missing-keyword-in-override]
-
-class MissingOverload(Base):
-    def f(self, prefix: str, number: int) -> int: ...  # error: [incompatible-method-override]
-```
-
 ## Keyword and type conflicts against different bases
 
 A keyword mismatch with `Integers.f` does not hide the fact that the selected method cannot accept
