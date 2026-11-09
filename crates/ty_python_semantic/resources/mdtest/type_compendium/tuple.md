@@ -77,6 +77,18 @@ def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes,
     reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
+When `map` calls `tuple` on each row, the result contains tuples even if the assignment target
+allows any sequence.
+
+```py
+from collections.abc import Sequence
+
+def freeze_rows(rows: Sequence[Sequence[int]]) -> tuple[tuple[int, ...], ...]:
+    rows = tuple(map(tuple, rows))
+    reveal_type(rows)  # revealed: tuple[tuple[int, ...], ...]
+    return rows
+```
+
 ## Instantiating tuple subclasses
 
 Tuple subclasses inherit the special-cased constructors from their tuple superclasses:

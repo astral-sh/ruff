@@ -6736,9 +6736,8 @@ class SequenceMaker(Protocol[T]):
 
 static_assert(is_subtype_of(TypeOf[list[int]], SequenceMaker[int]))
 
-# TODO: these should pass
-static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # error: [static-assert-error]
-static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))
+static_assert(not is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))
 ```
 
 Specializing a type variable to `Any` does not make variadic parameters gradual. The gradual form

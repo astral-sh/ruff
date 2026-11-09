@@ -44,7 +44,7 @@ use crate::types::relation::{
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
-use crate::types::tuple::{Tuple, TupleSpec};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
@@ -2166,64 +2166,19 @@ impl<'db> ClassType<'db> {
                     .unwrap_or_else(fallback_member_lookup)
             }
 
-            // ```py
-            // class tuple:
-            //     @overload
-            //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
-            //     @overload
-            //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
-            // ```
-            "__new__" if class_literal.is_tuple(db) => {
-                let mut iterable_parameter =
-                    Parameter::positional_only(Some(Name::new_static("iterable")));
-
-                let tuple = specialization.and_then(|spec| spec.tuple(db));
-
-                match tuple {
-                    Some(tuple) => {
-                        // TODO: Once we support PEP 646 annotations for `*args` parameters, we can
-                        // use the tuple itself as the argument type.
-                        let tuple_len = tuple.len();
-
-                        if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
-                            // If the tuple has no length restrictions,
-                            // any iterable is allowed as long as the iterable has the correct element type.
-                            assert_eq!(
-                                tuple.iter_element_types(db).count(),
-                                1,
-                                "Tuple specialization should have exactly one element when it has \
-                                 no length restriction"
-                            );
-                            iterable_parameter = iterable_parameter.with_annotated_type(
-                                KnownClass::Iterable.to_specialized_instance(
-                                    db,
-                                    env,
-                                    &[tuple.homogeneous_element_type(db, env)],
-                                ),
-                            );
-                        } else {
-                            // But if the tuple is of a fixed length, or has a minimum length, we require a tuple rather
-                            // than an iterable, as a tuple is the only kind of iterable for which we can
-                            // specify a fixed length, or that the iterable must be at least a certain length.
-                            iterable_parameter = iterable_parameter
-                                .with_annotated_type(Type::instance(db, env, self));
-                        }
-                    }
-                    None => {
-                        // If the tuple isn't specialized at all, we allow any argument as long as it is iterable.
-                        iterable_parameter = iterable_parameter
-                            .with_annotated_type(KnownClass::Iterable.to_instance(db, env));
-                    }
-                }
-
-                // We allow the `iterable` parameter to be omitted for:
-                // - a zero-length tuple
-                // - an unspecialized tuple
-                // - a tuple with no minimum length
-                if tuple.is_none_or(|tuple| tuple.len().minimum() == 0) {
-                    iterable_parameter =
-                        iterable_parameter.with_default_type(Type::empty_tuple(db, env));
-                }
+            // Typeshed's `Iterable[_T_co]` parameter accepts any length. For a tuple with a
+            // fixed or minimum length, require a tuple argument that satisfies that constraint.
+            "__new__"
+                if class_literal.is_tuple(db)
+                    && let Some(tuple) = specialization.and_then(|spec| spec.tuple(db))
+                    && tuple.len() != TupleLength::unknown() =>
+            {
+                let default =
+                    (tuple.len() == TupleLength::Fixed(0)).then(|| Type::empty_tuple(db, env));
+                let iterable_parameter =
+                    Parameter::positional_only(Some(Name::new_static("iterable")))
+                        .with_annotated_type(Type::instance(db, env, self))
+                        .with_optional_default_type(default);
 
                 let parameters = Parameters::standard([
                     Parameter::positional_only(Some(Name::new_static("self")))
