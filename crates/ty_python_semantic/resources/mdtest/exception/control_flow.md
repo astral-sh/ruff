@@ -801,8 +801,39 @@ def nested_unpacking(pair: tuple[int, ...]) -> None:
     try:
         value, (a, b) = "bad", pair
     except ValueError:
-        reveal_type(value)  # revealed: Literal[1, "bad"]
+        reveal_type(value)  # revealed: Literal["bad"]
         reveal_type(a)  # revealed: Literal[0]
+```
+
+## Unpacking a literal of the expected length
+
+Both unpacks succeed, so only the explicit `raise` can reach the handler:
+
+```py
+def exact_length() -> None:
+    value = 0
+    try:
+        value, (a, b) = "bad", [1, 2]
+        value = 2
+        raise ValueError
+    except ValueError:
+        reveal_type(value)  # revealed: Literal[2]
+```
+
+## A starred element makes a literal's length unknown
+
+Expanding `items` can raise before `value` is assigned. Unpacking the resulting tuple can also raise
+after `value` has been assigned if `items` did not yield exactly one element:
+
+```py
+from collections.abc import Iterable
+
+def starred_literal(items: Iterable[int]) -> None:
+    value = 0
+    try:
+        value, (a, b) = 1, (2, *items)
+    except ValueError:
+        reveal_type(value)  # revealed: Literal[0, 1]
 ```
 
 ## Awaiting and yielding can raise

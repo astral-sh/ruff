@@ -3365,7 +3365,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.push_assignment(current_assignment);
         }
 
-        self.visit_expr(target);
+        if let Unpackable::Assign(stmt) = unpackable
+            // An earlier target in a chained assignment can expose and mutate the literal.
+            && stmt.targets.first().is_some_and(|first| std::ptr::eq(first, target))
+            && matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_))
+            && matches!(&*stmt.value, ast::Expr::List(_) | ast::Expr::Tuple(_))
+            && self.exception_context_stack_manager.has_active_exception_handler(self)
+        {
+            // Building the literal can itself raise, for example while expanding a starred item.
+            self.record_exception_checkpoint_if(!Self::expression_evaluation_is_known_safe(
+                &stmt.value,
+            ));
+            self.visit_literal_unpack(target, &stmt.value);
+        } else {
+            self.visit_expr(target);
+        }
 
         if current_assignment.is_some() {
             // Only need to pop in the case where we pushed something
@@ -3467,7 +3481,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
-    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+    /// Visit matching literal elements alongside their targets. Once the literal has been
+    /// evaluated, unpacking it at this level cannot raise, but assigning its children still can.
+    fn visit_literal_unpack(&mut self, target: &'ast ast::Expr, value: &'ast ast::Expr) {
+        fn elements(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+            match expr {
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(elts),
+                _ => None,
+            }
+        }
+
+        if let (Some(targets), Some(values)) = (elements(target), elements(value))
+            && targets.len() == values.len()
+            && !targets.iter().any(ast::Expr::is_starred_expr)
+            && !values.iter().any(ast::Expr::is_starred_expr)
+        {
+            self.enter_expression(target);
+            for (target, value) in targets.iter().zip(values) {
+                self.visit_literal_unpack(target, value);
+            }
+        } else {
+            self.visit_expr(target);
+        }
+    }
+
+    fn enter_expression(&mut self, expr: &'ast ast::Expr) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         // A place use records its scope together with its reaching-definition ID,
@@ -3478,7 +3517,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         ) {
             self.ast_ids.record_expression(expr, self.current_scope());
         }
+    }
 
+    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+        self.enter_expression(expr);
         match expr {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
