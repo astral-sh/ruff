@@ -1348,19 +1348,19 @@ mod tests {
         let _s = settings.bind_to_scope();
 
         assert_snapshot!(str::from_utf8(&buf)?, @"
-        io: test.py: Permission denied
+        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        --> test.py:1:1
+        info: This indicates a bug in Ruff.
+        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
+        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+
+        io: Cannot write to file
         --> test.py:1:1
 
         io: File not found
         --> test.py:1:1
 
-        internal-error: Expected index or slice expression
-        --> test.py:1:1
-
-        io: Cannot write to file
-        --> test.py:1:1
-
-        invalid-cli-option: Range formatting is only supported for Python files.
+        io: test.py: Permission denied
         --> test.py:1:1
 
         invalid-syntax: Unexpected indentation
@@ -1369,11 +1369,11 @@ mod tests {
         1 | 1
           | ^
 
-        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        invalid-cli-option: Range formatting is only supported for Python files.
         --> test.py:1:1
-        info: This indicates a bug in Ruff.
-        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+
+        internal-error: Expected index or slice expression
+        --> test.py:1:1
         ");
 
         Ok(())

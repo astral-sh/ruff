@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-W191 Indentation contains tabs
+invalid-syntax: Unexpected indentation
  --> W19.py:1:1
   |
 1 |     '''File starts with a tab
@@ -9,7 +9,7 @@ W191 Indentation contains tabs
 2 |     multiline string with tab in it'''
   |
 
-invalid-syntax: Unexpected indentation
+W191 Indentation contains tabs
  --> W19.py:1:1
   |
 1 |     '''File starts with a tab
