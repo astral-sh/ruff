@@ -16,16 +16,14 @@ class Base:
 
 
 class Wrong1(Base):
-    def scale(
-        self, multiplier: int
-    ) -> int:  # error: [lost-keyword-for-regular-parameter]
+    # error: [lost-keyword-for-regular-parameter]
+    def scale(self, multiplier: int) -> int:
         return multiplier * 3
 
 
 class Wrong2(Base):
-    def scale(
-        self, factor: int, /
-    ) -> int:  # error: [lost-keyword-for-regular-parameter]
+    # error: [lost-keyword-for-regular-parameter]
+    def scale(self, factor: int, /) -> int:
         return factor * 3
 
 
