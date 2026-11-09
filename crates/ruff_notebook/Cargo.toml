@@ -18,8 +18,9 @@ ruff_text_size = { workspace = true }
 anyhow = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-# Preserve float precision in notebook outputs and metadata when rewriting cells.
-serde_json = { workspace = true, features = ["float_roundtrip"] }
+# `raw_value` writes cell outputs back exactly as they were read. `float_roundtrip` preserves the
+# precision of floats in the notebook and cell metadata, which are deserialized as `Value`s.
+serde_json = { workspace = true, features = ["float_roundtrip", "raw_value"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 

@@ -16,7 +16,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
-use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
+use crate::schema::{Cell, RawNotebook, SourceValue};
 use crate::{CellMetadata, CellStart, RawNotebookMetadata, SYNTHETIC_CELL_SEPARATOR, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
@@ -478,7 +478,7 @@ impl Notebook {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
         let mut serializer = serde_json::Serializer::with_formatter(writer, formatter);
-        SortAlphabetically(&self.raw)
+        self.raw
             .serialize(&mut serializer)
             .map_err(NotebookError::Json)?;
         if self.trailing_newline {
