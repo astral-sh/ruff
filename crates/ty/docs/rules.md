@@ -1475,8 +1475,9 @@ Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#in
 works as an alias. The check for dropped keyword names now has its own rule,
 [`missing-keyword-in-override`](#missing-keyword-in-override).
 
-To preserve a custom severity across the split, set both rules to that level. The following
-configuration preserves a previous setting of `warn`.
+If you previously configured a custom severity for [`invalid-method-override`](#invalid-method-override), you can apply it to
+both rules to keep the same severity for both kinds of override violations. This example preserves a
+previous setting of `warn`.
 
 ```toml
 [rules]
@@ -1484,7 +1485,9 @@ incompatible-method-override = "warn"
 missing-keyword-in-override = "warn"
 ```
 
-For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]`.
+For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]` as a
+suppression comment.
+
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.
 
@@ -4509,10 +4512,6 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100<
 
 Detects method overrides that rename a positional-or-keyword parameter or make it positional-only.
 
-When an override also violates the base method's signature in another way, such as narrowing a
-parameter's type or returning an incompatible type, ty reports [`incompatible-method-override`](#incompatible-method-override)
-instead.
-
 **Why is this bad?**
 
 
@@ -4528,19 +4527,30 @@ class Base:
         return factor * 2
 
 
-class Child(Base):
+class Child1(Base):
     def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
         return multiplier * 3
+
+
+class Child2(Base):
+    def scale(self, factor: int, /) -> int:  # error: [missing-keyword-in-override]
+        return factor * 3
 
 
 def scale_by_two(obj: Base) -> int:
     return obj.scale(factor=2)
 
 
-scale_by_two(Child())  # Raises TypeError.
+scale_by_two(Child1())  # Raises TypeError, as would passing Child2().
 ```
 
-Preserve the parameter name `factor` in the override so that both calling conventions work.
+Keep `factor` as a positional-or-keyword parameter in the override so both calling conventions work.
+
+**See also**
+
+
+- [`incompatible-method-override`](#incompatible-method-override) reports other signature incompatibilities, such as a narrower
+    parameter type or an incompatible return type, even when the override also drops a keyword name.
 
 ## `missing-overload-implementation`
 

@@ -92,8 +92,9 @@ Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 works as an alias. The check for dropped keyword names now has its own rule,
 `missing-keyword-in-override`.
 
-To preserve a custom severity across the split, set both rules to that level. The following
-configuration preserves a previous setting of `warn`.
+If you previously configured a custom severity for `invalid-method-override`, you can apply it to
+both rules to keep the same severity for both kinds of override violations. This example preserves a
+previous setting of `warn`.
 
 ```toml
 [rules]
@@ -101,7 +102,9 @@ incompatible-method-override = "warn"
 missing-keyword-in-override = "warn"
 ```
 
-For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]`.
+For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]` as a
+suppression comment.
+
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.
 
