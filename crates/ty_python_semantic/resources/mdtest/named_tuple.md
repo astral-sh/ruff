@@ -132,6 +132,25 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Union of recursive named tuples
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+Expression: TypeAlias = Negation | Group | str
+
+def _(group: Group):
+    reveal_type(group.children)  # revealed: tuple[Negation | Group | str, ...]
+```
+
 ### Fields declared in stubs
 
 An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis

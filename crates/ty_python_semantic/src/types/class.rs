@@ -222,6 +222,13 @@ impl<'db> CodeGeneratorKind<'db> {
             // dataclass.)
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
+            } else if class
+                .explicit_bases(db)
+                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
+            {
+                // Resolving the metaclass or MRO would need the tuple's field types, which
+                // can refer back to this class through a type alias.
+                Some(CodeGeneratorKind::NamedTuple)
             } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
                     db,
@@ -251,11 +258,6 @@ impl<'db> CodeGeneratorKind<'db> {
                     class,
                     transformer_params,
                 ))
-            } else if class
-                .explicit_bases(db)
-                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
-            {
-                Some(CodeGeneratorKind::NamedTuple)
             } else if class.is_typed_dict(db) {
                 Some(CodeGeneratorKind::TypedDict)
             } else {
