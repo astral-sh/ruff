@@ -108,16 +108,18 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
 }
 
+pub(crate) use super::codemods::ImportMember;
+
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
-pub(crate) fn remove_unused_imports<'a>(
-    member_names: impl Iterator<Item = &'a str>,
+pub(crate) fn remove_unused_imports<'a, M: Into<ImportMember<'a>>>(
+    member_names: impl Iterator<Item = M>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
 ) -> Result<Edit> {
-    match codemods::remove_imports(member_names, stmt, locator, stylist)? {
+    match codemods::remove_imports(member_names.map(Into::into), stmt, locator, stylist)? {
         None => Ok(delete_stmt(stmt, parent, locator, indexer)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }

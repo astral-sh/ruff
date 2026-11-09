@@ -4,8 +4,9 @@ use std::borrow::Cow;
 
 use anyhow::{Result, bail};
 use libcst_native::{
-    Codegen, CodegenState, Expression, Import, ImportFrom, ImportNames, LazyImport, LazyImportFrom,
-    NameOrAttribute, ParenthesizableWhitespace, SmallStatement, Statement,
+    AssignTargetExpression, Codegen, CodegenState, Expression, Import, ImportAlias, ImportFrom,
+    ImportNames, LazyImport, LazyImportFrom, NameOrAttribute, ParenthesizableWhitespace,
+    SmallStatement, Statement,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec};
@@ -36,11 +37,60 @@ impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
     }
 }
 
-/// Given an import statement, remove any imports that are specified in the `imports` iterator.
+/// Describes an imported member to remove from an import statement.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum ImportMember<'a> {
+    /// Match an import by its member name, without considering whether it is aliased.
+    AnyAlias(Cow<'a, str>),
+    /// Match an import with a specific member name and alias.
+    Member {
+        name: Cow<'a, str>,
+        alias: Option<&'a str>,
+    },
+}
+
+impl ImportMember<'_> {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::AnyAlias(name) => name.as_ref(),
+            Self::Member { name, .. } => name.as_ref(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for ImportMember<'a> {
+    fn from(name: &'a str) -> Self {
+        Self::AnyAlias(Cow::Borrowed(name))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for ImportMember<'a> {
+    fn from(name: Cow<'a, str>) -> Self {
+        Self::AnyAlias(name)
+    }
+}
+
+impl From<String> for ImportMember<'_> {
+    fn from(name: String) -> Self {
+        Self::AnyAlias(Cow::Owned(name))
+    }
+}
+
+fn asname_from_alias<'a>(alias: &'a ImportAlias) -> Option<&'a str> {
+    alias.asname.as_ref().and_then(|asname| {
+        if let AssignTargetExpression::Name(name) = &asname.name {
+            Some(name.value)
+        } else {
+            None
+        }
+    })
+}
+
+/// Given an import statement, remove any imports that are specified in the `import_members` iterator.
 ///
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
 pub(crate) fn remove_imports<'a>(
-    member_names: impl Iterator<Item = &'a str>,
+    import_members: impl Iterator<Item = ImportMember<'a>>,
     stmt: &Stmt,
     locator: &Locator,
     stylist: &Stylist,
@@ -67,11 +117,14 @@ pub(crate) fn remove_imports<'a>(
                 // Special-case: if the import is a `from ... import *`, then we delete the
                 // entire statement.
                 let mut found_star = false;
-                for member in member_names {
-                    if member == "*" {
+                for member in import_members {
+                    if member.name() == "*" {
                         found_star = true;
                     } else {
-                        bail!("Expected \"*\" for unused import (got: \"{member}\")");
+                        bail!(
+                            "Expected \"*\" for unused import (got: \"{}\")",
+                            member.name()
+                        );
                     }
                 }
                 if !found_star {
@@ -88,15 +141,35 @@ pub(crate) fn remove_imports<'a>(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    // Remove any imports that are specified in the `imports` iterator (but, e.g., if the name is
+    // Remove any imports that are specified in the `import_members` iterator (but, e.g., if the name is
     // provided once, only remove the first occurrence).
-    let mut counts = member_names.fold(FxHashMap::<&str, usize>::default(), |mut map, name| {
-        map.entry(name).and_modify(|c| *c += 1).or_insert(1);
-        map
-    });
+    let mut specific_counts = FxHashMap::<(String, Option<String>), usize>::default();
+    let mut any_counts = FxHashMap::<String, usize>::default();
+
+    for member in import_members {
+        match member {
+            ImportMember::Member { name, alias } => {
+                *specific_counts
+                    .entry((name.into_owned(), alias.map(ToString::to_string)))
+                    .or_default() += 1;
+            }
+            ImportMember::AnyAlias(name) => {
+                *any_counts.entry(name.into_owned()).or_default() += 1;
+            }
+        }
+    }
+
     aliases.retain(|alias| {
         let name = qualified_name_from_name_or_attribute(&alias.name);
-        if let Some(count) = counts.get_mut(name.as_str()).filter(|count| **count > 0) {
+        let asname = asname_from_alias(alias);
+
+        if let Some(count) = specific_counts
+            .get_mut(&(name.clone(), asname.map(ToString::to_string)))
+            .filter(|count| **count > 0)
+        {
+            *count -= 1;
+            false
+        } else if let Some(count) = any_counts.get_mut(&name).filter(|count| **count > 0) {
             *count -= 1;
             false
         } else {

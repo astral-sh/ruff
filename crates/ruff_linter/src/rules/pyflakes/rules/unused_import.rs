@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::iter;
 
 use anyhow::{Result, anyhow, bail};
@@ -373,6 +372,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
             scope: binding.scope,
+            is_alias: binding.is_alias(),
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.start())
@@ -527,9 +527,18 @@ struct ImportBinding<'a> {
     parent_range: Option<TextRange>,
     /// The [`ScopeId`] of the scope in which the [`ImportBinding`] was defined.
     scope: ScopeId,
+    /// Whether this import was aliased (e.g., `import foo as bar`).
+    is_alias: bool,
 }
 
-impl ImportBinding<'_> {
+impl<'a> ImportBinding<'a> {
+    fn import_member(&self) -> fix::edits::ImportMember<'a> {
+        fix::edits::ImportMember::Member {
+            name: self.import.member_name(),
+            alias: if self.is_alias { Some(self.name) } else { None },
+        }
+    }
+
     /// The symbol that is stored in the outer scope as a result of this import.
     ///
     /// For example:
@@ -570,16 +579,14 @@ fn fix_by_removing_imports<'a>(
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
-    let member_names: Vec<Cow<'_, str>> = imports
-        .map(|ImportBinding { import, .. }| import)
-        .map(Imported::member_name)
-        .collect();
-    if member_names.is_empty() {
+    let import_members: Vec<fix::edits::ImportMember<'_>> =
+        imports.map(ImportBinding::import_member).collect();
+    if import_members.is_empty() {
         bail!("Expected import bindings");
     }
 
     let edit = fix::edits::remove_unused_imports(
-        member_names.iter().map(AsRef::as_ref),
+        import_members.into_iter(),
         statement,
         parent,
         checker.locator(),

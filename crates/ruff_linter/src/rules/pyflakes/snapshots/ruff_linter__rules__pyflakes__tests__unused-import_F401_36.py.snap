@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `os.path.join` imported but unused
+ --> F401_36.py:6:39
+  |
+4 | # The second binding (`join as path_join`) is unused, so only it should be removed.
+5 | def f1():
+6 |     from os.path import join, join as path_join
+  |                                       ^^^^^^^^^
+7 |
+8 |     print(join("a", "b"))
+  |
+help: Remove unused import: `os.path.join`
+  |
+5 | def f1():
+  -     from os.path import join, join as path_join
+6 +     from os.path import join
+7 |
+  |
+
+F401 [*] `os.path.join` imported but unused
+  --> F401_36.py:13:25
+   |
+11 | # The first binding (`join`) is unused, so only it should be removed.
+12 | def f2():
+13 |     from os.path import join, join as path_join
+   |                         ^^^^
+14 |
+15 |     print(path_join("a", "b"))
+   |
+help: Remove unused import: `os.path.join`
+   |
+12 | def f2():
+   -     from os.path import join, join as path_join
+13 +     from os.path import join as path_join
+14 |
+   |
+
+F401 [*] `os.path.join` imported but unused
+  --> F401_36.py:20:33
+   |
+18 | # The first binding (`join as path_join`) is unused, so only it should be removed.
+19 | def f3():
+20 |     from os.path import join as path_join, join
+   |                                 ^^^^^^^^^
+21 |
+22 |     print(join("a", "b"))
+   |
+help: Remove unused import: `os.path.join`
+   |
+19 | def f3():
+   -     from os.path import join as path_join, join
+20 +     from os.path import join
+21 |
+   |
+
+F401 [*] `os` imported but unused
+  --> F401_36.py:27:29
+   |
+25 | # Both aliased: second binding (`os as os2`) is unused.
+26 | def f4():
+27 |     import os as os1, os as os2
+   |                             ^^^
+28 |
+29 |     print(os1.name)
+   |
+help: Remove unused import: `os`
+   |
+26 | def f4():
+   -     import os as os1, os as os2
+27 +     import os as os1
+28 |
+   |
+
+F401 [*] `os` imported but unused
+  --> F401_36.py:34:18
+   |
+32 | # Both aliased: first binding (`os as os1`) is unused.
+33 | def f5():
+34 |     import os as os1, os as os2
+   |                  ^^^
+35 |
+36 |     print(os2.name)
+   |
+help: Remove unused import: `os`
+   |
+33 | def f5():
+   -     import os as os1, os as os2
+34 +     import os as os2
+35 |
+   |
