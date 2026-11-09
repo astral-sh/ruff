@@ -947,17 +947,20 @@ impl<'db> StaticClassLiteral<'db> {
         let ancestors = self
             .try_class_metadata_ancestors(db)
             .unwrap_or_else(StaticMroError::fallback_ancestors);
-        let mut bases = ancestors.iter().filter_map(|base| {
+        let params = ancestors.iter().find_map(|base| {
             let (literal, _) = base.into_class()?.static_class_literal(db)?;
-            Some(literal)
-        });
-        let params = bases
-            .clone()
-            .find_map(|base| base.dataclass_transformer_params(db))?;
+            literal.dataclass_transformer_params(db)
+        })?;
 
         // A subclass of `type` inherits the transform for use as a metaclass itself.
-        if self.is_known(db, KnownClass::Type)
-            || bases.any(|base| base.is_known(db, KnownClass::Type))
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        if KnownClass::Type
+            .try_to_class_literal(db, &env)
+            .is_some_and(|type_literal| {
+                let type_class = ClassType::NonGeneric(type_literal.into());
+                self.default_specialization(db) == type_class
+                    || ancestors.contains(&ClassBase::Class(type_class))
+            })
         {
             return None;
         }
