@@ -212,7 +212,6 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
-            let env = ProgramEnvironment::from_scope(class.body_scope(db));
             // If a class is directly decorated as a dataclass, it's a dataclass.
             // If a class' metaclass is a dataclass transformer, it's a dataclass.
             // If a class inherits from a base class that is a dataclass
@@ -228,27 +227,7 @@ impl<'db> CodeGeneratorKind<'db> {
                     class,
                     info.params,
                 ))
-            } else if class.has_only_named_tuple_base(db) {
-                // No other base can supply a dataclass transform.
-                Some(CodeGeneratorKind::NamedTuple)
-            } else if KnownClass::Type
-                .try_to_class_literal(db, &env)
-                .is_none_or(|type_class| {
-                    !class.is_subclass_of(
-                        db,
-                        None,
-                        ClassType::NonGeneric(ClassLiteral::Static(type_class)),
-                    )
-                })
-                && let Some(transformer_params) =
-                    class.iter_mro(db, None).skip(1).find_map(|base| {
-                        base.into_class().and_then(|class| {
-                            class
-                                .static_class_literal(db)
-                                .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
-                        })
-                    })
-            {
+            } else if let Some(transformer_params) = class.dataclass_transformer_from_bases(db) {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
                     db,
                     class,
@@ -564,7 +543,13 @@ impl<'db> GenericAlias<'db> {
     ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
         tracing::trace!("GenericAlias::try_mro_ancestors: {}", origin.name(db));
-        Mro::ancestors_of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
+        Mro::ancestors_of_static_class(
+            db,
+            origin,
+            Some(self.specialization(db)),
+            origin.explicit_bases(db),
+        )
+        .map_err(Box::new)
     }
 
     /// Compose each type argument's variance with its formal parameter's variance. Inferred

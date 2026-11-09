@@ -148,7 +148,7 @@ class Group(NamedTuple):
 Expression: TypeAlias = Negation | Group | str
 
 def _(group: Group):
-    reveal_type(group.children)  # revealed: tuple[Negation | Group | str, ...]
+    reveal_type(group[0])  # revealed: tuple[Negation | Group | str, ...]
 ```
 
 ### Explicit dataclass-transform metaclass
