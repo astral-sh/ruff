@@ -15,12 +15,12 @@ class Base:
         return factor * 2
 
 
-class Child1(Base):
+class Wrong1(Base):
     def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
         return multiplier * 3
 
 
-class Child2(Base):
+class Wrong2(Base):
     def scale(self, factor: int, /) -> int:  # error: [missing-keyword-in-override]
         return factor * 3
 
@@ -29,7 +29,7 @@ def scale_by_two(obj: Base) -> int:
     return obj.scale(factor=2)
 
 
-scale_by_two(Child1())  # Raises TypeError, as would passing Child2().
+scale_by_two(Wrong1())  # Raises TypeError, as would passing Wrong2().
 ```
 
 Keep `factor` as a positional-or-keyword parameter in the override so both calling conventions work.
