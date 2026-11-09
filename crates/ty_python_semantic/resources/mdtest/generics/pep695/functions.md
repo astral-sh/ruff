@@ -3657,7 +3657,7 @@ every specialization of the enclosing function's `U`.
 
 ```py
 def collect[U](value: U) -> list[U]:
-    return choose(choose(value, value), value)
+    return choose(choose(value, value), value)  # ok
 ```
 
 ## Inferring a union parameter from other arguments
