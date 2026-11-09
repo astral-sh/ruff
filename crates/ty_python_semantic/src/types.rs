@@ -7036,6 +7036,12 @@ impl<'db> Type<'db> {
         if let Type::ClassLiteral(ClassLiteral::Static(class)) = self {
             return Self::static_class_bindings(db, env, class);
         }
+        if let Type::BoundMethod(method) = self
+            && method.program(db) == env.program(db)
+            && let Some(bindings) = Self::prepared_method_bindings(db, method)
+        {
+            return bindings.as_ref().clone();
+        }
         self.bindings_impl(db, env, &ActiveRecursionDetector::default())
     }
 
@@ -7082,6 +7088,34 @@ impl<'db> Type<'db> {
             ClassLiteral::Static(class),
             &ActiveRecursionDetector::default(),
         )
+    }
+
+    /// Prepare the receiver-dependent overloads once. The copy used at a call site is
+    /// freshened and matched to its own arguments. Recursive preparation uses the caller's
+    /// ordinary binding path until a complete template is available.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "a cycle produces no reusable template"
+    )]
+    fn prepared_method_bindings(
+        db: &'db dyn Db,
+        method: BoundMethodType<'db>,
+    ) -> &'db Option<Box<Bindings<'db>>> {
+        #[salsa::tracked(returns(ref), no_eq, cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn prepare<'db>(
+            db: &'db dyn Db,
+            method: BoundMethodType<'db>,
+        ) -> Option<Box<Bindings<'db>>> {
+            let env = ProgramEnvironment::from_program(method.program(db));
+            let mut bindings = Box::new(Type::BoundMethod(method).bindings_impl(
+                db,
+                &env,
+                &ActiveRecursionDetector::default(),
+            ));
+            bindings.shrink_to_fit();
+            Some(bindings)
+        }
+        prepare(db, method)
     }
 
     fn bindings_impl(
