@@ -2489,6 +2489,36 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Nested calls with ambiguous union arguments
+
+An empty list matches both `T` and `list[T]`. Using the list itself to infer its element type on
+subsequent passes would add another level of nesting each time.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def select(left: T | list[T], right: T | list[T]) -> list[T]:
+    raise NotImplementedError
+
+reveal_type(select([], []))  # revealed: list[list[Unknown] | Unknown]
+# revealed: list[list[list[Unknown] | Unknown] | list[Unknown] | Unknown | None]
+reveal_type(select(select([], []), None))
+
+result: list[int] = select(reveal_type([]), 1)  # revealed: list[int]
+```
+
+Both alternatives from a sibling argument contribute to the type of a callback parameter.
+
+```py
+from collections.abc import Callable
+
+def visit(value: T | list[T], callback: Callable[[T], object]) -> None: ...
+def _(items: list[int]):
+    visit(items, lambda item: reveal_type(item))  # revealed: list[int] | int
+```
+
 ## Passing generic functions to generic functions
 
 ```py

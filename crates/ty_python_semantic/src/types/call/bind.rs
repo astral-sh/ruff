@@ -6027,7 +6027,7 @@ fn parameter_context_specialization<'db>(
         }),
     );
 
-    let kinds = types
+    let kinds: Vec<_> = types
         .generic_context(db)
         .variables(db)
         .map(|typevar| {
@@ -6042,7 +6042,33 @@ fn parameter_context_specialization<'db>(
         })
         .collect();
 
-    ArgumentContextSpecialization { types, kinds }
+    let merged_typevars = inference.map_or(TypeVarSet::None, |inference| {
+        let (TypeVarInferenceSolutions::Alternatives(paths)
+        | TypeVarInferenceSolutions::Incomplete(paths)) = inference.solutions(db)
+        else {
+            return TypeVarSet::None;
+        };
+        TypeVarSet::from_typevars(
+            db,
+            generic_context
+                .variables(db)
+                .zip(&kinds)
+                .filter_map(|(variable, kind)| {
+                    if *kind != Some(TypeContextKind::Inferred) {
+                        return None;
+                    }
+                    let index = inference
+                        .generic_context(db)
+                        .variable_index(db, variable.identity(db))?;
+                    (!paths.iter().map(|path| path[index]).all_equal()).then_some(variable)
+                }),
+        )
+    });
+    ArgumentContextSpecialization {
+        types,
+        kinds,
+        merged_typevars,
+    }
 }
 
 /// Completed inference and its diagnostics, passed together to argument validation.
@@ -8248,6 +8274,8 @@ impl<'db> MatchedArgument<'db> {
 pub(crate) struct ArgumentContextSpecialization<'db> {
     types: Specialization<'db>,
     kinds: Vec<Option<TypeContextKind>>,
+    /// Variables whose argument context combines different bindings from alternative solutions.
+    merged_typevars: TypeVarSet<'db>,
 }
 
 impl<'db> ArgumentContextSpecialization<'db> {
@@ -8915,7 +8943,29 @@ impl<'db> Binding<'db> {
                     tcx_kind = parameter_tcx_kind;
                 }
 
-                parameter_type = parameter_type.apply_specialization(db, specialization.types);
+                let specialized = parameter_type.apply_specialization(db, specialization.types);
+                // With a parameter `T | list[T]`, `[]` can bind `T` to either `list[Unknown]`
+                // or `Unknown`. Feeding their union back into `list[T]` would wrap the same
+                // list again on each iteration. Keep the previous argument type if the merged
+                // context already covers it. Assignability alone would also keep `list[Unknown]`
+                // when a sibling supplies `list[int]` as a more precise context.
+                if specialization.merged_typevars != TypeVarSet::None
+                    && inferable_typevar_occurrences(
+                        db,
+                        env,
+                        parameter_type,
+                        specialization.merged_typevars,
+                    ) > 0
+                    && let Some(previous) = arguments_types
+                        .get(argument_index)
+                        .and_then(|argument| argument.matched_type(original_parameter_type, None))
+                    && previous.is_redundant_with(db, env, specialized)
+                {
+                    parameter_type = previous;
+                    tcx_kind = TypeContextKind::Inferred;
+                } else {
+                    parameter_type = specialized;
+                }
             }
 
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
@@ -8984,6 +9034,7 @@ impl<'db> Binding<'db> {
                             Type::Dynamic(DynamicType::UnspecializedTypeVar),
                         ),
                         kinds: vec![None; context.len(db)],
+                        merged_typevars: TypeVarSet::None,
                     });
                 }
                 ParameterContextKey::Inferred(inference) => {
