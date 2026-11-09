@@ -277,7 +277,12 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert(
+        self,
+        args: &[Expr],
+        keywords: &[Keyword],
+        regex_binding: Option<&str>,
+    ) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True
@@ -425,7 +430,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: Name::new_static("re"),
+                    id: Name::new(regex_binding.unwrap_or("re")),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,

@@ -322,8 +322,26 @@ pub(crate) fn unittest_assertion(
         && checker.semantic().current_expression_parent().is_none()
         && !checker.comment_ranges().intersects(expr.range())
     {
-        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        diagnostic.try_set_fix(|| {
+            let (import_edit, regex_binding) = if matches!(
+                unittest_assert,
+                UnittestAssert::Regex
+                    | UnittestAssert::RegexpMatches
+                    | UnittestAssert::NotRegex
+                    | UnittestAssert::NotRegexpMatches
+            ) {
+                let (edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("re", "search"),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                (Some(edit), Some(binding))
+            } else {
+                (None, None)
+            };
+            let stmt =
+                unittest_assert.generate_assert(args, keywords, regex_binding.as_deref())?;
+            let replacement = Edit::range_replacement(
                 checker.generator().stmt(&stmt),
                 parenthesized_range(
                     expr.into(),
@@ -331,8 +349,14 @@ pub(crate) fn unittest_assertion(
                     checker.tokens(),
                 )
                 .unwrap_or(expr.range()),
-            )));
-        }
+            );
+            Ok(match import_edit {
+                Some(import_edit) => {
+                    Fix::unsafe_edits(iter::once(import_edit), iter::once(replacement))
+                }
+                None => Fix::unsafe_edit(replacement),
+            })
+        });
     }
 }
 

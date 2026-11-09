@@ -461,6 +461,9 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
    |
 help: Replace `assertRegex(...)` with `assert ...`
    |
+1 + import re
+2 | import unittest
+3 |
 72 |     def test_assert_regex(self):
    -         self.assertRegex("abc", r"def")  # Error
 73 +         assert re.search(r"def", "abc")  # Error
@@ -479,6 +482,9 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
+1 + import re
+2 | import unittest
+3 |
 75 |     def test_assert_not_regex(self):
    -         self.assertNotRegex("abc", r"abc")  # Error
 76 +         assert not re.search(r"abc", "abc")  # Error
@@ -497,6 +503,9 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
    |
 help: Replace `assertRegexpMatches(...)` with `assert ...`
    |
+1 + import re
+2 | import unittest
+3 |
 78 |     def test_assert_regexp_matches(self):
    -         self.assertRegexpMatches("abc", r"def")  # Error
 79 +         assert re.search(r"def", "abc")  # Error
@@ -515,6 +524,9 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
+1 + import re
+2 | import unittest
+3 |
 81 |     def test_assert_not_regexp_matches(self):
    -         self.assertNotRegex("abc", r"abc")  # Error
 82 +         assert not re.search(r"abc", "abc")  # Error
