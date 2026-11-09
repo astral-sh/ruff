@@ -1054,6 +1054,9 @@ pub struct BoundTypeVarInstance<'db> {
     // and reconstructing the full identity regresses hot-path project benchmarks.
     #[returns(copy)]
     identity_inner: BoundTypeVarIdentity<'db>,
+    /// Keep the kind here as well so most typevar operations need only the bound occurrence.
+    #[returns(copy)]
+    pub(crate) kind: TypeVarKind<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1073,7 +1076,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             paramspec_attr,
             freshness,
         };
-        Self::new_internal(db, typevar, identity)
+        Self::new_internal(db, typevar, identity, identity.kind(db))
     }
 
     pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
@@ -1112,14 +1115,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.typevar(db).name(db)
     }
 
-    pub(crate) fn kind(self, db: &'db dyn Db) -> TypeVarKind<'db> {
-        self.identity(db).kind(db)
-    }
-
     pub(crate) fn domain(self, db: &'db dyn Db) -> TypeVarDomain {
-        let identity = self.identity(db);
-        let kind = identity.kind(db);
-        if kind.is_paramspec() && identity.paramspec_attr.is_none() {
+        let kind = self.kind(db);
+        if kind.is_paramspec() && self.paramspec_attr(db).is_none() {
             TypeVarDomain::ParameterSignature
         } else if kind.is_typevartuple() {
             TypeVarDomain::TypeTuple
@@ -1949,7 +1947,8 @@ impl<'db> BoundTypeVarIdentity<'db> {
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum TypeVarSet<'db> {
     None,
-    Some(TypeVarSetInner<'db>),
+    One(BoundTypeVarInstance<'db>),
+    Many(TypeVarSetInner<'db>),
 }
 
 impl<'db> TypeVarSet<'db> {
@@ -1957,17 +1956,22 @@ impl<'db> TypeVarSet<'db> {
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        let mut typevars = typevars.into_iter().peekable();
-        if typevars.peek().is_none() {
-            return TypeVarSet::None;
-        }
-
+        let mut typevars = typevars.into_iter();
+        let Some(first) = typevars.next() else {
+            return Self::None;
+        };
+        let Some(second) = typevars.next() else {
+            return Self::One(first);
+        };
         let mut set = FxOrderMap::default();
-        for typevar in typevars {
+        for typevar in [first, second].into_iter().chain(typevars) {
             set.entry(typevar.identity(db)).or_insert(typevar);
         }
+        if set.len() == 1 {
+            return Self::One(first);
+        }
         set.shrink_to_fit();
-        Self::Some(TypeVarSetInner::new_internal(db, set))
+        Self::Many(TypeVarSetInner::new_internal(db, set))
     }
 }
 
@@ -1984,14 +1988,19 @@ impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
         match inferable {
             TypeVarSet::None => false,
-            TypeVarSet::Some(inner) => inner.typevars(db).contains_key(&self),
+            TypeVarSet::One(only) => only.identity(db) == self,
+            TypeVarSet::Many(inner) => inner.typevars(db).contains_key(&self),
         }
     }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
-        self.identity(db).is_inferable(db, inferable)
+        match inferable {
+            TypeVarSet::None => false,
+            TypeVarSet::One(only) if self == only => true,
+            _ => self.identity(db).is_inferable(db, inferable),
+        }
     }
 }
 
@@ -2015,9 +2024,9 @@ impl<'db> TypeVarSet<'db> {
 
         match (self, other) {
             (TypeVarSet::None, other) | (other, TypeVarSet::None) => other,
-            (TypeVarSet::Some(self_inner), TypeVarSet::Some(other_inner)) => {
-                merge_inner(db, self_inner, other_inner)
-            }
+            _ if self == other => self,
+            (Self::Many(left), Self::Many(right)) => merge_inner(db, left, right),
+            _ => Self::from_typevars(db, self.iter(db).chain(other.iter(db))),
         }
     }
 
@@ -2028,8 +2037,9 @@ impl<'db> TypeVarSet<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + 'db {
         match self {
-            TypeVarSet::None => Either::Left(std::iter::empty()),
-            TypeVarSet::Some(inner) => Either::Right(inner.typevars(db).values().copied()),
+            Self::None => Either::Left(None.into_iter()),
+            Self::One(only) => Either::Left(Some(only).into_iter()),
+            Self::Many(inner) => Either::Right(inner.typevars(db).values().copied()),
         }
     }
 
