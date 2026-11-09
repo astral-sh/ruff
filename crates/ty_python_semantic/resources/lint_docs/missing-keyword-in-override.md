@@ -29,10 +29,12 @@ def scale_by_two(obj: Base) -> int:
     return obj.scale(factor=2)
 
 
-scale_by_two(Wrong1())  # Raises TypeError, as would passing Wrong2().
+scale_by_two(Wrong1())  # Raise TypeError
+scale_by_two(Wrong2())  # Raise TypeError
 ```
 
-Keep `factor` as a positional-or-keyword parameter in the override so both calling conventions work.
+To fix this, keep `factor` as a positional-or-keyword parameter in the override so both calling
+conventions work.
 
 ## See also
 
