@@ -61,7 +61,7 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 /// RUF046
 pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call_fields: &ExprCallFields<'_>) {
     let call = call_fields.node;
-    let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
+    let Some(argument) = single_argument_to_int_call(call_fields, checker.semantic()) else {
         return;
     };
 
@@ -149,11 +149,11 @@ fn call_applicability(checker: &Checker, inner_call: ExprCall<'_>) -> Option<App
 }
 
 fn single_argument_to_int_call<'a>(
-    call: ExprCall<'a>,
+    call: &ExprCallFields<'a>,
     semantic: &SemanticModel,
 ) -> Option<Expr<'a>> {
-    let func = call.func();
-    let arguments = call.arguments();
+    let func = call.func;
+    let arguments = call.arguments;
 
     if !semantic.match_builtin_expr(func, "int") {
         return None;
