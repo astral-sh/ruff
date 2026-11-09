@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
-use crate::types::infer::is_instance_attribute_assignment;
+use crate::types::annotation_target::is_instance_attribute_assignment;
 use crate::{
     TypeQualifiers,
     types::{

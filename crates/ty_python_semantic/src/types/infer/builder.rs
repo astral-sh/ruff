@@ -50,6 +50,7 @@ use crate::reachability::{
 };
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
+use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
     ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
@@ -101,9 +102,8 @@ use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
-    TypeAndRange, TypeExpressionFlags, infer_statement_types, is_valid_annotation_target,
-    nearest_enclosing_class, nearest_enclosing_function, original_class_type,
-    receiver_method_scope,
+    TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
+    nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::member::inherited_class_body_declaration;
