@@ -194,6 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
+use crate::types::narrow::{known_capture_outcome, match_capture_constraints};
 use std::cell::RefCell;
 
 use crate::{
@@ -975,7 +976,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     env: &ProgramEnvironment<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
     base_ty: Type<'db>,
-    place: ScopedPlaceId,
+    target: impl FnOnce() -> (ScopedPlaceId, Option<PatternPredicate<'db>>),
 ) -> Type<'db> {
     let id = evaluator.constraint();
     match id {
@@ -984,7 +985,8 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         _ => {}
     }
 
-    NarrowingProjector::new(
+    let (place, captured_by) = target();
+    let mut projector = NarrowingProjector::new(
         db,
         env,
         evaluator.narrowing_constraints(),
@@ -992,8 +994,9 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         evaluator.predicate_narrowing_targets(),
         place,
         base_ty,
-    )
-    .narrow(id, base_ty)
+    );
+    projector.captured_by = captured_by;
+    projector.narrow(id, base_ty)
 }
 
 fn apply_accumulated_narrowing<'db>(
@@ -1105,8 +1108,8 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
 /// when simplifying a join requires their predicates.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(id)),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
+    cycle_initial = |_, id, _, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(id)),
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty, _| {
         match result {
             ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(
                 ty.cycle_normalized(db, &ProgramEnvironment::from_scope(scope), previous.ty(base_ty), cycle)
@@ -1122,6 +1125,7 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
     place: ScopedPlaceId,
     constraint: ScopedNarrowingConstraint,
     base_ty: Type<'db>,
+    captured_by: Option<PatternPredicate<'db>>,
 ) -> ProjectedNarrowingCheckpoint<'db> {
     let env = ProgramEnvironment::from_scope(scope);
     let use_def = use_def_map(db, scope);
@@ -1135,6 +1139,7 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
         place,
         base_ty,
     );
+    projector.captured_by = captured_by;
     let root = projector.project(constraint, false);
     match root {
         ProjectedNarrowingNodeId::ALWAYS_FALSE => ProjectedNarrowingCheckpoint::Unreachable,
@@ -1152,6 +1157,8 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
     place: ScopedPlaceId,
     base_ty: Type<'db>,
+    /// A case tests the saved subject. A structural capture can bind a different value.
+    captured_by: Option<PatternPredicate<'db>>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
     project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -1177,6 +1184,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             predicate_narrowing_targets,
             place,
             base_ty,
+            captured_by: None,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
             narrowed_cache: FxHashMap::default(),
@@ -1259,8 +1267,20 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let constraints =
-            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
+        let predicate = self.predicates[predicate_id];
+        let constraints = if let Some(capture) = self.captured_by
+            && let PredicateNode::Pattern(tested) = predicate.node
+            && tested.subject(db) == capture.subject(db)
+        {
+            let (positive, negative) = match_capture_constraints(db, capture, tested, self.place);
+            if predicate.is_positive {
+                (positive, negative)
+            } else {
+                (negative, positive)
+            }
+        } else {
+            infer_narrowing_constraints(db, predicate, self.place)
+        };
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
@@ -1473,6 +1493,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             self.place,
                             id,
                             self.base_ty,
+                            self.captured_by,
                         );
                         let projected = match checkpoint {
                             ProjectedNarrowingCheckpoint::Unreachable => {
@@ -1510,25 +1531,32 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         continue;
                     }
                     let predicate = self.predicates[node.atom];
-                    if !matches!(
-                        predicate.node,
+                    let truthiness = match predicate.node {
                         PredicateNode::IsNonTerminalCall(_)
-                            | PredicateNode::ContextManagerSuppresses { .. }
-                            | PredicateNode::FinallyNormalPathImpossible { .. }
-                    ) {
-                        actions.push(Action::FinishPredicate(id));
-                        actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_true));
-                        continue;
-                    }
-                    let branch = match analyze_single(db, self.env, &predicate) {
+                        | PredicateNode::ContextManagerSuppresses { .. }
+                        | PredicateNode::FinallyNormalPathImpossible { .. } => {
+                            analyze_single(db, self.env, &predicate)
+                        }
+                        PredicateNode::Pattern(tested)
+                            if let Some(capture) = self.captured_by
+                                && capture.subject(db) == tested.subject(db) =>
+                        {
+                            known_capture_outcome(db, self.env, capture, tested)
+                                .map_or(Truthiness::Ambiguous, |matched| {
+                                    Truthiness::from(matched == predicate.is_positive)
+                                })
+                        }
+                        _ => Truthiness::Ambiguous,
+                    };
+                    let branch = match truthiness {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
                         Truthiness::Ambiguous => {
-                            unreachable!(
-                                "statically decidable predicates should never be Ambiguous"
-                            )
+                            actions.push(Action::FinishPredicate(id));
+                            actions.push(Action::Visit(node.if_false));
+                            actions.push(Action::Visit(node.if_true));
+                            continue;
                         }
                     };
 
