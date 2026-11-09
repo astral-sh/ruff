@@ -175,3 +175,10 @@ class Foo:
 # ruff:disable[F401]
 print("goodbye")
 # ruff:enable[F401]
+
+
+# RUF104 should be suppressed when an ignore comment covers the disable comment.
+def f():
+    # ruff: disable[F841]  # ruff: ignore[RUF104]
+    x = 1
+
