@@ -3320,11 +3320,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        self.record_exception_checkpoint_if(matches!(
-            target,
-            ast::Expr::List(_) | ast::Expr::Tuple(_)
-        ));
-
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
@@ -3575,6 +3570,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         *unpack_position = UnpackPosition::Other;
                     }
                 }
+            }
+            ast::Expr::List(ast::ExprList { ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
+                // A nested unpack can raise after earlier targets have been assigned.
+                self.record_exception_checkpoint_if(*ctx == ast::ExprContext::Store);
+                walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 self.visit_expr(&node.value);

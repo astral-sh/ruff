@@ -789,6 +789,22 @@ def unpacking(values: Iterable[int]) -> None:
         reveal_type(state)  # revealed: Literal[0]
 ```
 
+## Nested unpacking can raise after an earlier target is assigned
+
+Python assigns targets from left to right. If unpacking `pair` raises, `value` already holds
+`"bad"`, while `a` still holds its original value:
+
+```py
+def nested_unpacking(pair: tuple[int, ...]) -> None:
+    value = 1
+    a = 0
+    try:
+        value, (a, b) = "bad", pair
+    except ValueError:
+        reveal_type(value)  # revealed: Literal[1, "bad"]
+        reveal_type(a)  # revealed: Literal[0]
+```
+
 ## Awaiting and yielding can raise
 
 Awaiting can raise when a coroutine resumes:
