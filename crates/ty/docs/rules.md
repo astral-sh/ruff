@@ -1471,8 +1471,9 @@ Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#in
 **Migrating from `invalid-method-override`**
 
 
-[`invalid-method-override`](#invalid-method-override) is an alias for [`incompatible-method-override`](#incompatible-method-override). The check for dropped
-keyword names now has its own rule, [`missing-keyword-in-override`](#missing-keyword-in-override).
+[`incompatible-method-override`](#incompatible-method-override) was previously called [`invalid-method-override`](#invalid-method-override). The old name still
+works as an alias. The check for dropped keyword names now has its own rule,
+[`missing-keyword-in-override`](#missing-keyword-in-override).
 
 To preserve a custom severity across the split, set both rules to that level. The following
 configuration preserves a previous setting of `warn`.
