@@ -801,54 +801,8 @@ def nested_unpacking(pair: tuple[int, ...]) -> None:
     try:
         value, (a, b) = "bad", pair
     except ValueError:
-        reveal_type(value)  # revealed: Literal["bad"]
+        reveal_type(value)  # revealed: Literal[1, "bad"]
         reveal_type(a)  # revealed: Literal[0]
-```
-
-## Unpacking a literal of the expected length
-
-Both unpacks succeed, so only the explicit `raise` can reach the handler:
-
-```py
-def exact_length() -> None:
-    value = 0
-    try:
-        value, (a, b) = "bad", [1, 2]
-        value = 2
-        raise ValueError
-    except ValueError:
-        reveal_type(value)  # revealed: Literal[2]
-```
-
-## A starred element makes a literal's length unknown
-
-Expanding `items` can raise before `value` is assigned. Unpacking the resulting tuple can also raise
-after `value` has been assigned if `items` did not yield exactly one element:
-
-```py
-from collections.abc import Iterable
-
-def starred_literal(items: Iterable[int]) -> None:
-    value = 0
-    try:
-        value, (a, b) = 1, (2, *items)
-    except ValueError:
-        reveal_type(value)  # revealed: Literal[0, 1]
-```
-
-## Unpacking a constant tuple in a chained assignment
-
-Binding the tuple to `held` preserves both tuple lengths, so both unpacks succeed:
-
-```py
-def chained() -> None:
-    value = 0
-    try:
-        held = value, (a, b) = "bad", (1, 2)
-        value = 2
-        raise ValueError
-    except ValueError:
-        reveal_type(value)  # revealed: Literal[2]
 ```
 
 ## An earlier chained target can mutate the unpacked value
@@ -868,48 +822,6 @@ def chained(sink: Sink) -> None:
     except ValueError:
         reveal_type(x)  # revealed: Literal[0, 1]
         reveal_type(y)  # revealed: Literal[0]
-```
-
-## Lambda defaults can raise before unpacking
-
-Python expands `items` twice while creating the lambda. Either expansion can raise, and the
-assignment in the next tuple element runs only after both succeed:
-
-```py
-from collections.abc import Iterable
-
-def defaults(items: Iterable[int]) -> None:
-    state = 0
-    try:
-        a, b = held = (lambda v=[*items, (state := 1), *items]: v), (state := 2)
-    except ValueError:
-        reveal_type(state)  # revealed: Literal[0, 1]
-```
-
-## Storing an unpacked name in a class namespace can raise
-
-A metaclass can supply a mapping that rejects a store after an exact-length unpack succeeds:
-
-```py
-class Namespace(dict[str, object]):
-    def __setitem__(self, key, value):
-        if key == "a":
-            raise ValueError
-        super().__setitem__(key, value)
-
-class Meta(type):
-    @classmethod
-    def __prepare__(mcls, name, bases, /, **kwargs):
-        return Namespace()
-
-class C(metaclass=Meta):
-    state = "before"
-    try:
-        a, b = held = 1, 2
-        state = 2
-        raise ValueError
-    except ValueError:
-        reveal_type(state)  # revealed: Literal["before", 2]
 ```
 
 ## Awaiting and yielding can raise

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
-use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_constant, is_dotted_name};
+use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
@@ -2494,36 +2494,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return true;
         };
 
-        if !self
-            .exception_context_stack_manager
-            .has_active_exception_handler(self)
-        {
-            return false;
-        }
-
-        let symbol = self.current_place_table().symbol_id(name.id.as_str());
-        if !is_use {
-            // A metaclass (including one inherited from a base) can supply a namespace
-            // whose __setitem__ raises. Global and nonlocal stores bypass that mapping.
-            let Some(class) = self.scopes[self.current_scope()].node().as_class() else {
-                return false;
-            };
-            return name.ctx == ast::ExprContext::Store
-                && class
-                    .node(self.module)
-                    .arguments
-                    .as_ref()
-                    .is_some_and(|args| !args.is_empty())
-                && symbol.is_none_or(|id| {
-                    let symbol = self.current_place_table().symbol(id);
-                    !symbol.is_global() && !symbol.is_nonlocal()
-                });
-        }
-        symbol.is_none_or(|symbol| {
-            self.current_use_def_map_mut()
-                .symbol_live_binding_status(symbol)
-                != LiveBindingStatus::Bound
-        })
+        is_use
+            && self
+                .exception_context_stack_manager
+                .has_active_exception_handler(self)
+            && self
+                .current_place_table()
+                .symbol_id(name.id.as_str())
+                .is_none_or(|symbol| {
+                    self.current_use_def_map_mut()
+                        .symbol_live_binding_status(symbol)
+                        != LiveBindingStatus::Bound
+                })
     }
 
     /// Returns whether evaluating and truth-testing `expr` cannot invoke Python user code.
@@ -3338,18 +3320,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        let unpack_source = unpackable.direct_source().filter(|_| {
-            self.exception_context_stack_manager
-                .has_active_exception_handler(self)
-        });
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
-                if let Some(source) = unpack_source {
-                    // Building a literal can raise even when unpacking it will succeed.
-                    self.record_exception_checkpoint_if(
-                        !Self::expression_evaluation_is_known_safe(source),
-                    );
-                }
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
                     debug_assert_eq!(
                         self.scopes[self.current_scope()].node().scope_kind(),
@@ -3393,7 +3365,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.push_assignment(current_assignment);
         }
 
-        self.visit_expr_impl(target, ExpressionContext::Value, unpack_source);
+        self.visit_expr(target);
 
         if current_assignment.is_some() {
             // Only need to pop in the case where we pushed something
@@ -3496,15 +3468,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
-        self.visit_expr_impl(expr, context, None);
-    }
-
-    fn visit_expr_impl(
-        &mut self,
-        expr: &'ast ast::Expr,
-        context: ExpressionContext,
-        unpack_source: Option<&'ast ast::Expr>,
-    ) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         // A place use records its scope together with its reaching-definition ID,
@@ -3608,33 +3571,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
             }
-            ast::Expr::List(ast::ExprList { elts, ctx, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, ctx, .. })
-                if *ctx == ast::ExprContext::Load =>
-            {
-                for elt in elts {
-                    self.visit_expr(elt);
-                    // Expansion can raise before later elements (including walruses) run.
-                    if let ast::Expr::Starred(starred) = elt {
-                        self.record_exception_checkpoint_if(!Self::iteration_is_known_safe(
-                            &starred.value,
-                        ));
-                    }
-                }
-            }
-            ast::Expr::List(ast::ExprList { elts, ctx, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, ctx, .. })
-                if *ctx == ast::ExprContext::Store =>
-            {
-                if let Some(values) = literal_unpack_values(elts, unpack_source) {
-                    for (target, value) in elts.iter().zip(values) {
-                        self.visit_expr_impl(target, ExpressionContext::Value, Some(value));
-                    }
-                } else {
-                    // A nested unpack can raise after earlier targets have been assigned.
-                    self.record_exception_checkpoint();
-                    walk_expr(self, expr);
-                }
+            ast::Expr::List(ast::ExprList { ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
+                // A nested unpack can raise after earlier targets have been assigned.
+                self.record_exception_checkpoint_if(*ctx == ast::ExprContext::Store);
+                walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 self.visit_expr(&node.value);
@@ -3662,9 +3603,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .filter_map(|param| param.default.as_deref())
                     {
                         self.visit_expr(default);
-                        self.record_exception_checkpoint_if(
-                            !Self::expression_evaluation_is_known_safe(default),
-                        );
                     }
                     self.visit_parameters(parameters);
                 }
@@ -4452,12 +4390,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                    for (index, target) in node.targets.iter().enumerate() {
-                        let assignment = Unpackable::Assign {
-                            node,
-                            first: index == 0,
-                        };
-                        self.add_unpackable_assignment(&assignment, target, value);
+                    for target in &node.targets {
+                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
             }
@@ -6164,10 +6098,7 @@ impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
 }
 
 enum Unpackable<'ast> {
-    Assign {
-        node: &'ast ast::StmtAssign,
-        first: bool,
-    },
+    Assign(&'ast ast::StmtAssign),
     For(&'ast ast::StmtFor),
     WithItem {
         item: &'ast ast::WithItem,
@@ -6180,18 +6111,9 @@ enum Unpackable<'ast> {
 }
 
 impl<'ast> Unpackable<'ast> {
-    /// Later targets in a chain can rely on a literal's shape only if earlier stores
-    /// cannot mutate it or any nested element.
-    fn direct_source(&self) -> Option<&'ast ast::Expr> {
-        match self {
-            Self::Assign { node, first } if *first || is_constant(&node.value) => Some(&node.value),
-            _ => None,
-        }
-    }
-
     const fn kind(&self) -> UnpackKind {
         match self {
-            Unpackable::Assign { .. } => UnpackKind::Assign,
+            Unpackable::Assign(_) => UnpackKind::Assign,
             Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
                 mode: EvaluationMode::from_is_async(*is_async),
             },
@@ -6213,8 +6135,8 @@ impl<'ast> Unpackable<'ast> {
     ) -> CurrentAssignment<'ast, 'db> {
         let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
-            Unpackable::Assign { node, .. } => CurrentAssignment::Assign {
-                node,
+            Unpackable::Assign(stmt) => CurrentAssignment::Assign {
+                node: stmt,
                 unpack,
                 owner: BindingsOwner::Statement,
             },
@@ -6288,20 +6210,6 @@ fn is_direct_range_call(expr: &ast::Expr) -> bool {
         .as_call_expr()
         .and_then(|call| call.func.as_name_expr())
         .is_some_and(|name| name.id == "range")
-}
-
-/// Returns the source elements when unpacking a tuple or list literal into these targets cannot raise.
-fn literal_unpack_values<'a>(
-    targets: &[ast::Expr],
-    source: Option<&'a ast::Expr>,
-) -> Option<&'a [ast::Expr]> {
-    let (ast::Expr::List(ast::ExprList { elts: values, .. })
-    | ast::Expr::Tuple(ast::ExprTuple { elts: values, .. })) = source?
-    else {
-        return None;
-    };
-    (targets.len() == values.len() && !targets.iter().chain(values).any(ast::Expr::is_starred_expr))
-        .then_some(values)
 }
 
 /// Returns the static truthiness of a literal iterable.
