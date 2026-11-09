@@ -11,7 +11,7 @@ use crate::{
     types::{
         CallableType, KnownClass, Type,
         context::InferContext,
-        diagnostic::INVALID_OVERLOAD,
+        diagnostic::{INVALID_OVERLOAD, SINGLE_OVERLOAD},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         infer::original_class_type,
         signatures::{ParameterConsistency, ReturnTypeConsistency},
@@ -117,7 +117,7 @@ pub(crate) fn check_overloaded_function<'db>(
     // Check that the overloaded function has at least two overloads
     if let [single_overload] = overloads {
         let function_node = single_overload.node(db, context.file(), context.module());
-        if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
+        if let Some(builder) = context.report_lint(&SINGLE_OVERLOAD, &function_node.name) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Overloaded function `{}` requires at least two overloads",
                 function_node.name
