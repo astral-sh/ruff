@@ -244,6 +244,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
+    /// Exact-length literal unpacks awaiting their target visit.
+    infallible_unpacks: FxHashSet<ExpressionNodeKey>,
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
@@ -331,6 +333,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
+            infallible_unpacks: FxHashSet::default(),
             current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
@@ -2466,7 +2469,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
-        if !self.has_active_exception_handler() {
+        if !self
+            .exception_context_stack_manager
+            .has_active_exception_handler(self)
+        {
             return;
         }
 
@@ -2474,11 +2480,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             std::mem::take(&mut self.exception_context_stack_manager);
         exception_context_stack_manager.record_exception_checkpoint(self);
         self.exception_context_stack_manager = exception_context_stack_manager;
-    }
-
-    fn has_active_exception_handler(&self) -> bool {
-        self.exception_context_stack_manager
-            .has_active_exception_handler(self)
     }
 
     fn record_exception_checkpoint_if(&mut self, can_raise: bool) {
@@ -2497,7 +2498,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && self.has_active_exception_handler()
+            && self
+                .exception_context_stack_manager
+                .has_active_exception_handler(self)
             && self
                 .current_place_table()
                 .symbol_id(name.id.as_str())
@@ -3310,6 +3313,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .mark_parameter();
     }
 
+    /// Marks exact-length literal unpacks and returns whether the outer unpack is infallible.
+    /// A nested target can still raise after its outer unpack succeeds.
+    fn mark_infallible_unpacks(&mut self, target: &ast::Expr, value: &ast::Expr) -> bool {
+        fn elements(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+            match expr {
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(elts),
+                _ => None,
+            }
+        }
+
+        let (Some(targets), Some(values)) = (elements(target), elements(value)) else {
+            return false;
+        };
+        if targets.len() != values.len()
+            || targets.iter().chain(values).any(ast::Expr::is_starred_expr)
+        {
+            return false;
+        }
+        self.infallible_unpacks.insert(target.into());
+        for (target, value) in targets.iter().zip(values) {
+            self.mark_infallible_unpacks(target, value);
+        }
+        true
+    }
+
     /// Add an unpackable assignment for the given [`Unpackable`].
     ///
     /// This method handles assignments that can contain unpacking like assignment statements,
@@ -3365,19 +3394,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.push_assignment(current_assignment);
         }
 
-        match unpackable {
-            Unpackable::Assign { node, first: true }
-                if self.has_active_exception_handler()
-                    && let Some(elements) = literal_unpack_elements(target, &node.value) =>
-            {
-                // Building the literal can raise before any target is assigned.
-                self.record_exception_checkpoint_if(!Self::expression_evaluation_is_known_safe(
-                    &node.value,
-                ));
-                self.visit_literal_unpack(target, elements);
-            }
-            _ => self.visit_expr(target),
-        }
+        self.visit_expr(target);
 
         if current_assignment.is_some() {
             // Only need to pop in the case where we pushed something
@@ -3479,24 +3496,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
-    /// The unpack itself cannot raise. Visit each child in assignment order, taking the
-    /// usual checkpoints wherever we can no longer pair targets with literal elements.
-    fn visit_literal_unpack(
-        &mut self,
-        target: &'ast ast::Expr,
-        elements: impl Iterator<Item = (&'ast ast::Expr, &'ast ast::Expr)>,
-    ) {
-        self.enter_expression(target);
-        for (target, value) in elements {
-            if let Some(children) = literal_unpack_elements(target, value) {
-                self.visit_literal_unpack(target, children);
-            } else {
-                self.visit_expr(target);
-            }
-        }
-    }
-
-    fn enter_expression(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         // A place use records its scope together with its reaching-definition ID,
@@ -3507,10 +3507,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         ) {
             self.ast_ids.record_expression(expr, self.current_scope());
         }
-    }
 
-    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
-        self.enter_expression(expr);
         match expr {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
@@ -3606,7 +3603,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { ctx, .. })
             | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
                 // A nested unpack can raise after earlier targets have been assigned.
-                self.record_exception_checkpoint_if(*ctx == ast::ExprContext::Store);
+                if *ctx == ast::ExprContext::Store && !self.infallible_unpacks.remove(&expr.into())
+                {
+                    self.record_exception_checkpoint();
+                }
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
@@ -3800,8 +3800,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Each operand sees the narrowing from the preceding operands. If the expression
         // introduces no bindings, none of that narrowing survives the short-circuit paths
         // rejoining. Restore their common entry state after visiting the operands.
-        let entry = (!has_named_expression && !self.has_active_exception_handler())
-            .then(|| self.flow_snapshot());
+        let entry = (!has_named_expression
+            && !self
+                .exception_context_stack_manager
+                .has_active_exception_handler(self))
+        .then(|| self.flow_snapshot());
         let mut reachability_constraints = SmallVec::<[ScopedReachabilityConstraintId; 1]>::new();
         let mut last_condition_flow_snapshots = None;
 
@@ -4363,7 +4366,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test, ExpressionContext::Condition, None);
 
-                if msg.is_some() || self.has_active_exception_handler() {
+                if msg.is_some()
+                    || self
+                        .exception_context_stack_manager
+                        .has_active_exception_handler(self)
+                {
                     let truthy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                         self.flow_restore(snapshots.falsy);
                         snapshots.truthy
@@ -4415,12 +4422,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                    for (index, target) in node.targets.iter().enumerate() {
-                        let assignment = Unpackable::Assign {
-                            node,
-                            first: index == 0,
-                        };
-                        self.add_unpackable_assignment(&assignment, target, value);
+                    // A later chained target may see a list mutated by an earlier assignment.
+                    if let Some(first) = node.targets.first()
+                        && self
+                            .exception_context_stack_manager
+                            .has_active_exception_handler(self)
+                        && self.mark_infallible_unpacks(first, &node.value)
+                    {
+                        // Building the literal can still raise before any targets are assigned.
+                        self.record_exception_checkpoint_if(
+                            !Self::expression_evaluation_is_known_safe(&node.value),
+                        );
+                    }
+                    for target in &node.targets {
+                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
             }
@@ -6127,11 +6142,7 @@ impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
 }
 
 enum Unpackable<'ast> {
-    Assign {
-        node: &'ast ast::StmtAssign,
-        // An earlier chained target can expose and mutate the assigned list.
-        first: bool,
-    },
+    Assign(&'ast ast::StmtAssign),
     For(&'ast ast::StmtFor),
     WithItem {
         item: &'ast ast::WithItem,
@@ -6146,7 +6157,7 @@ enum Unpackable<'ast> {
 impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
-            Unpackable::Assign { .. } => UnpackKind::Assign,
+            Unpackable::Assign(_) => UnpackKind::Assign,
             Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
                 mode: EvaluationMode::from_is_async(*is_async),
             },
@@ -6168,8 +6179,8 @@ impl<'ast> Unpackable<'ast> {
     ) -> CurrentAssignment<'ast, 'db> {
         let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
         match self {
-            Unpackable::Assign { node, .. } => CurrentAssignment::Assign {
-                node,
+            Unpackable::Assign(stmt) => CurrentAssignment::Assign {
+                node: stmt,
                 unpack,
                 owner: BindingsOwner::Statement,
             },
@@ -6243,25 +6254,6 @@ fn is_direct_range_call(expr: &ast::Expr) -> bool {
         .as_call_expr()
         .and_then(|call| call.func.as_name_expr())
         .is_some_and(|name| name.id == "range")
-}
-
-/// Pairs each unpacking target with its source when both have a fixed, matching length.
-fn literal_unpack_elements<'a>(
-    target: &'a ast::Expr,
-    value: &'a ast::Expr,
-) -> Option<impl Iterator<Item = (&'a ast::Expr, &'a ast::Expr)>> {
-    fn fixed_elements(expr: &ast::Expr) -> Option<&[ast::Expr]> {
-        let elts = match expr {
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
-            _ => return None,
-        };
-        (!elts.iter().any(ast::Expr::is_starred_expr)).then_some(elts)
-    }
-
-    let targets = fixed_elements(target)?;
-    let values = fixed_elements(value)?;
-    (targets.len() == values.len()).then(|| targets.iter().zip(values))
 }
 
 /// Returns the static truthiness of a literal iterable.
