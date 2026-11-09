@@ -2056,6 +2056,7 @@ fn normalize_field_specifiers<'db>(
 
 /// Representation of a type: a set of possible values at runtime.
 ///
+#[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
