@@ -941,19 +941,26 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.add_dotted_name_tokens(module, SemanticTokenType::Namespace);
                 }
                 for alias in &import.names {
-                    let classification = self
-                        .classify_type_alias_from_resolved_definitions(
-                            &definitions_for_imported_symbol(
-                                self.model,
-                                import,
-                                alias.name.as_str(),
-                                ImportAliasResolution::ResolveAliases,
-                            ),
-                        )
-                        .or_else(|| {
-                            let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
-                            self.classify_from_alias_type(ty, &alias.name)
-                        });
+                    let definitions = definitions_for_imported_symbol(
+                        self.model,
+                        import,
+                        alias.name.as_str(),
+                        ImportAliasResolution::ResolveAliases,
+                    );
+                    let classification = if !definitions.is_empty()
+                        && definitions.iter().all(|resolved| {
+                            resolved.definition().is_some_and(|def| {
+                                matches!(def.kind(self.model.db()), DefinitionKind::Function(_))
+                            })
+                        }) {
+                        Some((SemanticTokenType::Function, SemanticTokenModifier::empty()))
+                    } else {
+                        self.classify_type_alias_from_resolved_definitions(&definitions)
+                            .or_else(|| {
+                                let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
+                                self.classify_from_alias_type(ty, &alias.name)
+                            })
+                    };
 
                     if let Some((token_type, modifiers)) = classification {
                         // Add token for the imported name (Y in "from X import Y" or "from X import Y as Z")
@@ -4926,6 +4933,32 @@ def foo(self, **key, value=10):
         "path" @ 19..23: Namespace
         "pathlib" @ 29..36: Namespace
         "Path" @ 44..48: Class
+        "#);
+    }
+
+    #[test]
+    fn imported_decorated_function() {
+        let mut test = SemanticTokenTest::new("from funcs import wrapper as alias\nalias(1)\n");
+        test.db
+            .write_file(
+                SystemPath::new("src/funcs.py"),
+                "
+from functools import wraps
+
+def original(a, b): ...
+
+@wraps(original)
+def wrapper(a): ...
+",
+            )
+            .unwrap();
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "funcs" @ 5..10: Namespace
+        "wrapper" @ 18..25: Function
+        "alias" @ 29..34: Function
+        "alias" @ 35..40: Function
+        "1" @ 41..42: Number
         "#);
     }
 
