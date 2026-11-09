@@ -11,6 +11,9 @@ supertype. Applied to Python, this means:
 1. The return type of an overriding subclass method must be a subtype of the return type of the
     superclass method.
 
+An otherwise compatible override that renames a positional-or-keyword parameter or makes it
+positional-only can trigger `lost-keyword-for-regular-parameter`.
+
 ## Why is this bad?
 
 Violating the Liskov Substitution Principle will lead to many of ty's assumptions and inferences
@@ -38,18 +41,6 @@ def accepts_super(s: Super) -> int:
 # The result of this call is a string, but ty will infer it to be an `int`
 # due to the violation of the Liskov Substitution Principle.
 accepts_super(Sub())
-
-
-class Sub2(Super):
-    # Liskov violation: the superclass method can be called with a `x=`
-    # keyword argument, but the subclass method does not accept it.
-    def method(self, y) -> int:  # error: [incompatible-method-override]
-        return 42
-
-
-# TypeError at runtime: method() got an unexpected keyword argument 'x'
-# ty cannot catch this error due to the violation of the Liskov Substitution Principle.
-accepts_super(Sub2())
 ```
 
 ## Common issues
@@ -83,11 +74,10 @@ second argument.
 Ruff has several rules that will encourage you to rename a parameter, or change its type signature,
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
-parameter should either be removed or renamed to start with `_`. Applying either of these
-suggestions can cause ty to start reporting an `incompatible-method-override` error if the function
-in question is a method on a subclass that overrides a method on a superclass, and the change would
-cause the subclass method to no longer accept all argument combinations that the superclass method
-accepts.
+parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
+override can trigger `lost-keyword-for-regular-parameter` if the base method accepts it by keyword.
+Removing the parameter can trigger `incompatible-method-override` if the override no longer accepts
+a call allowed by the base method.
 
 This can usually be resolved by adding [`@typing.override`][override] to your method definition.
 Ruff knows that a method decorated with `@typing.override` is intended to override a method by the
@@ -95,6 +85,28 @@ same name on a superclass, and avoids reporting rules like ARG002 for such metho
 the changes recommended by ARG002 would violate the Liskov Substitution Principle.
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
+
+## Migrating from `invalid-method-override`
+
+`incompatible-method-override` was previously called `invalid-method-override`. The old name still
+works as an alias. The check for dropped keyword names now has its own rule,
+`lost-keyword-for-regular-parameter`.
+
+If you previously configured a custom severity for `invalid-method-override`, you can apply it to
+both rules to keep the same severity for both kinds of override violations. This example preserves a
+previous setting of `warn`.
+
+```toml
+[rules]
+incompatible-method-override = "warn"
+lost-keyword-for-regular-parameter = "warn"
+```
+
+For diagnostics that moved to the new rule, use `# ty: ignore[lost-keyword-for-regular-parameter]`
+as a suppression comment.
+
+Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
+newly reported diagnostics before updating the baseline.
 
 ## Rule history
 
