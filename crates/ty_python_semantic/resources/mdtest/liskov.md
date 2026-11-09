@@ -500,7 +500,8 @@ class OldSuppression(Base):
 ```
 
 `WrongType.f` also rejects integers passed by position. That incompatibility falls under the
-disabled `incompatible-method-override` rule, so ty reports no diagnostic.
+`incompatible-method-override` rule. The configuration above sets that rule to `"ignore"`, so ty
+reports no diagnostic.
 
 ```pyi
 class WrongType(Base):
