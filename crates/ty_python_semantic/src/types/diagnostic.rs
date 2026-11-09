@@ -724,7 +724,7 @@ declare_lint! {
     pub(crate) static SINGLE_OVERLOAD = {
         summary: "detects functions with only one overload declaration",
         status: LintStatus::stable("0.0.100"),
-        default_level: Level::Error,
+        default_level: Level::Warn,
     }
 }
 
