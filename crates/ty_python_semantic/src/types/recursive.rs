@@ -80,6 +80,8 @@ use super::{
 };
 use crate::{Db, ProgramEnvironment};
 
+mod relation;
+
 /// A reference to a constructor in the enclosing recursive graph.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.

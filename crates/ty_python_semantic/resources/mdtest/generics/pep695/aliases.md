@@ -974,3 +974,194 @@ type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 # These are fine:
 type Ok1[T, *Ts] = tuple[T, *Ts]
 ```
+
+## Parametric relations between growing recursive aliases
+
+Equivalent recursive definitions remain equivalent when their arguments grow at every step. An
+unused parameter does not affect the relation.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+type Left[T] = tuple[T, Left[list[T]]] | None
+type Right[T] = tuple[T, Right[list[T]]] | None
+
+static_assert(is_equivalent_to(Left[int], Right[int]))
+static_assert(not is_subtype_of(Left[bool], Right[int]))
+
+type PhantomLeft[T] = tuple[PhantomLeft[list[T]]] | None
+type PhantomRight[T] = tuple[PhantomRight[tuple[T]]] | None
+
+static_assert(is_equivalent_to(PhantomLeft[int], PhantomRight[str]))
+static_assert(is_equivalent_to(PhantomLeft[Any], PhantomRight[object]))
+```
+
+Covariant argument transformations preserve subtyping. The names and ordering of parameters need not
+agree, nor does the number of definitions in a mutually recursive cycle.
+
+```py
+type CovariantLeft[T] = tuple[T, CovariantLeft[tuple[T]]] | None
+type CovariantRight[T] = tuple[T, CovariantRight[tuple[T]]] | None
+
+static_assert(is_subtype_of(CovariantLeft[bool], CovariantRight[int]))
+static_assert(not is_subtype_of(CovariantLeft[int], CovariantRight[bool]))
+
+type PermutedLeft[A, B] = tuple[A, B, PermutedLeft[list[A], tuple[B]]] | None
+type PermutedRight[X, Y] = tuple[Y, X, PermutedRight[tuple[X], list[Y]]] | None
+
+static_assert(is_equivalent_to(PermutedLeft[int, str], PermutedRight[str, int]))
+
+type Mutual[T] = tuple[T, MutualNext[list[T]]] | None
+type MutualNext[T] = tuple[T, Mutual[list[T]]] | None
+
+static_assert(is_equivalent_to(Left[int], Mutual[int]))
+
+type NestedLeft[T] = tuple[T, NestedLeft[NestedLeft[T]]] | None
+type NestedRight[T] = tuple[T, NestedRight[NestedRight[T]]] | None
+
+static_assert(is_equivalent_to(NestedLeft[int], NestedRight[int]))
+```
+
+Matching a union may require choosing different branches for different specializations.
+
+```py
+type ChoiceLeft[A, B] = tuple[A, ChoiceLeft[tuple[A], tuple[B]]] | tuple[B, ChoiceLeft[tuple[A], tuple[B]]]
+type ChoiceRight[A, B] = tuple[A, ChoiceRight[tuple[A], tuple[B]]] | tuple[B, ChoiceRight[tuple[A], tuple[B]]]
+
+static_assert(is_equivalent_to(ChoiceLeft[int, str], ChoiceRight[str, int]))
+static_assert(not is_equivalent_to(ChoiceLeft[int, bytes], ChoiceRight[str, int]))
+```
+
+Choices for different tuple elements remain independent when recursion combines all their
+requirements, including when those rows appear in contravariant positions.
+
+```py
+type Rows[A, B, C, D] = (
+    tuple[
+        tuple[A, A, A],
+        tuple[B, B, B],
+        tuple[C, C, C],
+        tuple[D, D, D],
+        Rows[tuple[A], tuple[B], tuple[C], tuple[D]],
+    ]
+    | None
+)
+type ChoiceRows[P, Q, R, S, U, V] = (
+    tuple[
+        tuple[P | Q, R | S, U | V],
+        tuple[P | Q, R | S, U | V],
+        tuple[P | Q, R | S, U | V],
+        tuple[P | Q, R | S, U | V],
+        ChoiceRows[tuple[P], tuple[Q], tuple[R], tuple[S], tuple[U], tuple[V]],
+    ]
+    | None
+)
+
+static_assert(is_subtype_of(Rows[bool, str, str, int], ChoiceRows[int, str, str, int, int, str]))
+static_assert(not is_subtype_of(Rows[bool, str, bytes, int], ChoiceRows[int, str, str, int, int, str]))
+
+from typing import Callable
+
+type AcceptRows[A, B, C, D] = Callable[[Rows[A, B, C, D]], AcceptRows[tuple[A], tuple[B], tuple[C], tuple[D]]] | None
+type AcceptChoices[P, R, U, Q, S, V] = (
+    Callable[
+        [ChoiceRows[P, Q, R, S, U, V]],
+        AcceptChoices[tuple[P], tuple[R], tuple[U], tuple[Q], tuple[S], tuple[V]],
+    ]
+    | None
+)
+
+static_assert(is_subtype_of(AcceptChoices[int, str, int, str, int, str], AcceptRows[bool, str, str, int]))
+static_assert(not is_subtype_of(AcceptChoices[int, str, int, str, int, str], AcceptRows[bool, str, bytes, int]))
+```
+
+Equal arguments at one step do not suffice: the definitions can use different parameters at later
+steps. Here `(1, ([], None))` belongs to `ProjectedLeft[int, int]` but not to
+`ProjectedRight[int, int]`.
+
+```py
+type ProjectedLeft[A, B] = tuple[A, ProjectedLeft[list[A], tuple[B]]] | None
+type ProjectedRight[A, B] = tuple[B, ProjectedRight[list[A], tuple[B]]] | None
+
+static_assert(not is_equivalent_to(ProjectedLeft[int, int], ProjectedRight[int, int]))
+
+def witness() -> ProjectedLeft[int, int]:
+    return (1, ([], None))
+
+def invalid() -> ProjectedRight[int, int]:
+    return (1, ([], None))  # error: [invalid-return-type]
+```
+
+Nominal generic classes contribute their declared or inferred variance to the recursive relation.
+
+```py
+class Producer[T]:
+    def read(self) -> T:
+        raise NotImplementedError
+
+class Consumer[T]:
+    def write(self, value: T) -> None: ...
+
+type EndpointLeft[A, B] = tuple[Producer[A], Consumer[B], EndpointLeft[tuple[A], tuple[B]]] | None
+type EndpointRight[A, B] = tuple[Producer[A], Consumer[B], EndpointRight[tuple[A], tuple[B]]] | None
+
+static_assert(is_subtype_of(EndpointLeft[bool, int], EndpointRight[int, bool]))
+static_assert(not is_subtype_of(EndpointRight[int, bool], EndpointLeft[bool, int]))
+```
+
+Contravariant positions reverse the parameter requirements. Alternating positive and negative
+occurrences require both directions.
+
+```py
+from typing import Literal
+
+type ConsumerLeft[T] = Callable[[T], ConsumerLeft[tuple[T]]] | None
+type ConsumerRight[T] = Callable[[T], ConsumerRight[tuple[T]]] | None
+
+static_assert(is_subtype_of(ConsumerLeft[int], ConsumerRight[bool]))
+static_assert(not is_subtype_of(ConsumerLeft[bool], ConsumerRight[int]))
+
+type AlternatingLeft[T] = Callable[[AlternatingLeft[tuple[T]]], T] | None
+type AlternatingRight[T] = Callable[[AlternatingRight[tuple[T]]], T] | None
+
+static_assert(is_equivalent_to(AlternatingLeft[int], AlternatingRight[int]))
+static_assert(not is_subtype_of(AlternatingLeft[bool], AlternatingRight[int]))
+
+static_assert(is_subtype_of(CovariantLeft[Literal[1]], CovariantRight[int]))
+```
+
+Variable-length tuples can contain recursive elements as well as fixed prefixes and suffixes.
+
+```py
+type TupleLeft[T] = tuple[T, *tuple[T, ...], TupleLeft[tuple[T]]]
+type TupleRight[T] = tuple[*tuple[T, ...], TupleRight[tuple[T]]]
+
+static_assert(is_subtype_of(TupleLeft[bool], TupleRight[int]))
+static_assert(not is_subtype_of(TupleRight[bool], TupleLeft[int]))
+```
+
+Positive intersections combine requirements on the same type. Assignability to each component
+separately is insufficient when those comparisons choose incompatible materializations of `Any`.
+
+```py
+from ty_extensions import Intersection
+from ty_extensions._internal import is_assignable_to
+
+type MeetLeft[A, B] = tuple[Intersection[A, B], MeetLeft[list[A], list[B]]] | None
+type MeetRight[A, B] = tuple[Intersection[A, B], MeetRight[list[A], list[B]]] | None
+
+static_assert(is_equivalent_to(MeetLeft[int, int], MeetRight[int, int]))
+
+type Source[T, A] = tuple[T, Source[list[A], list[A]]] | None
+type Target[T, P, A, B] = tuple[Intersection[T, P], Target[list[A], list[B], list[A], list[B]]] | None
+
+static_assert(not is_assignable_to(Source[int, Any], Target[int, int, int, str]))
+
+def source_value() -> Source[int, Any]:
+    return (1, ([], None))
+
+def target_value() -> Target[int, int, int, str]:
+    return (1, ([], None))  # error: [invalid-return-type]
+```

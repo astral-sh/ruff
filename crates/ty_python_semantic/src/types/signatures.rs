@@ -1370,7 +1370,7 @@ impl<'db> Signature<'db> {
 
     /// Aggregation compares parameter and return types. A receiver constraint imposes an
     /// additional obligation, and a `ParamSpec` value has no meaningful return type.
-    fn supports_overload_aggregation(&self) -> bool {
+    pub(super) fn supports_overload_aggregation(&self) -> bool {
         self.receiver_constraints().is_none() && !self.is_paramspec_value()
     }
 

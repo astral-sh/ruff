@@ -1907,6 +1907,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return nominally_satisfied;
         }
 
+        if source.is_parametric_subtype_of(db, self.env, target) {
+            return self.always();
+        }
+
         // TODO: Recursively-specialized structural types can encode context-free languages,
         // whose inclusion and equivalence are undecidable. No complete fallback exists, but
         // more decidable cases can be recognized here before conservatively rejecting the pair.

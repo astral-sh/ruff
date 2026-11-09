@@ -1419,16 +1419,14 @@ from ty_extensions._internal import is_subtype_of
 type Left[T] = tuple[Left[list[T]]]
 type Right[T] = tuple[Right[list[T]]]
 
-# TODO: Left[int] should be equivalent to (subtype of) Right[int]
-static_assert(not is_subtype_of(Left[int], Right[int]))
+static_assert(is_subtype_of(Left[int], Right[int]))
 
 type Box[T] = list[T]
 type WrappedLeft[T] = tuple[Box[Box[WrappedLeft[list[T]]]]]
 type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 
 # A repeated non-recursive alias must not hide the recursive reference in its type arguments.
-# TODO: WrappedLeft[int] should be equivalent to (subtype of) WrappedRight[int]
-static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
+static_assert(is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
 ### Recursive alias relations with finite specialization orbits
@@ -1495,10 +1493,8 @@ type MixedGrowingRight[T] = tuple[T, MixedGrowingRight[T | list[T]]]
 type NestedSetGrowingLeft[T] = tuple[T, NestedSetGrowingLeft[list[T | int]]]
 type NestedSetGrowingRight[T] = tuple[T, NestedSetGrowingRight[list[T | int]]]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(MixedGrowingLeft[int], MixedGrowingRight[int]))
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(NestedSetGrowingLeft[int], NestedSetGrowingRight[int]))
+static_assert(is_subtype_of(MixedGrowingLeft[int], MixedGrowingRight[int]))
+static_assert(is_subtype_of(NestedSetGrowingLeft[int], NestedSetGrowingRight[int]))
 
 # Alternating normalized set operations also reach a fixed point.
 class SetElementA(Protocol):
@@ -1529,8 +1525,7 @@ type ErasingArgument[T] = int
 type ErasingLeft[T] = tuple[T, ErasingLeft[ErasingArgument[T]]]
 type ErasingRight[T] = tuple[T, ErasingRight[ErasingArgument[T]]]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(ErasingLeft[str], ErasingRight[str]))
+static_assert(is_subtype_of(ErasingLeft[str], ErasingRight[str]))
 
 # Neither recursive occurrence grows indefinitely by itself, but alternating between them adds
 # another list layer on every cycle.
@@ -1543,8 +1538,7 @@ type AlternatingRight[X, Y] = tuple[
     AlternatingRight[None, list[X]],
 ]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
+static_assert(is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
 
 # The nested aliases grow their first argument, but the references back to the outer aliases erase
 # that argument. The outer specialization orbits are therefore finite.
@@ -1553,8 +1547,7 @@ type NodeLeft[A, B] = tuple[A, NodeLeft[list[A], B], OuterLeft[B, None]]
 type OuterRight[A, B] = NodeRight[A, B]
 type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[B, None]]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
+static_assert(is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
 
 # If the reference back to the outer alias retains the growing argument, the outer specialization
 # can grow transitively.
@@ -1571,8 +1564,7 @@ type TransitiveNodeRight[T] = tuple[
     TransitiveOuterRight[T],
 ]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(TransitiveOuterLeft[int], TransitiveOuterRight[int]))
+static_assert(is_subtype_of(TransitiveOuterLeft[int], TransitiveOuterRight[int]))
 ```
 
 ### Non-recursive nested generic aliases
