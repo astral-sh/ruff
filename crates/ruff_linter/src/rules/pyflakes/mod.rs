@@ -3259,6 +3259,26 @@ lambda: fu
     }
 
     #[test]
+    fn relative_future_import() {
+        // Relative imports from a module named `__future__` are ordinary relative
+        // imports and should not trigger `LateFutureImport` or `FutureFeatureNotDefined`.
+        flakes(
+            r"
+        x = 5
+        from .__future__ import non_existent_future_feature
+        non_existent_future_feature
+        ",
+            &[],
+        );
+        flakes(
+            r"
+        from .__future__ import *
+        ",
+            &[Rule::UndefinedLocalWithImportStar],
+        );
+    }
+
+    #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
         // function scope.
