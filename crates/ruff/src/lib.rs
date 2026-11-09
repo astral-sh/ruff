@@ -134,21 +134,19 @@ pub fn run(args: Args) -> Result<ExitStatus> {
         ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            #[expect(clippy::print_stderr)]
-            {
-                eprintln!(
-                    r#"
+            writeln!(
+                io::stderr().lock(),
+                r#"
 {}{} {} If you could open an issue at:
 
     https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
 
 ...quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
-                    "error".red().bold(),
-                    ":".bold(),
-                    "Ruff crashed.".bold(),
-                );
-            }
+                "error".red().bold(),
+                ":".bold(),
+                "Ruff crashed.".bold(),
+            ).ok();
             default_panic_hook(info);
         }));
     }
