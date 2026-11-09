@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
-use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_constant, is_dotted_name};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
@@ -2494,18 +2494,36 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return true;
         };
 
-        is_use
-            && self
-                .exception_context_stack_manager
-                .has_active_exception_handler(self)
-            && self
-                .current_place_table()
-                .symbol_id(name.id.as_str())
-                .is_none_or(|symbol| {
-                    self.current_use_def_map_mut()
-                        .symbol_live_binding_status(symbol)
-                        != LiveBindingStatus::Bound
-                })
+        if !self
+            .exception_context_stack_manager
+            .has_active_exception_handler(self)
+        {
+            return false;
+        }
+
+        let symbol = self.current_place_table().symbol_id(name.id.as_str());
+        if !is_use {
+            // A metaclass (including one inherited from a base) can supply a namespace
+            // whose __setitem__ raises. Global and nonlocal stores bypass that mapping.
+            let Some(class) = self.scopes[self.current_scope()].node().as_class() else {
+                return false;
+            };
+            return name.ctx == ast::ExprContext::Store
+                && class
+                    .node(self.module)
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| !args.is_empty())
+                && symbol.is_none_or(|id| {
+                    let symbol = self.current_place_table().symbol(id);
+                    !symbol.is_global() && !symbol.is_nonlocal()
+                });
+        }
+        symbol.is_none_or(|symbol| {
+            self.current_use_def_map_mut()
+                .symbol_live_binding_status(symbol)
+                != LiveBindingStatus::Bound
+        })
     }
 
     /// Returns whether evaluating and truth-testing `expr` cannot invoke Python user code.
@@ -3592,6 +3610,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, ctx, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, ctx, .. })
+                if *ctx == ast::ExprContext::Load =>
+            {
+                for elt in elts {
+                    self.visit_expr(elt);
+                    // Expansion can raise before later elements (including walruses) run.
+                    if let ast::Expr::Starred(starred) = elt {
+                        self.record_exception_checkpoint_if(!Self::iteration_is_known_safe(
+                            &starred.value,
+                        ));
+                    }
+                }
+            }
+            ast::Expr::List(ast::ExprList { elts, ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, ctx, .. })
                 if *ctx == ast::ExprContext::Store =>
             {
                 if let Some(values) = literal_unpack_values(elts, unpack_source) {
@@ -3630,6 +3662,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .filter_map(|param| param.default.as_deref())
                     {
                         self.visit_expr(default);
+                        self.record_exception_checkpoint_if(
+                            !Self::expression_evaluation_is_known_safe(default),
+                        );
                     }
                     self.visit_parameters(parameters);
                 }
@@ -6145,11 +6180,11 @@ enum Unpackable<'ast> {
 }
 
 impl<'ast> Unpackable<'ast> {
-    /// The first target of a plain assignment receives the RHS directly. An earlier
-    /// target in a chained assignment could already have mutated a list on the RHS.
+    /// Later targets in a chain can rely on a literal's shape only if earlier stores
+    /// cannot mutate it or any nested element.
     fn direct_source(&self) -> Option<&'ast ast::Expr> {
         match self {
-            Self::Assign { node, first: true } => Some(&node.value),
+            Self::Assign { node, first } if *first || is_constant(&node.value) => Some(&node.value),
             _ => None,
         }
     }
@@ -6260,10 +6295,10 @@ fn literal_unpack_values<'a>(
     targets: &[ast::Expr],
     source: Option<&'a ast::Expr>,
 ) -> Option<&'a [ast::Expr]> {
-    let values = match source? {
-        ast::Expr::List(ast::ExprList { elts, .. })
-        | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
-        _ => return None,
+    let (ast::Expr::List(ast::ExprList { elts: values, .. })
+    | ast::Expr::Tuple(ast::ExprTuple { elts: values, .. })) = source?
+    else {
+        return None;
     };
     (targets.len() == values.len() && !targets.iter().chain(values).any(ast::Expr::is_starred_expr))
         .then_some(values)
