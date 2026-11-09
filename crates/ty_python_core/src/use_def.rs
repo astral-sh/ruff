@@ -1447,6 +1447,16 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// The reachability roots in the same order as the bindings, including the implicit
+    /// unbound entry when present.
+    pub fn reachability_constraint_ids(
+        &self,
+    ) -> impl Iterator<Item = ScopedReachabilityConstraintId> + Clone {
+        self.initial_unbound
+            .into_iter()
+            .chain(self.inner.clone().map(LiveBinding::reachability_constraint))
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
