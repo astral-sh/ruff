@@ -224,11 +224,13 @@ pub(crate) fn remove_argument<T: Ranged>(
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
 
-    // A keyword's range starts at its name, while the parenthesized range of its value starts
-    // at the opening parenthesis after `name=`, so cover both.
-    let parenthesized_range =
-        token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
-            .map_or(arg.range(), |range| range.cover(arg.range()));
+    let parenthesized_range = match arg {
+        ast::ArgOrKeyword::Keyword(keyword) => keyword.range(),
+        ast::ArgOrKeyword::Arg(expr) => {
+            token::parenthesized_range(expr.into(), arguments.into(), tokens)
+                .unwrap_or(expr.range())
+        }
+    };
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
