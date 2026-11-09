@@ -387,6 +387,16 @@
             }
           ]
         },
+        "abstract-class-instantiation": {
+          "title": "detects direct instantiation of abstract classes and protocols",
+          "description": "## What it does\n\nChecks for direct instantiation of protocol classes and classes with unimplemented abstract methods.\n\n## Why is this bad?\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and\nrejects direct instantiation of protocols.\n\n## Examples\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```\n\n```python\nfrom typing import Protocol\n\n\nclass HasName(Protocol):\n    name: str\n\n\nHasName()  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "abstract-method-in-final-class": {
           "title": "detects `@final` classes with unimplemented abstract methods",
           "description": "## What it does\n\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\n\nA class decorated with `@final` cannot be subclassed. If such a class has abstract methods that are\nnot implemented, the class can never be properly instantiated, as the abstract methods can never be\nimplemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only prevented for\nclasses that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also\nenforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is\nclear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n@final\n# `Derived` does not implement `method`\nclass Derived(Base):  # error\n    pass\n```",
@@ -448,7 +458,7 @@
         },
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\nThis includes attempts to instantiate classes with unimplemented abstract methods, whether those\nmethods are explicitly decorated with `abstractmethod` or implicitly abstract protocol members.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime; the type checker also enforces it for classes\nwithout `ABCMeta`.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.",
           "default": "error",
           "oneOf": [
             {

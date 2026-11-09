@@ -165,6 +165,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
+    registry.register_lint(&ABSTRACT_CLASS_INSTANTIATION);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
@@ -1101,6 +1102,15 @@ declare_lint! {
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
         status: LintStatus::stable("0.0.16"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/abstract-class-instantiation.md")]
+    pub(crate) static ABSTRACT_CLASS_INSTANTIATION = {
+        summary: "detects direct instantiation of abstract classes and protocols",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -4043,7 +4053,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     call: &ast::ExprCall,
     protocol: ProtocolClass,
 ) {
-    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+    let Some(builder) = context.report_lint(&ABSTRACT_CLASS_INSTANTIATION, call) else {
         return;
     };
     let db = context.db();
@@ -4098,7 +4108,7 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
     let Some(first_name) = abstract_methods.first_name() else {
         return;
     };
-    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+    let Some(builder) = context.report_lint(&ABSTRACT_CLASS_INSTANTIATION, call) else {
         return;
     };
     let class_name = class.name(db);

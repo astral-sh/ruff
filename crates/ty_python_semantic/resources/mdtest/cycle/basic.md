@@ -149,7 +149,7 @@ class B(Protocol):
 x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 type(x)
 x = 2
@@ -162,7 +162,7 @@ if bool:
     x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 class A: ...
 ```
