@@ -46,6 +46,18 @@ impl Violation for ShebangNotFirstLine {
 
 /// EXE005
 pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator, context: &LintContext) {
+    // Nix uses a second shebang line for arguments to `nix-shell`:
+    // `#!/usr/bin/env nix-shell` followed by `#!nix-shell ...`.
+    if locator
+        .up_to(range.start())
+        .lines()
+        .next_back()
+        .is_some_and(|line| line.trim_end_matches('\r') == "#!/usr/bin/env nix-shell")
+        && locator.slice(range).starts_with("#!nix-shell")
+    {
+        return;
+    }
+
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
         return;
