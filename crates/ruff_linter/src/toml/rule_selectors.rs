@@ -1,7 +1,6 @@
 use toml::Spanned;
 use toml::de::{DeArray, DeTable, DeValue};
 
-use ruff_db::diagnostic::LintName;
 use ruff_python_ast::TomlSourceType;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -101,77 +100,49 @@ fn check_selector_array(
     let source = context.source_file().source_text();
 
     for value in values {
-        let Some(selector) = Selector::from_spanned(value, source) else {
+        let Some(selector) = value.get_ref().as_str() else {
             continue;
         };
+        let redirect = get_redirect(selector);
         if context.is_rule_enabled(Rule::RenamedRule)
-            && let Some((original, target)) = selector.redirect
+            && let Some((original, target)) = redirect
         {
-            renamed_rule(
-                context,
-                original,
-                target,
-                selector.range,
-                setting,
-                in_lint_table,
-            );
+            let range = selector_range(value, source);
+            renamed_rule(context, original, target, range, setting, in_lint_table);
         }
+
+        let code = redirect.map_or(selector, |(_, target)| target);
         if context.is_rule_enabled(Rule::RuleCodesInSelectors)
             && is_human_readable_names_enabled(context.settings().preview)
-            && let Some(name) = selector.name
+            && let Ok(rule) = Rule::from_code(code)
         {
-            rule_codes_in_selectors(context, name, selector.range, setting, in_lint_table);
+            let range = selector_range(value, source);
+            rule_codes_in_selectors(context, rule.name(), range, setting, in_lint_table);
         }
     }
 }
 
-struct Selector {
-    name: Option<LintName>,
-    redirect: Option<(&'static str, &'static str)>,
-    range: TextRange,
-}
+/// Return the source range of the selector inside its TOML quotes.
+///
+/// Callers must first validate the decoded string as a rule code or redirect.
+/// This ensures that all leading quote characters belong to the TOML delimiter.
+///
+/// ```toml
+/// [lint]
+/// select = ["F401"]
+///            ^^^^
+/// ```
+fn selector_range(spanned: &Spanned<DeValue<'_>>, source: &str) -> TextRange {
+    let span = spanned.span();
+    let range = TextRange::new(
+        TextSize::try_from(span.start).unwrap(),
+        TextSize::try_from(span.end).unwrap(),
+    );
 
-impl Selector {
-    /// Extract a rule selector and its range from a spanned TOML string.
-    ///
-    /// The range corresponds to the selector itself rather than the surrounding string:
-    ///
-    /// ```toml
-    /// [lint]
-    /// select = ["F401"]
-    ///            ^^^^
-    /// ```
-    fn from_spanned(spanned: &Spanned<DeValue<'_>>, source: &str) -> Option<Self> {
-        let selector = spanned.get_ref().as_str()?;
-        let redirect = get_redirect(selector);
-        let code = redirect.map_or(selector, |(_, target)| target);
-        let name = Rule::from_code(code).ok().map(|rule| rule.name());
-        if name.is_none() && redirect.is_none() {
-            return None;
-        }
-
-        let span = spanned.span();
-        let range = TextRange::new(
-            TextSize::try_from(span.start).unwrap(),
-            TextSize::try_from(span.end).unwrap(),
-        );
-
-        // Note that this should be infallible because the parsed TOML string is surrounded by valid
-        // quotes, and its content was recognized above as a rule code or a redirect. This
-        // means that we don't have to worry about stripping nested quotes like `"'F401'"` or similar.
-        let range = {
-            let string = &source[range];
-            let content = string.trim_start_matches(['"', '\'']);
-            let quote_len = string.text_len() - content.text_len();
-            let start = range.start() + quote_len;
-            let end = range.end() - quote_len;
-            TextRange::new(start, end)
-        };
-
-        Some(Self {
-            name,
-            redirect,
-            range,
-        })
-    }
+    let string = &source[range];
+    let content = string.trim_start_matches(['"', '\'']);
+    let quote_len = string.text_len() - content.text_len();
+    let start = range.start() + quote_len;
+    let end = range.end() - quote_len;
+    TextRange::new(start, end)
 }
