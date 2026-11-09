@@ -38,6 +38,63 @@ class Base(ABC):
     def method(self) -> None: ...  # error
 ```
 
+## `abstract-class-instantiation`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22abstract-class-instantiation%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1108" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for direct instantiation of protocol classes and classes with unimplemented abstract methods.
+
+**Why is this bad?**
+
+
+Abstract methods describe behavior that a subclass must implement before it can be instantiated.
+Classes using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and
+rejects direct instantiation of protocols.
+
+**Examples**
+
+
+```python
+from abc import ABC, abstractmethod
+
+
+class Abstract(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+
+# `method` has not been implemented.
+Abstract()  # error
+
+
+class Concrete(Abstract):
+    def method(self) -> int:
+        return 42
+
+
+Concrete()  # OK
+```
+
+```python
+from typing import Protocol
+
+
+class HasName(Protocol):
+    name: str
+
+
+HasName()  # error
+```
+
 ## `abstract-method-in-final-class`
 
 <small>
@@ -313,7 +370,7 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 **See also**
 
 
-- [`instantiate-abstract-class`](#instantiate-abstract-class) reports attempts to instantiate a protocol class or a class with
+- [`abstract-class-instantiation`](#abstract-class-instantiation) reports attempts to instantiate a protocol class or a class with
     unimplemented abstract methods.
 
 ## `call-top-callable`
@@ -1903,63 +1960,6 @@ will produce instances with an atypical memory layout.
 - [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)
 
 [method-resolution-order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-
-## `instantiate-abstract-class`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22instantiate-abstract-class%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1108" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for direct instantiation of protocol classes and classes with unimplemented abstract methods.
-
-**Why is this bad?**
-
-
-Abstract methods describe behavior that a subclass must implement before it can be instantiated.
-Classes using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and
-rejects direct instantiation of protocols.
-
-**Examples**
-
-
-```python
-from abc import ABC, abstractmethod
-
-
-class Abstract(ABC):
-    @abstractmethod
-    def method(self) -> int: ...
-
-
-# `method` has not been implemented.
-Abstract()  # error
-
-
-class Concrete(Abstract):
-    def method(self) -> int:
-        return 42
-
-
-Concrete()  # OK
-```
-
-```python
-from typing import Protocol
-
-
-class HasName(Protocol):
-    name: str
-
-
-HasName()  # error
-```
 
 ## `invalid-argument-type`
 

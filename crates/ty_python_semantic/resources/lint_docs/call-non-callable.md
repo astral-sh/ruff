@@ -15,5 +15,5 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 
 ## See also
 
-- `instantiate-abstract-class` reports attempts to instantiate a protocol class or a class with
+- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with
     unimplemented abstract methods.

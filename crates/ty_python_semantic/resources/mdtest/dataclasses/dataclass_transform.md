@@ -593,7 +593,7 @@ Disabling slot generation leaves the inherited property abstract:
 class StillAbstract(ModelBase, slots=False):
     value: int
 
-StillAbstract(1)  # error: [instantiate-abstract-class]
+StillAbstract(1)  # error: [abstract-class-instantiation]
 ```
 
 #### Before Python 3.10
