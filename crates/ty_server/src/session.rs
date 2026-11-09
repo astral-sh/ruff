@@ -39,9 +39,8 @@ use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options}
 use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{
-    Action, LazyWorkDoneProgress, MAX_QUEUED_REQUESTS, ScriptProgress, log_queue_size,
-    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
-    queue_full_error,
+    Action, LazyWorkDoneProgress, ScriptProgress, publish_all_document_diagnostics,
+    publish_diagnostics_if_needed, publish_settings_diagnostics,
 };
 use crate::session::client::Client;
 use crate::session::file_watcher::LspFileWatcher;
@@ -119,7 +118,6 @@ pub(crate) struct Session {
     in_test: bool,
 
     deferred_messages: VecDeque<Message>,
-    deferred_requests: usize,
 
     /// A revision counter. It gets incremented on every change to `Session` that
     /// could result in different workspace diagnostics.
@@ -194,7 +192,6 @@ impl Session {
             workspaces,
             workspace_configuration_initialized: false,
             deferred_messages: VecDeque::new(),
-            deferred_requests: 0,
             index: Some(index),
             initialization_options,
             use_uv,
@@ -433,11 +430,7 @@ impl Session {
     /// database in place.
     ///
     /// See <https://github.com/Microsoft/language-server-protocol/issues/567#issuecomment-2085131917>
-    pub(crate) fn should_defer_message(
-        &mut self,
-        message: Message,
-        client: &Client,
-    ) -> Option<Message> {
+    pub(crate) fn should_defer_message(&mut self, message: Message) -> Option<Message> {
         if self.workspaces.all_initialized() {
             Some(message)
         } else {
@@ -446,17 +439,6 @@ impl Session {
                     if request.method == ShutdownRequest::METHOD.as_str() {
                         return Some(message);
                     }
-                    if self.deferred_requests == MAX_QUEUED_REQUESTS {
-                        // Requests normally register on replay. Register this one now so its
-                        // overload response goes through the usual completion path.
-                        self.request_queue
-                            .incoming_mut()
-                            .register(request.id.clone(), request.method.clone());
-                        client.respond_err(request.id.clone(), queue_full_error());
-                        return None;
-                    }
-                    self.deferred_requests += 1;
-                    log_queue_size("initialization", self.deferred_requests);
                     tracing::debug!(
                         "Deferring `{}` request until all workspaces are initialized",
                         request.method
@@ -1103,11 +1085,7 @@ impl Session {
 
     pub(crate) fn take_deferred_messages(&mut self) -> Option<Message> {
         if self.workspaces.all_initialized() {
-            let message = self.deferred_messages.pop_front()?;
-            if matches!(message, Message::Request(_)) {
-                self.deferred_requests -= 1;
-            }
-            Some(message)
+            self.deferred_messages.pop_front()
         } else {
             None
         }

@@ -8,7 +8,7 @@ use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
 use ty_server::{ClientOptions, DiagnosticMode};
 
-use crate::{AwaitResponseError, TestServerBuilder};
+use crate::TestServerBuilder;
 
 #[test]
 #[should_panic(expected = "Invalid initialization options: Invalid `untrustedWorkspace` setting")]
@@ -87,7 +87,7 @@ fn single_workspace_folder() -> Result<()> {
 /// Requests received before workspace configuration must complete once initialization finishes.
 #[test]
 fn deferred_request_burst_does_not_block_responses() -> Result<()> {
-    const REQUEST_COUNT: usize = 2048;
+    const REQUEST_COUNT: usize = 64;
 
     let workspace_root = SystemPath::new("src");
     let file = SystemPath::new("src/main.py");
@@ -101,21 +101,16 @@ fn deferred_request_burst_does_not_block_responses() -> Result<()> {
     // must pass through the deferred-message queue.
     server.open_text_document(file, source, 1);
     let uri = server.file_uri(file);
-    let params = HoverParams {
-        text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri },
-            position: Position::new(0, 0),
-        },
-        work_done_progress_params: WorkDoneProgressParams::default(),
-    };
-    let request_ids: Vec<_> = (0..REQUEST_COUNT)
-        .map(|_| server.send_request::<HoverRequest>(params.clone()))
-        .collect();
-    let overflow = server.send_request::<HoverRequest>(params);
-    assert!(
-        matches!(server.try_await_response::<HoverRequest>(&overflow, None),
-        Err(AwaitResponseError::RequestFailed(error)) if error.code == lsp_server::ErrorCode::RequestFailed as i32)
-    );
+    let mut request_ids = Vec::with_capacity(REQUEST_COUNT);
+    for _ in 0..REQUEST_COUNT {
+        request_ids.push(server.send_request::<HoverRequest>(HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position::new(0, 0),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        }));
+    }
     let mut server = server.wait_until_workspaces_are_initialized();
 
     for id in request_ids {
