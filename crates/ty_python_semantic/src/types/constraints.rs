@@ -1125,6 +1125,25 @@ struct ConstraintSetStorage<'db> {
     exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
 }
 
+/// Small decision diagrams already have the keys in their arenas. Only build a reverse index
+/// once linear scans become more expensive. Overlay IDs can be sparse and are always indexed.
+fn find_interned<K: Eq + std::hash::Hash + Clone, I: Idx>(
+    arena: &IndexVec<I, K>,
+    reverse: &mut FxHashMap<K, I>,
+    key: &K,
+    overlay: bool,
+) -> Option<I> {
+    if reverse.is_empty() && !overlay {
+        if arena.len() < 8 {
+            return arena
+                .iter_enumerated()
+                .find_map(|(id, item)| (item == key).then_some(id));
+        }
+        reverse.extend(arena.iter_enumerated().map(|(id, item)| (item.clone(), id)));
+    }
+    reverse.get(key).copied()
+}
+
 impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
@@ -1417,15 +1436,22 @@ impl<'db> ConstraintSetStorage<'db> {
         data: Constraint<'db>,
     ) -> ConstraintId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.constraint_cache.get(&data) {
-            return *id;
+        if let Some(id) = find_interned(
+            &self.constraints,
+            &mut self.constraint_cache,
+            &data,
+            self.compacted.is_some(),
+        ) {
+            return id;
         }
         let support = self.intern_constraint_typevars(db, env, &data);
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data.clone());
         self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
-        self.constraint_cache.insert(data, id);
+        if !self.constraint_cache.is_empty() || self.compacted.is_some() {
+            self.constraint_cache.insert(data, id);
+        }
         id
     }
 
@@ -1441,8 +1467,13 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.node_cache.get(&data) {
-            return *id;
+        if let Some(id) = find_interned(
+            &self.nodes,
+            &mut self.node_cache,
+            &data,
+            self.compacted.is_some(),
+        ) {
+            return id;
         }
 
         let mut support = Support::default();
@@ -1455,7 +1486,9 @@ impl<'db> ConstraintSetStorage<'db> {
         let id = self.nodes.push(data);
         self.node_supports.push(support);
         let id = self.adjusted_node_id(id);
-        self.node_cache.insert(data, id);
+        if !self.node_cache.is_empty() || self.compacted.is_some() {
+            self.node_cache.insert(data, id);
+        }
         id
     }
 
@@ -1522,12 +1555,19 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.source_order_cache.get(&data) {
-            return *id;
+        if let Some(id) = find_interned(
+            &self.source_orders,
+            &mut self.source_order_cache,
+            &data,
+            self.compacted.is_some(),
+        ) {
+            return id;
         }
         let id = self.source_orders.push(data);
         let id = self.adjusted_source_order_id(id);
-        self.source_order_cache.insert(data, id);
+        if !self.source_order_cache.is_empty() || self.compacted.is_some() {
+            self.source_order_cache.insert(data, id);
+        }
         id
     }
 
