@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 12 |     @overload
 13 |     def try_from1(cls, x: str) -> None: ...
 14 |     @classmethod
-15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+15 |     # error: [inconsistent-overload-decorator] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
 16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
 17 |         if isinstance(x, int):
 18 |             return cls(x)
@@ -39,7 +39,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 24 |     @classmethod
 25 |     def try_from2(cls, x: str) -> None: ...
 26 |     @classmethod
-27 |     # error: [invalid-overload]
+27 |     # error: [inconsistent-overload-decorator]
 28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
 29 |         if isinstance(x, int):
 30 |             return cls(x)
@@ -51,7 +51,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 36 |     @overload
 37 |     @classmethod
 38 |     def try_from3(cls, x: str) -> None: ...
-39 |     # error: [invalid-overload]
+39 |     # error: [inconsistent-overload-decorator]
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
 41 |         if isinstance(x, int):
 42 |             # error: [call-non-callable]
@@ -101,7 +101,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
+error[inconsistent-overload-decorator]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:16:9
    |
 12 |     @overload
@@ -109,14 +109,14 @@ error[invalid-overload]: Overloaded function `try_from1` does not use the `@clas
 13 |     def try_from1(cls, x: str) -> None: ...
    |         --------- Missing here
 14 |     @classmethod
-15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+15 |     # error: [inconsistent-overload-decorator] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
 16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
    |         ^^^^^^^^^
 
 ```
 
 ```
-error[invalid-overload]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
+error[inconsistent-overload-decorator]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:28:9
    |
 28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
@@ -132,7 +132,7 @@ error[invalid-overload]: Overloaded function `try_from2` does not use the `@clas
 ```
 
 ```
-error[invalid-overload]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
+error[inconsistent-overload-decorator]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:40:9
    |
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
