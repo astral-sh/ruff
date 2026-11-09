@@ -135,6 +135,24 @@ pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
 impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
     /// Creates a new formatter. Returns `None` if the string can't be merged into a single string.
     pub(crate) fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
+        // Joining source literals can change the meaning of a short octal escape: Python parses
+        // each literal independently before concatenating it, while a joined literal lets the
+        // following octal digit extend the escape (e.g. `"\\0" "1"` must not become `"\\01"`).
+        if string.parts().tuple_windows().any(|(first, second)| {
+            matches!(
+                (first, second),
+                (
+                    StringLikePart::String(_) | StringLikePart::Bytes(_),
+                    StringLikePart::String(_) | StringLikePart::Bytes(_)
+                )
+            ) && has_short_octal_boundary(
+                &context.source()[first.content_range()],
+                &context.source()[second.content_range()],
+            )
+        }) {
+            return None;
+        }
+
         fn merge_flags(string: StringLike, context: &PyFormatContext) -> Option<AnyStringFlags> {
             // Multiline strings can never fit on a single line.
             if string.is_multiline(context) {
@@ -282,6 +300,51 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
 
     pub(crate) fn string(&self) -> StringLike<'a> {
         self.string
+    }
+}
+
+fn has_short_octal_boundary(first: &str, second: &str) -> bool {
+    let starts_with_octal_digit = second
+        .as_bytes()
+        .first()
+        .is_some_and(|byte| (b'0'..=b'7').contains(byte));
+    if !starts_with_octal_digit {
+        return false;
+    }
+
+    let bytes = first.as_bytes();
+    let mut index = bytes.len();
+    let mut digits = 0;
+    while index > 0 && (b'0'..=b'7').contains(&bytes[index - 1]) {
+        index -= 1;
+        digits += 1;
+    }
+    if !(1..=2).contains(&digits) || index == 0 || bytes[index - 1] != b'\\' {
+        return false;
+    }
+
+    // An odd number of backslashes means the final backslash starts the escape; an even number
+    // means it is itself escaped and the octal-looking suffix is ordinary text.
+    let mut backslashes = 0;
+    let mut cursor = index - 1;
+    while cursor > 0 && bytes[cursor - 1] == b'\\' {
+        cursor -= 1;
+        backslashes += 1;
+    }
+    backslashes % 2 == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_short_octal_boundary;
+
+    #[test]
+    fn detects_short_octal_boundaries() {
+        assert!(has_short_octal_boundary(r"\0", "1"));
+        assert!(has_short_octal_boundary(r"prefix\12", "7"));
+        assert!(!has_short_octal_boundary(r"\123", "4"));
+        assert!(!has_short_octal_boundary(r"\\0", "1"));
+        assert!(!has_short_octal_boundary(r"\0", "x"));
     }
 }
 
