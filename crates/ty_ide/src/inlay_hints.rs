@@ -4434,6 +4434,29 @@ Source with applied edits:
     }
 
     #[test]
+    fn argument_name_hint_requires_agreement_across_union_members() {
+        let test = inlay_hint_test(
+            "
+            def f(a: int, shared: int = 0): ...
+            def g(b: int, shared: int = 0): ...
+            def positional(a: int, /): ...
+            def h(flag: bool):
+                (f if flag else g)(1)
+                (f if flag else g)(1, 2)
+                (f if flag else positional)(1)
+            ",
+        );
+        let settings = InlayHintSettings {
+            variable_types: false,
+            return_types: false,
+            call_argument_names: true,
+        };
+        let [hint] = test.collect_hints(&settings).try_into().unwrap();
+        assert_eq!(hint.display().to_string(), "shared=");
+        assert!(!hint.text_edits.is_empty());
+    }
+
+    #[test]
     fn argument_name_hint_before_starred_argument_has_no_edit() {
         let test = inlay_hint_test(
             "

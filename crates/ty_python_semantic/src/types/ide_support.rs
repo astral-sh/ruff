@@ -5,7 +5,7 @@ use crate::FxIndexSet;
 use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::bind::CheckTypesMode;
-use crate::types::call::{CallArguments, CallError, MatchedArgument};
+use crate::types::call::{Bindings, CallArguments, CallError, CallableBinding, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::infer::infer_definition_types;
@@ -1582,6 +1582,18 @@ pub fn resolved_call_signature<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
+    let bindings = call_signature_bindings(model, call_expr)?;
+    active_call_signature(
+        model.db(),
+        &model.program_environment(),
+        bindings.iter_flat(),
+    )
+}
+
+fn call_signature_bindings<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<Bindings<'db>> {
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
     let env = &model.program_environment();
@@ -1599,9 +1611,17 @@ pub fn resolved_call_signature<'db>(
         .check_types(db, env, &constraints, &args, TypeContext::default(), &[])
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
+    Some(bindings)
+}
+
+fn active_call_signature<'a, 'db: 'a>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings: impl Iterator<Item = &'a CallableBinding<'db>> + Clone,
+) -> Option<CallSignatureDetails<'db>> {
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
-        .iter_flat()
+        .clone()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
         .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
         .collect();
@@ -1615,7 +1635,6 @@ pub fn resolved_call_signature<'db>(
     // `matching_overloads()` returns empty. Fall back to arity-based matching
     // across all overloads to pick the best candidate for showing hints.
     let all_details: Vec<_> = bindings
-        .iter_flat()
         .flatten()
         .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
         .collect();
@@ -1639,8 +1658,33 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let resolved = resolved_call_signature(model, call_expr)?;
+    let bindings = call_signature_bindings(model, call_expr)?;
+    let env = model.program_environment();
+    let mut candidates = bindings.iter_union_elements().map(|element| {
+        let signature = active_call_signature(db, &env, element)?;
+        Some(argument_names_for_signature(db, &signature, call_expr))
+    });
+    let mut argument_names = candidates.next()??;
+    for candidate in candidates {
+        let candidate = candidate?;
+        argument_names.retain(|index, (name, location)| {
+            let Some((other_name, other_location)) = candidate.get(index) else {
+                return false;
+            };
+            if location != other_location {
+                *location = None;
+            }
+            name == other_name
+        });
+    }
+    Some(InlayHintCallArgumentDetails { argument_names })
+}
 
+fn argument_names_for_signature(
+    db: &dyn Db,
+    resolved: &CallSignatureDetails,
+    call_expr: &ast::ExprCall,
+) -> HashMap<usize, (String, Option<FileRange>)> {
     let parameters = resolved.signature.parameters();
 
     let mut argument_names = HashMap::new();
@@ -1682,7 +1726,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         }
     }
 
-    Some(InlayHintCallArgumentDetails { argument_names })
+    argument_names
 }
 
 mod stub_mapping {

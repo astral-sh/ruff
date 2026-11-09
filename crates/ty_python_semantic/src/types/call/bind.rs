@@ -1028,13 +1028,20 @@ impl<'db> Bindings<'db> {
             })
     }
 
+    /// Iterate over each union element, keeping its intersection members together.
+    pub(crate) fn iter_union_elements(
+        &self,
+    ) -> impl Iterator<Item = impl Iterator<Item = &CallableBinding<'db>> + Clone> + Clone {
+        self.elements.iter().map(BindingsElement::callables)
+    }
+
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. The returned iterator yields
     /// all `CallableBinding`s from all elements, which can then be further flattened to
     /// individual `Binding`s via `CallableBinding`'s `IntoIterator` implementation.
-    pub(crate) fn iter_flat(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
-        self.elements.iter().flat_map(BindingsElement::callables)
+    pub(crate) fn iter_flat(&self) -> impl Iterator<Item = &CallableBinding<'db>> + Clone {
+        self.iter_union_elements().flatten()
     }
 
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
