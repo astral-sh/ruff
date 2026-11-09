@@ -12,7 +12,7 @@ supertype. Applied to Python, this means:
     superclass method.
 
 An otherwise compatible override that renames a positional-or-keyword parameter or makes it
-positional-only can trigger `missing-keyword-in-override`.
+positional-only can trigger `lost-keyword-for-regular-parameter`.
 
 ## Why is this bad?
 
@@ -75,7 +75,7 @@ Ruff has several rules that will encourage you to rename a parameter, or change 
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
 parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
-override can trigger `missing-keyword-in-override` if the base method accepts it by keyword.
+override can trigger `lost-keyword-for-regular-parameter` if the base method accepts it by keyword.
 Removing the parameter can trigger `incompatible-method-override` if the override no longer accepts
 a call allowed by the base method.
 
@@ -90,7 +90,7 @@ Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
 `incompatible-method-override` was previously called `invalid-method-override`. The old name still
 works as an alias. The check for dropped keyword names now has its own rule,
-`missing-keyword-in-override`.
+`lost-keyword-for-regular-parameter`.
 
 If you previously configured a custom severity for `invalid-method-override`, you can apply it to
 both rules to keep the same severity for both kinds of override violations. This example preserves a
@@ -99,11 +99,11 @@ previous setting of `warn`.
 ```toml
 [rules]
 incompatible-method-override = "warn"
-missing-keyword-in-override = "warn"
+lost-keyword-for-regular-parameter = "warn"
 ```
 
-For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]` as a
-suppression comment.
+For diagnostics that moved to the new rule, use `# ty: ignore[lost-keyword-for-regular-parameter]`
+as a suppression comment.
 
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.

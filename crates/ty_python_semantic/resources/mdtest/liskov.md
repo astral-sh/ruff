@@ -269,18 +269,18 @@ class Super2:
     def method2(self, x): ...
 
 class Sub16(Super2):
-    def method2(self, x, /): ...  # snapshot: missing-keyword-in-override
+    def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
 ```
 
 ```snapshot
-error[missing-keyword-in-override]: Override of method `method2` drops a keyword argument
+error[lost-keyword-for-regular-parameter]: Override of method `method2` disallows keyword arguments allowed by the method on the base class
   --> src/mdtest_snippet.pyi:46:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: missing-keyword-in-override
+46 |     def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
 info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -301,7 +301,7 @@ error[incompatible-method-override]: Invalid override of method `method2`
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: missing-keyword-in-override
+46 |     def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
 47 | class Sub17(Super2):
 48 |     def method2(self, *, x): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
@@ -416,10 +416,10 @@ class Base:
     def f(self, value: int) -> int: ...
 
 class Renamed(Base):
-    def f(self, item: object) -> int: ...  # error: [missing-keyword-in-override]
+    def f(self, item: object) -> int: ...  # error: [lost-keyword-for-regular-parameter]
 
 class PositionalOnly(Base):
-    def f(self, value: int, /) -> int: ...  # error: [missing-keyword-in-override]
+    def f(self, value: int, /) -> int: ...  # error: [lost-keyword-for-regular-parameter]
 ```
 
 If there is also an incompatible argument type, a missing argument, or an incompatible return type,
@@ -470,21 +470,22 @@ class Inherited(Renamed, Integers, Strings): ...  # error: [incompatible-method-
 
 ## Enabling only the keyword override rule
 
-Disabling `incompatible-method-override` leaves `missing-keyword-in-override` enabled.
+Disabling `incompatible-method-override` leaves `lost-keyword-for-regular-parameter` enabled.
 
 ```toml
 [rules]
 incompatible-method-override = "ignore"
 ```
 
-The `missing-keyword-in-override` suppression covers an override that renames `value` to `item`.
+The `lost-keyword-for-regular-parameter` suppression covers an override that renames `value` to
+`item`.
 
 ```pyi
 class Base:
     def f(self, value: int) -> None: ...
 
 class Suppressed(Base):
-    def f(self, item: int) -> None: ...  # ty: ignore[missing-keyword-in-override]
+    def f(self, item: int) -> None: ...  # ty: ignore[lost-keyword-for-regular-parameter]
 ```
 
 `invalid-method-override` is an alias for `incompatible-method-override`. With the old name in the
@@ -493,7 +494,7 @@ the comment is unused.
 
 ```pyi
 class OldSuppression(Base):
-    # error: [missing-keyword-in-override]
+    # error: [lost-keyword-for-regular-parameter]
     # error: [renamed-rule-in-ignore-comment]
     # error: [unused-ignore-comment]
     def f(self, item: int) -> None: ...  # ty: ignore[invalid-method-override]
@@ -515,7 +516,7 @@ using the `value=` keyword from `Base.f` fail.
 class Other:
     def f(self, item: int) -> None: ...
 
-class Inherited(Other, Base): ...  # error: [missing-keyword-in-override]
+class Inherited(Other, Base): ...  # error: [lost-keyword-for-regular-parameter]
 ```
 
 ## Selecting general method overrides with the previous rule name
@@ -1729,7 +1730,7 @@ class A:
     def get(self, default): ...
 
 class B(A):
-    def get(self, default, /): ...  # snapshot: missing-keyword-in-override
+    def get(self, default, /): ...  # snapshot: lost-keyword-for-regular-parameter
 
 get = 56
 
@@ -1745,14 +1746,14 @@ class D(C):
 ```
 
 ```snapshot
-error[missing-keyword-in-override]: Override of method `get` drops a keyword argument
+error[lost-keyword-for-regular-parameter]: Override of method `get` disallows keyword arguments allowed by the method on the base class
  --> src/other_stub.pyi:5:9
   |
 2 |     def get(self, default): ...
   |         ------------------ `A.get` defined here
 3 |
 4 | class B(A):
-5 |     def get(self, default, /): ...  # snapshot: missing-keyword-in-override
+5 |     def get(self, default, /): ...  # snapshot: lost-keyword-for-regular-parameter
   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
 info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -1791,13 +1792,13 @@ class Left:
 class Right:
     def method(self, right): ...
 
-class Parent(Left, Right): ...  # error: [missing-keyword-in-override]
+class Parent(Left, Right): ...  # error: [lost-keyword-for-regular-parameter]
 
 class Child(Parent):
     def method(self, left): ...
 
 class ChangesSignature(Parent):
-    # error: [missing-keyword-in-override] "Definition is incompatible with `Left.method`"
+    # error: [lost-keyword-for-regular-parameter] "Definition is incompatible with `Left.method`"
     def method(self, right): ...
 ```
 
@@ -2308,14 +2309,14 @@ class A:
 import one
 
 class A(one.A):
-    def foo(self, y): ...  # snapshot: missing-keyword-in-override
+    def foo(self, y): ...  # snapshot: lost-keyword-for-regular-parameter
 ```
 
 ```snapshot
-error[missing-keyword-in-override]: Override of method `foo` drops a keyword argument
+error[lost-keyword-for-regular-parameter]: Override of method `foo` disallows keyword arguments allowed by the method on the base class
  --> src/two.pyi:4:9
   |
-4 |     def foo(self, y): ...  # snapshot: missing-keyword-in-override
+4 |     def foo(self, y): ...  # snapshot: lost-keyword-for-regular-parameter
   |         ^^^^^^^^^^^^ Definition is incompatible with `one.A.foo`
   |
  ::: src/one.pyi:2:9

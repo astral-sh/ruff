@@ -1389,7 +1389,7 @@ supertype. Applied to Python, this means:
     superclass method.
 
 An otherwise compatible override that renames a positional-or-keyword parameter or makes it
-positional-only can trigger [`missing-keyword-in-override`](#missing-keyword-in-override).
+positional-only can trigger [`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter).
 
 **Why is this bad?**
 
@@ -1457,7 +1457,7 @@ Ruff has several rules that will encourage you to rename a parameter, or change 
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
 parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
-override can trigger [`missing-keyword-in-override`](#missing-keyword-in-override) if the base method accepts it by keyword.
+override can trigger [`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter) if the base method accepts it by keyword.
 Removing the parameter can trigger [`incompatible-method-override`](#incompatible-method-override) if the override no longer accepts
 a call allowed by the base method.
 
@@ -1473,7 +1473,7 @@ Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#in
 
 [`incompatible-method-override`](#incompatible-method-override) was previously called [`invalid-method-override`](#invalid-method-override). The old name still
 works as an alias. The check for dropped keyword names now has its own rule,
-[`missing-keyword-in-override`](#missing-keyword-in-override).
+[`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter).
 
 If you previously configured a custom severity for [`invalid-method-override`](#invalid-method-override), you can apply it to
 both rules to keep the same severity for both kinds of override violations. This example preserves a
@@ -1482,11 +1482,11 @@ previous setting of `warn`.
 ```toml
 [rules]
 incompatible-method-override = "warn"
-missing-keyword-in-override = "warn"
+lost-keyword-for-regular-parameter = "warn"
 ```
 
-For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]` as a
-suppression comment.
+For diagnostics that moved to the new rule, use `# ty: ignore[lost-keyword-for-regular-parameter]`
+as a suppression comment.
 
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.
@@ -4189,6 +4189,67 @@ def g(arg: object):
 
 - [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)
 
+## `lost-keyword-for-regular-parameter`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22lost-keyword-for-regular-parameter%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1422" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Detects method overrides that rename a positional-or-keyword parameter or make it positional-only.
+
+**Why is this bad?**
+
+
+Code that uses the base class's interface can pass the argument by keyword. The same call may raise
+`TypeError` on an instance of the subclass.
+
+**Example**
+
+
+```python
+class Base:
+    def scale(self, factor: int) -> int:
+        return factor * 2
+
+
+class Wrong1(Base):
+    def scale(
+        self, multiplier: int
+    ) -> int:  # error: [lost-keyword-for-regular-parameter]
+        return multiplier * 3
+
+
+class Wrong2(Base):
+    def scale(
+        self, factor: int, /
+    ) -> int:  # error: [lost-keyword-for-regular-parameter]
+        return factor * 3
+
+
+def scale_by_two(obj: Base) -> int:
+    return obj.scale(factor=2)
+
+
+scale_by_two(Wrong1())  # Raise TypeError
+scale_by_two(Wrong2())  # Raise TypeError
+```
+
+To fix this, rename `multiplier` to `factor` in `Wrong1.scale`, or remove the positional-only
+modifier `/` in `Wrong2.scale`.
+
+**See also**
+
+
+- [`incompatible-method-override`](#incompatible-method-override) reports other signature incompatibilities, such as a narrower
+    parameter type or an incompatible return type, even when the override also drops a keyword name.
+
 ## `mismatched-sentinel-name`
 
 <small>
@@ -4496,63 +4557,6 @@ import urllib3  # error: [missing-direct-dependency]
 ```
 
 Add `urllib3` to `project.dependencies` if your code imports it directly.
-
-## `missing-keyword-in-override`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-keyword-in-override%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1422" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Detects method overrides that rename a positional-or-keyword parameter or make it positional-only.
-
-**Why is this bad?**
-
-
-Code that uses the base class's interface can pass the argument by keyword. The same call may raise
-`TypeError` on an instance of the subclass.
-
-**Example**
-
-
-```python
-class Base:
-    def scale(self, factor: int) -> int:
-        return factor * 2
-
-
-class Wrong1(Base):
-    def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
-        return multiplier * 3
-
-
-class Wrong2(Base):
-    def scale(self, factor: int, /) -> int:  # error: [missing-keyword-in-override]
-        return factor * 3
-
-
-def scale_by_two(obj: Base) -> int:
-    return obj.scale(factor=2)
-
-
-scale_by_two(Wrong1())  # Raise TypeError
-scale_by_two(Wrong2())  # Raise TypeError
-```
-
-To fix this, rename `multiplier` to `factor` in `Wrong1.scale`, or remove the positional-only
-modifier `/` in `Wrong2.scale`.
-
-**See also**
-
-
-- [`incompatible-method-override`](#incompatible-method-override) reports other signature incompatibilities, such as a narrower
-    parameter type or an incompatible return type, even when the override also drops a keyword name.
 
 ## `missing-overload-implementation`
 

@@ -215,7 +215,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
         LintName::of("invalid-method-override"),
         &INCOMPATIBLE_METHOD_OVERRIDE,
     );
-    registry.register_lint(&MISSING_KEYWORD_IN_OVERRIDE);
+    registry.register_lint(&LOST_KEYWORD_FOR_REGULAR_PARAMETER);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -1420,8 +1420,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/missing-keyword-in-override.md")]
-    pub(crate) static MISSING_KEYWORD_IN_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/lost-keyword-for-regular-parameter.md")]
+    pub(crate) static LOST_KEYWORD_FOR_REGULAR_PARAMETER = {
         summary: "detects method overrides that drop a positional parameter's keyword name",
         status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
@@ -5260,7 +5260,7 @@ pub(super) fn report_incompatible_method_override<'db>(
             builder.into_diagnostic(format_args!("Invalid override of method `{member}`"))
         }
         MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
-            "Override of method `{member}` drops a keyword argument"
+            "Override of method `{member}` disallows keyword arguments allowed by the method on the base class"
         )),
     };
 

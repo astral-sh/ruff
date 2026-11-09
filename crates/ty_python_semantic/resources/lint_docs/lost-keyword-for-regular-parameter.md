@@ -16,12 +16,16 @@ class Base:
 
 
 class Wrong1(Base):
-    def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
+    def scale(
+        self, multiplier: int
+    ) -> int:  # error: [lost-keyword-for-regular-parameter]
         return multiplier * 3
 
 
 class Wrong2(Base):
-    def scale(self, factor: int, /) -> int:  # error: [missing-keyword-in-override]
+    def scale(
+        self, factor: int, /
+    ) -> int:  # error: [lost-keyword-for-regular-parameter]
         return factor * 3
 
 
