@@ -302,6 +302,11 @@ pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/26282
+pub(crate) const fn is_redirected_suppression_code_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/23473
 pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
     settings: &LinterSettings,

@@ -23,7 +23,7 @@ use crate::types::class::{
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
-use crate::types::overrides::MethodKind;
+use crate::types::overrides::{MethodKind, MethodOverrideViolation};
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
@@ -216,6 +216,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
         LintName::of("invalid-method-override"),
         &INCOMPATIBLE_METHOD_OVERRIDE,
     );
+    registry.register_lint(&LOST_KEYWORD_FOR_REGULAR_PARAMETER);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -1424,6 +1425,15 @@ declare_lint! {
     pub(crate) static INCOMPATIBLE_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/lost-keyword-for-regular-parameter.md")]
+    pub(crate) static LOST_KEYWORD_FOR_REGULAR_PARAMETER = {
+        summary: "detects method overrides that drop a positional parameter's keyword name",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -5209,6 +5219,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
 #[expect(clippy::too_many_arguments)]
 pub(super) fn report_incompatible_method_override<'db>(
     context: &InferContext<'db, '_>,
+    violation: MethodOverrideViolation,
     member: &str,
     subclass: ClassType<'db>,
     subclass_definition: Definition<'db>,
@@ -5240,7 +5251,7 @@ pub(super) fn report_incompatible_method_override<'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
-    let Some(builder) = context.report_lint(&INCOMPATIBLE_METHOD_OVERRIDE, diagnostic_range) else {
+    let Some(builder) = context.report_lint(violation.rule(), diagnostic_range) else {
         return;
     };
 
@@ -5254,8 +5265,14 @@ pub(super) fn report_incompatible_method_override<'db>(
         format!("{superclass_name}.{member}")
     };
 
-    let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
+    let mut diagnostic = match violation {
+        MethodOverrideViolation::General => {
+            builder.into_diagnostic(format_args!("Invalid override of method `{member}`"))
+        }
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
+            "Override of method `{member}` disallows keyword arguments allowed by the method on the base class"
+        )),
+    };
 
     diagnostic.set_primary_annotation_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
@@ -5404,6 +5421,7 @@ pub(super) fn report_incompatible_method_override<'db>(
 /// Reports an incompatible pair of source-defined methods in a resolved MRO.
 pub(super) fn report_incompatible_base_method<'db>(
     context: &InferContext<'db, '_>,
+    violation: MethodOverrideViolation,
     class: StaticClassLiteral<'db>,
     member: &str,
     selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
@@ -5411,8 +5429,7 @@ pub(super) fn report_incompatible_base_method<'db>(
     error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INCOMPATIBLE_METHOD_OVERRIDE, class.header_range(db))
-    else {
+    let Some(builder) = context.report_lint(violation.rule(), class.header_range(db)) else {
         return;
     };
 
@@ -5430,9 +5447,14 @@ pub(super) fn report_incompatible_base_method<'db>(
         .class_literal(db)
         .display_with(db, settings.clone());
     let contract_name = contract_owner.class_literal(db).display_with(db, settings);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Base classes for class `{class_name}` define method `{member}` incompatibly",
-    ));
+    let mut diagnostic = match violation {
+        MethodOverrideViolation::General => builder.into_diagnostic(format_args!(
+            "Base classes for class `{class_name}` define method `{member}` incompatibly",
+        )),
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
+            "Base classes for class `{class_name}` disagree on keywords for method `{member}`",
+        )),
+    };
     diagnostic.set_primary_annotation_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
     ));
