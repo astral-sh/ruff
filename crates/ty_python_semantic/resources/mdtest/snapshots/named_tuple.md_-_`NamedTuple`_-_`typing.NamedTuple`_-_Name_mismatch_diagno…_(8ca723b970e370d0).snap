@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
 # Diagnostics
 
 ```
-warning[mismatched-namedtuple-name]: The name passed to `NamedTuple` must match the variable it is assigned to
+info[mismatched-namedtuple-name]: The name passed to `NamedTuple` must match the variable it is assigned to
  --> src/mdtest_snippet.py:5:23
   |
 5 | Mismatch = NamedTuple("WrongName", [("x", int)])

@@ -9,6 +9,11 @@ name argument.
 The name argument becomes the enum class's `__name__`. A member's representation can therefore refer
 to a different class name than the one used in the source.
 
+## Default level
+
+This rule is disabled by default because a functional enum can intentionally have a runtime name
+that differs from its variable name.
+
 ## Examples
 
 ```python

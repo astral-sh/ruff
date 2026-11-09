@@ -8,6 +8,11 @@ the assigned variable.
 The `typename` determines the class name shown when printing a named tuple. A different name in the
 source makes it harder to identify the class that produced a value.
 
+## Default level
+
+This rule is disabled by default because named tuple factories can intentionally give their classes
+a different runtime name.
+
 ## Examples
 
 ```python

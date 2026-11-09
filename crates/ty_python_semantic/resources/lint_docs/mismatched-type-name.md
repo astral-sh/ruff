@@ -25,4 +25,7 @@ mismatched-namedtuple-name = "ignore"
 On the command line, the last matching flag takes precedence.
 `ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.
 
+`mismatched-enum-name` and `mismatched-namedtuple-name` are disabled by default. An explicit setting
+for `mismatched-type-name` still sets their severity.
+
 The separate `mismatched-sentinel-name` rule remains opt-in.
