@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `os.path.join` imported but unused
+ --> F401_duplicate_alias.py:1:35
+  |
+1 | from os.path import join, join as path_join
+  |                                   ^^^^^^^^^
+2 |
+3 | print(join("a", "b"))
+  |
+help: Remove unused import: `os.path.join`
+  |
+  - from os.path import join, join as path_join
+1 + from os.path import join
+2 |
+  |
+

@@ -875,9 +875,10 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
             continue;
         }
 
-        if binding
-            .as_any_import()
-            .is_some_and(|imp| imp.qualified_name() == best_name)
+        if binding.range == best.range
+            && binding
+                .as_any_import()
+                .is_some_and(|imp| imp.qualified_name() == best_name)
         {
             *is_used = true;
         }
