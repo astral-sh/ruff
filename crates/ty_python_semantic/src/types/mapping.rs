@@ -6,6 +6,7 @@ use std::mem::discriminant;
 use rustc_hash::{FxHashMap, FxHasher};
 use ty_python_core::scope::ScopeId;
 
+use super::generics::{ApplySpecialization, Specialization};
 use super::{
     ApplyTypeMappingVisitor, CallableType, MaterializationKind, PromotionKind, PromotionMode, Type,
     TypeContext, TypeMapping,
@@ -13,7 +14,8 @@ use super::{
 use crate::Db;
 
 /// An owned mapping and its application context, retained until a recursive type is unfolded.
-/// Substitutions of free variables act on the constructor's arguments instead.
+/// A leading specialization stores the constructor's current arguments. Later substitutions
+/// update those values immediately instead of extending the mapping sequence.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DeferredTypeMapping<'db> {
     kind: OwnedTypeMapping<'db>,
@@ -22,6 +24,23 @@ pub struct DeferredTypeMapping<'db> {
 }
 
 impl<'db> DeferredTypeMapping<'db> {
+    /// The canonical leading mapping for a constructor's arguments.
+    pub(super) fn from_specialization(specialization: Specialization<'db>) -> Self {
+        Self {
+            kind: OwnedTypeMapping::Specialization(specialization),
+            context: TypeContext::default(),
+            materialize_typevar_bounds_and_defaults: false,
+        }
+    }
+
+    /// Return the stored constructor arguments, if any.
+    pub(super) fn as_specialization(&self) -> Option<Specialization<'db>> {
+        match self.kind {
+            OwnedTypeMapping::Specialization(specialization) => Some(specialization),
+            _ => None,
+        }
+    }
+
     /// Retain whole-body transformations; argument and graph substitutions are applied immediately.
     pub(super) fn from_mapping(
         mapping: &TypeMapping<'_, 'db>,
@@ -72,6 +91,9 @@ impl<'db> DeferredTypeMapping<'db> {
 
     pub(super) fn type_mapping(&self) -> TypeMapping<'_, 'db> {
         match &self.kind {
+            OwnedTypeMapping::Specialization(specialization) => {
+                TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(*specialization))
+            }
             OwnedTypeMapping::Materialize(kind) => TypeMapping::Materialize(*kind),
             OwnedTypeMapping::Promote(mode, kind) => TypeMapping::Promote(*mode, *kind),
             OwnedTypeMapping::ReplaceParameterDefaults => TypeMapping::ReplaceParameterDefaults,
@@ -85,13 +107,21 @@ impl<'db> DeferredTypeMapping<'db> {
         }
     }
 
-    /// Close or rebind recursive references in the retained operation's operands.
+    /// Transform the types stored in the retained operation's operands.
     pub(super) fn rewrite(
         &self,
         db: &'db dyn Db,
         mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if let Some(specialization) = self.as_specialization() {
+            return Self::from_specialization(specialization.apply_type_mapping_impl(
+                db,
+                mapping,
+                &[],
+                visitor,
+            ));
+        }
         let map = |ty: Type<'db>| {
             ty.apply_type_mapping_impl(db, mapping, TypeContext::default(), visitor)
         };
@@ -128,6 +158,7 @@ impl<'db> DeferredTypeMapping<'db> {
 /// An owned form of the mappings applied to a whole recursive unfolding.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum OwnedTypeMapping<'db> {
+    Specialization(Specialization<'db>),
     Materialize(MaterializationKind),
     Promote(PromotionMode, PromotionKind),
     ReplaceParameterDefaults,
@@ -140,6 +171,7 @@ impl Hash for OwnedTypeMapping<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         discriminant(self).hash(state);
         match self {
+            Self::Specialization(specialization) => specialization.hash(state),
             Self::Materialize(kind) => kind.hash(state),
             Self::Promote(mode, kind) => (mode, kind).hash(state),
             Self::GeneralizeLocalTypes(scope) => scope.hash(state),
