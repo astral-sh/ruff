@@ -4457,6 +4457,39 @@ Source with applied edits:
     }
 
     #[test]
+    fn argument_name_hint_after_overload_argument_expansion() {
+        let test = inlay_hint_test(
+            "
+            from typing import overload
+
+            def f(x: int | str): ...
+
+            @overload
+            def g(x: int) -> int: ...
+            @overload
+            def g(y: str) -> str: ...
+            def g(*args, **kwargs): ...
+
+            def h(flag: bool, value: int | str):
+                (f if flag else g)(value)
+                (f if flag else g)(1)
+            ",
+        );
+        let [hint] = test
+            .collect_hints(&InlayHintSettings {
+                variable_types: false,
+                return_types: false,
+                call_argument_names: true,
+            })
+            .try_into()
+            .unwrap();
+        assert_eq!(hint.display().to_string(), "x=");
+        assert!(!hint.text_edits.is_empty());
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        assert!(source[usize::from(hint.position)..].starts_with("1)"));
+    }
+
+    #[test]
     fn argument_name_hint_before_starred_argument_has_no_edit() {
         let test = inlay_hint_test(
             "

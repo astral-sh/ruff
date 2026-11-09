@@ -1660,13 +1660,35 @@ pub fn inlay_hint_call_argument_details<'db>(
 ) -> Option<InlayHintCallArgumentDetails> {
     let bindings = call_signature_bindings(model, call_expr)?;
     let env = model.program_environment();
-    let mut candidates = bindings.iter_union_elements().map(|element| {
-        let signature = active_call_signature(db, &env, element)?;
-        Some(argument_names_for_signature(db, &signature, call_expr))
-    });
-    let mut argument_names = candidates.next()??;
+    let mut candidates = Vec::new();
+    for element in bindings.iter_union_elements() {
+        let start = candidates.len();
+        // Argument type expansion can select different overloads for the same union member.
+        for binding in element.clone() {
+            for (_, overload) in binding.matching_overloads() {
+                candidates.push(argument_names_for_signature(
+                    db,
+                    &overload.signature,
+                    overload.argument_matches(),
+                    call_expr,
+                ));
+            }
+        }
+        if candidates.len() == start {
+            // Keep offering hints by arity while the user is editing an invalid call.
+            let fallback = active_call_signature(db, &env, element)?;
+            candidates.push(argument_names_for_signature(
+                db,
+                &fallback.signature,
+                &fallback.argument_to_parameter_mapping,
+                call_expr,
+            ));
+        }
+    }
+
+    let mut candidates = candidates.into_iter();
+    let mut argument_names = candidates.next()?;
     for candidate in candidates {
-        let candidate = candidate?;
         argument_names.retain(|index, (name, location)| {
             let Some((other_name, other_location)) = candidate.get(index) else {
                 return false;
@@ -1682,15 +1704,16 @@ pub fn inlay_hint_call_argument_details<'db>(
 
 fn argument_names_for_signature(
     db: &dyn Db,
-    resolved: &CallSignatureDetails,
+    signature: &Signature,
+    argument_mapping: &[MatchedArgument],
     call_expr: &ast::ExprCall,
 ) -> HashMap<usize, (String, Option<FileRange>)> {
-    let parameters = resolved.signature.parameters();
+    let parameters = signature.parameters();
 
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
-        let Some(arg_mapping) = resolved.argument_to_parameter_mapping.get(arg_index) else {
+        let Some(arg_mapping) = argument_mapping.get(arg_index) else {
             continue;
         };
 
