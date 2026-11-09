@@ -15,7 +15,7 @@ class Base:
 
 
 class Child(Base):
-    value: bool  # error: [invalid-mutable-override]
+    value: bool  # error: [incompatible-mutable-override]
 
 
 def reset(obj: Base) -> None:
@@ -27,3 +27,9 @@ reset(Child())  # The value is no longer a bool.
 
 Use the same annotation in both classes, or expose a read-only property if callers do not need to
 write the attribute.
+
+## Rule history
+
+- v0.0.100: Renamed from `invalid-mutable-override`.
+
+    `invalid-mutable-override` remains as a compatibility alias for this rule.

@@ -2305,7 +2305,7 @@ class ChildProtocol(BaseProtocol, Protocol):
     marker: Any
 
     @property
-    def value(self) -> str: ...  # error: [invalid-property-type-override]
+    def value(self) -> str: ...  # error: [incompatible-property-override]
 
 static_assert(is_subtype_of(Top[ChildProtocol], BaseProtocol))
 static_assert(is_subtype_of(ChildProtocol, Top[BaseProtocol]))
