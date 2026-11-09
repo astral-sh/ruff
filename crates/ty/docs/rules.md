@@ -1388,8 +1388,8 @@ supertype. Applied to Python, this means:
 1. The return type of an overriding subclass method must be a subtype of the return type of the
     superclass method.
 
-Overrides that only drop the keyword name of a positional-or-keyword parameter are reported
-separately by [`missing-keyword-in-override`](#missing-keyword-in-override).
+An otherwise compatible override that renames a positional-or-keyword parameter or makes it
+positional-only can trigger [`missing-keyword-in-override`](#missing-keyword-in-override).
 
 **Why is this bad?**
 
@@ -1471,8 +1471,8 @@ Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#in
 **Migrating from `invalid-method-override`**
 
 
-[`invalid-method-override`](#invalid-method-override) is an alias for [`incompatible-method-override`](#incompatible-method-override). Keyword-only
-incompatibilities now use [`missing-keyword-in-override`](#missing-keyword-in-override), which defaults to `error`.
+[`invalid-method-override`](#invalid-method-override) is an alias for [`incompatible-method-override`](#incompatible-method-override). The new
+[`missing-keyword-in-override`](#missing-keyword-in-override) rule defaults to `error`.
 
 To preserve a custom severity across the split, set both rules to that level. The following
 configuration preserves a previous setting of `warn`.
@@ -1483,7 +1483,7 @@ incompatible-method-override = "warn"
 missing-keyword-in-override = "warn"
 ```
 
-For keyword-only violations, update inline ignores to `# ty: ignore[missing-keyword-in-override]`.
+For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]`.
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.
 
@@ -4506,9 +4506,7 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100<
 **What it does**
 
 
-Detects method overrides that drop the keyword name of a positional-or-keyword parameter from a base
-method while still accepting the argument by position. Renaming a parameter, making it
-positional-only, or absorbing it into `*args` can drop its keyword name.
+Detects method overrides that rename a positional-or-keyword parameter or make it positional-only.
 
 When an override also violates the base method's signature in another way, such as narrowing a
 parameter's type or returning an incompatible type, ty reports [`incompatible-method-override`](#incompatible-method-override)

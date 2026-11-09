@@ -1,8 +1,6 @@
 ## What it does
 
-Detects method overrides that drop the keyword name of a positional-or-keyword parameter from a base
-method while still accepting the argument by position. Renaming a parameter, making it
-positional-only, or absorbing it into `*args` can drop its keyword name.
+Detects method overrides that rename a positional-or-keyword parameter or make it positional-only.
 
 When an override also violates the base method's signature in another way, such as narrowing a
 parameter's type or returning an incompatible type, ty reports `incompatible-method-override`

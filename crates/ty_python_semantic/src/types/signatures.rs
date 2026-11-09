@@ -1389,17 +1389,12 @@ impl<'db> Signature<'db> {
             };
             if overriding.iter().all(|signature| {
                 let parameters = signature.parameters();
-                let positional = parameters.get_positional(index).or_else(|| {
-                    let (variadic_index, variadic) = parameters.variadic()?;
-                    (index >= variadic_index).then_some(variadic)
-                });
-                positional.is_some_and(|positional| {
+                parameters.get_positional(index).is_some_and(|positional| {
                     // Keep the keyword requirement if it can bind to a named parameter or
                     // to **kwargs without also needing a positional argument in its slot.
                     // In that case normal assignability must still check the keyword's type.
                     parameters.keyword_by_name(name).is_none()
-                        && !(parameters.keyword_variadic().is_some()
-                            && (positional.has_default() || positional.is_variadic()))
+                        && !(parameters.keyword_variadic().is_some() && positional.has_default())
                         && positional.keyword_name().is_none_or(|keyword| {
                             self.parameters.keyword_by_name(keyword).is_none()
                                 && self.parameters.keyword_variadic().is_none()

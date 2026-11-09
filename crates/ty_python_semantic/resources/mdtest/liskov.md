@@ -461,22 +461,6 @@ class KeywordArguments(Base):
     def f(self, item: int = 0, **kwargs: str) -> int: ...  # error: [incompatible-method-override]
 ```
 
-## Accepting the argument through typed variadics
-
-Replacing a positional-or-keyword parameter with `*args` keeps the positional call valid if the
-variadic parameter accepts the original argument type.
-
-```pyi
-class Base:
-    def f(self, prefix: str, value: int) -> None: ...
-
-class PositionalVariadic(Base):
-    def f(self, prefix: str, *items: int) -> None: ...  # error: [missing-keyword-in-override]
-
-class NarrowVariadic(Base):
-    def f(self, prefix: str, *items: str) -> None: ...  # error: [incompatible-method-override]
-```
-
 ## Overloads that drop the same keyword
 
 The override can use different names across overloads. Every base overload must still be callable by

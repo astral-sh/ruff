@@ -11,8 +11,8 @@ supertype. Applied to Python, this means:
 1. The return type of an overriding subclass method must be a subtype of the return type of the
     superclass method.
 
-Overrides that only drop the keyword name of a positional-or-keyword parameter are reported
-separately by `missing-keyword-in-override`.
+An otherwise compatible override that renames a positional-or-keyword parameter or makes it
+positional-only can trigger `missing-keyword-in-override`.
 
 ## Why is this bad?
 
@@ -88,8 +88,8 @@ Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
 ## Migrating from `invalid-method-override`
 
-`invalid-method-override` is an alias for `incompatible-method-override`. Keyword-only
-incompatibilities now use `missing-keyword-in-override`, which defaults to `error`.
+`invalid-method-override` is an alias for `incompatible-method-override`. The new
+`missing-keyword-in-override` rule defaults to `error`.
 
 To preserve a custom severity across the split, set both rules to that level. The following
 configuration preserves a previous setting of `warn`.
@@ -100,7 +100,7 @@ incompatible-method-override = "warn"
 missing-keyword-in-override = "warn"
 ```
 
-For keyword-only violations, update inline ignores to `# ty: ignore[missing-keyword-in-override]`.
+For diagnostics that moved to the new rule, use `# ty: ignore[missing-keyword-in-override]`.
 Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
 newly reported diagnostics before updating the baseline.
 
