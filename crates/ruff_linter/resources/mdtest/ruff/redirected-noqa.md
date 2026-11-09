@@ -51,6 +51,9 @@ help: Replace with `S307`
 
 A single fix updates both ends of a matched range so the comments continue to match.
 
+Note that the fix is unsafe because replacing the rule used in an unmatched `disable` comment could
+make it match an existing `enable` comment.
+
 ```py
 # snapshot: redirected-noqa
 # ruff: disable[F401, PGH001]
@@ -89,8 +92,8 @@ A `disable` without an explicit `enable` still suppresses the rule through the e
 
 ## Unmatched `enable` with the current code
 
-Replacing `PGH001` with `S307` would make the two comments match. The fix is unsafe because the
-call to `eval` would then fall outside the suppression range.
+As noted above, replacing `PGH001` with `S307` would make the two comments match. The fix is unsafe
+whether an `enable` comment becomes matched or not.
 
 ```py
 # snapshot: redirected-noqa
