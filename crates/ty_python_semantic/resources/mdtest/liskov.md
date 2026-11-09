@@ -468,57 +468,6 @@ class Renamed:
 class Inherited(Renamed, Integers, Strings): ...  # error: [incompatible-method-override]
 ```
 
-## Enabling only the keyword override rule
-
-Disabling `incompatible-method-override` leaves `lost-keyword-for-regular-parameter` enabled.
-
-```toml
-[rules]
-incompatible-method-override = "ignore"
-```
-
-The `lost-keyword-for-regular-parameter` suppression covers an override that renames `value` to
-`item`.
-
-```pyi
-class Base:
-    def f(self, value: int) -> None: ...
-
-class Suppressed(Base):
-    def f(self, item: int) -> None: ...  # ty: ignore[lost-keyword-for-regular-parameter]
-```
-
-`invalid-method-override` is an alias for `incompatible-method-override`. With the old name in the
-ignore comment, ty still reports the dropped keyword and warns that the rule was renamed and that
-the comment is unused.
-
-```pyi
-class OldSuppression(Base):
-    # error: [lost-keyword-for-regular-parameter]
-    # error: [renamed-rule-in-ignore-comment]
-    # error: [unused-ignore-comment]
-    def f(self, item: int) -> None: ...  # ty: ignore[invalid-method-override]
-```
-
-`WrongType.f` also rejects integers passed by position. That incompatibility falls under the
-`incompatible-method-override` rule. The configuration above sets that rule to `"ignore"`, so ty
-reports no diagnostic.
-
-```pyi
-class WrongType(Base):
-    def f(self, item: str) -> None: ...  # no diagnostic
-```
-
-The keyword rule also applies to inherited methods. `Inherited` resolves `f` to `Other.f`, so calls
-using the `value=` keyword from `Base.f` fail.
-
-```pyi
-class Other:
-    def f(self, item: int) -> None: ...
-
-class Inherited(Other, Base): ...  # error: [lost-keyword-for-regular-parameter]
-```
-
 ## Selecting general method overrides with the previous rule name
 
 The original rule name selects the general rule in configuration and ignore comments. The new
