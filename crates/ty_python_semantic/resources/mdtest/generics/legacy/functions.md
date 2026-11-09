@@ -2758,6 +2758,37 @@ def _(handlers: list[Callable[[str], str]]):
     register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
+## Nested calls with optional return context
+
+When checking `first(wrap(value))` against `T | None`, inferring the list element type from `value`
+preserves the caller's `T`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None
+
+def wrap(value: T) -> list[T]:
+    return [value]
+
+def find(value: T) -> T | None:
+    result: T | None = first(wrap(value))
+    reveal_type(result)  # revealed: T@find | None
+    return result
+```
+
+The same applies to the iterator passed to `next` when the caller's type variable has a bound.
+
+```py
+Bounded = TypeVar("Bounded", bound=int)
+
+def first_int(values: list[Bounded]) -> Bounded | None:
+    return next(iter(values), None)
+```
+
 ## Passing generic functions to generic functions
 
 ```py
