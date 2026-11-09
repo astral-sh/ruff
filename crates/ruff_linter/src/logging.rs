@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
@@ -16,6 +17,28 @@ use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
 
 pub static IDENTIFIERS: LazyLock<Mutex<Vec<&'static str>>> = LazyLock::new(Mutex::default);
+
+/// A stderr writer that treats a closed pipe as a successful write.
+///
+/// When a consumer such as `head` exits early, writing the fallback error from
+/// fern would otherwise panic while reporting the original `BrokenPipe` error.
+struct IgnoreBrokenPipe<W>(W);
+
+impl<W: Write> Write for IgnoreBrokenPipe<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self.0.write(buf) {
+            Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(buf.len()),
+            result => result,
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.0.flush() {
+            Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+            result => result,
+        }
+    }
+}
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
@@ -153,7 +176,7 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         .level_for("globset", log::LevelFilter::Warn)
         .level_for("ty_python_semantic", log::LevelFilter::Warn)
         .level_for("salsa", log::LevelFilter::Warn)
-        .chain(std::io::stderr())
+        .chain(Box::new(IgnoreBrokenPipe(std::io::stderr())))
         .apply()?;
     Ok(())
 }
@@ -281,7 +304,21 @@ enum ErrorLocation {
 
 #[cfg(test)]
 mod tests {
+    use super::IgnoreBrokenPipe;
     use crate::logging::LogLevel;
+    use std::io::{self, Write};
+
+    struct BrokenPipeWriter;
+
+    impl Write for BrokenPipeWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed pipe"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed pipe"))
+        }
+    }
 
     #[test]
     fn ordering() {
@@ -290,5 +327,13 @@ mod tests {
         assert!(LogLevel::Quiet > LogLevel::Silent);
         assert!(LogLevel::Verbose > LogLevel::Default);
         assert!(LogLevel::Verbose > LogLevel::Silent);
+    }
+
+    #[test]
+    fn ignore_broken_pipe_writer_swallows_write_errors() {
+        let mut writer = IgnoreBrokenPipe(BrokenPipeWriter);
+
+        assert_eq!(writer.write(b"message").unwrap(), 7);
+        writer.flush().unwrap();
     }
 }
