@@ -4,6 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
@@ -382,12 +383,43 @@ pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
     fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+        !self.0.borrow_mut().insert(ty.into())
     }
 }
 
 // Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
-type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+type CollectedTypes<'db> = SmallSet<CollectedType<'db>, 8>;
+
+/// A Salsa table ID uniquely identifies its value within the database used for the walk.
+/// A nominal instance and its class can wrap the same generic alias, but are distinct nodes.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+enum CollectedType<'db> {
+    Interned(salsa::Id),
+    Nominal(salsa::Id),
+    Other(Type<'db>),
+}
+
+impl<'db> From<Type<'db>> for CollectedType<'db> {
+    fn from(ty: Type<'db>) -> Self {
+        let id = match ty {
+            Type::NominalInstance(instance) => {
+                return instance
+                    .interned_identity()
+                    .map_or(Self::Other(ty), Self::Nominal);
+            }
+            Type::GenericAlias(alias) => alias.as_id(),
+            Type::Union(union) => union.as_id(),
+            Type::Intersection(intersection) => intersection.as_id(),
+            Type::TypeVar(variable) => variable.as_id(),
+            Type::FunctionLiteral(function) => function.as_id(),
+            Type::Callable(callable) => callable.as_id(),
+            Type::Recursive(recursive) => recursive.as_id(),
+            Type::EnumComplement(complement) => complement.as_id(),
+            _ => return Self::Other(ty),
+        };
+        Self::Interned(id)
+    }
+}
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
@@ -1289,12 +1321,12 @@ mod tests {
         ];
 
         for ty in types {
-            assert!(collected.insert(ty));
+            assert!(collected.insert(ty.into()));
         }
 
         assert!(collected.is_spilled());
-        assert!(!collected.insert(Type::Never));
-        assert!(!collected.insert(Type::SpecialForm(SpecialFormType::Any)));
-        assert!(collected.insert(Type::SpecialForm(SpecialFormType::Unknown)));
+        assert!(!collected.insert(Type::Never.into()));
+        assert!(!collected.insert(Type::SpecialForm(SpecialFormType::Any).into()));
+        assert!(collected.insert(Type::SpecialForm(SpecialFormType::Unknown).into()));
     }
 }

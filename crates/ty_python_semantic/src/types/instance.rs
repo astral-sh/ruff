@@ -8,6 +8,7 @@ use std::debug_assert_matches;
 use std::marker::PhantomData;
 
 use itertools::Itertools;
+use salsa::plumbing::AsId;
 
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
@@ -224,6 +225,19 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    pub(super) fn interned_identity(self) -> Option<salsa::Id> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(tuple.as_id()),
+            NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(class)) => {
+                Some(class.as_id())
+            }
+            NominalInstanceInner::NonTuple(NominalInstanceClass::InheritsFromExplicitAny(
+                class,
+            )) => Some(class.as_id()),
+            NominalInstanceInner::Object | NominalInstanceInner::SysVersionInfo => None,
+        }
+    }
+
     fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         Self(NominalInstanceInner::NonTuple(
             NominalInstanceClass::from_class(db, class),
