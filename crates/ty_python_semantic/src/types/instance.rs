@@ -9,10 +9,13 @@ use std::marker::PhantomData;
 
 use itertools::Itertools;
 
+use super::class::{
+    DynamicClassLiteral, DynamicEnumLiteral, DynamicNamedTupleLiteral, DynamicTypedDictLiteral,
+};
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, GenericAlias, KnownClass,
+    MaterializationKind, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -1575,7 +1578,12 @@ impl get_size2::GetSize for ExplicitAnyInstanceClass<'_> {}
 /// without increasing the size of [`Type`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum NominalInstanceClass<'db> {
-    Plain(ClassType<'db>),
+    Static(StaticClassLiteral<'db>),
+    Dynamic(DynamicClassLiteral<'db>),
+    DynamicEnum(DynamicEnumLiteral<'db>),
+    DynamicNamedTuple(DynamicNamedTupleLiteral<'db>),
+    DynamicTypedDict(DynamicTypedDictLiteral<'db>),
+    Generic(GenericAlias<'db>),
     InheritsFromExplicitAny(ExplicitAnyInstanceClass<'db>),
 }
 
@@ -1584,7 +1592,22 @@ impl<'db> NominalInstanceClass<'db> {
         if class.class_literal(db).inherits_from_explicit_any(db) {
             Self::InheritsFromExplicitAny(ExplicitAnyInstanceClass::new(db, class))
         } else {
-            Self::Plain(class)
+            Self::plain(class)
+        }
+    }
+
+    const fn plain(class: ClassType<'db>) -> Self {
+        match class {
+            ClassType::NonGeneric(ClassLiteral::Static(class)) => Self::Static(class),
+            ClassType::NonGeneric(ClassLiteral::Dynamic(class)) => Self::Dynamic(class),
+            ClassType::NonGeneric(ClassLiteral::DynamicEnum(class)) => Self::DynamicEnum(class),
+            ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(class)) => {
+                Self::DynamicNamedTuple(class)
+            }
+            ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(class)) => {
+                Self::DynamicTypedDict(class)
+            }
+            ClassType::Generic(class) => Self::Generic(class),
         }
     }
 
@@ -1596,17 +1619,26 @@ impl<'db> NominalInstanceClass<'db> {
     #[inline]
     fn class(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
-            Self::Plain(class) => class,
+            Self::Static(class) => ClassType::NonGeneric(ClassLiteral::Static(class)),
+            Self::Dynamic(class) => ClassType::NonGeneric(ClassLiteral::Dynamic(class)),
+            Self::DynamicEnum(class) => ClassType::NonGeneric(ClassLiteral::DynamicEnum(class)),
+            Self::DynamicNamedTuple(class) => {
+                ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(class))
+            }
+            Self::DynamicTypedDict(class) => {
+                ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(class))
+            }
+            Self::Generic(class) => ClassType::Generic(class),
             Self::InheritsFromExplicitAny(class) => class.class(db),
         }
     }
 
     fn with_class(self, db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match self {
-            Self::Plain(_) => Self::Plain(class),
             Self::InheritsFromExplicitAny(_) => {
                 Self::InheritsFromExplicitAny(ExplicitAnyInstanceClass::new(db, class))
             }
+            _ => Self::plain(class),
         }
     }
 }
@@ -1753,7 +1785,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
     ) -> Option<NominalInstanceType<'db>> {
         self.class_origin(db).map(|origin| {
-            NominalInstanceType(NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(
+            NominalInstanceType(NominalInstanceInner::NonTuple(NominalInstanceClass::plain(
                 *origin,
             )))
         })
