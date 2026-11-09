@@ -361,12 +361,13 @@ impl MemberExprBuilder {
             )),
             // Handle bytes literal subscripts, like `x[b"key"]`.
             ast::Expr::BytesLiteral(bytes) => {
-                let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
-                let text = String::from_utf8_lossy(&bytes_vec);
-                Some((
-                    SegmentKind::BytesSubscript,
-                    MemberPathPart::Owned(CharString::from(text.as_ref())),
-                ))
+                let escaped = bytes
+                    .value
+                    .bytes()
+                    .flat_map(std::ascii::escape_default)
+                    .map(char::from)
+                    .collect();
+                Some((SegmentKind::BytesSubscript, MemberPathPart::Owned(escaped)))
             }
             _ => None,
         }
