@@ -173,6 +173,11 @@ impl<'db> Type<'db> {
         Type::Callable(CallableType::paramspec_value(db, parameters))
     }
 
+    /// Returns whether this type can be used as a callable.
+    pub fn is_callable(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        self.try_upcast_to_callable(db, env).is_some()
+    }
+
     pub(crate) fn try_upcast_to_callable(
         self,
         db: &'db dyn Db,

@@ -741,12 +741,33 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
     }
 
-    fn classify_from_alias_type(
+    fn classify_imported_symbol(
         &self,
-        ty: Type,
-        local_name: &ast::Identifier,
+        alias: &ast::Alias,
+        definitions: &[ResolvedDefinition<'db>],
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
-        self.classify_from_type_and_name_str(ty, local_name.id.as_str())
+        if let Some(classification) =
+            self.classify_type_alias_from_resolved_definitions(definitions)
+        {
+            return Some(classification);
+        }
+
+        let ty = alias.inferred_type(self.model)?;
+        let classification = self.classify_from_type_and_name_str(ty, alias.name.as_str())?;
+        // A decorator can wrap a function in a callable object or replace it with a value.
+        if classification.0 == SemanticTokenType::Variable
+            && !ty.is_subclass_of()
+            && !definitions.is_empty()
+            && definitions.iter().all(|resolved| {
+                resolved.definition().is_some_and(|def| {
+                    matches!(def.kind(self.model.db()), DefinitionKind::Function(_))
+                })
+            })
+            && ty.is_callable(self.model.db(), &self.model.program_environment())
+        {
+            return Some((SemanticTokenType::Function, SemanticTokenModifier::empty()));
+        }
+        Some(classification)
     }
 
     // Visit parameters for a function or lambda expression and classify
@@ -947,22 +968,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                         alias.name.as_str(),
                         ImportAliasResolution::ResolveAliases,
                     );
-                    let classification = if !definitions.is_empty()
-                        && definitions.iter().all(|resolved| {
-                            resolved.definition().is_some_and(|def| {
-                                matches!(def.kind(self.model.db()), DefinitionKind::Function(_))
-                            })
-                        }) {
-                        Some((SemanticTokenType::Function, SemanticTokenModifier::empty()))
-                    } else {
-                        self.classify_type_alias_from_resolved_definitions(&definitions)
-                            .or_else(|| {
-                                let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
-                                self.classify_from_alias_type(ty, &alias.name)
-                            })
-                    };
-
-                    if let Some((token_type, modifiers)) = classification {
+                    if let Some((token_type, modifiers)) =
+                        self.classify_imported_symbol(alias, &definitions)
+                    {
                         // Add token for the imported name (Y in "from X import Y" or "from X import Y as Z")
                         self.add_token(&alias.name, token_type, modifiers);
 
@@ -4938,7 +4946,8 @@ def foo(self, **key, value=10):
 
     #[test]
     fn imported_decorated_function() {
-        let mut test = SemanticTokenTest::new("from funcs import wrapper as alias\nalias(1)\n");
+        let mut test =
+            SemanticTokenTest::new("from funcs import wrapper as alias, ANSWER\nalias(1)\n");
         test.db
             .write_file(
                 SystemPath::new("src/funcs.py"),
@@ -4949,6 +4958,12 @@ def original(a, b): ...
 
 @wraps(original)
 def wrapper(a): ...
+
+def constant(func) -> int:
+    return 42
+
+@constant
+def ANSWER(): ...
 ",
             )
             .unwrap();
@@ -4957,8 +4972,9 @@ def wrapper(a): ...
         "funcs" @ 5..10: Namespace
         "wrapper" @ 18..25: Function
         "alias" @ 29..34: Function
-        "alias" @ 35..40: Function
-        "1" @ 41..42: Number
+        "ANSWER" @ 36..42: Variable [readonly]
+        "alias" @ 43..48: Function
+        "1" @ 49..50: Number
         "#);
     }
 
