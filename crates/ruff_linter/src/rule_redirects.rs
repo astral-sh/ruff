@@ -13,8 +13,14 @@ pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str
     REDIRECTS.get_key_value(selector).map(|(k, v)| (*k, *v))
 }
 
+/// Former rule names and their current rules.
+pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[(
+    "missing-return-type-undocumented-public-function",
+    Rule::MissingReturnTypePublicFunction,
+)];
+
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    HashMap::from_iter([
+    let mut redirects = HashMap::from([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
         // The following are deprecated.
@@ -136,11 +142,13 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("TCH006", "TC010"),
         ("TCH010", "TC010"),
         ("RUF035", "S704"),
-        (
-            "missing-return-type-undocumented-public-function",
-            Rule::MissingReturnTypePublicFunction.name().as_str(),
-        ),
-    ])
+    ]);
+    redirects.extend(
+        RULE_NAME_REDIRECTS
+            .iter()
+            .map(|&(old_name, rule)| (old_name, rule.name().as_str())),
+    );
+    redirects
 });
 
 #[cfg(test)]
