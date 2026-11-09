@@ -498,7 +498,7 @@ def bounded(value: BoundedS) -> None:
     reveal_type(box(value))  # revealed: list[BoundedS@bounded]
 
 def contextual(value: str, existing: S) -> list[S]:
-    return box(value)  # error: [invalid-return-statement]
+    return box(value)  # error: [invalid-explicit-return]
 
 def compatible_context(value: BoundedS) -> list[BoundedS]:
     return box(value)  # ok
@@ -1335,7 +1335,7 @@ def good_return(x: T) -> T:
     return x
 
 def bad_return(x: T) -> T:
-    # error: [invalid-return-statement] "Return type does not match returned value: expected `T@bad_return`, found `int`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `T@bad_return`, found `int`"
     return x + 1
 ```
 
@@ -1371,7 +1371,7 @@ def different_types(cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-statement] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
         return s
 
 def same_types(cond: bool, t1: T, t2: T) -> T:
@@ -3686,7 +3686,7 @@ V = TypeVar("V", bound=int)
 
 def bounded(value: U) -> U:
     reveal_type(double(value))  # revealed: int
-    return double(value)  # error: [invalid-return-statement]
+    return double(value)  # error: [invalid-explicit-return]
 
 def same_bound(value: V) -> None:
     reveal_type(double(value))  # revealed: int

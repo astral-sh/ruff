@@ -1515,7 +1515,7 @@ class Box[T]:
 def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
         reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
-        return value  # error: [invalid-return-statement]
+        return value  # error: [invalid-explicit-return]
 
     reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
     raise TypeError
@@ -2063,7 +2063,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[object]
         reveal_type(list(value))
-        # error: [invalid-return-statement]
+        # error: [invalid-explicit-return]
         # revealed: list[object]
         return reveal_type(list(value))
     raise NotImplementedError

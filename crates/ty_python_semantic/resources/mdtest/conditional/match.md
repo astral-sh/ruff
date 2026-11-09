@@ -84,14 +84,14 @@ def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
         case int(), str():
             return 1
 
-def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [missing-return-statement]
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-implicit-return]
     match value:
         case [int(real=0)]:
             return 1
 
 def guarded_exact_sequence_pattern_is_not_exhaustive(
     value: tuple[int, str], flag: bool
-) -> int:  # error: [missing-return-statement]
+) -> int:  # error: [invalid-implicit-return]
     match value:
         case [int(), str()] if flag:
             return 1
@@ -254,12 +254,12 @@ def tuple_subclass(value: TupleSubclass) -> int:  # ok
 A guard or a refutable attribute pattern can still leave values unmatched:
 
 ```py
-def guarded(value: Point, flag: bool) -> int:  # error: [missing-return-statement] "can implicitly return `None`"
+def guarded(value: Point, flag: bool) -> int:  # error: [invalid-implicit-return] "can implicitly return `None`"
     match value:
         case Point() if flag:
             return 42
 
-def refutable(value: Point) -> int:  # error: [missing-return-statement] "can implicitly return `None`"
+def refutable(value: Point) -> int:  # error: [invalid-implicit-return] "can implicitly return `None`"
     match value:
         case Point(x=True):
             return 42

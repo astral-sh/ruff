@@ -639,19 +639,19 @@ def foo() -> TypeOf[foo]:  # error: [unresolved-reference]
     return foo
 
 def foo() -> TypeOf[foo]:
-    return foo  # error: [invalid-return-statement]
+    return foo  # error: [invalid-explicit-return]
 
 def foo() -> TypeOf[foo]:
-    return foo  # error: [invalid-return-statement]
+    return foo  # error: [invalid-explicit-return]
 
 def foo() -> TypeOf[foo]:
-    return foo  # error: [invalid-return-statement]
+    return foo  # error: [invalid-explicit-return]
 
 def foo() -> TypeOf[foo]:
-    return foo  # error: [invalid-return-statement]
+    return foo  # error: [invalid-explicit-return]
 
 def foo() -> TypeOf[foo]:
-    return foo  # error: [invalid-return-statement]
+    return foo  # error: [invalid-explicit-return]
 
 # Truncated after 4 levels of function type nesting:
 reveal_type(foo)  # revealed: def foo() -> def foo() -> def foo() -> def foo() -> def foo(...)

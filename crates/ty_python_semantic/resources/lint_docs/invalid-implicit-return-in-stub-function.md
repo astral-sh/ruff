@@ -1,9 +1,10 @@
 ## What it does
 
-Detects functions with empty bodies that have a non-`None` return type annotation.
+Detects functions with stub-like bodies whose return type excludes `None`. ty accepts the old name
+`empty-body` and warns about the rename in configuration and inline ignores.
 
-The errors reported by this rule have the same motivation as the `missing-return-statement` rule.
-The diagnostic exists as a separate error code to allow users to disable this rule while prototyping
+The errors reported by this rule have the same motivation as the `invalid-implicit-return` rule. The
+diagnostic exists as a separate error code to allow users to disable this rule while prototyping
 code. While we strongly recommend enabling this rule if possible, users migrating from other type
 checkers may also find it useful to temporarily disable this rule on some or all of their codebase
 if they find it results in a large number of diagnostics.
@@ -26,10 +27,15 @@ rather than implementations:
 ## Examples
 
 ```python
-def foo() -> int: ...  # error: [empty-body]
+def foo() -> int: ...  # error: [invalid-implicit-return-in-stub-function]
 
 
-def bar() -> str:  # error: [empty-body]
+def bar() -> str:  # error: [invalid-implicit-return-in-stub-function]
     """A function that does nothing."""
     pass
 ```
+
+## Rule history
+
+- v0.0.14: Split from `invalid-return-type` as `empty-body`.
+- v0.0.101: Renamed from `empty-body` to `invalid-implicit-return-in-stub-function`.

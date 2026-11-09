@@ -769,5 +769,5 @@ def keep[U](values: list[U]) -> list[U]:
 def make[T](arg: T) -> list[T]:
     values = [42]
     reveal_type(values)  # revealed: list[int]
-    return keep(values)  # error: [invalid-return-statement]
+    return keep(values)  # error: [invalid-explicit-return]
 ```

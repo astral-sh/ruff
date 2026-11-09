@@ -934,7 +934,7 @@ def return_invalid_literal() -> TD:
     # TODO: Report only the missing key here, as in `return_invalid_dict` below.
     #
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-    # error: [invalid-return-statement]
+    # error: [invalid-explicit-return]
     return {}
 
 def return_invalid_dict() -> TD:
@@ -2157,7 +2157,7 @@ def b_from_c(c: C) -> B:
     return c  # allowed
 
 def a_from_b(b: B) -> A:
-    # error: [invalid-return-statement] "Return type does not match returned value: expected `A`, found `B`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `A`, found `B`"
     return b
 
 # The error on the return statement above prevents us from assigning an invalid value to c['y'].
@@ -2185,7 +2185,7 @@ class A3(TypedDict):
     y: NotRequired[ReadOnly[int]]  # not assignable from `object`
 
 def a3_from_b(b: B) -> A3:
-    return b  # error: [invalid-return-statement]
+    return b  # error: [invalid-explicit-return]
 ```
 
 ## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
@@ -9529,7 +9529,7 @@ def as_mapping(value: Recursive) -> Mapping[str, object]:
     return value
 
 def as_dict(value: Recursive) -> dict[str, bool]:
-    return value  # error: [invalid-return-statement]
+    return value  # error: [invalid-explicit-return]
 
 def update(value: Recursive) -> None:
     value.update({"child": value})

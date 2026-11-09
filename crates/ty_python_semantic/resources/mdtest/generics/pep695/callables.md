@@ -1723,7 +1723,7 @@ class Box[C]:
             result = other.pair(n)
             # revealed: tuple[T@pair, int]
             reveal_type(result)
-            return result  # error: [invalid-return-statement]
+            return result  # error: [invalid-explicit-return]
 
         return self.value, arg
 ```

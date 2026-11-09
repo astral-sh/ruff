@@ -223,16 +223,16 @@ type Sixteen[T] = Quad[Quad[T]]
 type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
 
 def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
-    return source  # snapshot: invalid-return-statement
+    return source  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:7:12
   |
 6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
   |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
-7 |     return source  # snapshot: invalid-return-statement
+7 |     return source  # snapshot: invalid-explicit-return
   |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
 info: the second tuple element is not compatible: `int` is not assignable to `str`
 ```
@@ -249,16 +249,16 @@ class Receiver:
         return 0
 
 def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
-    return receiver.method  # snapshot: invalid-return-statement
+    return receiver.method  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:15:12
    |
 14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
    |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
-15 |     return receiver.method  # snapshot: invalid-return-statement
+15 |     return receiver.method  # snapshot: invalid-explicit-return
    |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
 info: the second parameter has an incompatible type: `str` is not assignable to `int`
 ```
@@ -915,7 +915,7 @@ def f(d: D) -> Mapping[str, int]:
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:40:12
    |
 39 | def f(d: D) -> Mapping[str, int]:
@@ -944,7 +944,7 @@ def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:8:12
   |
 7 | def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
@@ -1422,16 +1422,16 @@ class Source[T](HasPacket[T], Protocol):
     def __call__(self, x: str) -> Source[tuple[T]]: ...
 
 def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
-    return source  # snapshot: invalid-return-statement
+    return source  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:18:12
    |
 17 | def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
    |                                     --------------------------------------------- Expected `((int, /) -> Source[str]) | HasPacket[str]` because of return type
-18 |     return source  # snapshot: invalid-return-statement
+18 |     return source  # snapshot: invalid-explicit-return
    |            ^^^^^^ expected `((int, /) -> Source[str]) | HasPacket[str]`, found `Source[bytes]`
 info: type `Source[bytes]` is not assignable to any element of the union `((int, /) -> Source[str]) | HasPacket[str]`
 info: ├── type `Source[bytes]` has inferred callable type `Overload[(x: int) -> Source[bytes], (x: str) -> Source[tuple[bytes]]]`
@@ -2073,20 +2073,20 @@ def _(source: tuple[bool, bool]):
 
 ## Error context in other scenarios
 
-### In `invalid-return-statement` diagnostics
+### In `invalid-explicit-return` diagnostics
 
 ```py
 def f() -> tuple[int, str]:
-    return 1, b""  # snapshot: invalid-return-statement
+    return 1, b""  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:2:12
   |
 1 | def f() -> tuple[int, str]:
   |            --------------- Expected `tuple[int, str]` because of return type
-2 |     return 1, b""  # snapshot: invalid-return-statement
+2 |     return 1, b""  # snapshot: invalid-explicit-return
   |            ^^^^^^ expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```

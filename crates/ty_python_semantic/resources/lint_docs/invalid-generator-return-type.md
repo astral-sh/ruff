@@ -1,14 +1,13 @@
 ## What it does
 
 Checks whether a generator function's return annotation allows the generator object it produces.
+This applies to both synchronous and asynchronous generators.
 
 ## Why is this bad?
 
-Calling a generator function produces a generator object. A synchronous generator function's
-return-type annotation must be a supertype of `types.GeneratorType[Never, object, Never]`, and an
-asynchronous generator function's return-type annotation must be a supertype of
-`types.AsyncGeneratorType[Never, object]`. Other return-type annotations contradict what the
-function does, so must be disallowed.
+A caller that relies on an incompatible annotation can fail at runtime. For example, calling a
+generator function annotated with `-> int` produces a generator object even if every value it yields
+is an integer.
 
 ## Examples
 
@@ -22,20 +21,16 @@ def numbers() -> int:
 
 
 # error: [invalid-generator-return-type]
-async def numbers() -> Generator[int]:
+async def async_numbers() -> Generator[int]:
     yield 1
 ```
 
-Use instead:
+Both functions yield integers. Annotate `numbers` with `collections.abc.Generator[int]` and
+`async_numbers` with `collections.abc.AsyncGenerator[int]`.
 
-```py
-from collections.abc import AsyncGenerator, Generator
+An incompatible explicit `return` inside a synchronous generator is reported by
+`invalid-explicit-return`.
 
+## Rule history
 
-def numbers() -> Generator[int]:
-    yield 1
-
-
-async def numbers() -> AsyncGenerator[int]:
-    yield 1
-```
+- v0.0.101: Split from `invalid-return-type`.

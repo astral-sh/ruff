@@ -940,7 +940,7 @@ as a wrapper around a callback that accepts no arguments.
 
 ```py
 def erase_parameters(job: Job[P]) -> Job[[]]:
-    return job  # error: [invalid-return-statement]
+    return job  # error: [invalid-explicit-return]
 ```
 
 The same restriction applies in the other direction when a class consumes callbacks. A consumer of
@@ -953,7 +953,7 @@ class CallbackConsumer(Generic[P_co]):
     def consume(self, callback: Callable[P_co, None]) -> None: ...
 
 def broaden_parameters(consumer: CallbackConsumer[[]]) -> CallbackConsumer[P_co]:
-    return consumer  # error: [invalid-return-statement]
+    return consumer  # error: [invalid-explicit-return]
 ```
 
 ## Inferring an invariant `ParamSpec` through `Concatenate`

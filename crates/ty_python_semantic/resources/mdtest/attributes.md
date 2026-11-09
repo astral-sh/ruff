@@ -296,7 +296,7 @@ even when augmented assignments recursively look up that attribute.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -358,7 +358,7 @@ introduce `Unknown` into its instance attribute type.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py

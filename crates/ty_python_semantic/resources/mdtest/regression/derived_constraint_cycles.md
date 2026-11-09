@@ -161,7 +161,7 @@ OptionSequence: TypeAlias = Iterable[V_co] | Compatible
 
 def convert(obj: OptionSequence[V_co]) -> list[V_co]:
     if isinstance(obj, float):
-        return [obj]  # ty: ignore[invalid-return-statement]
+        return [obj]  # ty: ignore[invalid-explicit-return]
     return []
 ```
 

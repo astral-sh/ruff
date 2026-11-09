@@ -16,16 +16,16 @@ use crate::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
             INVALID_PARAMSPEC, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-            TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
+            TYPE_ASSERTION_FAILURE, UNSOUND_RETURN, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-            report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_statement, report_invalid_runtime_checkable,
+            report_implicit_return_type, report_invalid_explicit_return,
+            report_invalid_generator_function_return_type, report_invalid_runtime_checkable,
             report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
-            report_unsound_return_statement,
+            report_unsound_return,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -271,14 +271,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .ty
                             .is_assignable_to(db, env, expected_return_ty)
                         {
-                            report_invalid_return_statement(
+                            report_invalid_explicit_return(
                                 &self.context,
                                 return_statement.range,
                                 returns.range(),
                                 expected_return_ty,
                                 return_statement.ty,
                             );
-                        } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                        } else if self.context.is_lint_enabled(&UNSOUND_RETURN)
                             && expected_return_ty.is_fully_static(db, env)
                             && !return_statement.ty.is_pure_redundant_with(
                                 db,
@@ -288,7 +288,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
                             // update those too if updating this!
-                            report_unsound_return_statement(
+                            report_unsound_return(
                                 &self.context,
                                 return_statement.range,
                                 returns.range(),
@@ -332,20 +332,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
             {
                 if !accepts(return_statement.ty, TypeRelation::Assignability) {
-                    report_invalid_return_statement(
+                    report_invalid_explicit_return(
                         &self.context,
                         return_statement.range,
                         returns.range(),
                         *declared_ty,
                         return_statement.ty,
                     );
-                } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                } else if self.context.is_lint_enabled(&UNSOUND_RETURN)
                     && public.is_fully_static(db, env)
                     && !accepts(return_statement.ty, TypeRelation::Redundancy { pure: true })
                 {
                     // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
                     // update those too if updating this!
-                    report_unsound_return_statement(
+                    report_unsound_return(
                         &self.context,
                         return_statement.range,
                         returns.range(),

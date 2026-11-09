@@ -3,7 +3,7 @@
 Detects `return` statements that unsoundly return a type that is not a [subtype] of the function's
 annotated return type.
 
-This lint is a stricter version of `invalid-return-statement`.
+This lint is a stricter version of `invalid-explicit-return`.
 
 ## Why is this bad?
 
@@ -115,6 +115,12 @@ Python code.
 - `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound
     `return` statements
 - `unsound-assignment` is a similar rule that triggers on unsound assignments
+
+## Rule history
+
+- v0.0.70: Added as `unsound-return-statement`.
+- v0.0.101: Renamed to `unsound-return`. ty accepts `unsound-return-statement` in configuration and
+    ignore comments and warns about the rename.
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/

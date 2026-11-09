@@ -2447,7 +2447,7 @@ static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
 static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 
 def invalid(source: Top[Source]) -> Bottom[Target]:
-    return source  # error: [invalid-return-statement]
+    return source  # error: [invalid-explicit-return]
 ```
 
 ### Members outside the protocol interface

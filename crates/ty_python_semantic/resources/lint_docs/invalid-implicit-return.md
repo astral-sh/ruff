@@ -20,7 +20,7 @@ from hashlib import sha256
 from typing import BinaryIO
 
 
-# error: [missing-return-statement]
+# error: [invalid-implicit-return]
 def sign(x: int) -> int:
     """Compute the sign of the integer passed in"""
     if x < 0:
@@ -32,7 +32,7 @@ def sign(x: int) -> int:
     # No valid sign exists for `0`, so adjusting the return annotation is appropriate here
 
 
-# error: [missing-return-statement]
+# error: [invalid-implicit-return]
 def sale_price(price_in_cents: int, *, on_sale: bool) -> int:
     """If `on_sale` is `True`, return half the usual price; otherwise, return the usual price"""
     if on_sale:
@@ -42,7 +42,7 @@ def sale_price(price_in_cents: int, *, on_sale: bool) -> int:
     # This function is missing a `return price_in_cents` statement at the end.
 
 
-# error: [missing-return-statement]
+# error: [invalid-implicit-return]
 def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
     """Yield chunks of bytes and return the file's SHA-256 digest when the stream ends."""
     checksum = sha256()
@@ -90,3 +90,7 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 
     return checksum.hexdigest()
 ```
+
+## Rule history
+
+- v0.0.101: Split from `invalid-return-type`.

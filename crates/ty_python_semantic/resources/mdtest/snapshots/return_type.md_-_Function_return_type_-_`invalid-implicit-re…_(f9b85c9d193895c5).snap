@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: return_type.md - Function return type - Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
+mdtest name: return_type.md - Function return type - `invalid-implicit-return-in-stub-function` in a concrete subclass of a protocol
 mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ---
 
@@ -19,16 +19,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 4 |     def method(self) -> str: ...
 5 | 
 6 | class Concrete(Abstract):
-7 |     def method(self) -> str: ...  # error: [empty-body]
+7 |     def method(self) -> str: ...  # error: [invalid-implicit-return-in-stub-function]
 ```
 
 # Diagnostics
 
 ```
-error[empty-body]: Function always implicitly returns `None`, which is not assignable to return type `str`
+error[invalid-implicit-return-in-stub-function]: Function always implicitly returns `None`, which is not assignable to return type `str`
  --> src/mdtest_snippet.py:7:25
   |
-7 |     def method(self) -> str: ...  # error: [empty-body]
+7 |     def method(self) -> str: ...  # error: [invalid-implicit-return-in-stub-function]
   |                         ^^^
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: Functions with empty bodies and non-`None` return types are only permitted:

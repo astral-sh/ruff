@@ -3344,7 +3344,7 @@ parameter types do not contribute `Unknown` to the inferred return type:
 python-version = "3.13"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -3563,19 +3563,19 @@ def make_list() -> list[str]:
     result = list()
     result.append(1)
     reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-statement]
+    return result  # error: [invalid-explicit-return]
 
 def make_set() -> set[str]:
     result = set()
     result.add(1)
     reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-statement]
+    return result  # error: [invalid-explicit-return]
 
 def make_dict() -> dict[str, str]:
     result = dict()
     result["x"] = 1
     reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-statement]
+    return result  # error: [invalid-explicit-return]
 
 set_alias = set
 aliased_result = set_alias()
@@ -3653,7 +3653,7 @@ def _() -> list[int | None]:
 
 def _() -> int:
     invalid_x6 = []
-    return invalid_x6  # error: [invalid-return-statement]
+    return invalid_x6  # error: [invalid-explicit-return]
 ```
 
 A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list

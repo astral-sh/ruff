@@ -140,7 +140,7 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
-        # error: [invalid-return-statement] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
+        # error: [invalid-explicit-return] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
         return await self.response.__aenter__()
 ```
 

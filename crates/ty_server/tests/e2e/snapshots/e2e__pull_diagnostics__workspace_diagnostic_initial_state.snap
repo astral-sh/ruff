@@ -39,7 +39,7 @@ WorkspaceDiagnosticReport {
                             ),
                             code: Some(
                                 String(
-                                    "invalid-return-statement",
+                                    "invalid-explicit-return",
                                 ),
                             ),
                             code_description: Some(
@@ -58,7 +58,7 @@ WorkspaceDiagnosticReport {
                                         path: "/rules",
                                         query: None,
                                         fragment: Some(
-                                            "invalid-return-statement",
+                                            "invalid-explicit-return",
                                         ),
                                     },
                                 },
@@ -112,7 +112,7 @@ WorkspaceDiagnosticReport {
                             ),
                             code: Some(
                                 String(
-                                    "invalid-return-statement",
+                                    "invalid-explicit-return",
                                 ),
                             ),
                             code_description: Some(
@@ -131,7 +131,7 @@ WorkspaceDiagnosticReport {
                                         path: "/rules",
                                         query: None,
                                         fragment: Some(
-                                            "invalid-return-statement",
+                                            "invalid-explicit-return",
                                         ),
                                     },
                                 },
@@ -185,7 +185,7 @@ WorkspaceDiagnosticReport {
                             ),
                             code: Some(
                                 String(
-                                    "invalid-return-statement",
+                                    "invalid-explicit-return",
                                 ),
                             ),
                             code_description: Some(
@@ -204,7 +204,7 @@ WorkspaceDiagnosticReport {
                                         path: "/rules",
                                         query: None,
                                         fragment: Some(
-                                            "invalid-return-statement",
+                                            "invalid-explicit-return",
                                         ),
                                     },
                                 },
@@ -260,7 +260,7 @@ WorkspaceDiagnosticReport {
                             ),
                             code: Some(
                                 String(
-                                    "invalid-return-statement",
+                                    "invalid-explicit-return",
                                 ),
                             ),
                             code_description: Some(
@@ -279,7 +279,7 @@ WorkspaceDiagnosticReport {
                                         path: "/rules",
                                         query: None,
                                         fragment: Some(
-                                            "invalid-return-statement",
+                                            "invalid-explicit-return",
                                         ),
                                     },
                                 },

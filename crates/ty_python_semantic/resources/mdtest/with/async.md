@@ -153,7 +153,7 @@ An exception raised while evaluating an awaited return expression can be suppres
 async def may_raise() -> str:
     raise ValueError
 
-async def interrupted_return() -> str:  # error: [missing-return-statement]
+async def interrupted_return() -> str:  # error: [invalid-implicit-return]
     async with Suppresses():
         return await may_raise()
 ```

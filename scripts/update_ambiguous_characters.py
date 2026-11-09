@@ -10,7 +10,7 @@
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
+# unsound-return = "warn"
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
@@ -66,7 +66,7 @@ def get_mapping_data() -> dict[str, list[int]]:
     # The content is a JSON object literal wrapped in a JSON string, so double decode:
     mapping_data = json.loads(json.loads(content))
     assert isinstance(mapping_data, dict)
-    return mapping_data  # ty: ignore[unsound-return-statement]
+    return mapping_data  # ty: ignore[unsound-return]
 
 
 def format_number(number: int) -> str:

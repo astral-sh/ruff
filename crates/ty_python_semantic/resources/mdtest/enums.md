@@ -2442,7 +2442,7 @@ bound. Their `Self` type preserves the particular member at call sites.
 python-version = "3.11"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2481,7 +2481,7 @@ An ordinary type variable bounded by an enum has the same special attributes as 
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2509,7 +2509,7 @@ from every possible enum.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py

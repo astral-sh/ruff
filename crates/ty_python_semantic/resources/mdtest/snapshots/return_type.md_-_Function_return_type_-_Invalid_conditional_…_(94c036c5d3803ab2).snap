@@ -17,22 +17,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  2 |     if cond:
  3 |         return "a"
  4 |     else:
- 5 |         # error: [invalid-return-statement]
+ 5 |         # error: [invalid-explicit-return]
  6 |         return 1
  7 | 
  8 | def f(cond: bool) -> str:
  9 |     if cond:
-10 |         # error: [invalid-return-statement]
+10 |         # error: [invalid-explicit-return]
 11 |         return 1
 12 |     else:
-13 |         # error: [invalid-return-statement]
+13 |         # error: [invalid-explicit-return]
 14 |         return 2
 ```
 
 # Diagnostics
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:6:16
   |
 1 | def f(cond: bool) -> str:
@@ -40,27 +40,27 @@ error[invalid-return-statement]: Return type does not match returned value
 2 |     if cond:
 3 |         return "a"
 4 |     else:
-5 |         # error: [invalid-return-statement]
+5 |         # error: [invalid-explicit-return]
 6 |         return 1
   |                ^ expected `str`, found `Literal[1]`
 
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:11:16
    |
  8 | def f(cond: bool) -> str:
    |                      --- Expected `str` because of return type
  9 |     if cond:
-10 |         # error: [invalid-return-statement]
+10 |         # error: [invalid-explicit-return]
 11 |         return 1
    |                ^ expected `str`, found `Literal[1]`
 
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:14:16
    |
 14 |         return 2

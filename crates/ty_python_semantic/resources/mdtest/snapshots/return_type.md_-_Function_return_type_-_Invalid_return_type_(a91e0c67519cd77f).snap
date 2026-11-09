@@ -13,42 +13,42 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ## mdtest_snippet.py
 
 ```
- 1 | # error: [missing-return-statement]
+ 1 | # error: [invalid-implicit-return]
  2 | def f() -> int:
  3 |     1
  4 | 
  5 | def f() -> str:
- 6 |     # error: [invalid-return-statement]
+ 6 |     # error: [invalid-explicit-return]
  7 |     return 1
  8 | 
  9 | def f() -> int:
-10 |     # error: [invalid-return-statement]
+10 |     # error: [invalid-explicit-return]
 11 |     return
 12 | 
 13 | from typing import TypeVar
 14 | 
 15 | T = TypeVar("T")
 16 | 
-17 | # error: [empty-body]
+17 | # error: [invalid-implicit-return-in-stub-function]
 18 | def m(x: T) -> T: ...
 19 | 
 20 | class A[T]: ...
 21 | 
 22 | def f() -> A[int]:
 23 |     class A[T]: ...
-24 |     return A[int]()  # error: [invalid-return-statement]
+24 |     return A[int]()  # error: [invalid-explicit-return]
 25 | 
 26 | class B: ...
 27 | 
 28 | def g() -> B:
 29 |     class B: ...
-30 |     return B()  # error: [invalid-return-statement]
+30 |     return B()  # error: [invalid-explicit-return]
 ```
 
 # Diagnostics
 
 ```
-error[missing-return-statement]: Function always implicitly returns `None`, which is not assignable to return type `int`
+error[invalid-implicit-return]: Function always implicitly returns `None`, which is not assignable to return type `int`
  --> src/mdtest_snippet.py:2:12
   |
 2 | def f() -> int:
@@ -58,31 +58,31 @@ info: Consider changing the return annotation to `-> None` or adding a `return` 
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:7:12
   |
 5 | def f() -> str:
   |            --- Expected `str` because of return type
-6 |     # error: [invalid-return-statement]
+6 |     # error: [invalid-explicit-return]
 7 |     return 1
   |            ^ expected `str`, found `Literal[1]`
 
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:11:5
    |
  9 | def f() -> int:
    |            --- Expected `int` because of return type
-10 |     # error: [invalid-return-statement]
+10 |     # error: [invalid-explicit-return]
 11 |     return
    |     ^^^^^^ expected `int`, found `None`
 
 ```
 
 ```
-error[empty-body]: Function always implicitly returns `None`, which is not assignable to return type `T@m`
+error[invalid-implicit-return-in-stub-function]: Function always implicitly returns `None`, which is not assignable to return type `T@m`
   --> src/mdtest_snippet.py:18:16
    |
 18 | def m(x: T) -> T: ...
@@ -97,25 +97,25 @@ info:  - or as `@abstractmethod`-decorated methods on abstract classes
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:24:12
    |
 22 | def f() -> A[int]:
    |            ------ Expected `mdtest_snippet.A[int]` because of return type
 23 |     class A[T]: ...
-24 |     return A[int]()  # error: [invalid-return-statement]
+24 |     return A[int]()  # error: [invalid-explicit-return]
    |            ^^^^^^^^ expected `mdtest_snippet.A[int]`, found `mdtest_snippet.<locals of function 'f'>.A[int]`
 
 ```
 
 ```
-error[invalid-return-statement]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:30:12
    |
 28 | def g() -> B:
    |            - Expected `mdtest_snippet.B` because of return type
 29 |     class B: ...
-30 |     return B()  # error: [invalid-return-statement]
+30 |     return B()  # error: [invalid-explicit-return]
    |            ^^^ expected `mdtest_snippet.B`, found `mdtest_snippet.<locals of function 'g'>.B`
 
 ```

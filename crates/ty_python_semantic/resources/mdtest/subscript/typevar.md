@@ -116,7 +116,7 @@ class ChangesType:
 
 def slice_value[T: (First, ChangesType)](value: T) -> T:
     reveal_type(value[:2])  # revealed: First
-    # error: [invalid-return-statement]
+    # error: [invalid-explicit-return]
     return value[:2]
 ```
 
@@ -129,7 +129,7 @@ different sequence type, so the slice is not guaranteed to preserve the type var
 from collections.abc import Sequence
 
 def slice_sequence[T: Sequence[int]](value: T) -> T:
-    # error: [invalid-return-statement]
+    # error: [invalid-explicit-return]
     return value[:2]
 ```
 
