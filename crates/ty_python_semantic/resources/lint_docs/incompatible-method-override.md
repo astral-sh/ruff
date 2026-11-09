@@ -96,5 +96,11 @@ the changes recommended by ARG002 would violate the Liskov Substitution Principl
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
+## Rule history
+
+- v0.0.100: Renamed from `invalid-method-override`.
+
+    `invalid-method-override` remains as a compatibility alias for this rule.
+
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override

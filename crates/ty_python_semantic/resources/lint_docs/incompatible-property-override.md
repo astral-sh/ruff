@@ -25,3 +25,9 @@ class Child(Base):
 ```
 
 An override returning `bool` would be valid because `bool` is a subtype of `int`.
+
+## Rule history
+
+- v0.0.100: Renamed from `invalid-property-type-override`.
+
+    `invalid-property-type-override` remains as a compatibility alias for this rule.

@@ -36,4 +36,10 @@ class Sub(Base):
 Code that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also
 assign to `count`; making it final in the subclass removes that operation.
 
+## Rule history
+
+- v0.0.100: Renamed from `invalid-attribute-override`.
+
+    `invalid-attribute-override` remains as a compatibility alias for this rule.
+
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle

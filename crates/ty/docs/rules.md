@@ -1353,6 +1353,13 @@ class Sub(Base):
 Code that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also
 assign to `count`; making it final in the subclass removes that operation.
 
+**Rule history**
+
+
+- v0.0.100: Renamed from [`invalid-attribute-override`](#invalid-attribute-override).
+
+    [`invalid-attribute-override`](#invalid-attribute-override) remains as a compatibility alias for this rule.
+
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
 <a id="invalid-method-override"></a>
@@ -1471,6 +1478,13 @@ the changes recommended by ARG002 would violate the Liskov Substitution Principl
 
 Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#invalid-explicit-override) rule.
 
+**Rule history**
+
+
+- v0.0.100: Renamed from [`invalid-method-override`](#invalid-method-override).
+
+    [`invalid-method-override`](#invalid-method-override) remains as a compatibility alias for this rule.
+
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override
 
@@ -1519,6 +1533,13 @@ reset(Child())  # The value is no longer a bool.
 Use the same annotation in both classes, or expose a read-only property if callers do not need to
 write the attribute.
 
+**Rule history**
+
+
+- v0.0.100: Renamed from [`invalid-mutable-override`](#invalid-mutable-override).
+
+    [`invalid-mutable-override`](#invalid-mutable-override) remains as a compatibility alias for this rule.
+
 <a id="invalid-property-type-override"></a>
 
 ## `incompatible-property-override`
@@ -1561,6 +1582,13 @@ class Child(Base):
 ```
 
 An override returning `bool` would be valid because `bool` is a subtype of `int`.
+
+**Rule history**
+
+
+- v0.0.100: Renamed from [`invalid-property-type-override`](#invalid-property-type-override).
+
+    [`invalid-property-type-override`](#invalid-property-type-override) remains as a compatibility alias for this rule.
 
 ## `inconsistent-mro`
 
