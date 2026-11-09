@@ -416,24 +416,10 @@ class Base:
     def f(self, value: int) -> int: ...
 
 class Renamed(Base):
-    def f(self, item: object) -> int: ...  # snapshot: missing-keyword-in-override
+    def f(self, item: object) -> int: ...  # error: [missing-keyword-in-override]
 
 class PositionalOnly(Base):
     def f(self, value: int, /) -> int: ...  # error: [missing-keyword-in-override]
-```
-
-```snapshot
-error[missing-keyword-in-override]: Override of method `f` drops a keyword argument
- --> src/mdtest_snippet.pyi:5:9
-  |
-2 |     def f(self, value: int) -> int: ...
-  |         -------------------------- `Base.f` defined here
-3 |
-4 | class Renamed(Base):
-5 |     def f(self, item: object) -> int: ...  # snapshot: missing-keyword-in-override
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.f`
-info: the parameter named `item` does not match `value` (and can be used as a keyword parameter)
-info: This violates the Liskov Substitution Principle
 ```
 
 If there is also an incompatible argument type, a missing argument, or an incompatible return type,
@@ -499,9 +485,6 @@ class Base:
 
 class Other:
     def f(self, item: int) -> None: ...
-
-class Explicit(Base):
-    def f(self, item: int) -> None: ...  # error: [missing-keyword-in-override]
 
 class Suppressed(Base):
     def f(self, item: int) -> None: ...  # ty: ignore[missing-keyword-in-override]

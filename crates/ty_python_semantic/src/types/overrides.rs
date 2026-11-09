@@ -467,10 +467,10 @@ fn check_inherited_method_conflict<'db>(
         };
         if violation == MethodOverrideViolation::Keyword {
             keyword_conflict.get_or_insert(report);
-        } else {
-            report();
-            return;
+            continue;
         }
+        report();
+        return;
     }
     if let Some(report) = keyword_conflict {
         report();
@@ -1146,8 +1146,8 @@ fn check_class_declaration<'db>(
             // is about Liskov Substitution Principle checks
             // **********************************************************
 
-            // Defer keyword-only incompatibilities so they cannot hide a type or arity
-            // mismatch against a later base class.
+            // A suppressed diagnostic still completes the Liskov check. Defer keyword-only
+            // conflicts so a later base can reveal a general incompatibility.
             if liskov_check_complete {
                 continue;
             }
@@ -1331,10 +1331,10 @@ fn check_class_declaration<'db>(
             };
             if violation == MethodOverrideViolation::Keyword {
                 keyword_conflict.get_or_insert(report);
-            } else {
-                report();
-                liskov_check_complete = true;
+                continue;
             }
+            report();
+            liskov_check_complete = true;
         }
     }
 
@@ -1568,9 +1568,11 @@ impl MethodOverrideViolation {
             && let Some(overriding) = overriding.exactly_one()
         {
             let signatures = contract.signatures(db);
-            let adapted = CallableSignature::from_overloads(signatures.iter().map(|signature| {
-                signature.with_relaxed_override_keywords(overriding.signatures(db))
-            }));
+            let overriding = overriding.signatures(db);
+            let relaxed = signatures
+                .iter()
+                .map(|signature| signature.with_relaxed_override_keywords(overriding));
+            let adapted = CallableSignature::from_overloads(relaxed);
             if &adapted != signatures
                 && source.is_assignable_to(
                     db,
