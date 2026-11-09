@@ -120,6 +120,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
+    registry.register_lint(&SINGLE_OVERLOAD);
+    registry.register_lint(&INCONSISTENT_OVERLOAD_DECORATOR);
+    registry.register_lint(&MISPLACED_OVERLOAD_DECORATOR);
+    registry.register_lint(&MISSING_OVERLOAD_IMPLEMENTATION);
+    registry.register_lint(&INCONSISTENT_OVERLOAD_IMPLEMENTATION);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
@@ -709,10 +714,10 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-overload.md")]
-    pub(crate) static INVALID_OVERLOAD = {
-        summary: "detects invalid `@overload` usages",
-        status: LintStatus::stable("0.0.1-alpha.1"),
+    #[doc = include_str!("../../resources/lint_docs/single-overload.md")]
+    pub(crate) static SINGLE_OVERLOAD = {
+        summary: "detects functions with only one overload declaration",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -1508,6 +1513,55 @@ declare_lint! {
     pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
         summary: "detects unknown keys when constructing a TypedDict",
         status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-overload-implementation.md")]
+    pub(crate) static MISSING_OVERLOAD_IMPLEMENTATION = {
+        summary: "detects overloaded functions missing a required implementation",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-overload-implementation.md")]
+    pub(crate) static INCONSISTENT_OVERLOAD_IMPLEMENTATION = {
+        summary: "detects implementations that are inconsistent with their overloads",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-overload-decorator.md")]
+    pub(crate) static INCONSISTENT_OVERLOAD_DECORATOR = {
+        summary: "detects inconsistent use of `@staticmethod` or `@classmethod` on overloaded methods",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/misplaced-overload-decorator.md")]
+    pub(crate) static MISPLACED_OVERLOAD_DECORATOR = {
+        summary: "detects misplaced `@final` or `@override` decorators on overloaded methods",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// Overload declarations and their implementations now have separate rules.
+    static INVALID_OVERLOAD = {
+        summary: "detects invalid `@overload` usages",
+        status: LintStatus::removed(
+            "0.0.100",
+            "Use `single-overload`, `inconsistent-overload-decorator`, `misplaced-overload-decorator`, \
+             `missing-overload-implementation`, or `inconsistent-overload-implementation`.",
+        ),
         default_level: Level::Error,
     }
 }

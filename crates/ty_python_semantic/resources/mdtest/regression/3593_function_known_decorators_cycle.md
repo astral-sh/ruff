@@ -20,8 +20,8 @@ reveal_type(C().a)  # revealed: Unknown | D
 
 class D:
     @overload
-    # error: [invalid-overload]
-    # error: [invalid-overload]
+    # error: [single-overload]
+    # error: [missing-overload-implementation]
     def __get__() -> Self:
         pass
 ```

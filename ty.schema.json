@@ -706,6 +706,26 @@
             }
           ]
         },
+        "inconsistent-overload-decorator": {
+          "title": "detects inconsistent use of `@staticmethod` or `@classmethod` on overloaded methods",
+          "description": "## What it does\n\nChecks for inconsistent use of decorators on overloaded methods. If one definition uses\n`@staticmethod` or `@classmethod`, every overload and the implementation, if present, must use the\nsame decorator.\n\n## Why is this bad?\n\nPython's runtime doesn't know about overloads, but it does have a different binding behavior for\ninstance methods, class methods and staticmethods. Overloads therefore need to be consistent about\ntheir use of `@staticmethod` and `@classmethod` decorators.\n\n## Example\n\n```pyi\nfrom typing import overload\n\nclass Reader:\n    @staticmethod\n    @overload\n    def read() -> str: ...\n    @overload\n    def read(self, size: int) -> str: ...  # error\n```\n\nIf `read` is an instance method, remove `@staticmethod` and add `self` to the first overload. Both\noverloads then account for the implicit `self` in `reader.read()` and `reader.read(10)`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "inconsistent-overload-implementation": {
+          "title": "detects implementations that are inconsistent with their overloads",
+          "description": "## What it does\n\nChecks for overload implementations that are incompatible with one or more overloads.\n\nAfter decorators are applied, the implementation must accept every call allowed by the overloads.\nEach overload's return type must be assignable to the implementation's return type.\n\n## Why is this bad?\n\nCallers rely on the overloads to know which arguments they can pass and what type to expect in\nreturn.\n\n## Examples\n\n### Incompatible parameters\n\n```py\nfrom typing import overload\n\n\n@overload\ndef read() -> str: ...  # error\n@overload\ndef read(size: int) -> str: ...\ndef read(size: int) -> str:\n    return \"x\" * size\n```\n\nThe first overload allows `read()`. At runtime, that call raises `TypeError` because the\nimplementation requires a `size` argument.\n\n### Incompatible return type\n\n```py\nfrom typing import overload\n\n\n@overload\ndef double(value: int) -> int: ...  # error\n@overload\ndef double(value: str) -> str: ...\ndef double(value: int | str) -> str:\n    return str(value) * 2\n```\n\nThe first overload promises an `int`, but `double(3)` returns the string `\"33\"`.\n\n### A decorator makes the implementation uncallable\n\n```py\nfrom collections.abc import Callable\nfrom typing import overload\n\nhandlers: list[Callable[..., str]] = []\n\n\ndef register(func: Callable[..., str]) -> None:\n    handlers.append(func)\n\n\n@overload\ndef greet() -> str: ...\n@overload\ndef greet(name: str) -> str: ...\n@register\ndef greet(name: str = \"world\") -> str:  # error\n    return f\"Hello, {name}!\"\n```\n\n`register` returns `None`, so `@register` leaves `greet` bound to `None`. Calling `greet()` raises\n`TypeError`.\n\n## References\n\n- [Typing specification: Implementation consistency](https://typing.python.org/en/latest/spec/overload.html#implementation-consistency)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "index-out-of-bounds": {
           "title": "detects index out of bounds errors",
           "description": "## What it does\n\nChecks for attempts to use an out of bounds index to get an item from a container.\n\n## Why is this bad?\n\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n\n```python\nt = (0, 1, 2)\n# IndexError: tuple index out of range\nt[3]  # error\n```",
@@ -986,16 +1006,6 @@
             }
           ]
         },
-        "invalid-overload": {
-          "title": "detects invalid `@overload` usages",
-          "description": "## What it does\n\nChecks for various invalid `@overload` usages.\n\n## Why is this bad?\n\nThe `@overload` decorator is used to define functions and methods that accepts different\ncombinations of arguments and return different types based on the arguments passed. This is mainly\nbeneficial for type checkers. But, if the `@overload` usage is invalid, the type checker may not be\nable to provide correct type information.\n\n## Examples\n\n### Single overload\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo(x: int) -> int: ...  # error\ndef foo(x: int | None) -> int | None:\n    return x\n```\n\n### Missing implementation\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo() -> None: ...  # error\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-parameter-default": {
           "title": "detects default values that can't be assigned to the parameter's annotated type",
           "description": "## What it does\n\nChecks for default values that can't be assigned to the parameter's annotated type.\n\n## Why is this bad?\n\nThis breaks the rules of the type system and weakens a type checker's ability to accurately reason\nabout your code.\n\n## Examples\n\n```python\ndef f(a: int = \"\"): ...  # error\n```",
@@ -1246,6 +1256,16 @@
             }
           ]
         },
+        "misplaced-overload-decorator": {
+          "title": "detects misplaced `@final` or `@override` decorators on overloaded methods",
+          "description": "## What it does\n\nChecks for `@final` or `@override` decorators applied to the wrong definition of an overloaded\nmethod. If the overload set has an implementation function, put the decorator on the implementation.\nOtherwise, e.g. in a stub file, put the decorator on the first overload.\n\n## Why is this bad?\n\nThese decorators apply to the whole method. Placing one on an individual overload suggests that only\nthat overload is final or overrides a superclass method.\n\n## Example\n\n```pyi\nfrom typing_extensions import overload, override\n\nclass Decoder:\n    def decode(self, data: bytes) -> str: ...\n\nclass BatchDecoder(Decoder):\n    @overload\n    def decode(self, data: bytes) -> str: ...\n    @overload\n    @override\n    def decode(self, data: list[bytes]) -> list[str]: ...  # error\n```\n\nMove `@override` to the first overload of `BatchDecoder.decode`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\n\nChecks for missing required arguments in a call.\n\n## Why is this bad?\n\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef func(x: int): ...\n\n\n# TypeError: func() missing 1 required positional argument: 'x'\nfunc()  # error\n```",
@@ -1270,6 +1290,16 @@
           "title": "detects imports of dependencies that are not declared directly",
           "description": "## What it does\n\nChecks for imports from installable packages that the current project or PEP 723 script does not\ndeclare as direct dependencies.\n\nThe name used in dependency declarations can differ from the import name: for example, the `pillow`\npackage is imported as `PIL`.\n\n## Why is this bad?\n\nA dependency can be installed because another package requires it. Importing that dependency without\ndeclaring it makes your code rely on another package's dependency list. If that package removes the\ndependency, your imports can fail.\n\nDeclare the packages that provide your imports in `project.dependencies` or\n`project.optional-dependencies` in `pyproject.toml`. Non-package files, such as tests and\ndevelopment scripts, can also use dependencies declared in dependency groups.\n\nSee uv's [guide to managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)\nfor how to add these declarations.\n\n## Rule status\n\nThis rule is disabled by default and requires uv integration.\n\nFor projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized\nenvironment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes\nthe environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty\nreads the dependency graph and module ownership returned by `uv workspace metadata` without changing\ninstalled packages. uv may update the lockfile to match the current dependency declarations. uv\n0.12.3 or later is required.\n\nFor PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes\neach script's environment and checks imports against its inline `dependencies` list. Declarations\nand environments from the enclosing workspace or other scripts do not apply.\n\n## Known limitations\n\nImports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They\ncan use development-only dependencies, such as type stub packages, without requiring those packages\nas runtime dependencies.\n\nStandard-library imports and imports whose owning package cannot be identified unambiguously are\nalso not reported.\n\nImports of [namespace packages](https://docs.python.org/3/reference/import.html#namespace-packages)\nthemselves, such as `import ns`, are not reported: the namespace can contain modules from several\ninstallable packages. Imports of their submodules, such as `import ns.child`, are checked when the\nowning package is known. An `__init__.pyi` stub does not change this distinction.\n\nNative packages that ty can resolve only as namespace packages at runtime are also skipped. For\nother native modules, ty can use stubs to resolve the import and uv's ownership map to identify\nwhich package to declare.\n\nSome editable installations add the whole project directory to Python's import path, making both\npackage code and files such as `tests/test_app.py` importable. If uv does not identify which modules\nbelong to the installable package, ty allows dependency-group imports throughout that directory,\nincluding in package code, to avoid incorrectly flagging imports in tests and scripts.\n\n## Examples\n\nWith `requests` as a direct dependency, `urllib3` may also be installed because `requests` depends\non it:\n\n```python {data-mdtest=\"ignore\"}\nimport requests\nimport urllib3  # error: [missing-direct-dependency]\n```\n\nAdd `urllib3` to `project.dependencies` if your code imports it directly.",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-overload-implementation": {
+          "title": "detects overloaded functions missing a required implementation",
+          "description": "## What it does\n\nChecks for overloaded functions and methods without a required implementation. An implementation can\nbe omitted in any of the following cases:\n\n- The overloads are defined in a stub file (`.pyi`).\n- All overloads are defined inside `if TYPE_CHECKING` blocks.\n- The overloaded method is defined in a protocol.\n- The method is defined in an abstract base class and every overload is decorated with\n    `@abstractmethod`.\n\n## Why is this bad?\n\nThe `@overload` definitions describe the calls a type checker should accept. A separate\nimplementation handles those calls at runtime. Calling an overloaded function without an\nimplementation raises `NotImplementedError`.\n\n## Example\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo() -> None: ...  # error\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1539,6 +1569,16 @@
         "shadowed-type-variable": {
           "title": "detects type variables that shadow type variables from outer scopes",
           "description": "## What it does\n\nChecks for type variables in nested generic classes or functions that shadow type variables from an\nenclosing scope.\n\n## Why is this bad?\n\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Outer[T]:\n    # `T` is already used by `Outer`\n    class Inner[T]: ...  # error\n\n    # `T` is already used by `Outer`\n    def method[T](self, x: T) -> T:  # error\n        return x\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "single-overload": {
+          "title": "detects functions with only one overload declaration",
+          "description": "## What it does\n\nChecks for functions and methods with only one `@overload` declaration.\n\n## Why is this bad?\n\nAn overload describes one of several ways to call a function. If one signature describes all valid\ncalls, keep the implementation and remove the overload declaration. In a stub file, keep the\ndeclaration and remove the `@overload` decorator.\n\n## Example\n\n```py\nfrom typing import overload\n\n\n# This overload definition can be removed.\n@overload\ndef foo(x: int) -> int: ...  # error: [single-overload]\ndef foo(x: int) -> int:\n    return x\n```\n\n## Migrating from `invalid-overload`\n\nIn 0.0.100, `invalid-overload` was split into `single-overload`, `missing-overload-implementation`,\n`inconsistent-overload-implementation`, `inconsistent-overload-decorator`, and\n`misplaced-overload-decorator`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
           "default": "error",
           "oneOf": [
             {
