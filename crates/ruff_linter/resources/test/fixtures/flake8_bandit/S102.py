@@ -4,6 +4,8 @@ def fn():
 
 exec('y = 3')
 
+list(map(exec, ["hi"]))  # Error
+
 
 ## https://github.com/astral-sh/ruff/issues/15442
 def _():

@@ -21,12 +21,23 @@ S102 Use of `exec` detected
   | ^^^^
 
 S102 Use of `exec` detected
-  --> S102.py:11:5
+ --> S102.py:7:10
+  |
+5 | exec('y = 3')
+6 |
+7 | list(map(exec, ["hi"]))  # Error
+  |          ^^^^
+8 |
+9 | def _():
+  |
+
+S102 Use of `exec` detected
+  --> S102.py:13:5
    |
- 9 | def _():
-10 |     from builtins import exec
-11 |     exec('')  # Error
+11 | def _():
+12 |     from builtins import exec
+13 |     exec('')  # Error
    |     ^^^^
-12 |
-13 | def _():
+14 |
+15 | def _():
    |

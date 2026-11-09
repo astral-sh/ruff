@@ -253,6 +253,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::Numpy2Deprecation) {
                         numpy::rules::numpy_2_0_deprecation(checker, expr);
                     }
+                    if checker.is_rule_enabled(Rule::ExecBuiltin) {
+                        flake8_bandit::rules::exec_used(checker, expr_name);
+                    }
                     if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
@@ -791,9 +794,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::ExecBuiltin) {
-                flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
