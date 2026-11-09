@@ -1,6 +1,7 @@
 //! Tests the interaction of the `lint` configuration section
 
 use std::fs;
+use std::io;
 use std::process::Command;
 use std::str;
 
@@ -19,6 +20,27 @@ impl CliTest {
         command.args(STDIN_BASE_OPTIONS);
         command
     }
+}
+
+#[test]
+fn verbose_logging_with_closed_stderr() -> Result<()> {
+    let case = CliTest::with_file("test.py", "import os\n")?;
+    let (reader, writer) = io::pipe()?;
+    drop(reader);
+
+    assert_cmd_snapshot!(case.check_command()
+        .args(["--isolated", "--verbose", "test.py"])
+        .stderr(writer), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
 }
 
 #[test]
