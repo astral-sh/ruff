@@ -3,7 +3,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
@@ -488,7 +488,12 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some(prev_end) = prev_end {
-        for token in checker.tokens().after(prev_end) {
+        let end = parenthesized_range(string_expr.into(), bin_op.into(), checker.tokens())
+            .map_or(prev_end, |range| range.end());
+        for token in checker
+            .tokens()
+            .in_range(TextRange::new(prev_end, end))
+        {
             match token.kind() {
                 // If we hit a right paren, we have to preserve it.
                 TokenKind::Rpar => {

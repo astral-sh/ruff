@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_5.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"))]
+    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_nested_parentheses.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]

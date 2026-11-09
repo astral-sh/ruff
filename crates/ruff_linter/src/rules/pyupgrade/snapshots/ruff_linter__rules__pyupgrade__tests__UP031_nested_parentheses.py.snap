@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP031 [*] Use format specifiers instead of percent format
+ --> UP031_nested_parentheses.py:2:5
+  |
+1 | x = 1
+2 | y = (("%s")) % x
+  |     ^^^^^^^^^^^^
+  |
+help: Replace with format specifiers
+  |
+1 | x = 1
+  - y = (("%s")) % x
+2 + y = (("{}")).format(x)
+  |
+note: This is an unsafe fix and may change runtime behavior
+
