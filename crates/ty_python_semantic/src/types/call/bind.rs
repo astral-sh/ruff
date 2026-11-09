@@ -12,7 +12,7 @@ mod constructor;
 mod property;
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Range;
@@ -6725,7 +6725,7 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
-    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
+    fn infer(&self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
@@ -6846,7 +6846,7 @@ impl<'db> CallInference<'_, 'db> {
 
     // TODO: This method should go away once `ParamSpec` and `TypeVarTuple` are migrated to the constraint solver.
     fn infer_legacy(
-        self,
+        &self,
         constraints: &ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
         mut constraint_set_errors: Vec<bool>,
@@ -8243,9 +8243,42 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
+/// The members in which a bare type variable from the same union occurs inside another type.
+/// For example, in `T | list[T] | None` only `list[T]` has this property.
+fn nested_union_members<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    inferable: TypeVarSet<'db>,
+) -> Option<(UnionType<'db>, Type<'db>)> {
+    let union = ty.resolve_type_alias(db).as_union()?;
+    let bare = TypeVarSet::from_typevars(
+        db,
+        union
+            .elements(db)
+            .iter()
+            .filter_map(|member| member.as_typevar())
+            .filter(|var| var.is_inferable(db, inferable)),
+    );
+    if bare == TypeVarSet::None {
+        return None;
+    }
+    let nested = union.filter(db, |&member| {
+        !member.is_type_var() && inferable_typevar_occurrences(db, env, member, bare) > 0
+    });
+    (!nested.is_never()).then_some((union, nested))
+}
+
+/// Specializations shared by all arguments of one overload during an inference pass.
+#[derive(Default)]
+pub(crate) struct ArgumentContextCache<'db> {
+    ordinary: OnceCell<Option<Cow<'db, ArgumentContextSpecialization<'db>>>>,
+    nested: OnceCell<Option<Specialization<'db>>>,
+}
+
 /// The call specialization inferred during fixpoint generic call inference.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct ArgumentContextSpecialization<'db> {
+struct ArgumentContextSpecialization<'db> {
     types: Specialization<'db>,
     kinds: Vec<Option<TypeContextKind>>,
 }
@@ -8823,7 +8856,7 @@ impl<'db> Binding<'db> {
     /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
     /// ```
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn argument_type_context<'a>(
+    pub(crate) fn argument_type_context(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8832,11 +8865,21 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
-        specialization: impl Fn() -> Option<&'a ArgumentContextSpecialization<'db>>,
-    ) -> Option<ArgumentTypeContext<'db>>
-    where
-        'db: 'a,
-    {
+        cache: &ArgumentContextCache<'db>,
+    ) -> Option<ArgumentTypeContext<'db>> {
+        let specialization = || {
+            cache
+                .ordinary
+                .get_or_init(|| {
+                    self.argument_type_context_specialization(
+                        db,
+                        env,
+                        constraints,
+                        call_expression_tcx,
+                    )
+                })
+                .as_deref()
+        };
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [matched_parameter] = argument_matches.parameters.as_slice() else {
             return None;
@@ -8915,7 +8958,41 @@ impl<'db> Binding<'db> {
                     tcx_kind = parameter_tcx_kind;
                 }
 
-                parameter_type = parameter_type.apply_specialization(db, specialization.types);
+                parameter_type = if self.inference.is_some()
+                    && let Some((union, nested)) =
+                        nested_union_members(db, env, parameter_type, self.inferable_typevars)
+                    && let Some(actual) = arguments_types
+                        .get(argument_index)
+                        .and_then(|argument| argument.matched_type(original_parameter_type, None))
+                    && let Some(nested_types) = cache.nested.get_or_init(|| {
+                        self.nested_union_specialization(
+                            db,
+                            env,
+                            binding,
+                            arguments_types,
+                            call_expression_tcx,
+                        )
+                    })
+                    && actual.is_assignable_to(
+                        db,
+                        env,
+                        nested.apply_specialization(db, *nested_types),
+                    ) {
+                    union.map_leave_aliases(db, env, |&member| {
+                        let types = if nested == member
+                            || nested
+                                .as_union()
+                                .is_some_and(|union| union.contains_member(db, member))
+                        {
+                            *nested_types
+                        } else {
+                            specialization.types
+                        };
+                        member.apply_specialization(db, types)
+                    })
+                } else {
+                    parameter_type.apply_specialization(db, specialization.types)
+                };
             }
 
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
@@ -8948,6 +9025,97 @@ impl<'db> Binding<'db> {
         ))
     }
 
+    /// For `x: T | list[T]`, an argument `list[int]` supplies two possible bindings for `T`.
+    /// Substituting their union back into `list[T]` would make the list itself a potential
+    /// element on the next pass. Solve for the context of the nested members with the matching
+    /// arguments bound to those members. The other arguments and the expected return type still
+    /// constrain this solution. For example, a sibling of type `list[T]` can independently fix `T`.
+    fn nested_union_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: &CallableBinding<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Option<Specialization<'db>> {
+        let generic = self.signature.generic_context?;
+        let constraints = &ConstraintSetBuilder::new();
+        let arguments = arguments.with_self(binding.bound_type);
+        let mut restricted = Cow::Borrowed(self.argument_matches.as_ref());
+        for (argument_index, (matched, argument)) in self
+            .argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .enumerate()
+        {
+            for (match_index, parameter) in matched.parameters.iter().enumerate() {
+                let raw = self.signature.parameters()[parameter.index].annotated_type();
+                let Some((_, nested)) = nested_union_members(
+                    db,
+                    env,
+                    parameter.expected_type.unwrap_or(raw),
+                    self.inferable_typevars,
+                ) else {
+                    continue;
+                };
+                let Some(actual) = argument.matched_type(raw, parameter.argument_type) else {
+                    continue;
+                };
+                // An enclosing function's unbounded `U` can be a `list` for some callers,
+                // but that does not let us bind an argument of type `U` to `list[T]` here.
+                if actual
+                    .when_assignable_to(db, env, nested, constraints, self.inferable_typevars)
+                    .is_never_satisfied_bounded(db, env, self.inferable_typevars)
+                    == Some(false)
+                {
+                    restricted.to_mut()[argument_index].parameters[match_index].expected_type =
+                        Some(nested);
+                }
+            }
+        }
+        let Cow::Owned(restricted) = restricted else {
+            return None;
+        };
+        let call = CallInference {
+            db,
+            env,
+            signature: &self.signature,
+            arguments: &arguments,
+            argument_matches: &restricted,
+            call_expression_tcx: tcx,
+            return_ty: self.unspecialized_return_type(db),
+            is_partial_application: self.is_partial_application,
+            is_constructor: self.constructor_context.is_some(),
+            inferable_typevars: self.inferable_typevars,
+        };
+        let result = call.infer(constraints);
+        let inference = result.inference?;
+        // Different arguments can require different members of the same union. Use the
+        // restricted context only if it gives one specialization that works for all of them.
+        // Inference can also recover by retrying without the expected return type. Preserve a
+        // compatible result from the unrestricted call in that case.
+        if !result.errors.is_empty()
+            || !call.accepts_arguments(inference.merged_specialization(db))
+            || tcx.declared_type().is_some_and(|target| {
+                self.return_ty.is_assignable_to(db, env, target)
+                    && !result.return_ty.is_assignable_to(db, env, target)
+            })
+        {
+            return None;
+        }
+        Some(
+            parameter_context_specialization(
+                db,
+                env,
+                generic,
+                Some(inference),
+                &FxHashMap::default(),
+                tcx.kind(),
+            )
+            .types,
+        )
+    }
+
     /// Returns the specialization that should be applied to the parameters of this overload for
     /// type context.
     ///
@@ -8958,7 +9126,7 @@ impl<'db> Binding<'db> {
         clippy::unnecessary_wraps,
         reason = "Salsa supplies None while the inferred parameter context is resolving a cycle"
     )]
-    pub(crate) fn argument_type_context_specialization(
+    fn argument_type_context_specialization(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

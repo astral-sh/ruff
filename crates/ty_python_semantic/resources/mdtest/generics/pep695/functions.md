@@ -3637,6 +3637,83 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Nested calls with ambiguous union parameters
+
+A list argument can match either `T` or `list[T]`. Inferring the whole list as `T` through the first
+alternative should not add another list layer to the argument on the next inference pass.
+
+```py
+def choose[T](left: T | list[T], right: T | list[T]) -> list[T]:
+    raise NotImplementedError
+
+reveal_type(choose([], []))  # revealed: list[list[Unknown] | Unknown]
+
+result: list[None] | list[int] = choose(choose(choose(None, None), None), None)
+reveal_type(result)  # revealed: list[None]
+```
+
+The inner call supplies a `list[U]`. The outer call accepts `value` through its bare `T` arm for
+every specialization of the enclosing function's `U`.
+
+```py
+def collect[U](value: U) -> list[U]:
+    return choose(choose(value, value), value)
+```
+
+## Inferring a union parameter from other arguments
+
+A sibling argument can independently fix `T` to a union that contains a list. Both members of that
+union are needed when inferring the empty list.
+
+```py
+def pick[T](source: list[T], *others: T | list[T]) -> T:
+    return source[0]
+
+def _(items: list[int | list[str]]):
+    reveal_type(pick(items, []))  # revealed: int | list[str]
+```
+
+With `T = list[int]`, the empty list can take the `list[T]` arm and `items` can take the `T` arm.
+
+```py
+def _(nested: list[list[int]], items: list[int]):
+    reveal_type(pick(nested, [], items))  # revealed: list[int]
+```
+
+The element type can also come from an argument matched to a bare type variable.
+
+```py
+from collections.abc import Iterable
+
+def first[T](value: T, fallback: T | Iterable[T | None]) -> T:
+    return value
+
+def _(value: int):
+    reveal_type(first(value, list()))  # revealed: int
+```
+
+## Contextual typing of callbacks with ambiguous union parameters
+
+The two ways to match `shape` give different return types for the callback. In either case, `value`
+determines that the callback receives a `str`.
+
+```py
+from collections.abc import Callable
+
+def visit[T, U, V](shape: T | tuple[T], value: U, seed: V, callback: Callable[[U], list[T | V]]) -> None:
+    callback(value)
+
+visit((1,), "x", "", lambda x: [x.index(3)])  # error: [invalid-argument-type]
+```
+
+A callable supplied by the bare `T` arm can also provide the parameter type of a lambda.
+
+```py
+def register[T](handlers: list[T] | T, handler: T | Callable[[object], str]) -> None: ...
+def _(handlers: list[Callable[[str], str]]):
+    register(handlers, lambda s: "ascii" if s.isascii() else "unicode")  # ok
+```
+
 ## Passing generic functions to generic functions
 
 `functions.pyi`:

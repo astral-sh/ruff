@@ -1167,6 +1167,31 @@ fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4961>.
+///
+/// The inner constructor call matches both arms of `V | Declaration[K, V]`. Even without an
+/// expected type for the outer call, feeding the merged binding back into the inner call can
+/// add another `Declaration` layer on every inference pass.
+fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
+    let code = r#"
+        from __future__ import annotations
+
+        class Declaration[K, V]:
+            def __init__(self, key: K | None = None, *choices: V | Declaration[K, V]): ...
+
+        class Attribute[V](Declaration[str, V]): ...
+        class SubFactory[V](Declaration[str, V]): ...
+
+        Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
+    "#;
+
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments]",
+        code,
+    );
+}
+
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
 ///
 /// The nominal relation constrains `T` inside the source's union argument. Ignoring that
@@ -2881,6 +2906,7 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_generic_constructor_arguments,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
