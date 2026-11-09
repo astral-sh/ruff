@@ -19,12 +19,12 @@ use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::comments::shebang::leading_shebang_range;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_human_readable_names_enabled;
-use crate::rule_redirects::get_redirect_target;
+use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_code_enabled};
+use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA,
-    UnusedNOQAKind, code_is_valid,
+    RedirectedNOQA, RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes,
+    UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -399,7 +399,10 @@ impl Suppressions {
 
     /// Check for rule codes in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
-        if !context.is_rule_enabled(Rule::RuleCodesInSuppressionComments) {
+        let check_names = context.is_rule_enabled(Rule::RuleCodesInSuppressionComments);
+        let check_redirects = context.is_rule_enabled(Rule::RedirectedNOQA)
+            && is_redirected_suppression_code_enabled(context.settings());
+        if !check_names && !check_redirects {
             return;
         }
 
@@ -416,7 +419,34 @@ impl Suppressions {
             let second_comment = suppression.comments.second();
             for (index, range) in first_comment.codes.iter().enumerate() {
                 let original = locator.slice(range);
-                let code = get_redirect_target(original).unwrap_or(original);
+                let redirect = get_redirect(original);
+                let second_range = second_comment.and_then(|comment| comment.codes.get(index));
+
+                if check_redirects && let Some((original, target)) = redirect {
+                    let mut diagnostic =
+                        context.report_diagnostic(RedirectedNOQA { original, target }, *range);
+                    let edit = Edit::range_replacement(target.to_string(), *range);
+                    // Conservatively mark any fixes involving a `ruff: disable` comment unsafe
+                    // because the fix could make the `disable` match a previously unmatched, nested
+                    // `enable` comment.
+                    let fix = if let Some(second_range) = second_range {
+                        diagnostic.secondary_annotation_without_message(*second_range);
+                        Fix::unsafe_edits(
+                            edit,
+                            [Edit::range_replacement(target.to_string(), *second_range)],
+                        )
+                    } else if first_comment.action == SuppressionAction::Disable {
+                        Fix::unsafe_edit(edit)
+                    } else {
+                        Fix::safe_edit(edit)
+                    };
+                    diagnostic.set_fix(fix);
+                }
+
+                if !check_names {
+                    continue;
+                }
+                let code = redirect.map_or(original, |(_, target)| target);
                 let Ok(rule) = Rule::from_code(code) else {
                     continue;
                 };
@@ -424,9 +454,7 @@ impl Suppressions {
                 let mut diagnostic =
                     context.report_diagnostic(RuleCodesInSuppressionComments, *range);
                 let name = rule.name().to_string();
-                let fix = if let Some(second_range) =
-                    second_comment.and_then(|comment| comment.codes.get(index))
-                {
+                let fix = if let Some(second_range) = second_range {
                     diagnostic.secondary_annotation_without_message(*second_range);
                     Fix::safe_edits(
                         Edit::range_replacement(name.clone(), *range),
