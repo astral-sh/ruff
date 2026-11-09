@@ -106,9 +106,11 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::type_alias::TypeAliasType;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
 };
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
     walk_non_atomic_type, walk_type_with_recursion_guard,
@@ -1332,12 +1334,35 @@ impl<'db> ConstraintSetStorage<'db> {
                 }
             }
 
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                self.notify_skipped_lazy_type_attributes();
+                let Some(specialization) = alias.specialization(db) else {
+                    return;
+                };
+                let parameters = specialization.generic_context(db).variables(db);
+                let origin = alias.unspecialized(db);
+                for (parameter, &argument) in parameters.zip(specialization.types(db)) {
+                    // With `type Constant[T] = int`, the value of T has no effect on the bound.
+                    let variance = origin.variance_of(db, self.env, parameter.identity(db));
+                    if variance.evaluate(db) != TypeVarVariance::Bivariant {
+                        self.visit_type(db, argument);
+                    }
+                }
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if let Type::TypeVar(bound_typevar) = ty {
                     let mut storage = self.storage.borrow_mut();
                     let typevar = storage.intern_typevar(db, bound_typevar);
                     let mut support = self.support.borrow_mut();
                     support.insert(typevar);
+                    // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
+                    // also depends on P itself, so solving or quantifying P must update it.
+                    if bound_typevar.paramspec_attr(db).is_some() {
+                        support.insert(
+                            storage.intern_typevar(db, bound_typevar.without_paramspec_attr(db)),
+                        );
+                    }
                 }
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }

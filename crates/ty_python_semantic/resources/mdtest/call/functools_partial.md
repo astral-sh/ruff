@@ -747,6 +747,29 @@ reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
 reveal_type(bound({}))  # revealed: Any
 ```
 
+### Partially applied ParamSpec decorator
+
+Binding `attempts` with `partial` leaves `retry` generic in `P`. When the resulting decorator is
+applied to `greet`, ty infers `(name: str)` for `P` and preserves `greet`'s signature.
+
+```py
+from functools import partial
+from typing import Callable
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+
+def retry(func: Callable[P, str], *, attempts: int) -> Callable[P, str]:
+    return func
+
+@partial(retry, attempts=3)
+def greet(name: str) -> str:
+    return name
+
+reveal_type(greet)  # revealed: (name: str) -> str
+greet(42)  # error: [invalid-argument-type]
+```
+
 ### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
 
 Narrowing an optional callable by truthiness preserves its gradual parameter list when inferring a

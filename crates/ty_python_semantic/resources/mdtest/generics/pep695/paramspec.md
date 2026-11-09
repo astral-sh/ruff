@@ -1409,6 +1409,34 @@ class Factory[P: Protocol]:
 Factory.for_protocol(Protocol)  # ok
 ```
 
+### A decorator's unsolved parameter list
+
+The parameter list of `identity` is local to that function. When there is no callback to specialize
+it, ty infers `Unknown` for the result of `return_type_of(identity)`.
+
+```py
+from typing import Callable
+
+def identity[**P](f: Callable[P, str]) -> Callable[P, str]:
+    return f
+
+def return_type_of[R](f: Callable[..., R]) -> R:
+    raise NotImplementedError
+
+reveal_type(return_type_of(identity))  # revealed: Unknown
+```
+
+Since `Word` always denotes `str`, its parameter list has no effect on the result.
+
+```py
+type Word[**P] = str
+
+def word[**P](f: Callable[P, str]) -> Word[P]:
+    return "word"
+
+reveal_type(return_type_of(word))  # revealed: str
+```
+
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type
