@@ -137,7 +137,7 @@ fn path_limit_is_checked_before_solving() {
         .and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
-    for max_paths in [0, 3, 4] {
+    for max_paths in [0, 3, 4, 3] {
         let mut selected = 0;
         let mut folded = 0;
         let result = set.try_fold_solutions(
