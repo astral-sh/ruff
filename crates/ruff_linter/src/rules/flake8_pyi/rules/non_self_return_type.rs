@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::token::{parenthesized_range, Tokens};
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -246,12 +247,20 @@ fn add_diagnostic(
     );
 
     diagnostic.try_set_fix(|| {
-        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+        replace_with_self_fix(
+            checker.semantic(),
+            checker.tokens(),
+            &importer,
+            stmt,
+            returns,
+            class_def,
+        )
     });
 }
 
 fn replace_with_self_fix(
     semantic: &SemanticModel,
+    tokens: &Tokens,
     importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
@@ -266,8 +275,11 @@ fn replace_with_self_fix(
         let first = parameters.iter().next()?;
         let annotation = first.annotation()?;
 
-        is_class_reference(semantic, annotation, &class_def.name)
-            .then(|| Edit::deletion(first.name().end(), annotation.end()))
+        is_class_reference(semantic, annotation, &class_def.name).then(|| {
+            let annotation_end = parenthesized_range(annotation.into(), first.into(), tokens)
+                .map_or(annotation.end(), |range| range.end());
+            Edit::deletion(first.name().end(), annotation_end)
+        })
     };
 
     others.extend(remove_first_argument_type_hint());
