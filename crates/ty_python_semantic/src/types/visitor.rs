@@ -1218,7 +1218,9 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
 
-    use super::{CollectedTypes, DynamicContentMode, dynamic_content, dynamic_content_impl};
+    use super::{
+        CollectedTypes, DynamicContentMode, TypeCollector, dynamic_content, dynamic_content_impl,
+    };
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {
@@ -1303,6 +1305,26 @@ mod tests {
                     .is_absent()
             );
         }
+    }
+
+    #[test]
+    fn generic_instance_and_class_have_distinct_visits() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "value: list[int]")?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let value = global_symbol(&db, module, "value").place.expect_type();
+        let Type::NominalInstance(instance) = value else {
+            panic!("expected an instance of list[int]");
+        };
+        let class = Type::from(instance.class(&db, &env));
+        let guard = TypeCollector::default();
+        assert!(!guard.type_was_already_seen(value));
+        assert!(!guard.type_was_already_seen(class));
+        assert!(guard.type_was_already_seen(value));
+        assert!(guard.type_was_already_seen(class));
+        Ok(())
     }
 
     #[test]
