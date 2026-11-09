@@ -31,3 +31,7 @@ def good_func1(arg1: bool):
 
 def good_func2(arg1: Literal[True]):
     ...
+
+
+# Runtime uses of Literal are not type annotations and must not be rewritten.
+runtime_literal = Literal[True, False]

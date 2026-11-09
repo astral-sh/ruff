@@ -88,6 +88,13 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Ex
         return;
     }
 
+    // `Literal[...]` is also a runtime object. Restrict this type-annotation
+    // simplification to actual annotation contexts so expressions such as
+    // `get_args(Literal[True, False])` are never rewritten.
+    if !checker.semantic().in_annotation() {
+        return;
+    }
+
     let mut seen_expr = BooleanLiteral::empty();
 
     let mut find_bools = |expr: &'a Expr, _parent: &'a Expr| {
