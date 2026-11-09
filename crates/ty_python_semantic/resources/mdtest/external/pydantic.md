@@ -932,6 +932,17 @@ StrictFields(strict_int=1, strict_str="foo")
 StrictFields(strict_int="1", strict_str="foo")  # error: [invalid-argument-type]
 StrictFields(strict_int=1, strict_str=b"foo")  # error: [invalid-argument-type]
 
+type Direct = Annotated[int, Strict()]
+type Indirect = StrictInt
+
+class AliasedStrictFields(BaseModel):
+    direct: Direct
+    indirect: Indirect
+
+AliasedStrictFields(direct=1, indirect=1)  # ok
+AliasedStrictFields(direct="1", indirect=1)  # error: [invalid-argument-type]
+AliasedStrictFields(direct=1, indirect="1")  # error: [invalid-argument-type]
+
 class StrictMetadataOrder(BaseModel):
     field_then_lax: Annotated[int, Field(strict=True), Strict(False)]
     lax_then_field: Annotated[int, Strict(False), Field(strict=True)]

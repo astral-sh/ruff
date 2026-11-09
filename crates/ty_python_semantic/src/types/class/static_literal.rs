@@ -1944,8 +1944,9 @@ impl<'db> StaticClassLiteral<'db> {
                 if name == "__init__"
                     && let Some(metadata) = field_policy.pydantic_metadata()
                 {
+                    let strict = metadata.field_is_strict(db, strict);
                     field_ty = pydantic::constructor_parameter_type(
-                        db, self, field_name, field_ty, strict, metadata,
+                        db, self, field_name, field_ty, strict,
                     );
                 }
 
@@ -2796,6 +2797,7 @@ impl<'db> StaticClassLiteral<'db> {
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
 
+                let declared_ty = attr_ty.apply_optional_specialization(db, specialization);
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
@@ -2803,8 +2805,13 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
                 let mut frozen = false;
                 if field_policy.is_pydantic() {
-                    let metadata =
-                        pydantic::field_metadata(db, first_declaration, default_ty, specialization);
+                    let metadata = pydantic::field_metadata(
+                        db,
+                        first_declaration,
+                        declared_ty,
+                        default_ty,
+                        specialization,
+                    );
                     default_ty = metadata.default_ty;
                     init = metadata.init;
                     alias = metadata.alias;
@@ -2858,7 +2865,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 let mut field = Field {
-                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    declared_ty,
                     kind,
                     first_declaration,
                 };
