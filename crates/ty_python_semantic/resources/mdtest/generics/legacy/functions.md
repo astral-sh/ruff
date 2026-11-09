@@ -2508,8 +2508,9 @@ result: list[None] | list[int] = choose(choose(choose(None, None), None), None)
 reveal_type(result)  # revealed: list[None]
 ```
 
-The inner call supplies a `list[U]`. The outer call accepts `value` through its bare `T` arm for
-every specialization of the enclosing function's `U`.
+`collect` must return `list[U]` for any `U`. Both calls to `choose` can use `T = U`. The inner call
+takes `value` twice and returns `list[U]`. In the outer call, that list matches `list[T]` and
+`value` matches `T`, so the result is again `list[U]`.
 
 ```py
 U = TypeVar("U")
