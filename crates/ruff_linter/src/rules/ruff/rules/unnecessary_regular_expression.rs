@@ -52,8 +52,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
-/// the fix can be applied safely.
+/// This rule's fix is marked as unsafe if the affected expression contains comments or uses a
+/// bytes pattern. Otherwise, the fix can be applied safely.
 ///
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
@@ -142,7 +142,14 @@ pub(crate) fn unnecessary_regular_expression(
     if let Some(repl) = repl {
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if checker.comment_ranges().intersects(re_func.range) {
+            if checker.comment_ranges().intersects(re_func.range)
+                // `re` accepts any bytes-like object as its search target, while
+                // the equivalent builtin operations do not all preserve that
+                // behavior (for example, `b"ab" in memoryview(b"abc")` is false).
+                // Keep bytes-pattern rewrites opt-in so the fix is never presented
+                // as behavior-preserving for those inputs.
+                || matches!(literal, Literal::Bytes(_))
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
