@@ -68,7 +68,7 @@ use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
     LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -3200,43 +3200,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         filtered_out
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
-        for parameter in parameters.iter_non_variadic_params() {
-            self.declare_parameter(parameter);
-        }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+        let nodes = parameters
+            .iter_non_variadic_params()
+            .map(|p| (ParameterDefinitionNodeRef::Parameter(p), &p.parameter))
+            .chain(parameters.vararg.as_deref().map(|p| {
+                (
+                    ParameterDefinitionNodeRef::VariadicPositionalParameter(p),
+                    p,
+                )
+            }))
+            .chain(
+                parameters
+                    .kwarg
+                    .as_deref()
+                    .map(|p| (ParameterDefinitionNodeRef::VariadicKeywordParameter(p), p)),
             );
+        if is_stub_body {
+            let mut stub_parameters = Vec::with_capacity(parameters.len());
+            for (node, parameter) in nodes {
+                let (symbol, _) = self
+                    .current_place_table_mut()
+                    .add_symbol(Symbol::new(parameter.name.id().clone()));
+                let info = self.current_place_table_mut().symbol_mut(symbol);
+                info.mark_bound();
+                info.mark_parameter();
+                let annotated = parameter.annotation.is_some();
+                if annotated {
+                    info.mark_declared();
+                }
+                let definition = self.create_definition(symbol.into(), node);
+                stub_parameters.push(StubParameter {
+                    symbol,
+                    definition,
+                    annotated,
+                });
+            }
+            self.current_use_def_map_mut().stub_parameters = Some(stub_parameters);
+        } else {
+            for (node, parameter) in nodes {
+                let symbol = self.add_symbol(parameter.name.id().clone());
+                self.add_definition(symbol.into(), node);
+                self.current_place_table_mut()
+                    .symbol_mut(symbol)
+                    .mark_parameter();
+            }
         }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
-            );
-        }
-    }
-
-    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
-
-        self.add_definition(
-            symbol.into(),
-            ParameterDefinitionNodeRef::Parameter(parameter),
-        );
-
-        self.current_place_table_mut()
-            .symbol_mut(symbol)
-            .mark_parameter();
     }
 
     fn declare_lambda_parameters(
@@ -3445,7 +3454,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| use_def_map_interner.intern(builder.finish()))
+                .map(|builder| use_def_map_interner.finish(builder))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
@@ -3927,7 +3936,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters);
+                        builder.declare_parameters(parameters, ast::helpers::is_stub_body(body));
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
