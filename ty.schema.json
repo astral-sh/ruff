@@ -1268,8 +1268,8 @@
         },
         "mismatched-enum-name": {
           "title": "detects mismatched names in enum classes",
-          "description": "## What it does\n\nChecks that the name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or `Flag`,\nmatches the variable it is assigned to. This rule also warns if ty cannot determine the value of the\nname argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",
-          "default": "warn",
+          "description": "## What it does\n\nChecks that the name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or `Flag`,\nmatches the variable it is assigned to. This rule also warns if ty cannot determine the value of the\nname argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Default level\n\nThis rule is disabled by default because a functional enum can intentionally have a runtime name\nthat differs from its variable name.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1278,8 +1278,8 @@
         },
         "mismatched-namedtuple-name": {
           "title": "detects mismatched names in named tuples",
-          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable.\n\n## Why is this bad?\n\nThe `typename` determines the class name shown when printing a named tuple. A different name in the\nsource makes it harder to identify the class that produced a value.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name]\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name]\n```",
-          "default": "warn",
+          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable.\n\n## Why is this bad?\n\nThe `typename` determines the class name shown when printing a named tuple. A different name in the\nsource makes it harder to identify the class that produced a value.\n\n## Default level\n\nThis rule is disabled by default because named tuple factories can intentionally give their classes\na different runtime name.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name]\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name]\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1328,7 +1328,7 @@
         },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## Migration\n\nty now reports name mismatches under a separate rule for each kind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. A specific rule takes precedence within the same table. For example, to keep a policy\nthat treats name mismatches as errors but allow named tuples to have a different runtime name, use\nthese settings in `ty.toml`:\n\n```toml\n[rules]\nmismatched-type-name = \"error\"\nmismatched-namedtuple-name = \"ignore\"\n```\n\nOn the command line, the last matching flag takes precedence.\n`ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.\n\nThe separate `mismatched-sentinel-name` rule remains opt-in.",
+          "description": "## Migration\n\nty now reports name mismatches under a separate rule for each kind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. A specific rule takes precedence within the same table. For example, to keep a policy\nthat treats name mismatches as errors but allow named tuples to have a different runtime name, use\nthese settings in `ty.toml`:\n\n```toml\n[rules]\nmismatched-type-name = \"error\"\nmismatched-namedtuple-name = \"ignore\"\n```\n\nOn the command line, the last matching flag takes precedence.\n`ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.\n\n`mismatched-enum-name` and `mismatched-namedtuple-name` are disabled by default. An explicit setting\nfor `mismatched-type-name` still sets their severity.\n\nThe separate `mismatched-sentinel-name` rule remains opt-in.",
           "default": "warn",
           "deprecated": true,
           "oneOf": [

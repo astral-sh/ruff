@@ -4561,8 +4561,8 @@ modifier `/` in `Wrong2.scale`.
 ## `mismatched-enum-name`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-enum-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L760" target="_blank">View source</a>
 </small>
@@ -4581,6 +4581,12 @@ name argument.
 The name argument becomes the enum class's `__name__`. A member's representation can therefore refer
 to a different class name than the one used in the source.
 
+**Default level**
+
+
+This rule is disabled by default because a functional enum can intentionally have a runtime name
+that differs from its variable name.
+
 **Examples**
 
 
@@ -4593,8 +4599,8 @@ Color = Enum("Colour", "RED BLUE")  # error: [mismatched-enum-name]
 ## `mismatched-namedtuple-name`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-namedtuple-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L769" target="_blank">View source</a>
 </small>
@@ -4612,6 +4618,12 @@ the assigned variable.
 The `typename` determines the class name shown when printing a named tuple. A different name in the
 source makes it harder to identify the class that produced a value.
 
+**Default level**
+
+
+This rule is disabled by default because named tuple factories can intentionally give their classes
+a different runtime name.
+
 **Examples**
 
 
@@ -4627,7 +4639,7 @@ Pair = namedtuple("Coordinates", "x y")  # error: [mismatched-namedtuple-name]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-newtype-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L778" target="_blank">View source</a>
 </small>
@@ -4657,7 +4669,7 @@ UserId = NewType("Id", int)  # error: [mismatched-newtype-name]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-paramspec-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L787" target="_blank">View source</a>
 </small>
@@ -4739,7 +4751,7 @@ class Container:
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-type-alias-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L796" target="_blank">View source</a>
 </small>
@@ -4769,7 +4781,7 @@ UserId = TypeAliasType("Id", int)  # error: [mismatched-type-alias-name]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a>) ·
+Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-type-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L738" target="_blank">View source</a>
 </small>
@@ -4803,13 +4815,16 @@ mismatched-namedtuple-name = "ignore"
 On the command line, the last matching flag takes precedence.
 `ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.
 
+[`mismatched-enum-name`](#mismatched-enum-name) and [`mismatched-namedtuple-name`](#mismatched-namedtuple-name) are disabled by default. An explicit setting
+for [`mismatched-type-name`](#mismatched-type-name) still sets their severity.
+
 The separate [`mismatched-sentinel-name`](#mismatched-sentinel-name) rule remains opt-in.
 
 ## `mismatched-typeddict-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typeddict-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L805" target="_blank">View source</a>
 </small>
@@ -4840,7 +4855,7 @@ Movie = TypedDict("Film", {"title": str})  # error: [mismatched-typeddict-name]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typevar-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L814" target="_blank">View source</a>
 </small>
@@ -4870,7 +4885,7 @@ T = TypeVar("U")  # error: [mismatched-typevar-name]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.97">0.0.97</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typevartuple-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L823" target="_blank">View source</a>
 </small>

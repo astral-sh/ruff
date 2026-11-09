@@ -2816,7 +2816,7 @@ Mismatch = Enum("WrongName", "A B")
 ```
 
 ```snapshot
-warning[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
+info[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
  --> src/mdtest_snippet.py:8:17
   |
 8 | Mismatch = Enum("WrongName", "A B")
@@ -2832,7 +2832,7 @@ def f(name: str) -> None:
 ```
 
 ```snapshot
-warning[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
+info[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
   --> src/mdtest_snippet.py:11:28
    |
 11 |     DynamicMismatch = Enum(name, "A B")
