@@ -151,6 +151,28 @@ def _(group: Group):
     reveal_type(group.children)  # revealed: tuple[Negation | Group | str, ...]
 ```
 
+### Explicit dataclass-transform metaclass
+
+`models.pyi`:
+
+```pyi
+from typing import dataclass_transform
+
+@dataclass_transform()
+class RecordMeta(type): ...
+```
+
+```py
+from dataclasses import fields
+from typing import NamedTuple
+from models import RecordMeta
+
+class Point(NamedTuple, metaclass=RecordMeta):
+    x: int
+
+fields(Point)
+```
+
 ### Fields declared in stubs
 
 An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis

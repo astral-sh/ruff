@@ -754,6 +754,20 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Whether `NamedTuple` is the only base apart from an optional `Generic[...]`.
+    pub(super) fn has_only_named_tuple_base(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db)
+            .iter()
+            .copied()
+            .filter(|base| {
+                !matches!(
+                    base,
+                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                )
+            })
+            .eq([Type::SpecialForm(SpecialFormType::NamedTuple)])
+    }
+
     /// Iterate over the explicit bases that contribute to metaclass selection.
     fn metaclass_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
@@ -761,6 +775,12 @@ impl<'db> StaticClassLiteral<'db> {
             .iter()
             .copied()
             .filter_map(move |ty| {
+                // The tuple's metaclass does not depend on its field types.
+                let ty = if ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
+                    KnownClass::Tuple.to_class_literal(db, &env)
+                } else {
+                    ty
+                };
                 ClassBase::try_from_type(db, &env, ty, Some(ClassLiteral::Static(self)))
             })
             .filter(|base| matches!(base, ClassBase::Class(_) | ClassBase::Protocol))
@@ -1266,10 +1286,13 @@ impl<'db> StaticClassLiteral<'db> {
             // Identify the class's own metaclass (or take the first base class's metaclass).
             let mut base_classes = class.metaclass_bases(db).peekable();
 
-            if (base_classes.peek().is_some() && class.inheritance_cycle(db).is_some())
-                || class
-                    .try_mro_ancestors(db, None)
-                    .is_err_and(StaticMroError::is_cycle)
+            // A direct named tuple cannot form an inheritance cycle. Computing its MRO
+            // here would require its fields while we are still inferring their types.
+            if !class.has_only_named_tuple_base(db)
+                && ((base_classes.peek().is_some() && class.inheritance_cycle(db).is_some())
+                    || class
+                        .try_mro_ancestors(db, None)
+                        .is_err_and(StaticMroError::is_cycle))
             {
                 // We emit diagnostics for cyclic class definitions elsewhere.
                 // Avoid attempting to infer the metaclass if the class is cyclically defined.
