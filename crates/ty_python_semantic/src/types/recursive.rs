@@ -49,7 +49,7 @@
 //!
 //! Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
 //! The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
-//! graph index and the specialization `T := list[T]` in its mapping sequence.
+//! graph index and unspecialized arguments `[list[T]]`.
 //!
 //! To infer `x[1]` for `x: Tree[int]`, first unfold `x`'s type: substitute the constructor
 //! for `F`, then apply `T := int`. This order closes the body before specializing it:
@@ -68,24 +68,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
-use super::callable::walk_callable_type;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::function::walk_function_type;
 use super::generics::{ApplySpecialization, Specialization};
-use super::instance::walk_protocol_instance_type;
 use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
-use super::type_alias::{AliasCycleSummary, walk_type_alias_arguments};
-use super::typed_dict::walk_typed_dict_type;
+use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
-    walk_type_with_recursion_guard,
-};
+use super::visitor::any_over_type_including_alias_arguments;
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-    FunctionType, GenericContext, MaterializationKind, ProtocolInstanceType, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarInstance, TypedDictType, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
+    TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -101,12 +93,15 @@ pub struct RecursiveVar<'db> {
     index: usize,
     #[returns(ref)]
     mappings: Box<[DeferredTypeMapping<'db>]>,
+    /// Arguments in the enclosing alias's scope, specialized when its body is unfolded.
+    #[returns(copy)]
+    arguments: Option<Specialization<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveVar<'_> {}
 
 impl<'db> RecursiveVar<'db> {
-    /// Resolve or remap graph references while preserving their mapping sequence.
+    /// Resolve or remap graph references while preserving their arguments and mappings.
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -114,6 +109,13 @@ impl<'db> RecursiveVar<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        let deferred = DeferredTypeMapping::from_mapping(mapping, tcx, visitor);
+        let arguments = if deferred.is_none() {
+            self.arguments(db)
+                .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor))
+        } else {
+            self.arguments(db)
+        };
         let mut mappings = self.mappings(db).to_vec();
         if mapping.is_structural() {
             for retained in &mut mappings {
@@ -127,19 +129,28 @@ impl<'db> RecursiveVar<'db> {
                 db,
                 recursive.graph(db),
                 self.index(db),
+                arguments,
                 mappings.into_boxed_slice(),
             )),
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Import(builder, graph),
-            )) => builder.reference(db, visitor.env, *graph, self.index(db), &mappings),
+            )) => builder.reference(
+                db,
+                visitor.env,
+                *graph,
+                self.index(db),
+                arguments,
+                &mappings,
+            ),
             _ => {
-                for mapping in DeferredTypeMapping::from_mapping(db, mapping, tcx, visitor) {
-                    mapping.append(db, &mut mappings, visitor);
+                if let Some(mapping) = deferred {
+                    mappings.push(mapping);
                 }
                 Type::RecursiveVar(Self::new_internal(
                     db,
                     self.index(db),
                     mappings.into_boxed_slice(),
+                    arguments,
                 ))
             }
         }
@@ -171,7 +182,6 @@ enum RecursiveSubstitution<'a, 'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct RecursiveTypeNode<'db> {
     definition: Definition<'db>,
-    parameters: Option<GenericContext<'db>>,
     cycle: RecursiveCycle,
     /// The originating query's recovery iteration; zero denotes its initial seed.
     /// Compare only nodes from the same query.
@@ -196,7 +206,6 @@ impl<'db> RecursiveTypeGraph<'db> {
         nodes.len() == other_nodes.len()
             && nodes.iter().zip(other_nodes).all(|(node, other)| {
                 node.definition == other.definition
-                    && node.parameters == other.parameters
                     && node.cycle == other.cycle
                     && node.body == other.body
             })
@@ -222,6 +231,7 @@ impl<'db> RecursiveTypeGraphBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         graph: RecursiveTypeGraph<'db>,
         index: usize,
+        arguments: Option<Specialization<'db>>,
         mappings: &[DeferredTypeMapping<'db>],
     ) -> Type<'db> {
         let node = graph.nodes(db)[index];
@@ -231,7 +241,7 @@ impl<'db> RecursiveTypeGraphBuilder<'db> {
         } else {
             self.import(db, env, graph, index)
         };
-        Type::RecursiveVar(RecursiveVar::new_internal(db, target, mappings))
+        Type::RecursiveVar(RecursiveVar::new_internal(db, target, mappings, arguments))
     }
 
     fn import(
@@ -272,18 +282,21 @@ impl get_size2::GetSize for RecursiveCycle {}
 
 /// An application of a structural recursive type constructor.
 /// The private body remains unspecialized. Unfolding closes its recursive references,
-/// then applies the retained specializations and other mappings in order.
+/// specializes them with `arguments`, then applies the retained mappings.
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// Shared unspecialized bodies and their formal parameters.
+    /// Shared unspecialized bodies.
     #[returns(copy)]
     graph: RecursiveTypeGraph<'db>,
     /// Selects a body in `graph`. Sharing the graph and indexing its bodies avoids rebuilding
     /// nested binders for mutually recursive types when unfolding a reference.
     #[returns(copy)]
     index: usize,
-    /// Transformations applied, in order, after closing one body layer.
+    /// Actual arguments for the constructor's parameters, applied before the deferred mappings.
+    #[returns(copy)]
+    pub(super) arguments: Option<Specialization<'db>>,
+    /// Transformations applied, in order, after closing and specializing one body layer.
     #[returns(ref)]
     mappings: Box<[DeferredTypeMapping<'db>]>,
 }
@@ -303,6 +316,7 @@ impl<'db> RecursiveType<'db> {
             db,
             self.graph(db),
             variable.index(db),
+            variable.arguments(db),
             variable.mappings(db),
         )
     }
@@ -352,18 +366,23 @@ impl<'db> RecursiveType<'db> {
         parameters: Option<GenericContext<'db>>,
     ) -> Self {
         let cycle = RecursiveCycle(cycle);
+        let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
         let graph = RecursiveTypeGraph::new(
             db,
             vec![RecursiveTypeNode {
                 definition,
-                parameters,
                 cycle,
                 iteration: 0,
-                body: Type::RecursiveVar(RecursiveVar::new_internal(db, 0, Box::default())),
+                body: Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    0,
+                    Box::default(),
+                    arguments,
+                )),
             }]
             .into_boxed_slice(),
         );
-        Self::new_internal(db, graph, 0, Box::default())
+        Self::new_internal(db, graph, 0, arguments, Box::default())
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -387,6 +406,7 @@ impl<'db> RecursiveType<'db> {
         // Iteration metadata selects bodies but must not keep an unchanged type from converging.
         if let (Type::Recursive(current), Type::Recursive(previous)) = (result, previous)
             && current.index(db) == previous.index(db)
+            && current.arguments(db) == previous.arguments(db)
             && current.mappings(db) == previous.mappings(db)
             && current.graph(db).has_same_bodies(db, previous.graph(db))
         {
@@ -396,7 +416,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Bind references to this alias's query cycle in a closed inference result.
-    /// Each bound occurrence retains its mappings and refers to the graph's root node.
+    /// Each bound occurrence retains its arguments and mappings and refers to the graph's root node.
     fn bind(
         self,
         db: &'db dyn Db,
@@ -444,7 +464,13 @@ impl<'db> RecursiveType<'db> {
             nodes[0].body = body;
             nodes[0].iteration = iteration;
             let graph = RecursiveTypeGraph::new(db, nodes.into_boxed_slice());
-            Type::Recursive(Self::new_internal(db, graph, 0, Box::default()))
+            Type::Recursive(Self::new_internal(
+                db,
+                graph,
+                0,
+                self.arguments(db),
+                Box::default(),
+            ))
         } else {
             original
         };
@@ -456,8 +482,24 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
+    fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
+        Self::new_internal(
+            db,
+            self.graph(db),
+            self.index(db),
+            arguments,
+            self.mappings(db),
+        )
+    }
+
     fn with_mappings(self, db: &'db dyn Db, mappings: &[DeferredTypeMapping<'db>]) -> Self {
-        Self::new_internal(db, self.graph(db), self.index(db), mappings)
+        Self::new_internal(
+            db,
+            self.graph(db),
+            self.index(db),
+            self.arguments(db),
+            mappings,
+        )
     }
 
     pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
@@ -478,24 +520,8 @@ impl<'db> RecursiveType<'db> {
 
     /// Parameters bound by this recursive type constructor.
     pub(super) fn parameters(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.graph(db).nodes(db)[self.index(db)].parameters
-    }
-
-    /// Project substitutions for argument discovery and display; this does not reorder execution.
-    #[salsa::tracked(returns(copy), cycle_initial=|db, _, recursive: RecursiveType<'db>| recursive.parameters(db).map(|parameters| parameters.identity_specialization(db)))]
-    pub(super) fn arguments(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        let mut arguments = self.parameters(db)?.identity_specialization(db);
-        let env = self.environment(db);
-        let visitor = ApplyTypeMappingVisitor::new(&env);
-        for mapping in self
-            .mappings(db)
-            .iter()
-            .filter(|mapping| mapping.is_substitution())
-        {
-            arguments =
-                arguments.apply_type_mapping_impl(db, &mapping.type_mapping(), &[], &visitor);
-        }
-        Some(arguments)
+        self.arguments(db)
+            .map(|arguments| arguments.generic_context(db))
     }
 
     /// The declared alias name, shared by all specializations of this constructor.
@@ -521,7 +547,11 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn constructor(self, db: &'db dyn Db) -> Self {
         // Like an unspecialized PEP 695 alias, parameter-flow analysis must not
         // re-enter materialization while deriving the constructor's identity.
-        self.with_mappings(db, &[])
+        self.with_mappings(db, &[]).with_arguments(
+            db,
+            self.parameters(db)
+                .map(|parameters| parameters.identity_specialization(db)),
+        )
     }
 
     /// The program in which the recursive type's body was constructed.
@@ -573,60 +603,29 @@ impl<'db> RecursiveType<'db> {
         };
         self.mappings(db)
             .iter()
-            .fold(self.closed_body(db), |ty, mapping| {
+            .fold(self.unfolded_body(db), |ty, mapping| {
                 mapping.apply(db, ty, &visitor)
             })
     }
 
-    /// Collect specialization targets together, without unfolding growing applications.
+    /// Share the closed, specialized body across mappings with different visitors.
     #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _| SpecializationTargets::default(),
+        returns(copy),
+        cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn specialization_targets(self, db: &'db dyn Db) -> SpecializationTargets<'db> {
-        let Some((last, prefix)) = self.mappings(db).split_last() else {
-            let mut targets = RecursiveSpecializationSearch::collect(db, self, self.body(db));
-            if let Some(parameters) = self.parameters(db) {
-                for variable in parameters.variables(db) {
-                    targets.insert(db, variable);
-                }
-            }
-            targets.typevars.shrink_to_fit();
-            return targets;
-        };
-        let prefix = self.with_mappings(db, prefix);
-        let Some(substitution) = last.substitution() else {
-            // Other transformations can expose new targets in lazily inferred attributes.
-            let mut targets = SpecializationTargets::all();
-            if matches!(
-                last.type_mapping(),
-                TypeMapping::ApplySpecialization(ApplySpecialization::Effects { .. })
-            ) {
-                targets.effects = prefix.specialization_targets(db).effects;
-            }
-            return targets;
-        };
-        let input = prefix.specialization_targets(db);
-        let mut targets = input.clone();
-        for parameter in substitution.generic_context(db).variables(db) {
-            targets.remove(parameter.identity(db));
+    fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
+        let env = self.environment(db);
+        let unfolded = self.closed_body(db);
+        match self.arguments(db) {
+            Some(arguments) => unfolded.apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
+                TypeContext::default(),
+            ),
+            None => unfolded,
         }
-        for (parameter, ty) in substitution
-            .generic_context(db)
-            .variables(db)
-            .zip(substitution.types(db))
-        {
-            let value = RecursiveSpecializationSearch::collect(db, self, *ty);
-            // A substituted value contributes variables only if its parameter occurs in the input.
-            // Keep possible callable/Self effects even when the parameter is unused.
-            targets.effects |= value.effects;
-            if input.contains(parameter.identity(db)) {
-                targets.extend(&value);
-            }
-        }
-        targets.typevars.shrink_to_fit();
-        targets
     }
 
     /// Substitute free variables and graph references, or defer transformations until unfolding.
@@ -645,21 +644,26 @@ impl<'db> RecursiveType<'db> {
                 if let RecursiveSubstitution::Simplify = substitution {
                     return Type::Recursive(self.simplified(db));
                 }
+                let arguments = self
+                    .arguments(db)
+                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 let mappings = self
                     .mappings(db)
                     .iter()
                     .map(|retained| retained.rewrite(db, mapping, visitor))
                     .collect::<Vec<_>>();
                 match substitution {
-                    RecursiveSubstitution::Unfold(_) => {
-                        Type::Recursive(self.with_mappings(db, &mappings))
-                    }
+                    RecursiveSubstitution::Unfold(_) => Type::Recursive(
+                        self.with_arguments(db, arguments)
+                            .with_mappings(db, &mappings),
+                    ),
                     RecursiveSubstitution::Bind(builder)
                     | RecursiveSubstitution::Import(builder, _) => builder.reference(
                         db,
                         visitor.env,
                         self.graph(db),
                         self.index(db),
+                        arguments,
                         &mappings,
                     ),
                     RecursiveSubstitution::Fold(comparison, references) => {
@@ -669,10 +673,14 @@ impl<'db> RecursiveType<'db> {
                 }
             }
             _ => {
+                let Some(mapping) = DeferredTypeMapping::from_mapping(mapping, tcx, visitor) else {
+                    let arguments = self.arguments(db).map(|arguments| {
+                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                    });
+                    return Type::Recursive(self.with_arguments(db, arguments));
+                };
                 let mut mappings = self.mappings(db).to_vec();
-                for mapping in DeferredTypeMapping::from_mapping(db, mapping, tcx, visitor) {
-                    mapping.append(db, &mut mappings, visitor);
-                }
+                mappings.push(mapping);
                 let mapped = self.with_mappings(db, &mappings);
                 if visitor.recursive_unfolding {
                     return Type::Recursive(mapped);
@@ -694,48 +702,9 @@ impl<'db> RecursiveType<'db> {
         // Unfolding prepends the recursive edge's mappings. Normalize that prefix before
         // comparing the final operation, so redundant cycles inside the sequence disappear.
         let prefix = self.with_mappings(db, prefix).simplified(db);
-        if matches!(
-            last.type_mapping(),
-            TypeMapping::ApplySpecialization(ApplySpecialization::Effects { .. })
-        ) && !prefix.specialization_targets(db).effects
-        {
-            return prefix;
-        }
         let mut mappings = prefix.mappings(db).to_vec();
-        let env = self.environment(db);
-        let visitor = ApplyTypeMappingVisitor::new(&env);
-        last.clone().append(db, &mut mappings, &visitor);
-        let mut mapped = self.with_mappings(db, &mappings);
-        // Composition retains both domains. Drop a binding only after checking that the
-        // constructor does not use it, including through captured variables in its body.
-        if let Some(last) = mappings.last()
-            && let Some(substitution) = last.substitution()
-        {
-            let input = mapped.with_mappings(db, &mappings[..mappings.len() - 1]);
-            for (index, variable) in substitution
-                .generic_context(db)
-                .variables(db)
-                .enumerate()
-                .rev()
-            {
-                let mut candidate_mappings = mappings.clone();
-                let Some(last) = candidate_mappings.pop() else {
-                    break;
-                };
-                if let Some(reduced) = last.without_variable(db, index, &visitor) {
-                    candidate_mappings.push(reduced);
-                }
-                let candidate = self.with_mappings(db, &candidate_mappings);
-                if !input
-                    .specialization_targets(db)
-                    .contains(variable.identity(db))
-                    || RecursiveTypeComparison::default().equivalent(db, mapped, candidate)
-                {
-                    mappings = candidate_mappings;
-                    mapped = candidate;
-                }
-            }
-        }
+        mappings.push(last.clone());
+        let mapped = self.with_mappings(db, &mappings);
         for prefix in 0..mappings.len() {
             let candidate = self.with_mappings(db, &mappings[..prefix]);
             if RecursiveTypeComparison::default().equivalent(db, mapped, candidate) {
@@ -743,45 +712,6 @@ impl<'db> RecursiveType<'db> {
             }
         }
         mapped
-    }
-
-    /// For the same constructor, prove equality on every variable the shared input can expose.
-    fn has_equivalent_substitution(self, db: &'db dyn Db, other: Self) -> bool {
-        let left = self.mappings(db);
-        let right = other.mappings(db);
-        let common = left
-            .iter()
-            .zip(right)
-            .take_while(|(left, right)| left == right)
-            .count();
-        let left = &left[common..];
-        let right = &right[common..];
-        let (left, right) = match (left, right) {
-            ([left], [right])
-                if left.has_same_context(right)
-                    && let Some(left) = left.substitution()
-                    && let Some(right) = right.substitution() =>
-            {
-                (Some(left), Some(right))
-            }
-            ([left], []) if let Some(left) = left.substitution() => (Some(left), None),
-            ([], [right]) if let Some(right) = right.substitution() => (None, Some(right)),
-            _ => return false,
-        };
-        let input = self.with_mappings(db, &self.mappings(db)[..common]);
-        left.into_iter()
-            .chain(right)
-            .flat_map(|substitution| substitution.generic_context(db).variables(db))
-            .all(|variable| {
-                let left = left.and_then(|substitution| substitution.get(db, variable));
-                let right = right.and_then(|substitution| substitution.get(db, variable));
-                left == right
-                    || input.specialization_targets(db).substitutions_agree(
-                        variable.identity(db),
-                        left,
-                        right,
-                    )
-            })
     }
 
     pub(in crate::types) fn variance_equation(
@@ -793,213 +723,6 @@ impl<'db> RecursiveType<'db> {
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
-    }
-}
-
-/// Possible variable occurrences and callable/Self effects of specialization.
-#[derive(Clone, Debug, Default, Eq, PartialEq, salsa::SalsaValue, get_size2::GetSize)]
-struct SpecializationTargets<'db> {
-    // Keep a unique occurrence when known: identities omit materialized bounds and constraints.
-    typevars: FxHashMap<BoundTypeVarIdentity<'db>, Option<BoundTypeVarInstance<'db>>>,
-    /// Unknown attributes may contain any variable. In that case `typevars` lists exclusions,
-    /// so substitution can still remove variables from an otherwise unknown set.
-    complement: bool,
-    effects: bool,
-}
-
-impl<'db> SpecializationTargets<'db> {
-    fn all() -> Self {
-        Self {
-            complement: true,
-            effects: true,
-            ..Self::default()
-        }
-    }
-
-    fn contains(&self, variable: BoundTypeVarIdentity<'db>) -> bool {
-        self.typevars.contains_key(&variable) != self.complement
-    }
-
-    /// Compare replacements; a missing replacement preserves the original occurrence.
-    fn substitutions_agree(
-        &self,
-        variable: BoundTypeVarIdentity<'db>,
-        left: Option<Type<'db>>,
-        right: Option<Type<'db>>,
-    ) -> bool {
-        if !self.contains(variable) {
-            return true;
-        }
-        let unchanged = self
-            .typevars
-            .get(&variable)
-            .copied()
-            .flatten()
-            .map(Type::TypeVar);
-        left.or(unchanged) == right.or(unchanged)
-    }
-
-    fn insert(&mut self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
-        let occurrence_identity = variable.identity(db);
-        let identity = if occurrence_identity.is_paramspec(db) {
-            occurrence_identity.without_paramspec_attr(db)
-        } else {
-            occurrence_identity
-        };
-        // Do not treat a ParamSpec projection as the original occurrence of its lookup key.
-        let occurrence = (identity == occurrence_identity).then_some(variable);
-        if self.complement {
-            self.typevars.remove(&identity);
-        } else {
-            let previous = self.typevars.entry(identity).or_insert(occurrence);
-            if *previous != occurrence {
-                *previous = None;
-            }
-        }
-    }
-
-    fn remove(&mut self, variable: BoundTypeVarIdentity<'db>) {
-        if self.complement {
-            self.typevars.insert(variable, None);
-        } else {
-            self.typevars.remove(&variable);
-        }
-    }
-
-    fn extend(&mut self, other: &Self) {
-        match (self.complement, other.complement) {
-            (false, false) =>
-            {
-                #[expect(
-                    clippy::iter_over_hash_type,
-                    reason = "Merging occurrences is order-independent"
-                )]
-                for (identity, variable) in &other.typevars {
-                    let previous = self.typevars.entry(*identity).or_insert(*variable);
-                    if previous != variable {
-                        *previous = None;
-                    }
-                }
-            }
-            (true, false) => self
-                .typevars
-                .retain(|variable, _| !other.typevars.contains_key(variable)),
-            (false, true) => {
-                let mut excluded = other.typevars.clone();
-                excluded.retain(|variable, _| !self.typevars.contains_key(variable));
-                self.typevars = excluded;
-                self.complement = true;
-            }
-            (true, true) => self
-                .typevars
-                .retain(|variable, _| other.typevars.contains_key(variable)),
-        }
-        self.effects |= other.effects;
-    }
-}
-
-/// Search open graph bodies and substitution values, preserving the scope of recursive variables.
-struct RecursiveSpecializationSearch<'db> {
-    scope: RecursiveType<'db>,
-    env: ProgramEnvironment<'db>,
-    targets: RefCell<SpecializationTargets<'db>>,
-    visited: TypeCollector<'db>,
-}
-
-impl<'db> RecursiveSpecializationSearch<'db> {
-    fn collect(
-        db: &'db dyn Db,
-        scope: RecursiveType<'db>,
-        ty: Type<'db>,
-    ) -> SpecializationTargets<'db> {
-        let search = Self {
-            scope,
-            env: scope.environment(db),
-            targets: RefCell::default(),
-            visited: TypeCollector::default(),
-        };
-        search.visit_type(db, ty);
-        search.targets.into_inner()
-    }
-}
-
-impl<'db> TypeVisitor<'db> for RecursiveSpecializationSearch<'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        &self.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
-    fn notify_skipped_lazy_type_attributes(&self) {
-        *self.targets.borrow_mut() = SpecializationTargets::all();
-    }
-
-    fn visit_parameter_default(&self, db: &'db dyn Db, ty: Type<'db>) {
-        self.visit_type(db, ty);
-    }
-
-    // Substitution preserves generic declarations and TypeVar objects. Actual variable
-    // occurrences are handled in visit_type, without inspecting their bounds or defaults.
-    fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
-
-    // Specialization maps stored class arguments, not lazily inferred members or fields.
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some(class) = protocol.class_origin(db) {
-            self.visit_type(db, class.into());
-        } else {
-            walk_protocol_instance_type(db, protocol, self);
-        }
-    }
-
-    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
-        if let TypedDictType::Class(class) = typed_dict {
-            self.visit_type(db, class.into());
-        } else {
-            walk_typed_dict_type(db, typed_dict, self);
-        }
-    }
-
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        walk_type_alias_arguments(db, alias, self);
-    }
-
-    // Alias objects are unchanged by specialization, unlike aliases used as types.
-    fn visit_type_alias_object(&self, _db: &'db dyn Db, _alias: TypeAliasType<'db>) {}
-
-    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-        self.targets.borrow_mut().effects = true;
-        walk_callable_type(db, callable, self);
-    }
-
-    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
-        self.targets.borrow_mut().effects = true;
-        walk_function_type(db, function, self);
-    }
-
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        match ty {
-            Type::TypeVar(typevar) => {
-                let mut targets = self.targets.borrow_mut();
-                targets.insert(db, typevar);
-                targets.effects |= typevar.typevar(db).is_self(db);
-            }
-            Type::RecursiveVar(reference) => {
-                let targets = self
-                    .scope
-                    .reference(db, reference)
-                    .specialization_targets(db);
-                self.targets.borrow_mut().extend(targets);
-            }
-            Type::Recursive(recursive) => {
-                let targets = recursive.specialization_targets(db);
-                self.targets.borrow_mut().extend(targets);
-            }
-            _ => {
-                walk_type_with_recursion_guard(db, ty, self, &self.visited);
-            }
-        }
     }
 }
 
@@ -1122,35 +845,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: RecursiveType<'db>,
         target: RecursiveType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let (
-            Some((source_substitution, source_mappings)),
-            Some((target_substitution, target_mappings)),
-        ) = (
-            source
-                .without_materialization(db)
-                .mappings(db)
-                .split_first(),
-            target
-                .without_materialization(db)
-                .mappings(db)
-                .split_first(),
-        )
-        else {
-            return self.never();
-        };
         if !matches!(
             self.relation,
             TypeRelation::Subtyping | TypeRelation::Assignability
         ) || source.constructor(db) != target.constructor(db)
-            || source_mappings != target_mappings
+            || source.without_materialization(db).mappings(db)
+                != target.without_materialization(db).mappings(db)
         {
             return self.never();
         }
-        // Include captured variables: equal formal arguments do not imply equal bodies.
-        let (Some(source_arguments), Some(target_arguments)) = (
-            source_substitution.substitution(),
-            target_substitution.substitution(),
-        ) else {
+        let (Some(source_arguments), Some(target_arguments)) =
+            (source.arguments(db), target.arguments(db))
+        else {
             return self.never();
         };
         // This proof substitutes plain parameter values. Variadic packs and
@@ -1241,9 +947,6 @@ impl<'db> RecursiveTypeComparison<'db> {
         if left.arguments(db) != right.arguments(db) {
             return false;
         }
-        if left.has_equivalent_substitution(db, right) {
-            return true;
-        }
         {
             let active = self.active.borrow();
             // Bound stack use separately from the work shared by all branches.
@@ -1300,7 +1003,7 @@ impl<'db> RecursiveTypeComparison<'db> {
             references.push(recursive);
             index
         });
-        Type::RecursiveVar(RecursiveVar::new_internal(db, index, Box::default()))
+        Type::RecursiveVar(RecursiveVar::new_internal(db, index, Box::default(), None))
     }
 }
 

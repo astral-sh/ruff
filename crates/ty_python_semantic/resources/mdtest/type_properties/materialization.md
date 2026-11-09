@@ -1808,9 +1808,10 @@ def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
 
 ## Specialization after recursive materialization
 
-Materializing a generic alias leaves its type parameters available for later specialization.
-Substituting `Any` afterward does not materialize that new argument. This applies to recursive
-aliases at every depth, just as it does to a finite tuple.
+Materializing a generic alias leaves its type parameters available for later specialization. TODO:
+Substituting `Any` afterward should preserve that new argument, as it does for a finite tuple.
+Recursive aliases currently apply their arguments before materializing, regardless of the order in
+which these operations were requested.
 
 ```py
 from typing import Any, TypeAlias, TypeVar
@@ -1825,12 +1826,12 @@ RecursiveBottom: TypeAlias = Bottom[Recursive[T]]
 
 def specialize_after(flat: FlatTop[Any], top: RecursiveTop[Any], bottom: RecursiveBottom[Any]):
     reveal_type(flat)  # revealed: tuple[Any, object]
-    reveal_type(top[0])  # revealed: Any
+    reveal_type(top[0])  # revealed: object
     reveal_type(top[1])  # revealed: object
-    reveal_type(top[2][0])  # revealed: Any
+    reveal_type(top[2][0])  # revealed: object
     reveal_type(top[2][1])  # revealed: object
-    reveal_type(bottom[0])  # revealed: Any
-    reveal_type(bottom[2][0])  # revealed: Any
+    reveal_type(bottom[0])  # revealed: Never
+    reveal_type(bottom[2][0])  # revealed: Never
 
 def materialize_after(top: Top[Recursive[Any]], bottom: Bottom[Recursive[Any]]):
     reveal_type(top[0])  # revealed: object

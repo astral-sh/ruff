@@ -11514,7 +11514,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses the binding context and MRO-based matching against the class recorded in a `Self`
 /// typevar's origin.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,
@@ -11694,9 +11694,20 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::ApplySpecialization(specialization)
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
-                let kept = context
-                    .variables(db)
-                    .filter(|bound_typevar| !specialization.removes_parameter(db, *bound_typevar));
+                // Filter out type variables that are already specialized
+                // (i.e., mapped to a non-TypeVar type)
+                let kept = context.variables(db).filter(|bound_typevar| {
+                    // Keep the type variable if it's not in the specialization
+                    // or if it's mapped to itself (still a TypeVar)
+                    match specialization.get(db, *bound_typevar) {
+                        None => true,
+                        Some(Type::TypeVar(mapped_typevar)) => {
+                            // Still a TypeVar, keep it if it's mapping to itself
+                            mapped_typevar.identity(db) == bound_typevar.identity(db)
+                        }
+                        Some(_) => false, // Specialized to a concrete type, filter out
+                    }
+                });
                 if specialization.specialize_self_domain() {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)

@@ -3599,8 +3599,8 @@ def inspect(container: Container):
 
 ### Captured type variables in recursive aliases
 
-Specializing a class also substitutes its parameters in the body of a recursive alias, including at
-deeper levels. Equal alias arguments do not make differently specialized members interchangeable.
+TODO: Specializing a class should also substitute its parameters in the body of a recursive alias.
+Currently, specialization only updates the alias's arguments, leaving captured variables unchanged.
 
 ```toml
 [environment]
@@ -3621,17 +3621,18 @@ class Container[U]:
 def compare(source: Container[str], target: Container[bytes]):
     child = source.value[1]
     if child is not None:
-        reveal_type(child[0])  # revealed: tuple[int, str]
+        reveal_type(child[0])  # revealed: tuple[int, U@Container]
     other_child = target.value[1]
     if other_child is not None:
-        reveal_type(other_child[0])  # revealed: tuple[int, bytes]
+        reveal_type(other_child[0])  # revealed: tuple[int, U@Container]
+    # error: [static-assert-error]
     static_assert(not is_subtype_of(TypeOf[source.value], TypeOf[target.value]))
 ```
 
 ### Methods in recursive aliases
 
-Specializing a recursive alias that contains a method specializes both its receiver and its inferred
-return type. Substitution applies once even when a type argument contains the same variable.
+TODO: Specializing a recursive alias that contains a method should specialize both its receiver and
+its inferred return type. Currently, the method retains its unspecialized owner.
 
 ```toml
 [environment]
@@ -3654,10 +3655,12 @@ class Container[U]:
     methods: Methods
 
     def nested(self: "Container[list[U]]"):
-        reveal_type(self.methods[1][0](self))  # revealed: list[U@Container] | Unknown
+        # error: [invalid-argument-type]
+        reveal_type(self.methods[1][0](self))  # revealed: U@Container | Unknown
 
 def inspect(value: Container[int]):
-    reveal_type(value.methods[1][0](value))  # revealed: int | Unknown
+    # error: [invalid-argument-type]
+    reveal_type(value.methods[1][0](value))  # revealed: U@Container | Unknown
 ```
 
 ### Type parameters used only in recursive references

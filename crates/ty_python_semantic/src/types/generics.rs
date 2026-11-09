@@ -553,8 +553,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn variables(
         self,
         db: &'db dyn Db,
-    ) -> impl DoubleEndedIterator<Item = BoundTypeVarInstance<'db>> + ExactSizeIterator + Clone
-    {
+    ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
         self.variables_inner(db).values().copied()
     }
 
@@ -1225,7 +1224,6 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
-#[salsa::tracked]
 impl<'db> Specialization<'db> {
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
@@ -1394,47 +1392,6 @@ impl<'db> Specialization<'db> {
             .generic_context(db)
             .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
-    }
-
-    /// Compose pure substitutions in application order, retaining both domains.
-    pub(super) fn compose_substitution(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Substitution(other));
-        let types = self.map_types(db, |_, _, ty| {
-            ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor)
-        });
-        let mapped = match types {
-            Cow::Borrowed(_) => self,
-            Cow::Owned(types) => Self::new(
-                db,
-                self.generic_context(db),
-                types.into_boxed_slice(),
-                self.materialization_kind(db),
-                self.tuple_inner(db),
-            ),
-        };
-        mapped.merge_substitution(db, other)
-    }
-
-    // Only merging the tables is context-independent. Transform their values with the caller's
-    // recursion guards before caching the merge.
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    fn merge_substitution(self, db: &'db dyn Db, other: Self) -> Self {
-        let left = self.generic_context(db);
-        let mut variables: Vec<_> = left.variables(db).collect();
-        let mut types = self.types(db).to_vec();
-        for (variable, ty) in other.generic_context(db).variables(db).zip(other.types(db)) {
-            if left.variable_index(db, variable.identity(db)).is_none() {
-                variables.push(variable);
-                types.push(*ty);
-            }
-        }
-        let env = ProgramEnvironment::from_program(left.program(db));
-        GenericContext::from_typevar_instances(db, &env, variables).specialize(db, types)
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -2331,14 +2288,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
-    /// Substitute occurrences without changing declarations or evaluating lazy signatures.
-    Substitution(Specialization<'db>),
-    /// Prepare existing declarations and signatures before substituting occurrences.
-    Effects {
-        specialization: Specialization<'db>,
-        specialize_self_domain: bool,
-        evaluate_lazy_signatures: bool,
-    },
     Specialization {
         specialization: Specialization<'db>,
         /// Whether to substitute free owner variables in the declared domain of a retained
@@ -2381,10 +2330,6 @@ impl<'db> ApplySpecialization<'_, 'db> {
             Self::Specialization {
                 specialize_self_domain,
                 ..
-            }
-            | Self::Effects {
-                specialize_self_domain,
-                ..
             } => specialize_self_domain,
             Self::WithBindings { specialization, .. } => specialization.specialize_self_domain(),
             _ => false,
@@ -2394,34 +2339,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
     /// Returns `true` if this mapping should leave unevaluated function signatures unchanged.
     pub(super) fn preserves_lazy_signatures(self) -> bool {
         match self {
-            Self::ReturnCallables(_) | Self::TypeAlias(_) | Self::Substitution(_) => true,
-            Self::Effects {
-                evaluate_lazy_signatures,
-                ..
-            } => !evaluate_lazy_signatures,
+            Self::ReturnCallables(_) | Self::TypeAlias(_) => true,
             Self::WithBindings { specialization, .. } => specialization.preserves_lazy_signatures(),
             _ => false,
-        }
-    }
-
-    /// Whether this operation removes a variable from a signature's generic context.
-    pub(super) fn removes_parameter(
-        self,
-        db: &'db dyn Db,
-        variable: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        let replacement = match self {
-            Self::Substitution(_) => return false,
-            Self::Effects { specialization, .. } => specialization.get(db, variable),
-            Self::WithBindings { specialization, .. } => {
-                return specialization.removes_parameter(db, variable);
-            }
-            _ => self.get(db, variable),
-        };
-        match replacement {
-            None => false,
-            Some(Type::TypeVar(mapped)) => mapped.identity(db) != variable.identity(db),
-            Some(_) => true,
         }
     }
 
@@ -2461,10 +2381,8 @@ impl<'db> ApplySpecialization<'_, 'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            ApplySpecialization::Effects { .. } => None,
             ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization)
-            | ApplySpecialization::Substitution(specialization) => {
+            | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
             ApplySpecialization::Partial {
@@ -2501,9 +2419,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization)
-            | ApplySpecialization::Substitution(specialization)
-            | ApplySpecialization::Effects { specialization, .. } => Some(specialization),
+            | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,
                 types,
