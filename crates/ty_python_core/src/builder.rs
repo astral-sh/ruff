@@ -3125,7 +3125,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             },
             &generator.target,
             value,
-            None,
         );
 
         let mut filtered_out_paths = Vec::new();
@@ -3148,7 +3147,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
                 &generator.target,
                 value,
-                None,
             );
 
             for if_expr in &generator.ifs {
@@ -3321,8 +3319,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         unpackable: &Unpackable<'ast>,
         target: &'ast ast::Expr,
         value: Expression<'db>,
-        unpack_source: Option<&'ast ast::Expr>,
     ) {
+        let unpack_source = unpackable.direct_source(target).filter(|_| {
+            self.exception_context_stack_manager
+                .has_active_exception_handler(self)
+        });
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if let Some(source) = unpack_source {
@@ -4416,18 +4417,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                    // Only the first target sees the literal before a chained assignment can mutate it.
-                    let mut unpack_source = self
-                        .exception_context_stack_manager
-                        .has_active_exception_handler(self)
-                        .then_some(node.value.as_ref());
                     for target in &node.targets {
-                        self.add_unpackable_assignment(
-                            &Unpackable::Assign(node),
-                            target,
-                            value,
-                            unpack_source.take(),
-                        );
+                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
             }
@@ -4776,7 +4767,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             },
                             optional_vars,
                             context_manager,
-                            None,
                         );
                     }
                 }
@@ -4901,7 +4891,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ));
                 }
 
-                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr, None);
+                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
@@ -6148,6 +6138,15 @@ enum Unpackable<'ast> {
 }
 
 impl<'ast> Unpackable<'ast> {
+    /// The first target of a plain assignment receives the RHS directly. An earlier
+    /// target in a chained assignment could already have mutated a list on the RHS.
+    fn direct_source(&self, target: &ast::Expr) -> Option<&'ast ast::Expr> {
+        let Self::Assign(stmt) = self else {
+            return None;
+        };
+        std::ptr::eq(stmt.targets.first()?, target).then_some(stmt.value.as_ref())
+    }
+
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
