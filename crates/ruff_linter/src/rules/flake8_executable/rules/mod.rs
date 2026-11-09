@@ -26,6 +26,11 @@ pub(crate) fn from_tokens(
 ) {
     let mut has_any_shebang = false;
     for range in comment_ranges {
+        // A shebang must start at the beginning of a physical line. Indented `#!` comments inside
+        // a function (or comments following code on the same line) are ordinary comments.
+        if locator.line_start(range.start()) != range.start() {
+            continue;
+        }
         let comment = locator.slice(range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;
