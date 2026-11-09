@@ -9,7 +9,7 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::preview::is_human_readable_names_enabled;
 use crate::rule_redirects::get_redirect;
-use crate::rules::ruff::rules::{redirected_rule_selector, rule_codes_in_selectors};
+use crate::rules::ruff::rules::{renamed_rule, rule_codes_in_selectors};
 
 pub(super) fn check_rule_selectors(
     context: &LintContext,
@@ -104,10 +104,10 @@ fn check_selector_array(
         let Some(selector) = Selector::from_spanned(value, source) else {
             continue;
         };
-        if context.is_rule_enabled(Rule::RedirectedRuleSelector)
+        if context.is_rule_enabled(Rule::RenamedRule)
             && let Some((original, target)) = selector.redirect
         {
-            redirected_rule_selector(
+            renamed_rule(
                 context,
                 original,
                 target,

@@ -31,14 +31,14 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
-pub(crate) struct RedirectedRuleSelector {
+pub(crate) struct RenamedRule {
     original: &'static str,
     target: &'static str,
     setting: &'static str,
     in_lint_table: bool,
 }
 
-impl AlwaysFixableViolation for RedirectedRuleSelector {
+impl AlwaysFixableViolation for RenamedRule {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for RedirectedRuleSelector {
 }
 
 /// `RUF202`
-pub(crate) fn redirected_rule_selector(
+pub(crate) fn renamed_rule(
     context: &LintContext,
     original: &'static str,
     target: &'static str,
@@ -70,7 +70,7 @@ pub(crate) fn redirected_rule_selector(
 ) {
     context
         .report_diagnostic(
-            RedirectedRuleSelector {
+            RenamedRule {
                 original,
                 target,
                 setting,
