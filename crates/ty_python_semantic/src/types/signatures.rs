@@ -1858,11 +1858,10 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let constraints = ConstraintSetBuilder::new();
         let inferable = self.inferable_typevars(db);
         self_type
-            .when_assignable_to(db, env, expected_self_ty, &constraints, inferable)
-            .is_always_satisfied(db, env, inferable)
+            .when_assignable_to_owned(db, env, expected_self_ty, inferable)
+            .query(|_, when| when.is_always_satisfied(db, env, inferable))
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
