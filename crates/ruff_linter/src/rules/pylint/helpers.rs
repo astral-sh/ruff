@@ -95,6 +95,13 @@ impl<'a> SequenceIndexVisitor<'a> {
 }
 
 impl SequenceIndexVisitor<'_> {
+    fn mark_modified(&mut self) {
+        self.modified = true;
+        // Any access collected before the mutation is stale as well: the replacement value
+        // reflects the iterator snapshot, not the sequence after it was modified.
+        self.accesses.clear();
+    }
+
     fn is_assignment(&self, expr: &Expr) -> bool {
         // If we see the sequence, a subscript, or the index being modified, we'll stop emitting
         // diagnostics.
@@ -128,21 +135,29 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.mark_modified();
+                }
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
+                    if self.is_assignment(target) {
+                        self.mark_modified();
+                    }
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
+                if self.is_assignment(target) {
+                    self.mark_modified();
+                }
                 self.visit_expr(value);
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.mark_modified();
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         }
