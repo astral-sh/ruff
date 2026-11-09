@@ -6934,12 +6934,16 @@ impl<'db> CallInference<'_, 'db> {
 
         let mut solution = self.solve(constraints, &mut builder, return_context);
 
-        // If we failed to infer a compatible specialization, retry without the declared type.
-        //
-        // Note that this retry only exists to provide more precise diagnostics in cases where
-        // the declared type may partially influence the type inferred for the call, leading to
-        // confusing results.
-        if return_context.is_some() && solution.is_err() {
+        let accepts_arguments =
+            |&(inference, _, validated): &(TypeVarInference<'db>, Type<'db>, bool)| {
+                validated || self.accepts_arguments(inference.merged_specialization(db))
+            };
+
+        // An expected `list[None]` can specialize `wrap[B](x: B) -> list[B]` to `B = None`
+        // even when the argument has a caller-fixed type `S`. That solution assumes `S ≤ None`.
+        // TODO: Remove the extra argument check once the solver accounts for all specializations
+        // of caller-fixed type variables (https://github.com/astral-sh/ty/issues/4696).
+        if return_context.is_some() && !solution.as_ref().is_ok_and(accepts_arguments) {
             builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
             constraint_set_errors.fill(false);
@@ -6952,7 +6956,14 @@ impl<'db> CallInference<'_, 'db> {
                 &mut constraint_set_errors,
             );
 
-            solution = self.solve(constraints, &mut builder, None);
+            let retry = self.solve(constraints, &mut builder, None);
+            // If neither specialization accepts the arguments, the contextual parameter types
+            // give more precise diagnostics when available.
+            if solution.is_err()
+                || (specialization_errors.is_empty() && retry.as_ref().is_ok_and(accepts_arguments))
+            {
+                solution = retry;
+            }
         }
 
         let (inference, return_ty, arguments_validated) = solution.unwrap_or_else(|errors| {
