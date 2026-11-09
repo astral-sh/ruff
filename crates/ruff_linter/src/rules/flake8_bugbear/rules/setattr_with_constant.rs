@@ -1,3 +1,4 @@
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -135,9 +136,15 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     {
         if expr == child.as_ref() {
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
+            let replacement_range = parenthesized_range(
+                expr.into(),
+                checker.semantic().current_statement().into(),
+                checker.tokens(),
+            )
+            .unwrap_or(expr.range());
             let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
-                expr.range(),
+                replacement_range,
             );
             let fix = if is_unsafe {
                 Fix::unsafe_edit(edit)

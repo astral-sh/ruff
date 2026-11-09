@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+  --> B010_nested_parentheses.py:2:2
+   |
+1 | obj = object()
+2 | (setattr(obj, "attr", None))
+  |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Replace `setattr` with assignment
+  |
+1 | obj = object()
+  - (setattr(obj, "attr", None))
+2 + obj.attr = None
+  |
+
