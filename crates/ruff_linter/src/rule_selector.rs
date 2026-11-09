@@ -10,23 +10,24 @@ use ruff_ranged_value::{RangedValue, ValueSource};
 use crate::codes::{Category, NoqaCode, RuleCodePrefix, RuleIter, RuleStatus};
 use crate::preview::{is_human_readable_names_enabled, is_rule_categories_enabled};
 use crate::registry::{Linter, Rule, RuleNamespace};
-use crate::rule_redirects::get_redirect;
+use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::settings::types::PreviewMode;
-use crate::warn_user_once_by_message;
+use crate::{warn_user_once_by_id, warn_user_once_by_message};
 
 /// A potential rule selector that has not yet been validated and tracks its source.
 ///
-/// If you add a new field that uses this type, be sure to update `rule-codes-in-selectors`
-/// (`RUF201`) to validate the additional selector field.
+/// When adding a field of this type, update the list of selector settings in `toml::rule_selectors`
+/// so configuration lints also check the new field.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(transparent)]
 pub struct UnresolvedRuleSelector(RangedValue<String>);
 
 impl UnresolvedRuleSelector {
     pub fn resolve(&self, preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
-        let selector = self.0.as_str();
+        let redirect = get_redirect(&self.0);
+        let selector = redirect.map_or(self.0.as_str(), |(_, target)| target);
 
-        RuleSelector::from_str(selector).or_else(|_| {
+        let resolved = RuleSelector::parse_no_redirect(selector).or_else(|_| {
             let kind = if let Ok(category) = Category::from_str(selector) {
                 if is_rule_categories_enabled(preview) {
                     return Ok(RuleSelector::Category(category));
@@ -43,7 +44,14 @@ impl UnresolvedRuleSelector {
                 RuleResolutionErrorKind::Unknown
             };
             Err(RuleResolutionError::from_selector(self, kind))
-        })
+        })?;
+
+        if let Some((from, target)) = redirect
+            && matches!(self.source(), ValueSource::Cli)
+        {
+            warn_user_once_by_id!(from, "`{from}` has been remapped to `{target}`.");
+        }
+        Ok(resolved)
     }
 
     pub fn new(selector: impl Into<String>, source: ValueSource) -> Self {
@@ -155,23 +163,14 @@ pub enum RuleSelector {
     /// Select all rules for a given linter.
     Linter(Linter),
     /// Select all rules for a given linter with a given prefix.
-    Prefix {
-        prefix: RuleCodePrefix,
-        redirected_from: Option<&'static str>,
-    },
+    Prefix { prefix: RuleCodePrefix },
     /// Select an individual rule.
-    Rule {
-        rule: Rule,
-        redirected_from: Option<&'static str>,
-    },
+    Rule { rule: Rule },
 }
 
 impl RuleSelector {
     pub(crate) const fn rule(rule: Rule) -> Self {
-        Self::Rule {
-            rule,
-            redirected_from: None,
-        }
+        Self::Rule { rule }
     }
 }
 
@@ -193,40 +192,7 @@ impl FromStr for RuleSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // **Changes should be reflected in `parse_no_redirect` as well**
-        match s {
-            "ALL" => Ok(Self::All),
-            "C" => Ok(Self::C),
-            "T" => Ok(Self::T),
-            _ => {
-                let (s, redirected_from) = match get_redirect(s) {
-                    Some((from, target)) => (target, Some(from)),
-                    None => (s, None),
-                };
-
-                let (linter, code) =
-                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
-
-                if code.is_empty() {
-                    return Ok(Self::Linter(linter));
-                }
-
-                let prefix = RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
-
-                if let Some(rule) = prefix.as_rule() {
-                    Ok(Self::Rule {
-                        rule,
-                        redirected_from,
-                    })
-                } else {
-                    Ok(Self::Prefix {
-                        prefix,
-                        redirected_from,
-                    })
-                }
-            }
-        }
+        Self::parse_no_redirect(get_redirect_target(s).unwrap_or(s))
     }
 }
 
@@ -264,10 +230,10 @@ impl RuleSelector {
             RuleSelector::Category(category) => ("", category.into_str()),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } => {
+            RuleSelector::Prefix { prefix } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
-            RuleSelector::Rule { rule, .. } => rule
+            RuleSelector::Rule { rule } => rule
                 .noqa_code()
                 .map_or_else(|| ("", rule.name().as_str()), NoqaCode::into_parts),
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
@@ -295,8 +261,8 @@ impl RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Slice(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Slice(prefix.rules()),
-            RuleSelector::Rule { rule, .. } => RuleSelectorIter::Once(std::iter::once(*rule)),
+            RuleSelector::Prefix { prefix } => RuleSelectorIter::Slice(prefix.rules()),
+            RuleSelector::Rule { rule } => RuleSelectorIter::Once(std::iter::once(*rule)),
         }
     }
 
@@ -408,8 +374,8 @@ mod schema {
             .filter(|p| {
                 // Exclude removed rules and prefixes where all of the rules are removed
                 match RuleSelector::parse_no_redirect(p) {
-                    Ok(RuleSelector::Rule { rule, .. }) => !rule.is_removed(),
-                    Ok(RuleSelector::Prefix { prefix, .. }) => {
+                    Ok(RuleSelector::Rule { rule }) => !rule.is_removed(),
+                    Ok(RuleSelector::Prefix { prefix }) => {
                         !prefix.rules().all(|rule| rule.is_removed())
                     }
                     _ => true,
@@ -452,7 +418,7 @@ impl RuleSelector {
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
             RuleSelector::Rule { .. } => Specificity::Rule,
-            RuleSelector::Prefix { prefix, .. } => {
+            RuleSelector::Prefix { prefix } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
                     1 => Specificity::Prefix1Char,
@@ -468,9 +434,7 @@ impl RuleSelector {
     }
 
     /// Parse [`RuleSelector`] from a string; but do not follow redirects.
-    #[cfg(feature = "schemars")]
     fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
-        // **Changes should be reflected in `from_str` as well**
         match s {
             "ALL" => Ok(Self::All),
             "C" => Ok(Self::C),
@@ -487,15 +451,9 @@ impl RuleSelector {
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
                 if let Some(rule) = prefix.as_rule() {
-                    Ok(Self::Rule {
-                        rule,
-                        redirected_from: None,
-                    })
+                    Ok(Self::Rule { rule })
                 } else {
-                    Ok(Self::Prefix {
-                        prefix,
-                        redirected_from: None,
-                    })
+                    Ok(Self::Prefix { prefix })
                 }
             }
         }

@@ -940,7 +940,6 @@ impl LintConfiguration {
         let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
         // Store selectors for displaying warnings
-        let mut redirects = FxHashMap::default();
         let mut deprecated_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut removed_ignored_rules = FxHashSet::default();
@@ -1114,19 +1113,6 @@ impl LintConfiguration {
                         }
                     }
                 }
-
-                // Redirected rules
-                if let RuleSelector::Prefix {
-                    redirected_from: Some(redirect_from),
-                    ..
-                }
-                | RuleSelector::Rule {
-                    redirected_from: Some(redirect_from),
-                    ..
-                } = selector
-                {
-                    redirects.insert(*redirect_from, selector);
-                }
             }
         }
 
@@ -1165,12 +1151,6 @@ impl LintConfiguration {
             warn_user_once_by_message!(
                 "The following rules have been removed and ignoring them has no effect:{rules}"
             );
-        }
-
-        for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
-            let (prefix, code) = target.prefix_and_code();
-            // TODO(martin): This belongs into the ruff crate.
-            warn_user_once_by_id!(from, "`{from}` has been remapped to `{prefix}{code}`.");
         }
 
         if preview.mode.is_disabled() {

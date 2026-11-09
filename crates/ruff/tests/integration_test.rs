@@ -282,6 +282,7 @@ fn stdin_source_type_pyi() {
     All checks passed!
 
     ----- stderr -----
+    warning: `TCH` has been remapped to `TC`.
     ");
 }
 
