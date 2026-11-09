@@ -6,7 +6,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_final, is_overload};
@@ -247,20 +246,12 @@ fn add_diagnostic(
     );
 
     diagnostic.try_set_fix(|| {
-        replace_with_self_fix(
-            checker.semantic(),
-            checker.tokens(),
-            &importer,
-            stmt,
-            returns,
-            class_def,
-        )
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
     });
 }
 
 fn replace_with_self_fix(
     semantic: &SemanticModel,
-    tokens: &Tokens,
     importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
@@ -275,15 +266,9 @@ fn replace_with_self_fix(
         let first = parameters.iter().next()?;
         let annotation = first.annotation()?;
 
-        // Include any parentheses around the annotation, e.g. `self: (Foo)`, so that the
-        // closing parenthesis isn't left behind.
-        let annotation_end =
-            parenthesized_range(annotation.into(), first.as_parameter().into(), tokens)
-                .unwrap_or(annotation.range())
-                .end();
-
+        // The parameter's range includes any parentheses around the annotation, e.g. `self: (Foo)`.
         is_class_reference(semantic, annotation, &class_def.name)
-            .then(|| Edit::deletion(first.name().end(), annotation_end))
+            .then(|| Edit::deletion(first.name().end(), first.as_parameter().end()))
     };
 
     others.extend(remove_first_argument_type_hint());
