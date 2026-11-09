@@ -67,7 +67,7 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, find_node::covering_node};
+use ruff_python_ast::{self as ast, find_node::covering_node, helpers::is_stub_body};
 use ruff_text_size::Ranged;
 
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
@@ -168,8 +168,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Parameters are odd: they are Definitions in the function body scope, but have no
         // constituent nodes that are part of the function body. In order to get diagnostics
         // merged/emitted for them, we need to explicitly infer their definitions here.
+        let stub_body = is_stub_body(&function.body);
         for parameter in &function.parameters {
-            self.infer_definition(parameter);
+            if stub_body {
+                // A body containing only pass or ellipsis never reads a parameter binding.
+                // Check the definition directly instead of memoizing a result for each parameter.
+                self.infer_region_definition(self.index.expect_single_definition(parameter));
+            } else {
+                self.infer_definition(parameter);
+            }
         }
 
         validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
