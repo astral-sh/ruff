@@ -12,7 +12,7 @@ use crate::{
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
         function::FunctionDecorators,
-        generics::{Specialization, walk_generic_context},
+        generics::Specialization,
         newtype::NewType,
         typevar::TypeVarInstance,
         union_type_instance::{UnionTypeInstance, walk_union_type_instance},
@@ -314,7 +314,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
             if let Some(context) = context {
-                walk_generic_context(db, context, visitor);
+                visitor.visit_generic_context(db, context);
             }
         }
         KnownInstanceType::TypeVar(typevar) => {

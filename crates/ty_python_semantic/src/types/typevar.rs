@@ -403,6 +403,13 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
+    pub(super) fn has_eager_attributes(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self._bound_or_constraints(db),
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(_))
+        ) || matches!(self._default(db), Some(TypeVarDefaultEvaluation::Eager(_)))
+    }
+
     pub(crate) fn default_type(
         self,
         db: &'db dyn Db,

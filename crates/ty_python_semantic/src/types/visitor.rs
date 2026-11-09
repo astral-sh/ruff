@@ -18,7 +18,7 @@ use crate::types::{
     class::walk_generic_alias,
     cyclic::{ActiveRecursionDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
-    generics::{GenericContext, walk_specialization_types},
+    generics::{GenericContext, walk_generic_context, walk_specialization_types},
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
     known_instance::walk_known_instance_type,
     method::{walk_bound_method_type, walk_method_wrapper_type},
@@ -50,6 +50,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn notify_skipped_lazy_type_attributes(&self) {}
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
+
+    fn visit_generic_context(&self, db: &'db dyn Db, context: GenericContext<'db>) {
+        walk_generic_context(db, context, self);
+    }
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
         walk_union(db, union, self);
@@ -1007,6 +1011,14 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.mode.should_visit_lazy_type_attributes()
+        }
+
+        fn visit_generic_context(&self, db: &'db dyn Db, context: GenericContext<'db>) {
+            // Generic declarations contribute their bounds, constraints and defaults to this
+            // search. A declaration with only lazy attributes contributes no eager children.
+            if self.should_visit_lazy_type_attributes() || context.has_eager_attributes(db) {
+                walk_generic_context(db, context, self);
+            }
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

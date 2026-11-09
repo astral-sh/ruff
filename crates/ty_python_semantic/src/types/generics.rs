@@ -359,6 +359,9 @@ pub struct GenericContext<'db> {
 
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+
+    #[returns(copy)]
+    pub(super) has_eager_attributes: bool,
 }
 
 pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
@@ -486,7 +489,10 @@ impl<'db> GenericContext<'db> {
             .collect::<FxOrderMap<_, _>>();
         assert!(!variables.is_empty(), "a generic context must be nonempty");
         variables.shrink_to_fit();
-        Self::new_internal(db, program, variables)
+        let has_eager_attributes = variables
+            .values()
+            .any(|variable| variable.typevar(db).has_eager_attributes(db));
+        Self::new_internal(db, program, variables, has_eager_attributes)
     }
 
     /// Merge this generic context with another, returning a new generic context that
@@ -1206,7 +1212,7 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     specialization: Specialization<'db>,
     visitor: &V,
 ) {
-    walk_generic_context(db, specialization.generic_context(db), visitor);
+    visitor.visit_generic_context(db, specialization.generic_context(db));
     walk_specialization_types(db, specialization, visitor);
 }
 
