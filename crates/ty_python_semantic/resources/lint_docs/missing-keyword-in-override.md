@@ -22,7 +22,7 @@ class Base:
 
 
 class Child(Base):
-    def scale(self, multiplier: int) -> int:  # error: [incompatible-keyword-override]
+    def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
         return multiplier * 3
 
 

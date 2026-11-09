@@ -30,13 +30,13 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_KEYWORD_OVERRIDE,
-            INCOMPATIBLE_METHOD_OVERRIDE, INCOMPATIBLE_MUTABLE_OVERRIDE,
-            INCOMPATIBLE_PROPERTY_OVERRIDE, INVALID_ASSIGNMENT, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE,
-            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_incompatible_base_method, report_incompatible_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_METHOD_OVERRIDE,
+            INCOMPATIBLE_MUTABLE_OVERRIDE, INCOMPATIBLE_PROPERTY_OVERRIDE, INVALID_ASSIGNMENT,
+            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
+            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_KEYWORD_IN_OVERRIDE, MISSING_OVERRIDE_DECORATOR,
+            OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_incompatible_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
@@ -1551,7 +1551,7 @@ impl MethodOverrideViolation {
     pub(super) const fn rule(self) -> &'static LintMetadata {
         match self {
             Self::Incompatible => &INCOMPATIBLE_METHOD_OVERRIDE,
-            Self::Keyword => &INCOMPATIBLE_KEYWORD_OVERRIDE,
+            Self::Keyword => &MISSING_KEYWORD_IN_OVERRIDE,
         }
     }
 
@@ -1956,7 +1956,7 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         let mut config = OverrideRulesConfig::empty();
 
         if rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_METHOD_OVERRIDE))
-            || rule_selection.is_enabled(LintId::of(&INCOMPATIBLE_KEYWORD_OVERRIDE))
+            || rule_selection.is_enabled(LintId::of(&MISSING_KEYWORD_IN_OVERRIDE))
         {
             config |= OverrideRulesConfig::LISKOV_METHODS;
         }

@@ -1362,56 +1362,6 @@ assign to `count`; making it final in the subclass removes that operation.
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
-## `incompatible-keyword-override`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22incompatible-keyword-override%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1422" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Detects method overrides that drop the keyword name of a positional-or-keyword parameter from a base
-method while still accepting the argument by position. Renaming a parameter, making it
-positional-only, or absorbing it into `*args` can drop its keyword name.
-
-When an override also violates the base method's signature in another way, such as narrowing a
-parameter's type or returning an incompatible type, ty reports [`incompatible-method-override`](#incompatible-method-override)
-instead.
-
-**Why is this bad?**
-
-
-Code that uses the base class's interface can pass the argument by keyword. The same call may raise
-`TypeError` on an instance of the subclass.
-
-**Example**
-
-
-```python
-class Base:
-    def scale(self, factor: int) -> int:
-        return factor * 2
-
-
-class Child(Base):
-    def scale(self, multiplier: int) -> int:  # error: [incompatible-keyword-override]
-        return multiplier * 3
-
-
-def scale_by_two(obj: Base) -> int:
-    return obj.scale(factor=2)
-
-
-scale_by_two(Child())  # Raises TypeError.
-```
-
-Preserve the parameter name `factor` in the override so that both calling conventions work.
-
 <a id="invalid-method-override"></a>
 
 ## `incompatible-method-override`
@@ -1439,7 +1389,7 @@ supertype. Applied to Python, this means:
     superclass method.
 
 Overrides that only drop the keyword name of a positional-or-keyword parameter are reported
-separately by [`incompatible-keyword-override`](#incompatible-keyword-override).
+separately by [`missing-keyword-in-override`](#missing-keyword-in-override).
 
 **Why is this bad?**
 
@@ -1507,7 +1457,7 @@ Ruff has several rules that will encourage you to rename a parameter, or change 
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
 [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
 parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
-override can trigger [`incompatible-keyword-override`](#incompatible-keyword-override) if the base method accepts it by keyword.
+override can trigger [`missing-keyword-in-override`](#missing-keyword-in-override) if the base method accepts it by keyword.
 Removing the parameter can trigger [`incompatible-method-override`](#incompatible-method-override) if the override no longer accepts
 a call allowed by the base method.
 
@@ -1517,6 +1467,25 @@ same name on a superclass, and avoids reporting rules like ARG002 for such metho
 the changes recommended by ARG002 would violate the Liskov Substitution Principle.
 
 Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#invalid-explicit-override) rule.
+
+**Migrating from `invalid-method-override`**
+
+
+[`invalid-method-override`](#invalid-method-override) is an alias for [`incompatible-method-override`](#incompatible-method-override). Keyword-only
+incompatibilities now use [`missing-keyword-in-override`](#missing-keyword-in-override), which defaults to `error`.
+
+To preserve a custom severity across the split, set both rules to that level. The following
+configuration preserves a previous setting of `warn`.
+
+```toml
+[rules]
+incompatible-method-override = "warn"
+missing-keyword-in-override = "warn"
+```
+
+For keyword-only violations, update inline ignores to `# ty: ignore[missing-keyword-in-override]`.
+Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
+newly reported diagnostics before updating the baseline.
 
 **Rule history**
 
@@ -4523,6 +4492,56 @@ import urllib3  # error: [missing-direct-dependency]
 ```
 
 Add `urllib3` to `project.dependencies` if your code imports it directly.
+
+## `missing-keyword-in-override`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-keyword-in-override%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1422" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Detects method overrides that drop the keyword name of a positional-or-keyword parameter from a base
+method while still accepting the argument by position. Renaming a parameter, making it
+positional-only, or absorbing it into `*args` can drop its keyword name.
+
+When an override also violates the base method's signature in another way, such as narrowing a
+parameter's type or returning an incompatible type, ty reports [`incompatible-method-override`](#incompatible-method-override)
+instead.
+
+**Why is this bad?**
+
+
+Code that uses the base class's interface can pass the argument by keyword. The same call may raise
+`TypeError` on an instance of the subclass.
+
+**Example**
+
+
+```python
+class Base:
+    def scale(self, factor: int) -> int:
+        return factor * 2
+
+
+class Child(Base):
+    def scale(self, multiplier: int) -> int:  # error: [missing-keyword-in-override]
+        return multiplier * 3
+
+
+def scale_by_two(obj: Base) -> int:
+    return obj.scale(factor=2)
+
+
+scale_by_two(Child())  # Raises TypeError.
+```
+
+Preserve the parameter name `factor` in the override so that both calling conventions work.
 
 ## `missing-overload-implementation`
 
