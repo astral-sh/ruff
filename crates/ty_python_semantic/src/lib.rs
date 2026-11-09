@@ -270,7 +270,11 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
 
     diagnostics.extend(check_types(db, file));
 
-    diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
+    let resolver: &dyn ruff_db::Db = db;
+    diagnostics.sort_unstable_by(|a, b| {
+        a.rendering_sort_key(&resolver)
+            .cmp(&b.rendering_sort_key(&resolver))
+    });
 
     Ok(diagnostics.into_boxed_slice())
 }

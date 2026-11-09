@@ -278,9 +278,10 @@ where
 
     // Stitch the remaining diagnostics back together.
     diagnostics.extend(by_file.into_values().flatten());
+    let resolver: &dyn ruff_db::Db = db;
     diagnostics.sort_by(|left, right| {
-        left.rendering_sort_key(db)
-            .cmp(&right.rendering_sort_key(db))
+        left.rendering_sort_key(&resolver)
+            .cmp(&right.rendering_sort_key(&resolver))
     });
 
     Ok(FixAllResults {

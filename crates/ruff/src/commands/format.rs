@@ -591,14 +591,17 @@ impl<'a> FormatResults<'a> {
                 }
             })
             .collect();
-        let diagnostics: Vec<_> = errors
+        let mut diagnostics: Vec<_> = errors
             .iter()
             .map(Diagnostic::from)
             .chain(self.to_diagnostics(&mut notebook_index))
-            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
             .collect();
 
         let context = RenderContext::new(&notebook_index);
+        diagnostics.sort_unstable_by(|a, b| {
+            a.rendering_sort_key(&context)
+                .cmp(&b.rendering_sort_key(&context))
+        });
         let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());

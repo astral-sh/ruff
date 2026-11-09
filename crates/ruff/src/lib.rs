@@ -480,10 +480,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             .unwrap_or(Severity::Info);
         if max_severity.is_fatal() {
             // When a panic/fatal error is reported, prompt the user to open an issue on github.
-            // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
-            // message here instead of attaching it to the diagnostic ensures that we only print
-            // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
-            // the message from being captured by tools parsing the normal output.
+            // Printing the message here instead of attaching it to the diagnostic ensures that we
+            // only print it once instead of repeating it for each diagnostic. Prints to stderr to
+            // prevent the message from being captured by tools parsing the normal output.
             let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
