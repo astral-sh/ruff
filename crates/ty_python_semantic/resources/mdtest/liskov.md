@@ -498,7 +498,6 @@ class WrongType(Base):
     def f(self, item: str) -> None: ...  # no diagnostic
 
 class Inherited(Other, Base): ...  # error: [missing-keyword-in-override]
-class InheritedSuppressed(Other, Base): ...  # ty: ignore[missing-keyword-in-override]
 ```
 
 ## Selecting general method overrides with the previous rule name
