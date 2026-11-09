@@ -9,6 +9,7 @@ use ty_module_resolver::file_to_module;
 use super::TypeInferenceBuilder;
 use super::post_inference::type_param_validation::check_no_default_after_typevar_tuple;
 use crate::place::{DefinedPlace, Definedness, Place};
+use crate::types::TypePair;
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -41,6 +42,48 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
+
+/// Repeated explicit specializations can share a finished bound check. A recursive bound must
+/// keep using the caller's relation and its cycle recovery.
+fn rejects_type_argument<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: Type<'db>,
+    bound: Type<'db>,
+    constraints: &ConstraintSetBuilder<'db>,
+) -> bool {
+    fn check<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        bound: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        source
+            .when_assignable_to(db, env, bound, constraints, TypeVarSet::None)
+            .is_never_satisfied(db, env, TypeVarSet::None)
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| None,
+        cycle_fn=|_, _, _: &Option<bool>, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn acyclic_check<'db>(db: &'db dyn Db, pair: TypePair<'db>) -> Option<bool> {
+        let env = ProgramEnvironment::from_program(pair.program(db));
+        Some(check(
+            db,
+            &env,
+            pair.first(db),
+            pair.second(db),
+            &ConstraintSetBuilder::new(),
+        ))
+    }
+
+    acyclic_check(db, TypePair::new(db, env.program(db), source, bound))
+        .unwrap_or_else(|| check(db, env, source, bound, constraints))
+}
 
 /// Given a string literal or a union of string literals, return an iterator over the contained
 /// strings, or `None` if the type is neither.
@@ -1099,10 +1142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
                     match bound_or_constraints {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if type_to_check
-                                .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env, TypeVarSet::None)
-                            {
+                            if rejects_type_argument(db, env, type_to_check, bound, &constraints) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
@@ -1130,16 +1170,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
                             // constrained to `(int, str)`.
-                            if type_to_check
-                                .when_assignable_to(
-                                    db,
-                                    env,
-                                    typevar_constraints.as_type(db, env),
-                                    &constraints,
-                                    TypeVarSet::None,
-                                )
-                                .is_never_satisfied(db, env, TypeVarSet::None)
-                            {
+                            if rejects_type_argument(
+                                db,
+                                env,
+                                type_to_check,
+                                typevar_constraints.as_type(db, env),
+                                &constraints,
+                            ) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
