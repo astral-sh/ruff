@@ -244,8 +244,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
-    /// Exact-length literal unpacks awaiting their target visit.
-    infallible_unpacks: FxHashSet<ExpressionNodeKey>,
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
@@ -333,7 +331,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
-            infallible_unpacks: FxHashSet::default(),
             current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
@@ -3128,6 +3125,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             },
             &generator.target,
             value,
+            None,
         );
 
         let mut filtered_out_paths = Vec::new();
@@ -3150,6 +3148,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
                 &generator.target,
                 value,
+                None,
             );
 
             for if_expr in &generator.ifs {
@@ -3313,32 +3312,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .mark_parameter();
     }
 
-    /// Marks exact-length literal unpacks and returns whether the outer unpack is infallible.
-    /// A nested target can still raise after its outer unpack succeeds.
-    fn mark_infallible_unpacks(&mut self, target: &ast::Expr, value: &ast::Expr) -> bool {
-        fn elements(expr: &ast::Expr) -> Option<&[ast::Expr]> {
-            match expr {
-                ast::Expr::List(ast::ExprList { elts, .. })
-                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(elts),
-                _ => None,
-            }
-        }
-
-        let (Some(targets), Some(values)) = (elements(target), elements(value)) else {
-            return false;
-        };
-        if targets.len() != values.len()
-            || targets.iter().chain(values).any(ast::Expr::is_starred_expr)
-        {
-            return false;
-        }
-        self.infallible_unpacks.insert(target.into());
-        for (target, value) in targets.iter().zip(values) {
-            self.mark_infallible_unpacks(target, value);
-        }
-        true
-    }
-
     /// Add an unpackable assignment for the given [`Unpackable`].
     ///
     /// This method handles assignments that can contain unpacking like assignment statements,
@@ -3348,9 +3321,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         unpackable: &Unpackable<'ast>,
         target: &'ast ast::Expr,
         value: Expression<'db>,
+        unpack_source: Option<&'ast ast::Expr>,
     ) {
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                if let Some(source) = unpack_source {
+                    // Building a literal can raise even when unpacking it will succeed.
+                    self.record_exception_checkpoint_if(
+                        !Self::expression_evaluation_is_known_safe(source),
+                    );
+                }
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
                     debug_assert_eq!(
                         self.scopes[self.current_scope()].node().scope_kind(),
@@ -3394,7 +3374,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.push_assignment(current_assignment);
         }
 
-        self.visit_expr(target);
+        self.visit_expr_impl(target, ExpressionContext::Value, unpack_source);
 
         if current_assignment.is_some() {
             // Only need to pop in the case where we pushed something
@@ -3497,6 +3477,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+        self.visit_expr_impl(expr, context, None);
+    }
+
+    fn visit_expr_impl(
+        &mut self,
+        expr: &'ast ast::Expr,
+        context: ExpressionContext,
+        unpack_source: Option<&'ast ast::Expr>,
+    ) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         // A place use records its scope together with its reaching-definition ID,
@@ -3600,14 +3589,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
             }
-            ast::Expr::List(ast::ExprList { ctx, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
-                // A nested unpack can raise after earlier targets have been assigned.
-                if *ctx == ast::ExprContext::Store && !self.infallible_unpacks.remove(&expr.into())
-                {
+            ast::Expr::List(ast::ExprList { elts, ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, ctx, .. })
+                if *ctx == ast::ExprContext::Store =>
+            {
+                if let Some(values) = literal_unpack_values(elts, unpack_source) {
+                    for (target, value) in elts.iter().zip(values) {
+                        self.visit_expr_impl(target, ExpressionContext::Value, Some(value));
+                    }
+                } else {
+                    // A nested unpack can raise after earlier targets have been assigned.
                     self.record_exception_checkpoint();
+                    walk_expr(self, expr);
                 }
-                walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 self.visit_expr(&node.value);
@@ -4422,20 +4416,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 
-                    // A later chained target may see a list mutated by an earlier assignment.
-                    if let Some(first) = node.targets.first()
-                        && self
-                            .exception_context_stack_manager
-                            .has_active_exception_handler(self)
-                        && self.mark_infallible_unpacks(first, &node.value)
-                    {
-                        // Building the literal can still raise before any targets are assigned.
-                        self.record_exception_checkpoint_if(
-                            !Self::expression_evaluation_is_known_safe(&node.value),
-                        );
-                    }
+                    // Only the first target sees the literal before a chained assignment can mutate it.
+                    let mut unpack_source = self
+                        .exception_context_stack_manager
+                        .has_active_exception_handler(self)
+                        .then_some(node.value.as_ref());
                     for target in &node.targets {
-                        self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
+                        self.add_unpackable_assignment(
+                            &Unpackable::Assign(node),
+                            target,
+                            value,
+                            unpack_source.take(),
+                        );
                     }
                 }
             }
@@ -4784,6 +4776,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             },
                             optional_vars,
                             context_manager,
+                            None,
                         );
                     }
                 }
@@ -4908,7 +4901,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ));
                 }
 
-                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
+                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr, None);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
@@ -6254,6 +6247,20 @@ fn is_direct_range_call(expr: &ast::Expr) -> bool {
         .as_call_expr()
         .and_then(|call| call.func.as_name_expr())
         .is_some_and(|name| name.id == "range")
+}
+
+/// Returns the source elements when unpacking a tuple or list literal into these targets cannot raise.
+fn literal_unpack_values<'a>(
+    targets: &[ast::Expr],
+    source: Option<&'a ast::Expr>,
+) -> Option<&'a [ast::Expr]> {
+    let values = match source? {
+        ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+        _ => return None,
+    };
+    (targets.len() == values.len() && !targets.iter().chain(values).any(ast::Expr::is_starred_expr))
+        .then_some(values)
 }
 
 /// Returns the static truthiness of a literal iterable.
