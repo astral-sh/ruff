@@ -19,7 +19,7 @@ use ty_python_core::scope::{NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
     AncestorScope, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
-    FileScopeId, ProgramFile, SemanticIndex, use_def_map,
+    FileScopeId, ProgramFile, SemanticIndex, semantic_index, use_def_map,
 };
 
 use crate::Db;
@@ -31,6 +31,39 @@ use crate::place::{
 };
 use crate::reachability::ReachabilityEvaluationCache;
 use crate::types::{ProgramEnvironment, Type, original_class_type};
+
+/// Deferred annotations in the same scope see the same reachable bindings for a name.
+/// Keep deprecation reporting at each use site, and leave narrowed loads to their caller.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn unconstrained_deferred_name<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+) -> Option<(PlaceAndQualifiers<'db>, PlaceAndQualifiers<'db>)> {
+    let file = scope.program_file(db);
+    let index = semantic_index(db, file);
+    let symbol = index.place_table(scope.file_scope_id(db)).symbol(symbol);
+    let env = ProgramEnvironment::from_file(file);
+    let mut implicit_reveal = false;
+    let resolved = PlaceLoadResolver::from_source(
+        db,
+        &env,
+        index,
+        scope,
+        PlaceExprRef::Symbol(symbol),
+        PlaceLoadMode::Deferred,
+        None,
+        None,
+    )
+    .resolve(|source| {
+        implicit_reveal |= matches!(
+            source.kind(),
+            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::UnimportedRevealType)
+        );
+    });
+    (resolved.constraint_keys.is_empty() && !implicit_reveal)
+        .then_some((resolved.place, resolved.deprecation_target))
+}
 
 /// Evaluates the possible sources of a place load's value.
 ///

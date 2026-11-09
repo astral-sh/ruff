@@ -43,7 +43,7 @@ use crate::place::{
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
-    ResolvedPlaceLoadSource,
+    ResolvedPlaceLoadSource, unconstrained_deferred_name,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -10993,6 +10993,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         if matches!(mode, PlaceLoadMode::Deferred) && expr_ref.is_name_expr() {
             self.deferred_name_loads.insert(expr_ref.into());
+            if let Some(symbol) = source_place
+                .operand()
+                .and_then(|operand| operand.place.as_symbol())
+                && let Some((place, deprecation_target)) =
+                    unconstrained_deferred_name(self.db(), self.scope(), symbol)
+            {
+                if let Some(ty) = deprecation_target.ignore_possibly_undefined() {
+                    self.check_deprecated(expr_ref, ty);
+                }
+                return (place, Vec::new());
+            }
         }
 
         let resolver = PlaceLoadResolver::from_source(
