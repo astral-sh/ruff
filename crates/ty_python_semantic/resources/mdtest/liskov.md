@@ -471,12 +471,12 @@ class Inherited(Renamed, Integers, Strings): ...  # error: [incompatible-method-
 ## Enabling only the keyword override rule
 
 The keyword rule checks both explicit overrides and inherited methods selected by multiple
-inheritance. A suppression for this rule covers either form.
+inheritance. An ignore comment using the old rule name is unused when the only violation is a
+dropped keyword name.
 
 ```toml
 [rules]
 incompatible-method-override = "ignore"
-renamed-rule-in-ignore-comment = "ignore"
 ```
 
 ```pyi
@@ -491,6 +491,7 @@ class Suppressed(Base):
 
 class OldSuppression(Base):
     # error: [missing-keyword-in-override]
+    # error: [renamed-rule-in-ignore-comment]
     # error: [unused-ignore-comment]
     def f(self, item: int) -> None: ...  # ty: ignore[invalid-method-override]
 
