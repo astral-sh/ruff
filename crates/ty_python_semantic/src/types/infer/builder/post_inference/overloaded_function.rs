@@ -13,7 +13,7 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INCONSISTENT_OVERLOAD_DECORATOR, INCONSISTENT_OVERLOAD_IMPLEMENTATION,
-            INVALID_OVERLOAD, MISSING_OVERLOAD_IMPLEMENTATION, SINGLE_OVERLOAD,
+            MISPLACED_OVERLOAD_DECORATOR, MISSING_OVERLOAD_IMPLEMENTATION, SINGLE_OVERLOAD,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         infer::original_class_type,
@@ -230,7 +230,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     continue;
                 }
                 let function_node = overload.node(db, context.file(), context.module());
-                let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name)
+                let Some(builder) =
+                    context.report_lint(&MISPLACED_OVERLOAD_DECORATOR, &function_node.name)
                 else {
                     continue;
                 };
@@ -262,7 +263,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     continue;
                 }
                 let function_node = overload.node(db, context.file(), context.module());
-                let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name)
+                let Some(builder) =
+                    context.report_lint(&MISPLACED_OVERLOAD_DECORATOR, &function_node.name)
                 else {
                     continue;
                 };

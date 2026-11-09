@@ -1797,7 +1797,7 @@ class Foo:
 
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
@@ -1808,7 +1808,7 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
@@ -1830,16 +1830,16 @@ class Foo:
     def method2(self, x: int) -> int: ...
     @final
     @overload
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: str) -> str: ...
     @overload
     def method3(self, x: int) -> int: ...
     @final
     @overload
-    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     @final
-    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    def method3(self, x: bytes) -> bytes: ...  # error: [misplaced-overload-decorator]
     @overload
     def method3(self, x: bytearray) -> bytearray: ...
 ```
@@ -1875,7 +1875,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
@@ -1883,7 +1883,7 @@ class Sub2(Base):
 class Sub3(Base):
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -1914,7 +1914,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
 ```
 
