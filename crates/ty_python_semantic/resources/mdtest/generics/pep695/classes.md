@@ -680,6 +680,31 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)
 ```
 
+### Union type arguments inferred with a generic callback
+
+The identity function can return either member of the expected input union.
+
+```py
+from collections.abc import Callable
+from typing import assert_type
+
+class Transform[T, U]:
+    def __init__(self, callback: Callable[[T], U]) -> None:
+        self.callback = callback
+
+def identity[V](value: V) -> V:
+    return value
+
+transform: Transform[int | str, int | str] = assert_type(Transform(identity), Transform[int | str, int | str])
+
+def make_transform[S]() -> Transform[S | None, S | None]:
+    return assert_type(Transform(identity), Transform[S | None, S | None])
+
+wider: Transform[int | str, object] = Transform(identity)  # ok
+# error: [invalid-assignment]
+incompatible: Transform[int | str, int] = Transform(identity)
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument
@@ -1162,6 +1187,26 @@ reveal_type(C(1, True))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+The expected instance type can fix a method-scoped type variable on `self`, even when the
+specialization includes a type variable from the caller.
+
+```py
+from typing import assert_type
+
+class Box[T]:
+    value: T
+
+    def __init__[S](self: "Box[S]") -> None: ...
+
+box: Box[int | None] = assert_type(Box(), Box[int | None])
+
+type Maybe[T] = T | None
+
+def outer[T]() -> None:
+    direct: Box[T | None] = assert_type(Box(), Box[T | None])
+    aliased: Box[Maybe[T]] = assert_type(Box(), Box[Maybe[T]])
 ```
 
 ### Class-scoped type variables in `__init__` receiver annotations

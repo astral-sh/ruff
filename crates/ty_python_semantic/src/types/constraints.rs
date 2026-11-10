@@ -4233,23 +4233,23 @@ impl<'db> CandidateSolutions<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
-        let default_solution =
+        let combined_solution =
             Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::All);
-        let PathBoundSolution::Solved(restricted) = default_solution else {
-            return default_solution;
+        let PathBoundSolution::Solved(combined) = combined_solution else {
+            return combined_solution;
         };
 
         // A single parameter list must satisfy all of its lower bounds. A union of captured
         // parameter lists represents neither that common signature nor alternative runtime calls.
         // TODO: Construct a common behavioral supertype where possible.
         if path_bound.bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
-            && restricted.is_union()
+            && combined.is_union()
         {
             return PathBoundSolution::Unsatisfiable;
         }
 
         if !path_bound.has_declared_evidence {
-            return default_solution;
+            return combined_solution;
         }
 
         let inferred =
@@ -4258,7 +4258,7 @@ impl<'db> CandidateSolutions<'db> {
                 PathBoundSolution::Solved(inferred) => Some(inferred),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. } => {
-                    return default_solution;
+                    return combined_solution;
                 }
             }
             .filter(|candidate| !candidate.has_provisional_marker(db, env));
@@ -4266,30 +4266,35 @@ impl<'db> CandidateSolutions<'db> {
         let declared = match path_bound.declared_candidate(db, env) {
             PathBoundSolution::Solved(declared) => Some(declared),
             PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
-            PathBoundSolution::BudgetExceeded { .. } => return default_solution,
+            PathBoundSolution::BudgetExceeded { .. } => return combined_solution,
         }
         .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
-        // Prefer the declared candidate when it is mutually assignable with the inferred
-        // candidate. Otherwise, prefer the inferred candidate.
-        let candidates = match (inferred, declared) {
-            (Some(inferred), Some(declared))
-                if inferred.is_assignable_to(db, env, declared)
-                    && declared.is_assignable_to(db, env, inferred) =>
-            {
-                [Some(declared), Some(inferred)]
-            }
-            (Some(inferred), _) => [Some(inferred), None],
-            (None, declared) => [declared, None],
-        };
-
-        for candidate in candidates.into_iter().flatten() {
-            if path_bound.accepts_candidate(db, env, builder, candidate) {
-                return PathBoundSolution::Solved(candidate);
-            }
+        // Prefer the declared candidate when the arguments leave the variable unsolved or the
+        // inferred and declared candidates are mutually assignable.
+        if let Some(declared) = declared
+            && inferred.is_none_or(|inferred| {
+                inferred.is_assignable_to(db, env, declared)
+                    && declared.is_assignable_to(db, env, inferred)
+            })
+            && path_bound.accepts_candidate(db, env, builder, declared)
+        {
+            return PathBoundSolution::Solved(declared);
         }
 
-        default_solution
+        // An argument such as an identity callback can imply only `K ≤ V`. Choosing `V` for
+        // `K` and `K` for `V` independently loses any concrete bounds from the expected type.
+        // Keep the solution from all evidence while the argument-only candidate depends on
+        // another variable being solved.
+        if let Some(inferred) = inferred
+            && inferred != combined
+            && inferred.is_independent_of_typevars(db, env, path_bound.inferable)
+            && path_bound.accepts_candidate(db, env, builder, inferred)
+        {
+            return PathBoundSolution::Solved(inferred);
+        }
+
+        combined_solution
     }
 
     /// Selects a preliminary solution to use as type context during generic call inference.
