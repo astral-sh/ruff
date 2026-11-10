@@ -3201,20 +3201,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
-        use ParameterDefinitionNodeRef::{
-            Parameter, VariadicKeywordParameter, VariadicPositionalParameter,
-        };
-
         let nodes = parameters
             .iter_non_variadic_params()
-            .map(Parameter)
+            .map(ParameterDefinitionNodeRef::Parameter)
             .chain(
                 parameters
                     .vararg
                     .as_deref()
-                    .map(VariadicPositionalParameter),
+                    .map(ParameterDefinitionNodeRef::VariadicPositionalParameter),
             )
-            .chain(parameters.kwarg.as_deref().map(VariadicKeywordParameter));
+            .chain(
+                parameters
+                    .kwarg
+                    .as_deref()
+                    .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
+            );
         if is_stub_body {
             let parameters = nodes
                 .map(|node| self.declare_stub_parameter(node))
