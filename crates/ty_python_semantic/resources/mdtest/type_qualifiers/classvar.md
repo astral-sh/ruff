@@ -541,7 +541,7 @@ class D:
 Note that `class_attr` does not appear in the signature of `__init__`:
 
 ```py
-# revealed: (self: D, instance_attr: int = 1) -> None
+# revealed: (self: D, /, instance_attr: int = 1) -> None
 reveal_type(D.__init__)
 ```
 
@@ -564,7 +564,7 @@ from dataclasses import dataclass
 class E:
     class_attr: Final[ClassVar[int]] = 1
 
-# revealed: (self: E) -> None
+# revealed: (self: E, /) -> None
 reveal_type(E.__init__)
 
 def _(e: E):

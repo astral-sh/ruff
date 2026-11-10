@@ -1427,7 +1427,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: str = ..., age: int | None = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, /, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -1494,6 +1494,34 @@ DynamicB = NamedTuple("DynamicB", [("x", int)])
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
     # TODO: Report [invalid-explicit-return] (https://github.com/astral-sh/ty/issues/3114).
     return DynamicA._replace if flag else DynamicB._replace  # ok
+```
+
+### Fields named `self`
+
+Replacement methods take their receiver positionally, so `self` can be used as a keyword argument to
+replace a field.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple
+
+class Record(NamedTuple):
+    self: int
+
+record = Record(self=1)
+reveal_type(record._replace(self=2))  # revealed: Record
+reveal_type(record.__replace__(self=2))  # revealed: Record
+reveal_type(Record._replace(record, self=2))  # revealed: Record
+record._replace(self="wrong")  # error: [invalid-argument-type]
+
+DynamicRecord = NamedTuple("DynamicRecord", [("self", int)])
+dynamic_record = DynamicRecord(self=1)
+reveal_type(dynamic_record._replace(self=2))  # revealed: DynamicRecord
+reveal_type(dynamic_record.__replace__(self=2))  # revealed: DynamicRecord
 ```
 
 ### Fields annotated with `Self`
@@ -1608,7 +1636,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: Any = ..., age: Any = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, /, *, name: Any = ..., age: Any = ...) -> Self
 
 # _make creates instances from an iterable.
 reveal_type(Person._make(["Alice", 30]))  # revealed: Person
@@ -1687,7 +1715,7 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: [Self](self: Self, *, x: int = ..., y: int = ...) -> Self
+reveal_type(Point._replace)  # revealed: [Self](self: Self, /, *, x: int = ..., y: int = ...) -> Self
 
 # Point is assignable to NamedTuple.
 static_assert(is_assignable_to(Point, NamedTuple))

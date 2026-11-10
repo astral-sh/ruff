@@ -55,7 +55,7 @@ class Product:
     price_cent: int = field(kw_only=True)
     data: bytes = field(converter=serialize_data, kw_only=True)
 
-reveal_type(Product.__init__)  # revealed: (self: Product, name: str, *, price_cent: int, data: dict[str, int]) -> None
+reveal_type(Product.__init__)  # revealed: (self: Product, /, name: str, *, price_cent: int, data: dict[str, int]) -> None
 
 p = Product(name="Gadget", price_cent=1999, data={"a": 1})
 

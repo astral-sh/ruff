@@ -91,7 +91,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 return None;
             }
 
-            // _replace(self, *, field1=..., field2=...) -> Self
+            // _replace(self, /, *, field1=..., field2=...) -> Self
             let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
                 origin,
@@ -100,7 +100,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             );
             let self_ty = Type::TypeVar(self_typevar);
 
-            let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+            let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(self_ty);
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {

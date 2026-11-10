@@ -1553,7 +1553,7 @@ class Base[T]:
 @model
 class Child(Base[str]): ...
 
-reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, value: str) -> None
 child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
@@ -1561,7 +1561,7 @@ Child(1)  # error: [invalid-argument-type]
 child.value = "b"  # ok
 child.value = 1  # error: [invalid-assignment]
 
-reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+reveal_type(Child.__replace__)  # revealed: (self: Child, /, *, value: str = ...) -> Child
 child.__replace__(value="b")  # ok
 child.__replace__(value=1)  # error: [invalid-argument-type]
 ```
@@ -1575,7 +1575,7 @@ class Nested[U](Base[list[U]]): ...
 @model
 class Indirect(Nested[str]): ...
 
-reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, /, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
 indirect.value = ["b"]  # ok
