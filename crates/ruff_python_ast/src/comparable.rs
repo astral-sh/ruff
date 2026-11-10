@@ -21,9 +21,22 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-// Equality checks the other node's kind before reading either node's fields.
-// Hashing and formatter diffs use the same projection. A variant with only
-// ignored fields spells out its AST pattern directly.
+/// Use `compare_enum!(Wrapper(AstEnum) { ... })` to compare borrowed AST nodes
+/// by their structural fields. Listing the fields once keeps the wrapper's
+/// `PartialEq`, `Hash`, and `Debug` implementations in sync. Equality checks
+/// the variants before reading either node's fields.
+///
+/// List every variant of `AstEnum`. For example, `ComparableStmt` uses both
+/// forms of entry.
+///
+/// - `Return => stmt_return_fields` delegates to a function taking
+///   `&ast::StmtReturn` and returning `Option<ComparableExpr<'_>>`. Only the
+///   return value participates in comparison.
+/// - `Pass(ast::StmtPass { range: _, node_index: _ })` compares just the
+///   variant. Any two `pass` statements are structurally equal.
+///
+/// Destructure the node exhaustively in the helper or the inline pattern so
+/// that adding an AST field forces a decision about whether to compare it.
 macro_rules! compare_enum {
     ($key:ident($ast:ident) {
         $($variant:ident $(($ignored:pat))? $(=> $fields:ident)?,)*
@@ -358,7 +371,7 @@ impl Hash for ComparableNumber<'_> {
     }
 }
 
-/// Borrows a sequence and converts its elements only as equality or hashing visits them.
+/// Borrows a sequence and converts each element as it is visited.
 struct ComparableSlice<'a, T, C> {
     items: &'a [T],
     comparable: PhantomData<fn() -> C>,
@@ -371,13 +384,18 @@ impl<'a, T, C> ComparableSlice<'a, T, C> {
             comparable: PhantomData,
         }
     }
+
+    fn iter(&self) -> impl Iterator<Item = C>
+    where
+        C: From<&'a T>,
+    {
+        self.items.iter().map(C::from)
+    }
 }
 
 impl<'a, T, C: From<&'a T> + fmt::Debug> fmt::Debug for ComparableSlice<'a, T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list()
-            .entries(self.items.iter().map(C::from))
-            .finish()
+        f.debug_list().entries(self.iter()).finish()
     }
 }
 
@@ -389,12 +407,7 @@ impl<T, C> Default for ComparableSlice<'_, T, C> {
 
 impl<'a, T, C: From<&'a T> + PartialEq> PartialEq for ComparableSlice<'a, T, C> {
     fn eq(&self, other: &Self) -> bool {
-        self.items.len() == other.items.len()
-            && self
-                .items
-                .iter()
-                .map(C::from)
-                .eq(other.items.iter().map(C::from))
+        self.items.len() == other.items.len() && self.iter().eq(other.iter())
     }
 }
 
@@ -403,8 +416,8 @@ impl<'a, T, C: From<&'a T> + Eq> Eq for ComparableSlice<'a, T, C> {}
 impl<'a, T, C: From<&'a T> + Hash> Hash for ComparableSlice<'a, T, C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.items.len().hash(state);
-        for item in self.items {
-            C::from(item).hash(state);
+        for item in self.iter() {
+            item.hash(state);
         }
     }
 }
@@ -1310,6 +1323,7 @@ fn ipy_escape_command_fields(node: &ast::ExprIpyEscapeCommand) -> IpyEscapeComma
     IpyEscapeCommandFields { kind: *kind, value }
 }
 
+/// Compares normalized elements. The enclosing expression distinguishes f-strings from t-strings.
 #[derive(Clone, Copy)]
 enum ComparableInterpolatedString<'a> {
     FString(&'a ast::FStringValue),
@@ -1420,7 +1434,6 @@ impl Eq for ComparableInterpolatedString<'_> {}
 
 impl Hash for ComparableInterpolatedString<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self).hash(state);
         for element in self.normalized_elements() {
             Some(element).hash(state);
         }
@@ -1465,7 +1478,11 @@ impl PartialEq for ComparableBytes<'_> {
 
 impl fmt::Debug for ComparableBytes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Cow::from(self.0).fmt(f)
+        let mut list = f.debug_list();
+        for part in self.0 {
+            list.entries(part.as_slice());
+        }
+        list.finish()
     }
 }
 

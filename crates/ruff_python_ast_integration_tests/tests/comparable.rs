@@ -17,8 +17,10 @@ fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
     let right_compr = ComparableExpr::from(right_parsed.expr());
 
     assert_eq!(left_compr, right_compr);
+    assert_eq!(format!("{left_compr:?}"), format!("{right_compr:?}"));
     assert_eq!(format!("{left_compr:#?}"), format!("{right_compr:#?}"));
-    assert!(HashSet::from([left_compr]).contains(&right_compr));
+    let hasher = RandomState::new();
+    assert_eq!(hasher.hash_one(left_compr), hasher.hash_one(right_compr));
     Ok(())
 }
 
@@ -140,6 +142,7 @@ fn different_kinds_with_the_same_fields() -> Result<(), ParseError> {
     for (left, right) in [
         ("[x for x in xs]", "{x for x in xs}"),
         ("[x for x in xs]", "(x for x in xs)"),
+        ("f'{x}'", "t'{x}'"),
         ("global x", "nonlocal x"),
         ("def f[*T](): pass", "def f[**T](): pass"),
         (
