@@ -1875,7 +1875,7 @@ fn place_from_bindings_impl<'db>(
             binding.kind(db),
             DefinitionKind::LoopHeader(_) | DefinitionKind::DictKeyAssignment(_)
         )
-        && !(requires_explicit_reexport.is_yes() && !is_reexported(db, binding))
+        && (!requires_explicit_reexport.is_yes() || is_reexported(db, binding))
     {
         return PlaceWithDefinition {
             place: Place::Defined(
