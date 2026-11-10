@@ -153,8 +153,10 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::codes::{Rule, RuleStatus};
-    use crate::rule_redirects::REDIRECTS;
+    use crate::rule_redirects::{REDIRECTS, RULE_NAME_REDIRECTS};
     use strum::IntoEnumIterator;
 
     /// Tests for rule names and codes that overlap with a redirect.
@@ -178,6 +180,26 @@ mod tests {
                     "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
                 );
             }
+        }
+    }
+
+    /// Tests for redirected rule names and codes that overlap with each other.
+    #[test]
+    fn unique_redirects() {
+        let codes = Rule::iter()
+            .filter_map(|rule| rule.noqa_code())
+            .flat_map(|code| {
+                let code = code.to_string();
+                [code.to_ascii_lowercase(), code]
+            });
+        let old_names = RULE_NAME_REDIRECTS.iter().map(|&(name, _)| name.to_owned());
+
+        let mut sources = HashSet::new();
+        for source in codes.chain(old_names) {
+            assert!(
+                sources.insert(source.clone()),
+                "Duplicate redirect for `{source}`",
+            );
         }
     }
 }
