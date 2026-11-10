@@ -68,12 +68,12 @@ impl Renderer for GroupedRenderer<'_> {
                             .as_ref(),
                         message,
                         stylesheet: &stylesheet,
-                        show_fix_status: self.config.show_fix_status(),
-                        applicability: self.config.fix_applicability(),
+                        show_fix_status: self.config.show_fix_status,
+                        applicability: self.config.fix_applicability,
                         row_length,
                         column_length,
-                        preview: self.config.preview_enabled(),
-                        prefer_rule_codes: self.config.is_prefer_rule_codes_enabled(),
+                        preview: self.config.preview,
+                        prefer_rule_codes: self.config.prefer_rule_codes,
                     }
                 )?;
             }
