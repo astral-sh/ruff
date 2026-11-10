@@ -3659,17 +3659,6 @@ impl<'db> CallableBinding<'db> {
             return;
         }
 
-        // ParamSpec freshening needs relation-side support so `Callable[P, R]` inference doesn't
-        // quantify away `P` before call specialization can use it.
-        if self.overloads.iter().any(|overload| {
-            overload
-                .signature
-                .generic_context
-                .is_some_and(|generic_context| generic_context_has_paramspec(db, generic_context))
-        }) {
-            return;
-        }
-
         // If any of the overloads being called are generic, we need to "freshen" their generic
         // contexts. The typevars bound by this generic context might collide with other visible
         // occurrences of the same generic context. This happens most often when referring to a

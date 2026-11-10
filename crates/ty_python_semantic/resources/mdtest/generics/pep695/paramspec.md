@@ -1680,6 +1680,21 @@ def default[T = Callable[[int], int]](callback: T) -> None: ...
 forward(default, lambda x: reveal_type(x))  # revealed: int
 ```
 
+### Recursive calls with a forwarded parameter list
+
+A recursive call can choose a new type for `T` while forwarding the callback's parameters. The
+caller's `value` still has type `T`, so it cannot be used as an `int`.
+
+```py
+from typing import Callable
+
+def f[T, **P](value: T, n: int, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    if n:
+        f(0, n - 1, callback, *args, **kwargs)  # ok
+        # error: [invalid-argument-type] "Expected `int`, found `T@f`"
+        f(0, value, callback, *args, **kwargs)
+```
+
 ### Forwarded arguments with type-variable bounds
 
 When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
