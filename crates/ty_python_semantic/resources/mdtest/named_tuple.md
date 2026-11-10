@@ -151,6 +151,27 @@ def _(group: Group):
     reveal_type(group[0])  # revealed: tuple[Negation | Group | str, ...]
 ```
 
+### Union containing a subclass of a recursive named tuple
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+class Subgroup(Group): ...
+
+Expression: TypeAlias = Negation | Subgroup | str
+
+def _(group: Subgroup):
+    reveal_type(group[0])  # revealed: tuple[Negation | Subgroup | str, ...]
+```
+
 ### Explicit dataclass-transform metaclass
 
 `models.pyi`:
@@ -167,6 +188,7 @@ from dataclasses import fields
 from typing import NamedTuple
 from models import RecordMeta
 
+# TODO: Report the metaclass conflict that makes this class definition raise TypeError.
 class Point(NamedTuple, metaclass=RecordMeta):
     x: int
 
