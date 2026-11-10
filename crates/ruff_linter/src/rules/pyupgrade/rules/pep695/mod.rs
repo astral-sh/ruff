@@ -442,7 +442,7 @@ pub(crate) enum GenericBase {
 }
 
 impl GenericBase {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             GenericBase::Generic => "Generic",
             GenericBase::Protocol => "Protocol",
