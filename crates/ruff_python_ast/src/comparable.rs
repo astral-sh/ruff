@@ -616,6 +616,128 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
     }
 }
 
+/// Compares normalized elements. The enclosing expression distinguishes f-strings from t-strings.
+#[derive(Clone, Copy)]
+enum ComparableInterpolatedString<'a> {
+    FString(&'a ast::FStringValue),
+    TString(&'a ast::TStringValue),
+}
+
+impl<'a> ComparableInterpolatedString<'a> {
+    /// Coalesce adjacent literals so that part boundaries do not affect comparison.
+    /// For example, `f"{foo!r} one" " and two " f" and three {bar!s}"` decomposes into
+    ///
+    /// - An f-string part with the interpolation `{foo!r}` and the literal `" one"`.
+    /// - A plain string literal part containing `" and two "`.
+    /// - An f-string part with the literal `" and three "` and the interpolation `{bar!s}`.
+    ///
+    /// All three pieces of literal text form one comparable element between the
+    /// two interpolations. A single piece can stay borrowed.
+    ///
+    /// [CPython's `string.templatelib.Template`] has one more string than interpolation.
+    /// Interleaving the two sequences, starting with a string, recovers the reading
+    /// order. For example, `t"{foo}bar"` has string slots `("", "bar")`, while
+    /// `t"bar{foo}"` has `("bar", "")`. Here the interpolations already delimit
+    /// the slots, so we can omit empty t-string text. For f-strings, an explicit
+    /// empty literal part still participates in comparison, as in `f"{foo}" ""`.
+    ///
+    /// [CPython's `string.templatelib.Template`]: https://github.com/python/cpython/blob/c91ad5da9d92eac4718e4da8d53689c3cc24535e/Python/codegen.c#L4052-L4103
+    fn normalized_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
+        let mut raw = self.raw_elements().peekable();
+        std::iter::from_fn(move || {
+            loop {
+                match raw.next()? {
+                    element @ ComparableStringElement::Interpolation(_) => {
+                        return Some(element);
+                    }
+                    ComparableStringElement::Literal(mut text) => {
+                        // `raw.next()` yields the Cow by value, borrowing the AST text.
+                        // In `f"{x}a" "b"`, `text` starts as a borrow of "a". Appending
+                        // "b" makes it own the joined string "ab". In `f"{x}ab"`, the
+                        // single piece stays borrowed. Both yield the same literal.
+                        while let Some(ComparableStringElement::Literal(next)) =
+                            raw.next_if(|next| matches!(next, ComparableStringElement::Literal(_)))
+                        {
+                            text += next;
+                        }
+                        if !text.is_empty() || matches!(self, Self::FString(_)) {
+                            return Some(ComparableStringElement::Literal(text));
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn raw_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
+        enum Parts<'a> {
+            FString(ast::FStringParts<'a>),
+            TString(std::slice::Iter<'a, ast::TString>),
+        }
+
+        let mut parts = match self {
+            Self::FString(value) => Parts::FString(value.iter()),
+            Self::TString(value) => Parts::TString(value.as_slice().iter()),
+        };
+        let mut elements = [].iter();
+        std::iter::from_fn(move || {
+            loop {
+                if let Some(element) = elements.next() {
+                    return Some(ComparableStringElement::from(element));
+                }
+                elements = match &mut parts {
+                    Parts::FString(parts) => match parts.next()? {
+                        ast::FStringPartRef::FString(ast::FString {
+                            elements,
+                            range: _,
+                            node_index: _,
+                            flags: _,
+                        }) => elements.iter(),
+                        ast::FStringPartRef::Literal(part) => {
+                            return Some(ComparableStringElement::Literal(Cow::Borrowed(
+                                ComparableText::from(part).0,
+                            )));
+                        }
+                    },
+                    Parts::TString(parts) => {
+                        let ast::TString {
+                            elements,
+                            range: _,
+                            node_index: _,
+                            flags: _,
+                        } = parts.next()?;
+                        elements.iter()
+                    }
+                };
+            }
+        })
+    }
+}
+
+impl PartialEq for ComparableInterpolatedString<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+            && self.normalized_elements().eq(other.normalized_elements())
+    }
+}
+
+impl fmt::Debug for ComparableInterpolatedString<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.normalized_elements()).finish()
+    }
+}
+
+impl Eq for ComparableInterpolatedString<'_> {}
+
+impl Hash for ComparableInterpolatedString<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for element in self.normalized_elements() {
+            Some(element).hash(state);
+        }
+        Option::<ComparableStringElement>::None.hash(state);
+    }
+}
+
 enum ComparableStringElement<'a> {
     Literal(Cow<'a, str>),
     Interpolation(&'a ast::InterpolatedElement),
@@ -1323,124 +1445,6 @@ fn ipy_escape_command_fields(node: &ast::ExprIpyEscapeCommand) -> IpyEscapeComma
     IpyEscapeCommandFields { kind: *kind, value }
 }
 
-/// Compares normalized elements. The enclosing expression distinguishes f-strings from t-strings.
-#[derive(Clone, Copy)]
-enum ComparableInterpolatedString<'a> {
-    FString(&'a ast::FStringValue),
-    TString(&'a ast::TStringValue),
-}
-
-impl<'a> ComparableInterpolatedString<'a> {
-    /// Coalesce adjacent literals so that part boundaries do not affect comparison.
-    /// For example, `f"{foo!r} one" " and two " f" and three {bar!s}"` decomposes into
-    ///
-    /// - An f-string part with the interpolation `{foo!r}` and the literal `" one"`.
-    /// - A plain string literal part containing `" and two "`.
-    /// - An f-string part with the literal `" and three "` and the interpolation `{bar!s}`.
-    ///
-    /// All three pieces of literal text form one comparable element between the
-    /// two interpolations. A single piece can stay borrowed.
-    ///
-    /// [CPython's `string.templatelib.Template`] has one more string than interpolation.
-    /// Interleaving the two sequences, starting with a string, recovers the reading
-    /// order. For example, `t"{foo}bar"` has string slots `("", "bar")`, while
-    /// `t"bar{foo}"` has `("bar", "")`. Here the interpolations already delimit
-    /// the slots, so we can omit empty t-string text. For f-strings, an explicit
-    /// empty literal part still participates in comparison, as in `f"{foo}" ""`.
-    ///
-    /// [CPython's `string.templatelib.Template`]: https://github.com/python/cpython/blob/c91ad5da9d92eac4718e4da8d53689c3cc24535e/Python/codegen.c#L4052-L4103
-    fn normalized_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
-        let mut raw = self.raw_elements().peekable();
-        std::iter::from_fn(move || {
-            loop {
-                match raw.next()? {
-                    element @ ComparableStringElement::Interpolation(_) => {
-                        return Some(element);
-                    }
-                    ComparableStringElement::Literal(mut text) => {
-                        while let Some(ComparableStringElement::Literal(next)) =
-                            raw.next_if(|next| matches!(next, ComparableStringElement::Literal(_)))
-                        {
-                            text += next;
-                        }
-                        if !text.is_empty() || matches!(self, Self::FString(_)) {
-                            return Some(ComparableStringElement::Literal(text));
-                        }
-                    }
-                }
-            }
-        })
-    }
-
-    fn raw_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
-        enum Parts<'a> {
-            FString(ast::FStringParts<'a>),
-            TString(std::slice::Iter<'a, ast::TString>),
-        }
-
-        let mut parts = match self {
-            Self::FString(value) => Parts::FString(value.iter()),
-            Self::TString(value) => Parts::TString(value.as_slice().iter()),
-        };
-        let mut elements = [].iter();
-        std::iter::from_fn(move || {
-            loop {
-                if let Some(element) = elements.next() {
-                    return Some(ComparableStringElement::from(element));
-                }
-                elements = match &mut parts {
-                    Parts::FString(parts) => match parts.next()? {
-                        ast::FStringPartRef::FString(ast::FString {
-                            elements,
-                            range: _,
-                            node_index: _,
-                            flags: _,
-                        }) => elements.iter(),
-                        ast::FStringPartRef::Literal(part) => {
-                            return Some(ComparableStringElement::Literal(Cow::Borrowed(
-                                ComparableText::from(part).0,
-                            )));
-                        }
-                    },
-                    Parts::TString(parts) => {
-                        let ast::TString {
-                            elements,
-                            range: _,
-                            node_index: _,
-                            flags: _,
-                        } = parts.next()?;
-                        elements.iter()
-                    }
-                };
-            }
-        })
-    }
-}
-
-impl PartialEq for ComparableInterpolatedString<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        std::mem::discriminant(self) == std::mem::discriminant(other)
-            && self.normalized_elements().eq(other.normalized_elements())
-    }
-}
-
-impl fmt::Debug for ComparableInterpolatedString<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.normalized_elements()).finish()
-    }
-}
-
-impl Eq for ComparableInterpolatedString<'_> {}
-
-impl Hash for ComparableInterpolatedString<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for element in self.normalized_elements() {
-            Some(element).hash(state);
-        }
-        Option::<ComparableStringElement>::None.hash(state);
-    }
-}
-
 struct ComparableBytes<'a>(&'a ast::BytesLiteralValue);
 
 impl PartialEq for ComparableBytes<'_> {
@@ -1449,6 +1453,12 @@ impl PartialEq for ComparableBytes<'_> {
             return left.as_slice() == right.as_slice();
         }
 
+        // Implicit concatenation makes `b'ab' b'c'` equal to `b'a' b'bc'`.
+        // Compare slices up to the next part boundary on either side so we can
+        // compare the full byte sequences without allocating a joined buffer.
+        // In this example, matching `a` exhausts the first right part. Matching
+        // `b` then exhausts the first left part, leaving `c` in `right` for
+        // the next left part.
         let mut right_parts = other
             .0
             .iter()
@@ -1472,6 +1482,8 @@ impl PartialEq for ComparableBytes<'_> {
                 right = &right[len..];
             }
         }
+        // All left bytes matched. Extra right bytes can be in the current
+        // slice or in a later part. The iterator skips empty parts.
         right.is_empty() && right_parts.next().is_none()
     }
 }
