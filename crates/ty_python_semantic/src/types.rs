@@ -5983,6 +5983,19 @@ impl<'db> Type<'db> {
             .member(db)
     }
 
+    /// Look up a member on this union element, narrowing the receiver to the element.
+    fn lookup_on_union_element(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+    ) -> MemberLookupResult<'db> {
+        let receiver = receiver.map(|ty| IntersectionType::from_two_elements(db, env, ty, self));
+        self.member_lookup_with_policy_and_receiver(db, env, name, policy, receiver)
+    }
+
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
     /// receiver than the type whose members are being searched.
     ///
@@ -6181,12 +6194,8 @@ impl<'db> Type<'db> {
                         // the original receiver (`T`). Here, we distribute lookup over the union
                         // and intersect each member with that receiver to obtain `T & E1`
                         // and `T & E2`, respectively.
-                        let receiver = receiver.map(|receiver| {
-                            IntersectionType::from_two_elements(db, env, receiver, *elem)
-                        });
-                        let result = elem.member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
-                        );
+                        let result =
+                            elem.lookup_on_union_element(db, env, name_str, policy, receiver);
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
                         let member = result.unwrap_or_else(|error| error.fallback_member(db));
                         properties = union_deprecated_properties(
@@ -8365,6 +8374,32 @@ impl<'db> Type<'db> {
             )
     }
 
+    /// Call a unary operator's dunder, retaining the original receiver when evaluating a bound.
+    fn try_call_unary_dunder(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        receiver: Option<Type<'db>>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let mut arguments = CallArguments::none();
+        let tcx = TypeContext::default();
+        if let (Type::Union(union), Some(receiver)) = (self, receiver) {
+            return union.try_call_dunder(db, env, &mut arguments, tcx, |element| {
+                element.lookup_on_union_element(
+                    db,
+                    env,
+                    name,
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    Some(receiver),
+                )
+            });
+        }
+        receiver
+            .unwrap_or(self)
+            .try_call_dunder(db, env, name, arguments, tcx)
+    }
+
     /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
@@ -8409,22 +8444,19 @@ impl<'db> Type<'db> {
                 .map(|bindings| bindings.into_bindings(self));
         }
 
-        if let Type::Union(union) = self {
-            return union.try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy);
-        }
-
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies.
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
+        if let Type::Union(union) = self {
+            return union.try_call_dunder(db, env, argument_types, tcx, |element| {
+                element.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
+            });
+        }
+
         Self::try_call_dunder_member_impl(
             db,
             env,
-            self.member_lookup_with_policy_and_receiver(
-                db,
-                env,
-                name,
-                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                None,
-            ),
+            self.member_lookup_with_policy_and_receiver(db, env, name, policy, None),
             argument_types,
             tcx,
         )
@@ -11221,14 +11253,13 @@ impl<'db> UnionType<'db> {
     // This alternative to aggregating the dunder lookups with
     // `UnionType.map_with_boundness_and_qualifiers` preserves the information
     // necessary to emit more precise diagnostics for "possibly unbound" errors.
-    fn try_call_dunder_with_policy(
+    fn try_call_dunder(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
-        policy: MemberLookupPolicy,
+        lookup: impl Fn(Type<'db>) -> MemberLookupResult<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         let elements = self.elements(db);
         let mut builder = UnionBuilder::new(db, env);
@@ -11238,13 +11269,9 @@ impl<'db> UnionType<'db> {
         let mut provenance = Provenance::Unknown;
 
         for element in elements {
-            match element
-                .member_lookup_with_policy(
-                    db,
-                    env,
-                    name,
-                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
+            match lookup(*element)
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db)
                 .place
             {
                 Place::Defined(DefinedPlace {

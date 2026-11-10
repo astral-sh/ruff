@@ -11647,26 +11647,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
-        let ast::ExprUnaryOp {
-            range: _,
-            node_index: _,
-            op,
-            operand,
-        } = unary;
-
-        let operand_type = self.infer_expression(operand, TypeContext::default());
-
-        self.infer_unary_expression_type(*op, operand_type, unary)
+        let operand_type = self.infer_expression(&unary.operand, TypeContext::default());
+        self.infer_unary_expression_type(unary, operand_type, None)
     }
 
     fn infer_unary_expression_type(
         &mut self,
-        op: ast::UnaryOp,
-        operand_type: Type<'db>,
         unary: &ast::ExprUnaryOp,
+        operand_type: Type<'db>,
+        receiver: Option<Type<'db>>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
+        let op = unary.op;
         let fallback_unary_expression_type = || {
             let unary_dunder_method = match op {
                 ast::UnaryOp::Invert => "__invert__",
@@ -11677,13 +11670,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
-            match operand_type.try_call_dunder(
-                db,
-                env,
-                unary_dunder_method,
-                CallArguments::none(),
-                TypeContext::default(),
-            ) {
+            match operand_type.try_call_unary_dunder(db, env, unary_dunder_method, receiver) {
                 Ok(outcome) => {
                     self.check_deprecated_bindings(unary, &outcome);
                     outcome.return_type(db, env)
@@ -11718,7 +11705,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
-                self.infer_unary_expression_type(op, alias.value_type(db), unary)
+                self.infer_unary_expression_type(unary, alias.value_type(db), receiver)
             }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
@@ -11807,13 +11794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .elements(db)
                             .iter()
                             .map(|constraint| {
-                                constraint.try_call_dunder(
-                                    db,
-                                    env,
-                                    unary_dunder_method,
-                                    CallArguments::none(),
-                                    TypeContext::default(),
-                                )
+                                constraint.try_call_unary_dunder(db, env, unary_dunder_method, None)
                             })
                             .collect();
                         self.report_deprecated_functions(
@@ -11860,13 +11841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     None,
                                 );
                                 operand_type
-                                    .try_call_dunder(
-                                        db,
-                                        env,
-                                        unary_dunder_method,
-                                        CallArguments::none(),
-                                        TypeContext::default(),
-                                    )
+                                    .try_call_unary_dunder(db, env, unary_dunder_method, None)
                                     .map_or_else(
                                         |e| e.fallback_return_type(db, env),
                                         |b| b.return_type(db, env),
@@ -11874,33 +11849,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     }
-                    // For bounded TypeVars with union bounds (like `bound=float` which becomes
-                    // `int | float`), we need to delegate to the bound type.
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.infer_unary_expression_type(op, bound, unary)
-                    }
-                    // For unconstrained TypeVars, fall through to default handling.
-                    None => {
-                        match operand_type.try_call_dunder(
-                            db,
-                            env,
-                            unary_dunder_method,
-                            CallArguments::none(),
-                            TypeContext::default(),
-                        ) {
-                            Ok(outcome) => outcome.return_type(db, env),
-                            Err(e) => {
-                                self.report_unsupported_unary_operator(
-                                    unary,
-                                    op,
-                                    operand_type,
-                                    unary_dunder_method,
-                                    Some(&e),
-                                );
-                                e.fallback_return_type(db, env)
-                            }
-                        }
-                    }
+                    // A literal bound lets us fold the operation. A dunder returning `Self`
+                    // needs the original type variable as its receiver.
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self
+                        .infer_unary_expression_type(unary, bound, receiver.or(Some(operand_type))),
+                    None => fallback_unary_expression_type(),
                 }
             }
 
