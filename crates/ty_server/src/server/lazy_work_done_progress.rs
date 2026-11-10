@@ -111,20 +111,17 @@ impl LazyWorkDoneProgress {
     }
 
     fn begin(&self, token: ProgressToken, begin: WorkDoneProgressBegin) {
-        if self
-            .inner
+        self.inner
             .client
             .send_notification::<lsp_types::ProgressNotification>(ProgressParams {
                 token: token.clone(),
                 value: serde_json::to_value(begin)
                     .expect("Failed to serialize work done progress begin"),
-            })
-        {
-            self.inner
-                .token
-                .set(token)
-                .expect("progress token should only be set once");
-        }
+            });
+        self.inner
+            .token
+            .set(token)
+            .expect("progress token should only be set once");
     }
 }
 

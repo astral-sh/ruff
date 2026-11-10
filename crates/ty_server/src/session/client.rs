@@ -95,8 +95,8 @@ impl Client {
         }
     }
 
-    /// Sends a notification to the client. Returns `false` if the writer has disconnected.
-    pub(crate) fn send_notification<N>(&self, params: N::Params) -> bool
+    /// Sends a notification to the client.
+    pub(crate) fn send_notification<N>(&self, params: N::Params)
     where
         N: lsp_types::Notification,
     {
@@ -111,9 +111,7 @@ impl Client {
                 "Failed to send notification `{method}` because the client sender is closed: {err}",
                 method = N::METHOD,
             );
-            return false;
         }
-        true
     }
 
     /// Drops the notification if the client writer is busy or has disconnected.
