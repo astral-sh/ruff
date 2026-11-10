@@ -10,6 +10,10 @@ class __bad:
     pass
 
 
+class bad_:
+    pass
+
+
 class bad_class:
     pass
 
@@ -18,6 +22,9 @@ class Bad_Class:
     pass
 
 class Bad__Class:
+    pass
+
+class Bad_Class_:
     pass
 
 class BAD_CLASS:
@@ -40,4 +47,16 @@ class GOOD:
     pass
 
 class __GoodClass:
+    pass
+
+
+class Fine_:
+    pass
+
+
+class _Fine_:
+    pass
+
+
+class Fine__:
     pass
