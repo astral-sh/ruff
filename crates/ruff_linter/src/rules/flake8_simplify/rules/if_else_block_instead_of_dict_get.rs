@@ -23,8 +23,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// the key is not found. When possible, using `dict.get` is more concise and
 /// more idiomatic.
 ///
-/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule will
-/// also suggest replacing `if`-`else` _expressions_ with `dict.get` calls.
+/// This rule also flags `if`-`else` _expressions_ that can be replaced with
+/// `dict.get` calls.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// value = foo.get("bar", 0)
 /// ```
 ///
-/// If preview mode is enabled:
+/// The rule also flags the equivalent expression form:
 /// ```python
 /// value = foo["bar"] if "bar" in foo else 0
 /// ```
@@ -257,6 +257,17 @@ pub(crate) fn if_exp_instead_of_dict_get(
     let Some((test_key, op, test_dict)) = compare.as_single() else {
         return;
     };
+
+    // Only flag the rewrite when the tested value is known to be a plain
+    // dictionary. A subclass may override `get`, so rewriting its lookups
+    // to a `.get` call could change behavior (or, inside the override
+    // itself, recurse forever).
+    if !test_dict
+        .as_name_expr()
+        .is_some_and(|dict_name| is_known_to_be_of_type_dict(checker.semantic(), dict_name))
+    {
+        return;
+    }
 
     let (body, default_value) = match op {
         CmpOp::In => (body, orelse),

@@ -142,7 +142,7 @@ else:
     value = None
 
 ###
-# Positive cases (preview)
+# Positive cases (if expressions)
 ###
 
 # SIM401
@@ -153,6 +153,22 @@ var = "default-1" if key not in a_dict else a_dict[key]
 
 # OK (default contains effect)
 var = a_dict[key] if key in a_dict else val1 + val2
+
+###
+# Dict subclasses overriding `get`
+###
+
+class Cache(dict):
+    def get(self, key, default=None):
+        # OK (`self` is a dict subclass, not a known plain dict; rewriting
+        # this to `self.get(...)` would call this method again).
+        return self[key] if key in self else default
+
+
+cache = Cache()
+
+# OK (a dict subclass may override `get`)
+var = cache[key] if key in cache else "default4"
 
 ###
 # Lambda parameter defaults

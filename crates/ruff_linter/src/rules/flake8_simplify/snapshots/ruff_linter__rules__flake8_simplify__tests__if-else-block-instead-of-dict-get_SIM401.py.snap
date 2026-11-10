@@ -159,25 +159,25 @@ help: Replace with `a_dict.get(key, "default-1")`
 note: This is an unsafe fix and may change runtime behavior
 
 SIM401 [*] Use `var = a_dict.get(key, lambda x=0, /, y=1, *, z=2: (x, y, z))` instead of an `if` block
-   --> SIM401.py:162:1
+   --> SIM401.py:178:1
     |
-161 |   # SIM401: literal defaults have no side effects.
-162 | / if key in a_dict:
-163 | |     var = a_dict[key]
-164 | | else:
-165 | |     var = lambda x=0, /, y=1, *, z=2: (x, y, z)
+177 |   # SIM401: literal defaults have no side effects.
+178 | / if key in a_dict:
+179 | |     var = a_dict[key]
+180 | | else:
+181 | |     var = lambda x=0, /, y=1, *, z=2: (x, y, z)
     | |_______________________________________________^
-166 |
-167 |   # OK: dict.get would evaluate the lambda's default even when the key exists.
+182 |
+183 |   # OK: dict.get would evaluate the lambda's default even when the key exists.
     |
 help: Replace with `var = a_dict.get(key, lambda x=0, /, y=1, *, z=2: (x, y, z))`
     |
-161 | # SIM401: literal defaults have no side effects.
+177 | # SIM401: literal defaults have no side effects.
     - if key in a_dict:
     -     var = a_dict[key]
     - else:
     -     var = lambda x=0, /, y=1, *, z=2: (x, y, z)
-162 + var = a_dict.get(key, lambda x=0, /, y=1, *, z=2: (x, y, z))
-163 |
+178 + var = a_dict.get(key, lambda x=0, /, y=1, *, z=2: (x, y, z))
+179 |
     |
 note: This is an unsafe fix and may change runtime behavior
