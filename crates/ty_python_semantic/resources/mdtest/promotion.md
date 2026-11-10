@@ -1082,15 +1082,11 @@ B = TypeVar("B")
 C = TypeVar("C")
 D = TypeVar("D")
 E = TypeVar("E")
-Rotating = tuple[A, "Rotating[B, C, D, A]"]
-Rotating2 = tuple[A, "Rotating2[B, C, D, E, A]"]
+Rotating = tuple[A, "Rotating[B, C, D, E, A]"]
 
-def inspect(x: Rotating[int, int, int, None], y: Rotating2[int, int, int, int, None]):
-    promoted = [x][0]
-    promoted2 = [y][0]
-    reveal_type(promoted[1][1][1][0])  # revealed: None | Unknown
-    # TODO: should be `None | Unknown`. The current implementation has a cutoff in its application depth.
-    reveal_type(promoted2[1][1][1][1][0])  # revealed: None
+def inspect(value: Rotating[int, int, int, int, None]):
+    promoted = [value][0]
+    reveal_type(promoted[1][1][1][1][0])  # revealed: None | Unknown
 ```
 
 ## Recursive aliases with growing arguments
