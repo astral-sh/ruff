@@ -2491,14 +2491,24 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 
 ## List literals with ambiguous union parameters
 
-In `as_list([])`, the argument `[]` initially has type `list[Unknown]`. Matching it against `T`
-binds `T` to the whole list, `list[Unknown]`. Matching it against `list[T]` binds `T` to the element
-type, `Unknown`.
+When a type variable appears at different nesting levels in a union parameter, an argument can
+provide more than one binding for it. In `as_list([1])`, the literal initially has type `list[int]`.
+Matching it against `T` gives `T = list[int]`, and matching it against `list[T]` gives `T = int`.
 
-When we revisit `[]` using the specialized parameter type as context, the `list[T]` arm supplies
-`Unknown` as the literal's element type. Feeding the whole-list binding back into the literal could
-add another list layer each time we revisit it. The declared return type `list[T]` uses both
-bindings, so the element type of the returned list is `list[Unknown] | Unknown`.
+When a type variable occurs more than once, we can revisit the call's arguments using the
+specialized parameter types from the previous pass as context. This lets one argument help determine
+the type of another. For example, in `map(lambda s: s.upper(), ["foo"])`, the list of strings tells
+us that `s` is a `str`. See [Unified call inference](../../bidirectional.md#unified-call-inference).
+
+If we used both bindings to specialize the `list[T]` arm, it would become `list[list[int] | int]`.
+On the second pass, the bare arm would still allow `list[int]`, so the inferred type of `[1]` would
+be `list[int] | list[list[int] | int]`. Matching that union against the parameter again would give
+`T = list[list[int] | int] | list[int] | int`. Each pass would add another list layer until we hit
+the iteration limit.
+
+When we revisit `[1]`, we specialize the `list[T]` arm with the binding it contributed, `T = int`.
+That gives the literal an expected element type of `int`, so its type stays `list[int]`. Both
+bindings still contribute to the return type, `list[list[int] | int]`.
 
 ```py
 from typing import TypeVar
@@ -2510,8 +2520,8 @@ def as_list(value: T | list[T]) -> list[T]:
         return value
     return [value]
 
-result = as_list(reveal_type([]))  # revealed: list[Unknown]
-reveal_type(result)  # revealed: list[list[Unknown] | Unknown]
+result = as_list(reveal_type([1]))  # revealed: list[int]
+reveal_type(result)  # revealed: list[list[int] | int]
 ```
 
 ## Nested calls with ambiguous union parameters
