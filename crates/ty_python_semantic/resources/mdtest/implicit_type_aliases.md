@@ -3064,6 +3064,19 @@ def invalid_odd() -> Odd:
     return ((1,),)  # error: [invalid-return-type]
 ```
 
+### Mutually recursive aliases using `typing.Union`
+
+```py
+from typing import Union
+
+DictState = dict[str, "State"]
+ListState = list["State"]
+State = Union[int, DictState, ListState]
+
+valid: State = {"children": [1]}
+invalid: State = [b"leaf"]  # error: [invalid-assignment]
+```
+
 ### Self-recursion within mutually recursive aliases
 
 An inner tuple can refer both to itself and to the outer tuple. Indexing preserves their distinct
