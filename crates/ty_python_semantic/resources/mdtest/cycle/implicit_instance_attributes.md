@@ -96,26 +96,25 @@ reveal_type(C().value)  # revealed: list[int] | list[Divergent]
 
 ## Wrapping list elements in tuples
 
-Both list assignments contribute to the inferred attribute type.
+The element type can contain arbitrarily nested tuples. The attribute is still a list both inside
+`update` and at the call site.
 
 ```py
 class Items:
     def update(self, values) -> None:
         self.items = [*values]
         self.items = [(x,) for x in self.items]
-        reveal_type(self.items)  # revealed: list[tuple[Unknown]]
+        reveal_type(self.items.reverse())  # revealed: None
 
 def _(items: Items):
     items.update(items.items)
-    # TODO: This should still be a list, and accessing `missing` should be an error.
-    reveal_type(items.items)  # revealed: Unknown
-    items.items.missing
+    items.items.missing  # error: [missing-attribute]
 ```
 
 ## Reading an attribute with a growing type argument
 
 Reading `value` before checking `advance` starts inference at the member lookup. Each update nests
-the type argument one level deeper, so inference eventually falls back to `Unknown`.
+the type argument one level deeper, but every possible value is still a `Box`.
 
 ```toml
 [environment]
@@ -127,7 +126,7 @@ class Box[T]:
     next: Box[tuple[T]]
 
 def read(c: C):
-    reveal_type(c.value)  # revealed: Unknown
+    c.value.missing  # error: [missing-attribute]
 
 class C:
     def __init__(self):

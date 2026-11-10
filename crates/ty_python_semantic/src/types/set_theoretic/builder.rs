@@ -1316,6 +1316,15 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Both represent the same gradual type. Keep the marker so that wrapping this
+            // union in another constructor still respects the recursive inference bound.
+            if let (Type::Dynamic(left), Type::Dynamic(right)) = (element_type, ty)
+                && let Some(widened) = left.merge_widened(right)
+            {
+                self.elements[i] = UnionElement::Type(Type::Dynamic(widened));
+                return;
+            }
+
             if Self::is_incomparable_for_union(db, ty, element_type) {
                 continue;
             }
