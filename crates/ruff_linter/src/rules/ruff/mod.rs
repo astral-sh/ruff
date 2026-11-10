@@ -2,6 +2,7 @@
 
 mod helpers;
 pub(crate) mod rules;
+pub use rules::renamed_rule_on_cli;
 pub mod settings;
 pub(crate) mod typing;
 

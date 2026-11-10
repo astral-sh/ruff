@@ -1,14 +1,20 @@
+use std::borrow::Cow;
+
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryCode, Severity};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::TextRange;
 
-use crate::AlwaysFixableViolation;
 use crate::checkers::ast::LintContext;
 use crate::codes::Category;
+use crate::registry::Rule;
+use crate::rule_redirects::get_redirect;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 ///
-/// Checks Ruff configuration files for redirected rule names, codes, and prefixes.
+/// Checks Ruff configuration files and command line arguments for redirected rule names, codes, and
+/// prefixes.
 ///
 /// ## Why is this bad?
 ///
@@ -34,11 +40,13 @@ use crate::codes::Category;
 pub(crate) struct RenamedRule {
     original: &'static str,
     target: &'static str,
-    setting: &'static str,
+    setting: Cow<'static, str>,
     in_lint_table: bool,
 }
 
-impl AlwaysFixableViolation for RenamedRule {
+impl Violation for RenamedRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -54,8 +62,8 @@ impl AlwaysFixableViolation for RenamedRule {
         }
     }
 
-    fn fix_title(&self) -> String {
-        format!("Replace with `{}`", self.target)
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with `{}`", self.target))
     }
 }
 
@@ -73,7 +81,7 @@ pub(crate) fn renamed_rule(
             RenamedRule {
                 original,
                 target,
-                setting,
+                setting: Cow::Borrowed(setting),
                 in_lint_table,
             },
             range,
@@ -82,4 +90,26 @@ pub(crate) fn renamed_rule(
             target.to_string(),
             range,
         )));
+}
+
+/// Check a rule selector passed to a command-line option.
+pub fn renamed_rule_on_cli(selector: &str, option: &str) -> Option<Diagnostic> {
+    let (original, target) = get_redirect(selector)?;
+    let violation = RenamedRule {
+        original,
+        target,
+        setting: Cow::Owned(format!("--{option}")),
+        in_lint_table: false,
+    };
+    let rule = Rule::RenamedRule;
+    let mut diagnostic = Diagnostic::new(
+        DiagnosticId::Lint(rule.name()),
+        Severity::Error,
+        violation.message(),
+    );
+    if let Some(code) = rule.noqa_code() {
+        diagnostic.set_secondary_code(SecondaryCode::new(code.to_string()));
+    }
+    diagnostic.set_documentation_url(Some(rule.url()));
+    Some(diagnostic)
 }
