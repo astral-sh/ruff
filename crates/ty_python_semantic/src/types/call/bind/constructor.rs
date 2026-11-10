@@ -229,8 +229,14 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         mode: CheckTypesMode,
     ) {
-        self.entry
-            .check_types(db, env, constraints, argument_types, call_expression_tcx);
+        self.entry.check_types(
+            db,
+            env,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            mode,
+        );
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.

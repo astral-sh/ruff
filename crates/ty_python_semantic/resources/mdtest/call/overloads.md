@@ -113,6 +113,26 @@ reveal_type(f(*("a",)))  # revealed: Unknown
 More examples of this diagnostic can be found in the
 [single_matching_overload.md](../diagnostics/single_matching_overload.md) document.
 
+### Overloads distinguished by a string literal
+
+A literal-valued variable can select an overload by keyword. If its other argument is
+incompatible, the call still reports the overload error.
+
+```py
+from typing import Literal, overload
+
+@overload
+def select(key: Literal["number"], value: int) -> int: ...
+@overload
+def select(key: Literal["text"], value: str) -> str: ...
+def select(key: str, value: int | str) -> int | str:
+    return value
+
+def use(key: Literal["text"]):
+    reveal_type(select(key=key, value="hello"))  # revealed: str
+    select(key, 1)  # error: [no-matching-overload]
+```
+
 ### Multiple matches
 
 `overloaded.pyi`:
