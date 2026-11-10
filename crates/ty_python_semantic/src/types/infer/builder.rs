@@ -54,7 +54,8 @@ use crate::types::annotation_target::{is_valid_annotation_target, receiver_metho
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
     ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
-    OverloadSet, inferable_typevar_occurrences, requires_overload_evaluation,
+    InitialArgumentTypes, OverloadSet, ProducerSignature, inferable_typevar_occurrences,
+    requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -301,6 +302,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -559,6 +561,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
+            producers: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -788,11 +791,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         expressions: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>,
     ) {
-        if self.comparison_truthiness.is_empty() {
+        if self.comparison_truthiness.is_empty() && self.producers.is_empty() {
             self.expressions.extend(expressions);
         } else {
             for (expression, ty) in expressions {
                 self.expressions.insert(expression, ty);
+                self.producers.remove(&expression);
                 self.comparison_truthiness.remove(&expression);
             }
         }
@@ -838,6 +842,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.producers.extend(
+            inference
+                .producers
+                .iter()
+                .map(|(&key, p)| (key, Rc::clone(p))),
+        );
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -1020,6 +1030,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn teardown_expression_cache(&mut self) {
         self.expression_cache = None;
+        self.producers.clear();
     }
 
     /// Are we currently inferring types in file with deferred types?
@@ -6244,6 +6255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
         let arguments_tcx = self.collect_call_arguments_type_context(
             baseline_argument_types,
+            None,
             bindings,
             requires_overload_evaluation.then_some(candidates),
             constraints,
@@ -6302,6 +6314,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // inferred types and diagnostics from matching overloads are preserved.
         let arguments_tcx = self.collect_call_arguments_type_context(
             &checked_argument_types,
+            None,
             bindings,
             None,
             constraints,
@@ -6339,6 +6352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut arguments_tcx = self.collect_call_arguments_type_context(
             argument_types,
+            None,
             bindings,
             Some(candidates),
             constraints,
@@ -6346,6 +6360,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let mut iteration = 0;
+        let mut first_pass = None;
+        let argument_expressions: Vec<_> = ast_arguments
+            .clone()
+            .map(ast::ArgOrKeyword::value)
+            .collect();
         let mut next_bindings = bindings.clone();
         let mut prev_argument_types = argument_types.clone();
 
@@ -6400,6 +6419,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Collect the argument constraints based on the newly inferred types.
             let next_arguments_tcx = self.collect_call_arguments_type_context(
                 &next_argument_types,
+                Some(speculative_builder.initial_argument_types(
+                    &next_argument_types,
+                    &argument_expressions,
+                    first_pass.as_ref(),
+                )),
                 &next_bindings,
                 Some(candidates),
                 constraints,
@@ -6415,6 +6439,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 break (speculative_builder, next_argument_types);
             }
 
+            // Only retain the first pass once another iteration will discard its builder.
+            first_pass.get_or_insert_with(|| FirstArgumentPass {
+                arguments: next_argument_types.clone(),
+                expressions: std::mem::take(&mut speculative_builder.expressions),
+                producers: std::mem::take(&mut speculative_builder.producers),
+            });
             iteration += 1;
             arguments_tcx = next_arguments_tcx;
             prev_argument_types = next_argument_types;
@@ -6434,6 +6464,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if requires_overload_evaluation {
             let arguments_tcx = self.collect_call_arguments_type_context(
                 &converged_argument_types,
+                Some(converged_builder.initial_argument_types(
+                    &converged_argument_types,
+                    &argument_expressions,
+                    first_pass.as_ref(),
+                )),
                 &next_bindings,
                 None,
                 constraints,
@@ -6459,10 +6494,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         result
     }
 
+    fn initial_argument_types<'a, 'call>(
+        &'a self,
+        arguments: &'a CallArguments<'call, 'db>,
+        expressions: &'a [&'a ast::Expr],
+        first_pass: Option<&'a FirstArgumentPass<'call, 'db>>,
+    ) -> InitialArgumentTypes<'a, 'call, 'db> {
+        let (arguments, observed, producers) = first_pass
+            .map_or((arguments, &self.expressions, &self.producers), |pass| {
+                (&pass.arguments, &pass.expressions, &pass.producers)
+            });
+        InitialArgumentTypes {
+            arguments,
+            expressions,
+            observed,
+            producers,
+        }
+    }
+
     /// Collects the type contexts used to infer the arguments of a call expression.
     fn collect_call_arguments_type_context<'bindings>(
         &self,
         argument_types: &CallArguments<'_, 'db>,
+        initial: Option<InitialArgumentTypes<'_, '_, 'db>>,
         bindings: &'bindings Bindings<'db>,
         candidates: Option<&'bindings OverloadSet>,
         constraints: &ConstraintSetBuilder<'db>,
@@ -6470,10 +6524,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Vec<Option<MatchingArgumentTypeContext<'db>>> {
         type CachedSpecialization<'db> =
             OnceCell<Option<Cow<'db, ArgumentContextSpecialization<'db>>>>;
+        #[derive(Default)]
+        struct ContextCache<'db> {
+            specialization: CachedSpecialization<'db>,
+            arguments: OnceCell<Option<Vec<Option<Type<'db>>>>>,
+        }
         type OverloadsWithBinding<'a, 'db> = Vec<(
             &'a Binding<'db>,
             &'a CallableBinding<'db>,
-            CachedSpecialization<'db>,
+            ContextCache<'db>,
         )>;
 
         fn add_overloads_from_binding<'a, 'db>(
@@ -6483,12 +6542,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut matching_overloads = binding.matching_overloads().peekable();
             if matching_overloads.peek().is_some() {
                 overloads_with_binding.extend(
-                    matching_overloads.map(|(_, overload)| (overload, binding, OnceCell::new())),
+                    matching_overloads
+                        .map(|(_, overload)| (overload, binding, ContextCache::default())),
                 );
             } else if let Some(overload) = binding.best_failing_overload() {
                 // If there is a single overload that does not match, we still infer the argument
                 // types for better diagnostics.
-                overloads_with_binding.push((overload, binding, OnceCell::new()));
+                overloads_with_binding.push((overload, binding, ContextCache::default()));
             }
         }
         let db = self.db();
@@ -6499,7 +6559,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut overloads_with_binding: OverloadsWithBinding = Vec::new();
         if let Some(candidates) = candidates {
             bindings.visit_overload_set(candidates, &mut |overload, binding| {
-                overloads_with_binding.push((overload, binding, OnceCell::new()));
+                overloads_with_binding.push((overload, binding, ContextCache::default()));
             });
         } else {
             bindings.visit_type_context_callables(&mut |binding| {
@@ -6517,17 +6577,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let parameter_tcx =
                     |overload: &Binding<'db>,
                      binding: &CallableBinding<'db>,
-                     specialization: &CachedSpecialization<'db>| {
+                     cache: &ContextCache<'db>| {
                         overload.argument_type_context(
                             db,
                             env,
                             constraints,
                             binding,
                             argument_types,
+                            || {
+                                cache
+                                    .arguments
+                                    .get_or_init(|| {
+                                        overload.joint_argument_contexts(
+                                            db,
+                                            env,
+                                            constraints,
+                                            binding,
+                                            argument_types,
+                                            initial?,
+                                            call_expression_tcx,
+                                        )
+                                    })
+                                    .as_ref()?
+                                    .get(argument_index)
+                                    .copied()
+                                    .flatten()
+                            },
                             argument_index,
                             call_expression_tcx,
                             || {
-                                specialization
+                                cache
+                                    .specialization
                                     .get_or_init(|| {
                                         overload.argument_type_context_specialization(
                                             db,
@@ -6878,6 +6958,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
         let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+        self.producers.remove(&expression_key);
 
         match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
@@ -10163,6 +10244,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(db, env);
             }
         };
+        let producer = if self.expression_cache.is_some()
+            && !matches!(callable_type, Type::GenericAlias(_))
+            && let Ok((binding, arguments)) = inferred.iter().exactly_one()
+        {
+            ProducerSignature::from_call(db, env, binding, arguments)
+                .map(|producer| (binding.return_type(db, env), producer))
+        } else {
+            None
+        };
         let revealed_type = self.revealed_type_for_call(&inferred);
         let mut bindings = inferred.into_bindings();
 
@@ -10312,7 +10402,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return_ty,
         };
 
-        typeguard::bind_type_guard_return_type(db, self.scope(), return_ty, &bindings, arguments)
+        let return_ty = typeguard::bind_type_guard_return_type(
+            db,
+            self.scope(),
+            return_ty,
+            &bindings,
+            arguments,
+        );
+        if let Some((raw_result, producer)) = producer
+            && raw_result == return_ty
+        {
+            self.producers
+                .insert(call_expression.into(), Rc::new(producer));
+        }
+        return_ty
     }
 
     fn infer_starred_expression(
@@ -12209,6 +12312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             expressions,
+            producers,
             comparison_truthiness,
             qualifiers: _,
             type_expression_flags,
@@ -12254,6 +12358,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FullExpressionCacheEntry {
             legacy_aliases,
             expressions,
+            producers,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -12276,6 +12381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             expressions,
+            producers: _,
             comparison_truthiness,
             qualifiers,
             type_expression_flags,
@@ -12418,6 +12524,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             expressions,
+            producers: _,
             comparison_truthiness: _,
             bindings,
             called_functions,
@@ -12473,6 +12580,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             expressions,
+            producers: _,
             comparison_truthiness,
             qualifiers,
             type_expression_flags,
@@ -12682,6 +12790,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             expressions,
+            producers: _,
             comparison_truthiness: _,
             scope,
             cycle_recovery,
@@ -12772,6 +12881,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: _,
             collection_use_constraints: _,
             expressions: _,
+            producers: _,
             comparison_truthiness: _,
             string_annotations: _,
             deferred_name_loads: _,
@@ -12838,6 +12948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             expressions,
+            producers,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -12881,6 +12992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.extend_expression_types(expressions);
+        self.producers.extend(producers);
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
@@ -12923,6 +13035,13 @@ struct ChainedBooleanResult<'db> {
     /// Using `value_type` instead would model testing the returned object again, which can
     /// give a different answer when a comparison returns an object with mutable truthiness.
     preceding_truthiness: Truthiness,
+}
+
+/// Values needed from the first pass after its speculative builder has been discarded.
+struct FirstArgumentPass<'call, 'db> {
+    arguments: CallArguments<'call, 'db>,
+    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
 }
 
 /// An expression cache shared across builders during multi-inference.
@@ -13011,6 +13130,7 @@ enum ExpressionCacheEntry<'db> {
 struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -13036,6 +13156,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.expressions.len() == 1
+            && self.producers.is_empty()
             && self.expressions.get(&expression) == Some(&ty)
             && !self.has_extra()
     }

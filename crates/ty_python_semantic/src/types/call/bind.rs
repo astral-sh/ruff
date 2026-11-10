@@ -9,7 +9,11 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
+mod producer;
+mod producer_signature;
 mod property;
+pub(crate) use producer::InitialArgumentTypes;
+pub(crate) use producer_signature::ProducerSignature;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -5972,6 +5976,7 @@ fn parameter_context_specialization<'db>(
         })
     });
 
+    // Constructed arguments may instead get their context from the joint solve in `producer`.
     // TODO: Note that specializing parameter types for type context using this specialization is
     // not strictly correct, as it requires eagerly choosing a solution for a given type variable,
     // which may conflate upper and lower bounds when applied transitively to parameter types
@@ -6083,45 +6088,54 @@ struct CallInference<'a, 'db> {
     inferable_typevars: TypeVarSet<'db>,
 }
 
+/// Yields the effective formal and actual types for each matched argument-parameter pair.
+///
+/// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
+/// the matched parameter can provide a more specific formal type for the corresponding element.
+fn matched_argument_relations<'a, 'db>(
+    parameters: &'a Parameters<'db>,
+    argument_matches: &'a [MatchedArgument<'db>],
+    arguments: &'a CallArguments<'a, 'db>,
+) -> impl Iterator<Item = ArgumentRelation<'db>> + 'a {
+    enumerate_argument_types(arguments).flat_map(
+        move |(argument_index, adjusted_argument_index, _, argument_types)| {
+            argument_matches[argument_index]
+                .iter()
+                .filter_map(move |matched_parameter| {
+                    let parameter_index = matched_parameter.index;
+                    if ArgumentTypeChecker::is_gradual_variadic_parameter(
+                        parameters,
+                        parameter_index,
+                    ) {
+                        return None;
+                    }
+
+                    let parameter = &parameters[parameter_index];
+                    // Note that the inferred type of a positional argument is stored under
+                    // the variadic parameter type, rather than the matched parameter.
+                    let argument_type = argument_types.matched_type(
+                        parameter.annotated_type(),
+                        matched_parameter.argument_type,
+                    )?;
+
+                    Some(ArgumentRelation::new(
+                        argument_index,
+                        adjusted_argument_index,
+                        parameter,
+                        matched_parameter,
+                        argument_type,
+                    ))
+                })
+        },
+    )
+}
+
 impl<'a, 'db> CallInference<'a, 'db> {
-    /// Yields the effective formal and actual types for each matched argument-parameter pair.
-    ///
-    /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
-    /// the matched parameter can provide a more specific formal type for the corresponding element.
     fn argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + 'a {
-        let parameters: &'a Parameters<'db> = self.signature.parameters();
-        let argument_matches: &'a [MatchedArgument<'db>] = self.argument_matches;
-
-        enumerate_argument_types(self.arguments).flat_map(
-            move |(argument_index, adjusted_argument_index, _, argument_types)| {
-                argument_matches[argument_index]
-                    .iter()
-                    .filter_map(move |matched_parameter| {
-                        let parameter_index = matched_parameter.index;
-                        if ArgumentTypeChecker::is_gradual_variadic_parameter(
-                            parameters,
-                            parameter_index,
-                        ) {
-                            return None;
-                        }
-
-                        let parameter = &parameters[parameter_index];
-                        // Note that the inferred type of a positional argument is stored under
-                        // the variadic parameter type, rather than the matched parameter.
-                        let argument_type = argument_types.matched_type(
-                            parameter.annotated_type(),
-                            matched_parameter.argument_type,
-                        )?;
-
-                        Some(ArgumentRelation::new(
-                            argument_index,
-                            adjusted_argument_index,
-                            parameter,
-                            matched_parameter,
-                            argument_type,
-                        ))
-                    })
-            },
+        matched_argument_relations(
+            self.signature.parameters(),
+            self.argument_matches,
+            self.arguments,
         )
     }
 }
@@ -8830,6 +8844,7 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         binding: &CallableBinding<'db>,
         arguments_types: &CallArguments<'_, 'db>,
+        joint_context: impl Fn() -> Option<Type<'db>>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
         specialization: impl Fn() -> Option<&'a ArgumentContextSpecialization<'db>>,
@@ -8915,7 +8930,9 @@ impl<'db> Binding<'db> {
                     tcx_kind = parameter_tcx_kind;
                 }
 
-                parameter_type = parameter_type.apply_specialization(db, specialization.types);
+                parameter_type = joint_context().unwrap_or_else(|| {
+                    parameter_type.apply_specialization(db, specialization.types)
+                });
             }
 
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()

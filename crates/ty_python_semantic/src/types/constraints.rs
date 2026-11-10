@@ -822,9 +822,45 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
     ) -> Self {
+        let ControlFlow::Continue(result) = self.reduce_inferable_with_limits(
+            db,
+            env,
+            builder,
+            to_remove,
+            &mut UnboundedSolutionLimits,
+        );
+        result
+    }
+
+    /// Existentially quantifies the given type variables within the default traversal budget.
+    /// A caller using the projection as a type hint can discard it when the traversal is incomplete.
+    pub(super) fn reduce_inferable_bounded(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: TypeVarSet<'db>,
+    ) -> Option<Self> {
+        let budget = SolutionBudget::default();
+        let mut limits = BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        };
+        self.reduce_inferable_with_limits(db, env, builder, to_remove, &mut limits)
+            .continue_value()
+    }
+
+    fn reduce_inferable_with_limits<L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: TypeVarSet<'db>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, Self> {
         self.verify_builder(builder);
         if to_remove == TypeVarSet::None {
-            return self;
+            return ControlFlow::Continue(self);
         }
         let mut storage = builder.storage.borrow_mut();
         // A quantified body is false if no assignment to its locals or free variables can
@@ -847,12 +883,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 self.source_order,
                 limits,
             ) {
-                return Self::never(builder);
+                return ControlFlow::Continue(Self::never(builder));
             }
         }
         let (node, derived_source_order) =
             self.node
-                .exists(db, env, &mut storage, to_remove, self.source_order);
+                .exists(db, env, &mut storage, to_remove, self.source_order, limits)?;
         // The eliminated typevars must also leave the source-order history. Otherwise recursive
         // relations can re-import each other's quantified constraints after their live graphs have
         // stabilized. Keep the original order of the remaining entries and append derived facts.
@@ -867,7 +903,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 storage.ordered_source_order(source_order, Some(constraint_source_order))
             });
         let source_order = storage.ordered_source_order(source_order, derived_source_order);
-        Self::from_node(builder, node, source_order)
+        ControlFlow::Continue(Self::from_node(builder, node, source_order))
     }
 
     /// Applies a type mapping to every constraint in this constraint set.
@@ -2879,31 +2915,33 @@ impl NodeId {
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
     /// The result will return true whenever `self` returns true for _any_ assignment of those
     /// typevars. The result will not contain any constraints that mention those typevars.
-    fn exists<'db>(
+    fn exists<'db, L: SolutionLimits>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (Self, Option<SourceOrderId>) {
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, (Self, Option<SourceOrderId>)> {
         if bound_typevars == TypeVarSet::None {
-            return (self, None);
+            return ControlFlow::Continue((self, None));
         }
 
         let Node::Interior(interior) = self.node() else {
-            return (self, None);
+            return ControlFlow::Continue((self, None));
         };
 
         let key = (self, bound_typevars, source_order);
         if let Some(result) = storage.exists_cache.get(&key) {
-            return *result;
+            return ControlFlow::Continue(*result);
         }
 
-        let result = interior.exists_inner(db, env, storage, bound_typevars, source_order);
+        let result =
+            interior.exists_inner(db, env, storage, bound_typevars, source_order, limits)?;
 
         storage.exists_cache.insert(key, result);
-        result
+        ControlFlow::Continue(result)
     }
 
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
@@ -4527,20 +4565,21 @@ impl InteriorNode {
         result
     }
 
-    fn exists_inner<'db>(
+    fn exists_inner<'db, L: SolutionLimits>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let ControlFlow::Continue(result) = self.abstract_inner(
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
+        self.abstract_inner(
             db,
             env,
             storage,
             source_order,
-            &mut UnboundedSolutionLimits,
+            limits,
             // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
             // bound that mentions one of them. Removed constraints are still added to `path`, so
             // the sequent map can propagate any derived constraints that do not mention the
@@ -4548,8 +4587,7 @@ impl InteriorNode {
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
                 storage.constraint_mentions_typevars(db, constraint, bound_typevars)
             },
-        );
-        result
+        )
     }
 
     fn abstract_inner<'db, F, L>(
@@ -5723,6 +5761,31 @@ mod tests {
             bounded_path_bounds(db, set, TypeVarSet::None, usize::MAX, usize::MAX),
             Ok(CandidateSolutions::Unconstrained)
         );
+    }
+
+    #[test]
+    fn existential_projection_can_retry_after_exhausting_its_visit_budget() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(db, &builder, u, KnownClass::Str);
+        let both = t_int.and(db, &builder, || u_str);
+        let remove = TypeVarSet::from_typevars(db, [t]);
+
+        let mut limits = BoundedSolutionLimits {
+            remaining_paths: usize::MAX,
+            remaining_visits: 1,
+        };
+        assert!(matches!(
+            both.reduce_inferable_with_limits(db, &env, &builder, remove, &mut limits),
+            ControlFlow::Break(ProjectionError::TraversalBudgetExceeded)
+        ));
+        let projected = both.reduce_inferable_bounded(db, &env, &builder, remove);
+        assert_eq!(projected.map(|set| set.node), Some(u_str.node));
     }
 
     #[test]
