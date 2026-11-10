@@ -208,6 +208,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [SQLAlchemy](https://pypi.org/project/SQLAlchemy/)
+    #[prefix = "SA"]
+    SQLAlchemy,
     /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
