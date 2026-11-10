@@ -2193,7 +2193,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let self_typevar = BoundTypeVarInstance::synthetic_self(
                     db,
                     SelfTypeVarOrigin::Class(self.into()),
-                    instance_ty,
+                    *instance_ty,
                     BindingContext::Synthetic(env.program(db)),
                 );
                 let self_ty = Type::TypeVar(self_typevar);
@@ -2211,15 +2211,10 @@ impl<'db> StaticClassLiteral<'db> {
             (field_policy, "__init__")
                 if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
             {
-                let self_parameter = if field_policy.is_pydantic() {
-                    // Pydantic makes the receiver positional-only so a model can have a
-                    // field named `self`.
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                } else {
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                }
-                // TODO: could be `Self`.
-                .with_annotated_type(*instance_ty);
+                // The receiver must not consume keyword arguments for fields named `self`.
+                let self_parameter = Parameter::positional_only(Some(Name::new_static("self")))
+                    // TODO: could be `Self`.
+                    .with_annotated_type(*instance_ty);
                 signature_from_fields(vec![self_parameter], Type::none(db, env))
             }
             (
@@ -2374,8 +2369,13 @@ impl<'db> StaticClassLiteral<'db> {
                 CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_),
                 "__replace__",
             ) if env.python_version(db) >= PythonVersion::PY313 => {
-                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(*instance_ty);
+                let self_parameter = if field_policy.is_pydantic() {
+                    // Pydantic's `__replace__` receiver can be passed by keyword.
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                } else {
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                }
+                .with_annotated_type(*instance_ty);
 
                 signature_from_fields(vec![self_parameter], *instance_ty)
             }

@@ -2349,7 +2349,7 @@ class Person:
     age: int = Field(default=0)
 
 # `id` is absent in the constructor signature:
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = 0) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str, age: int = 0) -> None
 
 Person(name="Alice")
 Person(name="Alice", age=20)
@@ -2452,7 +2452,7 @@ from pydantic import BaseModel
 class Person(BaseModel):
     name: str
 
-reveal_type(Person.__init__)  # revealed: (self: Person, *, name: str) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, *, name: str) -> None
 Person(name="Alice")
 Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
