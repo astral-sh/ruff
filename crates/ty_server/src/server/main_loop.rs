@@ -1,9 +1,10 @@
-use crate::server::schedule::{RequestAttempt, Scheduler};
-use crate::server::{Server, api};
+use crate::server::schedule::{Scheduler, Task};
+use crate::server::{MAX_QUEUED_REQUESTS, Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
-use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
+use crate::session::{ClientOptions, Session, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
-use lsp_server::Message;
+use crossbeam::channel::TrySendError;
+use lsp_server::{ErrorCode, Message, Request, ResponseError};
 use lsp_types::Notification;
 use lsp_types::Uri;
 use ruff_db::system::SystemPathBuf;
@@ -51,8 +52,8 @@ impl Server {
                                 );
                                 client.respond_err(
                                     req.id,
-                                    lsp_server::ResponseError {
-                                        code: lsp_server::ErrorCode::InvalidRequest as i32,
+                                    ResponseError {
+                                        code: ErrorCode::InvalidRequest as i32,
                                         message: "Shutdown already requested".to_owned(),
                                         data: None,
                                     },
@@ -60,7 +61,8 @@ impl Server {
                                 continue;
                             }
 
-                            scheduler.dispatch_request(
+                            dispatch_request(
+                                &mut scheduler,
                                 req,
                                 &mut self.session,
                                 &client,
@@ -134,7 +136,8 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            scheduler.dispatch_request(
+                            dispatch_request(
+                                &mut scheduler,
                                 request,
                                 &mut self.session,
                                 &client,
@@ -211,6 +214,50 @@ impl Server {
         self.session
             .request_uninitialized_workspace_folder_configurations(client);
     }
+}
+
+pub(super) fn dispatch_request(
+    scheduler: &mut Scheduler,
+    request: Request,
+    session: &mut Session,
+    client: &Client,
+    attempt: RequestAttempt,
+) -> crate::Result<()> {
+    let id = request.id.clone();
+    let task = api::request(request);
+    let retry_error = match (&task, attempt) {
+        (Task::Background(background), RequestAttempt::Retry) => background.cancellation_error,
+        _ => None,
+    };
+    match scheduler.dispatch(task, session, client) {
+        Ok(()) => Ok(()),
+        Err(TrySendError::Full(())) => {
+            tracing::warn!(
+                %id,
+                method = session.request_queue().incoming().method(&id),
+                ?attempt,
+                capacity = MAX_QUEUED_REQUESTS,
+                "Worker queue is full, cannot schedule request"
+            );
+            let error = match retry_error {
+                Some(cancelled) => cancelled(),
+                None => ResponseError {
+                    code: ErrorCode::RequestFailed as i32,
+                    message: "ty is busy: too many queued requests".to_owned(),
+                    data: None,
+                },
+            };
+            client.respond_err(id, error);
+            Ok(())
+        }
+        Err(TrySendError::Disconnected(())) => anyhow::bail!("Worker pool disconnected"),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) enum RequestAttempt {
+    Initial,
+    Retry,
 }
 
 /// An action that should be performed on the main loop.

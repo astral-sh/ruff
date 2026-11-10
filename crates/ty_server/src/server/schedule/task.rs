@@ -51,7 +51,7 @@ pub(in crate::server) enum Task {
 pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
     /// The response to send if a cancelled request cannot be retried.
-    pub(super) cancellation_error: Option<fn() -> lsp_server::ResponseError>,
+    pub(in crate::server) cancellation_error: Option<fn() -> lsp_server::ResponseError>,
     pub(super) builder: BackgroundFnBuilder,
 }
 

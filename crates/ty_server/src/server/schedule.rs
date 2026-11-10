@@ -1,9 +1,7 @@
 use std::num::NonZeroUsize;
 
-use crate::server::{MAX_QUEUED_REQUESTS, api};
 use crate::session::Session;
 use crossbeam::channel::TrySendError;
-use lsp_server::{ErrorCode, Request, ResponseError};
 
 mod task;
 mod thread;
@@ -33,12 +31,6 @@ pub(crate) fn spawn_main_loop(
     )
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(super) enum RequestAttempt {
-    Initial,
-    Retry,
-}
-
 pub(crate) struct Scheduler {
     fmt_pool: thread::Pool,
     background_pool: thread::Pool,
@@ -50,44 +42,6 @@ impl Scheduler {
         Self {
             fmt_pool: thread::Pool::new(NonZeroUsize::try_from(FMT_THREADS).unwrap()),
             background_pool: thread::Pool::new(worker_threads),
-        }
-    }
-
-    pub(super) fn dispatch_request(
-        &mut self,
-        request: Request,
-        session: &mut Session,
-        client: &Client,
-        attempt: RequestAttempt,
-    ) -> crate::Result<()> {
-        let id = request.id.clone();
-        let task = api::request(request);
-        let retry_error = match (&task, attempt) {
-            (Task::Background(background), RequestAttempt::Retry) => background.cancellation_error,
-            _ => None,
-        };
-        match self.dispatch(task, session, client) {
-            Ok(()) => Ok(()),
-            Err(TrySendError::Full(())) => {
-                tracing::warn!(
-                    %id,
-                    method = session.request_queue().incoming().method(&id),
-                    ?attempt,
-                    capacity = MAX_QUEUED_REQUESTS,
-                    "Worker queue is full, cannot schedule request"
-                );
-                let error = match retry_error {
-                    Some(cancelled) => cancelled(),
-                    None => ResponseError {
-                        code: ErrorCode::RequestFailed as i32,
-                        message: "ty is busy: too many queued requests".to_owned(),
-                        data: None,
-                    },
-                };
-                client.respond_err(id, error);
-                Ok(())
-            }
-            Err(TrySendError::Disconnected(())) => anyhow::bail!("Worker pool disconnected"),
         }
     }
 
@@ -141,8 +95,9 @@ mod tests {
     use ruff_db::system::TestSystem;
     use serde_json::json;
 
-    use super::{RequestAttempt, Scheduler, ThreadPriority};
+    use super::{Scheduler, ThreadPriority};
     use crate::capabilities::ResolvedClientCapabilities;
+    use crate::server::main_loop::{RequestAttempt, dispatch_request};
     use crate::server::{Action, Event, MAX_QUEUED_REQUESTS};
     use crate::session::{ClientName, InitializationOptions, client::Client};
     use crate::{PositionEncoding, Session};
@@ -218,7 +173,7 @@ mod tests {
                 .request_queue_mut()
                 .incoming_mut()
                 .register(request.id.clone(), request.method.clone());
-            scheduler.dispatch_request(request, &mut session, &client, attempt)?;
+            dispatch_request(&mut scheduler, request, &mut session, &client, attempt)?;
             let Event::Action(Action::SendResponse(response)) = actions.try_recv()? else {
                 anyhow::bail!("expected a response for request {id}");
             };
