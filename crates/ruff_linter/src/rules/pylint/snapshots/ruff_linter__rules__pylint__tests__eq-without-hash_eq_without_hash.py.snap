@@ -146,3 +146,20 @@ PLW1641 Object does not implement `__hash__` method
 103 |     if ...:
 104 |         ...
     |
+
+PLW1641 Object does not implement `__hash__` method
+   --> eq_without_hash.py:112:7
+    |
+111 | # A chained assignment binds every target, see #30227
+112 | class EqChainedAssignment:
+    |       ^^^^^^^^^^^^^^^^^^^
+113 |     __eq__ = __ne__ = lambda self, other: True
+    |
+
+PLW1641 Object does not implement `__hash__` method
+   --> eq_without_hash.py:116:7
+    |
+116 | class EqChainedLater:
+    |       ^^^^^^^^^^^^^^
+117 |     _eq = __eq__ = lambda self, other: True
+    |

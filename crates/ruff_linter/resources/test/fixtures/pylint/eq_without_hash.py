@@ -108,6 +108,15 @@ class MaybeEqDeeplyNested:
                 def __eq__(self, other): ...
 
 
+# A chained assignment binds every target, see #30227
+class EqChainedAssignment:
+    __eq__ = __ne__ = lambda self, other: True
+
+
+class EqChainedLater:
+    _eq = __eq__ = lambda self, other: True
+
+
 ### OK
 
 class Language:
@@ -141,3 +150,14 @@ class ChildClass(SingleClass):
         return True
 
     __hash__ = SingleClass.__hash__
+
+
+class HashChainedAssignment:
+    def __eq__(self, other):
+        return True
+
+    __hash__ = _hash = None
+
+
+class EqAndHashChained:
+    __eq__ = __hash__ = None
