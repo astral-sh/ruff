@@ -24,10 +24,10 @@ use crate::{
         definition_expression_type,
         diagnostic::{
             ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
-            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+            INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS, INVALID_GENERIC_CLASS,
+            INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_PROTOCOL,
+            INVALID_TYPED_DICT_HEADER, IncompatibleBases, REQUIRED_DATACLASS_FIELD_AFTER_DEFAULT,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -1095,7 +1095,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
 
                 let report = |range: TextRange| {
-                    let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
+                    let Some(builder) =
+                        context.report_lint(&REQUIRED_DATACLASS_FIELD_AFTER_DEFAULT, range)
+                    else {
                         return false;
                     };
                     builder.into_diagnostic(format_args!(
