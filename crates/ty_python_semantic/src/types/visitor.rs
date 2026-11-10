@@ -25,6 +25,7 @@ use crate::types::{
     newtype::{NewType, walk_newtype_base, walk_newtype_instance_type},
     protocol_class::walk_protocol_instance_interface,
     set_theoretic::{walk_intersection_type, walk_union},
+    signatures::Parameter,
     subclass_of::walk_subclass_of_type,
     type_alias::{walk_type_alias_arguments, walk_type_alias_type},
     type_form::walk_typeform_type,
@@ -50,6 +51,11 @@ pub(crate) trait TypeVisitor<'db> {
     fn notify_skipped_lazy_type_attributes(&self) {}
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
+
+    /// Most type operations inspect a parameter's annotation and can skip its default value.
+    fn visit_parameter(&self, db: &'db dyn Db, parameter: &Parameter<'db>) {
+        self.visit_type(db, parameter.annotated_type());
+    }
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
         walk_union(db, union, self);

@@ -2732,7 +2732,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
-        self.bindings.insert(definition, union.build());
+        let ty = union.build().propagate_widened_inference(db, env);
+        self.bindings.insert(definition, ty);
     }
 
     fn infer_nested_bindings_definition(
@@ -2802,7 +2803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let ty = union.build();
         let ty = match nested_bindings_kind.execution {
-            NestedBindingExecution::Lazy => ty,
+            NestedBindingExecution::Lazy => ty.propagate_widened_inference(db, env),
             NestedBindingExecution::Eager => ty.promote(db, env),
         };
         self.bindings.insert(definition, ty);

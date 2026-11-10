@@ -322,7 +322,8 @@ impl<'db> StaticClassLiteral<'db> {
                     union_of_inferred_types
                         .build()
                         .promote(db, env)
-                        .promote_singletons(db, env),
+                        .promote_singletons(db, env)
+                        .propagate_widened_inference(db, env),
                 )
                 .with_provenance(provenance)
                 .with_qualifiers(qualifiers),

@@ -583,6 +583,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
+            (Type::Dynamic(left), Type::Dynamic(right), _)
+                if let Some(widened) = left.merge_widened(right) =>
+            {
+                Some(Type::Dynamic(widened))
+            }
+            (unknown @ Type::Dynamic(DynamicType::Widened(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::Widened(_)), _) => Some(unknown),
+
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 

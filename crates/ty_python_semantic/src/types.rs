@@ -145,6 +145,7 @@ mod class_base;
 mod constraints;
 mod context;
 mod context_manager;
+mod cycle_widen;
 mod cyclic;
 mod dedicated;
 mod diagnostic;
@@ -584,6 +585,10 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
+        if matches!(type_mapping, TypeMapping::WidenRecursiveInference(_)) {
+            // This mapping caches by both type and remaining depth.
+            return func();
+        }
         let type_transformer = match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
             TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
@@ -2544,6 +2549,7 @@ impl<'db> Type<'db> {
             self,
             Type::Dynamic(
                 DynamicType::Unknown
+                    | DynamicType::Widened(_)
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnknownLambdaParameter
                     | DynamicType::AmbiguousOverload
@@ -2641,16 +2647,6 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        // Leave room before Salsa's iteration limit for the fallback to reach other cycle heads.
-        const MAX_TYPE_CYCLE_ITERATIONS: u32 = 16;
-        let iteration = cycle.iteration();
-        let at_iteration_limit = iteration >= MAX_TYPE_CYCLE_ITERATIONS;
-        // Once the budget is exhausted and `previous` is `Unknown`, the cutoff below
-        // returns `Unknown` for every result. Skip normalization in that case.
-        if at_iteration_limit && previous == Self::unknown() {
-            return previous;
-        }
-
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -2664,7 +2660,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        let result = if iteration <= crate::TAINTED_CYCLES {
+        let result = if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, env, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -2696,11 +2692,7 @@ impl<'db> Type<'db> {
         let result = UnionType::widen_growing_tuples(db, env, previous, result)
             .unwrap_or(result)
             .recursive_type_normalized_impl_with_cycle(db, env, cycle);
-        if at_iteration_limit && result != previous {
-            Self::unknown()
-        } else {
-            result
-        }
+        result.widen_growing_inference(db, env, previous)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -2733,6 +2725,7 @@ impl<'db> Type<'db> {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
             DynamicType::Any
             | DynamicType::Unknown
+            | DynamicType::Widened(_)
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
@@ -3619,6 +3612,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(dynamic) => match dynamic {
                 DynamicType::Any => true,
                 DynamicType::Unknown
+                | DynamicType::Widened(_)
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
                 | DynamicType::UnknownLambdaParameter
@@ -9830,6 +9824,9 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::WidenRecursiveInference(widening) = type_mapping {
+            return widening.project(db, self, visitor);
+        }
         // Each nested type is specialized independently of the parameter lists selected for
         // the enclosing callable (e.g., the return type of `Callable[P, Callable[P, None]]`).
         let underlying = type_mapping.without_bindings();
@@ -10219,6 +10216,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::WidenRecursiveInference(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -10242,6 +10240,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::WidenRecursiveInference(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -10922,6 +10921,7 @@ impl<'db> Type<'db> {
             }
             Self::Dynamic(
                 DynamicType::Unknown
+                | DynamicType::Widened(_)
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnknownLambdaParameter
                 | DynamicType::AmbiguousOverload,
@@ -11590,6 +11590,8 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// A structural substitution constructed only by the recursive-type binder.
     ApplyRecursiveSubstitution(RecursiveMapping<'a, 'db>),
+    /// Bound the nesting of eagerly stored types during recursive inference.
+    WidenRecursiveInference(cycle_widen::CycleWidening<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -11721,6 +11723,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::WidenRecursiveInference(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -11772,6 +11775,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::WidenRecursiveInference(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -11788,7 +11792,10 @@ impl<'db> TypeMapping<'_, 'db> {
     /// Binding and unfolding may traverse open recursive bodies, so neither inference queries
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
-        matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
+        matches!(
+            self,
+            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::WidenRecursiveInference(_)
+        )
     }
 }
 
@@ -11857,12 +11864,24 @@ impl DivergentType {
     }
 }
 
+/// The structural limit reached while widening a recursively inferred type.
+#[derive(
+    Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub enum WideningLimit {
+    Depth,
+    /// Absorbs further alternatives at this position, including an unknown from a depth cutoff.
+    UnionWidth,
+}
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
+    /// An inferred type that exceeded a structural limit during recursive inference.
+    Widened(WideningLimit),
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.
@@ -11900,6 +11919,16 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
+    /// Retain the strongest widening marker when combining two unknowns.
+    fn merge_widened(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            (Self::Widened(left), Self::Widened(right)) => Some(Self::Widened(left.max(right))),
+            (widened @ Self::Widened(_), Self::Unknown)
+            | (Self::Unknown, widened @ Self::Widened(_)) => Some(widened),
+            _ => None,
+        }
+    }
+
     fn recursive_type_normalized(self) -> Self {
         self
     }
@@ -11914,6 +11943,7 @@ impl std::fmt::Display for DynamicType<'_> {
         match self {
             DynamicType::Any => f.write_str("Any"),
             DynamicType::Unknown
+            | DynamicType::Widened(_)
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnknownLambdaParameter
             | DynamicType::InvalidConcatenateUnknown

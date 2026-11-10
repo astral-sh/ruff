@@ -483,6 +483,14 @@ impl<'db> UnionElement<'db> {
         cycle_recovery: bool,
     ) -> ReduceResult<'db> {
         if let UnionElement::Type(existing) = self {
+            // Both represent the same gradual type. Keep the marker so that wrapping this
+            // union in another constructor still respects the recursive inference bound.
+            if let (Type::Dynamic(left), Type::Dynamic(right)) = (*existing, other_type)
+                && let Some(widened) = left.merge_widened(right)
+            {
+                *existing = Type::Dynamic(widened);
+                return ReduceResult::Ignore;
+            }
             return ReduceResult::Type(*existing);
         }
 
