@@ -1459,6 +1459,25 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4990>.
+fn benchmark_list_of_generic_callable(criterion: &mut Criterion) {
+    let code = "
+        type Box[T] = list[T]
+
+        def f[
+            A: (int, str, bytes, range, slice),
+            B: (int, str, bytes, range, slice),
+            C: (int, str, bytes, range, slice),
+            D: (int, str, bytes, range, slice),
+            E: (int, str, bytes, range, slice),
+        ](a: Box[A], b: Box[B], c: Box[C], d: Box[D], e: Box[E]) -> None: ...
+
+        funcs = [f]
+    ";
+
+    benchmark_micro_case(criterion, "ty_micro[list_of_generic_callable]", code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
 ///
 /// Capturing independently bounded generic overloads must not enumerate every combination of
@@ -2889,6 +2908,7 @@ criterion_group!(
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_list_of_generic_callable,
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
