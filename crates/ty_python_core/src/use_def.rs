@@ -874,10 +874,107 @@ pub struct UseDefMap<'db> {
 pub(super) struct UseDefMapInterner {
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,
+    stub_parameters: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
+}
+
+/// A stub body has no name uses or control flow. Its local binding tables depend only on which
+/// parameters have annotations; definition IDs in these tables are scope-local ordinals.
+struct StubParameterLayout {
+    bindings: Arc<RetainedBindings>,
+    declarations: Arc<RetainedDeclarations>,
+    symbols: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(super) struct StubParameter<'db> {
+    pub(super) symbol: ScopedSymbolId,
+    pub(super) definition: Definition<'db>,
+    pub(super) annotated: bool,
 }
 
 impl UseDefMapInterner {
-    pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
+    pub(super) fn finish<'db>(
+        &mut self,
+        mut builder: Box<UseDefMapBuilder<'db>>,
+    ) -> Arc<UseDefMap<'db>> {
+        let Some(parameters) = builder.stub_parameters.take() else {
+            return self.intern(builder.finish());
+        };
+        // Duplicate names in invalid signatures have real previous definitions, specific to
+        // this scope. Let the general builder handle them.
+        let unique = parameters
+            .iter()
+            .enumerate()
+            .all(|(i, p)| p.symbol.index() == i);
+        let shape = unique.then(|| {
+            parameters
+                .iter()
+                .map(|p| p.annotated)
+                .collect::<SmallVec<[_; 8]>>()
+        });
+        if let Some(layout) = shape
+            .as_ref()
+            .and_then(|shape| self.stub_parameters.get(shape))
+        {
+            return Arc::new(UseDefMap {
+                all_definitions: RetainedDefinitions {
+                    states: parameters
+                        .into_iter()
+                        .map(|p| DefinitionEntry::Unused(p.definition))
+                        .collect(),
+                },
+                constraint_tables: None,
+                interned_bindings: Arc::clone(&layout.bindings),
+                interned_declarations: Arc::clone(&layout.declarations),
+                range_reachability: builder.finish_ranges(),
+                definitions_by_definition: FrozenMap::default(),
+                symbol_states: layout.symbols.clone(),
+                extra: None,
+                end_of_scope_reachability: builder.reachability,
+            });
+        }
+
+        for StubParameter {
+            symbol,
+            definition,
+            annotated,
+        } in parameters
+        {
+            let place = symbol.into();
+            if symbol == builder.symbol_states.next_index() {
+                builder.add_place(place);
+            }
+            if annotated {
+                builder.record_combined_definition(
+                    place,
+                    definition,
+                    DefinitionCategory::DeclarationAndBinding,
+                );
+            } else {
+                builder.record_binding(
+                    place,
+                    definition,
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                    ImportedQualifierAction::Preserve,
+                );
+            }
+        }
+        let map = self.intern(builder.finish());
+        if let Some(shape) = shape {
+            self.stub_parameters.insert(
+                shape,
+                StubParameterLayout {
+                    bindings: Arc::clone(&map.interned_bindings),
+                    declarations: Arc::clone(&map.interned_declarations),
+                    symbols: map.symbol_states.clone(),
+                },
+            );
+        }
+        map
+    }
+
+    fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
         map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
         map.interned_declarations =
             Self::intern_table(&mut self.declarations, map.interned_declarations);
@@ -2088,6 +2185,7 @@ pub(super) struct SingleSymbolSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
+    pub(super) stub_parameters: Option<Vec<StubParameter<'db>>>,
     /// Append-only history of declarations and bindings, including their usage state.
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>,
 
@@ -2174,6 +2272,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(scope_kind: ScopeKind) -> Self {
         Self {
+            stub_parameters: None,
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
             predicate_narrowing_targets: Vec::new(),
@@ -3189,7 +3288,15 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
+    fn finish_ranges(&mut self) -> Box<[(TextRange, RangeInfo)]> {
+        let mut ranges = std::mem::take(&mut self.range_reachability);
+        // Default ranges are barriers while building; absence represents the default in the map.
+        ranges.retain(|(_, info)| *info != RangeInfo::default());
+        ranges.into_boxed_slice()
+    }
+
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+        let range_reachability = self.finish_ranges();
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -3297,12 +3404,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
-        // Keep default entries while building so they remain barriers between non-contiguous
-        // ranges with the same metadata. Once construction is complete, absence represents the
-        // default of reachable code outside a `TYPE_CHECKING` block.
-        self.range_reachability
-            .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
+        for &(_, RangeInfo { reachability, .. }) in &range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
         for enclosing_snapshot in &enclosing_snapshots {
@@ -3356,7 +3458,7 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
-            range_reachability: self.range_reachability.into_boxed_slice(),
+            range_reachability,
             symbol_states,
             definitions_by_definition,
             extra,
