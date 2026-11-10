@@ -69,6 +69,10 @@ pub(crate) trait TypeVisitor<'db> {
         walk_callable_type(db, callable, self);
     }
 
+    fn visit_signature(&self, db: &'db dyn Db, signature: &super::Signature<'db>) {
+        super::walk_signature(db, signature, self);
+    }
+
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
     }
@@ -172,7 +176,7 @@ pub(crate) trait TypeVisitor<'db> {
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
@@ -387,7 +391,7 @@ type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
-pub(super) enum SmallSet<T, const INLINE_CAPACITY: usize> {
+enum SmallSet<T, const INLINE_CAPACITY: usize> {
     Inline(SmallVec<[T; INLINE_CAPACITY]>),
     Spilled(FxHashSet<T>),
 }
@@ -400,7 +404,7 @@ impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
 
 impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     #[inline]
-    pub(super) fn insert(&mut self, value: T) -> bool
+    fn insert(&mut self, value: T) -> bool
     where
         T: Hash + Eq,
     {
