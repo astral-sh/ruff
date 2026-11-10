@@ -37,15 +37,24 @@ impl Renderer for GroupedRenderer<'_> {
             let mut max_column_length = OneIndexed::MIN;
 
             for message in &messages {
-                max_row_length = max_row_length.max(message.start_location.line);
-                max_column_length = max_column_length.max(message.start_location.column);
+                if let Some(start) = message.start_location {
+                    max_row_length = max_row_length.max(start.line);
+                    max_column_length = max_column_length.max(start.column);
+                }
             }
 
             let row_length = max_row_length.digits();
             let column_length = max_column_length.digits();
 
             // Print the filename.
-            writeln!(f, "{}:", fmt_styled(filename, stylesheet.underline))?;
+            writeln!(
+                f,
+                "{}:",
+                fmt_styled(
+                    filename.unwrap_or("<no filename>".into()),
+                    stylesheet.underline
+                )
+            )?;
 
             // Print each message.
             for message in messages {
@@ -53,9 +62,9 @@ impl Renderer for GroupedRenderer<'_> {
                     f,
                     "{}",
                     DisplayGroupedMessage {
-                        notebook_index: self
-                            .resolver
-                            .notebook_index(message.expect_primary_span().file())
+                        notebook_index: message
+                            .primary_span_ref()
+                            .and_then(|span| self.resolver.notebook_index(span.file()))
                             .as_ref(),
                         message,
                         stylesheet: &stylesheet,
@@ -79,7 +88,7 @@ impl Renderer for GroupedRenderer<'_> {
 
 struct MessageWithLocation<'a> {
     message: &'a Diagnostic,
-    start_location: LineColumn,
+    start_location: Option<LineColumn>,
 }
 
 impl std::ops::Deref for MessageWithLocation<'_> {
@@ -93,24 +102,31 @@ impl std::ops::Deref for MessageWithLocation<'_> {
 fn group_diagnostics_by_filename<'a>(
     diagnostics: &'a [Diagnostic],
     resolver: &'a dyn FileResolver,
-) -> BTreeMap<Cow<'a, str>, Vec<MessageWithLocation<'a>>> {
+) -> BTreeMap<Option<Cow<'a, str>>, Vec<MessageWithLocation<'a>>> {
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
-        let span = diagnostic
+        let (filename, start_location) = diagnostic
             .primary_span_ref()
-            .expect("Expected a primary span");
-        let file = span.file();
-        let start_location = span.range().map(|range| {
-            file.diagnostic_source(resolver)
-                .as_source_code()
-                .line_column(range.start())
-        });
+            .map(|span| {
+                let file = span.file();
+                let start_location = span.range().map(|range| {
+                    file.diagnostic_source(resolver)
+                        .as_source_code()
+                        .line_column(range.start())
+                });
+
+                (
+                    Some(span.file().relative_path(resolver).to_string_lossy()),
+                    start_location,
+                )
+            })
+            .unwrap_or_default();
         grouped_messages
-            .entry(file.relative_path(resolver).to_string_lossy())
+            .entry(filename)
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message: diagnostic,
-                start_location: start_location.unwrap_or_default(),
+                start_location,
             });
     }
     grouped_messages
@@ -135,39 +151,49 @@ impl Display for DisplayGroupedMessage<'_> {
             start_location,
         } = &self.message;
 
-        write!(
-            f,
-            "  {row_padding}",
-            row_padding = " ".repeat(self.row_length.get() - start_location.line.digits().get())
-        )?;
+        write!(f, "  ")?;
 
-        // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-        let (row, col) = if let Some(jupyter_index) = self.notebook_index {
+        if let Some(start_location) = start_location {
             write!(
                 f,
-                "cell {cell}{sep}",
-                cell = jupyter_index
-                    .cell(start_location.line)
-                    .unwrap_or(OneIndexed::MIN),
-                sep = fmt_styled(":", self.stylesheet.separator)
+                "{row_padding}",
+                row_padding =
+                    " ".repeat(self.row_length.get() - start_location.line.digits().get())
             )?;
-            (
-                jupyter_index
-                    .cell_row(start_location.line)
-                    .unwrap_or(OneIndexed::MIN),
-                start_location.column,
-            )
-        } else {
-            (start_location.line, start_location.column)
-        };
+
+            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
+            let (row, col) = if let Some(jupyter_index) = self.notebook_index {
+                write!(
+                    f,
+                    "cell {cell}{sep}",
+                    cell = jupyter_index
+                        .cell(start_location.line)
+                        .unwrap_or(OneIndexed::MIN),
+                    sep = fmt_styled(":", self.stylesheet.separator)
+                )?;
+                (
+                    jupyter_index
+                        .cell_row(start_location.line)
+                        .unwrap_or(OneIndexed::MIN),
+                    start_location.column,
+                )
+            } else {
+                (start_location.line, start_location.column)
+            };
+
+            write!(
+                f,
+                "{row}{sep}{col}{col_padding} ",
+                sep = fmt_styled(":", self.stylesheet.separator),
+                col_padding =
+                    " ".repeat(self.column_length.get() - start_location.column.digits().get()),
+            )?;
+        }
 
         writeln!(
             f,
-            "{row}{sep}{col}{col_padding} {code_and_body}",
-            sep = fmt_styled(":", self.stylesheet.separator),
-            col_padding =
-                " ".repeat(self.column_length.get() - start_location.column.digits().get()),
-            code_and_body = RuleCodeAndBody {
+            "{}",
+            RuleCodeAndBody {
                 message,
                 stylesheet: self.stylesheet,
                 show_fix_status: self.show_fix_status,
@@ -235,6 +261,8 @@ impl Display for RuleCodeAndBody<'_> {
 mod tests {
     use ruff_diagnostics::Applicability;
 
+    use crate::diagnostic::Annotation;
+
     use super::super::tests::{
         DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
@@ -288,6 +316,36 @@ mod tests {
            1:8  F401 [*] `os` imported but unused
            6:5  F841 [*] Local variable `x` is assigned to but never used
           12:16 F821 Undefined name `fibonaccii`
+
+        undef.py:
+          1:4 F821 Undefined name `a`
+        ");
+    }
+
+    #[test]
+    fn missing_file_and_range() {
+        let (mut env, mut diagnostics) = create_diagnostics(DiagnosticFormat::Grouped);
+        diagnostics.push(env.err().build());
+        diagnostics.push({
+            env.add("no_range.py", "");
+            let mut diagnostic = env.err().build();
+            let span = env.path("no_range.py");
+            let annotation = Annotation::primary(span);
+            diagnostic.annotate(annotation);
+            diagnostic
+        });
+
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        <no filename>:
+          test-diagnostic: main diagnostic message
+
+        fib.py:
+           1:8  F401 `os` imported but unused
+           6:5  F841 Local variable `x` is assigned to but never used
+          12:16 F821 Undefined name `fibonaccii`
+
+        no_range.py:
+          test-diagnostic: main diagnostic message
 
         undef.py:
           1:4 F821 Undefined name `a`
