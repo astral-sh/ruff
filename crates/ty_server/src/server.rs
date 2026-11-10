@@ -36,14 +36,6 @@ pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 /// Maximum number of requests waiting for a worker.
 pub(crate) const MAX_QUEUED_REQUESTS: usize = 2048;
 
-pub(crate) fn queue_full_error() -> lsp_server::ResponseError {
-    lsp_server::ResponseError {
-        code: ErrorCode::RequestFailed as i32,
-        message: "ty is busy: too many queued requests".to_owned(),
-        data: None,
-    }
-}
-
 pub struct Server {
     connection: Connection,
     worker_threads: NonZeroUsize,

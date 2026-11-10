@@ -1,9 +1,9 @@
 use std::num::NonZeroUsize;
 
-use crate::server::{MAX_QUEUED_REQUESTS, api, queue_full_error};
+use crate::server::{MAX_QUEUED_REQUESTS, api};
 use crate::session::Session;
 use crossbeam::channel::TrySendError;
-use lsp_server::Request;
+use lsp_server::{ErrorCode, Request, ResponseError};
 
 mod task;
 mod thread;
@@ -76,7 +76,14 @@ impl Scheduler {
                     capacity = MAX_QUEUED_REQUESTS,
                     "Worker queue is full, cannot schedule request"
                 );
-                let error = retry_error.map_or_else(queue_full_error, |cancelled| cancelled());
+                let error = match retry_error {
+                    Some(cancelled) => cancelled(),
+                    None => ResponseError {
+                        code: ErrorCode::RequestFailed as i32,
+                        message: "ty is busy: too many queued requests".to_owned(),
+                        data: None,
+                    },
+                };
                 client.respond_err(id, error);
                 Ok(())
             }
