@@ -15,7 +15,7 @@
 
 use super::{Builder, JoinHandle, ThreadPriority};
 use crate::server::MAX_QUEUED_REQUESTS;
-use crossbeam::channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, SendError, Sender, TrySendError};
 use ruff_db::STACK_SIZE;
 use std::num::NonZeroUsize;
 use std::panic::AssertUnwindSafe;
@@ -38,10 +38,13 @@ struct Job {
 }
 
 impl Pool {
-    /// Reserves space for one job or returns [`FullError`] before the caller builds it.
-    pub(crate) fn spawn(&mut self, priority: ThreadPriority) -> Result<PendingJob<'_>, FullError> {
+    /// Reserves space for one job, returning `Full` before the caller builds the work.
+    pub(crate) fn spawn(
+        &mut self,
+        priority: ThreadPriority,
+    ) -> Result<PendingJob<'_>, TrySendError<()>> {
         if self.job_sender.is_full() {
-            return Err(FullError);
+            return Err(TrySendError::Full(()));
         }
         Ok(PendingJob {
             sender: &mut self.job_sender,
@@ -111,10 +114,6 @@ impl Pool {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Worker queue is full")]
-pub(in crate::server) struct FullError;
-
 /// Holds a place in the job queue until submitted or dropped. The exclusive borrow
 /// of the pool's only sender ensures no other submission can take that place.
 pub(crate) struct PendingJob<'pool> {
@@ -124,7 +123,7 @@ pub(crate) struct PendingJob<'pool> {
 
 impl PendingJob<'_> {
     /// Submits the work to run on a worker thread.
-    pub(crate) fn run<F>(self, f: F) -> Result<(), DisconnectedError>
+    pub(crate) fn run<F>(self, f: F) -> Result<(), SendError<()>>
     where
         F: FnOnce() + Send + 'static,
     {
@@ -140,7 +139,7 @@ impl PendingJob<'_> {
             requested_priority: priority,
             f,
         };
-        sender.send(job).map_err(|_| DisconnectedError)?;
+        sender.send(job).map_err(|_| SendError(()))?;
         let queued = sender.len();
         if queued != 0 && queued.is_multiple_of(256) {
             tracing::info!(
@@ -153,7 +152,3 @@ impl PendingJob<'_> {
         Ok(())
     }
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("Worker pool disconnected")]
-pub(in crate::server) struct DisconnectedError;

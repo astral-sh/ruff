@@ -2,6 +2,7 @@ use std::num::NonZeroUsize;
 
 use crate::server::{MAX_QUEUED_REQUESTS, api, queue_full_error};
 use crate::session::Session;
+use crossbeam::channel::TrySendError;
 use lsp_server::Request;
 
 mod task;
@@ -67,7 +68,7 @@ impl Scheduler {
         };
         match self.dispatch(task, session, client) {
             Ok(()) => Ok(()),
-            Err(DispatchError::Full(_)) => {
+            Err(TrySendError::Full(())) => {
                 tracing::warn!(
                     %id,
                     method = session.request_queue().incoming().method(&id),
@@ -79,7 +80,7 @@ impl Scheduler {
                 client.respond_err(id, error);
                 Ok(())
             }
-            Err(DispatchError::Disconnected(err)) => Err(err.into()),
+            Err(TrySendError::Disconnected(())) => anyhow::bail!("Worker pool disconnected"),
         }
     }
 
@@ -90,7 +91,7 @@ impl Scheduler {
         task: task::Task,
         session: &mut Session,
         client: &Client,
-    ) -> Result<(), DispatchError> {
+    ) -> Result<(), TrySendError<()>> {
         match task {
             Task::Sync(SyncTask { func }) => {
                 func(session, client);
@@ -119,14 +120,6 @@ impl Scheduler {
         }
         Ok(())
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub(super) enum DispatchError {
-    #[error(transparent)]
-    Full(#[from] thread::FullError),
-    #[error(transparent)]
-    Disconnected(#[from] thread::DisconnectedError),
 }
 
 #[cfg(test)]
