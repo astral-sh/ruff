@@ -2383,3 +2383,19 @@ class RelatedBox(Generic[T]):
     def __init__(self, holder: Holder[T]) -> None:
         self.holder = holder
 ```
+
+## Gradual arguments to a generic constructor returning `Self`
+
+The receiver of `map` is generic. A callback with a known return type can be passed alongside an
+iterable whose element type is unknown or dynamic.
+
+```py
+from typing import Any
+
+def convert(value: str) -> str | None: ...
+
+def check(known: set[str], unknown: set, dynamic: set[Any]):  # error: [missing-type-argument]
+    reveal_type(map(convert, known))  # revealed: map[str | None]
+    reveal_type(map(convert, unknown))  # revealed: map[str | Unknown | None]
+    reveal_type(map(convert, dynamic))  # revealed: map[str | Any | None]
+```
