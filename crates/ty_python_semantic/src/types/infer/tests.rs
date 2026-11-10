@@ -573,6 +573,43 @@ fn loop_variable_types_are_independent_of_file_order() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn loop_predicate_tracks_changes_to_bool_method() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from flags import Flag
+
+        def f(flag: Flag, running: bool) -> None:
+            while running:
+                if flag:  # ty: ignore[redundant-condition]
+                    result = 1
+                else:
+                    result = 2
+                reveal_type(result)
+                break
+        "#,
+    )?;
+
+    for (boolean, expected) in [("True", "Literal[1]"), ("False", "Literal[2]")] {
+        db.write_dedented(
+            "/src/flags.pyi",
+            &format!(
+                r#"
+                from typing import Literal
+
+                class Flag:
+                    def __bool__(self) -> Literal[{boolean}]: ...
+                "#
+            ),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
 /// Comparison truthiness widens consistently in expression, statement, and definition inference
 /// when an override is present in only one iteration.
 ///
