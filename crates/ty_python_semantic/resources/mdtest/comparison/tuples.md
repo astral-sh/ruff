@@ -159,10 +159,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, o: object) -> EqReturnType:  # error: [invalid-method-override]
+    def __eq__(self, o: object) -> EqReturnType:  # error: [incompatible-method-override]
         return EqReturnType()
 
-    def __ne__(self, o: object) -> NeReturnType:  # error: [invalid-method-override]
+    def __ne__(self, o: object) -> NeReturnType:  # error: [incompatible-method-override]
         return NeReturnType()
 
     def __lt__(self, o: A) -> LtReturnType:
@@ -657,7 +657,7 @@ class NotBoolable:
     __bool__: None = None
 
 class A:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
 
@@ -718,4 +718,28 @@ class Node(NamedTuple):
 
 def _(n: Node):
     reveal_type(n.parent is n)  # revealed: bool
+```
+
+While membership compares a `Needle` with `First`, it encounters a recursive comparison with
+`Second`. Comparing `Second` directly establishes that the children differ because `First` and
+`Needle` have different tags.
+
+```py
+from typing import Literal
+
+class Needle(NamedTuple):
+    child: Needle | Literal["needle"]
+    tag: Literal[1]
+
+class First(NamedTuple):
+    child: Second | Literal["candidate"]
+    tag: Literal[0]
+
+class Second(NamedTuple):
+    child: First | Literal["candidate"]
+    tag: Literal[1]
+
+def membership(needle: Needle, first: First, second: Second) -> None:
+    reveal_type(needle in (first, second))  # revealed: Literal[False]
+    reveal_type(needle in (second, first))  # revealed: Literal[False]
 ```

@@ -230,12 +230,12 @@ from typing import NamedTuple, final
 class Point(NamedTuple):
     x: bool
 
-def named_tuple(value: Point) -> int:  # no diagnostic
+def named_tuple(value: Point) -> int:  # ok
     match value:
         case Point():
             return 42
 
-def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
+def nested_named_tuple(value: tuple[Point]) -> int:  # ok
     match value:
         case [Point()]:
             return 42
@@ -243,7 +243,7 @@ def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
 @final
 class TupleSubclass(tuple[bool]): ...
 
-def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
+def tuple_subclass(value: TupleSubclass) -> int:  # ok
     match value:
         case TupleSubclass():
             return 42

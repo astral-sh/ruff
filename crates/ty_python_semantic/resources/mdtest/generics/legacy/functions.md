@@ -63,6 +63,27 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+## Conditional imports of `Type`
+
+Either binding of `Type` lets ty infer `T` from the class passed to `make`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+try:
+    from typing import Type
+except ImportError:
+    Type = type
+
+def make(cls: Type[T]) -> T:
+    reveal_type(cls)  # revealed: type[T@make]
+    return cls()
+
+reveal_type(make(int))  # revealed: int
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -190,6 +211,15 @@ item: Item[int] = {"value": 1}
 
 reveal_type(accept)  # revealed: def accept[T](value: Item[T]) -> None
 accept(item)
+```
+
+The field type also determines the return type of a generic call.
+
+```py
+def get_value(item: Item[T]) -> T:
+    return item["value"]
+
+reveal_type(get_value(item))  # revealed: int
 ```
 
 ## Inferring a class-object parameter through a generic factory
@@ -425,6 +455,25 @@ def consume_comparable(values: Iterable[ComparableT]) -> None: ...
 consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
+## Widening a lower bound to a hashable type
+
+The first tuple element can contribute `object` as a lower bound for `T`. Its union with the second
+element's `list[Any]` is `object`, which satisfies the `Hashable` bound.
+
+```py
+from collections.abc import Callable, Hashable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=Hashable)
+
+def consume(callback: Callable[[], tuple[tuple[T] | T, T]]) -> T:
+    return callback()[1]
+
+def check(callback: Callable[[], tuple[tuple[object], list[Any]]]) -> None:
+    # TODO: Reject this call because the callback's second tuple element, `list[Any]`, is unhashable.
+    reveal_type(consume(callback))  # revealed: object
+```
+
 ## Inferring a bound from a caller's type variable
 
 An argument whose type is fixed by an enclosing function must satisfy the callee's bound for every
@@ -452,10 +501,10 @@ def contextual(value: str, existing: S) -> list[S]:
     return box(value)  # error: [invalid-return-type]
 
 def compatible_context(value: BoundedS) -> list[BoundedS]:
-    return box(value)  # no diagnostic
+    return box(value)  # ok
 
 def gradual_context(value: Any) -> list[S]:
-    return box(value)  # no diagnostic
+    return box(value)  # ok
 
 def box_callable(value: Callable[[], T]) -> list[T]:
     return [value()]
@@ -560,6 +609,53 @@ info: Type variable defined here
   |
 3 | T = TypeVar("T", int, str)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Constrained type variables in bound method receivers
+
+The argument to `list.extend` must be valid for every possible element type of the receiver.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+
+def extend(values: list[T], other: list[T]) -> None:
+    values.extend(other)
+
+    # error: [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    values.extend([1])
+```
+
+## Generic callbacks in bound method calls
+
+A callback registered for an arbitrary `T` must return that `T` for every input. The identity
+function returns its input, which can be any `object`, so it is not a valid callback here.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+V = TypeVar("V")
+T = TypeVar("T")
+
+def identity(value: V) -> V:
+    return value
+
+def register(callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
+    callbacks.append(callback)  # ok
+    # TODO: should report invalid-argument-type (https://github.com/astral-sh/ty/issues/3114)
+    callbacks.append(identity)
+```
+
+When a dictionary lookup uses `identity` as its default, it can return either kind of callback.
+
+```py
+Callback = Callable[[object], T]
+
+def lookup(callbacks: dict[str, Callback[T]]) -> None:
+    # TODO: The result should be a union of the stored callback type and the type of `identity`.
+    reveal_type(callbacks.get("key", identity))  # revealed: (object, /) -> T@lookup
 ```
 
 ## Inferring a constrained typevar from a callback parameter
@@ -715,8 +811,8 @@ class Writer(Protocol[T_contra]):
 
 def constrained(writer: Writer[T]) -> None: ...
 def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
-    constrained(text)  # no diagnostic
-    constrained(binary)  # no diagnostic
+    constrained(text)  # ok
+    constrained(binary)  # ok
     # snapshot: invalid-argument-type
     constrained(either)
 ```
@@ -1066,6 +1162,60 @@ def _(x: int, y: str, a: list[int], b: list[str]) -> None:
     reveal_type(g(x, y, a, b))  # revealed: int | str
 ```
 
+## Diagnostic recovery preserves gradual evidence
+
+The middle tuple element can match either `U` or `tuple[U]`. In both cases the last element
+contributes an incompatible `int` for `T`. The diagnostic also includes the `Any` inferred from the
+first element's `list[Any]`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+U = TypeVar("U")
+
+def consume(producer: Callable[[], tuple[list[T], U | tuple[U], T]]) -> None: ...
+def check(callback: Callable[[], tuple[list[Any], tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `Any | int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery reports the shared lower bound
+
+Matching the first element against `T | tuple[T]` contributes either `tuple[str]` or `str`. The
+diagnostic reports the `int` from the second element, which violates the bound in both cases.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+
+def consume(callback: Callable[[], tuple[T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery preserves independent type-variable evidence
+
+Both choices for the middle element violate `T`'s bound once the last `int` is included. The
+diagnostic identifies the violation in the first tuple element, where `U` is inferred as `bytes`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+U = TypeVar("U", bound=list[Any])
+
+def consume(producer: Callable[[], tuple[U, T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[bytes, tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `bytes` does not satisfy upper bound `list[Any]` of type variable `U`"
+    consume(callback)
+```
+
 ## Diagnostic recovery with outer typevars
 
 If a failed argument relation involves an outer bounded type variable, we report the incompatible
@@ -1344,7 +1494,7 @@ class TwoTag(TypedDict):
 def equal_dictionary_tags(value: FalseTag | TwoTag, other: T):
     if value["tag"] == other:
         reveal_type(value)  # revealed: FalseTag | TwoTag
-        value["two_only"]  # error: [invalid-key] "Unknown key "two_only" for TypedDict `FalseTag`"
+        value["two_only"]  # error: [invalid-typed-dict-key] "Unknown key "two_only" for TypedDict `FalseTag`"
 ```
 
 ## Constraints containing `Any`
@@ -1440,6 +1590,24 @@ specific.asDict()
 
 reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
+```
+
+## Fixed-length starred parameters on generic methods
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Base:
+    def run(self, value: T, *args: *tuple[int, str]) -> None: ...
+
+class A(Base): ...
+class B(Base): ...
+
+def check(receiver: A | B, ints: list[int]) -> None:
+    receiver.run(0, 1, "ok")  # ok
+    receiver.run(0, *ints)  # error: [invalid-argument-type]
 ```
 
 ## Independent specializations during overload argument expansion
@@ -1649,6 +1817,15 @@ reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
+Inference combines evidence from all arguments before choosing how to match a union. A tuple
+argument can determine each variable separately, regardless of keyword argument order:
+
+```py
+def separate(value: int | str, pair: tuple[int, str]):
+    reveal_type(tuple_param(value, pair))  # revealed: tuple[int, str]
+    reveal_type(tuple_param(y=pair, x=value))  # revealed: tuple[int, str]
+```
+
 ## Unmatched union members do not constrain other arguments
 
 When assigning to a declared union type, only members to which the source type is assignable
@@ -1731,16 +1908,34 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 class P(Generic[T]):
-    x: T
+    p: T
 
 class Q(Generic[T]):
-    x: T
+    q: T
 
 def extract_t(x: P[T] | Q[T]) -> T:
     raise NotImplementedError
 
 reveal_type(extract_t(P[int]()))  # revealed: int
 reveal_type(extract_t(Q[str]()))  # revealed: str
+```
+
+Every member of a union argument must match a member of the parameter union with the same
+specialization. Inference preserves that specialization regardless of member order or nesting:
+
+```py
+def union_arguments(value: P[int] | Q[int], reverse: Q[int] | P[int], nested: P[list[int]] | Q[list[int]]):
+    reveal_type(extract_t(value))  # revealed: int
+    reveal_type(extract_t(reverse))  # revealed: int
+    reveal_type(extract_t(nested))  # revealed: list[int]
+```
+
+Invariant members must agree on one specialization; inferring `int | str` would satisfy neither
+member of this argument:
+
+```py
+def incompatible_members(value: P[int] | Q[str]):
+    extract_t(value)  # error: [invalid-argument-type]
 ```
 
 Passing anything else results in an error:
@@ -1762,6 +1957,15 @@ reveal_type(extract_both(P[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(extract_both(Q[str]()))  # revealed: tuple[Unknown, str]
 ```
 
+Different union members can determine different type variables. Reordering the members preserves
+both inferred types:
+
+```py
+def distinct_variables(value: P[int] | Q[str], reverse: Q[str] | P[int]):
+    reveal_type(extract_both(value))  # revealed: tuple[int, str]
+    reveal_type(extract_both(reverse))  # revealed: tuple[int, str]
+```
+
 Inference also works when passing subclasses of the generic classes in the union.
 
 ```py
@@ -1778,19 +1982,31 @@ reveal_type(extract_both(SubP[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(extract_both(SubQ[str]()))  # revealed: tuple[Unknown, str]
 ```
 
-When a type is a subclass of both `P` and `Q` with different specializations, we cannot infer a
-single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, we can still infer
-both types in a call to `extract_both`:
+When a type is a subclass of both `P` and `Q` with different specializations, both `T = int` and
+`T = str` satisfy `extract_t` independently. Its result must satisfy both return types, whose
+intersection is `Never`. Separate variables in `extract_both` retain both specializations:
 
 ```py
 class PandQ(P[int], Q[str]):
     pass
 
-# TODO: Ideally, we would return `Unknown` here.
-# error: [invalid-argument-type]
-reveal_type(extract_t(PandQ()))  # revealed: int | str
+# Isolate the non-returning call so the following examples remain reachable.
+def both_members():
+    reveal_type(extract_t(PandQ()))  # revealed: Never
 
 reveal_type(extract_both(PandQ()))  # revealed: tuple[int, str]
+```
+
+Another argument can rule out a specialization that a union parameter permits. The invariant list
+requires `T = str`, eliminating `T = int` regardless of keyword argument order:
+
+```py
+def extract_with_hint(value: P[T] | Q[T], hint: list[T]) -> list[T]:
+    return hint
+
+def with_hint(value: PandQ, hint: list[str]):
+    reveal_type(extract_with_hint(value, hint))  # revealed: list[str]
+    reveal_type(extract_with_hint(hint=hint, value=value))  # revealed: list[str]
 ```
 
 When non-generic types are part of the union, we can still infer typevars for the remaining generic
@@ -1811,8 +2027,7 @@ Passing anything else results in an error:
 reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
 ```
 
-If the union contains contains parent and child of a generic class, we ideally pick the union
-element that is more precise:
+A concrete union member nested in a subclass does not need to widen the inferred type variable:
 
 ```py
 class Base(Generic[T]):
@@ -1824,8 +2039,7 @@ def f(t: Base[T] | Sub[T | None]) -> T:
     raise NotImplementedError
 
 reveal_type(f(Base[int]()))  # revealed: int
-# TODO: Should ideally be `str`
-reveal_type(f(Sub[str | None]()))  # revealed: str | None
+reveal_type(f(Sub[str | None]()))  # revealed: str
 ```
 
 If we have a case like the following, where only one of the union elements matches due to the
@@ -1850,8 +2064,409 @@ reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
 However, if we pass something that does not match _any_ union element, we do emit an error:
 
 ```py
+# error: [invalid-argument-type] "Argument type `bytes` does not satisfy upper bound `int` of type variable `I_int`"
 # error: [invalid-argument-type]
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+```
+
+## Bounds apply to the matching union member
+
+A type variable's bound applies only to argument members matched to that variable. `Any` nested
+inside another union member does not change which evidence is subject to the bound.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=int)
+
+def extract(value: T | list[Any]) -> T:
+    raise NotImplementedError
+
+def check(value: int | list[Any]):
+    reveal_type(extract(value))  # revealed: int
+```
+
+## An iterable matching a concrete union member
+
+Iterating over `([1],)` yields a list, so the tuple cannot match `Iterable[T]` for any `T` bounded
+by `str`. The call is valid because the tuple matches `tuple[list[Any], ...]`. This covers
+<https://github.com/astral-sh/ty/issues/4695>.
+
+```py
+from collections.abc import Iterable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=str)
+
+def accept(value: Iterable[T] | tuple[list[Any], ...]) -> None: ...
+
+accept(([1],))  # ok
+```
+
+## Invalid members of a bounded union argument
+
+Every member of an argument union must satisfy the parameter type, including any bounds. The call is
+invalid if no member matches, or if only some members match. This covers
+<https://github.com/astral-sh/ty/issues/4277>.
+
+```py
+from typing import Generic, TypeVar
+
+BytesT = TypeVar("BytesT", bound=bytes)
+
+class Box(Generic[BytesT]): ...
+
+def unbox(value: Box[BytesT] | BytesT) -> BytesT:
+    raise NotImplementedError
+
+def invalid_union(value: int | str, partly_valid: Box[bytes] | int):
+    unbox(value)  # error: [invalid-argument-type]
+    unbox(partly_valid)  # error: [invalid-argument-type]
+```
+
+The same check excludes a generic overload whose bound cannot be satisfied, allowing another
+overload to match:
+
+```py
+from typing import overload
+
+@overload
+def select(value: Box[BytesT] | BytesT) -> BytesT: ...
+@overload
+def select(value: int | str) -> bool: ...
+def select(value: object) -> object: ...
+def check_overload(value: int | str):
+    reveal_type(select(value))  # revealed: bool
+```
+
+## Constrained variables shared by union members
+
+All members of an argument union must select the same declared constraint. That constraint also
+determines the result's element type.
+
+```py
+from typing import TypeVar
+
+Text = TypeVar("Text", str, bytes)
+
+def collect(value: Text | list[Text]) -> list[Text]:
+    raise NotImplementedError
+
+def check(value: str | list[str], mixed: str | list[bytes]):
+    result = collect(value)
+    reveal_type(result)  # revealed: list[str]
+    result.append(1)  # error: [invalid-argument-type]
+    collect(mixed)  # error: [invalid-argument-type]
+```
+
+## Concrete union members preserve type variable defaults
+
+Matching a concrete union member contributes no evidence for the type variable. Inference uses the
+variable's default unless another argument determines its type.
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T", default=str)
+
+def optional(value: T | None) -> T:
+    raise NotImplementedError
+
+def with_evidence(value: T | None, other: T) -> T:
+    return other
+
+reveal_type(optional(None))  # revealed: str
+reveal_type(with_evidence(None, 1))  # revealed: Literal[1]
+```
+
+## Recovery from an invalid union argument
+
+Rejecting an argument union does not discard inference from its valid members. The call retains that
+information in its return type for error recovery.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def element(value: list[T] | str) -> T:
+    raise NotImplementedError
+
+def check(value: list[int] | None):
+    # error: [invalid-argument-type]
+    reveal_type(element(value))  # revealed: int
+```
+
+## Gradual evidence in union arguments
+
+A gradual argument retains its gradual type when matched to the variable member of a union. Concrete
+members of the argument still contribute their own evidence.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def optional(value: T | None) -> T:
+    raise NotImplementedError
+
+def check(value: Any, mixed: Any | str):
+    reveal_type(optional(value))  # revealed: Any
+    reveal_type(optional(mixed))  # revealed: Any | str
+```
+
+Aliases preserve the same evidence in both the argument and parameter types:
+
+```py
+OptionalValue = T | None
+Gradual = Any | str
+
+def aliased_optional(value: OptionalValue[T]) -> T:
+    raise NotImplementedError
+
+def check_alias(value: Gradual, static: OptionalValue[str]):
+    reveal_type(aliased_optional(value))  # revealed: Any | str
+    reveal_type(aliased_optional(static))  # revealed: str
+```
+
+A gradual intersection or an `Any` base does not discard the known specialization of another member
+or base:
+
+```py
+from typing import Generic
+from ty_extensions import Intersection
+
+class Source(Generic[T]):
+    value: T
+
+class DynamicSource(Source[str], Any): ...
+
+def from_source(value: Source[T] | None) -> T:
+    raise NotImplementedError
+
+def check_source(narrowed: Intersection[Any, Source[str]], inherited: DynamicSource):
+    reveal_type(from_source(narrowed))  # revealed: str
+    reveal_type(from_source(inherited))  # revealed: str
+```
+
+## Nested gradual evidence in unions
+
+A gradual type argument remains evidence for a type variable inside a nested union. Inference
+preserves `Any` instead of using the variable's default.
+
+```py
+from typing import Any, Generic
+from typing_extensions import TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T", default=str)
+
+class Box(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+def unbox(value: Box[T | None] | int) -> T:
+    raise NotImplementedError
+
+reveal_type(unbox(Box[Any]()))  # revealed: Any
+```
+
+Gradual evidence from a generic base is also preserved, including when that base is nested inside
+another generic argument:
+
+```py
+class AnyBox(Box[Any]): ...
+class WrappedBox(Box[AnyBox]): ...
+
+def nested_unbox(value: Box[Box[T | None]] | int) -> T:
+    raise NotImplementedError
+
+reveal_type(unbox(AnyBox()))  # revealed: Any
+reveal_type(nested_unbox(Box[AnyBox]()))  # revealed: Any
+reveal_type(nested_unbox(WrappedBox()))  # revealed: Any
+```
+
+Recursively specialized bases still allow a finite result: extracting the element type does not
+require expanding that element's own bases indefinitely.
+
+```py
+class Growing(Box["Growing[list[T]]"], Generic[T]): ...
+
+reveal_type(unbox(Growing[int]()))  # revealed: Growing[list[int]]
+```
+
+## Variance when matching union arguments
+
+For a covariant parameter, the inferred type must include the element type of every argument union
+member. The result is the union of those types, regardless of member order.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import assert_type
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Source(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+def from_source(value: Source[T] | None) -> T:
+    raise NotImplementedError
+
+def check_source(value: Source[int] | Source[str], reverse: Source[str] | Source[int]):
+    assert_type(from_source(value), int | str)
+    assert_type(from_source(reverse), int | str)
+```
+
+For a contravariant parameter, the inferred type must be accepted by every argument union member.
+Only `Never` satisfies both `int` and `str` consumers.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Sink(Generic[T_contra]):
+    def put(self, value: T_contra) -> None: ...
+
+def from_sink(value: Sink[T] | None) -> T:
+    raise NotImplementedError
+
+def check_sink(value: Sink[int] | Sink[str]):
+    reveal_type(from_sink(value))  # revealed: Never
+```
+
+## Union inference preserves outer type variables
+
+Matching a union preserves an outer type variable's identity. Evidence from another argument can
+select that variable even when the union also permits a less precise specialization.
+
+```py
+from typing import Generic, TypeVar
+
+A_co = TypeVar("A_co", covariant=True)
+B_co = TypeVar("B_co", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[A_co, B_co]):
+    def get(self) -> tuple[A_co, B_co]:
+        raise NotImplementedError
+
+def choose(value: Pair[T, object] | Pair[object, T], hint: T) -> T:
+    return hint
+
+def forward(value: Pair[U, object], hint: U):
+    reveal_type(choose(value, hint))  # revealed: U@forward
+    reveal_type(choose(hint=hint, value=value))  # revealed: U@forward
+```
+
+An `isinstance` check can narrow an `int` to an intersection with the caller's type variable.
+Passing the narrowed argument to a generic optional parameter preserves that intersection.
+
+```py
+def unwrap(value: T | None) -> T:
+    raise NotImplementedError
+
+def checked_int(value: int, kind: type[U]) -> U:
+    assert isinstance(value, kind)
+    result = unwrap(value)
+    reveal_type(result)  # revealed: int & U@checked_int
+    return unwrap(value)
+```
+
+Excluding `None` preserves the caller's type variable as the inferred list element type, including
+when the parameter uses a type variable bounded by `None`.
+
+```py
+from types import NoneType
+
+N = TypeVar("N", bound=NoneType)
+
+def singleton(value: T | None) -> list[T]:
+    raise NotImplementedError
+
+def singleton_with_sentinel(value: T | N) -> list[T]:
+    raise NotImplementedError
+
+def non_none(value: U) -> list[U]:
+    assert value is not None
+    result = singleton(value)
+    reveal_type(result)  # revealed: list[U@non_none]
+    reveal_type(singleton_with_sentinel(value))  # revealed: list[U@non_none]
+    return singleton(value)
+```
+
+## Preserving type variables when forwarding a generic union
+
+Forwarding a union to a helper with the same parameter type preserves the caller's type variable. A
+broader alternative specialization does not widen the return type: the result must satisfy every
+valid specialization. This example is reduced from Werkzeug.
+
+```py
+from typing import Generic, TypeVar
+
+V = TypeVar("V")
+
+class Batch(Generic[V]): ...
+
+def first_value(mapping: V | Batch[V]) -> V:
+    raise NotImplementedError
+
+class MultiDict(Generic[V]):
+    def add(self, value: V): ...
+    def extend_values(self, mapping: V | Batch[V]):
+        self.add(first_value(mapping))  # ok
+```
+
+## Unions nested in covariant type arguments
+
+Constraints on a nested union are solved together with constraints from other arguments. The call is
+valid if an assignment satisfies both, even when a type variable defaults to `Never`.
+
+```py
+from typing import Generic
+from typing_extensions import Never, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+R = TypeVar("R", default=Never)
+
+class Box(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+def provide(box: Box[T | R], value: T) -> Box[R]:
+    raise NotImplementedError
+
+def check(box: Box[int | str], value: int):
+    reveal_type(provide(box, value))  # revealed: Box[str]
+```
+
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V", default=Never)
+
+def concat(left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider(left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
 ```
 
 ## Inferring nested generic function calls
@@ -1937,16 +2552,16 @@ from typing import Any, Callable, Generic, TypeVar
 F = TypeVar("F", bound=Callable[..., Any])
 
 def my_decorator(f: F) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     f.whatever = 1
 
 class Box(Generic[F]):
     cls: type[F]
 
 def specialized(box: Box[Callable[..., Any]]) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     box.cls.whatever
 ```
 
@@ -2004,6 +2619,29 @@ T = TypeVar("T", Instance, type[ClassObject])
 
 def read(value: T) -> list[str]:
     return value.keys()
+```
+
+## Class patterns after narrowing a class object
+
+Inside the identity check, `A` is known to be both the exact class object and a `type[T]`. A
+successful class pattern lets us return the subject as `T`. The pattern covers every `A` instance.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+
+def match_exact_class(value: A, cls: type[T]) -> T:
+    if cls is A:
+        match value:
+            case A():
+                return value
+            case _:
+                reveal_type(value)  # revealed: Never
+    else:
+        raise AssertionError
 ```
 
 ## Assignment narrowing of dynamic attributes
@@ -2100,6 +2738,44 @@ def infer_list_bound(value: list[ListBoundT] | Other) -> ListBoundT:
 
 reveal_type(infer_any_bound(list[str]()))  # revealed: str
 reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
+```
+
+## Gradual specializations in callable union returns
+
+A callable's return type only needs to match one member of an expected union, even when the match
+relies on a gradual type argument. If several declared constraints remain possible, inference
+preserves the gradual type argument.
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+T = TypeVar("T", str, bytes)
+
+class Box(Generic[T]):
+    value: T
+
+def infer(callback: Callable[[], T | Box[T]]) -> T:
+    raise NotImplementedError
+
+unknown = Box()
+any_ = Box[Any]()
+
+unknown_result = infer(lambda: unknown)  # ok
+reveal_type(unknown_result)  # revealed: Unknown
+any_result = infer(lambda: any_)  # ok
+reveal_type(any_result)  # revealed: Any
+```
+
+Other arguments must still satisfy the type variable's declared constraints. Gradual evidence from a
+callback does not make an incompatible argument valid:
+
+```py
+def consume(callback: Callable[[], Box[T]], other: T) -> None: ...
+
+# The callback returns a box, as required by `Box[T]`. The second argument must instead
+# be `str` or `bytes`, but is also a box: only its type argument is gradual.
+consume(lambda: unknown, unknown)  # error: [invalid-argument-type] "does not satisfy constraints"
+consume(lambda: any_, any_)  # error: [invalid-argument-type] "does not satisfy constraints"
 ```
 
 ## Invalid bounds in generic union members
@@ -2216,6 +2892,28 @@ reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
 ```
 
+## Nested overloads capture enclosing type variables
+
+Overload signatures and their implementation refer to the same type variables captured from an
+enclosing function.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+def outer(value: T) -> None:
+    @overload
+    def inner(value: T) -> T: ...
+    @overload
+    def inner(value: T, count: int) -> T: ...
+    def inner(value: T, count: int = 1) -> T:
+        return value
+
+    first: T = inner(value)  # ok
+    second: T = inner(value, 2)  # ok
+```
+
 ## `~T` is never assignable to `T`
 
 ```py
@@ -2228,6 +2926,22 @@ def f(x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
     y = x  # error: [invalid-assignment]
     return x
+```
+
+## Invalid assignments preserve type variable bindings
+
+After an invalid assignment, a local variable retains its declared type, including references to the
+enclosing function's type variables.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def recover(value: list[T]) -> list[T]:
+    result: list[T] = value
+    result = None  # error: [invalid-assignment]
+    return result  # ok
 ```
 
 ## Prefer exact matches for constrained typevars
@@ -2584,6 +3298,241 @@ def check(
     reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
 ```
 
+## Fixed outer variables in unions
+
+TODO: After #29236 lands, simplify these tests to use direct union annotations instead of `Callable`
+types, which are currently needed to exercise the full constraints.
+
+A caller's type variable contributes to the inferred return type even when the callee's type also
+accepts a concrete union member:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def helper(value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def outer(value: Callable[[], U | str]) -> None:
+    reveal_type(helper(value))  # revealed: (U@outer & ~int) | str
+```
+
+A disjoint bound also preserves the caller's variable. When the variable's entire bound fits the
+concrete `int` member, only the remaining `str` member contributes to inference:
+
+```py
+Disjoint = TypeVar("Disjoint", bound=bytes)
+Covered = TypeVar("Covered", bound=int)
+
+def disjoint(value: Callable[[], Disjoint | str]) -> None:
+    reveal_type(helper(value))  # revealed: Disjoint@disjoint | str
+
+def covered(value: Callable[[], Covered | str]) -> None:
+    reveal_type(helper(value))  # revealed: str
+```
+
+The caller's variable also supplies inference evidence without a separate union member:
+
+```py
+OnlyOuter = TypeVar("OnlyOuter", bound=str)
+
+def only_outer(value: Callable[[], OnlyOuter]) -> None:
+    # Since str and int are disjoint, OnlyOuter & ~int simplifies to OnlyOuter.
+    reveal_type(helper(value))  # revealed: OnlyOuter@only_outer
+```
+
+A literal union member excludes only that literal from the caller's contribution:
+
+```py
+from typing import Literal
+
+def helper_literal(value: Callable[[], T | Literal[1]]) -> T:
+    raise NotImplementedError
+
+def outer_literal(value: Callable[[], U | str]) -> None:
+    reveal_type(helper_literal(value))  # revealed: (U@outer_literal & ~Literal[1]) | str
+```
+
+## Fully covered outer variables in unions
+
+When the concrete union member covers the caller's entire variable, it contributes no inference
+evidence. We use the callee's default, or `Unknown` if there is none.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+Default = TypeVar("Default", default=str)
+Covered = TypeVar("Covered", bound=int)
+
+def helper(value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def defaulted(value: Callable[[], Default | int]) -> Default:
+    raise NotImplementedError
+
+def covered(value: Callable[[], Covered]):
+    reveal_type(helper(value))  # revealed: Unknown
+    result = defaulted(value)
+    reveal_type(result)  # revealed: str
+```
+
+## Invariant arguments with unions
+
+When a union annotation contains two inferred variables (e.g. `T | V`), invariant arguments can
+determine which variable accepts each union member:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+V = TypeVar("V")
+U = TypeVar("U")
+
+def helper(value: Callable[[], T | V], first: list[T], second: list[V]) -> tuple[T, V]:
+    raise NotImplementedError
+
+def outer(value: Callable[[], U | str], variables: list[U], strings: list[str]) -> None:
+    reveal_type(helper(value, variables, strings))  # revealed: tuple[U@outer, str]
+    reveal_type(helper(value, strings, variables))  # revealed: tuple[str, U@outer]
+```
+
+## Forwarding unions of invariant containers
+
+Passing a union of `list[U]` and `list[U | str]` to the same annotation with an inferred `T`
+preserves `U`: choosing `T = U` makes the two annotations identical.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def inner(value: Callable[[], list[T] | list[T | str]]) -> T:
+    raise NotImplementedError
+
+def outer(value: Callable[[], list[U] | list[U | str]]) -> None:
+    reveal_type(inner(value))  # revealed: U@outer
+
+def invalid(value: Callable[[], list[U] | list[U | str] | int]) -> None:
+    inner(value)  # error: [invalid-argument-type]
+```
+
+## Bounds and constraints with fixed outer union members
+
+In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
+type variable. The remaining part must satisfy the callee's bound or constraints; requiring the
+entire caller variable to satisfy them would reject these valid calls:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+Bounded = TypeVar("Bounded", bound=str)
+Constrained = TypeVar("Constrained", str, bytes)
+UnionBound = TypeVar("UnionBound", bound=int | str)
+Constraints = TypeVar("Constraints", int, str)
+
+def bounded(value: Callable[[], Bounded | int]) -> Bounded:
+    raise NotImplementedError
+
+def constrained(value: Callable[[], Constrained | int]) -> Constrained:
+    raise NotImplementedError
+
+def split_constraints(value: Callable[[], Constraints | str]) -> None:
+    reveal_type(bounded(value))  # revealed: str
+    reveal_type(constrained(value))  # revealed: str
+```
+
+Without a separate `str` member, the inferred bound preserves the caller's variable while excluding
+its `int` part. A constrained callee instead selects the compatible declared constraint:
+
+```py
+def only_bound(value: Callable[[], UnionBound]) -> None:
+    reveal_type(bounded(value))  # revealed: UnionBound@only_bound & ~int
+    reveal_type(constrained(value))  # revealed: str
+```
+
+The caller's variable remains fixed. An unrestricted variable, or one permitting an incompatible
+type, cannot be specialized just to make the call succeed:
+
+```py
+Unrestricted = TypeVar("Unrestricted")
+Incompatible = TypeVar("Incompatible", int, complex)
+
+def invalid_bound(value: Callable[[], Unrestricted | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
+
+def invalid_constraints(value: Callable[[], Incompatible | str]) -> None:
+    constrained(value)  # error: [invalid-argument-type]
+```
+
+## Gradual types in union arms
+
+When matching the caller's `U` against `T | A`, we infer `T` from the part of `U` outside the top
+materialization of `A`: `U & ~Top[A]`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T", default=bytes)
+Unrestricted = TypeVar("Unrestricted")
+Disjoint = TypeVar("Disjoint", bound=int)
+Gradual = TypeAliasType("Gradual", list[Any])
+
+def aliased(value: Callable[[], T | tuple[Gradual]]) -> T:
+    raise NotImplementedError
+
+def inline(value: Callable[[], T | tuple[list[Any]]]) -> T:
+    raise NotImplementedError
+
+def unrestricted(value: Callable[[], Unrestricted | str]) -> None:
+    # revealed: (Unrestricted@unrestricted & ~tuple[Top[list[Any]]]) | str
+    reveal_type(inline(value))
+
+def disjoint(value: Callable[[], Disjoint | str]) -> None:
+    reveal_type(inline(value))  # revealed: Disjoint@disjoint | str
+```
+
+Here, `U` is assignable to `tuple[list[Any]]`, so only `str` contributes to the inferred `T`. This
+holds whether `list[Any]` is written inline or wrapped in a lazy alias.
+
+```py
+U = TypeVar("U", bound=tuple[list[int]])
+
+def outer(value: Callable[[], U | str]) -> None:
+    reveal_type(aliased(value))  # revealed: str
+    reveal_type(inline(value))  # revealed: str
+```
+
+Without the separate `str` member, the gradual arm covers the entire caller variable, so we use
+`T`'s default.
+
+```py
+def covered_default(value: Callable[[], U]) -> None:
+    reveal_type(inline(value))  # revealed: bytes
+```
+
+The uncovered portion of the caller's variable must still satisfy the callee's bound.
+
+```py
+Bounded = TypeVar("Bounded", bound=str)
+
+def bounded(value: Callable[[], Bounded | tuple[list[Any]]]) -> Bounded:
+    raise NotImplementedError
+
+def invalid(value: Callable[[], Disjoint | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
+```
+
 ## Gradual overload alternatives remain compatible with other arguments
 
 An overload returning `Any` can satisfy a concrete callback return type independently of other
@@ -2685,7 +3634,7 @@ def union_callee(value: UnionT) -> UnionT:
 def union_caller(value: UnionS) -> UnionS:
     result = union_callee(value)
     reveal_type(result)  # revealed: UnionS@union_caller
-    return result  # no diagnostic
+    return result  # ok
 ```
 
 A fixed constrained typevar and a gradual argument can provide separate bounds for another
@@ -3128,6 +4077,26 @@ def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
     reveal_type(element(sink))  # revealed: A & B
 ```
 
+If multiple distinct alternatives are valid but their intersection is not, the compatible return
+types are unioned:
+
+```py
+from collections.abc import Sequence
+
+def make_list(sink: Sink[list[T]]) -> list[T]:
+    return []
+
+def _(sink: Intersection[Sink[list[A]], Sink[list[B]], Sink[list[C]]]) -> None:
+    inferred = make_list(sink)
+    reveal_type(inferred)  # revealed: list[A] | list[B] | list[C]
+
+    result: Sequence[A | B] = make_list(sink)
+    reveal_type(result)  # revealed: list[A] | list[B]
+
+    # error: [invalid-assignment] "Object of type `list[A] | list[B] | list[C]` is not assignable to `int`"
+    bad: int = make_list(sink)
+```
+
 Assignments to different type variables remain correlated within an alternative: the choices here
 are `(T = A, U = B)` and `(T = B, U = C)`. The contravariant `Sink[A]` selects the first pair, so
 the result is `B`:
@@ -3360,8 +4329,8 @@ def _(unknown, any_: Any) -> None:
     reveal_type(unknown_result)  # revealed: Literal[1] | str
     # TODO: revealed: Literal[1] | (Any & str)
     reveal_type(any_result)  # revealed: Literal[1] | str
-    unknown_result.bit_length()  # error: [unresolved-attribute]
-    any_result.bit_length()  # error: [unresolved-attribute]
+    unknown_result.bit_length()  # error: [missing-union-attribute]
+    any_result.bit_length()  # error: [missing-union-attribute]
 ```
 
 Gradual specializations inherited through concrete subclasses can satisfy bounds and constraints
@@ -3728,9 +4697,14 @@ def correlated(x: Source[ElementT], y: Source[ElementT]) -> ElementT:
     raise NotImplementedError
 
 def _(x: Intersection[Source[A], Source[B]], other: Any) -> None:
-    assert isinstance(other, DSource)
-    # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, other))  # revealed: (A & B) | D
+    if isinstance(other, DSource):
+        # TODO: revealed: (A & B) | (Any & D)
+        reveal_type(correlated(x, other))  # revealed: (A & B) | D
+
+    reveal_type(correlated(x, other))  # revealed: A | B
+
+    result: B = correlated(x, other)
+    reveal_type(result)  # revealed: B
 ```
 
 A gradual component in the return annotation is preserved in both specialized return types:
@@ -3793,11 +4767,13 @@ make independently valid specializations incompatible: a fresh `[]` can be typed
 `Never`, which would incorrectly imply that allocating the list cannot return.
 
 We handle this conservatively: if an invariant component differs across valid specializations, we do
-not intersect their return types.
+not intersect their return types. (But if one valid specialization results in a return type that is
+a subtype of all others, we select that one.)
 
 ### Mutable returns from intersection arguments
 
 ```py
+from collections.abc import Sequence
 from typing import Generic, TypeVar
 from ty_extensions import Intersection
 
@@ -3819,6 +4795,10 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
     # the argument also fits `Source[A | B]`. Inference uses `T = A | B`, producing `list[A | B]`
     # instead of intersecting `list[A]` and `list[B]`.
     reveal_type(make_list(source))  # revealed: list[A | B]
+
+    # Only `T = B` is assignable to the declared type.
+    result: Sequence[B] = make_list(source)
+    reveal_type(result)  # revealed: list[B]
 ```
 
 The same applies when an alias hides the mutable result:
@@ -3898,7 +4878,8 @@ mutable list, but merging their element types does not produce a specialization 
 sink. The call retains the union of the separately specialized list types:
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic
+from typing_extensions import TypeVar
 from ty_extensions import Intersection
 
 SinkT = TypeVar("SinkT", contravariant=True)
@@ -3917,6 +4898,21 @@ def make_list(sink: Sink[T]) -> list[T]:
 
 def _(sink: Intersection[ASink, BSink]) -> None:
     reveal_type(make_list(sink))  # revealed: list[A] | list[B]
+
+    result: list[A] | list[B] = make_list(sink)
+    reveal_type(result)  # revealed: list[A] | list[B]
+```
+
+A call with an unbound type variable retains the separately specialized list types:
+
+```py
+U = TypeVar("U", default=bytes)
+
+def collect_pairs(items: tuple[list[T], list[U]] | tuple[list[int], list[T]]) -> list[tuple[T, U]]:
+    return []
+
+def _(items: tuple[list[int], list[str]]) -> None:
+    reveal_type(collect_pairs(items))  # revealed: list[tuple[int, str]] | list[tuple[str, bytes]]
 ```
 
 Evidence from another argument can leave only one valid specialization. A supplied value of type `A`
@@ -3928,6 +4924,35 @@ def with_value(sink: Sink[T], value: T) -> list[T]:
 
 def _(sink: Intersection[ASink, BSink], value: A) -> None:
     reveal_type(with_value(sink, value))  # revealed: list[A]
+```
+
+If a nested callback accepts each distinct specialization of the list but not the merged
+`list[A | B]`, we retain the union of the separately specialized list types:
+
+```py
+from collections.abc import Callable, Sequence
+from typing import overload
+from typing_extensions import Unpack
+
+SourceT = TypeVar("SourceT", covariant=True)
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+def consume_lists(items: list[A] | list[B]) -> None: ...
+@overload
+def collect(
+    source: Source[T],
+    *args: Unpack[tuple[Sequence[Callable[[list[T]], None]]]],
+) -> list[T]: ...
+@overload
+def collect(source: None, arg: list[object], /) -> None: ...
+def collect(source: object, *args: object) -> object:
+    raise NotImplementedError
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(collect(source, [consume_lists]))  # revealed: list[A] | list[B]
 ```
 
 ### Mutable components in inferred return types
@@ -3951,6 +4976,16 @@ def invoke(callback: Callable[[object], R], value: object) -> R:
 
 def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
     reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+If the declared type excludes a given element of the intersection, the result is inferred from the
+remaining alternatives.
+
+```py
+def _(callback: Intersection[Callable[[object], A], Callable[[object], B], Callable[[object], list[int]]]) -> None:
+    result: A | B = invoke(callback, object())
+    # TODO: We could infer `A & B` here.
+    reveal_type(result)  # revealed: A | B
 ```
 
 An inferred tuple can still be refined when its mutable component has the same type in both
@@ -4000,6 +5035,36 @@ def _(
     reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
 ```
 
+The call to `invoke_all` below can infer three different types for `R`, one from each callback
+signature. Each choice gives a possible return type for the call. Inference selects `list[B]`
+because it is a subtype of both other return types, `list[A] | list[B]` and `list[B] | list[C]`:
+
+```py
+def _(
+    callback: Intersection[
+        Callable[[A], list[A] | list[B]],
+        Callable[[B], list[B] | list[C]],
+        Callable[[C], list[B]],
+    ],
+) -> None:
+    reveal_type(invoke_all(callback, All()))  # revealed: list[B]
+```
+
+Being a subtype of just one other return type is insufficient. Here `list[A]` and `list[B]` are both
+subtypes of `list[A] | list[B]`, but neither is a subtype of the other. Inference retains
+`list[A] | list[B]`:
+
+```py
+def _(
+    callback: Intersection[
+        Callable[[A], list[A] | list[B]],
+        Callable[[B], list[A]],
+        Callable[[C], list[B]],
+    ],
+) -> None:
+    reveal_type(invoke_all(callback, All()))  # revealed: list[A] | list[B]
+```
+
 For generic classes with both covariant and invariant parameters, refinement depends on which
 parameters vary. `Wrapper` only produces `T`, while its writable `value` attribute makes `U`
 invariant:
@@ -4027,6 +5092,55 @@ def _(
 ) -> None:
     reveal_type(invoke(fixed, object()))  # revealed: Wrapper[A, int] & Wrapper[B, int]
     reveal_type(invoke(varying, object()))  # revealed: Wrapper[A, int] | Wrapper[B, str]
+```
+
+### Returning values from mixed-variance unions
+
+Inference finds two valid specializations for the call to `first_value` below, returning `V@forward`
+and `V@forward | Invariant[V@forward]`. The first return type is a subtype of the second, so
+inference selects `V@forward`:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+V = TypeVar("V")
+V_co = TypeVar("V_co", covariant=True)
+
+class Covariant(Generic[V_co]):
+    def get(self) -> V_co:
+        raise NotImplementedError
+
+class Invariant(Generic[V]):
+    value: V
+
+def first_value(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> V:
+    raise NotImplementedError
+
+def forward(mapping: V | Invariant[V] | Covariant[V]) -> V:
+    value = first_value(lambda: mapping)
+    reveal_type(value)  # revealed: V@forward
+    return value
+```
+
+The comparison uses the complete return types after substituting the inferred type arguments. For
+`make_list`, the two choices produce `list[V]` and `list[V | Invariant[V]]`. Neither is a subtype of
+the other, because lists are invariant, so inference keeps the merged result below.
+
+For `make_sink`, a callable accepting `V | Invariant[V]` is a subtype of one accepting only `V`: it
+accepts every input the latter accepts. The wider parameter type therefore produces the narrower
+callable type, which inference selects:
+
+```py
+def make_list(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> list[V]:
+    return []
+
+def make_sink(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callable[[V], None]:
+    return lambda value: None
+
+def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
+    # revealed: list[Invariant[V@wrapped_returns] | V@wrapped_returns | Covariant[V@wrapped_returns]]
+    reveal_type(make_list(lambda: mapping))
+    reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
 
 ### Inferred TypedDict return alternatives
@@ -4159,7 +5273,7 @@ def _(
 ) -> None:
     result = remember_first(identity)
     reveal_type(result)  # revealed: (A | B, /) -> A | B
-    result(A())  # no diagnostic
+    result(A())  # ok
     reveal_type(result(B()))  # revealed: A | B
 ```
 
@@ -4207,7 +5321,7 @@ def convert(prefix: int, value: str | int) -> str | int:
 
 result = remember_first(convert)
 reveal_type(result)  # revealed: (value: str) -> str | int
-result("first")  # no diagnostic
+result("first")  # ok
 # A cached `str` must not be returned as `int` on a later call.
 # error: [invalid-argument-type]
 reveal_type(result(1))  # revealed: str | int
@@ -4420,6 +5534,33 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     return reveal_type(identity_callback(value))
 ```
 
+## Inferring a recursive protocol from a factory's return context
+
+The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the
+return types of `first_or` reaches `Stream`, whose `window` method adds the layer of nesting that
+`flatten` removes.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Result(Protocol[T_co]):
+    def first_or(self, default: U) -> T_co | U: ...
+
+class Stream(Protocol[T_co]):
+    def flatten(self: "Stream[Stream[U]]") -> "Stream[U]": ...
+    def window(self) -> "Stream[Stream[T_co]]": ...
+
+def make_result() -> Result[T]:
+    raise NotImplementedError
+
+result: Result[Stream[int]] = make_result()
+reveal_type(result)  # revealed: Result[Stream[int]]
+```
+
 ## Generic property setter overrides
 
 A method-scoped type variable is inferred for each write, so an unconstrained setter preserves an
@@ -4453,5 +5594,86 @@ class BoundedSetter(Base):
         return None
 
     @value.setter
-    def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
+    def value(self, value: I) -> None: ...  # error: [incompatible-property-override]
+```
+
+## Recursive calls preserve captured type variables
+
+A recursive call can infer a new specialization of the function's type parameter. A nested function
+that captures that parameter still refers to the original argument's type. Comparing a generic
+callback with that captured type also leaves the original parameter unchanged.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def recursive(value: T) -> T:
+    def captured(other: T) -> T:
+        return other
+
+    def generic(other: U) -> U:
+        return other
+
+    def accepts(callback: Callable[[T], T]) -> None: ...
+
+    accepts(generic)  # ok
+    captured(1)  # error: [invalid-argument-type]
+    # revealed: Literal[1]
+    reveal_type(recursive(1))
+    # revealed: T@recursive
+    reveal_type(captured(value))
+    return recursive(value)  # ok
+```
+
+## Type parameter defaults referring to other parameters
+
+Defaults use the type arguments inferred for the same call, including when the argument's type is
+fixed by an enclosing generic function.
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=list[T])
+V = TypeVar("V", default=tuple[U, T])
+
+def defaults(value: T) -> tuple[U, V]:
+    raise NotImplementedError
+
+def check(value: T) -> tuple[list[T], tuple[list[T], T]]:
+    result = defaults(value)
+    return result  # ok
+
+def concrete(value: int):
+    # revealed: tuple[list[int], tuple[list[int], int]]
+    reveal_type(defaults(value))
+```
+
+The default also uses the recursive call's type argument inside a recursive alias.
+
+```py
+A = TypeVar("A")
+Node = tuple[A, "Node[A] | None"]
+R = TypeVar("R", default=Node[T])
+
+def make(value: T) -> R:
+    result: Node[int] = make(1)  # ok
+    raise NotImplementedError
+```
+
+## Type arguments in annotation metadata
+
+Expressions in `Annotated` metadata can call constructors specialized with the enclosing function's
+type parameters.
+
+```py
+from typing import Annotated, TypeVar
+
+T = TypeVar("T")
+
+def metadata(value: T) -> None:
+    annotated: Annotated[int, list[T]([value])]  # ok
 ```

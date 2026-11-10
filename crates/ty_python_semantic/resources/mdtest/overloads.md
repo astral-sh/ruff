@@ -37,6 +37,31 @@ reveal_type(add(1))  # revealed: int
 reveal_type(add(1, 2))  # revealed: int
 ```
 
+## Local functions in a loop
+
+A previous iteration can bind the same local function. An overloaded local function still sees the
+overloads defined earlier in the loop body.
+
+```py
+from typing import overload
+
+def outer(values: list[int]):
+    for value in values:
+        def plain() -> int:
+            return value
+
+        reveal_type(plain)  # revealed: def plain() -> int
+
+        @overload
+        def convert(x: int) -> int: ...
+        @overload
+        def convert(x: str) -> str: ...
+        def convert(x: int | str) -> int | str:
+            return x
+
+        reveal_type(convert)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
 ## Overriding
 
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
@@ -800,7 +825,7 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
@@ -810,7 +835,7 @@ def func(x: int | str) -> int | str:
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 ```
 
@@ -827,14 +852,14 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
-# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
-    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+    # error: [missing-overload-implementation] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -903,7 +928,7 @@ class Fine(metaclass=CustomAbstractMetaclass):
 class Foo:
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -916,14 +941,14 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -980,7 +1005,7 @@ if TYPE_CHECKING:
 if TYPE_CHECKING:
     @overload
     # not all overloads are in a `TYPE_CHECKING` block, so this is an error
-    def c() -> None: ...  # error: [invalid-overload]
+    def c() -> None: ...  # error: [missing-overload-implementation]
 
 @overload
 def c(x: int) -> int: ...
@@ -1047,7 +1072,7 @@ from typing import overload
 @overload
 def return_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+# error: [inconsistent-overload-implementation] "Overload return type is not assignable to implementation return type"
 def return_type(x: str) -> str: ...
 def return_type(x: int | str) -> int:
     return 1
@@ -1055,7 +1080,7 @@ def return_type(x: int | str) -> int:
 @overload
 def parameter_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def parameter_type(x: str) -> str: ...
 def parameter_type(x: int) -> int | str:
     return 1
@@ -1068,7 +1093,7 @@ use the overload signatures.
 class StaticMethod:
     @overload
     @staticmethod
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
     def method(x: int) -> int: ...
     @overload
     @staticmethod
@@ -1106,7 +1131,7 @@ P = ParamSpec("P")
 
 class Task(Generic[P]):
     @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
     def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> int: ...
     @overload
     def submit(self: "Task[P]", value: int) -> int: ...
@@ -1148,7 +1173,7 @@ def narrow_parameter(func: Callable[[int | str], int | str]) -> Callable[[int], 
 @overload
 def narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def narrowed(x: str, /) -> str: ...
 @narrow_parameter
 def narrowed(x: int | str) -> int | str:
@@ -1245,7 +1270,7 @@ def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
 @overload
 def replaced(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def replaced(x: str, /) -> str: ...
 @deprecated("use replacement directly")
 @replace_with(replacement)
@@ -1309,7 +1334,7 @@ def callback_valid(x: int | str) -> int | str:
 @overload
 def callback_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def callback_narrowed(x: str, /) -> str: ...
 @narrow_callback
 def callback_narrowed(x: int | str) -> int | str:
@@ -1326,7 +1351,7 @@ def union_valid(x: int | str) -> int | str:
 @overload
 def union_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def union_narrowed(x: str, /) -> str: ...
 @narrow_union
 def union_narrowed(x: int | str) -> int | str:
@@ -1337,7 +1362,7 @@ def not_callable(x: int, /) -> int: ...
 @overload
 def not_callable(x: str, /) -> str: ...
 @noncallable
-# error: [invalid-overload] "Overload implementation is not callable after applying decorators"
+# error: [inconsistent-overload-implementation] "Overload implementation is not callable after applying decorators"
 def not_callable(x: int | str) -> int | str:
     return x
 
@@ -1402,7 +1427,7 @@ class Invalid:
     def identity(cls, value: int) -> int: ...
     @overload
     @classmethod
-    # error: [invalid-overload] "Overload signature is not consistent with implementation"
+    # error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
     def identity(cls, value: str) -> str: ...
     @classmethod
     @narrow_wrap
@@ -1428,7 +1453,7 @@ class ColumnSelector:
     @overload
     def _extract(self, row_key: int) -> object: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def _extract(self, column_key: int) -> object: ...
     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
         return object()
@@ -1437,14 +1462,14 @@ class PositionalOnlyWithKwargs:
     @overload
     def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def update(self, **kwds: str | Iterable[str]) -> None: ...
     def update(self, params=(), /, **kwds) -> None:
         pass
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:9:9
    |
  9 |     def _extract(self, column_key: int) -> object: ...
@@ -1455,7 +1480,7 @@ info: Implementation signature `(self, row_key: int | None = None, column_key: i
 info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
 
 
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:18:9
    |
 18 |     def update(self, **kwds: str | Iterable[str]) -> None: ...
@@ -1480,7 +1505,7 @@ python-version = "3.12"
 from typing import overload
 
 @overload
-# snapshot: invalid-overload
+# snapshot: inconsistent-overload-implementation
 def return_tuple(x: int) -> tuple[str]: ...
 @overload
 def return_tuple(x: str) -> tuple[int]: ...
@@ -1489,7 +1514,7 @@ def return_tuple(x: int | str) -> tuple[int]:
 ```
 
 ```snapshot
-error[invalid-overload]: Overload return type is not assignable to implementation return type
+error[inconsistent-overload-implementation]: Overload return type is not assignable to implementation return type
  --> src/mdtest_snippet.py:5:5
   |
 5 | def return_tuple(x: int) -> tuple[str]: ...
@@ -1520,7 +1545,7 @@ class CheckStaticMethod:
     @overload
     def method1(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
     def method1(self, x: int | str) -> int | str:
         return x
 
@@ -1530,7 +1555,7 @@ class CheckStaticMethod:
     @staticmethod
     def method2(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def method2(self, x: int | str) -> int | str:
         return x
 
@@ -1540,7 +1565,7 @@ class CheckStaticMethod:
     @overload
     @staticmethod
     def method3(self, x: str) -> str: ...
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def method3(self, x: int | str) -> int | str:
         return x
 
@@ -1585,13 +1610,13 @@ class Widget:
     @staticmethod
     def method(source: str, index: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
     def method(self, index: int) -> str: ...
     @overload
     def reversed(self, index: int) -> str: ...
     @overload
     @staticmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def reversed(source: str, index: int) -> int: ...
 ```
 
@@ -1631,7 +1656,7 @@ class CheckClassMethod:
     @overload
     def try_from1(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1643,7 +1668,7 @@ class CheckClassMethod:
     @classmethod
     def try_from2(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1655,7 +1680,7 @@ class CheckClassMethod:
     @overload
     @classmethod
     def try_from3(cls, x: str) -> None: ...
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             # error: [call-non-callable]
@@ -1730,13 +1755,13 @@ class Factory:
     @classmethod
     def method(cls: type[Factory], value: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
     def method(self, value: int) -> str: ...
     @overload
     def reversed(self, value: int) -> str: ...
     @overload
     @classmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def reversed(cls: type[Factory], value: int) -> int: ...
 ```
 
@@ -1772,7 +1797,7 @@ class Foo:
 
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
@@ -1783,7 +1808,7 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
@@ -1805,16 +1830,16 @@ class Foo:
     def method2(self, x: int) -> int: ...
     @final
     @overload
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: str) -> str: ...
     @overload
     def method3(self, x: int) -> int: ...
     @final
     @overload
-    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     @final
-    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    def method3(self, x: bytes) -> bytes: ...  # error: [misplaced-overload-decorator]
     @overload
     def method3(self, x: bytearray) -> bytearray: ...
 ```
@@ -1850,7 +1875,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
@@ -1858,7 +1883,7 @@ class Sub2(Base):
 class Sub3(Base):
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -1889,7 +1914,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
 ```
 
@@ -2022,7 +2047,7 @@ if flag():
     def a(x: str) -> str: ...
 
 @overload
-# error: [invalid-overload] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
 def a(x: bytes) -> bytes: ...
 @overload
 def a(x: bool) -> bool: ...

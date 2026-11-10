@@ -151,6 +151,12 @@ impl ProjectDatabase {
         project.freeze_open_files(self);
     }
 
+    /// Skips dropping cached Salsa data when the CLI is about to exit. The remaining fields
+    /// drop normally so the uv worker pool receives its shutdown signal.
+    pub fn forget_storage_on_exit(self) {
+        std::mem::forget(self.storage);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -957,6 +963,7 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
+    use salsa::plumbing::current_revision;
     use ty_module_resolver::list_modules;
     use ty_python_semantic::Db as _;
 
@@ -988,10 +995,33 @@ mod tests {
         // available configuration; preparing the environment is the host's responsibility.
         let diagnostics = db.check();
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unrelated_file_change_does_not_advance_revision() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        fs.write_files_all([
+            ("/project/main.py", ""),
+            ("/project/unrelated.log", "before"),
+        ])?;
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/project"));
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.project().files(&db);
+        let revision = current_revision(&db);
+
+        fs.write_file_all("/project/unrelated.log", "after")?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(SystemPathBuf::from(
+            "/project/unrelated.log",
+        ))]);
+
+        assert_eq!(current_revision(&db), revision);
 
         Ok(())
     }

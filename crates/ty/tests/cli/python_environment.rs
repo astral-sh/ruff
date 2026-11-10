@@ -30,7 +30,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `sys` has no member `last_exc`
+    error[missing-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
     5 | print(sys.last_exc)
@@ -190,7 +190,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package` has no member `nonexistent_submodule`
+    error[import-not-found]: Module `package` has no member `nonexistent_submodule`
      --> src/package/__init__.py:1:15
       |
     1 | from . import nonexistent_submodule
@@ -306,7 +306,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `string.templatelib`
+    error[import-not-found]: Cannot resolve imported module `string.templatelib`
      --> test.py:1:8
       |
     1 | import string.templatelib
@@ -388,7 +388,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
@@ -399,7 +399,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -421,7 +421,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -432,7 +432,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -454,7 +454,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -465,7 +465,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -487,7 +487,7 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
     2 | import bar
@@ -498,7 +498,7 @@ import colorama
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
     3 | import colorama
@@ -551,7 +551,7 @@ import bar",
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
@@ -597,7 +597,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:18
       |
     1 | import foo, bar, baz
@@ -640,7 +640,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -672,7 +672,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -706,7 +706,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
@@ -721,7 +721,7 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   7. <temp_dir>/ (first-party code)
     info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     Found 1 diagnostic
 
@@ -1263,7 +1263,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `os` has no member `grantpt`
+    error[missing-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
@@ -1275,7 +1275,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
-    error[unresolved-import]: Module `typing` has no member `TypeAliasType`
+    error[import-not-found]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
     6 | from typing import TypeAliasType  # added in Python 3.12
@@ -1325,14 +1325,27 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The `site-packages` directory is used by ty for external import.
-/// Ty does the following checks to discover the `site-packages` directory in the order:
-/// 1) If `VIRTUAL_ENV` environment variable is set
-/// 2) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
+fn write_conda_interpreters(case: &CliTest) -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python"
+    };
+    for prefix in ["conda", "conda/envs/conda-env"] {
+        case.write_file(format!("{prefix}/{python}"), "")?;
+    }
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external imports.
+/// ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If the `VIRTUAL_ENV` environment variable is set to a non-empty value
+/// 2) If `CONDA_PREFIX` points to a child environment (e.g. its directory name matches
+///    `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
-/// 4) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
-///    or if `_CONDA_ROOT` is set (and `_CONDA_ROOT` == `CONDA_PREFIX`)
+/// 4) If `CONDA_PREFIX` points to the base environment (e.g. `_CONDA_ROOT` == `CONDA_PREFIX`)
 ///
+/// A Conda environment is considered only if it contains a Python interpreter.
 /// This test (and the next one) is aiming at validating the logic around these cases.
 ///
 /// To do this we create a program that has these 4 imports:
@@ -1373,6 +1386,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// │               └── package1
 /// │                   └── __init__.py
 /// └── conda
+///     ├── bin/python
 ///     ├── lib
 ///     │   └── python3.13
 ///     │       └── site-packages
@@ -1380,6 +1394,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///     │               └── __init__.py
 ///     └── envs
 ///         └── conda-env
+///             ├── bin/python
 ///             └── lib
 ///                 └── python3.13
 ///                     └── site-packages
@@ -1387,7 +1402,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///                             └── __init__.py
 ///
 /// test.py imports package1
-/// And the command is run in the `child` directory.
+/// And the command is run in the `project` directory.
 #[test]
 fn check_venv_resolution_with_working_venv() -> anyhow::Result<()> {
     let child_conda_package1_path = if cfg!(windows) {
@@ -1472,13 +1487,33 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
+      |
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // An empty VIRTUAL_ENV does not hide the working venv.
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", ""), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1496,7 +1531,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1514,7 +1549,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1533,7 +1568,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1554,7 +1589,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1565,7 +1600,7 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
+    // run with CONDA_DEFAULT_ENV set to the directory name of CONDA_PREFIX, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
@@ -1573,7 +1608,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1588,11 +1623,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1603,19 +1638,19 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find WorkingVenv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
-     --> test.py:5:22
+    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    5 | from package1 import BaseConda
-      |                      ^^^^^^^^^
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
 
     Found 1 diagnostic
 
@@ -1691,13 +1726,15 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:2:6
       |
     2 | from package1 import ActiveVenv
@@ -1707,7 +1744,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:3:6
       |
     3 | from package1 import ChildConda
@@ -1717,7 +1754,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:4:6
       |
     4 | from package1 import WorkingVenv
@@ -1727,7 +1764,7 @@ home = ./
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:5:6
       |
     5 | from package1 import BaseConda
@@ -1749,7 +1786,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1767,7 +1804,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1786,7 +1823,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1807,7 +1844,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[import-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1826,7 +1863,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1841,11 +1878,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[import-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1860,11 +1897,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[import-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -2051,7 +2088,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> tests/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2120,7 +2157,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2161,7 +2198,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
     3 | from bar import bar  # expected unresolved import
@@ -2198,7 +2235,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/foo.py:2:8
       |
     2 | import baz
@@ -2250,7 +2287,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/main.py:2:8
       |
     2 | import baz
@@ -2261,7 +2298,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> src/main.py:3:8
       |
     3 | import foo

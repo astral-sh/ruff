@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
+use crate::metadata::options::{AnalysisOptionsContext, InnerOverrideOptions, OutputFormat};
 use crate::script::Script;
 use crate::{Db, glob::IncludeExcludeFilter};
 
@@ -25,6 +25,7 @@ use crate::{Db, glob::IncludeExcludeFilter};
 /// Settings that are part of [`ty_python_core::program::ProgramSettings`] are not included here.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
+    pub(super) baseline: Option<SystemPathBuf>,
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
@@ -39,6 +40,10 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub fn baseline(&self) -> Option<&SystemPath> {
+        self.baseline.as_deref()
+    }
+
     fn rules(&self) -> &RuleSelection {
         &self.rules
     }
@@ -126,8 +131,9 @@ impl Override {
 /// Resolves the settings for a given file.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
-    if let Some(script) = Script::for_file(db, file) {
-        let settings = script.settings(db);
+    if let Some(script) = Script::for_file(db, file)
+        && let Some(settings) = script.inline_settings(db)
+    {
         return FileSettings::File(Arc::new(OverrideSettings {
             rules: settings.rules().clone(),
             analysis: settings.analysis().clone(),
@@ -220,10 +226,9 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     let rules = merged.rules.unwrap_or_default();
     let analysis = merged.analysis.unwrap_or_default();
 
-    // It's okay to ignore the errors here because the rules are eagerly validated
-    // during `overrides.to_settings()`.
-    let rules = rules.to_rule_selection(db, &mut Vec::new());
-    let analysis = analysis.to_settings(db, &mut Vec::new());
+    let rules = rules.to_rule_selection(db);
+    // The analysis options were already validated when building the individual overrides.
+    let analysis = analysis.to_settings(db, AnalysisOptionsContext::Override, &mut Vec::new());
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }

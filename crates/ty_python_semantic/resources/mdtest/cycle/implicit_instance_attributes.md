@@ -94,6 +94,73 @@ class C:
 reveal_type(C().value)  # revealed: list[int] | list[Divergent]
 ```
 
+## Wrapping list elements in tuples
+
+Both list assignments contribute to the inferred attribute type.
+
+```py
+class Items:
+    def update(self, values) -> None:
+        self.items = [*values]
+        self.items = [(x,) for x in self.items]
+        reveal_type(self.items)  # revealed: list[tuple[Unknown]]
+
+def _(items: Items):
+    items.update(items.items)
+    # TODO: This should still be a list, and accessing `missing` should be an error.
+    reveal_type(items.items)  # revealed: Unknown
+    items.items.missing
+```
+
+## Reading an attribute with a growing type argument
+
+Reading `value` before checking `advance` starts inference at the member lookup. Each update nests
+the type argument one level deeper, so inference eventually falls back to `Unknown`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class Box[T]:
+    next: Box[tuple[T]]
+
+def read(c: C):
+    reveal_type(c.value)  # revealed: Unknown
+
+class C:
+    def __init__(self):
+        self.value = Box[int]()
+
+    def advance(self, other: C):
+        self.value = other.value.next
+```
+
+## Unwrapping a finite nest of tuples
+
+Each update removes one layer until indexing a string yields another string. The inferred type
+preserves enough information to report a missing attribute even after many updates.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+type FiveLayers[T] = tuple[tuple[tuple[tuple[tuple[T]]]]]
+
+class C:
+    def __init__(self, value: FiveLayers[FiveLayers[FiveLayers[str]]]):
+        self.value = value
+
+    def advance(self):
+        self.value = self.value[0]
+
+def read(c: C):
+    c.value.missing  # error: [missing-attribute]
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
@@ -155,7 +222,7 @@ class Base:
         if not hasattr(self, "x"):
             self.x = self.__str__
         if not hasattr(self, "z"):
-            self.z = self.y  # error: [unresolved-attribute]
+            self.z = self.y  # error: [missing-attribute]
 
 reveal_type(Base().x())  # revealed: str
 
@@ -163,7 +230,7 @@ class Annotated:
     def __init__(self: "Annotated"):
         if not hasattr(self, "value"):
             self.value = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -209,7 +276,7 @@ class Base:
         if not hasattr(self, "x"):
             self.x = self.__str__
         if not hasattr(self, "z"):
-            self.z = self.y  # error: [unresolved-attribute]
+            self.z = self.y  # error: [missing-attribute]
 
 reveal_type(Base().x())  # revealed: str
 
@@ -217,7 +284,7 @@ class Annotated:
     def __init__(self: "Annotated"):
         if not hasattr(self, "value"):
             self.value = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 ## Named protocol guards when the base is checked first
@@ -240,7 +307,7 @@ class Base:
     def __init__(self):
         if not isinstance(self, HasX):
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 
 def accepts_x(value: HasX) -> None: ...
 
@@ -284,7 +351,7 @@ class Base:
     def __init__(self):
         if not isinstance(self, HasX):
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 
 def accepts_x(value: HasX) -> None: ...
 
@@ -318,15 +385,15 @@ class Base:
         if self is not None:
             if not hasattr(self, "nonnull"):
                 self.nonnull = self.__str__
-                self.nonnull_missing  # error: [unresolved-attribute]
+                self.nonnull_missing  # error: [missing-attribute]
         if not hasattr(self, "other"):
             if not hasattr(self, "unrelated"):
                 self.unrelated = self.__str__
-                self.unrelated_missing  # error: [unresolved-attribute]
+                self.unrelated_missing  # error: [missing-attribute]
         if isinstance(self, Marker):
             if not hasattr(self, "narrowed"):
                 self.narrowed = self.__str__
-                self.narrowed_missing  # error: [unresolved-attribute]
+                self.narrowed_missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -383,15 +450,15 @@ class Base:
         if self is not None:
             if not hasattr(self, "nonnull"):
                 self.nonnull = self.__str__
-                self.nonnull_missing  # error: [unresolved-attribute]
+                self.nonnull_missing  # error: [missing-attribute]
         if not hasattr(self, "other"):
             if not hasattr(self, "unrelated"):
                 self.unrelated = self.__str__
-                self.unrelated_missing  # error: [unresolved-attribute]
+                self.unrelated_missing  # error: [missing-attribute]
         if isinstance(self, Marker):
             if not hasattr(self, "narrowed"):
                 self.narrowed = self.__str__
-                self.narrowed_missing  # error: [unresolved-attribute]
+                self.narrowed_missing  # error: [missing-attribute]
 ```
 
 ## Class attributes independently establish presence
@@ -503,7 +570,7 @@ class Base:
         if not hasattr(self, "x"):
             prepare()
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 `child.py`:
@@ -539,7 +606,7 @@ class Base:
         if not hasattr(self, "x"):
             prepare()
             self.x = self.__str__
-            self.missing  # error: [unresolved-attribute]
+            self.missing  # error: [missing-attribute]
 ```
 
 ## Non-returning initializers do not define instance attributes
@@ -557,7 +624,7 @@ class C:
         if not hasattr(self, "x"):
             self.x = fail()  # error: [invalid-assignment]
 
-C().x  # error: [unresolved-attribute]
+C().x  # error: [missing-attribute]
 ```
 
 ## Assignments in the opposite guard branch do not initialize an attribute
@@ -576,7 +643,7 @@ class C:
         else:
             self.y = self.missing
 
-C().y  # error: [unresolved-attribute]
+C().y  # error: [missing-attribute]
 ```
 
 ## Contradictory attribute guards do not initialize an attribute
@@ -590,7 +657,7 @@ class C:
             if not hasattr(self, "x"):
                 self.x = self.missing
 
-C().x  # error: [unresolved-attribute]
+C().x  # error: [missing-attribute]
 ```
 
 ## Lazy cached property behind `hasattr`
@@ -633,8 +700,8 @@ class ChildContext(Context):
     def get(cls):
         # TODO: This should include `None | Unknown`, not be `Never`.
         reveal_type(cls.current)  # revealed: Never
-        if not isinstance(cls.current, ChildContext):  # no diagnostic
-            cls.current = ChildContext()  # no diagnostic
+        if not isinstance(cls.current, ChildContext):  # ok
+            cls.current = ChildContext()  # ok
 ```
 
 ## Incompatible initialization in a classmethod
@@ -661,4 +728,40 @@ class ChildContext(Context):
         if not isinstance(cls.current, ChildContext):
             # TODO: Report an invalid-assignment error for assigning `ChildContext` to `int`.
             cls.current = ChildContext()
+```
+
+## Lazy initialization in a class property
+
+The metaclass initializes `_name` to `None`. Reading the class property can therefore enter the
+branch that fills the cache, including on a class with multiple bases.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+def module_name(module: str) -> str:
+    return module
+
+class ClassProperty:
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, owner):
+        return self.getter(owner)
+
+class Meta(type):
+    def __new__(cls, name, bases, namespace):
+        namespace["_name"] = None
+        return super(Meta, cls).__new__(cls, name, bases, namespace)
+
+class Left: ...
+class Right: ...
+
+class Package(Left, Right, metaclass=Meta):
+    @ClassProperty
+    def name(cls):
+        if cls._name is None:  # ok
+            cls._name = module_name(cls.__module__)
 ```

@@ -1,7 +1,8 @@
 use anyhow::Result;
 use insta::{assert_json_snapshot, assert_snapshot};
+use lsp_server::{ErrorCode, Message, RequestId, Response};
 use lsp_types::{
-    BaseUri, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
+    BaseUri, FileChangeType, FileSystemWatcher, GlobPattern, InlayHintRefreshRequest,
     TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument,
 };
 use ruff_db::system::SystemPath;
@@ -246,6 +247,58 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     Ok(())
 }
 
+/// A single deletion notification for the Pixi directory named by `CONDA_PREFIX` makes ty
+/// resolve imports in the open file from the workspace's `.venv`.
+#[test]
+fn deleting_pixi_prefix_selects_project_venv() -> Result<()> {
+    let builder = TestServerBuilder::new()?;
+    let workspace = builder.file_path("workspace");
+    let prefix = workspace.join(".pixi/envs/dev");
+    let venv = workspace.join(".venv");
+    let main = workspace.join("main.py");
+    let source =
+        "from typing import reveal_type\nfrom dependency import origin\nreveal_type(origin)";
+    let (python, dependency) = if cfg!(windows) {
+        ("python.exe", "Lib/site-packages/dependency.py")
+    } else {
+        ("bin/python", "lib/python3.13/site-packages/dependency.py")
+    };
+
+    let mut server = builder
+        .with_workspace(&workspace, None)?
+        .with_env_var("CONDA_PREFIX", prefix.as_str())
+        .with_files([
+            (prefix.join("conda-meta/pixi"), ""),
+            (prefix.join(python), ""),
+            (prefix.join(dependency), "origin = 'pixi'"),
+            (venv.join(dependency), "origin = 'venv'"),
+        ])?
+        .with_file(
+            venv.join("pyvenv.cfg"),
+            format!("home = {workspace}\nversion = 3.13\n"),
+        )?
+        .with_file(&main, source)?
+        // Disable relative patterns so a single workspace-wide watch covers both environments.
+        .with_watched_file_support(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    watcher_registrations(&mut server)?;
+    server.open_text_document(&main, source, 1);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        @r#"2:12..2:18[INFORMATION]: Revealed type: `Literal["pixi"]`"#
+    );
+
+    std::fs::remove_dir_all(&prefix)?;
+    server.did_change_watched_file(&prefix, FileChangeType::Deleted);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(&main, None)),
+        @r#"2:12..2:18[INFORMATION]: Revealed type: `Literal["venv"]`"#
+    );
+    Ok(())
+}
+
 #[test]
 fn nested_search_path_picks_up_missed_dependency_edit() -> Result<()> {
     let main = SystemPath::new("src/main.py");
@@ -404,6 +457,79 @@ fn watches_project_without_relative_patterns() -> Result<()> {
         @r#"1:14..1:19[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`"#
     );
     Ok(())
+}
+
+#[test]
+fn falls_back_to_a_workspace_watch_after_registration_fails() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let config = SystemPath::new("src/ty.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main, "x = 1")?
+        .with_file(config, "")?
+        .with_file("deps/dep.py", "")?
+        .with_watched_file_support(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    let (initial_id, _) = watcher_registrations(&mut server)?;
+
+    server.write_file(config, r#"environment.extra-paths = ["../deps"]"#)?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    let (request, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watches.len(), 2);
+    reject_registration(&mut server, request);
+
+    let (fallback, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watcher_snapshot(&watches), ["**"]);
+    server.acknowledge_request(fallback);
+    assert_eq!(server.acknowledge_unregistration()?, initial_id);
+
+    server.open_text_document(main, "x = 1", 1);
+    server.write_file(config, "")?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    server.document_diagnostic_request(main, None);
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
+fn stops_registering_after_workspace_watch_is_rejected() -> Result<()> {
+    let main = SystemPath::new("src/main.py");
+    let config = SystemPath::new("src/ty.toml");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main, "x = 1")?
+        .with_file(config, "")?
+        .with_file("deps/dep.py", "")?
+        .with_watched_file_support(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    watcher_registrations(&mut server)?;
+
+    server.write_file(config, r#"environment.extra-paths = ["../deps"]"#)?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    let (request, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watches.len(), 2);
+    reject_registration(&mut server, request);
+
+    let (fallback, _, watches) = server.watcher_registration_request()?;
+    assert_eq!(watcher_snapshot(&watches), ["**"]);
+    reject_registration(&mut server, fallback);
+
+    server.open_text_document(main, "x = 1", 1);
+    server.write_file(config, "")?;
+    server.did_change_watched_file(config, FileChangeType::Changed);
+    server.document_diagnostic_request(main, None);
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+fn reject_registration(server: &mut TestServer, request: RequestId) {
+    server.send(Message::Response(Response::new_err(
+        request,
+        ErrorCode::InternalError as i32,
+        "Watch limit reached".to_owned(),
+    )));
 }
 
 fn watcher_registrations(server: &mut TestServer) -> Result<(String, Vec<FileSystemWatcher>)> {

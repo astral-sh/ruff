@@ -1240,10 +1240,10 @@ An empty tuple member or an iterable of unknown length can leave room for the la
 ```py
 def optional(a: int, b: int = 0) -> None: ...
 def _(args: tuple[()] | tuple[int]) -> None:
-    optional(*args, 1)  # no diagnostic
+    optional(*args, 1)  # ok
 
 def _(args: list[int] | tuple[int]) -> None:
-    one(*args, 1)  # no diagnostic
+    one(*args, 1)  # ok
 ```
 
 When a tuple union is followed by another positional argument, we currently combine its element
@@ -1361,15 +1361,15 @@ Regression test for <https://github.com/astral-sh/ty/issues/3649>.
 ```py
 def f(a: str, b: str, c: float) -> None: ...
 def _(args: list[str]) -> None:
-    f(*args, 1.0)  # no diagnostic
+    f(*args, 1.0)  # ok
 ```
 
 Arguments on either side of the iterable reduce the number of parameters it can fill:
 
 ```py
 def _(args: list[str]) -> None:
-    f(*args, "b", 1.0)  # no diagnostic
-    f("a", *args, 1.0)  # no diagnostic
+    f(*args, "b", 1.0)  # ok
+    f("a", *args, 1.0)  # ok
 ```
 
 The later argument must match the type of its parameter:
@@ -1395,7 +1395,7 @@ Both positional and keyword arguments leave fewer parameters for the unpacked it
 ```py
 def f(a: str, b: float, c: int) -> None: ...
 def _(args: list[str]) -> None:
-    f(*args, 1.0, c=1)  # no diagnostic
+    f(*args, 1.0, c=1)  # ok
 ```
 
 Unpacking a dictionary afterwards does not prevent the positional argument from filling `b`:
@@ -1403,7 +1403,7 @@ Unpacking a dictionary afterwards does not prevent the positional argument from 
 ```py
 def g(a: str, b: float) -> None: ...
 def _(args: list[str], kwargs: dict[str, int]) -> None:
-    g(*args, 1.0, **kwargs)  # no diagnostic
+    g(*args, 1.0, **kwargs)  # ok
 ```
 
 ### Variable-length unpacking followed by another unpacked argument
@@ -1413,28 +1413,28 @@ A later unpacked tuple also needs room for its elements:
 ```py
 def f(a: str, b: str, c: float) -> None: ...
 def _(args: list[str]) -> None:
-    f(*args, *(1.0,))  # no diagnostic
+    f(*args, *(1.0,))  # ok
 ```
 
 If the tuple fills every parameter, the earlier iterable must be empty:
 
 ```py
 def _(args: list[str], tail: tuple[str, str, float]) -> None:
-    f(*args, *tail)  # no diagnostic
+    f(*args, *tail)  # ok
 ```
 
 A variable-length tuple needs room for at least its required elements:
 
 ```py
 def _(args: list[str], more: tuple[float, *tuple[float, ...]]) -> None:
-    f(*args, *more)  # no diagnostic
+    f(*args, *more)  # ok
 ```
 
 A later iterable with no required elements can be empty. Only the explicit `1.0` needs room here:
 
 ```py
 def _(args: list[str], more: list[float]) -> None:
-    f(*args, *more, 1.0)  # no diagnostic
+    f(*args, *more, 1.0)  # ok
 ```
 
 ### Required tuple elements before a later positional argument
@@ -1444,7 +1444,7 @@ The variable-length part of a tuple can be empty, leaving only its required fina
 ```py
 def f(a: str, b: float) -> None: ...
 def _(args: tuple[*tuple[bytes, ...], str]) -> None:
-    f(*args, 1.0)  # no diagnostic
+    f(*args, 1.0)  # ok
 ```
 
 That final element cannot be omitted when its type is incompatible:
@@ -1460,7 +1460,7 @@ Required elements at both ends of the tuple keep their order when the variable-l
 ```py
 def g(a: str, b: bytes, c: float) -> None: ...
 def _(args: tuple[str, *tuple[int, ...], bytes]) -> None:
-    g(*args, 1.0)  # no diagnostic
+    g(*args, 1.0)  # ok
 ```
 
 When the variable-length part supplies one element, both required final elements still follow it:
@@ -1468,7 +1468,7 @@ When the variable-length part supplies one element, both required final elements
 ```py
 def h(a: str, b: bytes, c: int, d: float) -> None: ...
 def _(args: tuple[*tuple[str, ...], bytes, int]) -> None:
-    h(*args, 1.0)  # no diagnostic
+    h(*args, 1.0)  # ok
 ```
 
 We still report excess arguments when the tuple's required elements cannot all fit:
@@ -1487,7 +1487,7 @@ positional parameters. Later arguments then go to the variadic parameter:
 ```py
 def log(fmt: str, *args: object) -> None: ...
 def _(parts: list[str]) -> None:
-    log(*parts, 1)  # no diagnostic
+    log(*parts, 1)  # ok
 ```
 
 This remains a limitation: we reject calls that would succeed if the iterable were shorter. With two

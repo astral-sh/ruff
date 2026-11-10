@@ -33,6 +33,7 @@ mod signature_help;
 mod stub_mapping;
 mod symbols;
 mod type_hierarchy;
+mod will_rename;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
@@ -67,6 +68,7 @@ pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, Symbol
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };
+pub use will_rename::{FileRename, FileRenameEdit, will_rename_files};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::{
@@ -407,9 +409,7 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
-    };
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DisplayDiagnosticConfig, UnifiedFile};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
@@ -462,10 +462,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
                 let config = config

@@ -1058,6 +1058,11 @@ def _(d: dict[bytes, str | None]):
     if d[b"key"] is not None:
         reveal_type(d[b"key"])  # revealed: str
         reveal_type(d[b"other"])  # revealed: str | None
+
+    if d[b"\xaa"] is not None:
+        reveal_type(d[b"\xaa"])  # revealed: str
+        reveal_type(d[b"\xff"])  # revealed: str | None
+        reveal_type(d[rb"\xaa"])  # revealed: str | None
 ```
 
 Combined with attribute access:

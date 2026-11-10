@@ -41,7 +41,6 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
-from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
@@ -277,40 +276,10 @@ def main() -> None:
         config = yaml.safe_load(fp)
 
     # Add the redirect section to mkdocs.yml.
-    rules = json.loads(
-        subprocess.check_output(
-            [
-                "cargo",
-                "run",
-                "-p",
-                "ruff",
-                "--",
-                "rule",
-                "--all",
-                "--output-format",
-                "json",
-            ],
-        ),
+    redirect_maps = json.loads(
+        subprocess.check_output(["cargo", "dev", "generate-rule-redirects"]),
     )
-    config["plugins"].append(
-        {
-            "redirects": {
-                "redirect_maps": dict(
-                    chain.from_iterable(
-                        [
-                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
-                            (
-                                f"rules/{rule['code'].lower()}.md",
-                                f"rules/{rule['name']}.md",
-                            ),
-                        ]
-                        for rule in rules
-                        if rule["code"] is not None
-                    )
-                ),
-            },
-        },
-    )
+    config["plugins"].append({"redirects": {"redirect_maps": redirect_maps}})
 
     # Add the nav section to mkdocs.yml.
     config["nav"] = []

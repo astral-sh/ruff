@@ -684,10 +684,10 @@ def add_param[**P, R](func: Callable[P, R]) -> Callable[Concatenate[int, P], R]:
     return wrapper
 
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def f2(y: str) -> str: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def f2(y: int) -> int: ...
 @add_param
 def f2(y: str | int) -> str | int:

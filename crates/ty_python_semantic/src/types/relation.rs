@@ -2,7 +2,7 @@ use crate::ProgramEnvironment;
 use std::borrow::Cow;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
@@ -21,11 +21,11 @@ use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, Program,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -244,6 +244,71 @@ fn has_missing_generic_nominal_bound<'db>(
         })
 }
 
+/// Return the class of a nominal instance with no generic specialization or tuple
+/// specification of its own, provided the class is defined by a `class` statement.
+fn non_generic_nominal_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let Type::NominalInstance(instance) = ty else {
+        return None;
+    };
+    if instance.own_tuple_spec(db).is_some() {
+        return None;
+    }
+    let ClassType::NonGeneric(class @ ClassLiteral::Static(_)) = instance.class(db, env) else {
+        return None;
+    };
+    Some(class)
+}
+
+/// Recognize a single nominal positive and nominal exclusions, without alias, type-variable, or
+/// enum-literal operands. These classes can still inherit specialized or recursive generic bases.
+fn nominal_intersection_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let positive = if let Type::Intersection(intersection) = ty {
+        if intersection.positive(db).len() != 1
+            || intersection
+                .negative(db)
+                .iter()
+                .any(|&negative| non_generic_nominal_class(db, env, negative).is_none())
+        {
+            return None;
+        }
+        *intersection.positive(db).iter().next()?
+    } else {
+        ty
+    };
+    non_generic_nominal_class(db, env, positive)
+}
+
+/// Index union alternatives by their required nominal class before checking their exclusions.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn nominal_union_index<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    union: UnionType<'db>,
+) -> Option<FxHashMap<ClassLiteral<'db>, Box<[Type<'db>]>>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut index: FxHashMap<_, Vec<_>> = FxHashMap::default();
+    for &element in union.elements(db) {
+        index
+            .entry(nominal_intersection_bound(db, &env, element)?)
+            .or_default()
+            .push(element);
+    }
+    let mut index: FxHashMap<_, _> = index
+        .into_iter()
+        .map(|(class, elements)| (class, elements.into_boxed_slice()))
+        .collect();
+    index.shrink_to_fit();
+    Some(index)
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -276,6 +341,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
@@ -373,7 +440,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -381,6 +448,21 @@ impl<'db> Type<'db> {
     ///
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        match (self, target) {
+            (Type::Callable(source), Type::Callable(target)) => {
+                source.is_assignable_to(db, env, target)
+            }
+            _ => self.is_assignable_to_via_constraints(db, env, target),
+        }
+    }
+
+    /// Checks whether the assignability constraints for this pair hold for every specialization.
+    pub(super) fn is_assignable_to_via_constraints(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -457,6 +539,16 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        // For example, if `Base.f` accepts `bytes`, overloads of `Child.f` for `int` and `str`
+        // both fail the original check. The checker suppresses notes for individual alternatives,
+        // so trying those overloads again would leave the error context empty.
+        if let (Type::Callable(source), Type::Callable(target)) = (self, target)
+            && !source
+                .signatures(db)
+                .may_explain_relation_to(target.signatures(db))
+        {
+            return ErrorContextTree::new(relation);
+        }
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             env,
@@ -465,7 +557,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -510,7 +602,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Subtyping,
                     TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                 )
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
@@ -602,8 +694,7 @@ impl<'db> Type<'db> {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
             (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
+                self.materialized_divergent_fallback().is_none() && union.contains_member(db, self)
             }
             (Type::Intersection(intersection), _) => {
                 target.materialized_divergent_fallback().is_none()
@@ -648,7 +739,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                 )
             })
         }
@@ -676,7 +767,7 @@ impl<'db> Type<'db> {
             env,
             target,
             constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -709,7 +800,15 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        // Comparing inferred signatures can depend on the union being simplified. Preserve
+        // failed redundancy checks during a cycle so changes to that union cannot make the
+        // comparison alternate between true and false. Keeping an extra alternative is safe.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| true,
+            cycle_fn=|_, _, previous: &bool, current: bool, _| *previous && current,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
@@ -786,7 +885,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             TypeVarEvaluation::Eager,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
         )
     }
 
@@ -841,8 +940,38 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
+        if let (Type::Never, ty) | (ty, Type::Never) = (self, other) {
+            // `Never` is redundant with every type, so only the converse needs checking.
+            return ty.might_be_equivalent_to_never(db)
+                && ty.is_pure_redundant_with(db, env, Type::Never);
+        }
         self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
             .is_always_satisfied(db, env, TypeVarSet::None)
+    }
+
+    /// Returns `false` for types we can cheaply distinguish from `Never`. A single such
+    /// member rules out an entire union without resolving the other members.
+    ///
+    /// ```python
+    /// type Result[T] = T | int  # Even Result[Never] contains int.
+    /// ```
+    ///
+    /// A `true` result still needs a relation check. For example, an alias may expand to `Never`.
+    fn might_be_equivalent_to_never(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(_)
+            | Type::LiteralValue(_)
+            | Type::Dynamic(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::ClassLiteral(_) => false,
+            Type::Divergent(_) => self.is_never(),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.might_be_equivalent_to_never(db)),
+            _ => true,
+        }
     }
 
     pub(crate) fn is_equivalent_to_with_materialization_visitor(
@@ -947,7 +1076,7 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             typevar_evaluation,
             relation_visitor: &relation_visitor,
@@ -1001,7 +1130,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1025,7 +1154,7 @@ impl<'db> Type<'db> {
             constraints: &constraints,
             inferable: TypeVarSet::None,
             context_tree: Some(context.clone()),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&constraints),
             disjointness_visitor: &IsDisjointVisitor::default(&constraints),
@@ -1056,7 +1185,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1162,7 +1291,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1230,7 +1359,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1254,7 +1383,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1380,6 +1509,44 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, alternatives, target);
         }
 
+        // Fast path for pattern narrowing, which can compare many intersections against the
+        // same wide union. If the source intersection and every arm require a single nominal
+        // class and have only nominal exclusions, the cached index lets us skip arms the
+        // source cannot match. Keep the full traversal when collecting error context for each arm.
+        if source.is_intersection()
+            && !self.is_context_collection_enabled()
+            && let Some(source_class) = nominal_intersection_bound(db, self.env, source)
+            && let Some(index) = nominal_union_index(db, self.env.program(db), union)
+            // A gradual base can make the source assignable to a class outside its known MRO.
+            && !(self.relation.is_assignability()
+                && source_class.iter_mro(db).any(|base| {
+                    matches!(base, ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
+                }))
+        {
+            // A successful alternative needs the same nominal class or one of its bases.
+            // Check class identity separately: an unspecialized generic class acquires default
+            // arguments in its MRO. The full relation still checks each alternative's exclusions.
+            let mut matching = std::iter::once(source_class)
+                .chain(source_class.iter_mro(db).filter_map(|base| match base {
+                    ClassBase::Class(ClassType::NonGeneric(class)) if class != source_class => {
+                        Some(class)
+                    }
+                    _ => None,
+                }))
+                .filter_map(|class| index.get(&class));
+            let Some(elements) = matching.next() else {
+                return self.never();
+            };
+            // One group preserves the target union's comparison order. If several bounds match,
+            // use the original traversal so recursive inherited specializations keep that order.
+            if matching.next().is_none() {
+                return elements.iter().when_any(db, self.constraints, |&element| {
+                    self.check_type_pair(db, source, element)
+                });
+            }
+        }
+
+        let elements = union.elements(db);
         let check_expanded_source = || {
             // Normally non-unions cannot directly contain unions in our model due to the fact that
             // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
@@ -1397,6 +1564,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::Intersection(intersection)
                     if self.should_expand_intersection(db, intersection) =>
                 {
+                    // A plain type-variable arm already records the required lower bound if all
+                    // other arms are disjoint. Expanding `int & U` to `int` when matching
+                    // `T | None` can erase `U`.
+                    let is_plain_typevar = |element: Type<'db>| {
+                        element
+                            .as_typevar()
+                            .is_some_and(|variable| variable.domain(db) == TypeVarDomain::Type)
+                    };
+                    if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                        && elements.iter().copied().any(is_plain_typevar)
+                        && elements
+                            .iter()
+                            .copied()
+                            .filter(|&element| {
+                                !self
+                                    .as_disjointness_checker()
+                                    .check_type_pair(db, source, element)
+                                    .is_trivially_always_satisfied()
+                            })
+                            .at_most_one()
+                            .is_ok_and(|overlapping| overlapping.is_none_or(is_plain_typevar))
+                    {
+                        return self.never();
+                    }
+
                     self.check_type_pair(
                         db,
                         intersection.with_expanded_typevars_and_newtypes(db, self.env),
@@ -1418,7 +1610,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let mut elements_context = vec![];
         let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
-        let elements = union.elements(db);
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
@@ -1431,7 +1622,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 result
             })
-            .or(db, self.constraints, check_expanded_source);
+            .or(db, self.constraints, check_expanded_source)
+            .or(db, self.constraints, || {
+                let has_exclusions = |element: Type<'db>| {
+                    matches!(element, Type::Intersection(intersection) if !intersection.negative(db).is_empty())
+                };
+                if !self.is_eager_assignability()
+                    || !elements.iter().copied().any(has_exclusions)
+                {
+                    return self.never();
+                }
+
+                // A gradual union can cover the source collectively even when no arm does:
+                // `U` is assignable to `(U & ~Top[A]) | A`. Materializing the covering arm A
+                // gives `(U & ~Top[A]) | Top[A]`, which simplifies to `U | Top[A]`: Top[A]
+                // restores the part excluded from U. Leave intersections with exclusions intact.
+                // Keep type-variable domains unchanged, since they describe the specializations
+                // allowed in this relation.
+                let materialization_visitor = ApplyTypeMappingVisitor {
+                    materialize_typevar_bounds_and_defaults: false,
+                    ..self.materialization_visitor.for_new_materialization_root()
+                };
+                let materialized = UnionType::from_elements(
+                    db,
+                    self.env,
+                    elements.iter().copied().map(|element| {
+                        if has_exclusions(element) {
+                            element
+                        } else {
+                            element.materialize(db, MaterializationKind::Top, &materialization_visitor)
+                        }
+                    }),
+                );
+                if materialized == target {
+                    return self.never();
+                }
+                self.without_context_collection(|| self.check_type_pair(db, source, materialized))
+            });
 
         if context_tree.is_some()
             && !elements_context.is_empty()
@@ -1989,6 +2216,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(source)),
+                Type::KnownInstance(KnownInstanceType::UnionType(target)),
+            ) => ConstraintSet::from_bool(self.constraints, source.same_value(db, env, target)),
+
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
                 if let Some(source_argument) = source_instance.type_form_argument(db, env) =>
             {
@@ -2228,7 +2460,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `T` will always be a subtype of any union containing `T`.
             (_, Type::Union(union))
                 if self.relation.can_safely_assume_reflexivity(source)
-                    && union.elements(db).contains(&source) =>
+                    && union.contains_member(db, source) =>
             {
                 self.always()
             }
@@ -3259,7 +3491,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             context_tree: None,
-            provenance: ConstraintProvenance::Evidence,
+            provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             disjointness_visitor,
             relation_visitor,
@@ -3621,6 +3853,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
+                    // Fast-path: If the type is inhabited and an exact member of the union,
+                    // the types cannot be disjoint.
+                    if self.report_context().is_none()
+                        && union.contains_member(db, other)
+                        && self
+                            .check_type_pair(db, other, other)
+                            .is_trivially_never_satisfied()
+                    {
+                        return self.never();
+                    }
+
                     let mut children = Vec::new();
                     let result = union
                         .elements(db)
@@ -3828,6 +4071,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         right_partial.wrapped(db).inner(db),
                     )
                 })
+            }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(left)),
+                Type::KnownInstance(KnownInstanceType::UnionType(right)),
+            ) => nontrivial_check(self, || {
+                ConstraintSet::from_bool(self.constraints, left.is_disjoint_from(db, env, right))
             }),
 
             (

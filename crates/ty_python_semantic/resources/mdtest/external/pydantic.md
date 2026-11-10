@@ -77,7 +77,7 @@ Product(name="Laptop", internal_price_cent=999_00)
 Conversely, accessing a field through the alias is also not allowed:
 
 ```py
-product.price_cent  # error: [unresolved-attribute]
+product.price_cent  # error: [missing-attribute]
 ```
 
 ## Usage of ellipsis in `Field`
@@ -932,6 +932,17 @@ StrictFields(strict_int=1, strict_str="foo")
 StrictFields(strict_int="1", strict_str="foo")  # error: [invalid-argument-type]
 StrictFields(strict_int=1, strict_str=b"foo")  # error: [invalid-argument-type]
 
+type Direct = Annotated[int, Strict()]
+type Indirect = StrictInt
+
+class AliasedStrictFields(BaseModel):
+    direct: Direct
+    indirect: Indirect
+
+AliasedStrictFields(direct=1, indirect=1)  # ok
+AliasedStrictFields(direct="1", indirect=1)  # error: [invalid-argument-type]
+AliasedStrictFields(direct=1, indirect="1")  # error: [invalid-argument-type]
+
 class StrictMetadataOrder(BaseModel):
     field_then_lax: Annotated[int, Field(strict=True), Strict(False)]
     lax_then_field: Annotated[int, Strict(False), Field(strict=True)]
@@ -1195,6 +1206,16 @@ Person(name=None, id=1)  # error: [invalid-argument-type]
 Person(id=1)  # error: [missing-argument]
 ```
 
+Quoting the annotation preserves the field's alias.
+
+```py
+class Quoted(BaseModel):
+    x: "Annotated[int, Field(alias='y')]"
+
+Quoted(y=1)  # no diagnostic
+Quoted(x=1)  # error: [missing-argument] "No argument provided for required parameter `y`"
+```
+
 Multiple `Field(...)` calls in `Annotated[...]` are merged:
 
 ```py
@@ -1228,8 +1249,9 @@ AliasField = Annotated[int, Field(default=0)]
 
 class ModelWithAliasField(BaseModel):
     value: AliasField
+    quoted: "AliasField"
 
-ModelWithAliasField()
+ModelWithAliasField()  # no diagnostic
 ```
 
 Field metadata is also collected through a generic alias, where the `Field(...)` default is carried
@@ -1407,10 +1429,10 @@ class AnnotatedFrozenFields(BaseModel):
 
 fields = AnnotatedFrozenFields()
 fields.annotated = 1  # error: [invalid-assignment]
-fields.unfrozen_by_assignment = 1  # no diagnostic
+fields.unfrozen_by_assignment = 1  # ok
 fields.frozen_by_assignment = 1  # error: [invalid-assignment]
-fields.unfrozen_by_none_assignment = 1  # no diagnostic
-fields.unfrozen_by_none_annotation = 1  # no diagnostic
+fields.unfrozen_by_none_assignment = 1  # ok
+fields.unfrozen_by_none_annotation = 1  # ok
 ```
 
 This also works through a type alias:
@@ -1436,9 +1458,9 @@ class MutableFields(BaseModel):
     unknown: int = Field(default=0, frozen=os.environ.get("FROZEN") == "1")
 
 fields = MutableFields()
-fields.disabled = 1  # no diagnostic
-fields.none = 1  # no diagnostic
-fields.unknown = 1  # no diagnostic
+fields.disabled = 1  # ok
+fields.none = 1  # ok
+fields.unknown = 1  # ok
 ```
 
 Pydantic checks whether the model is frozen before checking the field, so `Field(frozen=False)` does
@@ -1464,7 +1486,7 @@ class RedeclaresFrozenField(FrozenFieldBase):
     value: int
 
 InheritsFrozenField(value=1).value = 2  # error: [invalid-assignment]
-RedeclaresFrozenField(value=1).value = 2  # no diagnostic
+RedeclaresFrozenField(value=1).value = 2  # ok
 ```
 
 Frozen fields are also supported on generic models:
@@ -1485,7 +1507,7 @@ class FrozenFieldWithCustomSetattr(BaseModel):
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
 
-FrozenFieldWithCustomSetattr(value=1).value = 2  # no diagnostic
+FrozenFieldWithCustomSetattr(value=1).value = 2  # ok
 ```
 
 ## Frozen models and protocols
@@ -1531,7 +1553,7 @@ class FrozenField(BaseModel):
     value: int = Field(frozen=True)
 
 update(FrozenField(value=1))  # error: [invalid-argument-type]
-read(FrozenField(value=1))  # no diagnostic
+read(FrozenField(value=1))  # ok
 ```
 
 ## Validation of default values
@@ -1633,6 +1655,70 @@ DerivedSettings(1)
 
 # `CustomInit.__init__` overrides the constructor, so `_secrets_dir` is not accepted.
 DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
+```
+
+## BaseSettings extra fields
+
+Settings models forbid extra fields by default, but can allow them through `SettingsConfigDict`.
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(extra="allow")
+    name: str
+
+Settings(name="app", debug=True)
+Settings(debug=True, _secrets_dir="./secrets")
+```
+
+Declared fields and settings control parameters are still checked against their expected types:
+
+```py
+Settings(name=None, debug=True)  # error: [invalid-argument-type]
+Settings(debug=True, _secrets_dir=1)  # error: [invalid-argument-type]
+```
+
+With `extra="forbid"`, unknown arguments are rejected:
+
+```py
+class ForbidSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="forbid")
+
+ForbidSettings(debug=True)  # error: [unknown-argument]
+```
+
+Settings control parameters are still accepted when extra fields are forbidden:
+
+```py
+ForbidSettings(_secrets_dir="./secrets")  # ok
+```
+
+With `extra="ignore"`, extra arguments are accepted but discarded, so ty warns about them:
+
+```py
+class IgnoreSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+IgnoreSettings(debug=True)  # error: [pydantic-discarded-extra-argument]
+IgnoreSettings(_secrets_dir="./secrets")  # ok
+```
+
+## SettingsConfigDict subclasses
+
+Subclasses of `SettingsConfigDict` can add application-specific configuration keys while retaining
+Pydantic's model options:
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class AppConfig(SettingsConfigDict, total=False):
+    deployment: str
+
+class Settings(BaseSettings):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+Settings(debug=True)  # error: [unknown-argument]
 ```
 
 ## Root models
@@ -1803,6 +1889,18 @@ class AliasedConfigDict(BaseModel):
 AliasedConfigDict(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
+Subclasses of `ConfigDict` are also recognized:
+
+```py
+class AppConfig(ConfigDict, total=False):
+    deployment: str
+
+class CustomConfigModel(BaseModel):
+    model_config = AppConfig(extra="forbid", deployment="production")
+
+CustomConfigModel(something_else=7)  # error: [unknown-argument]
+```
+
 Pydantic also accepts a plain dictionary as `model_config`:
 
 ```py
@@ -1854,10 +1952,10 @@ class Parent(BaseModel):
     name: str
 
 class Child(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
-Child(name="child")  # no diagnostic
+Child(name="child")  # ok
 Child()  # error: [missing-argument] "No argument provided for required parameter `name`"
 ```
 
@@ -1869,17 +1967,17 @@ class Grandchild(Child):
 
 reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Grandchild.__replace__)  # revealed: (self: Grandchild, *, name: str = ...) -> Grandchild
-Grandchild(name="grandchild")  # no diagnostic
+Grandchild(name="grandchild")  # ok
 ```
 
 A `ClassVar` declaration without a value also excludes the inherited field.
 
 ```py
 class AnnotationOnly(Parent):
-    params: ClassVar[int]  # error: [invalid-attribute-override]
+    params: ClassVar[int]  # error: [incompatible-attribute-override]
 
 reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
-AnnotationOnly(name="child")  # no diagnostic
+AnnotationOnly(name="child")  # ok
 ```
 
 ## Class variables overriding mixin attributes
@@ -1894,10 +1992,10 @@ class Parent:
     params: int
 
 class Child(BaseModel, Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
-child = Child()  # no diagnostic
+child = Child()  # ok
 reveal_type(child.params)  # revealed: int
 ```
 
@@ -1905,13 +2003,13 @@ The overriding `ClassVar` can itself be inherited from an ordinary class.
 
 ```py
 class Mixin(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 class Model(BaseModel, Mixin):
     pass
 
 reveal_type(Model.__init__)  # revealed: (self: Model, **extra: Any) -> None
-Model()  # no diagnostic
+Model()  # ok
 ```
 
 ## Differences from dataclasses
@@ -1937,9 +2035,9 @@ RequiredAfterDefault(required=1)
 Pydantic models do not expose some of the special attributes of dataclasses:
 
 ```py
-RequiredAfterDefault.__dataclass_fields__  # error: [unresolved-attribute]
-RequiredAfterDefault.__dataclass_params__  # error: [unresolved-attribute]
-RequiredAfterDefault.__match_args__  # error: [unresolved-attribute]
+RequiredAfterDefault.__dataclass_fields__  # error: [missing-attribute]
+RequiredAfterDefault.__dataclass_params__  # error: [missing-attribute]
+RequiredAfterDefault.__match_args__  # error: [missing-attribute]
 ```
 
 They do, however, expose various Pydantic-specific fields (inherited from `BaseModel`), for example:

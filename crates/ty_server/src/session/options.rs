@@ -287,6 +287,7 @@ impl WorkspaceOptions {
                 match TyOptions::deserialize_with(
                     ValueSource::Editor,
                     serde::de::value::MapDeserializer::new(map.0.into_iter()),
+                    ty_python_semantic::default_lint_registry(),
                 ) {
                     Ok(options) => Some(options),
                     Err(error) => {

@@ -200,26 +200,30 @@ fn settings_diagnostic_path_from_sys_prefix(
         sys_prefix.join("bin")
     };
 
-    for candidate in [
-        bin_dir.join("python3"),
-        bin_dir.join("python"),
-        bin_dir.join("pypy3"),
-        bin_dir.join("pypy"),
-    ] {
+    find_interpreter_in_directory(&bin_dir, system)
+}
+
+/// Tries common interpreter names such as `python3`, `pypy`, and `graalpy` before scanning for
+/// names that include a minor version, such as `python3.13`.
+fn find_interpreter_in_directory(
+    bin_dir: &SystemPath,
+    system: &dyn System,
+) -> Option<SystemPathBuf> {
+    for name in ["python3", "python", "pypy3", "pypy", "graalpy"] {
+        let candidate = bin_dir.join(name);
+        #[cfg(windows)]
+        let candidate = candidate.with_extension("exe");
         if system.is_file(&candidate) {
             return Some(candidate);
         }
     }
 
-    let entries = system.read_directory(&bin_dir).ok()?;
+    let entries = system.read_directory(bin_dir).ok()?;
     for entry in entries.flatten() {
-        if entry.file_type().is_directory() {
-            continue;
-        }
-
         let path = entry.into_path();
         if let Some(file_name) = path.file_name()
             && is_versioned_interpreter_path(file_name)
+            && system.is_file(&path)
         {
             return Some(path);
         }
@@ -231,6 +235,12 @@ fn settings_diagnostic_path_from_sys_prefix(
 /// Returns `true` if the file name appears to be that of a versioned interpreter
 /// (e.g., `python3.15`).
 fn is_versioned_interpreter_path(file_name: &str) -> bool {
+    #[cfg(windows)]
+    let file_name = &file_name.to_ascii_lowercase();
+
+    if !file_name.ends_with(std::env::consts::EXE_SUFFIX) {
+        return false;
+    }
     matches!(
         PythonInterpreterLayout::from_file_name(file_name),
         Some(PythonInterpreterLayout {
@@ -270,6 +280,16 @@ impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
     }
 }
 
+/// Candidate paths for [`PythonEnvironment::discover`], collected before checking the filesystem.
+#[derive(Debug)]
+pub enum VirtualEnvironmentCandidates {
+    VirtualEnvVar(SystemPathBuf),
+    NoVirtualEnvVar {
+        conda_prefix: Option<SystemPathBuf>,
+        project_venv: Option<SystemPathBuf>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum PythonEnvironment {
     Virtual(VirtualEnvironment),
@@ -277,45 +297,61 @@ pub enum PythonEnvironment {
 }
 
 impl PythonEnvironment {
-    /// Discover the python environment using the following priorities:
+    /// Discovers the Python environment in order of priority:
     ///
-    /// 1. activated virtual environment
-    /// 2. conda (child)
-    /// 3. project virtual environment, when a project root is provided
-    /// 4. conda (base)
+    /// 1. An activated virtual environment.
+    /// 2. An active child Conda or Pixi environment containing Python.
+    /// 3. A `.venv` in the project root, if provided.
+    /// 4. An active base Conda environment containing Python.
+    /// 5. A Python interpreter on `PATH`.
+    ///
+    /// If the project's `.venv` fails to resolve, discovery continues. An error resolving a
+    /// selected Conda environment or `VIRTUAL_ENV` is returned to the caller.
     pub fn discover(
         project_root: Option<&SystemPath>,
         system: &dyn System,
     ) -> Result<Option<Self>, SitePackagesDiscoveryError> {
-        fn resolve_environment(
-            system: &dyn System,
-            path: &SystemPath,
-            origin: SysPrefixPathOrigin,
-        ) -> Result<PythonEnvironment, SitePackagesDiscoveryError> {
+        let resolve = |path: &SystemPath, origin| {
             tracing::debug!("Resolving {origin}: {path}");
-            PythonEnvironment::new(path, origin, system)
+            Self::new(path, origin, system)
+        };
+
+        let candidates = Self::virtual_environment_candidates(project_root, system);
+        let (conda_prefix, project_venv) = match candidates {
+            VirtualEnvironmentCandidates::VirtualEnvVar(path) => {
+                return resolve(&path, SysPrefixPathOrigin::VirtualEnvVar).map(Some);
+            }
+            VirtualEnvironmentCandidates::NoVirtualEnvVar {
+                conda_prefix,
+                project_venv,
+            } => (conda_prefix, project_venv),
+        };
+
+        let conda = conda_prefix
+            .as_deref()
+            .map(|path| (path, CondaEnvironmentKind::from_prefix_path(system, path)));
+        if let Some((path, CondaEnvironmentKind::Child)) = conda
+            && conda_prefix_has_python(path, system)
+        {
+            return resolve(path, SysPrefixPathOrigin::CondaPrefixVar).map(Some);
         }
 
-        if let Some((path, origin)) = Self::virtual_environment_candidate(project_root, system) {
-            let is_local_venv = matches!(origin, SysPrefixPathOrigin::LocalVenv);
-            match resolve_environment(system, &path, origin) {
+        if let Some(path) = project_venv.as_deref() {
+            match resolve(path, SysPrefixPathOrigin::LocalVenv) {
                 Ok(environment) => return Ok(Some(environment)),
-                Err(err) if !is_local_venv => return Err(err),
-                Err(err) => {
-                    if system.is_directory(&path) {
-                        tracing::debug!(
-                            "Ignoring automatically detected virtual environment at `{}`: {}",
-                            &path,
-                            err
-                        );
-                    }
+                Err(err) if system.is_directory(path) => {
+                    tracing::debug!(
+                        "Ignoring automatically detected virtual environment at `{path}`: {err}"
+                    );
                 }
+                Err(_) => {}
             }
         }
 
-        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Base) {
-            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
-                .map(Some);
+        if let Some((path, CondaEnvironmentKind::Base)) = conda
+            && conda_prefix_has_python(path, system)
+        {
+            return resolve(path, SysPrefixPathOrigin::CondaPrefixVar).map(Some);
         }
 
         if let Some(env) = environment_from_binary(system, "python3")
@@ -327,22 +363,27 @@ impl PythonEnvironment {
         Ok(None)
     }
 
-    /// Returns the virtual environment location to try and its origin, without checking whether
-    /// it exists. `VIRTUAL_ENV` takes precedence over a child Conda environment, followed by the
-    /// project's `.venv`. System Python fallbacks are handled by [`Self::discover`].
-    pub fn virtual_environment_candidate(
+    /// Returns the path from `VIRTUAL_ENV` if it is nonempty. Otherwise, the candidates are
+    /// `CONDA_PREFIX` if nonempty and `.venv` if a project root was supplied. The paths need
+    /// not exist. [`Self::discover`] resolves them in priority order.
+    pub fn virtual_environment_candidates(
         project_root: Option<&SystemPath>,
         system: &dyn System,
-    ) -> Option<(SystemPathBuf, SysPrefixPathOrigin)> {
-        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
-            return Some((virtual_env.into(), SysPrefixPathOrigin::VirtualEnvVar));
+    ) -> VirtualEnvironmentCandidates {
+        let from_env = |name| {
+            system
+                .env_var(name)
+                .ok()
+                .filter(|value| !value.is_empty())
+                .map(SystemPathBuf::from)
+        };
+        if let Some(path) = from_env(EnvVars::VIRTUAL_ENV) {
+            return VirtualEnvironmentCandidates::VirtualEnvVar(path);
         }
-
-        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
-            return Some((conda_env, SysPrefixPathOrigin::CondaPrefixVar));
+        VirtualEnvironmentCandidates::NoVirtualEnvVar {
+            conda_prefix: from_env(EnvVars::CONDA_PREFIX),
+            project_venv: project_root.map(|root| root.join(".venv")),
         }
-
-        project_root.map(|root| (root.join(".venv"), SysPrefixPathOrigin::LocalVenv))
     }
 
     pub fn new(
@@ -975,6 +1016,11 @@ impl CondaEnvironmentKind {
     /// `/usr/local/conda/envs/<name>`. Note that the name `CONDA_DEFAULT_ENV` is misleading, it's
     /// the active environment name, not a constant base environment name.
     fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
+        // Pixi has no base environment, and its environment names need not match the prefix.
+        if system.is_file(&path.join("conda-meta/pixi")) {
+            return Self::Child;
+        }
+
         // If `_CONDA_ROOT` is set and matches `CONDA_PREFIX`, it's the base environment.
         if let Ok(conda_root) = system.env_var(EnvVars::CONDA_ROOT)
             && path.as_str() == conda_root
@@ -986,6 +1032,11 @@ impl CondaEnvironmentKind {
         let Ok(current_env) = system.env_var(EnvVars::CONDA_DEFAULT_ENV) else {
             return Self::Child;
         };
+
+        // Environments created with `conda create -p` use their full prefix as the name.
+        if path == SystemPath::new(&current_env) {
+            return Self::Child;
+        }
 
         // If the environment name is "base" or "root", treat it as a base environment
         //
@@ -1010,22 +1061,17 @@ impl CondaEnvironmentKind {
     }
 }
 
-/// Read `CONDA_PREFIX` and confirm that it has the expected kind
-fn conda_environment_from_env(
-    system: &dyn System,
-    kind: CondaEnvironmentKind,
-) -> Option<SystemPathBuf> {
-    let dir = system
-        .env_var(EnvVars::CONDA_PREFIX)
-        .ok()
-        .filter(|value| !value.is_empty())?;
-    let path = SystemPathBuf::from(dir);
-
-    if kind != CondaEnvironmentKind::from_prefix_path(system, &path) {
-        return None;
-    }
-
-    Some(path)
+fn conda_prefix_has_python(path: &SystemPath, system: &dyn System) -> bool {
+    // A Conda or Pixi environment can supply tools or native libraries without installing
+    // Python. CPython's `make altinstall` may install only a versioned executable.
+    let bin_dirs: &[&str] = if cfg!(windows) {
+        &["", "Scripts", "bin"]
+    } else {
+        &["bin"]
+    };
+    bin_dirs
+        .iter()
+        .any(|dir| find_interpreter_in_directory(&path.join(dir), system).is_some())
 }
 
 fn environment_from_binary(system: &dyn System, binary: &str) -> Option<PythonEnvironment> {
@@ -2318,6 +2364,82 @@ mod tests {
                 Self::System(_) => panic!("Expected a virtual environment"),
             }
         }
+    }
+
+    /// Discovery selects the project's `.venv` when an unnamed Conda prefix contains only
+    /// `python3.13-config`. Adding `python3.13` makes the prefix take precedence.
+    /// A Conda environment created with `conda create -p` uses its full path as its name.
+    #[test]
+    fn unnamed_conda_environment_with_and_without_python() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/custom");
+        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, prefix.as_str());
+        let (config_helper, python) = if cfg!(windows) {
+            ("python3.13-config.exe", "python3.13.exe")
+        } else {
+            ("bin/python3.13-config", "bin/python3.13")
+        };
+        system
+            .memory_file_system()
+            .write_file_all(prefix.join(config_helper), "")?;
+        assert_conda_precedence(&system, prefix, python)
+    }
+
+    /// Even when `_CONDA_ROOT` matches the prefix, a Pixi environment takes precedence over
+    /// the project's `.venv` only when it contains Python.
+    #[test]
+    fn pixi_environment_with_and_without_python() -> Result<(), Box<dyn std::error::Error>> {
+        let system = TestSystem::default();
+        let prefix = SystemPath::new("/pixi/envs/default");
+        system.set_env_var(EnvVars::CONDA_DEFAULT_ENV, "project:default");
+        system.set_env_var(EnvVars::CONDA_ROOT, prefix.as_str());
+        system
+            .memory_file_system()
+            .write_file_all(prefix.join("conda-meta/pixi"), "")?;
+        let python = if cfg!(windows) {
+            "bin/python.exe"
+        } else {
+            "bin/python3"
+        };
+        assert_conda_precedence(&system, prefix, python)
+    }
+
+    /// Checks that discovery selects the project's `.venv` until the prefix contains an interpreter.
+    #[track_caller]
+    fn assert_conda_precedence(
+        system: &TestSystem,
+        prefix: &SystemPath,
+        python: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        system.set_env_var(EnvVars::CONDA_PREFIX, prefix.as_str());
+        let fs = system.memory_file_system();
+        fs.create_directory_all("/python")?;
+        fs.write_file_all("/project/.venv/pyvenv.cfg", "home = /python")?;
+
+        let discover = || {
+            PythonEnvironment::discover(Some(SystemPath::new("/project")), system)
+                .map(|environment| environment.map(|env| env.sys_prefix().to_path_buf()))
+        };
+        let venv = SystemPath::new("/project/.venv");
+        assert_eq!(discover()?, Some(system.canonicalize_path(venv)?));
+
+        fs.write_file_all(prefix.join(python), "")?;
+        assert_eq!(discover()?, Some(system.canonicalize_path(prefix)?));
+        Ok(())
+    }
+
+    /// Discovery finds no environment when neither the active base Conda prefix nor PATH supplies Python.
+    #[test]
+    fn base_conda_without_python() {
+        let system = TestSystem::default();
+        system.set_env_var(EnvVars::CONDA_PREFIX, "/conda");
+        system.set_env_var(EnvVars::CONDA_ROOT, "/conda");
+        system
+            .memory_file_system()
+            .create_directory_all("/conda")
+            .unwrap();
+        assert_eq!(PythonEnvironment::discover(None, &system).unwrap(), None);
     }
 
     #[derive(Default)]
@@ -3934,6 +4056,8 @@ mod tests {
         }
     }
 
+    /// ty discovers a Conda prefix containing only `bin/graalpy`. Selecting that executable
+    /// explicitly also locates its `lib/pythonX.Y/site-packages`.
     #[cfg(not(windows))]
     #[test]
     fn recognizes_unversioned_graalpy_executable() {
@@ -3947,6 +4071,10 @@ mod tests {
         memory_fs
             .create_directory_all(sys_prefix.join("lib/python3.14/site-packages"))
             .unwrap();
+
+        system.set_env_var(EnvVars::CONDA_PREFIX, sys_prefix.as_str());
+        let discovered = PythonEnvironment::discover(None, &system).unwrap().unwrap();
+        assert_eq!(&**discovered.sys_prefix(), sys_prefix.as_path());
 
         let environment = PythonEnvironment::new(
             sys_prefix.join("bin/graalpy"),

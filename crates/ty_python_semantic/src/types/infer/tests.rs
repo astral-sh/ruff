@@ -10,7 +10,10 @@ use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_db::testing::{
+    assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    assert_function_query_was_run, find_will_execute_event_by_name,
+};
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
@@ -123,7 +126,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     settings.python_version.version = PythonVersion::PY312;
     let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
-    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+    let check = |file, expected_type, expect_invalid_syntax, expect_import_not_found| {
         let diagnostics = crate::check_file_unwrap(&db, file);
 
         assert_eq!(
@@ -137,7 +140,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
             diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.headline_message().contains("zipfile._path")),
-            expect_unresolved_import,
+            expect_import_not_found,
             "{diagnostics:#?}"
         );
 
@@ -149,7 +152,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
         assert_eq!(
             diagnostics.len(),
-            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_import_not_found),
             "{diagnostics:#?}"
         );
     };
@@ -353,6 +356,28 @@ fn multiplied_literal_string() -> anyhow::Result<()> {
 }
 
 #[test]
+fn concatenated_bytes_literal_size_limit() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let limit = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE;
+    let content = format!(
+        r#"
+            from typing_extensions import Literal, assert_type
+
+            value = b"{prefix}" + b"x"
+            assert_type(len(value), Literal[{limit}])
+            value += b"x"
+            assert_type(value, bytes)
+            "#,
+        prefix = "x".repeat(limit - 1),
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
 fn truncated_string_literals_become_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
@@ -544,6 +569,43 @@ fn loop_variable_types_are_independent_of_file_order() -> anyhow::Result<()> {
                 assert_revealed_type(&db, &format!("src/check_{name}.py"), "Never");
             }
         }
+    }
+    Ok(())
+}
+
+#[test]
+fn loop_predicate_tracks_changes_to_bool_method() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from flags import Flag
+
+        def f(flag: Flag, running: bool) -> None:
+            while running:
+                if flag:  # ty: ignore[redundant-condition]
+                    result = 1
+                else:
+                    result = 2
+                reveal_type(result)
+                break
+        "#,
+    )?;
+
+    for (boolean, expected) in [("True", "Literal[1]"), ("False", "Literal[2]")] {
+        db.write_dedented(
+            "/src/flags.pyi",
+            &format!(
+                r#"
+                from typing import Literal
+
+                class Flag:
+                    def __bool__(self) -> Literal[{boolean}]: ...
+                "#
+            ),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", expected);
     }
     Ok(())
 }
@@ -1044,6 +1106,32 @@ value.bit_count()
 }
 
 #[test]
+fn suppressed_call_error_skips_callable_description() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    let source = "def f() -> int: return 1\nf(1)";
+    let query = "CallableDescription < 'db >::from_overload_";
+
+    db.write_file(
+        path,
+        format!("{source}  # ty: ignore[too-many-positional-arguments]"),
+    )?;
+    assert_file_diagnostics(&db, path, &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query, None, &events);
+
+    db.write_file(path, source)?;
+    assert_file_diagnostics(
+        &db,
+        path,
+        &["Too many positional arguments to function `f`: expected 0, got 1"],
+    );
+    let events = db.take_salsa_events();
+    assert!(find_will_execute_event_by_name(&db, query, None, &events).is_some());
+    Ok(())
+}
+
+#[test]
 fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
     let mut db = setup_db();
 
@@ -1066,6 +1154,36 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .end_of_scope_symbol_bindings(place_table(db, scope).symbol_id(name).unwrap())
         .find_map(|b| b.binding.definition())
         .expect("no binding found")
+}
+
+#[test]
+fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/main.py", "from dependency import x"),
+        ("/src/dependency.py", "x: int = 1\nlist\ndict\nlist"),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let assert_imported_type = |db: &TestDb| {
+        let ty = global_symbol(db, main, "x").place.expect_type();
+        assert_eq!(ty.display(db, &db.program_environment()).to_string(), "int");
+    };
+    let query_name = "place_by_id";
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert!(
+        find_will_execute_event_by_name(&db, query_name, None, &events).is_some(),
+        "Expected the first lookup to run {query_name}"
+    );
+
+    db.write_file("/src/dependency.py", "x: int = 1\nlist\ndict\ndict")?;
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query_name, None, &events);
+    Ok(())
 }
 
 #[test]
@@ -1215,6 +1333,42 @@ fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Res
         );
         db.write_file("/src/main.py", fixed)?;
         assert_file_diagnostics(&db, "/src/main.py", &[]);
+    }
+    Ok(())
+}
+
+#[test]
+fn overload_signatures_track_imported_annotations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/api.pyi",
+        r#"
+        from typing import overload
+        from payload import Result
+
+        @overload
+        def parse(value: int) -> Result: ...
+        @overload
+        def parse(value: bytes) -> bytes: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from api import parse
+
+        reveal_type((parse(1), parse(b"x")))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, bytes]"),
+        ("str", "tuple[str, bytes]"),
+        ("int", "tuple[int, bytes]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Result = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
     }
     Ok(())
 }
@@ -1568,6 +1722,156 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
         first_public_binding(&db, a, "x"),
         &events,
     );
+    Ok(())
+}
+
+#[test]
+fn specialized_alias_values_track_imported_types() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from typing import TypeAliasType, TypeVar
+        from payload import Payload
+
+        type Declared[T] = tuple[T, Payload]
+        T = TypeVar("T")
+        Manual = TypeAliasType("Manual", tuple[T, Payload], type_params=(T,))
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from aliases import Declared, Manual
+
+        def check(declared: Declared[int], manual: Manual[bytes]):
+            reveal_type((declared[1], manual[1]))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, int]"),
+        ("str", "tuple[str, str]"),
+        ("int", "tuple[int, int]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Payload = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "from aliases import Alias\nvalue: Alias = []",
+    )?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+
+    for (alias, unrelated, should_run) in [
+        ("list[int]", 1, true),
+        // The alias's meaning is unchanged by edits elsewhere in its defining module.
+        ("list[int]", 2, false),
+        ("list[str]", 2, true),
+    ] {
+        let source = format!("Alias = {alias}\ndef unrelated(): return {unrelated}");
+        db.write_file("/src/aliases.py", source)?;
+        db.clear_salsa_events();
+
+        let value = global_symbol(&db, main, "value").place.expect_type();
+        assert_eq!(
+            value.display(&db, &db.program_environment()).to_string(),
+            alias
+        );
+
+        let events = db.take_salsa_events();
+        let definition = first_public_binding(&db, main, "value");
+        if should_run {
+            assert_function_query_was_run(&db, infer_definition_types, definition, &events);
+        } else {
+            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 42")?;
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        class Model:
+            value: int
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from model import Model
+
+        def read(model: Model):
+            return model.value
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+
+    // The declaration determines the result. Looking up `Model.value` should not even
+    // index modules that are only used by assignments to it in method bodies.
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
+
+    Ok(())
+}
+
+#[test]
+fn inherited_class_defaults_avoid_inferring_instance_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 'updated'")?;
+    db.write_dedented(
+        "/src/bases.py",
+        r#"
+        class First:
+            value: int = 0
+
+        class Second:
+            value: str = ""
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from bases import First, Second
+
+        class Child(First, Second): ...
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Incompatible inherited attribute `value`"],
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
     Ok(())
 }
 

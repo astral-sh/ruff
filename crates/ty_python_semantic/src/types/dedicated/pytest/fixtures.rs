@@ -1817,9 +1817,10 @@ fn end_of_scope_definition<'db>(
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_db::diagnostic::render::{FullRenderer, Renderer};
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics,
-        Severity, SubDiagnostic, SubDiagnosticSeverity,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
@@ -4368,13 +4369,10 @@ resource = None
             }
             diagnostic.sub(resolved);
 
-            DisplayDiagnostics::new(
-                db,
-                &DisplayDiagnosticConfig::new("ty").context(0),
-                &[diagnostic],
-            )
-            .to_string()
-            .replace('\\', "/")
+            FullRenderer::new(db, &DisplayDiagnosticConfig::new("ty").context(0))
+                .display(&[diagnostic])
+                .to_string()
+                .replace('\\', "/")
         }
 
         fn parameter_definition<'db>(&'db self, parameter_name: &str) -> Definition<'db> {

@@ -164,7 +164,7 @@ from functools import cache
 def f(x: int) -> int:
     return x**2
 
-# revealed: _lru_cache_wrapper[int]
+# revealed: _lru_cache_wrapper[int, Hashable]
 reveal_type(f)
 # revealed: int
 reveal_type(f(1))
@@ -562,7 +562,7 @@ class Animal: ...
 reveal_type(Animal)  # revealed: <class 'Animal'>
 reveal_type(Animal())  # revealed: Animal
 
-Animal().set_full_name("John")  # error: [unresolved-attribute]
+Animal().set_full_name("John")  # error: [missing-attribute]
 ```
 
 This also applies to unannotated callables that are not function definitions:

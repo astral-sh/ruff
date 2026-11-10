@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_python_ast::helpers::{is_const_true, map_callable};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_ast::{self as ast, Decorator, Expr, Keyword, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
@@ -23,12 +23,6 @@ pub(super) fn get_mark_decorators<'a>(
     })
 }
 
-pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(call)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
-}
-
 pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
     checker
         .semantic()
@@ -48,14 +42,6 @@ pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &Semantic
         .resolve_qualified_name(map_callable(&decorator.expression))
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
-        })
-}
-
-pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })
 }
 

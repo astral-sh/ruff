@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{Write, stderr, stdout};
+use std::io::{BufWriter, Write, stderr, stdout};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -14,7 +14,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
-use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
+use ruff_linter::message::{RenderContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
 use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
@@ -201,16 +201,14 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    if config_arguments.log_level > LogLevel::Silent {
-        match mode {
-            FormatMode::Write => {}
-            FormatMode::Check => {
-                results.write_changed(&mut stdout().lock(), output_format, &errors)?;
-            }
-            FormatMode::Diff => {
-                results.write_diff(&mut stdout().lock())?;
-            }
+    if config_arguments.log_level > LogLevel::Silent && !mode.is_write() {
+        let mut writer = BufWriter::new(stdout().lock());
+        if mode.is_check() {
+            results.write_changed(&mut writer, output_format, &errors)?;
+        } else {
+            results.write_diff(&mut writer)?;
         }
+        writer.flush()?;
     }
 
     // Report on the formatting changes.
@@ -600,12 +598,12 @@ impl<'a> FormatResults<'a> {
             .sorted_unstable_by(Diagnostic::ruff_start_ordering)
             .collect();
 
-        let context = EmitterContext::new(&notebook_index);
+        let context = RenderContext::new(&notebook_index);
         let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
 
-        render_diagnostics(f, output_format, config, &context, &diagnostics)
+        render_diagnostics(f, output_format, &config, &context, &diagnostics)
     }
 
     /// Write a summary of the formatting results to the given writer.

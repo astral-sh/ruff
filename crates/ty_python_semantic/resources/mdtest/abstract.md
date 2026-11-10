@@ -15,7 +15,7 @@ class AbstractBase(abc.ABC):
 
 class StillAbstract(AbstractBase): ...
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 StillAbstract()
 
 class AbstractBase2(abc.ABC):
@@ -24,12 +24,12 @@ class AbstractBase2(abc.ABC):
     @abc.abstractmethod
     def bar2(self): ...
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 AbstractBase2()
 
 class StillAbstract2(AbstractBase2): ...
 
-# error: [call-non-callable]
+# error: [abstract-class-instantiation]
 StillAbstract2()
 
 class AbstractBase3(Protocol):
@@ -37,12 +37,12 @@ class AbstractBase3(Protocol):
 
 class StillAbstract3(AbstractBase3): ...
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 StillAbstract3()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `StillAbstract`
   --> src/mdtest_snippet.py:11:1
    |
 11 |   StillAbstract()
@@ -55,7 +55,7 @@ error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
    | |______________________- `bar` declared as abstract on superclass `AbstractBase`
 
 
-error[call-non-callable]: Cannot instantiate abstract class `AbstractBase2`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `AbstractBase2`
   --> src/mdtest_snippet.py:20:1
    |
 20 |   AbstractBase2()
@@ -68,7 +68,7 @@ error[call-non-callable]: Cannot instantiate abstract class `AbstractBase2`
    | |______________________- `bar` declared as abstract
 
 
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract3`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `StillAbstract3`
   --> src/mdtest_snippet.py:33:1
    |
 33 | StillAbstract3()
@@ -100,7 +100,7 @@ class AbstractOrdered(ABC):
 @dataclass(order=True)
 class ConcreteOrdered(AbstractOrdered): ...
 
-ConcreteOrdered()  # no diagnostic
+ConcreteOrdered()  # ok
 
 @total_ordering
 class AlsoConcreteOrdered(AbstractOrdered):
@@ -110,7 +110,7 @@ class AlsoConcreteOrdered(AbstractOrdered):
 # if it already exists in the MRO, even if the one that
 # exists in the MRO is abstract!
 #
-# error: [call-non-callable]
+# error: [abstract-class-instantiation]
 AlsoConcreteOrdered()
 ```
 
@@ -132,7 +132,7 @@ class ConcreteDynamic(AbstractDynamic):
     f: ClassVar[int]
     g: ClassVar[Callable[..., str]]
 
-ConcreteDynamic()  # no diagnostic
+ConcreteDynamic()  # ok
 ```
 
 But if the annotation does not use `ClassVar`, we do not see that as overriding the abstract method:
@@ -142,12 +142,12 @@ class StillAbstractDynamic(AbstractDynamic):
     f: int
     g: Callable[..., str]
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 StillAbstractDynamic()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstractDynamic`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `StillAbstractDynamic`
   --> src/mdtest_snippet.py:76:1
    |
 76 | StillAbstractDynamic()
@@ -179,8 +179,8 @@ class ConcreteMixin:
 class Sub1(AbstractMixin, ConcreteMixin): ...
 class Sub2(ConcreteMixin, AbstractMixin): ...
 
-Sub1()  # error: [call-non-callable]
-Sub2()  # no diagnostic
+Sub1()  # error: [abstract-class-instantiation]
+Sub2()  # ok
 ```
 
 When a class has many unimplemented abstract methods, the diagnostic lists only a few unless
@@ -203,12 +203,12 @@ class Abstract(Protocol):
 
 class StillSadlyAbstract(Abstract): ...
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 StillSadlyAbstract()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillSadlyAbstract`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `StillSadlyAbstract`
    --> src/mdtest_snippet.py:106:1
     |
 106 | StillSadlyAbstract()
@@ -245,12 +245,12 @@ class Abstract(Protocol):
 
 class StillAbstract(Abstract): ...
 
-# snapshot: call-non-callable
+# snapshot: abstract-class-instantiation
 StillAbstract()
 ```
 
 ```snapshot
-error[call-non-callable]: Cannot instantiate abstract class `StillAbstract`
+error[abstract-class-instantiation]: Cannot instantiate abstract class `StillAbstract`
   --> src/mdtest_snippet.py:12:1
    |
 12 | StillAbstract()
@@ -265,7 +265,7 @@ info: `Abstract.first` is implicitly abstract because `Abstract` is a `Protocol`
   |
 3 | class Abstract(Protocol):
   |       ------------------ `Abstract` declared here
-info: rule `call-non-callable` is enabled by default
+info: rule `abstract-class-instantiation` is enabled by default
 ```
 
 ## Abstract methods without `ABCMeta`
@@ -282,14 +282,14 @@ class Abstract:
     def method(self) -> int:
         return 42
 
-# error: [call-non-callable]
+# error: [abstract-class-instantiation]
 reveal_type(Abstract())  # revealed: Abstract
 
 class Concrete(Abstract):
     def method(self) -> int:
         return super().method()
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Generic abstract classes and aliases
@@ -309,15 +309,15 @@ class Abstract[T](ABC):
     @abstractmethod
     def method(self) -> T: ...
 
-Abstract[int]()  # error: [call-non-callable]
+Abstract[int]()  # error: [abstract-class-instantiation]
 Alias = Abstract[str]
-Alias()  # error: [call-non-callable]
+Alias()  # error: [abstract-class-instantiation]
 
 class Concrete[T](Abstract[T]):
     def method(self) -> T:
         raise NotImplementedError
 
-Concrete[int]()  # no diagnostic
+Concrete[int]()  # ok
 ```
 
 ## Constructor calls through `type[]`
@@ -338,10 +338,10 @@ class Concrete(Abstract):
         return 42
 
 def construct(cls: type[Abstract]) -> Abstract:
-    return cls()  # no diagnostic
+    return cls()  # ok
 
-construct(Concrete)  # no diagnostic
-construct(Abstract)  # no diagnostic
+construct(Concrete)  # ok
+construct(Abstract)  # ok
 ```
 
 ## Abstract property accessors
@@ -361,13 +361,13 @@ class AbstractSetter(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
-AbstractSetter()  # error: [call-non-callable]
+AbstractSetter()  # error: [abstract-class-instantiation]
 
 class ConcreteSetter(AbstractSetter):
     @AbstractSetter.value.setter
     def value(self, value: int) -> None: ...
 
-ConcreteSetter()  # no diagnostic
+ConcreteSetter()  # ok
 
 class AbstractDeleter(ABC):
     @property
@@ -378,13 +378,13 @@ class AbstractDeleter(ABC):
     @abstractmethod
     def value(self) -> None: ...
 
-AbstractDeleter()  # error: [call-non-callable]
+AbstractDeleter()  # error: [abstract-class-instantiation]
 
 class ConcreteDeleter(AbstractDeleter):
     @AbstractDeleter.value.deleter
     def value(self) -> None: ...
 
-ConcreteDeleter()  # no diagnostic
+ConcreteDeleter()  # ok
 ```
 
 ## Slots overriding abstract properties
@@ -404,18 +404,17 @@ class Abstract(ABC):
     @abstractmethod
     def value(self, value: int) -> None: ...
 
-# no diagnostic: the abstract property is implemented by the slot
+# ok: the abstract property is implemented by the slot
 @final
 class Concrete(Abstract):
     __slots__ = ("value",)
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Slots and abstract properties in the MRO
 
-A slot inherited from a mixin overrides an abstract property only if the mixin comes before the
-property's defining class in the MRO.
+A slot inherited from a mixin overrides an abstract property when the mixin comes first in the MRO.
 
 ```py
 from abc import ABC, abstractmethod
@@ -429,10 +428,17 @@ class SlotMixin:
     __slots__ = ("value",)
 
 class Concrete(SlotMixin, Abstract): ...
-class StillAbstract(Abstract, SlotMixin): ...
 
-Concrete()  # no diagnostic
-StillAbstract()  # error: [call-non-callable]
+Concrete()  # ok
+```
+
+With the bases reversed, the class remains abstract. The getter-only property also removes writes
+permitted by the mixin's slot, so the class definition receives an override error.
+
+```py
+class StillAbstract(Abstract, SlotMixin): ...  # error: [incompatible-property-override]
+
+StillAbstract()  # error: [abstract-class-instantiation]
 ```
 
 Further subclasses do not change that ordering, even though they inherit the mixin's slot.
@@ -441,7 +447,7 @@ Further subclasses do not change that ordering, even though they inherit the mix
 class StillAbstractChild(StillAbstract):
     __slots__ = ()
 
-StillAbstractChild()  # error: [call-non-callable]
+StillAbstractChild()  # error: [abstract-class-instantiation]
 ```
 
 ## Dataclass slots overriding abstract properties
@@ -461,7 +467,7 @@ class Abstract(ABC):
 class Concrete(Abstract):
     value: int
 
-Concrete(1)  # no diagnostic
+Concrete(1)  # ok
 ```
 
 ## Methods in stub files
@@ -488,13 +494,13 @@ from interface import Interface
 
 class StillAbstract(Interface): ...
 
-StillAbstract()  # error: [call-non-callable] "unimplemented abstract method `required`"
+StillAbstract()  # error: [abstract-class-instantiation] "unimplemented abstract method `required`"
 
 class Concrete(Interface):
     def required(self) -> int:
         return 42
 
-Concrete()  # no diagnostic
+Concrete()  # ok
 ```
 
 ## Abstract overloads
@@ -516,7 +522,7 @@ class Abstract(ABC):
     def method(self, value: int | str) -> int | str:
         return value
 
-Abstract()  # error: [call-non-callable]
+Abstract()  # error: [abstract-class-instantiation]
 ```
 
 ## Aliased abstract methods
@@ -534,5 +540,39 @@ class Abstract:
 class Alias:
     method = Abstract.method
 
-Alias()  # error: [call-non-callable]
+Alias()  # error: [abstract-class-instantiation]
+```
+
+A decorator can also return an abstract method. Here the decorator replaces `Decorated.method` with
+`Abstract.method`, so `Decorated` is abstract.
+
+```py
+from abc import ABC
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def replace_with(value: T) -> Callable[[object], T]:
+    return lambda _: value
+
+class Decorated(ABC):
+    @replace_with(Abstract.method)
+    def method(self) -> None:
+        pass
+
+Decorated()  # error: [abstract-class-instantiation]
+```
+
+Python applies the inner decorator first. It returns a plain object, which the outer decorator
+replaces with `Abstract.method`.
+
+```py
+class Stacked(ABC):
+    @replace_with(Abstract.method)
+    @replace_with(object())
+    def method(self) -> None:
+        pass
+
+Stacked()  # error: [abstract-class-instantiation]
 ```

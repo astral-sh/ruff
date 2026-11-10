@@ -82,12 +82,12 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and an unresolved-import (error) diagnostic by default.
+    // and an import-not-found (error) diagnostic by default.
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    error[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -96,7 +96,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
@@ -119,13 +119,19 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
+            .arg("--ignore")
+            .arg("unresolved-import")
+            .arg("--error")
+            .arg("import-not-found")
             .arg("--warn")
             .arg("unresolved-import"),
         @"
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+
+    warning[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -134,7 +140,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` was selected on the command line
+    info: rule `import-not-found` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
@@ -143,7 +149,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |     ^^^^^
     info: rule `division-by-zero` was selected on the command line
 
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     INFO Indexed 1 file(s) in 0.000s
@@ -218,6 +224,160 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The canonical name wins over an alias with a conflicting level in the same table.
+#[test]
+fn configuration_conflicting_rule_alias_levels() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    // An alias on the command line overrides the current name in ty.toml.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "unresolved-import", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    ty.toml:3:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+}
+
+/// A rule's name and its alias can select the same level, and a separate override can change it.
+#[test]
+fn configuration_rule_alias_levels_with_override() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "error"
+
+            [[overrides]]
+            include = ["test.py"]
+            [overrides.rules]
+            unresolved-import = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:9:1
+      |
+    9 | unresolved-import = "ignore"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            import-not-found = "warn"
+            unresolved-import = "ignore"
+
+            [tool.ty.terminal]
+            error-on-warning = false
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pyproject.toml:4:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn shadowed_pyproject_rule_alias_conflict() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            import-not-found = "ignore"
+            "#,
+        ),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-import = "warn"
+            import-not-found = "error"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN Ignoring the `tool.ty` section in `<temp_dir>/pyproject.toml` because `<temp_dir>/ty.toml` takes precedence.
+    ");
+    Ok(())
+}
+
 /// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {
@@ -227,11 +387,17 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
             r#"
             [tool.ty.rules]
             division-by-zer = "warn" # incorrect rule name
+
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "error"
             "#,
         ),
         ("test.py", "print(10)"),
     ])?;
 
+    // ty warns once about `division-by-zer`, even though the override inherits it.
     assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
@@ -247,6 +413,64 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     ----- stderr -----
     "#);
 
+    // The same typo written on the command line has its own diagnostic.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "division-by-zer", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    pyproject.toml:3:1: warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn removed_rule_in_configuration_and_ignore_comment() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            invalid-type-guard-call = "ignore"
+            "#,
+        ),
+        (
+            "test.py",
+            "
+            x = 1  # ty: ignore[invalid-type-guard-call]
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[ignore-comment-unknown-rule]: Rule `invalid-type-guard-call` has been removed
+     --> test.py:2:21
+      |
+    2 | x = 1  # ty: ignore[invalid-type-guard-call]
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    warning[unknown-rule]: Rule `invalid-type-guard-call` has been removed
+     --> ty.toml:3:1
+      |
+    3 | invalid-type-guard-call = "ignore"
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
     Ok(())
 }
 

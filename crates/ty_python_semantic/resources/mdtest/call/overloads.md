@@ -2542,7 +2542,7 @@ def f(components: Iterable[T | None]) -> T: ...
 
 ```py
 from overloaded import f
-from nonexistent_module import something_unknown  # error: [unresolved-import]
+from nonexistent_module import something_unknown  # error: [import-not-found]
 
 reveal_type(something_unknown)  # revealed: Unknown
 
@@ -2667,7 +2667,7 @@ select_payload({"name": "missing count"}, 1)
 # error: [no-matching-overload]
 select_payload({"name": "bad count", "count": "not an int"}, 1)
 
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 # error: [no-matching-overload]
 select_payload({"name": "extra key", "count": 1, "extra": None}, 1)
 

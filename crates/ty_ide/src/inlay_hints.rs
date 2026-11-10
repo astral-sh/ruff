@@ -2,9 +2,14 @@ use std::{fmt, vec};
 use ty_python_semantic::ProgramEnvironment;
 
 use crate::{Db, FxIndexMap, HasNavigationTargets, NavigationTarget};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Parameters, Stmt, UnaryOp};
+use ruff_python_ast::{
+    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprAttribute, ExprName, ExprUnaryOp, Parameters,
+    Stmt, StmtAssign, UnaryOp,
+};
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
@@ -12,7 +17,7 @@ use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, Member
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
-use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
+use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails, is_valid_annotation_target};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -27,29 +32,30 @@ impl InlayHint {
     fn variable_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
         expr: &Expr,
-        rhs: &Expr,
+        assignment: &StmtAssign,
         ty: Type<'db>,
-        allow_edits: bool,
+        tokens: &Tokens,
     ) -> Option<Self> {
         let InlayHintImportContext { db, file, .. } = context;
 
-        let position = expr.range().end();
         let env = ProgramEnvironment::from_file(file);
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db, &env).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
-        if call_matches_name(rhs, &details.label) {
+        if call_matches_name(&assignment.value, &details.label) {
             return None;
         }
 
+        let range =
+            parenthesized_range(expr.into(), assignment.into(), tokens).unwrap_or(expr.range());
         Some(Self::type_annotation(
             context,
             expr.into(),
-            position,
+            range.end(),
             &details,
             ": ",
-            allow_edits,
+            matches!(assignment.targets.as_slice(), [target] if is_valid_annotation_target(db, file, target)),
         ))
     }
 
@@ -215,6 +221,33 @@ impl InlayHint {
         }
     }
 
+    /// Attach the edits that turn this positional argument into a keyword argument.
+    fn enable_call_argument_edit(&mut self, argument: &Expr) {
+        let needs_parentheses = match argument {
+            // The named expression starts at the name on the left of `:=`. The hint starts
+            // at that same name or at the outermost opening parenthesis if the argument is grouped.
+            Expr::Named(_) => self.position == argument.start(),
+            Expr::Generator(generator) => !generator.parenthesized,
+            _ => false,
+        };
+        let mut prefix = InlayHintTextEdit {
+            range: TextRange::empty(self.position),
+            new_text: self.display().to_string(),
+        };
+        self.text_edits = if needs_parentheses {
+            prefix.new_text.push('(');
+            vec![
+                prefix,
+                InlayHintTextEdit {
+                    range: TextRange::empty(argument.end()),
+                    new_text: ")".to_owned(),
+                },
+            ]
+        } else {
+            vec![prefix]
+        };
+    }
+
     fn return_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
         function: &ruff_python_ast::StmtFunctionDef,
@@ -334,9 +367,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file.python_file(db)).load(db);
-    let importer = Importer::new(db, file, &ast);
-
-    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
+    let mut visitor = InlayHintVisitor::new(db, file, &ast, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -396,43 +427,45 @@ struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
     importer: Importer<'db>,
+    tokens: &'db Tokens,
     hints: Vec<InlayHint>,
     pending_return_hint: Option<(&'a Parameters, InlayHint)>,
-    assignment_rhs: Option<&'a Expr>,
+    assignment: Option<&'a StmtAssign>,
     range: TextRange,
     settings: &'a InlayHintSettings,
-    in_no_edits_allowed: bool,
 }
 
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         file: ProgramFile<'db>,
-        importer: Importer<'db>,
+        ast: &'db ParsedModuleRef,
         range: TextRange,
         settings: &'a InlayHintSettings,
     ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            importer,
+            importer: Importer::new(db, file, ast),
+            tokens: ast.tokens(),
             hints: Vec::new(),
             pending_return_hint: None,
-            assignment_rhs: None,
+            assignment: None,
             range,
             settings,
-            in_no_edits_allowed: false,
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr, rhs: &Expr, ty: Type<'db>, allow_edits: bool) {
-        if !self.settings.variable_types {
+    fn add_type_hint(&mut self, expr: &Expr) {
+        let Some(assignment) = self.assignment else {
+            return;
+        };
+        if !self.settings.variable_types || is_ignored_variable_assignment_target(expr) {
             return;
         }
-
-        if is_ignored_variable_assignment_target(expr) {
+        let Some(ty) = expr.inferred_type(&self.model) else {
             return;
-        }
+        };
 
         let context = InlayHintImportContext {
             db: self.db,
@@ -440,29 +473,34 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             importer: &self.importer,
         };
 
-        if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
+        if let Some(inlay_hint) =
+            InlayHint::variable_type(context, expr, assignment, ty, self.tokens)
+        {
             self.hints.push(inlay_hint);
         }
     }
 
     fn add_call_argument_name(
         &mut self,
-        position: TextSize,
+        argument: &Expr,
+        arguments: &Arguments,
         name: &str,
         navigation_target: Option<NavigationTarget>,
-    ) -> bool {
-        if !self.settings.call_argument_names {
-            return false;
+        mode: ArgumentHintMode,
+    ) {
+        if !self.settings.call_argument_names || name.starts_with('_') {
+            return;
         }
 
-        if name.starts_with('_') {
-            return false;
+        let range = parenthesized_range(argument.into(), arguments.into(), self.tokens)
+            .unwrap_or(argument.range());
+        let mut inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
+        match mode {
+            ArgumentHintMode::DisplayOnly => {}
+            ArgumentHintMode::Insertable => inlay_hint.enable_call_argument_edit(argument),
         }
-
-        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
 
         self.hints.push(inlay_hint);
-        true
     }
 }
 
@@ -495,16 +533,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
         match stmt {
             Stmt::Assign(assign) => {
                 if !type_hint_is_excessive_for_expr(&assign.value) {
-                    self.assignment_rhs = Some(&*assign.value);
-                }
-                if !annotations_are_valid_syntax(assign) {
-                    self.in_no_edits_allowed = true;
+                    self.assignment = Some(assign);
                 }
                 for target in &assign.targets {
                     self.visit_expr(target);
                 }
-                self.in_no_edits_allowed = false;
-                self.assignment_rhs = None;
+                self.assignment = None;
 
                 self.visit_expr(&assign.value);
 
@@ -544,24 +578,10 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(name) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if name.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
-                source_order::walk_expr(self, expr);
-            }
-            Expr::Attribute(attribute) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if attribute.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
+            Expr::Name(ExprName { ctx, .. }) | Expr::Attribute(ExprAttribute { ctx, .. })
+                if ctx.is_store() =>
+            {
+                self.add_type_hint(expr);
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
@@ -569,8 +589,6 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                     .unwrap_or_default();
 
                 self.visit_expr(&call.func);
-
-                let mut last_editable_hint_index: Option<usize> = None;
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
@@ -581,15 +599,31 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
                         {
-                            if self.add_call_argument_name(
-                                arg_or_keyword.range().start(),
+                            // A keyword cannot precede a plain positional argument. `args` also
+                            // includes starred arguments. Changing `f(value(), *items())` to
+                            // `f(x=value(), *items())` would evaluate `items()` first and could
+                            // pass `x` twice.
+                            let is_last_positional =
+                                positional_index + 1 == call.arguments.args.len();
+                            // For `def f(ｉｆ): ...`, `name` is already normalized to the
+                            // reserved word `if`. Inserting `if=` would be a syntax error.
+                            // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.
+                            let mode = if is_last_positional
+                                && !argument.is_starred_expr()
+                                && is_identifier(name)
+                                && call.arguments.find_keyword(name).is_none()
+                            {
+                                ArgumentHintMode::Insertable
+                            } else {
+                                ArgumentHintMode::DisplayOnly
+                            };
+                            self.add_call_argument_name(
+                                argument,
+                                &call.arguments,
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
-                            ) {
-                                if !argument.is_starred_expr() {
-                                    last_editable_hint_index = Some(self.hints.len() - 1);
-                                }
-                            }
+                                mode,
+                            );
                         }
 
                         positional_index += 1;
@@ -597,22 +631,25 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                     self.visit_expr(arg_or_keyword.value());
                 }
-
-                // For the last positional argument, provide an edit to insert
-                // the inlay hint.
-                if let Some(index) = last_editable_hint_index {
-                    let hint: &mut InlayHint = &mut self.hints[index];
-                    hint.text_edits = vec![InlayHintTextEdit {
-                        range: TextRange::empty(hint.position),
-                        new_text: format!("{}=", hint.label.parts()[0].text()),
-                    }];
-                }
             }
             _ => {
                 source_order::walk_expr(self, expr);
             }
         }
     }
+}
+
+/// Whether a parameter-name hint offers an edit to pass a positional argument by keyword.
+///
+/// Given `def f(x, y): ...`, the `x=` hint in `f(1, 2)` is display-only. Inserting it would
+/// leave the positional argument `2` after the keyword argument `x=1`, which is a syntax error.
+/// Accepting the `y=` hint produces `f(1, y=2)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArgumentHintMode {
+    /// Show the parameter name without offering a text edit.
+    DisplayOnly,
+    /// Offer a text edit that converts the positional argument to a keyword argument.
+    Insertable,
 }
 
 /// Given a positional argument, check if the expression is the "same name"
@@ -711,22 +748,6 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
 
 fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type) -> bool {
     module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
-}
-
-fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
-    if stmt_assign.targets.len() > 1 {
-        return false;
-    }
-
-    if stmt_assign
-        .targets
-        .iter()
-        .any(|target| matches!(target, Expr::Tuple(_)))
-    {
-        return false;
-    }
-
-    true
 }
 
 fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
@@ -851,23 +872,42 @@ mod tests {
     use insta::{assert_snapshot, internals::SettingsBindDropGuard};
     use itertools::Itertools;
     use ruff_db::{
+        Db as _,
         diagnostic::{
-            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-            LintName, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+            Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
+            Span, SubDiagnostic, SubDiagnosticSeverity,
         },
         files::{File, FileRange, system_path_to_file},
         source::source_text,
     };
     use ruff_diagnostics::{Edit, Fix};
-    use ruff_python_ast::PySourceType;
-    use ruff_python_parser::parse_unchecked_source;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::{TextLen, TextSize};
+    use ruff_text_size::TextSize;
 
-    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
-    use ty_project::ProjectMetadata;
+    use ruff_db::system::{
+        DbWithTestSystem, DbWithWritableSystem, SystemPathBuf, SystemVirtualPath,
+    };
     use ty_project::metadata::options::{AnalysisOptions, Options};
+    use ty_project::{ProjectMetadata, SemanticDb as _};
+    use ty_python_core::semantic_index;
     use ty_python_semantic::ReturnTypeInference;
+
+    /// For a given Python function definition and a call to that function,
+    /// return the edited Python source code after inlay hints have been applied to the function call.
+    ///
+    /// For example, `apply_inlay_hints("def f(x): ...\n", "f(y := 1)")` returns `"f(x=(y := 1))"`.
+    #[track_caller]
+    fn apply_inlay_hints(definition: &str, call: &str) -> String {
+        let mut source = format!("{definition}{call}");
+        let mut test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
+        let hints = test.collect_hints(&InlayHintSettings::default());
+
+        let edits = hints.iter().flat_map(|hint| &hint.text_edits);
+        apply_edits(&mut source, edits);
+
+        test.assert_syntax_error_counts_do_not_increase(&source);
+        source.strip_prefix(definition).unwrap().to_owned()
+    }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
         inlay_hint_test_with_options(source, Options::default())
@@ -1082,11 +1122,9 @@ mod tests {
             return 42
         "#,
         );
-        // TODO: Do not expose `def wrapper` in the return-type hint for `stringify`,
-        // and ideally show the return type of `str` for the returned callable.
         assert_snapshot!(test.inlay_hints(), @r#"
 
-        def stringify(function)[ -> def wrapper() -> Unknown]:
+        def stringify(function)[ -> () -> str]:
             def wrapper()[ -> str]:
                 return str([object=]function())
 
@@ -1098,15 +1136,15 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions/_internal.pyi:LL:1
+          --> stdlib/builtins.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | ^^^^^^^
+        LL | class str(Sequence[str]):
+           |       ^^^
         info: Source
-          --> main2.py:LL:46
+          --> main2.py:LL:35
            |
-        LL | def stringify(function)[ -> def wrapper() -> Unknown]:
-           |                                              ^^^^^^^
+        LL | def stringify(function)[ -> () -> str]:
+           |                                   ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -1290,9 +1328,8 @@ mod tests {
             self.db.write_file(file_name, content).unwrap();
         }
 
-        /// Returns the inlay hints for the given test case with custom settings.
-        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
-            let hints = inlay_hints(
+        fn collect_hints(&self, settings: &InlayHintSettings) -> Vec<InlayHint> {
+            inlay_hints(
                 &self.db,
                 ProgramFile::new(
                     &self.db,
@@ -1301,12 +1338,64 @@ mod tests {
                 ),
                 self.range,
                 settings,
+            )
+        }
+
+        /// Assert that `source`, with the hint edits applied, has no more parse errors and no
+        /// more semantic syntax errors than the original file. Existing errors in incomplete
+        /// code may remain.
+        #[track_caller]
+        fn assert_syntax_error_counts_do_not_increase(&mut self, source: &str) {
+            #[track_caller]
+            fn assert_error_count_did_not_increase<T: fmt::Display>(
+                kind: &str,
+                original: &[T],
+                edited: &[T],
+                source: &str,
+            ) {
+                assert!(
+                    edited.len() <= original.len(),
+                    "Inlay hint edits increased the number of {kind} from {} to {}.
+{}
+Source with applied edits:
+{source}",
+                    original.len(),
+                    edited.len(),
+                    edited.iter().join("\n"),
+                );
+            }
+
+            let db = &mut self.db;
+            let path = SystemVirtualPath::new("assert-syntax://edited.py");
+            db.write_virtual_file(path, source);
+            let virtual_file = db.files().virtual_file(db, path);
+
+            let original = db.program_file(self.file);
+            let edited = db.program_file(virtual_file.file());
+            let parsed = |file: ProgramFile<'_>| parsed_module(db, file.python_file(db)).load(db);
+            assert_error_count_did_not_increase(
+                "parse errors",
+                parsed(original).errors(),
+                parsed(edited).errors(),
+                source,
             );
+            assert_error_count_did_not_increase(
+                "semantic syntax errors",
+                semantic_index(db, original).semantic_syntax_errors(),
+                semantic_index(db, edited).semantic_syntax_errors(),
+                source,
+            );
+
+            virtual_file.close(db);
+            db.memory_file_system().remove_virtual_file(path).unwrap();
+        }
+
+        /// Returns the inlay hints for the given test case with custom settings.
+        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
+            let hints = self.collect_hints(settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
-            let source_has_errors =
-                parse_unchecked_source(&text_edit_buf, PySourceType::Python).has_invalid_syntax();
 
             let mut tbd_diagnostics = Vec::new();
 
@@ -1343,24 +1432,10 @@ mod tests {
                 .into_iter()
                 .unique_by(|edit| (edit.range, edit.new_text.clone()))
                 .collect();
-            let mut edit_offset = TextSize::default();
+            apply_edits(&mut text_edit_buf, &all_edits);
 
-            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
-                let updated_range = edit.range + edit_offset;
-                text_edit_buf.replace_range(updated_range.to_std_range(), &edit.new_text);
-                edit_offset += edit.new_text.text_len() - edit.range.len();
-            }
-
-            let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
-            if edited.has_invalid_syntax() && !source_has_errors {
-                let syntax_errors = edited.errors().iter().map(|error| &error.error).join("\n");
-
-                panic!(
-                    "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated inlay hint edits:
-{syntax_errors}
-Source with applied edits:
-{text_edit_buf}"
-                );
+            if !all_edits.is_empty() {
+                self.assert_syntax_error_counts_do_not_increase(&text_edit_buf);
             }
             self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
             let inlayed_file =
@@ -1408,10 +1483,7 @@ Source with applied edits:
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let diag = diagnostic.into_diagnostic();
             let config =
@@ -1422,8 +1494,23 @@ Source with applied edits:
         }
     }
 
+    /// Apply edits from right to left so each replacement leaves the remaining offsets unchanged.
+    fn apply_edits<'a>(
+        source: &mut String,
+        edits: impl IntoIterator<Item = &'a InlayHintTextEdit>,
+    ) {
+        for edit in edits
+            .into_iter()
+            .sorted_by_key(|edit| edit.range.start())
+            .rev()
+        {
+            source.replace_range(edit.range.to_std_range(), &edit.new_text);
+        }
+    }
+
     #[test]
     fn test_assign_statement() {
+        // The type hint and its edit follow the whole assignment target, including its parentheses.
         let mut test = inlay_hint_test(
             "
             def i(x: int, /) -> int:
@@ -1431,7 +1518,7 @@ Source with applied edits:
 
             x = 1
             y = x
-            z = i(1)
+            ((z)) = i(1)
             w = z
             aa = b'foo'
             bb = aa
@@ -1445,7 +1532,7 @@ Source with applied edits:
 
         x = 1
         y[: Literal[1]] = x
-        z[: int] = i(1)
+        ((z))[: int] = i(1)
         w[: int] = z
         aa = b'foo'
         bb[: Literal[b"foo"]] = aa
@@ -1479,10 +1566,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:5
+          --> main2.py:LL:9
            |
-        LL | z[: int] = i(1)
-           |     ^^^
+        LL | ((z))[: int] = i(1)
+           |         ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -1526,10 +1613,10 @@ Source with applied edits:
         --------------------------------------------------------------------------------
         6  | x = 1
            - y = x
-           - z = i(1)
+           - ((z)) = i(1)
            - w = z
         7  + y: Literal[1] = x
-        8  + z: int = i(1)
+        8  + ((z)): int = i(1)
         9  + w: int = z
         10 | aa = b'foo'
            - bb = aa
@@ -2439,6 +2526,39 @@ Source with applied edits:
         8 | a.y = int(3)
           |
         ");
+    }
+
+    #[test]
+    fn attribute_hint_edits_require_a_method_receiver() {
+        let test = inlay_hint_test(
+            "
+            class C:
+                def method(this, other: C, s: str) -> None:
+                    this.a = len(s)
+                    other.a = len(s)
+                    def inner() -> None:
+                        this.b = len(s)
+
+                @staticmethod
+                def static(self: C, s: str) -> None:
+                    self.a = len(s)
+            ",
+        );
+        let hints = test.collect_hints(&InlayHintSettings {
+            variable_types: true,
+            call_argument_names: false,
+            return_types: false,
+        });
+        let [receiver, other, captured, static_param] = hints.as_slice() else {
+            panic!("Expected four attribute hints, got {hints:?}");
+        };
+        for hint in &hints {
+            assert_eq!(hint.display().to_string(), ": int");
+        }
+        assert!(!receiver.text_edits.is_empty());
+        assert!(other.text_edits.is_empty());
+        assert!(!captured.text_edits.is_empty());
+        assert!(static_param.text_edits.is_empty());
     }
 
     #[test]
@@ -3819,16 +3939,19 @@ Source with applied edits:
 
     #[test]
     fn test_function_call_with_positional_or_keyword_parameter() {
+        // Both the hint and its edit go before the argument's outermost parentheses.
         let mut test = inlay_hint_test(
             "
             def foo(x: int): pass
-            foo(1)",
+            foo(1)
+            foo(((2)))",
         );
 
         assert_snapshot!(test.inlay_hints(), @"
 
         def foo(x: int): pass
         foo([x=]1)
+        foo([x=]((2)))
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
@@ -3841,15 +3964,47 @@ Source with applied edits:
         3 | foo([x=]1)
           |      ^
 
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(x: int): pass
+          |         ^
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([x=]((2)))
+          |      ^
+
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
         2 | def foo(x: int): pass
           - foo(1)
+          - foo(((2)))
         3 + foo(x=1)
+        4 + foo(x=((2)))
           |
         ");
+    }
+
+    #[test]
+    fn accepting_keyword_argument_hints_produces_valid_python() {
+        const DEFINITION: &str = "def f(x): ...\n";
+
+        fn apply_keyword_hint(call: &str) -> String {
+            apply_inlay_hints(DEFINITION, call)
+        }
+
+        // An assignment expression or a sole generator argument can use the call's parentheses.
+        // Inserting just `x=` would produce `f(x=y := 1)` or `f(x=i for i in [1])`. Both are invalid.
+        // As a keyword value, the expression needs its own pair, which may already be present.
+        assert_snapshot!(apply_keyword_hint("f(y := 1)"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f((y := 1))"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f(f(y := 1))"), @"f(x=f(x=(y := 1)))");
+
+        assert_snapshot!(apply_keyword_hint("f(i for i in [1])"), @"f(x=(i for i in [1]))");
+        assert_snapshot!(apply_keyword_hint("f((i for i in [1]))"), @"f(x=(i for i in [1]))");
     }
 
     #[test]
@@ -4226,6 +4381,142 @@ Source with applied edits:
     }
 
     #[test]
+    fn argument_name_hint_before_variadic_arguments_has_no_edit() {
+        // The second argument binds to `*rest` and has no hint. Keep the hint for `x` visible,
+        // but inserting it would turn `f(1, 2)` into the invalid call `f(x=1, 2)`.
+        let mut test = inlay_hint_test(
+            "
+            def f(x, *rest): ...
+            f(1)
+            f(1, 2)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(x, *rest): ...
+        f([x=]1)
+        f([x=]1, 2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x, *rest): ...
+          |       ^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([x=]1)
+          |    ^
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x, *rest): ...
+          |       ^
+        info: Source
+         --> main2.py:4:4
+          |
+        4 | f([x=]1, 2)
+          |    ^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        2 | def f(x, *rest): ...
+          - f(1)
+        3 + f(x=1)
+        4 | f(1, 2)
+          |
+        ");
+    }
+
+    #[test]
+    fn argument_name_hint_before_starred_argument_has_no_edit() {
+        let test = inlay_hint_test(
+            "
+            def f(x, *rest): ...
+            f(1, *[2])
+            ",
+        );
+        let [hint] = test
+            .collect_hints(&InlayHintSettings::default())
+            .try_into()
+            .unwrap();
+
+        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
+        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
+        // unpacked `2` and the keyword argument `x=1` both supply `x`.
+        assert_eq!(hint.display().to_string(), "x=");
+        assert!(hint.text_edits.is_empty());
+    }
+
+    #[test]
+    fn argument_name_hint_for_parameter_that_normalizes_to_a_keyword() {
+        // Python accepts the fullwidth spelling in the definition. Inserting the normalized
+        // hint would produce `f(if=1)`, which is a syntax error.
+        let mut test = inlay_hint_test(
+            "
+            def f(ｉｆ): ...
+            f(1)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(ｉｆ): ...
+        f([if=]1)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(ｉｆ): ...
+          |       ^^^^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([if=]1)
+          |    ^^
+        ");
+
+        // The soft keyword `match` can be used directly as a keyword argument.
+        assert_snapshot!(apply_inlay_hints("def f(match): ...\n", "f(1)"), @"f(match=1)");
+    }
+
+    #[test]
+    fn argument_name_hint_for_keyword_already_in_call_has_no_edit() {
+        // The original call would raise `TypeError` at runtime. Inserting `x=` would make
+        // it a syntax error instead, because `f(x=1, x=2)` repeats an explicit keyword.
+        let mut test = inlay_hint_test(
+            "
+            def f(x): ...
+            f(1, x=2)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(x): ...
+        f([x=]1, x=2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x): ...
+          |       ^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([x=]1, x=2)
+          |    ^
+        ");
+    }
+
+    #[test]
     fn test_function_call_with_keyword_variadic_parameter() {
         let mut test = inlay_hint_test(
             "
@@ -4283,15 +4574,6 @@ Source with applied edits:
           |
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        3 | t: tuple[int, int] = (23, 42)
-          - foo('foo', *t, d='bar')
-        4 + foo(a='foo', *t, d='bar')
-          |
         ");
     }
 
@@ -4357,6 +4639,8 @@ Source with applied edits:
 
     #[test]
     fn test_function_call_last_plain_positional_before_starred_argument() {
+        // Both hints are display-only. In `foo(a=1, *t)`, the unpacked `2` would fill `a`,
+        // so `a=1` would supply it again.
         let mut test = inlay_hint_test(
             "
             def foo(a: int, b: int): ...
@@ -4391,15 +4675,6 @@ Source with applied edits:
           |
         4 | foo([a=]1, [b=]*t)
           |             ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        3 | t: tuple[int] = (2,)
-          - foo(1, *t)
-        4 + foo(a=1, *t)
-          |
         ");
     }
 
@@ -5129,15 +5404,6 @@ Source with applied edits:
           |
         3 | foo(y='hello', [y=]1)
           |                 ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        2 | def foo(x: int, y: str): pass
-          - foo(y='hello', 1)
-        3 + foo(y='hello', y=1)
-          |
         ");
     }
 
@@ -7608,16 +7874,7 @@ Source with applied edits:
         "#,
             ),
         );
-        let hints = inlay_hints(
-            &test.db,
-            ProgramFile::new(
-                &test.db,
-                test.file,
-                test.db.program_environment().program(&test.db),
-            ),
-            test.range,
-            &InlayHintSettings::default(),
-        );
+        let hints = test.collect_hints(&InlayHintSettings::default());
 
         assert_eq!(hints.len(), 2);
         let source = source_text(&test.db, test.file);
@@ -7625,14 +7882,7 @@ Source with applied edits:
             .into_iter()
             .map(|hint| {
                 let mut edited = source.as_str().to_string();
-                for edit in hint
-                    .text_edits
-                    .iter()
-                    .sorted_by_key(|edit| edit.range.start())
-                    .rev()
-                {
-                    edited.replace_range(edit.range.to_std_range(), &edit.new_text);
-                }
+                apply_edits(&mut edited, &hint.text_edits);
                 edited
             })
             .join("\n");

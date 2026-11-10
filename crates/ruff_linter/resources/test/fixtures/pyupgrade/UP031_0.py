@@ -169,3 +169,10 @@ print("%02X" % 1)
 "%(1)s" % {1: 2, "1": 2}
 
 "%(and)s" % {"and": 2}
+
+# Each closing parenthesis around the format string must be kept exactly once.
+(("%s")) % (x,)
+((("%s" "%s"))) % (x, y)
+(  # comment
+    "%s"
+) % (x,)

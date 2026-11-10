@@ -266,8 +266,9 @@ fn replace_with_self_fix(
         let first = parameters.iter().next()?;
         let annotation = first.annotation()?;
 
+        // The parameter's range includes any parentheses around the annotation, e.g. `self: (Foo)`.
         is_class_reference(semantic, annotation, &class_def.name)
-            .then(|| Edit::deletion(first.name().end(), annotation.end()))
+            .then(|| Edit::deletion(first.name().end(), first.as_parameter().end()))
     };
 
     others.extend(remove_first_argument_type_hint());

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -159,10 +159,8 @@ impl Violation for PytestWarnsWithoutWarning {
     }
 }
 
-fn is_pytest_warns(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "warns"]))
+fn is_pytest_warns(qualified_name: &QualifiedName) -> bool {
+    matches!(qualified_name.segments(), ["pytest", "warns"])
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -174,8 +172,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 /// PT029, PT030
-pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
-    if is_pytest_warns(&call.func, checker.semantic()) {
+pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+    if is_pytest_warns(qualified_name) {
         if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
                 checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
@@ -199,7 +197,10 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
 /// PT031
 pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let warns_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_warns(func, checker.semantic()),
+        Expr::Call(ast::ExprCall { func, .. }) => checker
+            .semantic()
+            .resolve_qualified_name(func)
+            .is_some_and(|name| is_pytest_warns(&name)),
         _ => false,
     });
 

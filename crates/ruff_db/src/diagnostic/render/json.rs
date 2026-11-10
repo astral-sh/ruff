@@ -10,25 +10,24 @@ use crate::diagnostic::{
     ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, Severity,
 };
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
-pub(super) struct JsonRenderer<'a> {
+/// Print diagnostics in JSON format.
+///
+/// Unlike [`JsonLinesRenderer`](super::JsonLinesRenderer), this prints all diagnostics as a JSON array.
+pub struct JsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> JsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl JsonRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for JsonRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         write!(
             f,
             "{:#}",
@@ -252,12 +251,9 @@ struct JsonEdit<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{
-            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
-        },
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+        create_syntax_error_diagnostics,
     };
 
     #[test]

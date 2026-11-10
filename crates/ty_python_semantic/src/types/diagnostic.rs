@@ -12,7 +12,7 @@ use super::{
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::importer::{ImportAction, ImportRequest, MembersInScope};
-use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::lint::{Level, LintMetadata, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::abstract_methods::AbstractMethods;
@@ -23,7 +23,7 @@ use crate::types::class::{
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
-use crate::types::overrides::MethodKind;
+use crate::types::overrides::{MethodKind, MethodOverrideViolation};
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
@@ -31,7 +31,6 @@ use crate::types::string_annotation::{
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
-use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_value};
 use crate::types::{
@@ -44,7 +43,7 @@ use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, 
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
     parsed::parsed_module,
 };
@@ -90,7 +89,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
-    registry.register_lint(&INVALID_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_KEY);
+    registry.register_lint(&NON_LITERAL_TYPED_DICT_KEY);
+    registry.register_lint(&UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY);
+    registry.register_alias(LintName::of("invalid-key"), &INVALID_TYPED_DICT_KEY);
     registry.register_lint(&ISINSTANCE_AGAINST_PROTOCOL);
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
@@ -118,6 +120,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
+    registry.register_lint(&SINGLE_OVERLOAD);
+    registry.register_lint(&INCONSISTENT_OVERLOAD_DECORATOR);
+    registry.register_lint(&MISPLACED_OVERLOAD_DECORATOR);
+    registry.register_lint(&MISSING_OVERLOAD_IMPLEMENTATION);
+    registry.register_lint(&INCONSISTENT_OVERLOAD_IMPLEMENTATION);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
@@ -158,6 +165,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
+    registry.register_lint(&ABSTRACT_CLASS_INSTANTIATION);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
@@ -166,9 +174,12 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
-    registry.register_lint(&UNRESOLVED_ATTRIBUTE);
+    registry.register_lint(&MISSING_ATTRIBUTE);
+    registry.register_lint(&MISSING_UNION_ATTRIBUTE);
+    registry.register_alias(LintName::of("unresolved-attribute"), &MISSING_ATTRIBUTE);
     registry.register_lint(&MISSING_SLOT);
-    registry.register_lint(&UNRESOLVED_IMPORT);
+    registry.register_lint(&IMPORT_NOT_FOUND);
+    registry.register_alias(LintName::of("unresolved-import"), &IMPORT_NOT_FOUND);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
@@ -185,10 +196,27 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
-    registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
-    registry.register_lint(&INVALID_PROPERTY_TYPE_OVERRIDE);
-    registry.register_lint(&INVALID_MUTABLE_OVERRIDE);
-    registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&INCOMPATIBLE_ATTRIBUTE_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-attribute-override"),
+        &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_PROPERTY_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-property-type-override"),
+        &INCOMPATIBLE_PROPERTY_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_MUTABLE_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-mutable-override"),
+        &INCOMPATIBLE_MUTABLE_OVERRIDE,
+    );
+    registry.register_lint(&INCOMPATIBLE_METHOD_OVERRIDE);
+    registry.register_alias(
+        LintName::of("invalid-method-override"),
+        &INCOMPATIBLE_METHOD_OVERRIDE,
+    );
+    registry.register_lint(&LOST_KEYWORD_FOR_REGULAR_PARAMETER);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -408,12 +436,11 @@ declare_lint! {
     }
 }
 
-// Added in #19763.
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-key.md")]
-    pub(crate) static INVALID_KEY = {
-        summary: "detects invalid subscript accesses or TypedDict literal keys",
-        status: LintStatus::stable("0.0.1-alpha.17"),
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-key.md")]
+    pub(crate) static INVALID_TYPED_DICT_KEY = {
+        summary: "detects invalid keys when accessing TypedDict items",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -689,10 +716,10 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-overload.md")]
-    pub(crate) static INVALID_OVERLOAD = {
-        summary: "detects invalid `@overload` usages",
-        status: LintStatus::stable("0.0.1-alpha.1"),
+    #[doc = include_str!("../../resources/lint_docs/single-overload.md")]
+    pub(crate) static SINGLE_OVERLOAD = {
+        summary: "detects functions with only one overload declaration",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -779,7 +806,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
+    #[doc = include_str!("../../resources/removed_lint_docs/invalid-type-guard-call.md")]
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
         summary: "detects type guard function calls that have no narrowing effect",
         status: LintStatus::removed(
@@ -1080,6 +1107,15 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/abstract-class-instantiation.md")]
+    pub(crate) static ABSTRACT_CLASS_INSTANTIATION = {
+        summary: "detects direct instantiation of abstract classes and protocols",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-explicit-override.md")]
     pub(crate) static INVALID_EXPLICIT_OVERRIDE = {
         summary: "detects methods that are decorated with `@override` but do not override any method in a superclass",
@@ -1183,9 +1219,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-attribute.md")]
-    pub(crate) static UNRESOLVED_ATTRIBUTE = {
-        summary: "detects references to unresolved attributes",
+    #[doc = include_str!("../../resources/lint_docs/missing-attribute.md")]
+    pub(crate) static MISSING_ATTRIBUTE = {
+        summary: "detects references to missing attributes",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
@@ -1201,8 +1237,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/unresolved-import.md")]
-    pub(crate) static UNRESOLVED_IMPORT = {
+    #[doc = include_str!("../../resources/lint_docs/import-not-found.md")]
+    pub(crate) static IMPORT_NOT_FOUND = {
         summary: "detects unresolved imports",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -1358,8 +1394,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-attribute-override.md")]
-    pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-attribute-override.md")]
+    pub(crate) static INCOMPATIBLE_ATTRIBUTE_OVERRIDE = {
         summary: "detects attribute overrides that violate inherited type or access requirements",
         status: LintStatus::stable("0.0.33"),
         default_level: Level::Error,
@@ -1367,8 +1403,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-property-type-override.md")]
-    pub(crate) static INVALID_PROPERTY_TYPE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-property-override.md")]
+    pub(crate) static INCOMPATIBLE_PROPERTY_OVERRIDE = {
         summary: "detects incompatible overrides involving properties",
         status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
@@ -1376,8 +1412,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-mutable-override.md")]
-    pub(crate) static INVALID_MUTABLE_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-mutable-override.md")]
+    pub(crate) static INCOMPATIBLE_MUTABLE_OVERRIDE = {
         summary: "detects overrides that narrow writable attribute types",
         status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
@@ -1385,10 +1421,19 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
-    pub(crate) static INVALID_METHOD_OVERRIDE = {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-method-override.md")]
+    pub(crate) static INCOMPATIBLE_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/lost-keyword-for-regular-parameter.md")]
+    pub(crate) static LOST_KEYWORD_FOR_REGULAR_PARAMETER = {
+        summary: "detects method overrides that drop a positional parameter's keyword name",
+        status: LintStatus::stable("0.0.100"),
         default_level: Level::Error,
     }
 }
@@ -1462,6 +1507,82 @@ declare_lint! {
         summary: "detects truthiness tests of `Iterable`-typed objects",
         status: LintStatus::stable("0.0.83"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-union-attribute.md")]
+    pub(crate) static MISSING_UNION_ATTRIBUTE = {
+        summary: "detects attribute accesses where some union members lack the attribute",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/non-literal-typed-dict-key.md")]
+    pub(crate) static NON_LITERAL_TYPED_DICT_KEY = {
+        summary: "detects non-literal string keys in TypedDict subscripts",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unknown-typed-dict-constructor-key.md")]
+    pub(crate) static UNKNOWN_TYPED_DICT_CONSTRUCTOR_KEY = {
+        summary: "detects unknown keys when constructing a TypedDict",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-overload-implementation.md")]
+    pub(crate) static MISSING_OVERLOAD_IMPLEMENTATION = {
+        summary: "detects overloaded functions missing a required implementation",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-overload-implementation.md")]
+    pub(crate) static INCONSISTENT_OVERLOAD_IMPLEMENTATION = {
+        summary: "detects implementations that are inconsistent with their overloads",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-overload-decorator.md")]
+    pub(crate) static INCONSISTENT_OVERLOAD_DECORATOR = {
+        summary: "detects inconsistent use of `@staticmethod` or `@classmethod` on overloaded methods",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/misplaced-overload-decorator.md")]
+    pub(crate) static MISPLACED_OVERLOAD_DECORATOR = {
+        summary: "detects misplaced `@final` or `@override` decorators on overloaded methods",
+        status: LintStatus::stable("0.0.100"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// Overload declarations and their implementations now have separate rules.
+    static INVALID_OVERLOAD = {
+        summary: "detects invalid `@overload` usages",
+        status: LintStatus::removed(
+            "0.0.100",
+            "Use `single-overload`, `inconsistent-overload-decorator`, `misplaced-overload-decorator`, \
+             `missing-overload-implementation`, or `inconsistent-overload-implementation`.",
+        ),
+        default_level: Level::Error,
     }
 }
 
@@ -1647,20 +1768,11 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
     target_ty: Type<'db>,
     source: AnyNodeRef<'_>,
 ) -> bool {
-    target_ty
-        .filter_union(db, env, Type::is_typed_dict)
-        .as_typed_dict()
-        .is_some()
-        && matches!(source, AnyNodeRef::ExprDict(_))
-}
-
-fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
-    context: &'env InferContext,
-    node: T,
-    message: std::fmt::Arguments,
-) -> Option<LintDiagnosticGuard<'db, 'env>> {
-    let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
-    Some(builder.into_diagnostic(message))
+    matches!(source, AnyNodeRef::ExprDict(_))
+        && target_ty
+            .filter_union(db, env, Type::is_typed_dict)
+            .as_typed_dict()
+            .is_some()
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
@@ -2134,22 +2246,18 @@ pub(super) fn report_invalid_assignment<'db>(
         value_ty,
         AssignmentDiagnosticKind::Invalid,
     );
-    let settings =
-        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
-
     let diagnostic_range =
         assignment_diagnostic_range(context, target_node, value_node, invalid_element.as_ref());
-    let Some(mut diag) = report_invalid_assignment_with_message(
-        context,
-        diagnostic_range,
-        format_args!(
-            "Object of type `{}` is not assignable to `{}`",
-            value_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings.clone())
-        ),
-    ) else {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, diagnostic_range) else {
         return;
     };
+    let settings =
+        assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
+    let mut diag = builder.into_diagnostic(format_args!(
+        "Object of type `{}` is not assignable to `{}`",
+        value_ty.display_with(db, env, settings.clone()),
+        target_ty.display_with(db, env, settings.clone())
+    ));
 
     if matches!(target_node, AnyNodeRef::ExprName(_)) {
         match target_ty {
@@ -2324,19 +2432,16 @@ pub(super) fn report_invalid_attribute_assignment(
     // silenced diagnostics during attribute resolution, and rely on the assignability
     // diagnostic being emitted here.
 
-    let env = &context.program_environment();
-    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
-    let Some(mut diag) = report_invalid_assignment_with_message(
-        context,
-        range,
-        format_args!(
-            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display_with(db, env, settings.clone()),
-            target_ty.display_with(db, env, settings),
-        ),
-    ) else {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, range) else {
         return;
     };
+    let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [source_ty, target_ty]);
+    let mut diag = builder.into_diagnostic(format_args!(
+        "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+        source_ty.display_with(db, env, settings.clone()),
+        target_ty.display_with(db, env, settings),
+    ));
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
     error_context.attach_to(db, env, &mut diag);
@@ -3948,7 +4053,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     call: &ast::ExprCall,
     protocol: ProtocolClass,
 ) {
-    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+    let Some(builder) = context.report_lint(&ABSTRACT_CLASS_INSTANTIATION, call) else {
         return;
     };
     let db = context.db();
@@ -4003,7 +4108,7 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
     let Some(first_name) = abstract_methods.first_name() else {
         return;
     };
-    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+    let Some(builder) = context.report_lint(&ABSTRACT_CLASS_INSTANTIATION, call) else {
         return;
     };
     let class_name = class.name(db);
@@ -4418,17 +4523,52 @@ fn report_invalid_base<'env, 'db>(
     Some(diagnostic)
 }
 
+/// Uses `non-literal-typed-dict-key` only when every alternative in the rejected key type is
+/// a string of unknown value. This keeps a misspelled literal or a non-string in a mixed union
+/// visible when non-literal key errors are suppressed.
+pub(super) fn typed_dict_subscript_key_lint<'db>(
+    context: &InferContext<'db, '_>,
+    key: Type<'db>,
+) -> &'static LintMetadata {
+    let db = context.db();
+    let env = context.program_environment();
+
+    let is_non_literal_string = |ty: Type<'db>| {
+        if let Some(literal) = ty.as_literal_value() {
+            literal.is_literal_string()
+        } else {
+            ty.is_subtype_of(db, env, KnownClass::Str.to_instance(db, env))
+        }
+    };
+
+    let non_literal = match key.expand_top_level_aliases(db, env) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(is_non_literal_string),
+        key => is_non_literal_string(key),
+    };
+
+    if non_literal {
+        &NON_LITERAL_TYPED_DICT_KEY
+    } else {
+        &INVALID_TYPED_DICT_KEY
+    }
+}
+
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
     typed_dict_node: AnyNodeRef,
     key_node: AnyNodeRef,
-    typed_dict_ty: Type<'db>,
+    typed_dict: TypedDictType<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
-    items: &TypedDictSchema<'db>,
+    lint: &'static LintMetadata,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+    if let Some(builder) = context.report_lint(lint, key_node) {
+        let typed_dict_ty = Type::TypedDict(typed_dict);
         let env = &context.program_environment();
         match key_ty.as_string_literal() {
             Some(key) => {
@@ -4455,7 +4595,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys().map(Name::as_str);
+                let existing_keys = typed_dict.items(db).keys().map(Name::as_str);
 
                 if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
                     && let Some(suggestion) = did_you_mean(existing_keys, key)
@@ -5028,7 +5168,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
-    type_var_kind: TypeVarKind,
+    type_var_kind: TypeVarKind<'db>,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
@@ -5038,7 +5178,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     let typevar_kind = match type_var_kind {
         TypeVarKind::LegacyTypeVar
         | TypeVarKind::Pep695TypeVar
-        | TypeVarKind::TypingSelf
+        | TypeVarKind::TypingSelf { .. }
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
         TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
@@ -5077,8 +5217,9 @@ pub(crate) fn report_shadowed_type_variable<'db>(
 // I tried refactoring this function to placate Clippy,
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]
-pub(super) fn report_invalid_method_override<'db>(
+pub(super) fn report_incompatible_method_override<'db>(
     context: &InferContext<'db, '_>,
+    violation: MethodOverrideViolation,
     member: &str,
     subclass: ClassType<'db>,
     subclass_definition: Definition<'db>,
@@ -5110,7 +5251,7 @@ pub(super) fn report_invalid_method_override<'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, diagnostic_range) else {
+    let Some(builder) = context.report_lint(violation.rule(), diagnostic_range) else {
         return;
     };
 
@@ -5124,8 +5265,14 @@ pub(super) fn report_invalid_method_override<'db>(
         format!("{superclass_name}.{member}")
     };
 
-    let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
+    let mut diagnostic = match violation {
+        MethodOverrideViolation::General => {
+            builder.into_diagnostic(format_args!("Invalid override of method `{member}`"))
+        }
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
+            "Override of method `{member}` disallows keyword arguments allowed by the method on the base class"
+        )),
+    };
 
     diagnostic.set_primary_annotation_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
@@ -5274,6 +5421,7 @@ pub(super) fn report_invalid_method_override<'db>(
 /// Reports an incompatible pair of source-defined methods in a resolved MRO.
 pub(super) fn report_incompatible_base_method<'db>(
     context: &InferContext<'db, '_>,
+    violation: MethodOverrideViolation,
     class: StaticClassLiteral<'db>,
     member: &str,
     selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
@@ -5281,8 +5429,7 @@ pub(super) fn report_incompatible_base_method<'db>(
     error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
-    else {
+    let Some(builder) = context.report_lint(violation.rule(), class.header_range(db)) else {
         return;
     };
 
@@ -5300,9 +5447,14 @@ pub(super) fn report_incompatible_base_method<'db>(
         .class_literal(db)
         .display_with(db, settings.clone());
     let contract_name = contract_owner.class_literal(db).display_with(db, settings);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Base classes for class `{class_name}` define method `{member}` incompatibly",
-    ));
+    let mut diagnostic = match violation {
+        MethodOverrideViolation::General => builder.into_diagnostic(format_args!(
+            "Base classes for class `{class_name}` define method `{member}` incompatibly",
+        )),
+        MethodOverrideViolation::DroppedKeywordParameter => builder.into_diagnostic(format_args!(
+            "Base classes for class `{class_name}` disagree on keywords for method `{member}`",
+        )),
+    };
     diagnostic.set_primary_annotation_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
     ));
@@ -5420,11 +5572,10 @@ pub(super) fn report_overridden_final_method<'db>(
     // but you'd want to delete the `@my_property.deleter` as well as the getter and the setter,
     // and we don't yet track those definitions precisely enough to offer a safe fix.
     //
-    // We also only provide autofixes if the subclass member is a function definition (not an
-    // assignment like `method = some_function`). If it's an assignment, the function type
-    // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
+    // Only delete the function defined by the override. An assignment or a decorator can bind
+    // the name to a different function, possibly from another file.
     if let Type::FunctionLiteral(function) = subclass_type
-        && subclass_definition.kind(db).is_function_def()
+        && function.contains_definition(db, subclass_definition)
     {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;

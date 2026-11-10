@@ -179,10 +179,10 @@ return type is not narrowed to its `bool` subtype.
 
 ```py
 class Comparison:
-    def __eq__(self, other: object) -> str:  # error: [invalid-method-override]
+    def __eq__(self, other: object) -> str:  # error: [incompatible-method-override]
         return "equal"
 
-    def __ne__(self, other: object) -> bytes:  # error: [invalid-method-override]
+    def __ne__(self, other: object) -> bytes:  # error: [incompatible-method-override]
         return b"different"
 
     def __lt__(self, other: object) -> int:
@@ -251,7 +251,7 @@ def compare(value):
     reveal_type("ready" != value)  # revealed: Literal[True]
 
     assert value == "ready"
-    "unreachable".missing  # no diagnostic (unreachable)
+    "unreachable".missing  # ok (unreachable)
 ```
 
 The same applies to `Any`, including when both operands have been narrowed to `None`.
@@ -282,10 +282,10 @@ narrowed to `bool`.
 
 ```py
 class Custom:
-    def __eq__(self, other: object) -> str:  # error: [invalid-method-override]
+    def __eq__(self, other: object) -> str:  # error: [incompatible-method-override]
         return "equal"
 
-    def __ne__(self, other: object) -> bytes:  # error: [invalid-method-override]
+    def __ne__(self, other: object) -> bytes:  # error: [incompatible-method-override]
         return b"different"
 
 def compare_custom(value, custom: Custom):
@@ -309,7 +309,7 @@ def enabled() -> bool:
 
 class Conditional:
     if enabled():
-        def __eq__(self, other: object) -> str:  # error: [invalid-method-override]
+        def __eq__(self, other: object) -> str:  # error: [incompatible-method-override]
             return "equal"
 
 class Excluded: ...
@@ -376,7 +376,7 @@ from __future__ import annotations
 from typing_extensions import Self
 
 class Index:
-    def __eq__(self, other: object) -> Self:  # error: [invalid-method-override]
+    def __eq__(self, other: object) -> Self:  # error: [incompatible-method-override]
         return self
 
     def __lt__(self, other: object) -> Self:
@@ -429,7 +429,7 @@ being the entire return type.
 from typing_extensions import Self
 
 class Comparison:
-    def __eq__(self, other: object) -> tuple[Self]:  # error: [invalid-method-override]
+    def __eq__(self, other: object) -> tuple[Self]:  # error: [incompatible-method-override]
         return (self,)
 
 class Excluded: ...

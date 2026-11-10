@@ -603,7 +603,7 @@ x = 1
 `main.py`:
 
 ```py
-import foo.hidden  # error: [unresolved-import]
+import foo.hidden  # error: [import-not-found]
 from foo.bar.impl import x
 
 reveal_type(x)  # revealed: Literal[1]
@@ -650,7 +650,7 @@ x = 1
 `main.py`:
 
 ```py
-import foo.hidden  # error: [unresolved-import]
+import foo.hidden  # error: [import-not-found]
 from foo.impl import x
 
 reveal_type(x)  # revealed: Literal[1]

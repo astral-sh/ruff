@@ -13,8 +13,8 @@ TC004 [*] Move import `builtins` out of type-checking block. Import is used for 
 help: Move out of type-checking block
   |
 2 | # there is a (potentially invisible) unicode formfeed character (000C) between `TYPE_CHECKING` and the backslash
-  - from typing import TYPE_CHECKING\
-3 + from typing import TYPE_CHECKING; import builtins\
+  - from typing import TYPE_CHECKING␌\
+3 + from typing import TYPE_CHECKING; import builtins␌\
 4 |
   - if TYPE_CHECKING: import builtins
 5 + if TYPE_CHECKING: pass

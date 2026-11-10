@@ -39,14 +39,14 @@ However, returning a supertype leads to an error:
 
 ```pyi
 class Sub3(Super):
-    def method(self) -> object: ...  # snapshot: invalid-method-override
+    def method(self) -> object: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:10:9
    |
-10 |     def method(self) -> object: ...  # snapshot: invalid-method-override
+10 |     def method(self) -> object: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -61,14 +61,14 @@ Returning a completely unrelated type also leads to an error:
 
 ```pyi
 class Sub4(Super):
-    def method(self) -> str: ...  # snapshot: invalid-method-override
+    def method(self) -> str: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:12:9
    |
-12 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+12 |     def method(self) -> str: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -124,7 +124,7 @@ class Base(Generic[T]):
     def method(self) -> "Derived[Any]": ...
 
 class Derived(Base[T], Generic[T]):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self: "Derived[Element[S]]") -> "Derived[S]": ...
 ```
 
@@ -177,14 +177,14 @@ This method can no longer be passed arguments:
 
 ```pyi
 class Sub12(Super):
-    def method(self, /): ...  # snapshot: invalid-method-override
+    def method(self, /): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:35:9
    |
-35 |     def method(self, /): ...  # snapshot: invalid-method-override
+35 |     def method(self, /): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -199,14 +199,14 @@ This method can no longer be passed exactly one argument:
 
 ```pyi
 class Sub13(Super):
-    def method(self, x, y, /): ...  # snapshot: invalid-method-override
+    def method(self, x, y, /): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:37:9
    |
-37 |     def method(self, x, y, /): ...  # snapshot: invalid-method-override
+37 |     def method(self, x, y, /): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -222,14 +222,14 @@ Here, `x` can no longer be passed positionally:
 
 ```pyi
 class Sub14(Super):
-    def method(self, /, *, x): ...  # snapshot: invalid-method-override
+    def method(self, /, *, x): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:39:9
    |
-39 |     def method(self, /, *, x): ...  # snapshot: invalid-method-override
+39 |     def method(self, /, *, x): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -244,14 +244,14 @@ Here, `x` can no longer be passed any integer -- it now requires a `bool`!
 
 ```pyi
 class Sub15(Super):
-    def method(self, x: bool, /): ...  # snapshot: invalid-method-override
+    def method(self, x: bool, /): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:41:9
    |
-41 |     def method(self, x: bool, /): ...  # snapshot: invalid-method-override
+41 |     def method(self, x: bool, /): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super.method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -269,18 +269,18 @@ class Super2:
     def method2(self, x): ...
 
 class Sub16(Super2):
-    def method2(self, x, /): ...  # snapshot: invalid-method-override
+    def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method2`
+error[lost-keyword-for-regular-parameter]: Override of method `method2` disallows keyword arguments allowed by the method on the base class
   --> src/mdtest_snippet.pyi:46:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
+46 |     def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
 info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -290,20 +290,20 @@ In this case, `x` can no longer be passed as a positional argument:
 
 ```pyi
 class Sub17(Super2):
-    def method2(self, *, x): ...  # snapshot: invalid-method-override
+    def method2(self, *, x): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method2`
+error[incompatible-method-override]: Invalid override of method `method2`
   --> src/mdtest_snippet.pyi:48:9
    |
 43 |     def method2(self, x): ...
    |         ---------------- `Super2.method2` defined here
 44 |
 45 | class Sub16(Super2):
-46 |     def method2(self, x, /): ...  # snapshot: invalid-method-override
+46 |     def method2(self, x, /): ...  # snapshot: lost-keyword-for-regular-parameter
 47 | class Sub17(Super2):
-48 |     def method2(self, *, x): ...  # snapshot: invalid-method-override
+48 |     def method2(self, *, x): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super2.method2`
 info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
@@ -323,11 +323,11 @@ This is an error because `x` can no longer be passed as a keyword argument:
 
 ```pyi
 class Sub19(Super3):
-    def method3(self, x, /): ...  # snapshot: invalid-method-override
+    def method3(self, x, /): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method3`
+error[incompatible-method-override]: Invalid override of method `method3`
   --> src/mdtest_snippet.pyi:55:9
    |
 50 |     def method3(self, *, x): ...
@@ -336,7 +336,7 @@ error[invalid-method-override]: Invalid override of method `method3`
 52 | class Sub18(Super3):
 53 |     def method3(self, x): ...  # fine: `x` can still be used as a keyword argument
 54 | class Sub19(Super3):
-55 |     def method3(self, x, /): ...  # snapshot: invalid-method-override
+55 |     def method3(self, x, /): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super3.method3`
 info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -356,11 +356,11 @@ Omitting `**kwargs` is an error:
 
 ```pyi
 class Sub21(Super4):
-    def method(self, *args): ...  # snapshot: invalid-method-override
+    def method(self, *args): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:62:9
    |
 57 |     def method(self, *args: int, **kwargs: str): ...
@@ -369,7 +369,7 @@ error[invalid-method-override]: Invalid override of method `method`
 59 | class Sub20(Super4):
 60 |     def method(self, *args: object, **kwargs: object): ...  # fine
 61 | class Sub21(Super4):
-62 |     def method(self, *args): ...  # snapshot: invalid-method-override
+62 |     def method(self, *args): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
 info: the signature must accept arbitrary keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -379,14 +379,14 @@ Similarly, omitting `*args` is also an error:
 
 ```pyi
 class Sub22(Super4):
-    def method(self, **kwargs): ...  # snapshot: invalid-method-override
+    def method(self, **kwargs): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:64:9
    |
-64 |     def method(self, **kwargs): ...  # snapshot: invalid-method-override
+64 |     def method(self, **kwargs): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Super4.method`
    |
   ::: src/mdtest_snippet.pyi:57:9
@@ -406,6 +406,93 @@ class Sub23(Super4):
     def method(self, x, *args, y, **kwargs): ...
 ```
 
+## Dropping a positional parameter's keyword name
+
+Renaming a positional-or-keyword parameter or making it positional-only breaks calls that pass it by
+name. Both overrides still accept an integer by position.
+
+```pyi
+class Base:
+    def f(self, value: int) -> int: ...
+
+class Renamed(Base):
+    def f(self, item: object) -> int: ...  # error: [lost-keyword-for-regular-parameter]
+
+class PositionalOnly(Base):
+    def f(self, value: int, /) -> int: ...  # error: [lost-keyword-for-regular-parameter]
+```
+
+If there is also an incompatible argument type, a missing argument, or an incompatible return type,
+the general rule applies.
+
+```pyi
+class NarrowArgument(Base):
+    def f(self, item: str) -> int: ...  # error: [incompatible-method-override]
+
+class ExtraArgument(Base):
+    def f(self, value: int, extra: int, /) -> int: ...  # error: [incompatible-method-override]
+
+class WrongReturn(Base):
+    def f(self, item: int) -> str: ...  # error: [incompatible-method-override]
+```
+
+The original keyword may still bind to another parameter or to `**kwargs`. Both overrides below
+accept `value=`, but require its value to be a string.
+
+```pyi
+class DifferentParameter(Base):
+    def f(self, item: int = 0, *, value: str = "") -> int: ...  # error: [incompatible-method-override]
+
+class KeywordArguments(Base):
+    def f(self, item: int = 0, **kwargs: str) -> int: ...  # error: [incompatible-method-override]
+```
+
+## Keyword and type conflicts against different bases
+
+A keyword mismatch with `Integers.f` does not hide the fact that the selected method cannot accept
+strings as required by `Strings.f`.
+
+```pyi
+class Integers:
+    def f(self, value: int) -> int: ...
+
+class Strings:
+    def f(self, value: str) -> int: ...
+
+class Explicit(Integers, Strings):
+    def f(self, item: int) -> int: ...  # error: [incompatible-method-override]
+
+class Renamed:
+    def f(self, item: int) -> int: ...
+
+class Inherited(Renamed, Integers, Strings): ...  # error: [incompatible-method-override]
+```
+
+## Selecting general method overrides with the previous rule name
+
+The original rule name selects the general rule in configuration and ignore comments. The new
+keyword rule can be disabled separately.
+
+```toml
+[rules]
+all = "ignore"
+invalid-method-override = "error"
+```
+
+```pyi
+class Base:
+    def f(self, value: int) -> None: ...
+
+class WrongType(Base):
+    def f(self, item: str) -> None: ...  # error: [incompatible-method-override]
+
+class Suppressed(Base):
+    def f(self, item: str) -> None: ...  # ty: ignore[invalid-method-override]
+
+class Renamed(Base):
+    def f(self, item: int) -> None: ...  # no diagnostic
+```
+
 ## Variadic keyword parameters cannot replace positional parameters
 
 A method that accepts only keyword arguments cannot accept a positional argument required by the
@@ -416,18 +503,18 @@ class Parent:
     def method(self, value: int, /) -> None: ...
 
 class Child(Parent):
-    def method(self, **kwargs: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, **kwargs: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, value: int, /) -> None: ...
   |         ----------------------------------- `Parent.method` defined here
 3 |
 4 | class Child(Parent):
-5 |     def method(self, **kwargs: int) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self, **kwargs: int) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
 info: parameter `value` is missing
 info: This violates the Liskov Substitution Principle
@@ -443,18 +530,18 @@ class Parent:
     def method(self, *args: int) -> None: ...
 
 class Child(Parent):
-    def method(self, first: int, *args: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, first: int, *args: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, *args: int) -> None: ...
   |         -------------------------------- `Parent.method` defined here
 3 |
 4 | class Child(Parent):
-5 |     def method(self, first: int, *args: int) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self, first: int, *args: int) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
 info: unexpected extra parameter `first`
 help: Parameter `first` must have a default value
@@ -466,7 +553,7 @@ Adding a positional parameter with a default is valid because callers can omit i
 ```pyi
 class OptionalChild(Parent):
     # TODO: this is a false-positive error that should be fixed.
-    def method(self, first: int = 0, *args: int) -> None: ...  # error: [invalid-method-override]
+    def method(self, first: int = 0, *args: int) -> None: ...  # error: [incompatible-method-override]
 ```
 
 ## Variadic keyword parameters cannot be overridden with a limited set of keyword-only parameters
@@ -479,18 +566,18 @@ class Parent:
     def method(self, **kwargs: int) -> None: ...
 
 class Child(Parent):
-    def method(self, *, value: int = 0) -> None: ...  # snapshot: invalid-method-override
+    def method(self, *, value: int = 0) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, **kwargs: int) -> None: ...
   |         ----------------------------------- `Parent.method` defined here
 3 |
 4 | class Child(Parent):
-5 |     def method(self, *, value: int = 0) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self, *, value: int = 0) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
 info: the signature must accept arbitrary keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -506,18 +593,18 @@ class ParentPositionalOnly:
     def method(self, parent_value: int = 0, /) -> None: ...
 
 class ChildPositionalOnly(ParentPositionalOnly):
-    def method(self, child_value: int, /) -> None: ...  # snapshot: invalid-method-override
+    def method(self, child_value: int, /) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, parent_value: int = 0, /) -> None: ...
   |         ---------------------------------------------- `ParentPositionalOnly.method` defined here
 3 |
 4 | class ChildPositionalOnly(ParentPositionalOnly):
-5 |     def method(self, child_value: int, /) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self, child_value: int, /) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentPositionalOnly.method`
 info: parameter `child_value` must have a default value
 info: This violates the Liskov Substitution Principle
@@ -530,18 +617,18 @@ class ParentPositionalOrKeyword:
     def method(self, value: int = 0) -> None: ...
 
 class ChildPositionalOrKeyword(ParentPositionalOrKeyword):
-    def method(self, value: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, value: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:10:9
    |
  7 |     def method(self, value: int = 0) -> None: ...
    |         ------------------------------------ `ParentPositionalOrKeyword.method` defined here
  8 |
  9 | class ChildPositionalOrKeyword(ParentPositionalOrKeyword):
-10 |     def method(self, value: int) -> None: ...  # snapshot: invalid-method-override
+10 |     def method(self, value: int) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentPositionalOrKeyword.method`
 info: parameter `value` must have a default value
 info: This violates the Liskov Substitution Principle
@@ -554,18 +641,18 @@ class ParentKeywordOnly:
     def method(self, *, value: int = 0) -> None: ...
 
 class ChildKeywordOnly(ParentKeywordOnly):
-    def method(self, *, value: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, *, value: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:15:9
    |
 12 |     def method(self, *, value: int = 0) -> None: ...
    |         --------------------------------------- `ParentKeywordOnly.method` defined here
 13 |
 14 | class ChildKeywordOnly(ParentKeywordOnly):
-15 |     def method(self, *, value: int) -> None: ...  # snapshot: invalid-method-override
+15 |     def method(self, *, value: int) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentKeywordOnly.method`
 info: parameter `value` must have a default value
 info: This violates the Liskov Substitution Principle
@@ -580,18 +667,18 @@ class PositionalOnlyParent:
     def method(self, *, value: int) -> None: ...
 
 class PositionalOnlyChild(PositionalOnlyParent):
-    def method(self, extra: int, /, *, value: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, extra: int, /, *, value: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, *, value: int) -> None: ...
   |         ----------------------------------- `PositionalOnlyParent.method` defined here
 3 |
 4 | class PositionalOnlyChild(PositionalOnlyParent):
-5 |     def method(self, extra: int, /, *, value: int) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self, extra: int, /, *, value: int) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `PositionalOnlyParent.method`
 info: unexpected extra parameter `extra`
 help: Parameter `extra` must have a default value
@@ -605,18 +692,18 @@ class KeywordOnlyParent:
     def method(self, *, value: int) -> None: ...
 
 class KeywordOnlyChild(KeywordOnlyParent):
-    def method(self, *, value: int, extra: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, *, value: int, extra: int) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:10:9
    |
  7 |     def method(self, *, value: int) -> None: ...
    |         ----------------------------------- `KeywordOnlyParent.method` defined here
  8 |
  9 | class KeywordOnlyChild(KeywordOnlyParent):
-10 |     def method(self, *, value: int, extra: int) -> None: ...  # snapshot: invalid-method-override
+10 |     def method(self, *, value: int, extra: int) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `KeywordOnlyParent.method`
 info: unexpected extra parameter `extra`
 help: Parameter `extra` must have a default value
@@ -633,18 +720,18 @@ class Parent:
     def method(self, *, value: int) -> None: ...
 
 class Child(Parent):
-    def method(self) -> None: ...  # snapshot: invalid-method-override
+    def method(self) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:5:9
   |
 2 |     def method(self, *, value: int) -> None: ...
   |         ----------------------------------- `Parent.method` defined here
 3 |
 4 | class Child(Parent):
-5 |     def method(self) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
 info: parameter `value` is missing
 info: This violates the Liskov Substitution Principle
@@ -655,20 +742,20 @@ providing the original argument.
 
 ```pyi
 class ChildWithDifferentKeyword(Parent):
-    def method(self, *, other: int = 0) -> None: ...  # snapshot: invalid-method-override
+    def method(self, *, other: int = 0) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.pyi:7:9
   |
 2 |     def method(self, *, value: int) -> None: ...
   |         ----------------------------------- `Parent.method` defined here
 3 |
 4 | class Child(Parent):
-5 |     def method(self) -> None: ...  # snapshot: invalid-method-override
+5 |     def method(self) -> None: ...  # snapshot: incompatible-method-override
 6 | class ChildWithDifferentKeyword(Parent):
-7 |     def method(self, *, other: int = 0) -> None: ...  # snapshot: invalid-method-override
+7 |     def method(self, *, other: int = 0) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
 info: parameter `value` is missing
 info: This violates the Liskov Substitution Principle
@@ -695,13 +782,13 @@ class Base:
     class_attr: ClassVar[int] = 1
 
 class Subclass(Base):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
     instance_attr: ClassVar[int]
 
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
     instance_attr_with_default: ClassVar[int] = 1
 
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
     class_attr: int
 
 class ValidSubclass(Base):
@@ -742,7 +829,7 @@ class RegularClassAttributeBase:
     attr = 1
 
 class ExplicitClassVarOverride(RegularClassAttributeBase):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
     attr: ClassVar[int] = 1
 
 class ClassDefaultBase:
@@ -771,18 +858,18 @@ class ClassVarBase:
     non_callable: ClassVar[int]
 
 class MethodSubclass(ClassVarBase):
-    def plain(self, x: int) -> int:  # error: [invalid-mutable-override]
+    def plain(self, x: int) -> int:  # error: [incompatible-mutable-override]
         return x
 
     @staticmethod
-    def static(x: int) -> int:  # error: [invalid-mutable-override]
+    def static(x: int) -> int:  # error: [incompatible-mutable-override]
         return x
 
     @classmethod
-    def class_(cls, x: int) -> int:  # error: [invalid-mutable-override]
+    def class_(cls, x: int) -> int:  # error: [incompatible-mutable-override]
         return x
 
-    def non_callable(self) -> int:  # error: [invalid-attribute-override]
+    def non_callable(self) -> int:  # error: [incompatible-attribute-override]
         return 1
 
 class PropertyBase:
@@ -790,7 +877,7 @@ class PropertyBase:
 
 class PropertySubclass(PropertyBase):
     @property
-    def attr(  # error: [invalid-property-type-override]
+    def attr(  # error: [incompatible-property-override]
         self,
     ) -> int:
         return 1
@@ -809,7 +896,7 @@ class GrandparentClassVar:
     attr: ClassVar[int]
 
 class ParentInstance(GrandparentClassVar):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
     attr: int
 
 class ChildInstance(ParentInstance):
@@ -819,7 +906,7 @@ class GrandparentInstance:
     attr: int
 
 class ParentClassVar(GrandparentInstance):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
     attr: ClassVar[int]
 
 class ChildClassVar(ParentClassVar):
@@ -849,7 +936,7 @@ class DescriptorAnnotationBase:
     descriptor_attr: Descriptor
 
 class DescriptorAnnotationOverride(DescriptorAnnotationBase):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
     descriptor_attr: ClassVar[Descriptor]
 ```
 
@@ -869,7 +956,7 @@ class InstanceBase:
     attr: int
 
 class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
     attr: int
 ```
 
@@ -889,10 +976,10 @@ class DC6:
 
 @dataclass
 class DC7(DC6):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `DC6.x`"
+    # error: [incompatible-attribute-override] "class variable cannot override instance variable `DC6.x`"
     x: ClassVar[int]
 
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `DC6.y`"
     y: int
 ```
 
@@ -940,12 +1027,12 @@ class ReturnsInt:
 class ReturnsBool:
     def method(self) -> bool: ...
 
-class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: incompatible-method-override
 class Compatible(ReturnsBool, ReturnsInt): ...
 ```
 
 ```snapshot
-error[invalid-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
+error[incompatible-method-override]: Base classes for class `BasicConflict` define method `method` incompatibly
   --> src/mdtest_snippet.pyi:10:7
    |
  2 |     def method(self) -> str: ...
@@ -958,7 +1045,7 @@ error[invalid-method-override]: Base classes for class `BasicConflict` define me
  7 | class ReturnsBool:
  8 |     def method(self) -> bool: ...
  9 |
-10 | class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+10 | class BasicConflict(ReturnsStr, ReturnsInt): ...  # snapshot: incompatible-method-override
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
 info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
@@ -977,9 +1064,9 @@ class ReturnsStr:
 class ReturnsInt:
     def method(self) -> int: ...
 
-class EmptyFirst(Empty, ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
-class EmptyMiddle(ReturnsStr, Empty, ReturnsInt): ...  # error: [invalid-method-override]
-class EmptyLast(ReturnsStr, ReturnsInt, Empty): ...  # error: [invalid-method-override]
+class EmptyFirst(Empty, ReturnsStr, ReturnsInt): ...  # error: [incompatible-method-override]
+class EmptyMiddle(ReturnsStr, Empty, ReturnsInt): ...  # error: [incompatible-method-override]
+class EmptyLast(ReturnsStr, ReturnsInt, Empty): ...  # error: [incompatible-method-override]
 ```
 
 ### An earlier compatible method satisfies both contracts
@@ -1000,6 +1087,40 @@ class ReturnsInt:
     def method(self) -> int: ...
 
 class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
+```
+
+### Instance attributes take precedence over methods
+
+The callback stored by the first base is the selected member. The later methods do not need to be
+compatible with each other; each is checked against the callback's type.
+
+```py
+from typing import Any, Callable
+
+class Callback:
+    def __init__(self, callback: Callable[[], Any]) -> None:
+        self.method: Callable[[], Any] = callback
+
+class ReturnsStr:
+    def method(self) -> str:
+        return ""
+
+class ReturnsInt:
+    def method(self) -> int:
+        return 0
+
+class Combined(Callback, ReturnsStr, ReturnsInt): ...  # ok
+```
+
+A non-callable instance attribute still conflicts with the inherited methods. The error describes
+that attribute's type, without also comparing the hidden methods with each other.
+
+```py
+class Value:
+    def __init__(self) -> None:
+        self.method: int = 0
+
+class Invalid(Value, ReturnsStr, ReturnsInt): ...  # error: [incompatible-attribute-override]
 ```
 
 ### Subclass overrides must satisfy both contracts
@@ -1033,10 +1154,10 @@ base. The conflict is introduced by the subclass, so it is reported on the overr
 
 ```pyi
 class IncompatibleReturn(ReturnsStr, ReturnsInt):
-    def method(self) -> str: ...  # error: [invalid-method-override]
+    def method(self) -> str: ...  # error: [incompatible-method-override]
 
 class IncompatibleParameter(AcceptsStr, AcceptsInt):
-    def accepts(self, value: str) -> None: ...  # error: [invalid-method-override]
+    def accepts(self, value: str) -> None: ...  # error: [incompatible-method-override]
 ```
 
 ### An intermediate `Any` does not hide a conflict
@@ -1057,7 +1178,7 @@ class AcceptsAny(AcceptsInt):
 class AcceptsStr:
     def accepts(self, value: str) -> None: ...
 
-class AnyConflict(AcceptsStr, AcceptsAny): ...  # error: [invalid-method-override]
+class AnyConflict(AcceptsStr, AcceptsAny): ...  # error: [incompatible-method-override]
 ```
 
 ### Dynamic bases only hide later conflicts
@@ -1079,7 +1200,7 @@ class ReturnsStr:
 class ReturnsInt:
     def method(self) -> int: ...
 
-class DynamicMiddle(ReturnsStr, Any, ReturnsInt): ...  # error: [invalid-method-override]
+class DynamicMiddle(ReturnsStr, Any, ReturnsInt): ...  # error: [incompatible-method-override]
 class DynamicFirst(Any, ReturnsStr, ReturnsInt): ...
 ```
 
@@ -1102,8 +1223,8 @@ class ReturnsInt:
 class GenericReturn(Generic[T]):
     def method(self) -> T: ...
 
-class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
-class GenericBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [incompatible-method-override]
+class GenericBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [incompatible-method-override]
 ```
 
 ### Methods inherited by a direct base
@@ -1119,12 +1240,12 @@ class Intermediate(ReturnsStr): ...
 class ReturnsInt:
     def method(self) -> int: ...
 
-class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
+class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [incompatible-method-override]
 ```
 
 ### Properties
 
-Incompatible properties inherited from different bases are not yet checked.
+Incompatible properties inherited from different bases are rejected at the class that joins them.
 
 ```pyi
 class ReturnsStr:
@@ -1135,8 +1256,7 @@ class ReturnsInt:
     @property
     def value(self) -> int: ...
 
-# TODO: Incompatible inherited properties should be reported here.
-class PropertyConflict(ReturnsStr, ReturnsInt): ...
+class PropertyConflict(ReturnsStr, ReturnsInt): ...  # error: [incompatible-property-override]
 ```
 
 ### Synthesized members
@@ -1157,6 +1277,27 @@ class AcceptsObject:
 class SynthesizedConflict(Ordered, AcceptsObject): ...
 ```
 
+### Generated NamedTuple methods
+
+The first base supplies a generated `_replace` method that accepts both argument types. Without that
+base, the selected method accepts only `int` and conflicts with the one that accepts `str`.
+
+```pyi
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int | str
+
+class AcceptsInt:
+    def _replace(self, *, x: int) -> object: ...
+
+class AcceptsStr:
+    def _replace(self, *, x: str) -> object: ...
+
+class FromTuple(Point, AcceptsInt, AcceptsStr): ...
+class FromBases(AcceptsInt, AcceptsStr): ...  # error: [incompatible-method-override]
+```
+
 ### Enum mixins
 
 Ordinary mixin methods continue to contribute inherited contracts when the resulting class is an
@@ -1172,7 +1313,7 @@ class ReturnsStr:
 class ReturnsInt:
     def method(self) -> int: ...
 
-class MixedEnum(ReturnsStr, ReturnsInt, Enum):  # error: [invalid-method-override]
+class MixedEnum(ReturnsStr, ReturnsInt, Enum):  # error: [incompatible-method-override]
     MEMBER = 1
 
 class FirstString:
@@ -1181,7 +1322,7 @@ class FirstString:
 class SecondString:
     def __str__(self) -> Literal["second"]: ...
 
-class StringConflict(FirstString, SecondString, Enum):  # error: [invalid-method-override]
+class StringConflict(FirstString, SecondString, Enum):  # error: [incompatible-method-override]
     MEMBER = 1
 ```
 
@@ -1202,20 +1343,20 @@ class ClassMethod:
     @classmethod
     def kind(cls, value: int) -> int: ...
 
-class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
-class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
-class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
+class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [incompatible-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: incompatible-method-override
+class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [incompatible-method-override]
 ```
 
 ```snapshot
-error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
+error[incompatible-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
   --> src/mdtest_snippet.pyi:13:7
    |
 10 |     def kind(cls, value: int) -> int: ...
    |         ---- `ClassMethod.kind` defined here
 11 |
-12 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
-13 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+12 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [incompatible-method-override]
+13 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: incompatible-method-override
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -1249,7 +1390,7 @@ class Right(ReceiverBase):
     @classmethod
     def selected(cls) -> str: ...
 
-class Combined(Left, Right): ...  # error: [invalid-method-override]
+class Combined(Left, Right): ...  # error: [incompatible-method-override]
 class Compatible(Left, Right): ...
 ```
 
@@ -1273,7 +1414,7 @@ class ReturnsStr:
     @classmethod
     def class_method(cls) -> str: ...
 
-class MetaclassConflict(ReturnsInt, ReturnsStr): ...  # error: [invalid-method-override]
+class MetaclassConflict(ReturnsInt, ReturnsStr): ...  # error: [incompatible-method-override]
 ```
 
 ### The implicit `object` base does not repeat an existing error
@@ -1286,7 +1427,7 @@ error.
 class Empty: ...
 
 class InvalidStr:
-    def __str__(self) -> int: ...  # error: [invalid-method-override]
+    def __str__(self) -> int: ...  # error: [incompatible-method-override]
 
 class Combined(Empty, InvalidStr): ...
 ```
@@ -1313,7 +1454,7 @@ class Base(Generic[T]):
     def method(self, value: object) -> None: ...
 
 class Parent[U](Base):
-    def method(self, value: U) -> None: ...  # error: [invalid-method-override]
+    def method(self, value: U) -> None: ...  # error: [incompatible-method-override]
 
 class Child(Parent[str], object): ...
 ```
@@ -1343,14 +1484,14 @@ class Base:
 from left import Base as LeftBase
 from right import Base as RightBase
 
-class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+class Combined(LeftBase, RightBase): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Base classes for class `Combined` define method `method` incompatibly
+error[incompatible-method-override]: Base classes for class `Combined` define method `method` incompatibly
  --> src/main.pyi:4:7
   |
-4 | class Combined(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+4 | class Combined(LeftBase, RightBase): ...  # snapshot: incompatible-method-override
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `left.Base.method` is incompatible with `right.Base.method`
   |
  ::: src/left.pyi:2:9
@@ -1409,7 +1550,7 @@ class Grandparent:
     def method(self, x: int) -> None: ...
 
 class Parent(Grandparent):
-    def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+    def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
 
 class Child(Parent):
     # compatible with the signature of `Parent.method`, but not with `Grandparent.method`.
@@ -1419,23 +1560,23 @@ class Child(Parent):
 
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
-    def method(self, x: int) -> None: ...  # snapshot: invalid-method-override
+    def method(self, x: int) -> None: ...  # snapshot: incompatible-method-override
 
 class ChildWithNewViolation(Parent):
     # incompatible with BOTH `Parent.method` (str) and `Grandparent.method` (int).
     # We report the violation against the immediate parent (`Parent`), not the grandparent.
-    def method(self, x: bytes) -> None: ...  # snapshot: invalid-method-override
+    def method(self, x: bytes) -> None: ...  # snapshot: incompatible-method-override
 
 class GrandparentWithReturnType:
     def method(self) -> int: ...
 
 class ParentWithReturnType(GrandparentWithReturnType):
-    def method(self) -> str: ...  # snapshot: invalid-method-override
+    def method(self) -> str: ...  # snapshot: incompatible-method-override
 
 class ChildWithReturnType(ParentWithReturnType):
     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
-    def method(self) -> int: ...  # snapshot: invalid-method-override
+    def method(self) -> int: ...  # snapshot: incompatible-method-override
 
 class GradualParent(Grandparent):
     def method(self, x: Any) -> None: ...
@@ -1444,83 +1585,83 @@ class ThirdChild(GradualParent):
     # `GradualParent.method` is compatible with the signature of `Grandparent.method`,
     # and `ThirdChild.method` is compatible with the signature of `GradualParent.method`,
     # but `ThirdChild.method` is not compatible with the signature of `Grandparent.method`
-    def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+    def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/stub.pyi:7:9
   |
 4 |     def method(self, x: int) -> None: ...
   |         ---------------------------- `Grandparent.method` defined here
 5 |
 6 | class Parent(Grandparent):
-7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+7 |     def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
 info: parameter `x` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/stub.pyi:17:9
    |
-17 |     def method(self, x: int) -> None: ...  # snapshot: invalid-method-override
+17 |     def method(self, x: int) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
    |
   ::: src/stub.pyi:7:9
    |
- 7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+ 7 |     def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
    |         ---------------------------- `Parent.method` defined here
 info: parameter `x` has an incompatible type: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/stub.pyi:22:9
    |
-22 |     def method(self, x: bytes) -> None: ...  # snapshot: invalid-method-override
+22 |     def method(self, x: bytes) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
    |
   ::: src/stub.pyi:7:9
    |
- 7 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+ 7 |     def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
    |         ---------------------------- `Parent.method` defined here
 info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/stub.pyi:28:9
    |
 25 |     def method(self) -> int: ...
    |         ------------------- `GrandparentWithReturnType.method` defined here
 26 |
 27 | class ParentWithReturnType(GrandparentWithReturnType):
-28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+28 |     def method(self) -> str: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `GrandparentWithReturnType.method`
 info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/stub.pyi:33:9
    |
-28 |     def method(self) -> str: ...  # snapshot: invalid-method-override
+28 |     def method(self) -> str: ...  # snapshot: incompatible-method-override
    |         ------------------- `ParentWithReturnType.method` defined here
 29 |
 30 | class ChildWithReturnType(ParentWithReturnType):
 31 |     # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
 32 |     # but not with `ParentWithReturnType.method`. We report against the immediate parent.
-33 |     def method(self) -> int: ...  # snapshot: invalid-method-override
+33 |     def method(self) -> int: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentWithReturnType.method`
 info: incompatible return types: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/stub.pyi:42:9
    |
-42 |     def method(self, x: str) -> None: ...  # snapshot: invalid-method-override
+42 |     def method(self, x: str) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.method`
    |
   ::: src/stub.pyi:4:9
@@ -1538,7 +1679,7 @@ class A:
     def get(self, default): ...
 
 class B(A):
-    def get(self, default, /): ...  # snapshot: invalid-method-override
+    def get(self, default, /): ...  # snapshot: lost-keyword-for-regular-parameter
 
 get = 56
 
@@ -1554,14 +1695,14 @@ class D(C):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `get`
+error[lost-keyword-for-regular-parameter]: Override of method `get` disallows keyword arguments allowed by the method on the base class
  --> src/other_stub.pyi:5:9
   |
 2 |     def get(self, default): ...
   |         ------------------ `A.get` defined here
 3 |
 4 | class B(A):
-5 |     def get(self, default, /): ...  # snapshot: invalid-method-override
+5 |     def get(self, default, /): ...  # snapshot: lost-keyword-for-regular-parameter
   |         ^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `A.get`
 info: parameter `default` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
@@ -1581,7 +1722,7 @@ parent. Preserving that signature does not produce another diagnostic on the chi
 
 ```pyi
 class InvalidStr:
-    def __str__(self) -> int: ...  # error: [invalid-method-override]
+    def __str__(self) -> int: ...  # error: [incompatible-method-override]
 
 class PreservesInvalidStr(InvalidStr):
     def __str__(self) -> int: ...
@@ -1600,13 +1741,13 @@ class Left:
 class Right:
     def method(self, right): ...
 
-class Parent(Left, Right): ...  # error: [invalid-method-override]
+class Parent(Left, Right): ...  # error: [lost-keyword-for-regular-parameter]
 
 class Child(Parent):
     def method(self, left): ...
 
 class ChangesSignature(Parent):
-    # error: [invalid-method-override] "Definition is incompatible with `Left.method`"
+    # error: [lost-keyword-for-regular-parameter] "Definition is incompatible with `Left.method`"
     def method(self, right): ...
 ```
 
@@ -1631,7 +1772,7 @@ class RequiresExtra:
     def method(self, left, extra): ...
 
 class AddsContract(Parent, RequiresExtra):
-    # error: [invalid-method-override] "Definition is incompatible with `RequiresExtra.method`"
+    # error: [incompatible-method-override] "Definition is incompatible with `RequiresExtra.method`"
     def method(self, left): ...
 ```
 
@@ -1643,7 +1784,7 @@ class Static:
     @staticmethod
     def method(left=None): ...
 
-class StaticParent(Left, Static): ...  # error: [invalid-method-override]
+class StaticParent(Left, Static): ...  # error: [incompatible-method-override]
 
 class StaticChild(StaticParent):
     def method(self, left): ...
@@ -1662,7 +1803,7 @@ class Base:
 class Inherited(Base): ...
 
 class Override(Base):
-    def method(self, value: str): ...  # error: [invalid-method-override]
+    def method(self, value: str): ...  # error: [incompatible-method-override]
 
 class Child(Inherited, Override):
     def method(self, value: str): ...
@@ -1683,7 +1824,7 @@ class Base:
 class AcceptsBase:
     def method(self, other: Base): ...
 
-class Parent(Base, AcceptsBase): ...  # error: [invalid-method-override]
+class Parent(Base, AcceptsBase): ...  # error: [incompatible-method-override]
 
 class Child(Parent):
     def method(self, other: Parent): ...
@@ -1714,11 +1855,11 @@ class E(A[int]):
 
 class F[T](A[T]):
     # `str` is not necessarily a supertype of `T`!
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self, x: str) -> None: ...
 
 class G(A[int]):
-    def method(self, x: bool) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: bool) -> None: ...  # error: [incompatible-method-override]
 ```
 
 ## Generic methods on non-generic classes work as expected
@@ -1741,7 +1882,7 @@ class C(A):
     def method(self, x: object) -> Never: ...  # fine
 
 class D(A):
-    # TODO: we should emit [invalid-method-override] here:
+    # TODO: we should emit [incompatible-method-override] here:
     # `A.method` accepts an argument of any type,
     # but `D.method` only accepts `int`s
     def method(self, x: int) -> int: ...
@@ -1765,12 +1906,12 @@ class ExplicitReceiverBase:
 class ExplicitReceiverChild(ExplicitReceiverBase):
     # Binding this method adds `ExplicitReceiverChild <= T`, which is incompatible with the
     # `T = int` specialization needed to implement the base method.
-    def method[T](self: T, x: T) -> T: ...  # error: [invalid-method-override]
+    def method[T](self: T, x: T) -> T: ...  # error: [incompatible-method-override]
 
 class D2(A2):
     # The type variable is bound to a type disjoint from `int`,
     # so the method will not accept integers, and therefore this is an invalid override
-    def method[T: str](self, x: T) -> T: ...  # error: [invalid-method-override]
+    def method[T: str](self, x: T) -> T: ...  # error: [incompatible-method-override]
 
 class A3:
     def method(self) -> Self: ...
@@ -1806,18 +1947,18 @@ class H3(A3):
     # `A3.method()` can be called on any subtype of `A3`, but `H3.method()` can only be called on
     # objects that are subtypes of `str`.
     # error: [invalid-type-form]
-    def method(self: str) -> Self: ...  # error: [invalid-method-override]
+    def method(self: str) -> Self: ...  # error: [incompatible-method-override]
 
 class I3(A3):
     # `I3.method()` cannot be called with any inhabited type.
     # error: [invalid-type-form]
-    def method(self: Never) -> Self: ...  # error: [invalid-method-override]
+    def method(self: Never) -> Self: ...  # error: [incompatible-method-override]
 
 class A4:
     def method[T: int](self, x: T) -> T: ...
 
 class B4(A4):
-    # TODO: we should emit `invalid-method-override` here.
+    # TODO: we should emit `incompatible-method-override` here.
     # `A4.method` promises that if it is passed a `bool`, it will return a `bool`,
     # but this is not necessarily true for `B4.method`: if passed a `bool`,
     # it could return a non-`bool` `int`!
@@ -1850,19 +1991,19 @@ instance of the subclass. Adding or omitting `self: Self` does not change this:
 
 ```pyi
 class ReturnsBase(Base):
-    def implicit(self) -> Base: ...  # snapshot: invalid-method-override
-    def explicit(self: Self) -> Base: ...  # error: [invalid-method-override]
+    def implicit(self) -> Base: ...  # snapshot: incompatible-method-override
+    def explicit(self: Self) -> Base: ...  # error: [incompatible-method-override]
 
 class ReturnsBaseWithChangedAnnotation(Base):
-    def implicit(self: Self) -> Base: ...  # error: [invalid-method-override]
-    def explicit(self) -> Base: ...  # error: [invalid-method-override]
+    def implicit(self: Self) -> Base: ...  # error: [incompatible-method-override]
+    def explicit(self) -> Base: ...  # error: [incompatible-method-override]
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `implicit`
+error[incompatible-method-override]: Invalid override of method `implicit`
   --> src/mdtest_snippet.pyi:15:9
    |
-15 |     def implicit(self) -> Base: ...  # snapshot: invalid-method-override
+15 |     def implicit(self) -> Base: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.implicit`
    |
   ::: src/mdtest_snippet.pyi:4:9
@@ -1898,15 +2039,15 @@ class Base:
     def explicit(self: Self, other: Self) -> None: ...
 
 class PreservesSelf(Base):
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def implicit(self, other: Self) -> None: ...
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def explicit(self: Self, other: Self) -> None: ...
 
 class ChangesReceiverAnnotation(Base):
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def implicit(self: Self, other: Self) -> None: ...
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def explicit(self, other: Self) -> None: ...
 ```
 
@@ -1914,8 +2055,8 @@ An override cannot replace the `Self` parameter with an unrelated type:
 
 ```pyi
 class Incompatible(Base):
-    def implicit(self, other: int) -> None: ...  # error: [invalid-method-override]
-    def explicit(self: Self, other: int) -> None: ...  # error: [invalid-method-override]
+    def implicit(self, other: int) -> None: ...  # error: [incompatible-method-override]
+    def explicit(self: Self, other: int) -> None: ...  # error: [incompatible-method-override]
 ```
 
 For generic superclasses, we use the inherited specialization of the class's type parameters, but
@@ -1931,11 +2072,11 @@ class GenericBase[T]:
     def method(self, other: Self, value: T) -> Self: ...
 
 class Specialized(GenericBase[int]):
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def method(self, other: Self, value: int) -> Self: ...
 
 class IncompatibleSpecialization(GenericBase[int]):
-    def method(self, other: Self, value: str) -> Self: ...  # error: [invalid-method-override]
+    def method(self, other: Self, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Protocol annotations on mixin receivers
@@ -1978,18 +2119,18 @@ class HasOtherValue(Protocol):
     other_value: str
 
 class InvalidReceiver(Mixin):
-    def method(self: HasOtherValue, argument: int) -> None: ...  # error: [invalid-method-override]
+    def method(self: HasOtherValue, argument: int) -> None: ...  # error: [incompatible-method-override]
 
 class InvalidArgument(Mixin):
     value: int
-    def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+    def method(self: HasValue, argument: str) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.pyi:28:9
    |
-28 |     def method(self: HasValue, argument: str) -> None: ...  # snapshot: invalid-method-override
+28 |     def method(self: HasValue, argument: str) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Mixin.method`
    |
   ::: src/mdtest_snippet.pyi:7:9
@@ -2013,7 +2154,7 @@ class SameUnionReceiver(UnionMixin):
 Overloaded mixin methods need the same treatment for every receiver-specific overload:
 
 ```pyi
-# TODO: We should emit an `invalid-method-override` diagnostic on the second
+# TODO: We should emit an `incompatible-method-override` diagnostic on the second
 # `InvalidOverloadedReceiver.method` overload. Both overload sets need to be
 # compared within the `HasValue` receiver domain instead of being filtered
 # against the concrete mixin subclass.
@@ -2117,14 +2258,14 @@ class A:
 import one
 
 class A(one.A):
-    def foo(self, y): ...  # snapshot: invalid-method-override
+    def foo(self, y): ...  # snapshot: lost-keyword-for-regular-parameter
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `foo`
+error[lost-keyword-for-regular-parameter]: Override of method `foo` disallows keyword arguments allowed by the method on the base class
  --> src/two.pyi:4:9
   |
-4 |     def foo(self, y): ...  # snapshot: invalid-method-override
+4 |     def foo(self, y): ...  # snapshot: lost-keyword-for-regular-parameter
   |         ^^^^^^^^^^^^ Definition is incompatible with `one.A.foo`
   |
  ::: src/one.pyi:2:9
@@ -2191,8 +2332,8 @@ class Assigned:
 class Defined:
     def method(self) -> int: ...
 
-class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
-class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
+class AssignedFirst(Assigned, Defined): ...  # error: [incompatible-method-override]
+class AssignedSecond(Defined, Assigned): ...  # error: [incompatible-method-override]
 ```
 
 ## Edge case: function defined in another module and then assigned in a class body
@@ -2212,24 +2353,24 @@ class A:
     def x(self, y: int): ...
 
 class B(A):
-    x = foo.x  # snapshot: invalid-method-override
+    x = foo.x  # snapshot: incompatible-method-override
 
 class C:
     x = foo.x
 
 class D(C):
-    def x(self, y: int): ...  # snapshot: invalid-method-override
+    def x(self, y: int): ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `x`
+error[incompatible-method-override]: Invalid override of method `x`
  --> src/bar.pyi:7:5
   |
 4 |     def x(self, y: int): ...
   |         --------------- `A.x` defined here
 5 |
 6 | class B(A):
-7 |     x = foo.x  # snapshot: invalid-method-override
+7 |     x = foo.x  # snapshot: incompatible-method-override
   |     ^^^^^^^^^ Definition is incompatible with `A.x`
   |
  ::: src/foo.pyi:1:5
@@ -2240,14 +2381,14 @@ info: parameter `y` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 
 
-error[invalid-method-override]: Invalid override of method `x`
+error[incompatible-method-override]: Invalid override of method `x`
   --> src/bar.pyi:13:9
    |
 10 |     x = foo.x
    |     --------- `C.x` defined here
 11 |
 12 | class D(C):
-13 |     def x(self, y: int): ...  # snapshot: invalid-method-override
+13 |     def x(self, y: int): ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
    |
   ::: src/foo.pyi:1:5
@@ -2263,15 +2404,15 @@ info: This violates the Liskov Substitution Principle
 ```py
 class Bad:
     x: int
-    def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
+    def __eq__(self, other: "Bad") -> bool:  # snapshot: incompatible-method-override
         return self.x == other.x
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `__eq__`
+error[incompatible-method-override]: Invalid override of method `__eq__`
    --> src/mdtest_snippet.py:3:9
     |
-  3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
+  3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: incompatible-method-override
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
     |
    ::: stdlib/builtins.pyi:137:9
@@ -2301,17 +2442,17 @@ by base classes.
 
 ```pyi
 class Hashable:
-    def __hash__(self) -> int: ...  # no diagnostic
+    def __hash__(self) -> int: ...  # ok
 
 class InvalidHash:
-    def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+    def __hash__(self) -> str: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid `__hash__` definition
+error[incompatible-method-override]: Invalid `__hash__` definition
  --> src/mdtest_snippet.pyi:5:9
   |
-5 |     def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+5 |     def __hash__(self) -> str: ...  # snapshot: incompatible-method-override
   |         ^^^^^^^^ Expected `(() -> int) | None`
 info: type `bound method InvalidHash.__hash__() -> str` is not assignable to any element of the union `(() -> int) | None`
 info: ├── incompatible return types: `str` is not assignable to `int`
@@ -2320,13 +2461,13 @@ info: └── ... omitted 1 union element without additional context
 
 ```pyi
 class InvalidParameters:
-    def __hash__(self, extra: int) -> int: ...  # error: [invalid-method-override]
+    def __hash__(self, extra: int) -> int: ...  # error: [incompatible-method-override]
 
 class NonCallable:
-    __hash__ = 42  # error: [invalid-method-override]
+    __hash__ = 42  # error: [incompatible-method-override]
 
 class Unhashable:
-    __hash__ = None  # no diagnostic
+    __hash__ = None  # ok
 ```
 
 ## Restoring hashability
@@ -2341,15 +2482,15 @@ class NarrowHash:
     __hash__: ClassVar[Callable[..., bool]]
 
 class Assigned(NarrowHash):
-    __hash__ = object.__hash__  # no diagnostic
+    __hash__ = object.__hash__  # ok
 
 reveal_type(Assigned.__hash__)  # revealed: def __hash__(self) -> int
 
 class Unhashable(Assigned):
-    __hash__ = None  # no diagnostic
+    __hash__ = None  # ok
 
 class Restored(Unhashable):
-    def __hash__(self) -> int: ...  # no diagnostic
+    def __hash__(self) -> int: ...  # ok
 ```
 
 The inherited `ClassVar` still prevents assignment through an instance:
@@ -2374,7 +2515,7 @@ class HashCallable:
         return 0
 
 class Restored(Unhashable):
-    __hash__ = HashCallable()  # no diagnostic
+    __hash__ = HashCallable()  # ok
 ```
 
 An incompatible return type makes the replacement invalid:
@@ -2385,7 +2526,7 @@ class StringHashCallable:
         return "invalid"
 
 class InvalidReturn(Unhashable):
-    __hash__ = StringHashCallable()  # error: [invalid-method-override]
+    __hash__ = StringHashCallable()  # error: [incompatible-method-override]
 ```
 
 ## Optional hash methods
@@ -2397,10 +2538,10 @@ callable alternative must still return an `int`:
 from typing import Callable, ClassVar
 
 class OptionalHash:
-    __hash__: ClassVar[Callable[..., int] | None]  # no diagnostic
+    __hash__: ClassVar[Callable[..., int] | None]  # ok
 
 class InvalidOptionalHash:
-    __hash__: ClassVar[Callable[..., str] | None]  # error: [invalid-method-override]
+    __hash__: ClassVar[Callable[..., str] | None]  # error: [incompatible-method-override]
 ```
 
 ## Final hash definitions
@@ -2456,11 +2597,11 @@ class Foo:
     x: int
 
 class Bar(Foo):  # error: [subclass-of-dataclass-with-order]
-    def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
+    def __lt__(self, other: Bar) -> bool: ...  # error: [incompatible-method-override]
 
 # Specifying `order=True` on the subclass means that comparison methods are generated for the
 # subclass, but cross-class comparisons with the parent still raise `TypeError` at runtime.
-# TODO: We should also emit `invalid-method-override` diagnostics for each generated
+# TODO: We should also emit `incompatible-method-override` diagnostics for each generated
 # comparison method since they have incompatible signatures.
 @dataclass(order=True)
 class Bar2(Foo):  # error: [subclass-of-dataclass-with-order]
@@ -2488,14 +2629,14 @@ class Baz(NamedTuple):
     x: int
 
 class Spam(Baz):
-    def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+    def _asdict(self) -> tuple[int, ...]: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `_asdict`
+error[incompatible-method-override]: Invalid override of method `_asdict`
   --> src/mdtest_snippet.pyi:41:9
    |
-41 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+41 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
 info: incompatible return types: `tuple[int, ...]` is not assignable to `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
@@ -2516,10 +2657,10 @@ from typing import NamedTuple
 Base = NamedTuple("Base", [("value", int)])
 
 class Compatible(Base):
-    def _asdict(self) -> dict[str, int]: ...  # no diagnostic
+    def _asdict(self) -> dict[str, int]: ...  # ok
 
 class Incompatible(Base):
-    def _asdict(self) -> int: ...  # error: [invalid-method-override]
+    def _asdict(self) -> int: ...  # error: [incompatible-method-override]
 ```
 
 ## Staticmethods and classmethods
@@ -2553,14 +2694,14 @@ When the types are incompatible, we report an error:
 ```pyi
 class BadTypesA(Parent):
     @classmethod
-    def class_method(cls, x: bool) -> object: ...  # snapshot: invalid-method-override
+    def class_method(cls, x: bool) -> object: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `class_method`
+error[incompatible-method-override]: Invalid override of method `class_method`
   --> src/mdtest_snippet.pyi:21:9
    |
-21 |     def class_method(cls, x: bool) -> object: ...  # snapshot: invalid-method-override
+21 |     def class_method(cls, x: bool) -> object: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method`
    |
   ::: src/mdtest_snippet.pyi:4:9
@@ -2574,14 +2715,14 @@ info: This violates the Liskov Substitution Principle
 ```pyi
 class BadTypesB(Parent):
     @staticmethod
-    def static_method(x: bool) -> object: ...  # snapshot: invalid-method-override
+    def static_method(x: bool) -> object: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `static_method`
+error[incompatible-method-override]: Invalid override of method `static_method`
   --> src/mdtest_snippet.pyi:24:9
    |
-24 |     def static_method(x: bool) -> object: ...  # snapshot: invalid-method-override
+24 |     def static_method(x: bool) -> object: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
    |
   ::: src/mdtest_snippet.pyi:6:9
@@ -2627,14 +2768,14 @@ However, if the signature does not match, we emit a useful error message:
 ```pyi
 class BadSignature1(Parent):
     @staticmethod
-    def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
+    def instance_method(self, x: int) -> int: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `instance_method`
+error[incompatible-method-override]: Invalid override of method `instance_method`
   --> src/mdtest_snippet.pyi:48:9
    |
-48 |     def instance_method(self, x: int) -> int: ...  # snapshot: invalid-method-override
+48 |     def instance_method(self, x: int) -> int: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.instance_method`
    |
   ::: src/mdtest_snippet.pyi:2:9
@@ -2711,12 +2852,12 @@ generic and concrete class receivers:
 ```pyi
 class InvalidDynamicItem(Item):
     @classmethod
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def from_component(cls: type[Self], component: int) -> Self: ...
 
 class InvalidSwapEvent(Event):
     @classmethod
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def deserialize(cls: type[InvalidSwapEvent], data: dict[str, int]) -> InvalidSwapEvent: ...
 ```
 
@@ -2738,12 +2879,12 @@ class Base:
 
 class ImplicitReceiver(Base):
     @classmethod
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def compare(cls, other: Self) -> None: ...
 
 class ExplicitReceiver(Base):
     @classmethod
-    # TODO: Emit `invalid-method-override` for narrowing `other`.
+    # TODO: Emit `incompatible-method-override` for narrowing `other`.
     def compare(cls: type[Self], other: Self) -> None: ...
 ```
 
@@ -2752,7 +2893,7 @@ An override that returns the superclass does not satisfy the inherited `Self` re
 ```pyi
 class ReturnsBase(Base):
     @classmethod
-    def copy(cls) -> Base: ...  # error: [invalid-method-override]
+    def copy(cls) -> Base: ...  # error: [incompatible-method-override]
 ```
 
 ## Overloaded methods with positional-only parameters with defaults
@@ -2778,7 +2919,40 @@ class GoodChild(Base):
 
 class BadChild(Base):
     # `x` has no default, so `obj.method(a=1)` would fail
-    def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
+    def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [incompatible-method-override]
+```
+
+## Incompatible returns in an overloaded override
+
+The overloads accept both argument types from the base method, but only one returns a string. The
+diagnostic identifies the incompatible return type.
+
+```pyi
+from typing import overload
+
+class Base:
+    def get(self, x: int | bytes) -> str: ...
+
+class Child(Base):
+    @overload
+    def get(self, x: int) -> bytes: ...
+    @overload
+    def get(self, x: bytes) -> str: ...  # snapshot: incompatible-method-override
+```
+
+```snapshot
+error[incompatible-method-override]: Invalid override of method `get`
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def get(self, x: bytes) -> str: ...  # snapshot: incompatible-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.get`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def get(self, x: int | bytes) -> str: ...
+   |         -------------------------------- `Base.get` defined here
+info: element `bytes` of union `bytes | str` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
 ```
 
 ## Definitely bound members with no reachable definitions(!)
@@ -2825,10 +2999,10 @@ class Receiver(Generic[ValueCo, ShapeCo]):
     def by_shape(self: "Receiver[Any, tuple[str, str]]", value: bytes) -> None: ...
 
 class NarrowValueOverride(Receiver[str, ShapeCo], Generic[ShapeCo]):
-    def by_value(self, value: str) -> None: ...  # error: [invalid-method-override]
+    def by_value(self, value: str) -> None: ...  # error: [incompatible-method-override]
 
 class WrongShapeOverride(Receiver[ValueCo, tuple[str, str]], Generic[ValueCo]):
-    def by_shape(self, value: str) -> None: ...  # error: [invalid-method-override]
+    def by_shape(self, value: str) -> None: ...  # error: [incompatible-method-override]
 ```
 
 ## Equivalent overloaded protocol receivers are valid overrides
@@ -2878,7 +3052,7 @@ class Compatible(Base):
     method = staticmethod(second)
 
 class Incompatible(Base):
-    method = staticmethod(incompatible)  # error: [invalid-attribute-override]
+    method = staticmethod(incompatible)  # error: [incompatible-attribute-override]
 
 Base.method = staticmethod(second)
 reveal_type(Compatible().method(1))  # revealed: int
@@ -2887,12 +3061,12 @@ reveal_type(Compatible().method(1))  # revealed: int
 ## Attribute value types
 
 An overriding attribute must expose a value compatible with the superclass annotation. Disabling
-`invalid-mutable-override` permits mutable narrowing, but incompatible readable types are still
+`incompatible-mutable-override` permits mutable narrowing, but incompatible readable types are still
 rejected.
 
 ```toml
 [rules]
-invalid-mutable-override = "ignore"
+incompatible-mutable-override = "ignore"
 ```
 
 ```py
@@ -2900,24 +3074,24 @@ class AttributeBase:
     value: int
 
 class IncompatibleAttribute(AttributeBase):
-    value: str  # snapshot: invalid-attribute-override
+    value: str  # snapshot: incompatible-attribute-override
 
 class InitializedAttribute(AttributeBase):
     value = 1
 
 class NarrowedAttribute(AttributeBase):
-    value: bool  # no diagnostic
+    value: bool  # ok
 ```
 
 ```snapshot
-error[invalid-attribute-override]: Invalid override of attribute `value`
+error[incompatible-attribute-override]: Invalid override of attribute `value`
  --> src/mdtest_snippet.py:5:5
   |
 2 |     value: int
   |     ----- `AttributeBase.value` declared here
 3 |
 4 | class IncompatibleAttribute(AttributeBase):
-5 |     value: str  # snapshot: invalid-attribute-override
+5 |     value: str  # snapshot: incompatible-attribute-override
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
@@ -2931,19 +3105,19 @@ class Initialized:
     value: int = 1
 
 class Uninitialized(Initialized):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 class Declared:
     value: int
 
 class WithDefault(Declared):
-    value: str = ""  # error: [invalid-attribute-override]
+    value: str = ""  # error: [incompatible-attribute-override]
 
 class Compatible(Declared):
-    value: int = 2  # no diagnostic
+    value: int = 2  # ok
 
 class InheritsAnnotation(Declared):
-    value = 1  # no diagnostic
+    value = 1  # ok
 ```
 
 ## Inherited annotations and instance assignments
@@ -2966,20 +3140,20 @@ class Middle(Base):
         self.defaulted = "middle"
 
 class Child(Middle):
-    value = "child"  # no diagnostic
-    defaulted = "child"  # no diagnostic
+    value = "child"  # ok
+    defaulted = "child"  # ok
 
 def clear(obj: Middle):
     reveal_type(obj.value)  # revealed: str | None
     reveal_type(obj.defaulted)  # revealed: str | None
-    obj.value = None  # no diagnostic
-    obj.defaulted = None  # no diagnostic
+    obj.value = None  # ok
+    obj.defaulted = None  # ok
 
 class Incompatible(Middle):
-    value: int = 1  # error: [invalid-attribute-override]
+    value: int = 1  # error: [incompatible-attribute-override]
 
 class Narrower(Middle):
-    value: str = "narrower"  # error: [invalid-mutable-override]
+    value: str = "narrower"  # error: [incompatible-mutable-override]
 ```
 
 ## Inherited attribute conflicts
@@ -2992,16 +3166,16 @@ class Base:
     value: int
 
 class Parent(Base):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 class Child(Parent):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class Unrelated:
     value: bytes
 
 class Multiple(Parent, Unrelated):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 Read-only properties follow the same rule, including when the child repeats a covariant narrowing
@@ -3015,12 +3189,12 @@ class PropertyBase:
 
 class PropertyParent(PropertyBase):
     @property
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 1
 
 class PropertyChild(PropertyParent):
     @property
-    def value(self) -> bool:  # no diagnostic
+    def value(self) -> bool:  # ok
         return True
 ```
 
@@ -3035,30 +3209,30 @@ class Base:
     value: int
 
 class Bad(Base):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 class Bridge(Bad):
     def reset(self) -> None:
         self.value = ""
 
 class ClassBody(Bridge):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class Receiver(Bridge):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 
 class NewClassBodyConflict(Bridge):
-    value: bytes  # error: [invalid-attribute-override]
+    value: bytes  # error: [incompatible-attribute-override]
 
 class NewReceiverConflict(Bridge):
     def __init__(self) -> None:
-        self.value: bytes = b""  # error: [invalid-attribute-override]
+        self.value: bytes = b""  # error: [incompatible-attribute-override]
 ```
 
 ## Mutable attribute narrowing
 
-The `invalid-mutable-override` rule rejects narrowing that prevents writes allowed by the
+The `incompatible-mutable-override` rule rejects narrowing that prevents writes allowed by the
 superclass. An `Any` annotation remains gradually compatible in either direction.
 
 ```py
@@ -3069,8 +3243,8 @@ class Base:
     shared: ClassVar[int]
 
 class Narrow(Base):
-    value: bool  # error: [invalid-mutable-override]
-    shared: ClassVar[bool]  # error: [invalid-mutable-override]
+    value: bool  # error: [incompatible-mutable-override]
+    shared: ClassVar[bool]  # error: [incompatible-mutable-override]
 
 class Gradual(Base):
     value: Any
@@ -3097,14 +3271,14 @@ class Narrow(Base):
 
 class Incompatible(Base):
     @property
-    def value(self) -> str: ...  # snapshot: invalid-property-type-override
+    def value(self) -> str: ...  # snapshot: incompatible-property-override
 ```
 
 ```snapshot
-error[invalid-property-type-override]: Invalid override of attribute `value`
+error[incompatible-property-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.pyi:11:9
    |
-11 |     def value(self) -> str: ...  # snapshot: invalid-property-type-override
+11 |     def value(self) -> str: ...  # snapshot: incompatible-property-override
    |         ^^^^^ Read type `str` is not assignable to inherited read type `int`
    |
   ::: src/mdtest_snippet.pyi:3:9
@@ -3129,7 +3303,7 @@ class Base:
 
 class Child(Base):
     @property
-    def value(self) -> int:  # no diagnostic
+    def value(self) -> int:  # ok
         return 1
 ```
 
@@ -3148,14 +3322,14 @@ class PropertyBase:
         return 1
 
 class MethodOverProperty(PropertyBase):
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 1
 
 class AttributeBase:
     value: int
 
 class MethodOverAttribute(AttributeBase):
-    def value(self) -> int:  # error: [invalid-attribute-override]
+    def value(self) -> int:  # error: [incompatible-attribute-override]
         return 1
 
 class MethodBase:
@@ -3163,15 +3337,15 @@ class MethodBase:
         return 1
 
 class AttributeOverMethod(MethodBase):
-    value: int  # error: [invalid-attribute-override]
+    value: int  # error: [incompatible-attribute-override]
 
 class PropertyOverMethod(MethodBase):
     @property
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 1
 
 class CallableAttributeOverMethod(MethodBase):
-    value: Callable[[], int]  # no diagnostic
+    value: Callable[[], int]  # ok
 
 class CallablePropertyBase:
     @property
@@ -3179,7 +3353,7 @@ class CallablePropertyBase:
         return lambda: 1
 
 class CompatibleMethod(CallablePropertyBase):
-    def value(self) -> int:  # no diagnostic
+    def value(self) -> int:  # ok
         return 1
 ```
 
@@ -3198,13 +3372,13 @@ class Base:
     def value(self) -> int: ...
 
 class Compatible(Base):
-    def value(self) -> int: ...  # no diagnostic
+    def value(self) -> int: ...  # ok
 
 class Incompatible(Base):
-    def value(self) -> str: ...  # error: [invalid-method-override]
+    def value(self) -> str: ...  # error: [incompatible-method-override]
 
 class Suppressed(Base):
-    def value(self) -> str: ...  # ty: ignore[invalid-method-override]
+    def value(self) -> str: ...  # ty: ignore[incompatible-method-override]
 ```
 
 ## Callable attributes and method binding
@@ -3217,7 +3391,7 @@ The optional mutable-override rule is disabled here to isolate read compatibilit
 
 ```toml
 [rules]
-invalid-mutable-override = "ignore"
+incompatible-mutable-override = "ignore"
 ```
 
 ```pyi
@@ -3227,19 +3401,78 @@ class AttributeBase:
     value: Callable[[int], int]
 
 class CompatibleMethod(AttributeBase):
-    def value(self, x: int, /) -> int: ...  # no diagnostic
+    def value(self, x: int, /) -> int: ...  # ok
 
 class IncompatibleMethod(AttributeBase):
-    def value(self) -> int: ...  # error: [invalid-attribute-override]
+    def value(self) -> int: ...  # error: [incompatible-attribute-override]
 
 class MethodBase:
     def value(self, x: int, /) -> int: ...
 
 class CompatibleAttribute(MethodBase):
-    value: Callable[[int], int]  # no diagnostic
+    value: Callable[[int], int]  # ok
 
 class IncompatibleAttribute(MethodBase):
-    value: Callable[[], int]  # error: [invalid-attribute-override]
+    value: Callable[[], int]  # error: [incompatible-attribute-override]
+```
+
+## Methods overriding annotated callable defaults
+
+PyTorch's `Module` annotates (or used to) its default `forward` as `Callable[..., Any]`. In this
+scenario, we allow a subclass to override it with a method that declares its own parameters and
+return type ([ty #4823](https://github.com/astral-sh/ty/issues/4823)). This might be seen as a
+subclass limitation in the sense that *writes* to the `forward` attribute are now restricted, but
+since we allow shadowing of methods with instance attributes, it seems consistent to allow this as
+well:
+
+```toml
+[rules]
+incompatible-mutable-override = "error"
+```
+
+```py
+from typing import Any, Callable
+
+def default_forward(self, *args: Any, **kwargs: Any) -> Any:
+    raise NotImplementedError
+
+class Module:
+    forward: Callable[..., Any] = default_forward
+
+class Model(Module):
+    def forward(self, x: int) -> int:  # ok
+        return x
+```
+
+## Callable attributes overriding class methods
+
+Both `@classmethod` and `classmethod(impl)` expose the same bound signature. A subclass callable
+attribute that narrows the return type should pass the override check in both cases.
+
+```toml
+[rules]
+incompatible-mutable-override = "error"
+```
+
+```py
+from collections.abc import Callable
+
+class DecoratedBase:
+    @classmethod
+    def f(cls) -> object:
+        return object()
+
+class DecoratedChild(DecoratedBase):
+    f: Callable[[], str]  # ok
+
+def impl(cls: type) -> object:
+    return object()
+
+class WrappedBase:
+    f = classmethod(impl)
+
+class WrappedChild(WrappedBase):
+    f: Callable[[], str]  # ok
 ```
 
 ## Methods replacing inferred callable defaults
@@ -3256,13 +3489,13 @@ class FloatBaseType:
     cast_nocheck = Float
 
 class Compatible(FloatBaseType):
-    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # no diagnostic
+    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # ok
 
 class Incompatible(FloatBaseType):
-    def cast_nocheck(self, num: int) -> Float: ...  # error: [invalid-method-override]
+    def cast_nocheck(self, num: int) -> Float: ...  # error: [incompatible-method-override]
 
 class Suppressed(FloatBaseType):
-    def cast_nocheck(self, num: int) -> Float: ...  # ty: ignore[invalid-method-override]
+    def cast_nocheck(self, num: int) -> Float: ...  # ty: ignore[incompatible-method-override]
 ```
 
 The same check applies to an instance with a `__call__` method. Ordinary inferred defaults still do
@@ -3277,11 +3510,11 @@ class Base:
     value = 0
 
 class Compatible(Base):
-    def callback(self, value: int) -> int: ...  # no diagnostic
-    value = "text"  # no diagnostic
+    def callback(self, value: int) -> int: ...  # ok
+    value = "text"  # ok
 
 class Incompatible(Base):
-    def callback(self) -> int: ...  # error: [invalid-method-override]
+    def callback(self) -> int: ...  # error: [incompatible-method-override]
 ```
 
 ## Methods replacing final callable attributes
@@ -3302,19 +3535,19 @@ class Compatible(Base):
 
 class Incompatible(Base):
     # error: [override-of-final-variable]
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def value(self) -> int: ...
 
 class SuppressedFinality(Base):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def value(self) -> int: ...  # ty: ignore[override-of-final-variable]
 
 class SuppressedSignature(Base):
     # error: [override-of-final-variable]
-    def value(self) -> int: ...  # ty: ignore[invalid-method-override]
+    def value(self) -> int: ...  # ty: ignore[incompatible-method-override]
 
 class SuppressedBoth(Base):
-    def value(self) -> int: ...  # ty: ignore[override-of-final-variable, invalid-method-override]
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable, incompatible-method-override]
 ```
 
 ## Disabling final variable override checks
@@ -3334,10 +3567,10 @@ class Base:
     value: Final[Callable[[int], int]]
 
 class Compatible(Base):
-    def value(self, x: int, /) -> int: ...  # no diagnostic
+    def value(self, x: int, /) -> int: ...  # ok
 
 class Incompatible(Base):
-    def value(self) -> int: ...  # error: [invalid-method-override]
+    def value(self) -> int: ...  # error: [incompatible-method-override]
 ```
 
 ## Inactive method declarations
@@ -3354,7 +3587,7 @@ class Pdb(Bdb):
         def set_trace(self) -> None: ...
 
 class Debugger(Pdb):
-    # error: [invalid-method-override] "Definition is incompatible with `Bdb.set_trace`"
+    # error: [incompatible-method-override] "Definition is incompatible with `Bdb.set_trace`"
     def set_trace(self) -> None: ...
 ```
 
@@ -3373,13 +3606,13 @@ class Base:
     value = Descriptor()
 
 class Compatible(Base):
-    def value(self, x: int) -> int: ...  # no diagnostic
+    def value(self, x: int) -> int: ...  # ok
 
 class Incompatible(Base):
-    def value(self) -> int: ...  # error: [invalid-attribute-override]
+    def value(self) -> int: ...  # error: [incompatible-attribute-override]
 
 class Suppressed(Base):
-    def value(self) -> int: ...  # ty: ignore[invalid-attribute-override]
+    def value(self) -> int: ...  # ty: ignore[incompatible-attribute-override]
 ```
 
 ## Suppressing mixed override diagnostics
@@ -3394,11 +3627,11 @@ class AttributeBase:
     value: Callable[[int], int]
 
 class Incompatible(AttributeBase):
-    def value(self) -> int:  # error: [invalid-attribute-override]
+    def value(self) -> int:  # error: [incompatible-attribute-override]
         return 0
 
 class Suppressed(AttributeBase):
-    def value(self) -> int:  # ty: ignore[invalid-attribute-override]
+    def value(self) -> int:  # ty: ignore[incompatible-attribute-override]
         return 0
 
 class PropertyBase:
@@ -3407,7 +3640,7 @@ class PropertyBase:
         return lambda x: x
 
 class SuppressedProperty(PropertyBase):
-    def value(self) -> int:  # ty: ignore[invalid-property-type-override]
+    def value(self) -> int:  # ty: ignore[incompatible-property-override]
         return 0
 ```
 
@@ -3428,7 +3661,7 @@ class Base:
 
 class Child(Base):
     @classmethod
-    def value(cls) -> int:  # ty: ignore[invalid-attribute-override]
+    def value(cls) -> int:  # ty: ignore[incompatible-attribute-override]
         return 0
 ```
 
@@ -3439,9 +3672,9 @@ override rule. Incompatible overrides of ordinary methods are still rejected.
 
 ```toml
 [rules]
-invalid-attribute-override = "ignore"
-invalid-property-type-override = "ignore"
-invalid-mutable-override = "ignore"
+incompatible-attribute-override = "ignore"
+incompatible-property-override = "ignore"
+incompatible-mutable-override = "ignore"
 ```
 
 ```pyi
@@ -3454,14 +3687,14 @@ class Base:
     def method(self, x: int) -> int: ...
 
 class Child(Base):
-    def attribute(self) -> int: ...  # no diagnostic
-    def property(self) -> int: ...  # no diagnostic
-    def method(self) -> int: ...  # error: [invalid-method-override]
+    def attribute(self) -> int: ...  # ok
+    def property(self) -> int: ...  # ok
+    def method(self) -> int: ...  # error: [incompatible-method-override]
 
 class Compatible(Base):
-    def attribute(self, x: int) -> int: ...  # no diagnostic
-    def property(self, x: int) -> int: ...  # no diagnostic
-    def method(self, x: int) -> int: ...  # no diagnostic
+    def attribute(self, x: int) -> int: ...  # ok
+    def property(self, x: int) -> int: ...  # ok
+    def method(self, x: int) -> int: ...  # ok
 ```
 
 Methods replacing inferred callable defaults still have their signatures checked.
@@ -3474,7 +3707,7 @@ class CallableBase:
     make = Factory
 
 class Incompatible(CallableBase):
-    def make(self) -> Factory: ...  # error: [invalid-method-override]
+    def make(self) -> Factory: ...  # error: [incompatible-method-override]
 ```
 
 ## Disabling method override rules
@@ -3483,7 +3716,7 @@ Disabling method override diagnostics still leaves attribute and property checks
 
 ```toml
 [rules]
-invalid-method-override = "ignore"
+incompatible-method-override = "ignore"
 ```
 
 ```pyi
@@ -3496,9 +3729,9 @@ class Base:
     def method(self, x: int) -> int: ...
 
 class Child(Base):
-    def attribute(self) -> int: ...  # error: [invalid-attribute-override]
-    def property(self) -> int: ...  # error: [invalid-property-type-override]
-    def method(self) -> int: ...  # no diagnostic
+    def attribute(self) -> int: ...  # error: [incompatible-attribute-override]
+    def property(self) -> int: ...  # error: [incompatible-property-override]
+    def method(self) -> int: ...  # ok
 ```
 
 This also disables signature checking for methods that replace inferred callable defaults.
@@ -3511,7 +3744,7 @@ class CallableBase:
     make = Factory
 
 class Child(CallableBase):
-    def make(self) -> Factory: ...  # no diagnostic
+    def make(self) -> Factory: ...  # ok
 ```
 
 Finality checks remain enabled even when the overriding method has an incompatible signature.
@@ -3533,8 +3766,8 @@ conflict does not suppress an enabled rule for a later conflict.
 
 ```toml
 [rules]
-invalid-property-type-override = "ignore"
-invalid-mutable-override = "ignore"
+incompatible-property-override = "ignore"
+incompatible-mutable-override = "ignore"
 ```
 
 ```pyi
@@ -3546,7 +3779,7 @@ class AttributeBase:
     value: str
 
 class Child(PropertyBase, AttributeBase):
-    value: bytes  # error: [invalid-attribute-override]
+    value: bytes  # error: [incompatible-attribute-override]
 ```
 
 ## Class variables replacing properties
@@ -3563,17 +3796,17 @@ class Base:
         return 1
 
 class Incompatible(Base):
-    value: ClassVar[str]  # error: [invalid-property-type-override]
+    value: ClassVar[str]  # error: [incompatible-property-override]
 
 class Compatible(Base):
-    value: ClassVar[int]  # no diagnostic
+    value: ClassVar[int]  # ok
 
 class ClassBase:
     value: ClassVar[int]
 
 class IncompatibleProperty(ClassBase):
     @property
-    def value(self) -> str:  # error: [invalid-property-type-override]
+    def value(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 
@@ -3597,10 +3830,10 @@ class Base:
             return ""
 
 class Child(Base):
-    value: bytes  # error: [invalid-property-type-override]
+    value: bytes  # error: [incompatible-property-override]
 
 class Compatible(Base):
-    value: int  # no diagnostic
+    value: int  # ok
 ```
 
 ## Property setters
@@ -3631,11 +3864,11 @@ class Narrower(Base):
         return 0
 
     @value.setter
-    def value(self, value: bool) -> None: ...  # error: [invalid-property-type-override]
+    def value(self, value: bool) -> None: ...  # error: [incompatible-property-override]
 
 class ReadOnly(Base):
     @property
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 0
 ```
 
@@ -3652,11 +3885,11 @@ class Base:
 
 class ReadOnly(Base):
     @property
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 0
 
 class FinalOverride(Base):
-    value: Final[int] = 0  # error: [invalid-attribute-override]
+    value: Final[int] = 0  # error: [incompatible-attribute-override]
 
 class Writable(Base):
     @property
@@ -3687,7 +3920,7 @@ class Frozen(Neutral):
     value: int
 
 class Incompatible(Neutral):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 @dataclass_transform(frozen_default=True)
 class NeutralBase:
@@ -3701,11 +3934,50 @@ class Ordinary:
 
 @dataclass(frozen=True)
 class Invalid(Ordinary):
-    value: int  # error: [invalid-attribute-override]
+    value: int  # error: [incompatible-attribute-override]
 
 def check(base: Neutral, child: Frozen) -> None:
     base.value = 1
     child.value = 1  # error: [invalid-assignment]
+```
+
+## Inheriting frozen fields from a dataclass-transform base
+
+A `dataclass_transform` base permits both frozen and non-frozen subclasses. A frozen subclass's
+fields can remain read-only when inherited alongside another base.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class Base(metaclass=ModelMeta):
+    value: int
+
+class Mixin: ...
+
+class Frozen(Base):
+    value: int
+
+class Child(Mixin, Frozen): ...  # ok
+```
+
+The inherited field is still read-only.
+
+```py
+def assign(child: Child) -> None:
+    child.value = 1  # error: [invalid-assignment]
+```
+
+This permission applies to frozen fields. Replacing the base's writable attribute with a getter-only
+property is still an invalid override.
+
+```py
+class PropertyChild(Base):
+    @property
+    def value(self) -> int:  # error: [incompatible-property-override]
+        return 0
 ```
 
 ## Descriptors preserving instance access
@@ -3775,7 +4047,7 @@ class InferredSlot:
 class ReadOnlySlot(InferredSlot):
     @property
     @override
-    def value(self) -> int:  # error: [invalid-property-type-override]
+    def value(self) -> int:  # error: [incompatible-property-override]
         return 0
 ```
 
@@ -3803,7 +4075,7 @@ class Generated(Base):
 
 class Incompatible(Base):
     __slots__ = ("value",)
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 def read(base: Base, slot: Slotted, generated: Generated) -> None:
     reveal_type(base.value)  # revealed: int | Descriptor
@@ -3823,11 +4095,11 @@ class Base:
 
 class AttributeChild(Base):
     __slots__ = ()
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
 class PropertyChild(Base):
     @property
-    def value(self) -> str:  # error: [invalid-property-type-override]
+    def value(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 
@@ -3841,16 +4113,16 @@ can assign this metadata in their class bodies without violating an inherited wr
 ```py
 class Slotted:
     __slots__ = ()
-    __module__ = "custom"  # no diagnostic
-    __doc__ = None  # no diagnostic
-    __annotations__ = {}  # no diagnostic
+    __module__ = "custom"  # ok
+    __doc__ = None  # ok
+    __annotations__ = {}  # ok
 ```
 
 Overrides must still preserve the declared read types.
 
 ```py
 class InvalidRead:
-    __module__: int = 0  # error: [invalid-attribute-override]
+    __module__: int = 0  # error: [incompatible-attribute-override]
 ```
 
 Explicit declarations on user-defined bases still constrain overrides of `__module__`.
@@ -3862,7 +4134,7 @@ class Declared:
     __module__: str = "custom"
 
 class Narrowed(Declared):
-    __module__: Literal["custom"] = "custom"  # error: [invalid-mutable-override]
+    __module__: Literal["custom"] = "custom"  # error: [incompatible-mutable-override]
 ```
 
 ## Descriptor setters cannot narrow accepted writes
@@ -3884,7 +4156,7 @@ class Base:
     value: int
 
 class Child(Base):
-    value: Descriptor = Descriptor()  # error: [invalid-mutable-override]
+    value: Descriptor = Descriptor()  # error: [incompatible-mutable-override]
 
 class HasValue(Protocol):
     value: int
@@ -3915,7 +4187,7 @@ class Compatible(Base):
 
 class Incompatible(Base):
     @cached_property
-    def value(self) -> str:  # error: [invalid-attribute-override]
+    def value(self) -> str:  # error: [incompatible-attribute-override]
         return ""
 
 class HasValue(Protocol):
@@ -3933,10 +4205,10 @@ Property checking still applies when the method and ordinary attribute rules are
 
 ```toml
 [rules]
-invalid-method-override = "ignore"
-invalid-attribute-override = "ignore"
-invalid-mutable-override = "ignore"
-invalid-property-type-override = "error"
+incompatible-method-override = "ignore"
+incompatible-attribute-override = "ignore"
+incompatible-mutable-override = "ignore"
+incompatible-property-override = "error"
 ```
 
 ```pyi
@@ -3946,7 +4218,7 @@ class Base:
 
 class Child(Base):
     @property
-    def value(self) -> str: ...  # error: [invalid-property-type-override]
+    def value(self) -> str: ...  # error: [incompatible-property-override]
 ```
 
 ## Attributes declared in methods
@@ -3961,7 +4233,7 @@ class Base:
 
 class Same(Base):
     def __init__(self) -> None:
-        self.value: int = 1  # no diagnostic
+        self.value: int = 1  # ok
 ```
 
 An incompatible type is rejected. Narrowing to `bool` also violates the mutable-override rule: code
@@ -3970,11 +4242,11 @@ using the base class can assign any `int` to the attribute.
 ```py
 class Incompatible(Base):
     def __init__(self) -> None:
-        self.value: str = ""  # error: [invalid-attribute-override]
+        self.value: str = ""  # error: [incompatible-attribute-override]
 
 class Narrow(Base):
     def __init__(self) -> None:
-        self.value: bool = True  # error: [invalid-mutable-override]
+        self.value: bool = True  # error: [incompatible-mutable-override]
 ```
 
 An assignment without an annotation does not change the inherited type.
@@ -3982,14 +4254,14 @@ An assignment without an annotation does not change the inherited type.
 ```py
 class Initialized(Base):
     def __init__(self) -> None:
-        self.value = True  # no diagnostic
+        self.value = True  # ok
 ```
 
 An annotation in the subclass's body is also checked against the base's constructor annotation.
 
 ```py
 class ClassBodyOverride(Base):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 Repeating an incompatible annotation in a further subclass does not report the same error again.
@@ -3997,7 +4269,7 @@ Repeating an incompatible annotation in a further subclass does not report the s
 ```py
 class Grandchild(Incompatible):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 ```
 
 ## Method annotations overriding class-body declarations
@@ -4010,7 +4282,7 @@ class Base:
 
 class Child(Base):
     def __init__(self) -> None:
-        self.value: bool = True  # error: [invalid-mutable-override]
+        self.value: bool = True  # error: [incompatible-mutable-override]
 ```
 
 ## Method annotations alongside slots and class defaults
@@ -4026,25 +4298,25 @@ class Slotted(Base):
     __slots__ = ("value",)
 
     def __init__(self) -> None:
-        self.value: str = ""  # error: [invalid-attribute-override]
+        self.value: str = ""  # error: [incompatible-attribute-override]
 
 class WithDefault(Base):
     value = 0
 
     def __init__(self) -> None:
-        self.value: str = ""  # error: [invalid-attribute-override]
+        self.value: str = ""  # error: [incompatible-attribute-override]
 
 class CompatibleSlot(Base):
     __slots__ = ("value",)
 
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 
 class CompatibleDefault(Base):
     value = 0
 
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 ```
 
 When the class body declares the attribute, we check that declaration once, even if a method repeats
@@ -4052,10 +4324,10 @@ the annotation.
 
 ```py
 class AnnotatedDefault(Base):
-    value: str = ""  # error: [invalid-attribute-override]
+    value: str = ""  # error: [incompatible-attribute-override]
 
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 ```
 
 Further subclasses can repeat the receiver declaration without reporting its existing conflict
@@ -4065,20 +4337,20 @@ is used as a base. Overrides with a different incompatible type still produce an
 ```py
 class RepeatedReceiver(WithDefault):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 
 class RepeatedClassBody(WithDefault):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class RepeatedDefault(WithDefault):
-    value = 0  # no diagnostic
+    value = 0  # ok
 
 class NewReceiverConflict(WithDefault):
     def __init__(self) -> None:
-        self.value: bytes = b""  # error: [invalid-attribute-override]
+        self.value: bytes = b""  # error: [incompatible-attribute-override]
 
 class NewClassBodyConflict(WithDefault):
-    value: bytes  # error: [invalid-attribute-override]
+    value: bytes  # error: [incompatible-attribute-override]
 ```
 
 ## Method annotations overriding initialized class attributes
@@ -4091,11 +4363,11 @@ class Base:
 
 class Child(Base):
     def __init__(self) -> None:
-        self.value: str = ""  # snapshot: invalid-attribute-override
+        self.value: str = ""  # snapshot: incompatible-attribute-override
 ```
 
 ```snapshot
-error[invalid-attribute-override]: Invalid override of attribute `value`
+error[incompatible-attribute-override]: Invalid override of attribute `value`
  --> src/mdtest_snippet.py:6:9
   |
 2 |     value: int = 0
@@ -4103,7 +4375,7 @@ error[invalid-attribute-override]: Invalid override of attribute `value`
 3 |
 4 | class Child(Base):
 5 |     def __init__(self) -> None:
-6 |         self.value: str = ""  # snapshot: invalid-attribute-override
+6 |         self.value: str = ""  # snapshot: incompatible-attribute-override
   |         ^^^^^^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
@@ -4126,5 +4398,155 @@ class Slotted(Base):
         self.value = value
 
 class Child(Slotted):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
+```
+
+## Attribute conflicts between base classes
+
+A class must preserve every base's attribute contract, even when it does not redeclare the
+attribute. The first definition in the MRO supplies the effective attribute.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(Integer, String): ...  # snapshot: incompatible-attribute-override
+```
+
+```snapshot
+error[incompatible-attribute-override]: Incompatible inherited attribute `value`
+ --> src/mdtest_snippet.py:7:7
+  |
+2 |     value: int
+  |     ----- `Integer.value` declared here
+3 |
+4 | class String:
+5 |     value: str
+  |     ----- `String.value` declared here
+6 |
+7 | class Conflict(Integer, String): ...  # snapshot: incompatible-attribute-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `Integer.value` is incompatible with `String.value`
+info: Type `int` is not assignable to inherited type `str`
+```
+
+The error is not repeated in subclasses, including when the conflicting parent is not the first base
+class.
+
+```py
+class Descendant(Conflict): ...  # ok
+class Independent: ...
+class JoinedAgain(Independent, Conflict): ...  # ok
+```
+
+## Explicit overrides with multiple bases
+
+An explicit annotation is checked against both bases. The error belongs to that annotation; there is
+no additional error on the class definition for the same attribute.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(String, Integer):
+    value: str  # error: [incompatible-attribute-override]
+```
+
+Repeating the same annotation in a subclass does not report the existing error again, even when the
+conflicting parent is not the first base.
+
+```py
+class Independent: ...
+
+class JoinedAgain(Independent, Conflict):
+    value: str  # ok
+```
+
+## `Any` on an intermediate base
+
+Annotating `value` as `Any` in an intermediate class does not hide the `int` annotation on its base.
+
+```py
+from typing import Any
+
+class Integer:
+    value: int
+
+class Gradual(Integer):
+    value: Any
+
+class String:
+    value: str
+
+class Conflict(String, Gradual): ...  # error: [incompatible-attribute-override]
+```
+
+## Generated `__hash__`
+
+With the default `dataclass_transform` settings, ty infers `__hash__ = None` for subclasses without
+an explicit hash method. Override checks use this member instead of an older method in the
+hierarchy.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Base: ...
+
+class Hashable(Base):
+    def __hash__(self) -> int:
+        return 0
+
+class Unhashable(Hashable): ...
+class Mixin: ...
+class Child(Unhashable, Mixin): ...  # ok
+```
+
+## Generated `__match_args__`
+
+A `dataclass_transform` base tells ty to infer dataclass members for its subclasses. An empty
+subclass gets an empty `__match_args__` tuple. The inherited annotation must not cause an override
+error, even when the subclass has another base.
+
+```py
+from typing import ClassVar
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+class Concrete(Base): ...
+class Mixin: ...
+class Child(Concrete, Mixin): ...  # ok
+```
+
+## Inherited `__match_args__`
+
+An ordinary subclass inherits the `__match_args__` generated by `@dataclass`. That empty tuple is
+used instead of the older annotation on `Base`. With mutable narrowing allowed, this is a valid
+override.
+
+```toml
+[rules]
+incompatible-mutable-override = "ignore"
+```
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+@dataclass
+class Generated(Base): ...
+
+class Mixin: ...
+class Child(Generated, Mixin): ...  # ok
 ```

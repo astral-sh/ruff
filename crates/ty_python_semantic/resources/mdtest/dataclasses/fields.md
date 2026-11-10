@@ -193,10 +193,10 @@ class DC:
 
 dc = DC(name="Alice")
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 dc.sentinel
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 DC.sentinel
 ```
 
@@ -287,4 +287,49 @@ C(name="foo")
 # This should error because field(init=False) is respected for B
 # error: [unknown-argument]
 B(name="foo")
+```
+
+## Union-annotated fields
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When a field is annotated with a union type, the `field(..)` call is inferred with the full union as
+type context, so that a single `Field[..]` specialization is inferred, instead of e.g.
+`Field[str] | Field[None]`. This ensures that the field's metadata can be accurately captured.
+
+For the `values` field, the `field(..)` call is inferred with a narrower `Field[list[int]]`
+specialization due to the default factory argument, but the declared type is what determines the
+constructor signature, so lists of strings are still allowed.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+def returns_any() -> Any:
+    return None
+
+@dataclass
+class Entry:
+    value: str | None = field(default_factory=returns_any, kw_only=True)
+    reveal_type(value)  # revealed: dataclasses.Field[str | None]
+
+    values: list[int] | list[str] = field(default_factory=lambda: [1], kw_only=True)
+    reveal_type(values)  # revealed: dataclasses.Field[list[int]]
+
+# revealed: (self: Entry, *, value: str | None = ..., values: list[int] | list[str] = ...) -> None
+reveal_type(Entry.__init__)
+
+Entry()
+Entry(value=None)
+Entry(values=[1, 2])
+Entry(value="value", values=["other"])
+```
+
+The `kw_only` argument is respected:
+
+```py
+Entry("value", [1, 2])  # error: [too-many-positional-arguments]
 ```

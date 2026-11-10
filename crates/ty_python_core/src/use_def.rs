@@ -169,7 +169,7 @@
 //! this in the future for some closures, but for now this is where we start.)
 //!
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
-//! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
+//! `bindings_by_use` table of reaching bindings indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
 //! `definitions_by_definition` map of [`DefinitionsAtDefinition`], and `symbol_states` and
 //! `member_states` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in
@@ -261,7 +261,7 @@ use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionCategory, DefinitionState};
-use crate::frozen::FrozenMap;
+use crate::frozen::{FrozenMap, PackedIds};
 use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
@@ -685,7 +685,7 @@ impl PredicateNarrowingTargets {
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+    bindings_by_use: PackedIds<InternedBindingsId>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -996,7 +996,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.extra().bindings_by_use[use_id];
+        let bindings_id = self.extra().bindings_by_use.get(use_id.index());
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1956,6 +1956,7 @@ impl PendingReachability {
         // Consecutive places often share their last applied reachability node, so their
         // merged path constraint can be reused even when they have distinct place states.
         let mut last_merged_reachability = None;
+        let mut last_singleton_merge = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
@@ -2023,6 +2024,30 @@ impl PendingReachability {
                 continue;
             }
 
+            // Distinct definitions can carry the same path constraints. When both branches
+            // retain the same binding and declaration for a place, only these constraints
+            // change. Reuse an earlier eager merge with identical inputs and pending paths.
+            let inputs = current
+                .state
+                .singleton_merge_inputs(&branch_state.state)
+                .map(|constraints| {
+                    (
+                        current.reachability,
+                        current.narrowing,
+                        branch_state.reachability,
+                        branch_state.narrowing,
+                        constraints,
+                    )
+                });
+            if let (Some(inputs), Some((previous, merged))) = (inputs, last_singleton_merge)
+                && inputs == previous
+            {
+                Rc::make_mut(&mut current.state).set_singleton_constraints(merged);
+                current.reachability = self.current;
+                current.narrowing = self.current;
+                continue;
+            }
+
             self.materialize(
                 &mut branch_state,
                 branch,
@@ -2036,11 +2061,20 @@ impl PendingReachability {
                 narrowing_constraints,
                 reachability_constraints,
             );
-            current.merge(
-                branch_state,
-                narrowing_constraints,
-                reachability_constraints,
-            );
+            if let Some(inputs) = inputs {
+                let merged = current.merge_singleton(
+                    &branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+                last_singleton_merge = Some((inputs, merged));
+            } else {
+                current.merge(
+                    branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+            }
         }
     }
 }
@@ -2069,7 +2103,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
-    /// Live bindings at each so-far-recorded use.
+    /// Live bindings at each use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
     /// Live bindings associated with each so-far-recorded use.
@@ -2193,7 +2227,8 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
-        self.checkpoint_state.record_binding_change();
+        // Earlier snapshots restore new places as undefined. The first definition
+        // changes the bindings visible to an exception handler.
         match place {
             ScopedPlaceId::Symbol(symbol) => {
                 let new_place = self.symbol_states.push(PendingPlaceState::new(
@@ -2773,7 +2808,9 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+    /// Appends the bindings for a source use and returns its scope-local ordinal.
+    pub(super) fn record_use(&mut self, place: ScopedPlaceId) -> ScopedUseId {
+        let use_id = self.bindings_by_use.next_index();
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
                 ScopedPlaceId::Symbol(symbol) => snapshot.symbol_states.get_mut(symbol),
@@ -2805,7 +2842,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings = place_state.bindings().clone();
 
-        self.record_use_bindings(bindings, use_id);
+        self.record_use_bindings(bindings)
     }
 
     pub(super) fn set_if_chain_start(&mut self, snapshot: Option<FlowSnapshot>) {
@@ -2815,8 +2852,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_multi_use(
         &mut self,
         places: impl Iterator<Item = ScopedPlaceId>,
-        use_id: ScopedUseId,
-    ) {
+    ) -> ScopedUseId {
+        let use_id = self.bindings_by_use.next_index();
         let pending = self.pending_reachability.current;
         for place in places {
             let place_state =
@@ -2838,17 +2875,16 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
-        self.record_use_bindings(Bindings::default(), use_id);
+        self.record_use_bindings(Bindings::default())
     }
 
-    fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
+    fn record_use_bindings(&mut self, bindings: Bindings) -> ScopedUseId {
         let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
         self.mark_definition_ids_used(binding_definition_ids);
 
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        let new_use = self.bindings_by_use.push(bindings);
-        debug_assert_eq!(use_id, new_use);
+        self.bindings_by_use.push(bindings)
     }
 
     pub(super) fn symbol_binding_definition_ids(
@@ -2933,9 +2969,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
-        is_parent_of_annotation_scope: bool,
+        snapshot_symbol_bindings: bool,
     ) -> ScopedEnclosingSnapshotId {
         let pending = self.pending_reachability.current;
         let place_state = pending_place_state_mut(
@@ -2953,7 +2988,6 @@ impl<'db> UseDefMapBuilder<'db> {
             )
             .bindings();
 
-        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
@@ -2961,15 +2995,13 @@ impl<'db> UseDefMapBuilder<'db> {
             && bindings
                 .iter()
                 .any(|binding| !binding.binding().is_unbound());
-        // Names bound in class scopes are never visible to nested scopes (but
-        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
-        // class scope. There is one exception to this rule: annotation scopes can see names
-        // defined in an immediately-enclosing class scope. Likewise, unbound `global` and
+        // Member bindings can be visible even when the enclosing scope's names are hidden
+        // (e.g. a comprehension in a class body). Likewise, unbound `global` and
         // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
         // should continue walking outward instead of treating any bindings here as owned by this
         // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
         // state needs to be snapshotted so nested scopes can see the rebound type.
-        if (is_class_symbol && !is_parent_of_annotation_scope)
+        if (enclosing_place.is_symbol() && !snapshot_symbol_bindings)
             || !enclosing_place_expr.is_bound()
             || (is_forwarding_symbol && !stores_visible_bindings)
         {
@@ -3039,6 +3071,18 @@ impl<'db> UseDefMapBuilder<'db> {
             checkpoint_state: self.checkpoint_state.snapshot(),
             pending_reachability: self.pending_reachability.current,
         }
+    }
+
+    /// Get the current binding IDs for a place without materializing pending constraints.
+    pub(super) fn current_binding_ids(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        let pending = match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.member_states[member],
+        };
+        pending.state.bindings().iter().map(LiveBinding::binding)
     }
 
     /// Get the current live bindings for a place.
@@ -3189,8 +3233,13 @@ impl<'db> UseDefMapBuilder<'db> {
             self.definitions_by_definition,
             &mut place_state_interner,
         );
-        let bindings_by_use =
-            Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
+        let has_uses = !self.bindings_by_use.is_empty();
+        let bindings_by_use = self
+            .bindings_by_use
+            .into_iter()
+            .map(|bindings| place_state_interner.intern_bindings(&bindings))
+            .collect::<Vec<_>>()
+            .into();
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
@@ -3269,14 +3318,14 @@ impl<'db> UseDefMapBuilder<'db> {
         // In `body if test else other`, we visit `test` before `body`, but node indices follow
         // source order. Sort the recorded IDs so root membership can use binary search.
         boolean_test_roots.sort_unstable();
-        let extra = (!bindings_by_use.is_empty()
+        let extra = (has_uses
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
             || !loop_headers.is_empty()
             || !boolean_test_roots.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
-                bindings_by_use: bindings_by_use.into(),
+                bindings_by_use,
                 if_chain_start_by_use,
                 multi_bindings_by_use,
                 member_states,
@@ -3400,21 +3449,6 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         FrozenMap::from_entries(interned_ids_by_definition)
-    }
-
-    fn intern_bindings_by_use(
-        bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<ScopedUseId, InternedBindingsId> {
-        let mut interned_ids_by_use: IndexVec<ScopedUseId, InternedBindingsId> =
-            IndexVec::with_capacity(bindings_by_use.len());
-
-        for bindings in bindings_by_use {
-            let interned_id = place_state_interner.intern_bindings(&bindings);
-            interned_ids_by_use.push(interned_id);
-        }
-
-        interned_ids_by_use
     }
 
     fn intern_place_states<I: Idx, T>(

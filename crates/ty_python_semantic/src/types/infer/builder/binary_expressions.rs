@@ -179,12 +179,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
 
+        self.infer_binary_expression_from_types(binary, left_ty, right_ty)
+    }
+
+    /// Evaluate a binary operator whose operands have already been inferred in their type contexts.
+    pub(super) fn infer_binary_expression_from_types(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
+        let op = binary.op;
         let mut state = BinaryInferenceState::default();
         let return_type =
-            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
+            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, op, &mut state);
         self.report_deprecated_functions(binary, state.deprecated_functions);
         return_type.unwrap_or_else(|| {
-            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
+            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, op);
             Type::unknown()
         })
     }
@@ -195,7 +206,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let env = self.program_environment();
         let ast::ExprBinOp {
             left,
             op,
@@ -218,17 +228,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
         // And attempting to enforce this more tightly showed a lot of potential false positives in
         // the ecosystem.
-        if left_ty.is_equivalent_to(db, env, right_ty) {
-            left_ty
-        } else {
-            UnionTypeInstance::from_value_expression_types(
-                db,
-                [left_ty, right_ty],
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-        }
+        UnionTypeInstance::from_value_expression_types(
+            db,
+            [left_ty, right_ty],
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        )
     }
 
     /// Returns a `TypedDict` result when a PEP 584 special case succeeds, otherwise the inferred
@@ -337,9 +343,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
     ///
-    /// The normal path's bidirectional inference would emit spurious typed-dict diagnostics
-    /// (e.g., `missing-typed-dict-key`, `invalid-key`) when the RHS doesn't exactly match
-    /// the `TypedDict` schema. We probe here to decide the outcome without those side effects.
+    /// The normal path's bidirectional inference would report missing or unknown constructor keys
+    /// when the RHS doesn't exactly match the `TypedDict` schema. We probe here to decide the
+    /// outcome without those side effects.
     ///
     /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
@@ -879,8 +885,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bytes(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let bytes = [lhs.value(db), rhs.value(db)].concat();
-                        Some(Type::bytes_literal(db, &bytes))
+                        let lhs = lhs.value(db);
+                        let rhs = rhs.value(db);
+                        let new_length = lhs.len().saturating_add(rhs.len());
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            Type::bytes_literal(db, &[lhs, rhs].concat())
+                        } else {
+                            KnownClass::Bytes.to_instance(db, env)
+                        };
+                        Some(ty)
                     }
 
                     (
@@ -1089,22 +1102,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // PEP 604-style union types using the `|` operator.
             (left, right, ast::Operator::BitOr)
-                if is_union_type_operand(left) && is_union_type_operand(right) =>
-            {
-                if left_ty.is_equivalent_to(db, env, right_ty) {
-                    Some(left_ty)
-                } else {
-                    Some(UnionTypeInstance::from_value_expression_types(
-                        db,
-                        [left_ty, right_ty],
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags(),
-                    ))
-                }
-            }
-            (left, right, ast::Operator::BitOr)
-                if (is_union_type_operand(left) && right.is_none(db))
+                if (is_union_type_operand(left)
+                    && (is_union_type_operand(right) || right.is_none(db)))
                     || (left.is_none(db) && is_union_type_operand(right)) =>
             {
                 Some(UnionTypeInstance::from_value_expression_types(

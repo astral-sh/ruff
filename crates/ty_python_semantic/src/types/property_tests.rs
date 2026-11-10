@@ -77,6 +77,8 @@ mod stable {
         type_generation::{FullyStaticTy, Ty},
         union,
     };
+    use crate::types::constraints::ConstraintSetBuilder;
+    use crate::types::typevar::TypeVarSet;
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
@@ -89,6 +91,14 @@ mod stable {
     type_property_test!(
         equivalent_to_is_symmetric, db, env,
         forall types s, t. s.is_equivalent_to(db, env, t) => t.is_equivalent_to(db, env, s)
+    );
+
+    // The shortcut for Never must agree with the general equivalence relation.
+    type_property_test!(
+        equivalent_to_never, db, env,
+        forall types t. t.is_equivalent_to(db, env, Type::Never)
+            == t.when_equivalent_to(db, env, Type::Never, &ConstraintSetBuilder::new())
+                .is_always_satisfied(db, env, TypeVarSet::None)
     );
 
     // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.

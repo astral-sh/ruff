@@ -457,7 +457,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:5:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:5:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
     Found 2 diagnostics
 
@@ -713,7 +713,7 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:1:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
     Found 2 diagnostics
 
@@ -743,7 +743,7 @@ fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> member.py:1:8
       |
     1 | import shared
@@ -908,7 +908,7 @@ members = ["packages/*"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `typing` has no member `override`
+    error[import-not-found]: Module `typing` has no member `override`
      --> member.py:1:20
       |
     1 | from typing import override

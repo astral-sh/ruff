@@ -124,7 +124,7 @@ instance = C()
 instance.declared: str = "wrong"
 
 # error: [invalid-type-form]
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 instance.missing: str = "wrong"
 
 class Other:
@@ -184,14 +184,14 @@ When trying to set an attribute that is not defined, we also emit errors:
 ```py
 class C: ...
 
-C.non_existent = 1  # snapshot: unresolved-attribute
+C.non_existent = 1  # snapshot: missing-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Unresolved attribute `non_existent` on type `<class 'C'>`.
+error[missing-attribute]: Unresolved attribute `non_existent` on type `<class 'C'>`.
  --> src/mdtest_snippet.py:3:1
   |
-3 | C.non_existent = 1  # snapshot: unresolved-attribute
+3 | C.non_existent = 1  # snapshot: missing-attribute
   | ^^^^^^^^^^^^^^
 ```
 
@@ -199,14 +199,14 @@ And on instances:
 
 ```py
 instance = C()
-instance.non_existent = 1  # snapshot: unresolved-attribute
+instance.non_existent = 1  # snapshot: missing-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
+error[missing-attribute]: Unresolved attribute `non_existent` on type `C`
  --> src/mdtest_snippet.py:5:1
   |
-5 | instance.non_existent = 1  # snapshot: unresolved-attribute
+5 | instance.non_existent = 1  # snapshot: missing-attribute
   | ^^^^^^^^^^^^^^^^^^^^^
 ```
 
@@ -232,10 +232,10 @@ error[missing-slot]: Cannot assign to attribute `value`: `Slotted` has no slot o
 info: Attribute `value` is declared but is not included in `__slots__`
 ```
 
-A genuinely undeclared attribute keeps the ordinary unresolved-attribute diagnostic.
+A genuinely undeclared attribute keeps the ordinary missing-attribute diagnostic.
 
 ```py
-Slotted().missing = 1  # error: [unresolved-attribute] "Unresolved attribute `missing` on type `Slotted`"
+Slotted().missing = 1  # error: [missing-attribute] "Unresolved attribute `missing` on type `Slotted`"
 ```
 
 An inherited annotation also does not provide storage for a slotted subclass.

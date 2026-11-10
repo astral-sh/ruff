@@ -747,6 +747,29 @@ reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
 reveal_type(bound({}))  # revealed: Any
 ```
 
+### Partially applied ParamSpec decorator
+
+Binding `attempts` with `partial` leaves `retry` generic in `P`. When the resulting decorator is
+applied to `greet`, ty infers `(name: str)` for `P` and preserves `greet`'s signature.
+
+```py
+from functools import partial
+from typing import Callable
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+
+def retry(func: Callable[P, str], *, attempts: int) -> Callable[P, str]:
+    return func
+
+@partial(retry, attempts=3)
+def greet(name: str) -> str:
+    return name
+
+reveal_type(greet)  # revealed: (name: str) -> str
+greet(42)  # error: [invalid-argument-type]
+```
+
 ### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
 
 Narrowing an optional callable by truthiness preserves its gradual parameter list when inferring a
@@ -1235,6 +1258,29 @@ def chain(depth):
         cur = functools.partial(cur)
     reveal_type(cur())  # revealed: Unknown | Divergent
     return cur
+```
+
+### Repeated partial application to a union of callables
+
+The configured factories share earlier partials. When the loop wraps them again, cycle recovery
+preserves each factory's return type.
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+Factory = Callable[..., bytes] | Callable[..., str] | Callable[..., bytearray] | Callable[..., int]
+
+def configure(factory: Factory, layers: list[int]):
+    build = partial(factory, width=32)
+    build = partial(build, height=32)
+    build = partial(build, channels=3)
+    build = partial(build, stride=2)
+    build = partial(build, padding=1)
+    build = partial(build, bias=False)
+    for units in layers:
+        build = partial(build, units=units)
+    reveal_type(build())  # revealed: bytes | str | bytearray | int | Divergent
 ```
 
 ### Repeated partial application at module scope
@@ -2103,6 +2149,6 @@ def f() -> None:
     pass
 
 p = partial(f)
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 p.__name__ = "renamed"
 ```

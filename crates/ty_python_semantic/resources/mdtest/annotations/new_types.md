@@ -438,7 +438,7 @@ Bing() < 3.14  # error: [unsupported-operator]
 
 ```py
 from typing import NewType
-from doesnotexist import unknown  # error: [unresolved-import]
+from doesnotexist import unknown  # error: [import-not-found]
 
 MyFloat = NewType("MyFloat", float)
 

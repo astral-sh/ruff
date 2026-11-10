@@ -554,6 +554,25 @@ alias_func()  # error: [deprecated] "Use other_func instead"
 AliasClass()  # error: [deprecated] "Use OtherType instead"
 ```
 
+## Conditional definitions shadowing builtins
+
+A reference to a conditionally defined deprecated function still warns when another path falls back
+to a builtin of the same name.
+
+```py
+from typing_extensions import deprecated
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @deprecated("old len")
+    def len() -> int:
+        return 0
+
+ref = len  # error: [deprecated] "old len"
+```
+
 ## Names in annotations
 
 Each reference to a deprecated class produces one warning, including references through aliases and
@@ -1347,7 +1366,7 @@ def decorate(fn):
 def string_result() -> str:
     return ""
 
-@decorate  # no diagnostic
+@decorate  # ok
 def integer_result() -> int:
     return 1
 
@@ -1380,7 +1399,7 @@ def decorate(cls):
 @decorate
 class OldClass(Old): ...
 
-@decorate  # no diagnostic
+@decorate  # ok
 class NewClass(New): ...
 ```
 
@@ -1553,7 +1572,7 @@ def example(flag: bool):
     def string_result() -> str:
         return ""
 
-    @(decorate if flag else identity)  # no diagnostic
+    @(decorate if flag else identity)  # ok
     def integer_result() -> int:
         return 1
 
@@ -1561,7 +1580,7 @@ def example(flag: bool):
     @(decorate if flag else identity)
     class OldClass(Old): ...
 
-    @(decorate if flag else identity)  # no diagnostic
+    @(decorate if flag else identity)  # ok
     class NewClass(New): ...
 
     # error: [deprecated] "old implementation"
@@ -1626,13 +1645,13 @@ def model(cls: type[object]) -> type[object]:
 class OldClass(Old):
     value: int
 
-OldClass(1)  # no diagnostic
+OldClass(1)  # ok
 
-@model  # no diagnostic
+@model  # ok
 class NewClass(New):
     value: int
 
-NewClass(1)  # no diagnostic
+NewClass(1)  # ok
 ```
 
 ### Callable instances as decorators
@@ -1668,7 +1687,7 @@ decorate = Decorator()
 def string_result() -> str:
     return ""
 
-@decorate  # no diagnostic
+@decorate  # ok
 def integer_result() -> int:
     return 1
 
@@ -1676,7 +1695,7 @@ def integer_result() -> int:
 @decorate
 class OldClass(Old): ...
 
-@decorate  # no diagnostic
+@decorate  # ok
 class NewClass(New): ...
 
 class OldDecorator:
@@ -1730,7 +1749,7 @@ class Decorator:
 def string_result() -> str:
     return ""
 
-@Decorator  # no diagnostic
+@Decorator  # ok
 def integer_result() -> int:
     return 1
 ```
@@ -1855,7 +1874,7 @@ def replace_with_str(fn: Callable[[], int]) -> str:
 def first() -> int:
     return 1
 
-@outer  # no diagnostic
+@outer  # ok
 @replace_with_str
 def second() -> int:
     return 1
@@ -1889,7 +1908,7 @@ def replace_with_int(cls: type[Base]) -> int:
 def replace_with_str(cls: type[Base]) -> str:
     return ""
 
-@outer  # no diagnostic
+@outer  # ok
 @replace_with_int
 class First(Base): ...
 
@@ -1918,14 +1937,14 @@ def decorate(fn):
     return fn()
 
 @no_type_check
-@decorate  # no diagnostic
+@decorate  # ok
 def first() -> str: ...
-@decorate  # no diagnostic
+@decorate  # ok
 @no_type_check
 def second() -> str: ...
 @no_type_check
 def outer():
-    @decorate  # no diagnostic
+    @decorate  # ok
     def nested() -> str: ...
 ```
 
@@ -1947,7 +1966,7 @@ from contextlib import asynccontextmanager
 async def iterator() -> AsyncIterator[int]:
     yield 1
 
-@asynccontextmanager  # no diagnostic
+@asynccontextmanager  # ok
 async def generator() -> AsyncGenerator[int, None]:
     yield 1
 ```

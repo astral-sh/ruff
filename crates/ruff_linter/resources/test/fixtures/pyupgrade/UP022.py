@@ -47,6 +47,10 @@ output = subprocess.run(
     ["foo"], capture_output=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
 )
 
+# A removed keyword argument with a parenthesized value that is not the last argument
+subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=(subprocess.PIPE), text=True)
+subprocess.run(["foo"], stdout=(subprocess.PIPE), stderr=subprocess.PIPE, text=True)
+
 # OK
 from foo import PIPE
 subprocess.run(["foo"], stdout=PIPE, stderr=PIPE)

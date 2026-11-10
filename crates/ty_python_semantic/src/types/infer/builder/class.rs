@@ -3,6 +3,7 @@ use crate::ProgramEnvironment;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    class::StaticClassHeader,
     function::{KnownFunction, OverloadLiteral},
     infer::{
         TypeInferenceBuilder,
@@ -174,16 +175,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     db,
                     &name.id,
                     body_scope,
-                    maybe_known_class,
+                    StaticClassHeader {
+                        known: maybe_known_class,
+                        dataclass_params,
+                        has_explicit_bases,
+                        has_explicit_metaclass,
+                    },
                     deprecated,
                     type_check_only,
-                    dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
                     !class_node.decorator_list.is_empty(),
                     class_node.type_params.is_some(),
-                    has_explicit_bases,
-                    has_explicit_metaclass,
                 )),
             }
         };

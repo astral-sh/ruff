@@ -8,7 +8,7 @@ This example demonstrates the diagnostic when a `from` style import is used with
 not be found:
 
 ```py
-from does_not_exist import add  # error: [unresolved-import]
+from does_not_exist import add  # error: [import-not-found]
 
 stat = add(10, 15)
 ```
@@ -33,7 +33,7 @@ def add(x, y):
 `package/subpackage/subsubpackage/__init__.py`:
 
 ```py
-from ....foo import add  # error: [unresolved-import]
+from ....foo import add  # error: [import-not-found]
 
 stat = add(10, 15)
 ```
@@ -44,7 +44,7 @@ This is another case handled separately in ty, where a `.` provokes relative mod
 but where the module name is not resolvable.
 
 ```py
-from .does_not_exist import add  # error: [unresolved-import]
+from .does_not_exist import add  # error: [import-not-found]
 
 stat = add(10, 15)
 ```
@@ -54,7 +54,7 @@ stat = add(10, 15)
 Like the previous test, but with sub-modules to ensure the span is correct.
 
 ```py
-from .does_not_exist.foo.bar import add  # error: [unresolved-import]
+from .does_not_exist.foo.bar import add  # error: [import-not-found]
 
 stat = add(10, 15)
 ```
@@ -72,7 +72,7 @@ does_exist2 = 2
 ```
 
 ```py
-from a import does_exist1, does_not_exist, does_exist2  # error: [unresolved-import]
+from a import does_exist1, does_not_exist, does_exist2  # error: [import-not-found]
 ```
 
 ## An unresolvable import that does not use `from`
@@ -81,7 +81,7 @@ This ensures that an unresolvable `import ...` statement highlights just the mod
 entire statement.
 
 ```py
-import does_not_exist  # error: [unresolved-import]
+import does_not_exist  # error: [import-not-found]
 
 x = does_not_exist.foo
 ```

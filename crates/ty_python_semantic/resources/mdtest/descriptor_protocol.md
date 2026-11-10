@@ -251,7 +251,7 @@ on the class still makes it a descriptor, but we do not assume that `Unknown` su
 
 ```py
 from typing import Literal
-from unknown_module import UnknownBase  # error: [unresolved-import]
+from unknown_module import UnknownBase  # error: [import-not-found]
 
 class NotADescriptor(UnknownBase): ...
 
@@ -911,7 +911,7 @@ respect its `str | None` annotation, and arbitrary instance attributes remain un
 descriptor = property(lambda instance: 1)
 descriptor.__doc__ = None
 descriptor.__doc__ = 1  # error: [invalid-assignment]
-descriptor.extra = 1  # error: [unresolved-attribute]
+descriptor.extra = 1  # error: [missing-attribute]
 ```
 
 ### Overriding properties in subclasses
@@ -1247,14 +1247,14 @@ class ItemDescriptor:
 class Holder:
     item = ItemDescriptor()
 
-compatible: HasItem = Holder()  # no diagnostic
+compatible: HasItem = Holder()  # ok
 ```
 
 Checking a class that only annotates its attribute with the descriptor type also terminates:
 
 ```py
 class AnnotationOnlyHolder:
-    item: ItemDescriptor  # no diagnostic
+    item: ItemDescriptor  # ok
 ```
 
 The recursive check does not make an incompatible setter acceptable:
@@ -1666,7 +1666,7 @@ class Descriptor:
 class C:
     value = Descriptor()
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 

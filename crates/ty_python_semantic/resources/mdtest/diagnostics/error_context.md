@@ -6,9 +6,9 @@ python-version = "3.13"
 ```
 
 A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
-(`invalid-assignment`, `invalid-argument-type` or `invalid-method-override`). Types can be complex,
-and so we can often help users understand the incompatibility by focusing on the relevant parts of
-the two types that are being compared.
+(`invalid-assignment`, `invalid-argument-type` or `incompatible-method-override`). Types can be
+complex, and so we can often help users understand the incompatibility by focusing on the relevant
+parts of the two types that are being compared.
 
 ## Basic
 
@@ -626,7 +626,7 @@ class Child1(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.py:7:9
   |
 7 |     def method(self, x: bytes) -> bool:
@@ -654,7 +654,7 @@ class ChildYX(ParentXY):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:15:9
    |
 15 |     def method(self, *, y: int, x: bytes) -> bool:
@@ -678,7 +678,7 @@ class Child2(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:19:9
    |
 19 |     def method(self, x: str) -> None:
@@ -702,7 +702,7 @@ class Child3(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[lost-keyword-for-regular-parameter]: Override of method `method` disallows keyword arguments allowed by the method on the base class
   --> src/mdtest_snippet.py:23:9
    |
 23 |     def method(self, y: str):
@@ -981,17 +981,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str) -> None: ...
     def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str) -> None: ...
@@ -1025,17 +1025,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str, later: str) -> None: ...
     def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str, later: str) -> None: ...

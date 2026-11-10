@@ -242,6 +242,46 @@ def _(c: C, d: D):
     reveal_type(d)  # revealed: D
 ```
 
+## Negated recursive aliases in unions of containers
+
+A recursive alias can appear positively and negatively in one container's element type and
+negatively in another union member.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4799>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+type A = list[A | ~A] | list[~A]
+B: TypeAlias = "list[B | ~B] | list[~B]"
+
+def _(a: A, b: B):
+    reveal_type(a)  # revealed: list[A | ~A] | list[~A]
+    reveal_type(b)  # revealed: B
+```
+
+## Negated recursive aliases through an aliased container
+
+The recursion can pass through another alias for a container in the union.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Container = list[A | ~A]
+type A = Container | list[~A]
+
+def _(value: A):
+    reveal_type(value)  # revealed: list[Divergent]
+```
+
 ## Intersections inside `type[...]`
 
 ```toml

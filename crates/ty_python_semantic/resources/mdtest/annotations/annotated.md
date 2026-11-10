@@ -129,6 +129,19 @@ def _(x: Annotated[(int,)]):
     reveal_type(x)  # revealed: int
 ```
 
+Runtime inference preserves an `Annotated` object when a type argument is present, even if that type
+is `Unknown`. With no type argument, the entire expression recovers as `Unknown`:
+
+```py
+from ty_extensions._internal import Unknown
+
+Missing = Annotated[()]  # error: [invalid-type-form]
+Wrapped = Annotated[Unknown]  # error: [invalid-type-form]
+
+reveal_type(Missing)  # revealed: Unknown
+reveal_type(Wrapped)  # revealed: <special-form 'typing.Annotated[Unknown, <metadata>]'>
+```
+
 ## Inheritance
 
 ### Correctly parameterized

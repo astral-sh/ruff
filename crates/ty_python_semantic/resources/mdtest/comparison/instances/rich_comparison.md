@@ -24,10 +24,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
+    def __eq__(self, other: A) -> EqReturnType:  # error: [incompatible-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: A) -> NeReturnType:  # error: [invalid-method-override]
+    def __ne__(self, other: A) -> NeReturnType:  # error: [incompatible-method-override]
         return NeReturnType()
 
     def __lt__(self, other: A) -> LtReturnType:
@@ -66,10 +66,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
+    def __eq__(self, other: B) -> EqReturnType:  # error: [incompatible-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: B) -> NeReturnType:  # error: [invalid-method-override]
+    def __ne__(self, other: B) -> NeReturnType:  # error: [incompatible-method-override]
         return NeReturnType()
 
     def __lt__(self, other: B) -> LtReturnType:
@@ -111,10 +111,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: B) -> EqReturnType:  # error: [invalid-method-override]
+    def __eq__(self, other: B) -> EqReturnType:  # error: [incompatible-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: B) -> NeReturnType:  # error: [invalid-method-override]
+    def __ne__(self, other: B) -> NeReturnType:  # error: [incompatible-method-override]
         return NeReturnType()
 
     def __lt__(self, other: B) -> LtReturnType:
@@ -132,10 +132,10 @@ class A:
 class Unrelated: ...
 
 class B:
-    def __eq__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
+    def __eq__(self, other: Unrelated) -> B:  # error: [incompatible-method-override]
         return B()
 
-    def __ne__(self, other: Unrelated) -> B:  # error: [invalid-method-override]
+    def __ne__(self, other: Unrelated) -> B:  # error: [incompatible-method-override]
         return B()
 
 # Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
@@ -180,10 +180,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, other: A) -> A:  # error: [invalid-method-override]
+    def __eq__(self, other: A) -> A:  # error: [incompatible-method-override]
         return A()
 
-    def __ne__(self, other: A) -> A:  # error: [invalid-method-override]
+    def __ne__(self, other: A) -> A:  # error: [incompatible-method-override]
         return A()
 
     def __lt__(self, other: A) -> A:
@@ -199,22 +199,22 @@ class A:
         return A()
 
 class B(A):
-    def __eq__(self, other: A) -> EqReturnType:  # error: [invalid-method-override]
+    def __eq__(self, other: A) -> EqReturnType:  # error: [incompatible-method-override]
         return EqReturnType()
 
-    def __ne__(self, other: A) -> NeReturnType:  # error: [invalid-method-override]
+    def __ne__(self, other: A) -> NeReturnType:  # error: [incompatible-method-override]
         return NeReturnType()
 
-    def __lt__(self, other: A) -> LtReturnType:  # error: [invalid-method-override]
+    def __lt__(self, other: A) -> LtReturnType:  # error: [incompatible-method-override]
         return LtReturnType()
 
-    def __le__(self, other: A) -> LeReturnType:  # error: [invalid-method-override]
+    def __le__(self, other: A) -> LeReturnType:  # error: [incompatible-method-override]
         return LeReturnType()
 
-    def __gt__(self, other: A) -> GtReturnType:  # error: [invalid-method-override]
+    def __gt__(self, other: A) -> GtReturnType:  # error: [incompatible-method-override]
         return GtReturnType()
 
-    def __ge__(self, other: A) -> GeReturnType:  # error: [invalid-method-override]
+    def __ge__(self, other: A) -> GeReturnType:  # error: [incompatible-method-override]
         return GeReturnType()
 
 reveal_type(A() == B())  # revealed: A | EqReturnType
@@ -243,10 +243,10 @@ class A:
         return A()
 
 class B(A):
-    def __lt__(self, other: int) -> B:  # error: [invalid-method-override]
+    def __lt__(self, other: int) -> B:  # error: [incompatible-method-override]
         return B()
 
-    def __gt__(self, other: int) -> B:  # error: [invalid-method-override]
+    def __gt__(self, other: int) -> B:  # error: [incompatible-method-override]
         return B()
 
 reveal_type(A() < B())  # revealed: A
@@ -266,7 +266,7 @@ not. Thus, the correct answer here for the `reveal_type` is `int | Unknown`.
 (This test is referenced from `mdtest/binary/instances.md`)
 
 ```py
-from does_not_exist import Foo  # error: [unresolved-import]
+from does_not_exist import Foo  # error: [import-not-found]
 
 reveal_type(Foo)  # revealed: Unknown
 
@@ -291,10 +291,10 @@ Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#ob
 from __future__ import annotations
 
 class A:
-    def __eq__(self, other: int) -> A:  # error: [invalid-method-override]
+    def __eq__(self, other: int) -> A:  # error: [incompatible-method-override]
         return A()
 
-    def __ne__(self, other: int) -> A:  # error: [invalid-method-override]
+    def __ne__(self, other: int) -> A:  # error: [incompatible-method-override]
         return A()
 
 reveal_type(A() == A())  # revealed: bool

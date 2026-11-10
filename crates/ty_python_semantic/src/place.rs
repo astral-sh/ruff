@@ -816,6 +816,35 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     )
 }
 
+/// Check whether a member prefix has a binding without inferring its value when possible.
+pub(crate) fn has_bound_prefix<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings: BindingWithConstraintsIterator<'_, 'db>,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> bool {
+    let mut rows = bindings.clone();
+    if let Some(row) = rows.next()
+        && rows.next().is_none()
+    {
+        match row.binding {
+            DefinitionState::Undefined => return false,
+            DefinitionState::Defined(definition) => {
+                let kind = definition.kind(db);
+                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
+                    // With no unbound or deleted alternative, even an unreachable binding gives
+                    // a defined place of type Never. Either way the outer prefix is shadowed.
+                    return true;
+                }
+            }
+            DefinitionState::Deleted => {}
+        }
+    }
+    !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
+        .place
+        .is_undefined()
+}
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -2005,6 +2034,7 @@ fn place_from_bindings_impl<'db>(
                             binding.place(db),
                             binding_ty,
                         )
+                        .with_reachability_cache(reachability_cache, reachability_constraints)
                     })
                     .narrow(constraint, binding_ty),
             };

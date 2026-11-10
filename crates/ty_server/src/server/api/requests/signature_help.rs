@@ -11,7 +11,7 @@ use lsp_types::{
     Documentation, ParameterInformation, ParameterInformationLabel, SignatureHelp,
     SignatureHelpParams, SignatureInformation, Uri,
 };
-use ty_ide::signature_help;
+use ty_ide::{MarkupKind, signature_help};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
 pub(crate) struct SignatureHelpRequestHandler;
@@ -129,9 +129,9 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig
-                        .documentation
-                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
+                    documentation: sig.documentation.map(|docstring| {
+                        Documentation::String(docstring.render(MarkupKind::PlainText))
+                    }),
                     parameters: Some(parameters),
                     active_parameter,
                 }

@@ -325,7 +325,7 @@ pub struct SourcePosition(TextSize);
 
 impl<Context> Format<Context> for SourcePosition {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        if let Some(FormatElement::SourcePosition(last_position)) = f.buffer.elements().last() {
+        if let Some(FormatElement::SourcePosition(last_position)) = f.elements().last() {
             if *last_position == self.0 {
                 return Ok(());
             }
@@ -341,6 +341,7 @@ impl<Context> Format<Context> for SourcePosition {
 ///
 /// This is done by allocating a new string internally.
 pub fn text(text: &str) -> Text<'_> {
+    #[cfg(debug_assertions)]
     debug_assert_no_newlines(text);
 
     Text { text }
@@ -388,6 +389,7 @@ where
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let source_code = f.context().source_code();
         let slice = source_code.slice(self.range);
+        #[cfg(debug_assertions)]
         debug_assert_no_newlines(slice.text(source_code));
 
         let text_width = TextWidth::from_text(
@@ -401,6 +403,8 @@ where
     }
 }
 
+#[cfg(debug_assertions)]
+#[track_caller]
 fn debug_assert_no_newlines(text: &str) {
     debug_assert!(
         !text.contains('\r'),
@@ -2433,19 +2437,19 @@ impl<T, Context> std::fmt::Debug for FormatOnce<T, Context> {
 /// Builder to join together a sequence of content.
 /// See [`Formatter::join`]
 #[must_use = "must eventually call `finish()` on Format builders"]
-pub struct JoinBuilder<'fmt, 'buf, Separator, Context> {
+pub struct JoinBuilder<'fmt, 'buf, 'state, Separator, Context> {
     result: FormatResult<()>,
-    fmt: &'fmt mut Formatter<'buf, Context>,
+    fmt: &'fmt mut Formatter<'buf, 'state, Context>,
     with: Option<Separator>,
     has_elements: bool,
 }
 
-impl<'fmt, 'buf, Separator, Context> JoinBuilder<'fmt, 'buf, Separator, Context>
+impl<'fmt, 'buf, 'state, Separator, Context> JoinBuilder<'fmt, 'buf, 'state, Separator, Context>
 where
     Separator: Format<Context>,
 {
     /// Creates a new instance that joins the elements without a separator
-    pub(super) fn new(fmt: &'fmt mut Formatter<'buf, Context>) -> Self {
+    pub(super) fn new(fmt: &'fmt mut Formatter<'buf, 'state, Context>) -> Self {
         Self {
             result: Ok(()),
             fmt,
@@ -2455,7 +2459,10 @@ where
     }
 
     /// Creates a new instance that prints the passed separator between every two entries.
-    pub(super) fn with_separator(fmt: &'fmt mut Formatter<'buf, Context>, with: Separator) -> Self {
+    pub(super) fn with_separator(
+        fmt: &'fmt mut Formatter<'buf, 'state, Context>,
+        with: Separator,
+    ) -> Self {
         Self {
             result: Ok(()),
             fmt,
@@ -2501,14 +2508,14 @@ where
 
 /// Builder to fill as many elements as possible on a single line.
 #[must_use = "must eventually call `finish()` on Format builders"]
-pub struct FillBuilder<'fmt, 'buf, Context> {
+pub struct FillBuilder<'fmt, 'buf, 'state, Context> {
     result: FormatResult<()>,
-    fmt: &'fmt mut Formatter<'buf, Context>,
+    fmt: &'fmt mut Formatter<'buf, 'state, Context>,
     empty: bool,
 }
 
-impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
-    pub(crate) fn new(fmt: &'a mut Formatter<'buf, Context>) -> Self {
+impl<'a, 'buf, 'state, Context> FillBuilder<'a, 'buf, 'state, Context> {
+    pub(crate) fn new(fmt: &'a mut Formatter<'buf, 'state, Context>) -> Self {
         fmt.write_element(FormatElement::Tag(StartFill));
 
         Self {

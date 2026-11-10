@@ -13,6 +13,17 @@
         }
       ]
     },
+    "baseline": {
+      "description": "Path to the JSON file that records existing lint diagnostics for this project.\nRelative paths are resolved against the project root. Use `ty check --update-baseline`\nto create or update the file.\n\nDiagnostic baselines are in preview. The file format may change between ty releases.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RelativePathBuf"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -36,7 +47,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -73,7 +84,7 @@
       "type": "object",
       "properties": {
         "allowed-unresolved-imports": {
-          "description": "A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "description": "A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
           "type": [
             "array",
             "null"
@@ -147,7 +158,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. Otherwise, ty looks for an\nactivated child Conda or Pixi environment, a `.venv` directory in the project root, then\nan activated base Conda environment, in that order. ty skips Conda and Pixi environments\nthat contain no Python interpreter. If none of these environments are found, ty looks for\na `python3` or `python` binary in `PATH`.\n\nScripts with inline metadata use their own Python environment. They can use an explicitly\nconfigured environment, an activated environment, or an environment selected by the editor.\nUnlike projects, they do not automatically use a `.venv` directory.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -169,7 +180,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nScripts with inline metadata use their `requires-python` field instead of\n`project.requires-python`. They do not inherit the Python version of the enclosing project.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.7\"` or `\"3.12\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nty officially supports type checking code that targets Python 3.10 and later. Python 3.7\nthrough 3.9 can still be selected, but ty may produce false positives or false negatives for\nstandard-library APIs because its bundled stubs do not fully describe those versions.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nA script uses its inline `environment.python-version` first, then `requires-python`.\nIt falls back to the project's version if it has no inline `[tool.ty]` table.\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/SupportedPythonVersion"
@@ -180,7 +191,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` to allow importing local modules.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`\n\nScripts with inline metadata have no first-party roots by default because they are\nsingle-file programs. Set `root = [\".\"]` in the script's `[tool.ty.environment]` table\nto import sibling modules.",
           "type": [
             "array",
             "null"
@@ -252,6 +263,11 @@
           "description": "Print diagnostics as a JUnit-style XML report.",
           "type": "string",
           "const": "junit"
+        },
+        {
+          "description": "Print diagnostics as a [SARIF] report.\n\n[SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html",
+          "type": "string",
+          "const": "sarif"
         }
       ]
     },
@@ -371,6 +387,16 @@
             }
           ]
         },
+        "abstract-class-instantiation": {
+          "title": "detects direct instantiation of abstract classes and protocols",
+          "description": "## What it does\n\nChecks for direct instantiation of protocol classes and classes with unimplemented abstract methods.\n\n## Why is this bad?\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime. ty also checks classes without `ABCMeta` and\nrejects direct instantiation of protocols.\n\n## Examples\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```\n\n```python\nfrom typing import Protocol\n\n\nclass HasName(Protocol):\n    name: str\n\n\nHasName()  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "abstract-method-in-final-class": {
           "title": "detects `@final` classes with unimplemented abstract methods",
           "description": "## What it does\n\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\n\nA class decorated with `@final` cannot be subclassed. If such a class has abstract methods that are\nnot implemented, the class can never be properly instantiated, as the abstract methods can never be\nimplemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only prevented for\nclasses that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also\nenforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is\nclear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n@final\n# `Derived` does not implement `method`\nclass Derived(Base):  # error\n    pass\n```",
@@ -432,7 +458,7 @@
         },
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\nThis includes attempts to instantiate classes with unimplemented abstract methods, whether those\nmethods are explicitly decorated with `abstractmethod` or implicitly abstract protocol members.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\nAbstract methods describe behavior that a subclass must implement before it can be instantiated.\nClasses using `ABCMeta` enforce this at runtime; the type checker also enforces it for classes\nwithout `ABCMeta`.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Abstract(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n# `method` has not been implemented.\nAbstract()  # error\n\n\nclass Concrete(Abstract):\n    def method(self) -> int:\n        return 42\n\n\nConcrete()  # OK\n```",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.",
           "default": "error",
           "oneOf": [
             {
@@ -630,9 +656,79 @@
             }
           ]
         },
+        "import-not-found": {
+          "title": "detects unresolved imports",
+          "description": "## What it does\n\nChecks for imports where ty cannot find the module or a member named in a `from` import.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from\nan existing module raises `ImportError`.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n\n# ImportError: cannot import name 'sine' from 'math'\nfrom math import sine  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "incompatible-attribute-override": {
+          "title": "detects attribute overrides that violate inherited type or access requirements",
+          "description": "## What it does\n\nDetects attribute overrides that change whether an inherited attribute is a class variable or an\ninstance variable, expose an incompatible value type, or make a writable attribute read-only.\n\nNarrowing a mutable attribute's type is checked separately by the `incompatible-mutable-override`\nrule. Overrides involving properties are checked by `incompatible-property-override`.\n\n## Why is this bad?\n\nPure class variables and instance variables have different access and assignment behavior.\nOverriding one with the other violates the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\"), because code that is valid\nfor the superclass may no longer be valid for the subclass.\n\n## Example\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n    name: str\n    count: int\n\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [incompatible-attribute-override]\n    class_attr: int  # error: [incompatible-attribute-override]\n    name: bytes  # error: [incompatible-attribute-override]\n    count: Final[int] = 0  # error: [incompatible-attribute-override]\n```\n\nCode that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also\nassign to `count`; making it final in the subclass removes that operation.\n\n## Rule history\n\n- v0.0.100: Renamed from `invalid-attribute-override`.\n\n    `invalid-attribute-override` remains as a compatibility alias for this rule.\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "incompatible-method-override": {
+          "title": "detects method definitions that violate the Liskov Substitution Principle",
+          "description": "## What it does\n\nDetects method overrides that violate the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\").\n\nThe LSP states that an instance of a subtype should be substitutable for an instance of its\nsupertype. Applied to Python, this means:\n\n1. All argument combinations a superclass method accepts must also be accepted by an overriding\n    subclass method.\n1. The return type of an overriding subclass method must be a subtype of the return type of the\n    superclass method.\n\nAn otherwise compatible override that renames a positional-or-keyword parameter or makes it\npositional-only can trigger `lost-keyword-for-regular-parameter`.\n\n## Why is this bad?\n\nViolating the Liskov Substitution Principle will lead to many of ty's assumptions and inferences\nbeing incorrect, which will mean that it will fail to catch many possible type errors in your code.\n\n## Example\n\n```python\nclass Super:\n    def method(self, x) -> int:\n        return 42\n\n\nclass Sub(Super):\n    # Liskov violation: `str` is not a subtype of `int`,\n    # but the supertype method promises to return an `int`.\n    def method(self, x) -> str:  # error: [incompatible-method-override]\n        return \"foo\"\n\n\ndef accepts_super(s: Super) -> int:\n    return s.method(x=42)\n\n\n# The result of this call is a string, but ty will infer it to be an `int`\n# due to the violation of the Liskov Substitution Principle.\naccepts_super(Sub())\n```\n\n## Common issues\n\n### Why does ty complain about my `__eq__` method?\n\n`__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary objects as their\nsecond argument, for example:\n\n```python\nclass A:\n    x: int\n\n    def __eq__(self, other: object) -> bool:\n        # gracefully handle an object of an unexpected type\n        # without raising an exception\n        if not isinstance(other, A):\n            return False\n        return self.x == other.x\n```\n\nIf `A.__eq__` here were annotated as only accepting `A` instances for its second argument, it would\nimply that you wouldn't be able to use `==` between instances of `A` and instances of unrelated\nclasses without an exception possibly being raised. While some classes in Python do indeed behave\nthis way, the strongly held convention is that it should be avoided wherever possible. As part of\nthis check, therefore, ty enforces that `__eq__` and `__ne__` methods accept `object` as their\nsecond argument.\n\n### Why does ty disagree with Ruff about how to write my method?\n\nRuff has several rules that will encourage you to rename a parameter, or change its type signature,\nif it thinks you're falling into a certain anti-pattern. For example, Ruff's\n[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused\nparameter should either be removed or renamed to start with `_`. Renaming the parameter in an\noverride can trigger `lost-keyword-for-regular-parameter` if the base method accepts it by keyword.\nRemoving the parameter can trigger `incompatible-method-override` if the override no longer accepts\na call allowed by the base method.\n\nThis can usually be resolved by adding [`@typing.override`][override] to your method definition.\nRuff knows that a method decorated with `@typing.override` is intended to override a method by the\nsame name on a superclass, and avoids reporting rules like ARG002 for such methods; it knows that\nthe changes recommended by ARG002 would violate the Liskov Substitution Principle.\n\nCorrect use of `@override` is enforced by ty's `invalid-explicit-override` rule.\n\n## Rule history\n\n- v0.0.100: ty used to have a rule called `invalid-method-override` that covered both\n    `incompatible-method-override` and `lost-keyword-for-regular-parameter`.\n\n    The old `invalid-method-override` name is now an alias for `incompatible-method-override` only. If\n    you previously had any configuration for `invalid-method-override` specifically, you should go\n    through `lost-keyword-for-regular-parameter` to see if you want to configure it in the same way.\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[override]: https://docs.python.org/3/library/typing.html#typing.override",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "incompatible-mutable-override": {
+          "title": "detects overrides that narrow writable attribute types",
+          "description": "## What it does\n\nDetects overrides that narrow the type of a writable attribute.\n\n## Why is this bad?\n\nA subclass must accept every write allowed by the superclass. Narrowing a mutable attribute's type\nallows code using the superclass interface to invalidate the subclass's attribute type.\n\n## Example\n\n```python\nclass Base:\n    value: int\n\n\nclass Child(Base):\n    value: bool  # error: [incompatible-mutable-override]\n\n\ndef reset(obj: Base) -> None:\n    obj.value = 42\n\n\nreset(Child())  # The value is no longer a bool.\n```\n\nUse the same annotation in both classes, or expose a read-only property if callers do not need to\nwrite the attribute.\n\n## Rule history\n\n- v0.0.100: Renamed from `invalid-mutable-override`.\n\n    `invalid-mutable-override` remains as a compatibility alias for this rule.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "incompatible-property-override": {
+          "title": "detects incompatible overrides involving properties",
+          "description": "## What it does\n\nDetects overrides that change the readable type of an inherited property incompatibly, restrict the\nvalues accepted by its setter, or remove a required write operation.\n\n## Why is this bad?\n\nCode using the superclass interface must continue to work on subclass instances. A getter can return\na more specific type, but a setter must accept every value accepted by the superclass. A writable\nattribute cannot be replaced by a read-only property.\n\n## Example\n\n```python\nclass Base:\n    @property\n    def value(self) -> int:\n        return 0\n\n\nclass Child(Base):\n    @property\n    def value(self) -> str:  # error: [incompatible-property-override]\n        return \"\"\n```\n\nAn override returning `bool` would be valid because `bool` is a subtype of `int`.\n\n## Rule history\n\n- v0.0.100: Renamed from `invalid-property-type-override`.\n\n    `invalid-property-type-override` remains as a compatibility alias for this rule.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\n\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\n\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass A: ...\n\n\nclass B(A): ...\n\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...  # error\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "inconsistent-overload-decorator": {
+          "title": "detects inconsistent use of `@staticmethod` or `@classmethod` on overloaded methods",
+          "description": "## What it does\n\nChecks for inconsistent use of decorators on overloaded methods. If one definition uses\n`@staticmethod` or `@classmethod`, every overload and the implementation, if present, must use the\nsame decorator.\n\n## Why is this bad?\n\nPython's runtime doesn't know about overloads, but it does have a different binding behavior for\ninstance methods, class methods and staticmethods. Overloads therefore need to be consistent about\ntheir use of `@staticmethod` and `@classmethod` decorators.\n\n## Example\n\n```pyi\nfrom typing import overload\n\nclass Reader:\n    @staticmethod\n    @overload\n    def read() -> str: ...\n    @overload\n    def read(self, size: int) -> str: ...  # error\n```\n\nIf `read` is an instance method, remove `@staticmethod` and add `self` to the first overload. Both\noverloads then account for the implicit `self` in `reader.read()` and `reader.read(10)`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "inconsistent-overload-implementation": {
+          "title": "detects implementations that are inconsistent with their overloads",
+          "description": "## What it does\n\nChecks for overload implementations that are incompatible with one or more overloads.\n\nAfter decorators are applied, the implementation must accept every call allowed by the overloads.\nEach overload's return type must be assignable to the implementation's return type.\n\n## Why is this bad?\n\nCallers rely on the overloads to know which arguments they can pass and what type to expect in\nreturn.\n\n## Examples\n\n### Incompatible parameters\n\n```py\nfrom typing import overload\n\n\n@overload\ndef read() -> str: ...  # error\n@overload\ndef read(size: int) -> str: ...\ndef read(size: int) -> str:\n    return \"x\" * size\n```\n\nThe first overload allows `read()`. At runtime, that call raises `TypeError` because the\nimplementation requires a `size` argument.\n\n### Incompatible return type\n\n```py\nfrom typing import overload\n\n\n@overload\ndef double(value: int) -> int: ...  # error\n@overload\ndef double(value: str) -> str: ...\ndef double(value: int | str) -> str:\n    return str(value) * 2\n```\n\nThe first overload promises an `int`, but `double(3)` returns the string `\"33\"`.\n\n### A decorator makes the implementation uncallable\n\n```py\nfrom collections.abc import Callable\nfrom typing import overload\n\nhandlers: list[Callable[..., str]] = []\n\n\ndef register(func: Callable[..., str]) -> None:\n    handlers.append(func)\n\n\n@overload\ndef greet() -> str: ...\n@overload\ndef greet(name: str) -> str: ...\n@register\ndef greet(name: str = \"world\") -> str:  # error\n    return f\"Hello, {name}!\"\n```\n\n`register` returns `None`, so `@register` leaves `greet` bound to `None`. Calling `greet()` raises\n`TypeError`.\n\n## References\n\n- [Typing specification: Implementation consistency](https://typing.python.org/en/latest/spec/overload.html#implementation-consistency)",
           "default": "error",
           "oneOf": [
             {
@@ -693,16 +789,6 @@
         "invalid-attribute-access": {
           "title": "Invalid attribute access",
           "description": "## What it does\n\nChecks for assignments to class variables from instances and assignments to instance-only attributes\nfrom their class. Also checks for reads and writes of generic instance attributes through a generic\nclass or a specialized generic alias.\n\nAn \"instance-only\" variable is one which is only ever assigned to or declared when accessed via\n`self` in an instance method.\n\nA generic instance attribute has a type that depends on the class's type parameters. Specializing a\ngeneric class does not create separate class attribute storage, so these attributes cannot be\naccessed through the generic class or a specialized alias. Access through a `type[...]` receiver is\nallowed because it can refer to a concrete subclass with its own class attributes.\n\n## Why is this bad?\n\nIncorrect assignments break the rules of the type system and weaken a type checker's ability to\naccurately reason about your code.\n\n## Examples\n\n```python\nfrom typing import ClassVar\n\n\nclass C:\n    instance_var: int\n    class_var: ClassVar[int] = 1\n\n    def __init__(self):\n        # instance variable declared in the class body\n        self.instance_var = 42\n\n        # instance-only variable not declared in the class body\n        self.instance_only_var: int = 42\n\n\nC.class_var = 3  # okay\n\nC.instance_var = 56  # okay\nC().instance_var = 72  # okay\n\nC().instance_only_var = 100  # okay\n\n# Cannot assign to class variable from instance\nC().class_var = 3  # error\n\n# Cannot assign to instance-only variable from class\nC.instance_only_var = 56  # error\n```\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Box(Generic[T]):\n    value: T\n\n\nBox[int].value = 1  # error\nBox.value  # error\n\nbox = Box[int]()\nbox.value = 1  # okay\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-attribute-override": {
-          "title": "detects attribute overrides that violate inherited type or access requirements",
-          "description": "## What it does\n\nDetects attribute overrides that change whether an inherited attribute is a class variable or an\ninstance variable, expose an incompatible value type, or make a writable attribute read-only.\n\nNarrowing a mutable attribute's type is checked separately by the `invalid-mutable-override` rule.\nOverrides involving properties are checked by `invalid-property-type-override`.\n\n## Why is this bad?\n\nPure class variables and instance variables have different access and assignment behavior.\nOverriding one with the other violates the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\"), because code that is valid\nfor the superclass may no longer be valid for the subclass.\n\n## Example\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass Base:\n    instance_attr: int\n    class_attr: ClassVar[int]\n    name: str\n    count: int\n\n\nclass Sub(Base):\n    instance_attr: ClassVar[int]  # error: [invalid-attribute-override]\n    class_attr: int  # error: [invalid-attribute-override]\n    name: bytes  # error: [invalid-attribute-override]\n    count: Final[int] = 0  # error: [invalid-attribute-override]\n```\n\nCode that reads `Base.name` on an instance expects a string. Code that accepts a `Base` can also\nassign to `count`; making it final in the subclass removes that operation.\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle",
           "default": "error",
           "oneOf": [
             {
@@ -850,16 +936,6 @@
             }
           ]
         },
-        "invalid-key": {
-          "title": "detects invalid subscript accesses or TypedDict literal keys",
-          "description": "## What it does\n\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.\n\n## Why is this bad?\n\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`\nit also violates the expectations of the type.\n\n## Examples\n\n```python\nfrom typing import TypedDict\nfrom typing_extensions import NotRequired\n\n\nclass Person(TypedDict):\n    name: NotRequired[str]\n    age: NotRequired[int]\n\n\nalice = Person(name=\"Alice\", age=30)\n# KeyError: 'height'\nalice[\"height\"]  # error\n\n# error\nbob: Person = {\"nickname\": \"Bob\", \"age\": 30}  # typo!\n\n# error\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-legacy-positional-parameter": {
           "title": "detects incorrect usage of the legacy convention for specifying positional-only parameters",
           "description": "## What it does\n\nChecks for parameters that appear to be attempting to use the legacy convention to specify that a\nparameter is positional-only, but do so incorrectly.\n\nThe \"legacy convention\" for specifying positional-only parameters was specified in\n[PEP 484][pep-484]. It states that parameters with names starting with `__` should be considered\npositional-only by type checkers. [PEP 570][pep-570], introduced in Python 3.8, added dedicated\nsyntax for specifying positional-only parameters, rendering the legacy convention obsolete. However,\nsome codebases may still use the legacy convention for compatibility with older Python versions.\n\nThis rule is disabled by default because modern code may use `__`-prefixed parameter names for other\npurposes. Enable it if your codebase uses the legacy convention and you want to check that it is\napplied consistently.\n\n## Why is this bad?\n\nIn most cases, a type checker will not consider a parameter to be positional-only if it comes after\na positional-or-keyword parameter, even if its name starts with `__`. This may be unexpected if the\nauthor intended to use the legacy convention.\n\n## Example\n\n```python\n# `__y` is not considered positional-only\ndef f(x, __y):  # error\n    pass\n```\n\nUse instead:\n\n```python\ndef f(__x, __y):  # If you need compatibility with Python <=3.7\n    pass\n```\n\nor:\n\n```python\ndef f(x, y, /):  # Python 3.8+ syntax\n    pass\n```\n\n## References\n\n- [Typing spec: positional-only parameters (legacy syntax)](https://typing.python.org/en/latest/spec/historical.html#pos-only-double-underscore)\n- [Python glossary: parameters](https://docs.python.org/3/glossary.html#term-parameter)\n\n[pep-484]: https://peps.python.org/pep-0484/#positional-only-arguments\n[pep-570]: https://peps.python.org/pep-0570/",
@@ -900,29 +976,9 @@
             }
           ]
         },
-        "invalid-method-override": {
-          "title": "detects method definitions that violate the Liskov Substitution Principle",
-          "description": "## What it does\n\nDetects method overrides that violate the\n[Liskov Substitution Principle][liskov-substitution-principle] (\"LSP\").\n\nThe LSP states that an instance of a subtype should be substitutable for an instance of its\nsupertype. Applied to Python, this means:\n\n1. All argument combinations a superclass method accepts must also be accepted by an overriding\n    subclass method.\n1. The return type of an overriding subclass method must be a subtype of the return type of the\n    superclass method.\n\n## Why is this bad?\n\nViolating the Liskov Substitution Principle will lead to many of ty's assumptions and inferences\nbeing incorrect, which will mean that it will fail to catch many possible type errors in your code.\n\n## Example\n\n```python\nclass Super:\n    def method(self, x) -> int:\n        return 42\n\n\nclass Sub(Super):\n    # Liskov violation: `str` is not a subtype of `int`,\n    # but the supertype method promises to return an `int`.\n    def method(self, x) -> str:  # error: [invalid-method-override]\n        return \"foo\"\n\n\ndef accepts_super(s: Super) -> int:\n    return s.method(x=42)\n\n\n# The result of this call is a string, but ty will infer it to be an `int`\n# due to the violation of the Liskov Substitution Principle.\naccepts_super(Sub())\n\n\nclass Sub2(Super):\n    # Liskov violation: the superclass method can be called with a `x=`\n    # keyword argument, but the subclass method does not accept it.\n    def method(self, y) -> int:  # error: [invalid-method-override]\n        return 42\n\n\n# TypeError at runtime: method() got an unexpected keyword argument 'x'\n# ty cannot catch this error due to the violation of the Liskov Substitution Principle.\naccepts_super(Sub2())\n```\n\n## Common issues\n\n### Why does ty complain about my `__eq__` method?\n\n`__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary objects as their\nsecond argument, for example:\n\n```python\nclass A:\n    x: int\n\n    def __eq__(self, other: object) -> bool:\n        # gracefully handle an object of an unexpected type\n        # without raising an exception\n        if not isinstance(other, A):\n            return False\n        return self.x == other.x\n```\n\nIf `A.__eq__` here were annotated as only accepting `A` instances for its second argument, it would\nimply that you wouldn't be able to use `==` between instances of `A` and instances of unrelated\nclasses without an exception possibly being raised. While some classes in Python do indeed behave\nthis way, the strongly held convention is that it should be avoided wherever possible. As part of\nthis check, therefore, ty enforces that `__eq__` and `__ne__` methods accept `object` as their\nsecond argument.\n\n### Why does ty disagree with Ruff about how to write my method?\n\nRuff has several rules that will encourage you to rename a parameter, or change its type signature,\nif it thinks you're falling into a certain anti-pattern. For example, Ruff's\n[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused\nparameter should either be removed or renamed to start with `_`. Applying either of these\nsuggestions can cause ty to start reporting an `invalid-method-override` error if the function in\nquestion is a method on a subclass that overrides a method on a superclass, and the change would\ncause the subclass method to no longer accept all argument combinations that the superclass method\naccepts.\n\nThis can usually be resolved by adding [`@typing.override`][override] to your method definition.\nRuff knows that a method decorated with `@typing.override` is intended to override a method by the\nsame name on a superclass, and avoids reporting rules like ARG002 for such methods; it knows that\nthe changes recommended by ARG002 would violate the Liskov Substitution Principle.\n\nCorrect use of `@override` is enforced by ty's `invalid-explicit-override` rule.\n\n[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[override]: https://docs.python.org/3/library/typing.html#typing.override",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-module-getattr-call": {
           "title": "detects imports that fail while calling module-level `__getattr__`",
           "description": "## What it does\n\nChecks for imports that fail when calling a module-level `__getattr__` function.\n\n## Why is this bad?\n\nIf a module defines `__getattr__`, Python calls it when a `from` import requests a name that is not\notherwise defined. The import raises an exception if `__getattr__` cannot accept the requested name.\n\n## Examples\n\n`module.py`:\n\n```python\ndef __getattr__() -> str:\n    return \"fallback\"\n```\n\n`main.py`:\n\n```python\n# TypeError: __getattr__() takes 0 positional arguments but 1 was given\nfrom module import missing  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-mutable-override": {
-          "title": "detects overrides that narrow writable attribute types",
-          "description": "## What it does\n\nDetects overrides that narrow the type of a writable attribute.\n\n## Why is this bad?\n\nA subclass must accept every write allowed by the superclass. Narrowing a mutable attribute's type\nallows code using the superclass interface to invalidate the subclass's attribute type.\n\n## Example\n\n```python\nclass Base:\n    value: int\n\n\nclass Child(Base):\n    value: bool  # error: [invalid-mutable-override]\n\n\ndef reset(obj: Base) -> None:\n    obj.value = 42\n\n\nreset(Child())  # The value is no longer a bool.\n```\n\nUse the same annotation in both classes, or expose a read-only property if callers do not need to\nwrite the attribute.",
           "default": "error",
           "oneOf": [
             {
@@ -960,16 +1016,6 @@
             }
           ]
         },
-        "invalid-overload": {
-          "title": "detects invalid `@overload` usages",
-          "description": "## What it does\n\nChecks for various invalid `@overload` usages.\n\n## Why is this bad?\n\nThe `@overload` decorator is used to define functions and methods that accepts different\ncombinations of arguments and return different types based on the arguments passed. This is mainly\nbeneficial for type checkers. But, if the `@overload` usage is invalid, the type checker may not be\nable to provide correct type information.\n\n## Examples\n\n### Single overload\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo(x: int) -> int: ...  # error\ndef foo(x: int | None) -> int | None:\n    return x\n```\n\n### Missing implementation\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo() -> None: ...  # error\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "invalid-parameter-default": {
           "title": "detects default values that can't be assigned to the parameter's annotated type",
           "description": "## What it does\n\nChecks for default values that can't be assigned to the parameter's annotated type.\n\n## Why is this bad?\n\nThis breaks the rules of the type system and weakens a type checker's ability to accurately reason\nabout your code.\n\n## Examples\n\n```python\ndef f(a: int = \"\"): ...  # error\n```",
@@ -983,16 +1029,6 @@
         "invalid-paramspec": {
           "title": "detects invalid ParamSpec usage",
           "description": "## What it does\n\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\n# ParamSpec requires a name\nP2 = ParamSpec()  # error\n```\n\n## References\n\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-property-type-override": {
-          "title": "detects incompatible overrides involving properties",
-          "description": "## What it does\n\nDetects overrides that change the readable type of an inherited property incompatibly, restrict the\nvalues accepted by its setter, or remove a required write operation.\n\n## Why is this bad?\n\nCode using the superclass interface must continue to work on subclass instances. A getter can return\na more specific type, but a setter must accept every value accepted by the superclass. A writable\nattribute cannot be replaced by a read-only property.\n\n## Example\n\n```python\nclass Base:\n    @property\n    def value(self) -> int:\n        return 0\n\n\nclass Child(Base):\n    @property\n    def value(self) -> str:  # error: [invalid-property-type-override]\n        return \"\"\n```\n\nAn override returning `bool` would be valid because `bool` is a subtype of `int`.",
           "default": "error",
           "oneOf": [
             {
@@ -1160,6 +1196,16 @@
             }
           ]
         },
+        "invalid-typed-dict-key": {
+          "title": "detects invalid keys when accessing TypedDict items",
+          "description": "## What it does\n\nChecks for invalid keys when accessing or assigning items on a `TypedDict`.\n\nThis rule flags invalid keys such as a misspelled string literal or an integer. If the rejected key\nis a string whose value is unknown, ty reports `non-literal-typed-dict-key` instead.\n\n## Why is this bad?\n\nReading a missing key raises `KeyError`. Assigning to an undeclared key can silently add it to the\ndictionary.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\n\nalice = Person(name=\"Alice\", age=30)\n\n# KeyError: 'height'\nprint(f\"The height of Alice is {alice['height']}\")  # error\n```\n\n## Rule history\n\n- v0.0.100: ty used to have a rule called `invalid-key` that covered `invalid-typed-dict-key`,\n    `unknown-typed-dict-constructor-key`, and `non-literal-typed-dict-key`.\n\n    The old `invalid-key` name is now an alias for `invalid-typed-dict-key` only. If you previously\n    had any configuration for `invalid-key` specifically, you should go through the other two rules\n    to see if you want to configure them in the same way.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-statement": {
           "title": "detects invalid statements in `TypedDict` class bodies",
           "description": "## What it does\n\nDetects statements other than annotated declarations in `TypedDict` class bodies.\n\n## Why is this bad?\n\n`TypedDict` class bodies aren't allowed to contain any other types of statements. For example,\nmethod definitions and field values aren't allowed. None of these will be available on \"instances of\nthe `TypedDict`\" at runtime (as `dict` is the runtime class of all \"`TypedDict` instances\").\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Foo(TypedDict):\n    def bar(self):  # error: [invalid-typed-dict-statement]\n        pass\n```",
@@ -1200,6 +1246,16 @@
             }
           ]
         },
+        "lost-keyword-for-regular-parameter": {
+          "title": "detects method overrides that drop a positional parameter's keyword name",
+          "description": "## What it does\n\nDetects method overrides that rename a positional-or-keyword parameter or make it positional-only.\n\n## Why is this bad?\n\nCode that uses the base class's interface can pass the argument by keyword. The same call may raise\n`TypeError` on an instance of the subclass.\n\n## Example\n\n```python\nclass Base:\n    def scale(self, factor: int) -> int:\n        return factor * 2\n\n\nclass Wrong1(Base):\n    # error: [lost-keyword-for-regular-parameter]\n    def scale(self, multiplier: int) -> int:\n        return multiplier * 3\n\n\nclass Wrong2(Base):\n    # error: [lost-keyword-for-regular-parameter]\n    def scale(self, factor: int, /) -> int:\n        return factor * 3\n\n\ndef scale_by_two(obj: Base) -> int:\n    return obj.scale(factor=2)\n\n\nscale_by_two(Wrong1())  # Raise TypeError\nscale_by_two(Wrong2())  # Raise TypeError\n```\n\nTo fix this, rename `multiplier` to `factor` in `Wrong1.scale`, or remove the positional-only\nmodifier `/` in `Wrong2.scale`.\n\n## See also\n\n- `incompatible-method-override` reports other signature incompatibilities, such as a narrower\n    parameter type or an incompatible return type, even when the override also drops a keyword name.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "mismatched-sentinel-name": {
           "title": "detects sentinel definitions whose declared name does not match the assigned variable",
           "description": "## What it does\n\nChecks for `builtins.sentinel` and `typing_extensions.Sentinel` definitions whose name argument does\nnot match the variable they are assigned to. In class scope, the name can be unqualified or include\nthe full enclosing class path.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a sentinel's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because sentinel names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent sentinel naming.\n\nThis rule is similar to `mismatched-type-name`, but is a distinct rule because the default severity\ndiffers.\n\n## Examples\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"OTHER\")  # error: [mismatched-sentinel-name]\n```\n\nUse a matching name instead:\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"MISSING\")\n\n\nclass Container:\n    UNSET = Sentinel(\"Container.UNSET\")\n```",
@@ -1220,9 +1276,29 @@
             }
           ]
         },
+        "misplaced-overload-decorator": {
+          "title": "detects misplaced `@final` or `@override` decorators on overloaded methods",
+          "description": "## What it does\n\nChecks for `@final` or `@override` decorators applied to the wrong definition of an overloaded\nmethod. If the overload set has an implementation function, put the decorator on the implementation.\nOtherwise, e.g. in a stub file, put the decorator on the first overload.\n\n## Why is this bad?\n\nThese decorators apply to the whole method. Placing one on an individual overload suggests that only\nthat overload is final or overrides a superclass method.\n\n## Example\n\n```pyi\nfrom typing_extensions import overload, override\n\nclass Decoder:\n    def decode(self, data: bytes) -> str: ...\n\nclass BatchDecoder(Decoder):\n    @overload\n    def decode(self, data: bytes) -> str: ...\n    @overload\n    @override\n    def decode(self, data: list[bytes]) -> list[str]: ...  # error\n```\n\nMove `@override` to the first overload of `BatchDecoder.decode`.\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-argument": {
           "title": "detects missing required arguments in a call",
           "description": "## What it does\n\nChecks for missing required arguments in a call.\n\n## Why is this bad?\n\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef func(x: int): ...\n\n\n# TypeError: func() missing 1 required positional argument: 'x'\nfunc()  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-attribute": {
+          "title": "detects references to missing attributes",
+          "description": "## What it does\n\nChecks for references to attributes that ty cannot find on the object's type. For a union, this rule\napplies when every member lacks the attribute. If only some members lack it, ty reports\n`missing-union-attribute`.\n\n## Why is this bad?\n\nAccessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is\nnot guaranteed to exist from the type alone, so this could also indicate that the object is not of\nthe type that the user expects.\n\n## Examples\n\n```python\nclass A: ...\n\n\n# AttributeError: 'A' object has no attribute 'foo'\nA().foo  # error\n```\n\n## Rule history\n\n- v0.0.100: ty used to have a rule called `unresolved-attribute` that covered both\n    `missing-attribute` and `missing-union-attribute`.\n\n    The old `unresolved-attribute` name is now an alias for `missing-attribute` only. If you\n    previously had any configuration for `unresolved-attribute` specifically, you should go through\n    `missing-union-attribute` to see if you want to configure it in the same way.",
           "default": "error",
           "oneOf": [
             {
@@ -1234,6 +1310,16 @@
           "title": "detects imports of dependencies that are not declared directly",
           "description": "## What it does\n\nChecks for imports from installable packages that the current project or PEP 723 script does not\ndeclare as direct dependencies.\n\nThe name used in dependency declarations can differ from the import name: for example, the `pillow`\npackage is imported as `PIL`.\n\n## Why is this bad?\n\nA dependency can be installed because another package requires it. Importing that dependency without\ndeclaring it makes your code rely on another package's dependency list. If that package removes the\ndependency, your imports can fail.\n\nDeclare the packages that provide your imports in `project.dependencies` or\n`project.optional-dependencies` in `pyproject.toml`. Non-package files, such as tests and\ndevelopment scripts, can also use dependencies declared in dependency groups.\n\nSee uv's [guide to managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)\nfor how to add these declarations.\n\n## Rule status\n\nThis rule is disabled by default and requires uv integration.\n\nFor projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized\nenvironment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes\nthe environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty\nreads the dependency graph and module ownership returned by `uv workspace metadata` without changing\ninstalled packages. uv may update the lockfile to match the current dependency declarations. uv\n0.12.3 or later is required.\n\nFor PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes\neach script's environment and checks imports against its inline `dependencies` list. Declarations\nand environments from the enclosing workspace or other scripts do not apply.\n\n## Known limitations\n\nImports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They\ncan use development-only dependencies, such as type stub packages, without requiring those packages\nas runtime dependencies.\n\nStandard-library imports and imports whose owning package cannot be identified unambiguously are\nalso not reported.\n\nImports of [namespace packages](https://docs.python.org/3/reference/import.html#namespace-packages)\nthemselves, such as `import ns`, are not reported: the namespace can contain modules from several\ninstallable packages. Imports of their submodules, such as `import ns.child`, are checked when the\nowning package is known. An `__init__.pyi` stub does not change this distinction.\n\nNative packages that ty can resolve only as namespace packages at runtime are also skipped. For\nother native modules, ty can use stubs to resolve the import and uv's ownership map to identify\nwhich package to declare.\n\nSome editable installations add the whole project directory to Python's import path, making both\npackage code and files such as `tests/test_app.py` importable. If uv does not identify which modules\nbelong to the installable package, ty allows dependency-group imports throughout that directory,\nincluding in package code, to avoid incorrectly flagging imports in tests and scripts.\n\n## Examples\n\nWith `requests` as a direct dependency, `urllib3` may also be installed because `requests` depends\non it:\n\n```python {data-mdtest=\"ignore\"}\nimport requests\nimport urllib3  # error: [missing-direct-dependency]\n```\n\nAdd `urllib3` to `project.dependencies` if your code imports it directly.",
           "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-overload-implementation": {
+          "title": "detects overloaded functions missing a required implementation",
+          "description": "## What it does\n\nChecks for overloaded functions and methods without a required implementation. An implementation can\nbe omitted in any of the following cases:\n\n- The overloads are defined in a stub file (`.pyi`).\n- All overloads are defined inside `if TYPE_CHECKING` blocks.\n- The overloaded method is defined in a protocol.\n- The method is defined in an abstract base class and every overload is decorated with\n    `@abstractmethod`.\n\n## Why is this bad?\n\nThe `@overload` definitions describe the calls a type checker should accept. A separate\nimplementation handles those calls at runtime. Calling an overloaded function without an\nimplementation raises `NotImplementedError`.\n\n## Example\n\n```py\nfrom typing import overload\n\n\n@overload\ndef foo() -> None: ...  # error\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -1280,6 +1366,16 @@
             }
           ]
         },
+        "missing-union-attribute": {
+          "title": "detects attribute accesses where some union members lack the attribute",
+          "description": "## What it does\n\nChecks for reads or deletions of attributes that are present on some members of a union and missing\nfrom others.\n\n## Why is this bad?\n\nReading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.\n\n## Examples\n\n```python\ndef normalize(value: str | bytes) -> str:\n    return value.decode()  # error: [missing-union-attribute]\n```\n\nNarrow the type before accessing the attribute:\n\n```python\ndef normalize(value: str | bytes) -> str:\n    if isinstance(value, bytes):\n        return value.decode()\n    return value\n```\n\n## See also\n\n- `missing-attribute` reports attributes missing from every union member and explains how to migrate\n    from `unresolved-attribute`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "no-matching-overload": {
           "title": "detects calls that do not match any overload",
           "description": "## What it does\n\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\n\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError` at\nruntime.\n\n## Examples\n\n```python\nfrom typing import overload\n\n\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\ndef func(x: int | bool): ...\n\n\nfunc(\"string\")  # error: [no-matching-overload]\n```",
@@ -1293,6 +1389,16 @@
         "non-callable-init-subclass": {
           "title": "detects class definitions that will fail due to non-callable `__init_subclass__`",
           "description": "## What it does\n\nChecks for class definitions that will fail due to non-callable `__init_subclass__` methods.\n\n## Why is this bad?\n\nIf a class defines a non-callable `__init_subclass__` method/attribute, any attempt to subclass that\nclass will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass Super:\n    __init_subclass__ = None\n\n\nclass Sub(Super): ...  # error: [non-callable-init-subclass]\n```\n\n## References\n\n- [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "non-literal-typed-dict-key": {
+          "title": "detects non-literal string keys in TypedDict subscripts",
+          "description": "## What it does\n\nReports attempts to subscript `TypedDict` instances with a key of type `str`.\n\n## Why is this bad?\n\nA `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a\ndistinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot\ninfer a precise type for the subscript expression.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n```\n\nUse instead:\n\n```py\nfrom typing import Literal\n\n\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typed-dict-key` reports other invalid subscripts, such as a misspelled field name or an\n    integer key.",
           "default": "error",
           "oneOf": [
             {
@@ -1470,9 +1576,29 @@
             }
           ]
         },
+        "renamed-rule-in-ignore-comment": {
+          "title": "detects ignore comments that use a rule's old name",
+          "description": "## What it does\n\nChecks for renamed rules in `ty: ignore` and `type: ignore[ty:...]` comments.\n\n## Why is this bad?\n\nWhen ty renames a rule, the old name still works in ignore comments. Prefer the current name to keep\nignore comments consistent across your codebase.\n\n## Examples\n\nIf ty renames `old-rule-name` to `new-rule-name`, the automatic fix changes\n`# ty: ignore[old-rule-name]` to `# ty: ignore[new-rule-name]`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "shadowed-type-variable": {
           "title": "detects type variables that shadow type variables from outer scopes",
           "description": "## What it does\n\nChecks for type variables in nested generic classes or functions that shadow type variables from an\nenclosing scope.\n\n## Why is this bad?\n\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Outer[T]:\n    # `T` is already used by `Outer`\n    class Inner[T]: ...  # error\n\n    # `T` is already used by `Outer`\n    def method[T](self, x: T) -> T:  # error\n        return x\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "single-overload": {
+          "title": "detects functions with only one overload declaration",
+          "description": "## What it does\n\nChecks for functions and methods with only one `@overload` declaration.\n\n## Why is this bad?\n\nAn overload describes one of several ways to call a function. If one signature describes all valid\ncalls, keep the implementation and remove the overload declaration. In a stub file, keep the\ndeclaration and remove the `@overload` decorator.\n\n## Example\n\n```py\nfrom typing import overload\n\n\n# This overload definition can be removed.\n@overload\ndef foo(x: int) -> int: ...  # error: [single-overload]\ndef foo(x: int) -> int:\n    return x\n```\n\n## References\n\n- [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)\n\n## Rule history\n\n- v0.0.100: ty used to have a rule called `invalid-overload` that covered `single-overload`,\n    `missing-overload-implementation`, `inconsistent-overload-implementation`,\n    `inconsistent-overload-decorator`, and `misplaced-overload-decorator`.\n\n    The old `invalid-overload` rule was removed. If you previously had any configuration for\n    `invalid-overload` specifically, you should go through the five rules to see if you want to\n    configure them in the same way.",
           "default": "error",
           "oneOf": [
             {
@@ -1610,9 +1736,9 @@
             }
           ]
         },
-        "unresolved-attribute": {
-          "title": "detects references to unresolved attributes",
-          "description": "## What it does\n\nChecks for unresolved attributes.\n\n## Why is this bad?\n\nAccessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is\nnot guaranteed to exist from the type alone, so this could also indicate that the object is not of\nthe type that the user expects.\n\n## Examples\n\n```python\nclass A: ...\n\n\n# AttributeError: 'A' object has no attribute 'foo'\nA().foo  # error\n```",
+        "unknown-typed-dict-constructor-key": {
+          "title": "detects unknown keys when constructing a TypedDict",
+          "description": "## What it does\n\nReports `TypedDict` constructions where an unknown key is or may be provided.\n\n## Why is this bad?\n\nAn unexpected key in a constructor often means a field name was misspelled. Even an implicitly open\n`TypedDict` rejects an explicitly supplied key it does not declare.\n\n## Examples\n\n```python\nfrom typing_extensions import TypedDict, NotRequired\n\n\nclass Person(TypedDict):\n    name: str\n    age: NotRequired[int]\n\n\n# error: \"Unknown key \"aeg\"\"\ncarol = Person(name=\"Carol\", aeg=25)  # typo!\n\n\n# error: \"Unknown key \"nickname\"\"\nbob: Person = {\"name\": \"Robert\", \"nickname\": \"Bob\", \"age\": 30}  # unknown key!\n```\n\nIf a `TypedDict` is declared with `closed=True`, this rule will also flag a string key being passed\nto the constructor, as this might introduce an illegal extra item:\n\n```py\nimport json\nfrom typing_extensions import TypedDict\n\n\nclass NotificationPatch(TypedDict, closed=True, total=False):\n    email: bool\n    sms: bool\n\n\ndef encode_patch(channel: str, enabled: bool) -> str:\n    # error: \"Non-literal string key may be unknown\"\n    payload: NotificationPatch = {channel: enabled}\n    return json.dumps(payload)\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1624,16 +1750,6 @@
           "title": "detects `global` statements with no definition in the global scope",
           "description": "## What it does\n\nDetects variables declared as `global` in an inner scope that have no explicit bindings or\ndeclarations in the global scope.\n\n## Why is this bad?\n\nFunction bodies with `global` statements can run in any order (or not at all), which makes it hard\nfor static analysis tools to infer the types of globals without explicit definitions or\ndeclarations.\n\n## Example\n\n### Assigning without a global-scope declaration\n\n```python\ndef f():\n    # unresolved global\n    global x  # error\n    x = 42\n\n\ndef g():\n    print(x)  # unresolved reference\n```\n\n### Use instead\n\n#### Declare the global\n\n```python\nx: int\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```\n\n#### Initialize the global\n\n```python\nx: int | None = None\n\n\ndef f():\n    global x\n    x = 42\n\n\ndef g():\n    print(x)\n```",
           "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "unresolved-import": {
-          "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n```",
-          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

@@ -57,9 +57,9 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
 
-- `version`: The Ruff version to install (default: latest).
+- `version`: The Ruff version to install (default: inferred from `pyproject.toml`, falling back to latest).
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
-- `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
+- `src`: The source paths to pass to Ruff (default: `${{ github.workspace }}`, the repository workspace).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
@@ -81,7 +81,7 @@ Add the following configuration to `.gitlab-ci.yml` to run `ruff format` in para
   stage: build
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.17.1-alpine
+    name: ghcr.io/astral-sh/ruff:0.17.4-alpine
   before_script:
     - cd $CI_PROJECT_DIR
     - ruff --version
@@ -107,7 +107,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.17.1
+  rev: v0.17.4
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -120,7 +120,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.17.1
+  rev: v0.17.4
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -134,7 +134,7 @@ To avoid running on Jupyter Notebooks, remove `jupyter` from the list of allowed
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.17.1
+  rev: v0.17.4
   hooks:
     # Run the linter.
     - id: ruff-check
