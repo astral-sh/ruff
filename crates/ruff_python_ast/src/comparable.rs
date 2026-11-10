@@ -632,7 +632,8 @@ impl<'a> ComparableInterpolatedString<'a> {
     /// - An f-string part with the literal `" and three "` and the interpolation `{bar!s}`.
     ///
     /// All three pieces of literal text form one comparable element between the
-    /// two interpolations. A single piece can stay borrowed.
+    /// two interpolations. Equality compares these elements in order, and hashing
+    /// visits the same sequence.
     ///
     /// [CPython's `string.templatelib.Template`] has one more string than interpolation.
     /// Interleaving the two sequences, starting with a string, recovers the reading
@@ -651,10 +652,12 @@ impl<'a> ComparableInterpolatedString<'a> {
                         return Some(element);
                     }
                     ComparableStringElement::Literal(mut text) => {
-                        // `raw.next()` yields the Cow by value, borrowing the AST text.
-                        // In `f"{x}a" "b"`, `text` starts as a borrow of "a". Appending
-                        // "b" makes it own the joined string "ab". In `f"{x}ab"`, the
-                        // single piece stays borrowed. Both yield the same literal.
+                        // In `f"{x}a" "b"`, after the interpolation, `raw.next()`
+                        // returns `Literal(Cow::Borrowed("a"))` by value. The pattern
+                        // moves the `Cow` into the mutable local variable `text`.
+                        // Its `&str` points into the AST. `text += next` appends "b" by
+                        // replacing the local `Cow` with an owned `String` containing "ab".
+                        // In `f"{x}ab"`, "ab" stays borrowed and compares equal by content.
                         while let Some(ComparableStringElement::Literal(next)) =
                             raw.next_if(|next| matches!(next, ComparableStringElement::Literal(_)))
                         {
@@ -669,6 +672,8 @@ impl<'a> ComparableInterpolatedString<'a> {
         })
     }
 
+    /// Flatten the parts in source order. Each element borrows from the AST,
+    /// and adjacent literal pieces are still separate at this point.
     fn raw_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
         enum Parts<'a> {
             FString(ast::FStringParts<'a>),
@@ -1296,6 +1301,8 @@ fn string_literal_fields(node: &ast::ExprStringLiteral) -> &str {
         range: _,
         node_index: _,
     } = node;
+    // `"a" "b"` and `"ab"` both yield "ab". The AST caches the joined text
+    // for the first spelling and lends the single literal's text for the second.
     value.to_str()
 }
 
