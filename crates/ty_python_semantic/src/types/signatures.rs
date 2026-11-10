@@ -1990,7 +1990,9 @@ impl<'db> Signature<'db> {
             && self.has_implicit_positional_receiver_annotation()
             && let Some((first, rest)) = self.parameters.as_slice().split_first()
             && matches!(first.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(output))
-            && !rest.iter().any(|parameter| parameter.annotated_type().contains_self(db, env))
+            && !rest
+                .iter()
+                .any(|parameter| parameter.annotated_type().contains_self(db, env))
         {
             // In `__new__(cls, ...) -> Self`, the class being constructed supplies the
             // receiver and fixes the returned instance. Keep other inference variables intact.

@@ -6869,7 +6869,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
-        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+        let cache_entry = expression_cache
+            .borrow()
+            .get(expression, tcx, self.index)
+            .cloned();
 
         match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
@@ -12929,10 +12932,60 @@ struct ExpressionCache<'db> {
 impl<'db> ExpressionCache<'db> {
     fn get(
         &self,
-        expression: ExpressionNodeKey,
+        expression: &ast::Expr,
         tcx: TypeContext<'db>,
+        index: &SemanticIndex<'db>,
     ) -> Option<&ExpressionCacheEntry<'db>> {
-        self.entries.get(&expression)?.get(tcx)
+        let key = ExpressionNodeKey::from(expression);
+        let entries = self.entries.get(&key)?;
+        if let Some(exact) = entries.get(tcx) {
+            return Some(exact);
+        }
+        let ExpressionCacheEntries::Single(previous, value) = entries else {
+            return None;
+        };
+        if !matches!(
+            expression,
+            ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Compare(_)
+                | ast::Expr::UnaryOp(_)
+        ) {
+            return None;
+        }
+        // A TypeForm context can select a different interpretation of the expression.
+        let ordinary = |context: TypeContext<'db>| {
+            !matches!(
+                context.declared_type(),
+                Some(
+                    Type::TypeForm(_)
+                        | Type::TypeAlias(_)
+                        | Type::Recursive(_)
+                        | Type::RecursiveVar(_)
+                        | Type::Union(_)
+                )
+            )
+        };
+        if !ordinary(*previous) || !ordinary(tcx) {
+            return None;
+        }
+        let ty = match value {
+            ExpressionCacheEntry::Small(ty) => *ty,
+            ExpressionCacheEntry::Full(full) => full.expression_type(key),
+        };
+        // Context can specialize a class, suppress literal promotion, or record a constraint
+        // for a collection initialized elsewhere. Replay other reads unchanged.
+        if matches!(
+            ty,
+            Type::LiteralValue(_) | Type::ClassLiteral(_) | Type::GenericAlias(_)
+        ) || index
+            .unannotated_collection_initializer(expression)
+            .is_some()
+        {
+            return None;
+        }
+        Some(value)
     }
 
     fn insert(
