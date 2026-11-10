@@ -1883,6 +1883,32 @@ reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
 reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
 ```
 
+## Receiver specialization with a class type parameter default
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A constructor argument can determine the receiver's specialization even when the class type
+parameter has a default:
+
+```py
+from typing import Any
+
+class Value[T]: ...
+
+type Scalar = int | Value[Any]
+
+class Box[T: Scalar = int | Any]:
+    def __init__[S: Scalar](self: "Box[S]", value: S) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def make_box(value: Value[str]):
+    reveal_type(Box(value))  # revealed: Box[Value[str]]
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py

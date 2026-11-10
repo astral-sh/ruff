@@ -4533,11 +4533,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             // of `ty` and `bound` is non-empty. Since `Never` is always a valid
                             // intersection if the types are disjoint, we don't need to perform any
                             // check here.
-                            self.add_type_mapping(
-                                bound_typevar,
-                                IntersectionType::from_two_elements(db, self.env, bound, ty),
-                                polarity,
-                            );
+                            // Keep S <= T as a range between variables. Intersecting T with
+                            // S's declared bound can distribute over a union and bury T inside
+                            // a concrete upper bound. The solver checks declared bounds separately.
+                            let upper = if ty
+                                .as_typevar()
+                                .is_some_and(|other| other.is_inferable(db, self.inferable))
+                            {
+                                ty
+                            } else {
+                                IntersectionType::from_two_elements(db, self.env, bound, ty)
+                            };
+                            self.add_type_mapping(bound_typevar, upper, polarity);
                             return Ok(());
                         }
                         if !ty
