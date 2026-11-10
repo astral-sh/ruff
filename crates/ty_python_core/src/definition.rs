@@ -956,7 +956,7 @@ pub enum DefinitionKind<'db> {
     NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
 
-impl<'db> DefinitionKind<'db> {
+impl DefinitionKind<'_> {
     pub(crate) fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
