@@ -3639,8 +3639,13 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 
 ## Nested calls with ambiguous union parameters
 
-A list argument can match either `T` or `list[T]`. Inferring the whole list as `T` through the first
-alternative should not add another list layer to the argument on the next inference pass.
+In `choose([], [])`, each `[]` initially has type `list[Unknown]`. It can match `T` with
+`T = list[Unknown]` or `list[T]` with `T = Unknown`. Both bindings contribute to the return type.
+
+We then revisit the same argument expressions using the specialized parameter types as context so
+that one argument can help determine the type of the other. The `list[T]` arm gives each `[]` an
+element type of `Unknown`. Using both bindings here would give the literal `list[Unknown] | Unknown`
+as its element type and could add another list layer each time we revisit it.
 
 ```py
 def choose[T](left: T | list[T], right: T | list[T]) -> list[T]:
