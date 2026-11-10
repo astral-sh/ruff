@@ -8,8 +8,8 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 ### `Final` with type
 
 A `Final` symbol in a module scope cannot be rebound, so a `Literal[…]` value it is initialized with
-is used as its type everywhere — not just locally, but also when it is accessed from another scope or
-imported from another module. This keeps statically known values intact, so a platform or version
+is used as its type everywhere — not just locally, but also when it is accessed from another scope
+or imported from another module. This keeps statically known values intact, so a platform or version
 check stored in a `Final` constant can prune branches. An explicit `Final[Unknown]` keeps the
 declared `Unknown` on the annotated assignment, while a bare `Final` takes its type from the value.
 
