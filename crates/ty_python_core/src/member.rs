@@ -605,23 +605,34 @@ impl std::fmt::Debug for MemberTable {
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
     table: MemberTable,
-    reverse: MemberReverseTable,
 }
 
 impl MemberTableBuilder {
-    pub(super) fn member_id<'a>(
-        &self,
-        member: impl Into<MemberExprRef<'a>>,
-    ) -> Option<ScopedMemberId> {
-        let member = member.into();
-        self.reverse.member_id(&self.table.members, &member)
-    }
-
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
-        let entry = self.reverse.entry(&self.table.members, &member);
+        if self.table.reverse.is_none() {
+            if let Some(id) = self.table.member_id(member.expression.as_ref()) {
+                self.table.members[id].flags.insert(member.flags);
+                return (id, false);
+            }
+            let id = self.table.members.push(member);
+            if self.table.members.len() > LINEAR_SEARCH_THRESHOLD {
+                let mut entries = hashbrown::HashTable::with_capacity(self.table.members.len());
+                let hash = |id: &ScopedMemberId| {
+                    let member = &self.table.members[*id];
+                    hash_single(&member.expression.as_ref())
+                };
+                for (id, _) in self.table.members.iter_enumerated() {
+                    entries.insert_unique(hash(&id), id, hash);
+                }
+                self.table.reverse = Some(Box::new(MemberReverseTable(entries)));
+            }
+            return (id, true);
+        }
+        let reverse = self.table.reverse.as_mut().unwrap();
+        let entry = reverse.entry(&self.table.members, &member);
 
         match entry {
             Entry::Occupied(entry) => {
@@ -642,17 +653,11 @@ impl MemberTableBuilder {
     }
 
     pub(super) fn build(self) -> MemberTable {
-        let Self {
-            mut table,
-            mut reverse,
-        } = self;
+        let mut table = self.table;
         table.members.shrink_to_fit();
-
-        if table.members.len() > LINEAR_SEARCH_THRESHOLD {
+        if let Some(reverse) = &mut table.reverse {
             reverse.shrink_to_fit(&table.members);
-            table.reverse = Some(Box::new(reverse));
         }
-
         table
     }
 }

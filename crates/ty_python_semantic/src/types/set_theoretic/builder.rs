@@ -1162,6 +1162,9 @@ impl<'db> UnionBuilder<'db> {
             {
                 true
             }
+            (Type::Callable(left), Type::Callable(right)) => left
+                .signatures(db)
+                .fixed_domains_incomparable(right.signatures(db)),
             (Type::BoundMethod(left), Type::BoundMethod(right))
                 if let (Type::LiteralValue(left), Type::LiteralValue(right)) =
                     (left.self_instance(db), right.self_instance(db))

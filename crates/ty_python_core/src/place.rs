@@ -370,9 +370,10 @@ impl PlaceTableBuilder {
 
     pub(crate) fn associated_place_ids(&self, place: ScopedPlaceId) -> &[ScopedMemberId] {
         match place {
-            ScopedPlaceId::Symbol(symbol) => &self.associated_symbol_members[symbol],
-            ScopedPlaceId::Member(member) => &self.associated_sub_members[member],
+            ScopedPlaceId::Symbol(symbol) => self.associated_symbol_members.get(symbol),
+            ScopedPlaceId::Member(member) => self.associated_sub_members.get(member),
         }
+        .map_or(&[], SmallVec::as_slice)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
@@ -387,23 +388,13 @@ impl PlaceTableBuilder {
     }
 
     pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let (id, is_new) = self.symbols.add(symbol);
-
-        if is_new {
-            let new_id = self.associated_symbol_members.push(SmallVec::new_const());
-            debug_assert_eq!(new_id, id);
-        }
-
-        (id, is_new)
+        self.symbols.add(symbol)
     }
 
     fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
-            let new_id = self.associated_sub_members.push(SmallVec::new_const());
-            debug_assert_eq!(new_id, id);
-
             let member = self.member.member(id);
 
             // iterate over parents
@@ -412,9 +403,17 @@ impl PlaceTableBuilder {
             {
                 match parent_id {
                     ScopedPlaceId::Symbol(scoped_symbol_id) => {
+                        if self.associated_symbol_members.len() <= scoped_symbol_id.index() {
+                            self.associated_symbol_members
+                                .resize(scoped_symbol_id.index() + 1, SmallVec::new_const());
+                        }
                         self.associated_symbol_members[scoped_symbol_id].push(id);
                     }
                     ScopedPlaceId::Member(scoped_member_id) => {
+                        if self.associated_sub_members.len() <= scoped_member_id.index() {
+                            self.associated_sub_members
+                                .resize(scoped_member_id.index() + 1, SmallVec::new_const());
+                        }
                         self.associated_sub_members[scoped_member_id].push(id);
                     }
                 }

@@ -169,6 +169,24 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    /// A callable pair with mutually incompatible positional or keyword requirements
+    /// cannot simplify to either member of a union.
+    pub(super) fn fixed_domains_incomparable(&self, other: &Self) -> bool {
+        let ([left], [right]) = (self.overloads.as_slice(), other.overloads.as_slice()) else {
+            return false;
+        };
+        if left.receiver_constraints().is_some() || right.receiver_constraints().is_some() {
+            return false;
+        }
+        let (Some(left), Some(right)) = (
+            left.parameters.data.fixed_call_domain,
+            right.parameters.data.fixed_call_domain,
+        ) else {
+            return false;
+        };
+        left.excludes(right) && right.excludes(left)
+    }
+
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
             overloads: smallvec_inline![signature],
@@ -5087,6 +5105,48 @@ pub(crate) enum ParametersKind<'db> {
     Concatenate(ConcatenateTail<'db>),
 }
 
+/// Necessary conditions for one fixed parameter list to accept every call to another.
+/// Colliding keyword bits fall back to the normal parameter comparison.
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+struct FixedCallDomain {
+    keywords: u64,
+    positional: u16,
+    required: u16,
+}
+
+impl FixedCallDomain {
+    fn of(parameters: &[Parameter<'_>], kind: ParametersKind<'_>) -> Option<Self> {
+        if kind != ParametersKind::Standard {
+            return None;
+        }
+        let mut domain = Self::default();
+        for parameter in parameters {
+            if parameter.is_variadic() || parameter.is_keyword_variadic() {
+                return None;
+            }
+            if parameter.is_positional() {
+                domain.positional = domain.positional.saturating_add(1);
+            }
+            if !parameter.has_default() {
+                domain.required = domain.required.saturating_add(1);
+            }
+            if let Some(keyword) = parameter.keyword_name() {
+                let hash = std::hash::BuildHasher::hash_one(&rustc_hash::FxBuildHasher, keyword);
+                domain.keywords |= 1 << (hash & 63);
+            }
+        }
+        Some(domain)
+    }
+
+    fn excludes(self, other: Self) -> bool {
+        self.positional < other.positional
+            || self.required > other.required
+            || other.keywords & !self.keywords != 0
+    }
+}
+
 /// Represents a list of parameters in a function signature.
 ///
 /// ## Representation
@@ -5107,6 +5167,7 @@ pub(crate) enum ParametersKind<'db> {
 // invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ParametersData<'db> {
+    fixed_call_domain: Option<FixedCallDomain>,
     // TODO: use SmallVec here once invariance bug is fixed
     value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
@@ -5155,7 +5216,11 @@ impl<'db> Parameters<'db> {
             return Self::empty();
         }
         Self {
-            data: Arc::new(ParametersData { value, kind }),
+            data: Arc::new(ParametersData {
+                fixed_call_domain: FixedCallDomain::of(&value, kind),
+                value,
+                kind,
+            }),
         }
     }
 
@@ -5308,6 +5373,7 @@ impl<'db> Parameters<'db> {
         thread_local! {
             static EMPTY: Parameters<'static> = Parameters {
                 data: Arc::new(ParametersData {
+                    fixed_call_domain: Some(FixedCallDomain::default()),
                     value: Box::default(),
                     kind: ParametersKind::Standard,
                 }),

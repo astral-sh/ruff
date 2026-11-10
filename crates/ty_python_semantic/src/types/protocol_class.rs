@@ -58,6 +58,11 @@ impl<'db> ClassType<'db> {
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
+    /// Wraps a class whose protocol status has already been established.
+    pub(super) fn from_protocol(class: ClassType<'db>) -> Self {
+        Self(class)
+    }
+
     /// Returns the protocol members of this class.
     ///
     /// A protocol's members define the interface declared by the protocol.
