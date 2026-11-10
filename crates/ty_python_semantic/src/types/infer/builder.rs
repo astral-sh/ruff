@@ -10156,6 +10156,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
         let revealed_type = self.revealed_type_for_call(&inferred);
+        let merged_field =
+            inferred.merged_field_return_type(db, env, &self.dataclass_field_specifiers);
         let mut bindings = inferred.into_bindings();
 
         self.report_deprecated_call(
@@ -10287,7 +10289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let return_ty = bindings.return_type(db, env);
+        let return_ty = merged_field.unwrap_or_else(|| bindings.return_type(db, env));
         let return_ty = match collection_initializer_class {
             Some(collection_class @ (KnownClass::List | KnownClass::Set))
                 if return_ty
@@ -13176,6 +13178,37 @@ impl<'args, 'call, 'db> CallArgumentInference<'args, 'call, 'db> {
         std::iter::once(&self.first)
             .chain(&self.rest)
             .map(|(bindings, arguments)| (bindings, arguments.as_ref()))
+    }
+
+    /// Each successful specialization of a field call can infer a different default type.
+    /// If the attempts agree on all other field options, they describe a single field.
+    fn merged_field_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        field_specifiers: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        let (first_bindings, _) = &self.first;
+        if self.rest.is_empty() || !field_specifiers.contains(&first_bindings.callable_type()) {
+            return None;
+        }
+        let field_for = |bindings: &Bindings<'db>| match bindings.return_type(db, env) {
+            Type::KnownInstance(KnownInstanceType::Field(field)) => Some(field),
+            _ => None,
+        };
+        let first = field_for(first_bindings)?;
+        let mut defaults = UnionBuilder::new(db, env).add(first.default_type(db)?);
+        for (bindings, _) in &self.rest {
+            let field = field_for(bindings)?;
+            let default = field.default_type(db)?;
+            if first.with_default_type(db, default) != field {
+                return None;
+            }
+            defaults.add_in_place(default);
+        }
+        Some(Type::KnownInstance(KnownInstanceType::Field(
+            first.with_default_type(db, defaults.build()),
+        )))
     }
 
     fn into_bindings(self) -> Bindings<'db> {

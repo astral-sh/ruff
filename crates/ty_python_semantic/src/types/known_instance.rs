@@ -760,6 +760,19 @@ pub struct FieldInstance<'db> {
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
+    pub(super) fn with_default_type(self, db: &'db dyn Db, default_type: Type<'db>) -> Self {
+        Self::new(
+            db,
+            Some(default_type),
+            self.init(db),
+            self.kw_only(db),
+            self.alias(db),
+            self.converter(db),
+            self.strict(db),
+            self.frozen(db),
+        )
+    }
+
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,

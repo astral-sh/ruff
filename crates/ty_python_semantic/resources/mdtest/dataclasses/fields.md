@@ -170,6 +170,23 @@ alice = Person(role="admin", name="Alice")
 bob = Person("Bob", 30)
 ```
 
+A field stays keyword-only when its factory's return type is compatible with both members of the
+declared union.
+
+```py
+from typing import Any
+
+def default_value() -> Any:
+    return None
+
+@dataclass
+class Entry:
+    value: str | None = field(default_factory=default_value, kw_only=True)
+    reveal_type(value)  # revealed: dataclasses.Field[str | None]
+
+Entry("value")  # error: [too-many-positional-arguments]
+```
+
 ## `KW_ONLY` sentinel
 
 The `KW_ONLY` sentinel is a marker, not a real attribute. It should not appear as an instance or
