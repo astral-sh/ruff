@@ -118,6 +118,35 @@ help: Replace with `S307`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
+## Renamed rules
+
+```toml
+[lint]
+preview = true
+select = ["ANN201", "RUF101"]
+```
+
+```py
+# snapshot: redirected-noqa
+def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
+    pass
+```
+
+```snapshot
+error[RUF101]: `missing-return-type-undocumented-public-function` is a redirect to `missing-return-type-public-function`
+ --> src/mdtest_snippet.py:2:26
+  |
+2 | def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `missing-return-type-public-function`
+  |
+1 | # snapshot: redirected-noqa
+  - def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
+2 + def f():  # ruff: ignore[missing-return-type-public-function]
+3 |     pass
+  |
+```
+
 ## Stable mode
 
 ```toml
