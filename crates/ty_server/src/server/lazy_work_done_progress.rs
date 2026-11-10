@@ -63,13 +63,7 @@ impl LazyWorkDoneProgress {
         };
 
         if let Some(token) = request_token {
-            if Self::send_begin(client, token.clone(), begin) {
-                work_done
-                    .inner
-                    .token
-                    .set(token)
-                    .expect("progress token should only be set once");
-            }
+            work_done.begin(token, begin);
         } else if capabilities.supports_work_done_progress() {
             // Use a string token because Zed does not support numeric tokens
             let token = ProgressToken::String(format!(
@@ -81,17 +75,9 @@ impl LazyWorkDoneProgress {
             let params = WorkDoneProgressCreateParams {
                 token: token.clone(),
             };
-            let response_handler = move |client: &Client, ()| {
-                if Self::send_begin(client, token.clone(), begin) {
-                    work_done
-                        .inner
-                        .token
-                        .set(token)
-                        .expect("progress token should only be set once");
-                }
-            };
-
-            client.send_deferred_request::<WorkDoneProgressCreateRequest>(params, response_handler);
+            client.send_deferred_request::<WorkDoneProgressCreateRequest>(params, move |_, ()| {
+                work_done.begin(token, begin);
+            });
         }
 
         work_done
@@ -105,7 +91,7 @@ impl LazyWorkDoneProgress {
 
     /// Sends a progress report with the given message and optional percentage.
     ///
-    /// Reports sent before the client acknowledges progress creation are dropped.
+    /// Drops updates until the client acknowledges creation or whenever the writer is busy.
     pub(super) fn report_progress(&self, message: impl Display, percentage: Option<u32>) {
         let Some(token) = self.inner.token.get() else {
             return;
@@ -124,12 +110,21 @@ impl LazyWorkDoneProgress {
             });
     }
 
-    fn send_begin(client: &Client, token: ProgressToken, begin: WorkDoneProgressBegin) -> bool {
-        client.try_send_notification::<lsp_types::ProgressNotification>(ProgressParams {
-            token,
-            value: serde_json::to_value(begin)
-                .expect("Failed to serialize work done progress begin"),
-        })
+    fn begin(&self, token: ProgressToken, begin: WorkDoneProgressBegin) {
+        if self
+            .inner
+            .client
+            .send_notification::<lsp_types::ProgressNotification>(ProgressParams {
+                token: token.clone(),
+                value: serde_json::to_value(begin)
+                    .expect("Failed to serialize work done progress begin"),
+            })
+        {
+            self.inner
+                .token
+                .set(token)
+                .expect("progress token should only be set once");
+        }
     }
 }
 

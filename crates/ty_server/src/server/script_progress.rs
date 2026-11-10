@@ -111,8 +111,11 @@ impl State {
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::time::Duration;
+
     use anyhow::{Context, Result, bail};
-    use crossbeam::channel::unbounded;
+    use crossbeam::channel::{Select, bounded, unbounded};
     use lsp_server::Message;
     use lsp_types::{ProgressParams, ProgressToken, WorkDoneProgressBegin};
 
@@ -167,6 +170,46 @@ mod tests {
             ]
         );
         assert!(actions.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn busy_writer_receives_begin_and_end_but_skips_intermediate_progress() -> Result<()> {
+        let (main_loop, _actions) = unbounded();
+        let (sender, messages) = bounded(0);
+        let (reported, report_finished) = bounded(0);
+        let reporter = thread::spawn(move || {
+            let progress = LazyWorkDoneProgress::new(
+                &Client::new(main_loop, sender),
+                Some(ProgressToken::String("scripts".into())),
+                WorkDoneProgressBegin {
+                    title: "Synchronizing scripts".into(),
+                    ..WorkDoneProgressBegin::default()
+                },
+                ResolvedClientCapabilities::WORK_DONE_PROGRESS,
+            );
+            progress.report_progress("1/2", None);
+            let _ = reported.send(());
+        });
+
+        // Observe the waiting sender without offering it a receiver for a nonblocking send.
+        let timeout = Duration::from_secs(5);
+        let mut ready = Select::new();
+        ready.recv(&messages);
+        ready
+            .ready_timeout(timeout)
+            .ok()
+            .context("timed out waiting for progress begin")?;
+        assert_eq!(
+            progress_notification(messages.recv_timeout(timeout)?)?,
+            "begin: "
+        );
+        report_finished.recv_timeout(timeout)?;
+        assert_eq!(
+            progress_notification(messages.recv_timeout(timeout)?)?,
+            "end: "
+        );
+        reporter.join().unwrap();
         Ok(())
     }
 
