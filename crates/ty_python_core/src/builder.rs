@@ -68,7 +68,7 @@ use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
     LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -3215,6 +3215,50 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         filtered_out
     }
 
+    fn declare_stub_parameters(&mut self, parameters: &'ast ast::Parameters) {
+        let parameters = parameters
+            .iter_non_variadic_params()
+            .map(|parameter| {
+                (
+                    &parameter.parameter,
+                    ParameterDefinitionNodeRef::Parameter(parameter),
+                )
+            })
+            .chain(parameters.vararg.as_deref().map(|p| {
+                (
+                    p,
+                    ParameterDefinitionNodeRef::VariadicPositionalParameter(p),
+                )
+            }))
+            .chain(
+                parameters
+                    .kwarg
+                    .as_deref()
+                    .map(|p| (p, ParameterDefinitionNodeRef::VariadicKeywordParameter(p))),
+            );
+        let mut definitions = Vec::new();
+        for (parameter, node) in parameters {
+            let (symbol, _) = self
+                .current_place_table_mut()
+                .add_symbol(Symbol::new(parameter.name.id().clone()));
+            let definition = self.create_definition(symbol.into(), node);
+            let annotated = parameter.annotation.is_some();
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
+            self.mark_place_bound(symbol.into());
+            if annotated {
+                self.mark_place_declared(symbol.into());
+            }
+            definitions.push(StubParameter {
+                symbol,
+                definition,
+                annotated,
+            });
+        }
+        self.current_use_def_map_mut().stub_parameters = Some(definitions);
+    }
+
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
         for parameter in parameters.iter_non_variadic_params() {
             self.declare_parameter(parameter);
@@ -3460,7 +3504,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| use_def_map_interner.intern(builder.finish()))
+                .map(|builder| use_def_map_interner.finish_scope(builder))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
@@ -3943,7 +3987,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters);
+                        if !builder.in_type_checking_block
+                            && !body.is_empty()
+                            && body.iter().all(|stmt| match stmt {
+                                ast::Stmt::Pass(_) => true,
+                                ast::Stmt::Expr(expr) => matches!(
+                                    expr.value.as_ref(),
+                                    ast::Expr::EllipsisLiteral(_) | ast::Expr::StringLiteral(_)
+                                ),
+                                _ => false,
+                            })
+                        {
+                            builder.declare_stub_parameters(parameters);
+                        } else {
+                            builder.declare_parameters(parameters);
+                        }
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()

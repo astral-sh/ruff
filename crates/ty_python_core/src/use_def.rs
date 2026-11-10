@@ -764,17 +764,6 @@ struct RetainedDefinitions<'db> {
 }
 
 impl<'db> RetainedDefinitions<'db> {
-    fn new(states: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>) -> Self {
-        let mut states = states.into_iter();
-
-        let unbound_state = states.next();
-        debug_assert_eq!(unbound_state, Some(DefinitionEntry::Undefined));
-
-        Self {
-            states: states.collect(),
-        }
-    }
-
     #[inline]
     fn get(&self, id: ScopedDefinitionId) -> DefinitionEntry<'db> {
         let index = id.index();
@@ -866,17 +855,111 @@ pub struct UseDefMap<'db> {
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
+#[derive(Debug)]
+pub(super) struct StubParameter<'db> {
+    pub(super) symbol: ScopedSymbolId,
+    pub(super) definition: Definition<'db>,
+    pub(super) annotated: bool,
+}
+
+struct ParameterLayout {
+    bindings: Arc<RetainedBindings>,
+    declarations: Arc<RetainedDeclarations>,
+    symbols: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+}
+
 /// Shares equivalent scope-local binding and declaration tables within a file.
 ///
 /// Their IDs are interpreted through each scope's own definitions and constraints, so
 /// identical tables can share storage without sharing the scope-specific data they reference.
 #[derive(Default)]
 pub(super) struct UseDefMapInterner {
+    parameter_layouts: FxHashMap<SmallVec<[bool; 8]>, ParameterLayout>,
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,
 }
 
 impl UseDefMapInterner {
+    pub(super) fn finish_scope<'db>(
+        &mut self,
+        mut builder: Box<UseDefMapBuilder<'db>>,
+    ) -> Arc<UseDefMap<'db>> {
+        let Some(parameters) = builder.stub_parameters.take() else {
+            return self.intern(builder.finish());
+        };
+        // With no body uses or assignments, the scope-local IDs depend only on the
+        // order of annotated and unannotated parameters. Duplicate parameter names
+        // have prior bindings, so build their definition-specific tables normally.
+        let distinct = parameters
+            .iter()
+            .enumerate()
+            .all(|(i, p)| p.symbol.index() == i);
+        let shape: SmallVec<[bool; 8]> = parameters.iter().map(|p| p.annotated).collect();
+        if distinct && let Some(layout) = self.parameter_layouts.get(&shape) {
+            // A body consisting solely of pass, ellipses, or docstrings introduces
+            // no lookups, predicates, or additional definitions. The whole layout
+            // is determined by the order and annotation status of its parameters.
+            debug_assert!(builder.bindings_by_use.is_empty());
+            debug_assert!(builder.symbol_states.is_empty() && builder.member_states.is_empty());
+            debug_assert!(
+                builder
+                    .range_reachability
+                    .iter()
+                    .all(|(_, info)| *info == RangeInfo::default())
+            );
+            debug_assert!(builder.enclosing_snapshots.is_empty());
+            return Arc::new(UseDefMap {
+                all_definitions: RetainedDefinitions {
+                    states: parameters
+                        .into_iter()
+                        .map(|p| DefinitionEntry::Unused(p.definition))
+                        .collect(),
+                },
+                constraint_tables: None,
+                interned_bindings: Arc::clone(&layout.bindings),
+                interned_declarations: Arc::clone(&layout.declarations),
+                range_reachability: Box::default(),
+                definitions_by_definition: FrozenMap::default(),
+                symbol_states: layout.symbols.clone(),
+                extra: None,
+                end_of_scope_reachability: builder.reachability,
+            });
+        }
+        for parameter in parameters {
+            let place = parameter.symbol.into();
+            if parameter.symbol.index() == builder.symbol_states.len() {
+                builder.add_place(place);
+            }
+            if parameter.annotated {
+                builder.record_combined_definition(
+                    place,
+                    parameter.definition,
+                    DefinitionCategory::DeclarationAndBinding,
+                );
+            } else {
+                builder.record_binding(
+                    place,
+                    parameter.definition,
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                    ImportedQualifierAction::Preserve,
+                );
+            }
+        }
+        let map = self.intern(builder.finish());
+        if distinct {
+            self.parameter_layouts.insert(
+                shape,
+                ParameterLayout {
+                    bindings: Arc::clone(&map.interned_bindings),
+                    declarations: Arc::clone(&map.interned_declarations),
+                    symbols: map.symbol_states.clone(),
+                },
+            );
+        }
+        map
+    }
+
     pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
         map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
         map.interned_declarations =
@@ -1723,16 +1806,9 @@ struct PendingReachability {
 
 impl Default for PendingReachability {
     fn default() -> Self {
-        let mut constraints = IndexVec::new();
-        let root = constraints.next_index();
-        constraints.push(PendingReachabilityConstraint {
-            parent: root,
-            reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
-        });
         Self {
-            constraints,
-            current: root,
+            constraints: IndexVec::new(),
+            current: PendingReachabilityId::new(0),
         }
     }
 }
@@ -1743,6 +1819,14 @@ impl PendingReachability {
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
+        // A straight-line scope has no edges to the root and never needs its arena.
+        if self.constraints.is_empty() {
+            self.constraints.push(PendingReachabilityConstraint {
+                parent: self.current,
+                reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+                narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            });
+        }
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             reachability_constraint,
@@ -2121,8 +2205,9 @@ pub(super) struct SingleSymbolSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
+    pub(super) stub_parameters: Option<Vec<StubParameter<'db>>>,
     /// Append-only history of declarations and bindings, including their usage state.
-    all_definitions: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>,
+    all_definitions: Vec<DefinitionEntry<'db>>,
 
     /// Builder of predicates.
     predicates: PredicatesBuilder<'db>,
@@ -2207,7 +2292,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(scope_kind: ScopeKind) -> Self {
         Self {
-            all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
+            stub_parameters: None,
+            all_definitions: Vec::new(),
             predicates: PredicatesBuilder::default(),
             predicate_narrowing_targets: Vec::new(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
@@ -2248,11 +2334,17 @@ impl<'db> UseDefMapBuilder<'db> {
     fn push_definition(&mut self, entry: DefinitionEntry<'db>) -> ScopedDefinitionId {
         // Declaration-only entries also change the type visible to an exception handler.
         self.checkpoint_state.record_binding_change();
-        self.all_definitions.push(entry)
+        self.all_definitions.push(entry);
+        ScopedDefinitionId::new(self.all_definitions.len())
     }
 
     pub(super) fn definition(&self, def_id: ScopedDefinitionId) -> DefinitionState<'db> {
-        self.all_definitions[def_id].state()
+        def_id
+            .index()
+            .checked_sub(1)
+            .map_or(DefinitionState::Undefined, |index| {
+                self.all_definitions[index].state()
+            })
     }
 
     pub(super) fn mark_unreachable(&mut self) {
@@ -2289,7 +2381,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn next_definition_id(&self) -> ScopedDefinitionId {
-        self.all_definitions.next_index()
+        ScopedDefinitionId::new(self.all_definitions.len() + 1)
     }
 
     /// Identifies the visible bindings and control-flow path observed by an exception handler.
@@ -3088,7 +3180,10 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
-        let entry = &mut self.all_definitions[definition_id];
+        let Some(index) = definition_id.index().checked_sub(1) else {
+            return;
+        };
+        let entry = &mut self.all_definitions[index];
         if let DefinitionEntry::Unused(definition) = *entry {
             *entry = DefinitionEntry::Used(definition);
         }
@@ -3159,6 +3254,9 @@ impl<'db> UseDefMapBuilder<'db> {
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
+        if num_symbols == self.symbol_states.len() && num_members == self.member_states.len() {
+            return;
+        }
         let undefined = PendingPlaceState::new(
             PlaceState::undefined(self.reachability),
             self.pending_reachability.current,
@@ -3382,7 +3480,9 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
-        let all_definitions = RetainedDefinitions::new(self.all_definitions);
+        let all_definitions = RetainedDefinitions {
+            states: self.all_definitions.into_boxed_slice(),
+        };
 
         UseDefMap {
             all_definitions,

@@ -1460,10 +1460,40 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        // For Base[T] an ordinary specialization substitutes its sole parameter
+        // directly. Parameter-specification components and tuple shapes carry
+        // additional state and continue through the general mapper.
+        if let TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
+            specialization: outer,
+            ..
+        }) = type_mapping
+            && self.tuple_inner(db).is_none()
+            && let [original @ Type::TypeVar(parameter)] = self.types(db)
+            && parameter.paramspec_attr(db).is_none()
+            && let Some(mapped) = outer.get(db, *parameter)
+        {
+            if mapped == *original {
+                return self;
+            }
+            return Self::new(
+                db,
+                self.generic_context(db),
+                [mapped].as_slice(),
+                self.materialization_kind(db),
+                None,
+            );
+        }
+
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
+            // Flipping any other mapping leaves it unchanged, so the formal type
+            // parameter's variance cannot affect this argument's transformation.
+            if !matches!(
+                type_mapping,
+                TypeMapping::Promote(..)
+                    | TypeMapping::ApplySpecializationWithMaterialization { .. }
+            ) {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
             match (typevar.variance(db), type_mapping) {

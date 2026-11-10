@@ -77,7 +77,11 @@ impl<'db> Type<'db> {
                 let header = origin.header(db);
                 match header.known {
                     Some(KnownClass::Tuple) => {
-                        return Self::tuple(TupleType::new(db, env, &builtin_tuple_spec(db, class)));
+                        return Self::tuple(TupleType::new(
+                            db,
+                            env,
+                            &builtin_tuple_spec(db, class),
+                        ));
                     }
                     Some(KnownClass::Object) => return Self::object(),
                     Some(known) if known.is_typed_dict_subclass() => {
@@ -963,6 +967,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .is_trivially_always_satisfied()
             {
                 return result;
+            }
+
+            if can_use_nominal_result_directly
+                && !self.is_context_collection_enabled()
+                && let Some(source) = source_protocol
+                && source.materialization_kind(db).is_none()
+                && protocol.materialization_kind(db).is_none()
+                && let (Some(ClassType::Generic(left)), Some(ClassType::Generic(right))) = (
+                    source.class_origin(db).map(|class| *class),
+                    protocol.class_origin(db).map(|class| *class),
+                )
+                && left.origin(db) == right.origin(db)
+                && let Some(required) =
+                    self.check_parameter_return_method(db, left.origin(db), source, protocol)
+            {
+                if required
+                    .implies(db, self.constraints, || nominally_satisfied)
+                    .is_trivially_always_satisfied()
+                {
+                    return nominally_satisfied;
+                }
             }
 
             // For union simplification, failing the nominal relation between two

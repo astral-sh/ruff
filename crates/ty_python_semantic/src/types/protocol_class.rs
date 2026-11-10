@@ -2539,7 +2539,52 @@ fn protocol_member_read_type<'db>(
     }
 }
 
+/// Finds an inexpensive required method to compare before expanding a generic protocol.
+#[salsa::tracked(returns(ref), cycle_result=|_,_,_| None, heap_size=get_size2::GetSize::get_heap_size)]
+fn parameter_return_method<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Name> {
+    let context = class.generic_context(db)?;
+    let mut vars = context.variables(db);
+    let var = vars.next()?;
+    if vars.next().is_some() {
+        return None;
+    }
+    let protocol = class.identity_specialization(db).into_protocol_class(db)?;
+    protocol.interface(db).members(db).find_map(|member| {
+        let method = member
+            .access(ProtocolMemberAccessMode::Instance)
+            .unbound_instance_method(db)?;
+        let [signature] = method.overloads.as_slice() else {
+            return None;
+        };
+        (signature.parameters().len() == 1 && signature.return_ty == Type::TypeVar(var))
+            .then(|| Name::new(member.name()))
+    })
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Every structural solution must satisfy this member. Compare the specialized
+    /// signatures using the same receiver and return rules as the full interface.
+    pub(super) fn check_parameter_return_method(
+        &self,
+        db: &'db dyn Db,
+        origin: StaticClassLiteral<'db>,
+        source: ProtocolInstanceType<'db>,
+        target: ProtocolInstanceType<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let name = parameter_return_method(db, origin).as_ref()?;
+        let source_member = source.interface(db).member_by_name(db, name)?;
+        let target_member = target.interface(db).member_by_name(db, name)?;
+        self.try_check_nullary_methods(
+            db,
+            source_member
+                .access(ProtocolMemberAccessMode::Instance)
+                .unbound_instance_method(db)?,
+            target_member
+                .access(ProtocolMemberAccessMode::Instance)
+                .unbound_instance_method(db)?,
+        )
+    }
+
     /// Prove receiver compatibility without unfolding two instances of the same protocol.
     ///
     /// A target receiver restriction `P[B]` implies a source restriction `P[A]` if `P[B]`
