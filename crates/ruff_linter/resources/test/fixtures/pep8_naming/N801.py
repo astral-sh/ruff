@@ -41,3 +41,28 @@ class GOOD:
 
 class __GoodClass:
     pass
+
+
+# A trailing underscore avoids a clash with a keyword (PEP 8), see #30230
+class Good_:
+    pass
+
+
+class _Good_:
+    pass
+
+
+class __Good__:
+    pass
+
+
+class bad_:
+    pass
+
+
+class Bad_Class_:
+    pass
+
+
+class _:
+    pass
