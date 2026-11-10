@@ -4560,6 +4560,29 @@ def update_any_setter(value: HasAnySetter) -> None:
     value.value = object()
 ```
 
+## Comparing specializations of a protocol with a getter and a setter
+
+A getter checks the type argument covariantly. The setter also has to accept every value its caller
+can supply.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Buffer[T](Protocol):
+    def get(self) -> T: ...
+    def put(self, value: T, /) -> None: ...
+
+static_assert(not is_assignable_to(Buffer[int], Buffer[object]))
+static_assert(not is_assignable_to(Buffer[object], Buffer[int]))
+```
+
 ## Variance of generic protocols with `Final` members
 
 A `Final` attribute is readable but not writable, so it constrains an inferred type parameter

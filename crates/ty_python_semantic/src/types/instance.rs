@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 
 use itertools::Itertools;
 
+use super::class::ClassInstanceFlags;
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
@@ -73,7 +74,6 @@ impl<'db> Type<'db> {
             | ClassLiteral::DynamicEnum(_) => literal.inherits_from_explicit_any(db),
             ClassLiteral::DynamicTypedDict(_) => return Self::typed_dict(class),
             ClassLiteral::Static(origin) => {
-                use super::class::ClassInstanceFlags;
                 let header = origin.header(db);
                 match header.known {
                     Some(KnownClass::Tuple) => {

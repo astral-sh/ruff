@@ -62,7 +62,6 @@ pub fn unique_wildcard_sources<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
 ) -> FxHashMap<Name, ty_module_resolver::Module<'db>> {
-    use ruff_python_ast::visitor::{Visitor, walk_expr};
     struct Writes<'a>(&'a mut FxHashSet<Name>);
     impl<'a> Visitor<'a> for Writes<'_> {
         fn visit_expr(&mut self, expr: &'a ast::Expr) {
