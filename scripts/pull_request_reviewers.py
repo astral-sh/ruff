@@ -113,7 +113,6 @@ def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
         and pull["state"] == "open"
         and not pull["draft"]
         and pull["base"]["repo"]["id"] == REPOSITORY_ID
-        and (pull["head"]["repo"] or {}).get("id") == REPOSITORY_ID
         and pull["head"]["sha"] == head_sha
     )
 
