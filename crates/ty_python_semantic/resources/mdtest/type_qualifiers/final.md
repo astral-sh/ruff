@@ -7,13 +7,15 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 
 ### `Final` with type
 
-Declared symbols that are additionally qualified with `Final` use the declared type when accessed
-from another scope. Local uses of the symbol will use the inferred type, which may be more specific:
+A symbol annotated with `Final[T]` uses its declared type when accessed from another scope. A local
+read can narrow to the assigned value. An explicit `Final[Unknown]` keeps the declared `Unknown` on
+the annotated assignment, while a bare `Final` takes its type from the value.
 
 `mod.py`:
 
 ```py
 from typing import Final, Annotated
+from ty_extensions._internal import Unknown
 
 FINAL_A: Final[int] = 1
 FINAL_B: Annotated[Final[int], "the annotation for FINAL_B"] = 1
@@ -21,12 +23,16 @@ FINAL_C: Final[Annotated[int, "the annotation for FINAL_C"]] = 1
 FINAL_D: "Final[int]" = 1
 FINAL_F: Final[int]
 FINAL_F = 1
+FINAL_G: Final[Unknown] = b""
+FINAL_H: Final = b""
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
 reveal_type(FINAL_B)  # revealed: Literal[1]
 reveal_type(FINAL_C)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
-reveal_type(FINAL_D)  # revealed: Literal[1]
+reveal_type(FINAL_F)  # revealed: Literal[1]
+reveal_type(FINAL_G)  # revealed: Unknown
+reveal_type(FINAL_H)  # revealed: Literal[b""]
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: int
@@ -34,18 +40,22 @@ def nonlocal_uses():
     reveal_type(FINAL_C)  # revealed: int
     reveal_type(FINAL_D)  # revealed: int
     reveal_type(FINAL_F)  # revealed: int
+    reveal_type(FINAL_G)  # revealed: Unknown
+    reveal_type(FINAL_H)  # revealed: Literal[b""]
 ```
 
 Imported types:
 
 ```py
-from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F
+from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F, FINAL_G, FINAL_H
 
 reveal_type(FINAL_A)  # revealed: int
 reveal_type(FINAL_B)  # revealed: int
 reveal_type(FINAL_C)  # revealed: int
 reveal_type(FINAL_D)  # revealed: int
 reveal_type(FINAL_F)  # revealed: int
+reveal_type(FINAL_G)  # revealed: Unknown
+reveal_type(FINAL_H)  # revealed: Literal[b""]
 ```
 
 ### Bare `Final` without a type
@@ -75,6 +85,46 @@ from mod import FINAL_A
 reveal_type(FINAL_A)  # revealed: Literal[1]
 ```
 
+The contents of a final list remain mutable. A bare `Final` infers the same element type as an
+unannotated list.
+
+```py
+from typing import Final
+
+items: Final = [None]
+reveal_type(items)  # revealed: list[None | Unknown]
+items.append(1)  # ok
+```
+
+### Conditional type argument
+
+A public read combines the inferred value on a bare `Final` branch with the declared type on the
+other branch. Unreachable declarations do not contribute.
+
+```py
+from typing import Final
+
+def flag() -> bool:
+    return True
+
+if flag():
+    value: Final = "a"
+    possibly_unbound: Final
+else:
+    value: Final[int] = 0
+    possibly_unbound: Final[int] = 0
+
+if False:
+    always_typed: Final = "a"
+else:
+    always_typed: Final[int] = 0
+
+def read():
+    reveal_type(value)  # revealed: Literal["a"] | int
+    reveal_type(possibly_unbound)  # revealed: int
+    reveal_type(always_typed)  # revealed: int
+```
+
 ### In class definitions
 
 ```py
@@ -89,6 +139,7 @@ class C:
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
         self.FINAL_E = 1
+        self.FINAL_F: Final = reveal_type(bytes.fromhex("fd"))  # revealed: bytes
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -98,6 +149,56 @@ reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
 reveal_type(C().FINAL_D)  # revealed: Literal[1]
 reveal_type(C().FINAL_E)  # revealed: int
+```
+
+### Inferring a final attribute from its initializer
+
+A bare `Final` uses the type inferred in `__init__`. An explicit `Final[Unknown]` narrows inside
+`__init__` and exposes `Unknown` to callers.
+
+```py
+from typing import Final
+from ty_extensions._internal import Unknown
+
+class C:
+    inferred: Final
+    declared: Final[Unknown]
+
+    def __init__(self):
+        self.inferred = bytes.fromhex("fd")
+        reveal_type(self.inferred)  # revealed: bytes
+        self.declared = "data".encode()
+        reveal_type(self.declared)  # revealed: bytes
+
+    def reset(self):
+        self.inferred = 1  # error: [invalid-assignment]
+
+reveal_type(C().inferred)  # revealed: bytes
+reveal_type(C().declared)  # revealed: Unknown
+
+class Child(C):
+    def __init__(self):
+        self.inferred = b""  # error: [invalid-assignment]
+
+reveal_type(Child().inferred)  # revealed: bytes
+```
+
+Each branch infers its initializer independently. Copying an `Any` preserves its type even when
+another branch assigns an integer to the same attribute.
+
+```py
+from copy import copy
+from typing import Any
+
+class D:
+    value: Final
+
+    def __init__(self, flag: bool, dynamic: Any):
+        if flag:
+            self.value = copy(dynamic)
+            reveal_type(self.value)  # revealed: Any
+        else:
+            self.value = 1
 ```
 
 ### Recursive bare `Final` instance attribute
@@ -1187,7 +1288,7 @@ class Derived(Base):
 
 ### Instance `Final` declared in `__init__`
 
-Instance attributes declared as `Final` in `__init__` should also prevent overrides in subclasses:
+The subclass initializer cannot reassign a final attribute declared in the base class initializer.
 
 ```py
 from typing import Final
@@ -1197,9 +1298,21 @@ class Base:
         self.x: Final[int] = 1
 
 class Derived(Base):
-    # TODO: This should be an error, but instance attribute override checking is not yet supported
     def __init__(self):
-        self.x = 2
+        self.x = 2  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to inherited final attribute `x`
+ --> src/mdtest_snippet.py:9:9
+  |
+5 |         self.x: Final[int] = 1
+  |                 ---------- Attribute declared as `Final` here
+6 |
+7 | class Derived(Base):
+8 |     def __init__(self):
+9 |         self.x = 2  # snapshot: invalid-assignment
+  |         ^^^^^^ Only the class that declares a final attribute can initialize it
 ```
 
 ### Private (name-mangled) members are not checked
@@ -1212,8 +1325,15 @@ from typing import Final
 class Base:
     __X: Final[int] = 1
 
+    def __init__(self):
+        self.__value: Final[int] = 1
+
 class Derived(Base):
     __X = 2  # No error: name mangling means these are different attributes
+
+    def __init__(self):
+        super().__init__()
+        self.__value = 2  # ok
 ```
 
 ## Syntax and usage
@@ -1505,6 +1625,10 @@ from typing import Final
 
 DECLARED_THEN_BOUND: Final[int]
 DECLARED_THEN_BOUND = 1
+
+HEADER: Final
+HEADER = bytes.fromhex("fd")
+reveal_type(HEADER)  # revealed: bytes
 ```
 
 ### No assignment
@@ -1586,7 +1710,8 @@ del MODULE_FINAL
 
 ### Stub file `Final` without value
 
-In stub files, `Final` declarations without a value are permitted, at both module and class scope.
+In stubs, a `Final` declaration binds the name even when it omits the value. A bare `Final` with no
+initializer or with an ellipsis placeholder has type `Unknown`.
 
 `stub.pyi`:
 
@@ -1594,9 +1719,25 @@ In stub files, `Final` declarations without a value are permitted, at both modul
 from typing import Final
 
 STUB_FINAL: Final[int]
+UNTYPED: Final
 
 class StubClass:
     STUB_ATTR: Final[str]
+    placeholder: Final = ...
+```
+
+`main.py`:
+
+```py
+from stub import STUB_FINAL, UNTYPED, StubClass
+
+reveal_type(STUB_FINAL)  # revealed: int
+reveal_type(UNTYPED)  # revealed: Unknown
+reveal_type(StubClass().STUB_ATTR)  # revealed: str
+reveal_type(StubClass().placeholder)  # revealed: Unknown
+
+UNTYPED = 1  # error: [invalid-assignment]
+StubClass().placeholder = 1  # error: [invalid-assignment]
 ```
 
 ### Conditional assignment in `__init__`

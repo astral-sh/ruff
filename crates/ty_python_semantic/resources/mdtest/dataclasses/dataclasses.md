@@ -1895,6 +1895,17 @@ c = C(1)
 c.instance_variable = 2
 ```
 
+A bare `Final` field uses its default value to infer the constructor parameter type.
+
+```py
+@dataclass
+class Image:
+    data: Final = bytes.fromhex("fd")
+
+reveal_type(Image(b"bytes").data)  # revealed: bytes
+Image("fd")  # error: [invalid-argument-type]
+```
+
 ## Inheritance
 
 ### Normal class inheriting from a dataclass

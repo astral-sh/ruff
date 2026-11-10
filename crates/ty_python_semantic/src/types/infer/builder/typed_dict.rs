@@ -20,7 +20,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    ClassType, DeclaredType, IntersectionType, KnownClass, Type, TypeContext, TypedDictType,
     TypingModule, any_over_type,
 };
 use ty_python_core::definition::Definition;
@@ -196,7 +196,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let annotation = self.infer_extra_items_kwarg(&kw.value);
                         extra_items = Some(TypedDictOpenness::extra(
                             db,
-                            annotation.inner_type(),
+                            annotation.inner_type().unwrap_or_else(Type::unknown),
                             annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                         ));
                     }
@@ -730,7 +730,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             schema.insert(
                 Name::new(key_literal.value(db)),
                 functional_typed_dict_field(
-                    annotation.inner_type(),
+                    annotation.inner_type().unwrap_or_else(Type::unknown),
                     annotation.qualifiers(),
                     total,
                 ),
@@ -763,7 +763,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn infer_typeddict_field(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
+    fn infer_typeddict_field(&mut self, value: &ast::Expr) -> DeclaredType<'db> {
         let annotation = self.infer_annotation_expression(value, self.deferred_state);
         for qualifier in TypeQualifier::iter() {
             if !qualifier.is_valid_in_typeddict_field()
@@ -783,7 +783,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation
     }
 
-    pub(super) fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
+    pub(super) fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> DeclaredType<'db> {
         let annotation = self.infer_annotation_expression(value, self.deferred_state);
         for qualifier in TypeQualifier::iter() {
             if qualifier != TypeQualifier::ReadOnly
