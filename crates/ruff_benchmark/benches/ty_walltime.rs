@@ -254,6 +254,7 @@ fn colour_science(bencher: Bencher) {
 
 #[bench(sample_size = 1, sample_count = 2)]
 fn numpy(bencher: Bencher) {
+    // Checking NumPy and its tests on a single thread takes too long for CI.
     run_multithreaded(bencher, &NUMPY);
 }
 
@@ -269,6 +270,7 @@ fn sympy(bencher: Bencher) {
 
 #[bench(sample_size = 3, sample_count = 8)]
 fn multithreaded(bencher: Bencher) {
+    // Use the same workload as `altair` so we can compare single- and multithreaded check times.
     run_multithreaded(bencher, &ALTAIR);
 }
 
