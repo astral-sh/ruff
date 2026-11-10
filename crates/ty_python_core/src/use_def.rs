@@ -874,11 +874,17 @@ pub struct UseDefMap<'db> {
 pub(super) struct UseDefMapInterner {
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,
-    stub_parameters: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
+    stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
 }
 
-/// A stub body has no name uses or control flow. Its local binding tables depend only on which
-/// parameters have annotations; definition IDs in these tables are scope-local ordinals.
+/// Binding and declaration tables for a function whose body contains only `pass` or `...`.
+/// Each distinct parameter binds its symbol once. An annotated parameter also declares it.
+/// These functions share a layout because the tables refer to definitions by scope-local index.
+///
+/// ```python
+/// def first(x: int, y): ...
+/// def second(a: str, b): pass
+/// ```
 struct StubParameterLayout {
     bindings: Arc<RetainedBindings>,
     declarations: Arc<RetainedDeclarations>,
@@ -892,7 +898,50 @@ pub(super) struct StubParameter<'db> {
     pub(super) annotated: bool,
 }
 
+impl StubParameterLayout {
+    /// Returns the annotation pattern in definition order. A repeated symbol shadows an
+    /// earlier parameter, so the annotation pattern alone cannot describe that scope.
+    fn key(parameters: &[StubParameter<'_>]) -> Option<SmallVec<[bool; 8]>> {
+        let mut key = SmallVec::with_capacity(parameters.len());
+        for (index, parameter) in parameters.iter().enumerate() {
+            if parameter.symbol.index() != index {
+                return None;
+            }
+            key.push(parameter.annotated);
+        }
+        Some(key)
+    }
+
+    /// Pairs the shared tables with the definitions their indices refer to in this function.
+    /// The function also keeps its own reachability information for source ranges.
+    fn instantiate<'db>(
+        &self,
+        parameters: Vec<StubParameter<'db>>,
+        builder: &mut UseDefMapBuilder<'db>,
+    ) -> UseDefMap<'db> {
+        UseDefMap {
+            all_definitions: RetainedDefinitions {
+                states: parameters
+                    .into_iter()
+                    .map(|p| DefinitionEntry::Unused(p.definition))
+                    .collect(),
+            },
+            constraint_tables: None,
+            interned_bindings: Arc::clone(&self.bindings),
+            interned_declarations: Arc::clone(&self.declarations),
+            range_reachability: builder.finish_ranges(),
+            definitions_by_definition: FrozenMap::default(),
+            symbol_states: self.symbols.clone(),
+            extra: None,
+            end_of_scope_reachability: builder.reachability,
+        }
+    }
+}
+
 impl UseDefMapInterner {
+    /// Reuses the layout of an earlier stub in this file when the same parameter positions
+    /// have annotations. The first occurrence and signatures with duplicate names build
+    /// their binding and declaration tables from the individual parameters.
     pub(super) fn finish<'db>(
         &mut self,
         mut builder: Box<UseDefMapBuilder<'db>>,
@@ -900,69 +949,18 @@ impl UseDefMapInterner {
         let Some(parameters) = builder.stub_parameters.take() else {
             return self.intern(builder.finish());
         };
-        // Duplicate names in invalid signatures have real previous definitions, specific to
-        // this scope. Let the general builder handle them.
-        let unique = parameters
-            .iter()
-            .enumerate()
-            .all(|(i, p)| p.symbol.index() == i);
-        let shape = unique.then(|| {
-            parameters
-                .iter()
-                .map(|p| p.annotated)
-                .collect::<SmallVec<[_; 8]>>()
-        });
+        let shape = StubParameterLayout::key(&parameters);
         if let Some(layout) = shape
             .as_ref()
-            .and_then(|shape| self.stub_parameters.get(shape))
+            .and_then(|shape| self.stub_layouts.get(shape))
         {
-            return Arc::new(UseDefMap {
-                all_definitions: RetainedDefinitions {
-                    states: parameters
-                        .into_iter()
-                        .map(|p| DefinitionEntry::Unused(p.definition))
-                        .collect(),
-                },
-                constraint_tables: None,
-                interned_bindings: Arc::clone(&layout.bindings),
-                interned_declarations: Arc::clone(&layout.declarations),
-                range_reachability: builder.finish_ranges(),
-                definitions_by_definition: FrozenMap::default(),
-                symbol_states: layout.symbols.clone(),
-                extra: None,
-                end_of_scope_reachability: builder.reachability,
-            });
+            return Arc::new(layout.instantiate(parameters, &mut builder));
         }
 
-        for StubParameter {
-            symbol,
-            definition,
-            annotated,
-        } in parameters
-        {
-            let place = symbol.into();
-            if symbol == builder.symbol_states.next_index() {
-                builder.add_place(place);
-            }
-            if annotated {
-                builder.record_combined_definition(
-                    place,
-                    definition,
-                    DefinitionCategory::DeclarationAndBinding,
-                );
-            } else {
-                builder.record_binding(
-                    place,
-                    definition,
-                    PreviousDefinitions::AreShadowed,
-                    FutureDefinitions::ShadowThisOne,
-                    ImportedQualifierAction::Preserve,
-                );
-            }
-        }
+        builder.record_stub_parameters(parameters);
         let map = self.intern(builder.finish());
         if let Some(shape) = shape {
-            self.stub_parameters.insert(
+            self.stub_layouts.insert(
                 shape,
                 StubParameterLayout {
                     bindings: Arc::clone(&map.interned_bindings),
@@ -3288,9 +3286,41 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
+    /// Records deferred stub parameters in definition order so duplicate names retain
+    /// their earlier bindings and declarations during construction.
+    fn record_stub_parameters(&mut self, parameters: Vec<StubParameter<'db>>) {
+        for StubParameter {
+            symbol,
+            definition,
+            annotated,
+        } in parameters
+        {
+            let place = symbol.into();
+            if symbol == self.symbol_states.next_index() {
+                self.add_place(place);
+            }
+            if annotated {
+                self.record_combined_definition(
+                    place,
+                    definition,
+                    DefinitionCategory::DeclarationAndBinding,
+                );
+            } else {
+                self.record_binding(
+                    place,
+                    definition,
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                    ImportedQualifierAction::Preserve,
+                );
+            }
+        }
+    }
+
+    /// Drops the default ranges that served as barriers between non-contiguous ranges
+    /// with the same reachability while building the map.
     fn finish_ranges(&mut self) -> Box<[(TextRange, RangeInfo)]> {
         let mut ranges = std::mem::take(&mut self.range_reachability);
-        // Default ranges are barriers while building; absence represents the default in the map.
         ranges.retain(|(_, info)| *info != RangeInfo::default());
         ranges.into_boxed_slice()
     }

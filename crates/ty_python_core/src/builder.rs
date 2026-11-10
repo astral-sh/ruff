@@ -3201,50 +3201,57 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+        use ParameterDefinitionNodeRef::{
+            Parameter, VariadicKeywordParameter, VariadicPositionalParameter,
+        };
+
         let nodes = parameters
             .iter_non_variadic_params()
-            .map(|p| (ParameterDefinitionNodeRef::Parameter(p), &p.parameter))
-            .chain(parameters.vararg.as_deref().map(|p| {
-                (
-                    ParameterDefinitionNodeRef::VariadicPositionalParameter(p),
-                    p,
-                )
-            }))
+            .map(Parameter)
             .chain(
                 parameters
-                    .kwarg
+                    .vararg
                     .as_deref()
-                    .map(|p| (ParameterDefinitionNodeRef::VariadicKeywordParameter(p), p)),
-            );
+                    .map(VariadicPositionalParameter),
+            )
+            .chain(parameters.kwarg.as_deref().map(VariadicKeywordParameter));
         if is_stub_body {
-            let mut stub_parameters = Vec::with_capacity(parameters.len());
-            for (node, parameter) in nodes {
-                let (symbol, _) = self
-                    .current_place_table_mut()
-                    .add_symbol(Symbol::new(parameter.name.id().clone()));
-                let info = self.current_place_table_mut().symbol_mut(symbol);
-                info.mark_bound();
-                info.mark_parameter();
-                let annotated = parameter.annotation.is_some();
-                if annotated {
-                    info.mark_declared();
-                }
-                let definition = self.create_definition(symbol.into(), node);
-                stub_parameters.push(StubParameter {
-                    symbol,
-                    definition,
-                    annotated,
-                });
-            }
-            self.current_use_def_map_mut().stub_parameters = Some(stub_parameters);
+            let parameters = nodes
+                .map(|node| self.declare_stub_parameter(node))
+                .collect();
+            self.current_use_def_map_mut().stub_parameters = Some(parameters);
         } else {
-            for (node, parameter) in nodes {
-                let symbol = self.add_symbol(parameter.name.id().clone());
+            for node in nodes {
+                let symbol = self.add_symbol(node.parameter().name.id().clone());
                 self.add_definition(symbol.into(), node);
                 self.current_place_table_mut()
                     .symbol_mut(symbol)
                     .mark_parameter();
             }
+        }
+    }
+
+    /// Creates the definition now so the semantic index can resolve the parameter's AST node.
+    /// Its binding and optional declaration are recorded when the scope's use-def map is finished.
+    fn declare_stub_parameter(
+        &mut self,
+        node: ParameterDefinitionNodeRef<'ast>,
+    ) -> StubParameter<'db> {
+        let parameter = node.parameter();
+        let (symbol, _) = self
+            .current_place_table_mut()
+            .add_symbol(Symbol::new(parameter.name.id().clone()));
+        let info = self.current_place_table_mut().symbol_mut(symbol);
+        info.mark_bound();
+        info.mark_parameter();
+        let annotated = parameter.annotation.is_some();
+        if annotated {
+            info.mark_declared();
+        }
+        StubParameter {
+            symbol,
+            definition: self.create_definition(symbol.into(), node),
+            annotated,
         }
     }
 
