@@ -2506,9 +2506,10 @@ be `list[int] | list[list[int] | int]`. Matching that union against the paramete
 `T = list[list[int] | int] | list[int] | int`. Each pass would add another list layer until we hit
 the iteration limit.
 
-When we revisit `[1]`, we specialize the `list[T]` arm with the binding it contributed, `T = int`.
-That gives the literal an expected element type of `int`, so its type stays `list[int]`. Both
-bindings still contribute to the return type, `list[list[int] | int]`.
+To avoid this, when we revisit `[1]`, we specialize the `list[T]` arm with the binding it
+contributed, `T = int`. That gives the literal just an expected element type of `int`, so its type
+stays `list[int]` and inference converges. Both bindings still contribute to the return type,
+`list[list[int] | int]`.
 
 ```py
 from typing import TypeVar
