@@ -1319,6 +1319,31 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    /// Restricts this specialization to only include the typevars in a generic context. If the
+    /// specialization does not include all of those typevars, returns `None`.
+    pub(crate) fn restrict(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Option<Self> {
+        let self_variables = self.generic_context(db).variables_inner(db);
+        let self_types = self.types(db);
+        let restricted_variables = generic_context.variables(db);
+        let restricted_types: Option<Box<[_]>> = restricted_variables
+            .map(|variable| {
+                let index = self_variables.get_index_of(&variable.identity(db))?;
+                self_types.get(index).copied()
+            })
+            .collect();
+        Some(Self::new(
+            db,
+            generic_context,
+            restricted_types?,
+            self.materialization_kind(db),
+            None,
+        ))
+    }
+
     /// Returns the tuple spec for a specialization of the `tuple` class.
     pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
         self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
