@@ -3995,7 +3995,11 @@ impl<'db> CallableBinding<'db> {
         // Signature details and provisional inference need the types of losing candidates too.
         // An expandable `*args` can also change which parameters the arguments match.
         if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
-            self.check_overloads_deferring_literal_mismatches(call_arguments.as_ref(), check_types);
+            self.check_overloads_deferring_literal_mismatches(
+                db,
+                call_arguments.as_ref(),
+                check_types,
+            );
         } else {
             for (_, overload) in self.matching_overloads_mut() {
                 check_types(overload);
@@ -4288,17 +4292,18 @@ impl<'db> CallableBinding<'db> {
         snapshotter.restore(self, post_evaluation_snapshot);
     }
 
-    /// Defer type checking for overloads ruled out by a string literal. If another candidate
+    /// Defer type checking for overloads ruled out by a literal argument. If another candidate
     /// matches, we can skip inference for those overloads entirely.
     fn check_overloads_deferring_literal_mismatches(
         &mut self,
+        db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         check_types: impl Fn(&mut Binding<'db>),
     ) {
         let mut literal_mismatches = SmallVec::<[_; 4]>::new();
         let mut found_match = false;
         for (_, overload) in self.matching_overloads_mut() {
-            if overload.has_disjoint_literal_argument(arguments) {
+            if overload.has_disjoint_literal_argument(db, arguments) {
                 literal_mismatches.push(overload);
             } else {
                 check_types(overload);
@@ -9180,10 +9185,13 @@ impl<'db> Binding<'db> {
         self.argument_matches = matcher.finish(db, env);
     }
 
-    /// A concrete string cannot satisfy a different literal-key parameter, irrespective of
-    /// type variables in the rest of the signature. In an overload set this often distinguishes
-    /// a single candidate before generic inference, for example for a `TypedDict` lookup.
-    fn has_disjoint_literal_argument(&self, arguments: &CallArguments<'_, 'db>) -> bool {
+    /// A disjoint literal argument rules out an overload regardless of how its type variables
+    /// are specialized. For example, a `TypedDict` lookup can skip overloads for other literal keys.
+    fn has_disjoint_literal_argument(
+        &self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
         if self.is_partial_application
             || self
                 .signature
@@ -9211,13 +9219,13 @@ impl<'db> Binding<'db> {
                     return false;
                 }
                 let declared = parameter.annotated_type();
-                let Some(expected) = declared.as_string_literal() else {
+                let Some(expected) = declared.as_literal_value() else {
                     return false;
                 };
                 argument
                     .matched_type(declared, matched.argument_type)
-                    .and_then(Type::as_string_literal)
-                    .is_some_and(|actual| actual != expected)
+                    .and_then(Type::as_literal_value)
+                    .is_some_and(|actual| actual.is_disjoint_from(db, expected))
             })
     }
 

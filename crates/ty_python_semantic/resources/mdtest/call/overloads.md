@@ -133,6 +133,26 @@ def use(key: Literal["text"]):
     select(key, 1)  # error: [no-matching-overload]
 ```
 
+### Overloads distinguished by a boolean literal
+
+A literal flag selects the return type. A plain `bool` can select either overload.
+
+```py
+from typing import Literal, overload
+
+@overload
+def read(binary: Literal[True]) -> bytes: ...
+@overload
+def read(binary: Literal[False]) -> str: ...
+def read(binary: bool) -> bytes | str:
+    return b"" if binary else ""
+
+def use(binary: bool):
+    reveal_type(read(True))  # revealed: bytes
+    reveal_type(read(False))  # revealed: str
+    reveal_type(read(binary))  # revealed: bytes | str
+```
+
 ### Multiple matches
 
 `overloaded.pyi`:
