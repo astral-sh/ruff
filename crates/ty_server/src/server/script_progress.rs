@@ -32,8 +32,9 @@ impl ScriptProgress {
         let mut current = self.current.lock().ok()?;
         let shared = current.upgrade().unwrap_or_else(|| {
             let shared = Arc::new(SharedProgress {
-                work_done: LazyWorkDoneProgress::new_on_main_loop(
+                work_done: LazyWorkDoneProgress::new(
                     client,
+                    None,
                     WorkDoneProgressBegin {
                         title: "Synchronizing scripts".to_string(),
                         cancellable: Some(false),
@@ -113,7 +114,7 @@ mod tests {
     use anyhow::{Context, Result, bail};
     use crossbeam::channel::unbounded;
     use lsp_server::Message;
-    use lsp_types::{ProgressParams, ProgressToken};
+    use lsp_types::{ProgressParams, ProgressToken, WorkDoneProgressBegin};
 
     use crate::capabilities::ResolvedClientCapabilities;
     use crate::server::LazyWorkDoneProgress;
@@ -129,7 +130,10 @@ mod tests {
         let work_done = LazyWorkDoneProgress::new(
             &client,
             Some(ProgressToken::String("scripts".into())),
-            "Synchronizing scripts",
+            WorkDoneProgressBegin {
+                title: "Synchronizing scripts".into(),
+                ..WorkDoneProgressBegin::default()
+            },
             ResolvedClientCapabilities::WORK_DONE_PROGRESS,
         );
         let mut state = State {

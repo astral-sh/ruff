@@ -47,47 +47,12 @@ pub(crate) struct LazyWorkDoneProgress {
 }
 
 impl LazyWorkDoneProgress {
+    /// Uses the supplied progress token or queues a create request for the main loop to send.
     pub(crate) fn new(
         client: &Client,
         request_token: Option<ProgressToken>,
-        title: &str,
-        capabilities: ResolvedClientCapabilities,
-    ) -> Self {
-        Self::new_inner(
-            client,
-            request_token,
-            WorkDoneProgressBegin {
-                title: title.to_string(),
-                cancellable: Some(false),
-                message: None,
-                percentage: Some(0),
-            },
-            capabilities,
-            ProgressCreation::Queue,
-        )
-    }
-
-    /// Creates a progress reporter from the main loop using best-effort delivery.
-    pub(crate) fn new_on_main_loop(
-        client: &Client,
         begin: WorkDoneProgressBegin,
         capabilities: ResolvedClientCapabilities,
-    ) -> Self {
-        Self::new_inner(
-            client,
-            None,
-            begin,
-            capabilities,
-            ProgressCreation::TryQueue,
-        )
-    }
-
-    fn new_inner(
-        client: &Client,
-        request_token: Option<ProgressToken>,
-        begin: WorkDoneProgressBegin,
-        capabilities: ResolvedClientCapabilities,
-        creation: ProgressCreation,
     ) -> Self {
         let work_done = Self {
             inner: Arc::new(Inner {
@@ -126,19 +91,7 @@ impl LazyWorkDoneProgress {
                 }
             };
 
-            match creation {
-                ProgressCreation::Queue => client
-                    .send_deferred_request::<WorkDoneProgressCreateRequest>(
-                        params,
-                        response_handler,
-                    ),
-                ProgressCreation::TryQueue => {
-                    client.try_send_deferred_request::<WorkDoneProgressCreateRequest>(
-                        params,
-                        response_handler,
-                    );
-                }
-            }
+            client.send_deferred_request::<WorkDoneProgressCreateRequest>(params, response_handler);
         }
 
         work_done
@@ -178,12 +131,6 @@ impl LazyWorkDoneProgress {
                 .expect("Failed to serialize work done progress begin"),
         })
     }
-}
-
-#[derive(Clone, Copy)]
-enum ProgressCreation {
-    Queue,
-    TryQueue,
 }
 
 impl ty_project::UvSyncProgress for LazyWorkDoneProgress {}

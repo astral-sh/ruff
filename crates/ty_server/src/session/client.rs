@@ -74,26 +74,6 @@ impl Client {
             .unwrap();
     }
 
-    /// Attempts to queue a request without blocking the main loop.
-    ///
-    /// Returns `false` if the main-loop queue is full or disconnected.
-    pub(crate) fn try_send_deferred_request<R>(
-        &self,
-        params: R::Params,
-        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
-    ) -> bool
-    where
-        R: lsp_types::Request,
-    {
-        self.main_loop_sender
-            .try_send(Event::Action(Action::SendRequest(SendRequest {
-                method: R::METHOD.to_string(),
-                params: serde_json::to_value(params).expect("Params to be serializable"),
-                response_handler: ClientResponseHandler::for_request::<R>(response_handler),
-            })))
-            .is_ok()
-    }
-
     pub(crate) fn send_request_raw(&self, session: &Session, request: SendRequest) {
         let id = session
             .request_queue()
