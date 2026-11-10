@@ -6040,6 +6040,10 @@ fn parameter_context_specialization<'db>(
             let identity = typevar.identity(db);
             if return_type_solutions.contains_key(&identity) {
                 Some(return_context_kind)
+            } else if typevar.is_paramspec(db) {
+                // A wrapped callable supplies parameter annotations for forwarded arguments.
+                // Only a specialization from the expected return type carries an outer context.
+                None
             } else {
                 inference
                     .is_some_and(|inference| inference.has_inferred_type(db, identity))
@@ -8262,12 +8266,80 @@ impl<'db> ArgumentContextSpecialization<'db> {
         db: &'db dyn Db,
         variable: BoundTypeVarInstance<'db>,
     ) -> Option<TypeContextKind> {
+        let identity = variable.identity(db);
+        let identity = if variable.paramspec_attr(db).is_some() {
+            identity.without_paramspec_attr(db)
+        } else {
+            identity
+        };
         let index = self
             .types
             .generic_context(db)
-            .variable_index(db, variable.identity(db))?;
+            .variable_index(db, identity)?;
 
         self.kinds[index]
+    }
+
+    /// A compound parameter inherits a context kind when all its components carry that kind.
+    /// For example, `list[T]` can inherit the kind of `T`, while `tuple[T, str]` also has a
+    /// fixed component.
+    fn parameter_kind(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        parameter: Type<'db>,
+        visitor: &CycleDetector<'db, TypeContextKind, Type<'db>, Option<TypeContextKind>, 4>,
+    ) -> Option<TypeContextKind> {
+        if let Type::TypeVar(variable) = parameter {
+            return self.kind_for(db, variable);
+        }
+        visitor.visit(db, parameter, || {
+            let kind = |ty| self.parameter_kind(db, env, ty, visitor);
+            match parameter {
+                Type::NominalInstance(_)
+                    if let Some(tuple) = parameter.exact_tuple_instance_spec(db) =>
+                {
+                    tuple
+                        .iter_element_types(db)
+                        .map(kind)
+                        .all_equal_value()
+                        .ok()?
+                }
+                Type::NominalInstance(_) => {
+                    let (_, specialization) = parameter.class_specialization(db, env)?;
+                    specialization
+                        .types(db)
+                        .iter()
+                        .copied()
+                        .map(kind)
+                        .all_equal_value()
+                        .ok()?
+                }
+                Type::Callable(callable)
+                    if let [signature] = callable.signatures(db).overloads.as_slice() =>
+                {
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::annotated_type)
+                        .chain(std::iter::once(signature.return_ty))
+                        .map(kind)
+                        .all_equal_value()
+                        .ok()?
+                }
+                Type::SubclassOf(cls) => kind(Type::from(cls)),
+                Type::TypeForm(form) => kind(form.type_argument(db)),
+                Type::TypeAlias(alias) => kind(alias.value_type(db)),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .map(kind)
+                    .all_equal_value()
+                    .ok()?,
+                _ => None,
+            }
+        })
     }
 }
 
@@ -8285,7 +8357,7 @@ pub(crate) enum ArgumentTypeContext<'db> {
         /// The `P.args` or `P.kwargs` parameter that this argument is bound to.
         paramspec_parameter_type: Type<'db>,
         /// The declared type of this argument on the callable stored in the `ParamSpec`.
-        declared_type: Type<'db>,
+        context: TypeContext<'db>,
     },
 }
 
@@ -8306,18 +8378,21 @@ impl<'db> ArgumentTypeContext<'db> {
     /// `paramspec_parameter_type` is the original `P.args` or `P.kwargs` lookup key on the wrapper
     /// call. `declared_type` is the concrete parameter type on the callable stored in the
     /// `ParamSpec`.
-    fn paramspec(paramspec_parameter_type: Type<'db>, declared_type: Type<'db>) -> Self {
+    fn paramspec(
+        paramspec_parameter_type: Type<'db>,
+        declared_type: Type<'db>,
+        kind: TypeContextKind,
+    ) -> Self {
         Self::ParamSpec {
             paramspec_parameter_type,
-            declared_type,
+            context: TypeContext::new(Some(declared_type), kind),
         }
     }
 
     /// Returns the type context used for inferring the argument expression.
     pub(crate) fn type_context(self) -> TypeContext<'db> {
         match self {
-            Self::Standard { context, .. } => context,
-            Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
+            Self::Standard { context, .. } | Self::ParamSpec { context, .. } => context,
         }
     }
 
@@ -8333,7 +8408,7 @@ impl<'db> ArgumentTypeContext<'db> {
                 raw_parameter_type,
                 context,
             } => context.with_declared_type(Some(raw_parameter_type)),
-            Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
+            Self::ParamSpec { .. } => self.type_context(),
         }
     }
 
@@ -8356,10 +8431,10 @@ impl<'db> ArgumentTypeContext<'db> {
             }
             Self::ParamSpec {
                 paramspec_parameter_type,
-                declared_type,
+                context,
             } => {
-                arguments_types.insert_type(argument_index, declared_type, inferred_ty);
-                if declared_type != paramspec_parameter_type {
+                arguments_types.insert_type(argument_index, context, inferred_ty);
+                if context.declared_type() != Some(paramspec_parameter_type) {
                     arguments_types.insert_type(
                         argument_index,
                         paramspec_parameter_type,
@@ -8911,17 +8986,25 @@ impl<'db> Binding<'db> {
                 return Some(ArgumentTypeContext::paramspec(
                     original_parameter_type,
                     specialized_parameter_type,
+                    specialization()
+                        .and_then(|specialization| specialization.kind_for(db, paramspec))
+                        .unwrap_or(TypeContextKind::Declared),
                 ));
             }
 
             if let Some(specialization) = specialization() {
-                if let Type::TypeVar(variable) = parameter_type.resolve_type_alias(db)
-                    && let Some(parameter_tcx_kind) = specialization.kind_for(db, variable)
+                let specialized = parameter_type.apply_specialization(db, specialization.types);
+                if specialized != parameter_type
+                    && let Some(kind) = specialization.parameter_kind(
+                        db,
+                        env,
+                        parameter_type,
+                        &CycleDetector::new(None),
+                    )
                 {
-                    tcx_kind = parameter_tcx_kind;
+                    tcx_kind = kind;
                 }
-
-                parameter_type = parameter_type.apply_specialization(db, specialization.types);
+                parameter_type = specialized;
             }
 
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
@@ -8945,7 +9028,7 @@ impl<'db> Binding<'db> {
             && call_expression_tcx.is_validity()
             && parameter_type != original_parameter_type
         {
-            tcx_kind = TypeContextKind::Validity;
+            tcx_kind = call_expression_tcx.kind();
         }
 
         Some(ArgumentTypeContext::standard(

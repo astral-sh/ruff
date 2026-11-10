@@ -1880,6 +1880,36 @@ OptionalCallback(empty).callback()
 OptionalCallback(empty).callback(1)  # error: [too-many-positional-arguments]
 ```
 
+### Declared type preference for forwarded arguments
+
+The annotation on `callback` specializes `P` to `[int]`, so the forwarded call to `identity` prefers
+`int` on both assignments. An upper bound on the result supplies the same parameter type, but leaves
+`identity` free to infer `Any` from its argument.
+
+```py
+from collections.abc import Callable
+from typing import Any, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def save(fn: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, None]:
+    return fn
+
+F = TypeVar("F", bound=Callable[[int], None])
+
+def bounded(fn: F) -> F:
+    return fn
+
+def _(fn: Callable[[int], None], value: Any):
+    callback: Callable[[int], None] = save(fn, reveal_type(identity(value)))  # revealed: int
+    callback = save(fn, reveal_type(identity(value)))  # revealed: int
+    bounded(save(fn, reveal_type(identity(value))))  # revealed: Any
+```
+
 ### Forwarded arguments with type-variable bounds
 
 When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when

@@ -937,6 +937,18 @@ def _(value: Any):
     reveal_type(f(1))  # revealed: list[Any | int]
 ```
 
+The field type from an upper bound constrains a nested call. An assignment annotation also gives the
+nested call a preferred type:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: Any):
+    payload({"value": reveal_type(identity(value))})  # revealed: Any
+    annotated: Payload = {"value": reveal_type(identity(value))}  # revealed: int
+```
+
 ## Upper-bound context without inference evidence
 
 If there are no inferred or declared constraints for a given type variable, it remains unsolved,

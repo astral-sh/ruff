@@ -329,6 +329,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         dict: &ast::ExprDict,
         typed_dict: TypedDictType<'db>,
+        tcx: TypeContext<'db>,
         item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
     ) -> Option<Type<'db>> {
         let db = self.db();
@@ -340,7 +341,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = dict;
 
         let key_tcx =
-            TypeContext::declared(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
+            tcx.with_declared_type(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in items {
             let key_ty = self.infer_optional_expression(item.key.as_ref(), key_tcx);
@@ -352,12 +353,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let Some(key) = key_ty.as_string_literal()
                 && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
-                self.infer_expression(&item.value, TypeContext::declared(Some(field.declared_ty)))
+                self.infer_expression(&item.value, tcx.with_declared_type(Some(field.declared_ty)))
             } else if let Some(key_ty) = key_ty {
                 if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                     && let Some(value_ty) = typed_dict.arbitrary_key_initialization_type(db, env)
                 {
-                    self.infer_expression(&item.value, TypeContext::declared(Some(value_ty)))
+                    self.infer_expression(&item.value, tcx.with_declared_type(Some(value_ty)))
                 } else {
                     self.infer_expression(&item.value, TypeContext::default())
                 }
@@ -611,7 +612,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if !arguments.keywords.is_empty() {
-            self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+            self.infer_typed_dict_constructor_keyword_values(
+                typed_dict,
+                arguments,
+                TypeContext::default(),
+            );
         }
 
         validate_typed_dict_constructor(
@@ -632,13 +637,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,
+        tcx: TypeContext<'db>,
     ) {
         for keyword in &arguments.keywords {
             let value_tcx = keyword
                 .arg
                 .as_ref()
                 .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
-                .map(|field| TypeContext::declared(Some(field.declared_ty)))
+                .map(|field| tcx.with_declared_type(Some(field.declared_ty)))
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
         }

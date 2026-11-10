@@ -1062,7 +1062,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(tuple) => Either::Left(
                 tuple
                     .iter_element_types(db)
-                    .map(|tcx| TypeContext::declared(Some(tcx))),
+                    .map(|element| tcx.with_declared_type(Some(element))),
             ),
         };
 

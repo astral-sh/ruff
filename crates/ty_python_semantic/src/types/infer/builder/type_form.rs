@@ -16,8 +16,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_type_form_contextual_expression(
         &mut self,
         expression: &ast::Expr,
-        target: Type<'db>,
+        tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        let target = tcx.declared_type()?;
         let db = self.db();
         let env = self.program_environment();
         let non_type_form_fallback = match target.resolve_type_alias(db) {
@@ -58,7 +59,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let contextual_ty = self
                 .speculate_without_diagnostics()
-                .infer_value_expression_impl(expression, TypeContext::declared(Some(target)));
+                .infer_value_expression_impl(expression, tcx);
             if contextual_ty.is_assignable_to(db, env, target) {
                 return None;
             }

@@ -6917,9 +6917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(target) = tcx.declared_type()
-            && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
-        {
+        if let Some(ty) = self.infer_type_form_contextual_expression(expression, tcx) {
             self.store_expression_type(expression, ty);
             return ty;
         }
@@ -7773,7 +7771,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // first means a union whose arms all alias the same `TypedDict` reaches this
                 // branch rather than neither.
                 if let Some(ty) =
-                    self.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
+                    self.infer_typed_dict_expression(dict, typed_dict, tcx, &mut item_types)
                 {
                     return ty;
                 }
@@ -7801,7 +7799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !has_dict_compatible_fallback
                 {
                     if let Some(ty) =
-                        self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
+                        self.infer_typed_dict_expression(dict, *typed_dict, tcx, &mut item_types)
                     {
                         return ty;
                     }
@@ -7814,9 +7812,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // `TypedDict | dict[str, Any]` should remain quiet when the dict arm accepts
                         // the literal.
                         let mut builder = self.speculate();
-                        if let Some(inferred_ty) =
-                            builder.infer_typed_dict_expression(dict, typed_dict, &mut item_types)
-                        {
+                        if let Some(inferred_ty) = builder.infer_typed_dict_expression(
+                            dict,
+                            typed_dict,
+                            tcx,
+                            &mut item_types,
+                        ) {
                             narrowed.push((inferred_ty, builder));
                         }
 
