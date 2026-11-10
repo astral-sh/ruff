@@ -1039,6 +1039,21 @@ where
         }
     }
 
+    // Atomic roots and instances of plain classes cannot recurse. Run their predicates before
+    // allocating a cycle guard or erasing the predicate for the general traversal.
+    if !matches!(ty, Type::RecursiveVar(_)) && matches!(TypeKind::from(ty), TypeKind::Atomic) {
+        return query(ty);
+    }
+    if let Type::NominalInstance(instance) = ty
+        && let Some(class) = instance.plain_class_for_visitor()
+    {
+        let result = query(ty);
+        return if result == T::default() {
+            query(Type::ClassLiteral(class))
+        } else {
+            result
+        };
+    }
     let visitor = AnyOverTypeVisitor {
         env,
         query: &query,

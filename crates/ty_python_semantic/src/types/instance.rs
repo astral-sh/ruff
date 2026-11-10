@@ -227,6 +227,16 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    /// A plain non-generic class is the only child of this instance in a type walk.
+    pub(super) fn plain_class_for_visitor(self) -> Option<ClassLiteral<'db>> {
+        match self.0 {
+            NominalInstanceInner::NonTuple(NominalInstanceClass::Static(class)) => {
+                Some(ClassLiteral::Static(class))
+            }
+            _ => None,
+        }
+    }
+
     fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         Self(NominalInstanceInner::NonTuple(
             NominalInstanceClass::from_class(db, class),
