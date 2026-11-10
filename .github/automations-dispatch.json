@@ -12,6 +12,7 @@
       "on": {
         "pull_request": ["opened", "reopened", "ready_for_review"]
       },
+      "allow_forks": true,
       "workflow": "pull-request-reviewers.yml"
     },
     {
