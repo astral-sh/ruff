@@ -1241,6 +1241,44 @@ class Remapped[T]:
 reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
 ```
 
+### Expected types and explicit initializer receivers
+
+A field constructed with `Field()` can return `None` from `read`. The assignment can restrict which
+values may be written and must accommodate `None` on reads.
+
+```py
+from typing import Any
+
+class Field[S, T]:
+    def __init__(self: "Field[bool | None, bool | None]") -> None: ...
+    def write(self, value: S) -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+valid: Field[bool, object] = reveal_type(Field())  # revealed: Field[bool | None, bool | None]
+gradual: Field[bool, Any] = reveal_type(Field())  # revealed: Field[bool | None, Any]
+invalid: Field[bool, bool] = Field()  # error: [invalid-assignment]
+explicit: Field[bool | None, bool] = Field[bool | None, bool]()  # ok
+```
+
+An inherited initializer also constrains a subclass's read type:
+
+```py
+class ReadField[T](Field[object, T]): ...
+
+invalid_read: ReadField[bool] = ReadField()  # error: [invalid-assignment]
+```
+
+If the base is already specialized, the assignment can still determine a type argument introduced by
+the subclass:
+
+```py
+class TaggedField[T](Field[object, bool | None]):
+    tag: T
+
+tagged: TaggedField[str] = reveal_type(TaggedField())  # revealed: TaggedField[str]
+```
+
 ### Type variables from enclosing scopes in `__init__` receiver annotations
 
 A nested class can reference an enclosing class's type parameters, but cannot use them in an

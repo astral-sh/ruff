@@ -1962,6 +1962,28 @@ class Remapped(Generic[T]):
 reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
 ```
 
+### Expected types and explicit initializer receivers
+
+A field constructed with `Field()` can return `None` from `read`. The assignment can restrict which
+values may be written and must accommodate `None` on reads.
+
+```py
+from typing import Any, Generic, TypeVar
+
+S = TypeVar("S", contravariant=True)
+T = TypeVar("T", covariant=True)
+
+class Field(Generic[S, T]):
+    def __init__(self: "Field[bool | None, bool | None]") -> None: ...
+    def write(self, value: S) -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+valid: Field[bool, object] = reveal_type(Field())  # revealed: Field[bool | None, bool | None]
+gradual: Field[bool, Any] = reveal_type(Field())  # revealed: Field[bool | None, Any]
+invalid: Field[bool, bool] = Field()  # error: [invalid-assignment]
+```
+
 ### Type variables from enclosing scopes in `__init__` receiver annotations
 
 Type variables bound to an enclosing function cannot be used in an explicit `__init__` receiver

@@ -6078,7 +6078,7 @@ struct CallInference<'a, 'db> {
     return_ty: Type<'db>,
     /// Whether a partial may leave variadic arguments for a later call.
     is_partial_application: bool,
-    is_constructor: bool,
+    constructor_kind: Option<ConstructorCallableKind>,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
 }
@@ -6433,7 +6433,7 @@ impl<'db> CallInference<'_, 'db> {
 
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
         // Their remaining parameters and return types must use the same specialization.
-        if self.is_partial_application || self.is_constructor {
+        if self.is_partial_application || self.constructor_kind.is_some() {
             return (specialize_return_ty(merged_specialization), false);
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
@@ -6725,6 +6725,47 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
+    /// Result implied by an explicit initializer receiver while inferring a bare class's type arguments.
+    fn annotated_init_result(&self, generic_context: GenericContext<'db>) -> Option<Type<'db>> {
+        if self.constructor_kind != Some(ConstructorCallableKind::Init)
+            || !self.signature.has_explicit_positional_receiver_annotation()
+        {
+            return None;
+        }
+        let db = self.db;
+        let env = self.env;
+        let receiver = self.argument_relations().next()?;
+        if receiver.adjusted_argument_index.is_some() || receiver.argument_type != self.return_ty {
+            return None;
+        }
+        let (constructed, specialization) = self.return_ty.class_specialization(db, env)?;
+        if !specialization.types(db).iter().all(|ty| {
+            ty.as_typevar()
+                .is_some_and(|var| var.is_inferable(db, self.inferable_typevars))
+        }) {
+            return None;
+        }
+        let annotation = receiver.declared_type.resolve_type_alias(db);
+        let annotated = annotation.as_nominal_instance()?;
+        if ClassLiteral::Static(constructed) == annotated.class_literal(db, env) {
+            return Some(annotation);
+        }
+
+        // For Child[T, U] inheriting __init__(self: Base[int]) through Base[T], infer
+        // Child[int, U]. Its own U is still available for inference from the expected result.
+        let constraints = ConstraintSetBuilder::new();
+        let mut projection = SpecializationBuilder::new(db, env, &constraints, generic_context);
+        projection.record_constraint_set(self.return_ty.when_constraint_set_assignable_to(
+            db,
+            env,
+            annotation,
+            &constraints,
+        ));
+        let specialization = projection
+            .build_merged_with(|var, bounds| bounds.is_none().then_some(Type::TypeVar(var)));
+        Some(self.return_ty.apply_specialization(db, specialization))
+    }
+
     fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
@@ -6775,6 +6816,17 @@ impl<'db> CallInference<'_, 'db> {
             }
 
             Some(tcx) => {
+                // The argument check asks whether __init__ accepts the receiver. Also require
+                // the instance described by its self annotation to fit the inferred result.
+                if let Some(result) = self.annotated_init_result(generic_context) {
+                    builder.record_constraint_set(result.when_constraint_set_assignable_to(
+                        db,
+                        self.env,
+                        self.return_ty,
+                        constraints,
+                    ));
+                }
+
                 let return_ty = self
                     .return_ty
                     .discard_disjoint_union_elements(db, self.env, tcx, self.inferable_typevars)
@@ -9173,7 +9225,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
-            is_constructor: self.constructor_context.is_some(),
+            constructor_kind: self.constructor_context.map(ConstructorContext::kind),
             inferable_typevars: self
                 .signature
                 .generic_context
