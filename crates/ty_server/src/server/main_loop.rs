@@ -219,8 +219,9 @@ impl Server {
 /// Runs a synchronous request on the main loop or tries to queue a background request.
 ///
 /// If the editor sends a hover request while the worker queue is full, we reply with
-/// `RequestFailed` to tell it that ty is busy. Waiting for a slot would prevent the main
-/// loop from reading the next message, even if it's `shutdown`.
+/// `RequestFailed`. Waiting for a slot here would prevent the main loop from forwarding
+/// responses that workers have already produced. During a restart, the editor could also
+/// time out waiting for the main loop to handle `shutdown`.
 ///
 /// An edit can also interrupt a completion that's already running. Normally we retry it.
 /// If the queue is full by then, we return the completion handler's `ContentModified` error
