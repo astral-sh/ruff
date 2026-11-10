@@ -21,6 +21,10 @@ doc-valid-idents = [
 ignore-interior-mutability = [
     # Interned is read-only. The wrapped `Rc` never gets updated.
     "ruff_formatter::format_element::Interned",
+    # These keys borrow AST nodes with an AtomicNodeIndex, which comparison ignores.
+    # A concatenated string's OnceLock caches only its decoded text.
+    "ruff_python_ast::comparable::ComparableExpr",
+    "ruff_python_ast::comparable::ComparableLiteral",
     # The expression is read-only.
     "ruff_python_ast::hashable::HashableExpr",
 ]
