@@ -415,6 +415,17 @@ pub struct ConstraintSet<'db, 'c> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
+    /// Even if a relation reduced to a constant, it may have interned type variables
+    /// while checking alternatives. Replaying just the boolean in another builder
+    /// would lose the identities and source order established by that comparison.
+    pub(super) fn builder_independent_value(self) -> Option<bool> {
+        if self.node.is_terminal() && self.builder.has_no_typevars() {
+            Some(self.is_trivially_always_satisfied())
+        } else {
+            None
+        }
+    }
+
     fn from_node(
         builder: &'c ConstraintSetBuilder<'db>,
         node: NodeId,
@@ -1212,6 +1223,12 @@ impl<'db> ConstraintSetStorage<'db> {
 }
 
 impl<'db> ConstraintSetBuilder<'db> {
+    pub(super) fn has_no_typevars(&self) -> bool {
+        self.storage
+            .try_borrow()
+            .is_ok_and(|storage| storage.compacted.is_none() && storage.typevars.is_empty())
+    }
+
     pub(crate) fn new() -> Self {
         Self::default()
     }
@@ -6070,6 +6087,23 @@ class E: ...
                 }
             }
         }
+    }
+
+    #[test]
+    fn terminal_proof_with_type_variable_evidence_is_builder_specific() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let always = ConstraintSet::always(&builder);
+        let never = ConstraintSet::never(&builder);
+        assert_eq!(always.builder_independent_value(), Some(true));
+        assert_eq!(never.builder_independent_value(), Some(false));
+
+        let t = create_typevar(&db, "T");
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        assert_eq!(t_int.builder_independent_value(), None);
+        let saturated = t_int.or(&db, &builder, || always);
+        assert!(saturated.is_trivially_always_satisfied());
+        assert_eq!(saturated.builder_independent_value(), None);
     }
 
     #[test]

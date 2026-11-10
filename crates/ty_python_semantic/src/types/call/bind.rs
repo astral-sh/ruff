@@ -7704,7 +7704,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
             && argument_type
-                .when_assignable_to(
+                .when_call_argument_assignable_to(
                     db,
                     self.env,
                     expected_ty,

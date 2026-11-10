@@ -196,7 +196,7 @@ impl TypeRelation {
 }
 
 /// Determines when comparisons involving type variables are evaluated.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::SalsaValue)]
 pub(crate) enum TypeVarEvaluation {
     /// Check immediately whether the relation holds for all or any valid specializations,
     /// depending on whether the type variable is inferable.
@@ -610,6 +610,89 @@ impl<'db> Type<'db> {
         is_constraint_set_subtype_of_impl(db, TypePair::new(db, env.program(db), self, target))
     }
 
+    /// A successful or failed comparison between unions or protocols can be expensive
+    /// even when its answer is independent of the constraint builder. Only share a
+    /// boolean if evaluating the relation left the builder's type-variable arena empty.
+    fn cached_terminal_assignability(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        evaluation: TypeVarEvaluation,
+    ) -> Option<bool> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn terminal_assignability<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+            evaluation: TypeVarEvaluation,
+        ) -> Option<bool> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            let result = types.first(db).has_relation_to_with_typevar_evaluation(
+                db,
+                &env,
+                types.second(db),
+                &constraints,
+                inferable,
+                TypeRelation::Assignability,
+                evaluation,
+                ConstraintProvenance::INFERRED,
+            );
+            result.builder_independent_value()
+        }
+
+        if !matches!(target, Type::Union(_) | Type::ProtocolInstance(_))
+            && !matches!(self, Type::Union(_) | Type::Intersection(_))
+        {
+            return None;
+        }
+        self.assert_not_recursive_var();
+        target.assert_not_recursive_var();
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return Some(true);
+        }
+        if !constraints.has_no_typevars() {
+            return None;
+        }
+        terminal_assignability(
+            db,
+            TypePair::new(db, env.program(db), self, target),
+            inferable,
+            evaluation,
+        )
+    }
+
+    /// Bindings can repeat the same argument checks for several overloads. Explicit
+    /// type-argument validation also uses eager assignability, but evaluating it
+    /// in a separate query can change the fixed point of recursive forward bounds.
+    pub(super) fn when_call_argument_assignable_to<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Some(result) = self.cached_terminal_assignability(
+            db,
+            env,
+            target,
+            constraints,
+            inferable,
+            TypeVarEvaluation::Eager,
+        ) {
+            return ConstraintSet::from_bool(constraints, result);
+        }
+        self.when_assignable_to(db, env, target, constraints, inferable)
+    }
+
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
@@ -779,6 +862,18 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
+        if provenance == ConstraintProvenance::INFERRED
+            && let Some(result) = self.cached_terminal_assignability(
+                db,
+                env,
+                target,
+                constraints,
+                TypeVarSet::None,
+                TypeVarEvaluation::Lazy,
+            )
+        {
+            return ConstraintSet::from_bool(constraints, result);
+        }
         self.has_relation_to_with_typevar_evaluation(
             db,
             env,
