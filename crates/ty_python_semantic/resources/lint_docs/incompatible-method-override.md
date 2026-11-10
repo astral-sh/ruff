@@ -86,33 +86,14 @@ the changes recommended by ARG002 would violate the Liskov Substitution Principl
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
-## Migrating from `invalid-method-override`
-
-`incompatible-method-override` was previously called `invalid-method-override`. The old name still
-works as an alias. The check for dropped keyword names now has its own rule,
-`lost-keyword-for-regular-parameter`.
-
-If you previously configured a custom severity for `invalid-method-override`, you can apply it to
-both rules to keep the same severity for both kinds of override violations. This example preserves a
-previous setting of `warn`.
-
-```toml
-[rules]
-incompatible-method-override = "warn"
-lost-keyword-for-regular-parameter = "warn"
-```
-
-For diagnostics that moved to the new rule, use `# ty: ignore[lost-keyword-for-regular-parameter]`
-as a suppression comment.
-
-Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
-newly reported diagnostics before updating the baseline.
-
 ## Rule history
 
-- v0.0.100: Renamed from `invalid-method-override`.
+- v0.0.100: ty used to have a rule called `invalid-method-override` that covered both
+    `incompatible-method-override` and `lost-keyword-for-regular-parameter`.
 
-    `invalid-method-override` remains as a compatibility alias for this rule.
+    The old `invalid-method-override` name is now an alias for `incompatible-method-override` only. If
+    you previously had any configuration for `invalid-method-override` specifically, you should go
+    through `lost-keyword-for-regular-parameter` to see if you want to configure it in the same way.
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override

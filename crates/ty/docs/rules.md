@@ -1503,35 +1503,15 @@ the changes recommended by ARG002 would violate the Liskov Substitution Principl
 
 Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#invalid-explicit-override) rule.
 
-**Migrating from `invalid-method-override`**
-
-
-[`incompatible-method-override`](#incompatible-method-override) was previously called [`invalid-method-override`](#invalid-method-override). The old name still
-works as an alias. The check for dropped keyword names now has its own rule,
-[`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter).
-
-If you previously configured a custom severity for [`invalid-method-override`](#invalid-method-override), you can apply it to
-both rules to keep the same severity for both kinds of override violations. This example preserves a
-previous setting of `warn`.
-
-```toml
-[rules]
-incompatible-method-override = "warn"
-lost-keyword-for-regular-parameter = "warn"
-```
-
-For diagnostics that moved to the new rule, use `# ty: ignore[lost-keyword-for-regular-parameter]`
-as a suppression comment.
-
-Diagnostics previously suppressed by a baseline can reappear under the new rule name. Review the
-newly reported diagnostics before updating the baseline.
-
 **Rule history**
 
 
-- v0.0.100: Renamed from [`invalid-method-override`](#invalid-method-override).
+- v0.0.100: ty used to have a rule called [`invalid-method-override`](#invalid-method-override) that covered both
+    [`incompatible-method-override`](#incompatible-method-override) and [`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter).
 
-    [`invalid-method-override`](#invalid-method-override) remains as a compatibility alias for this rule.
+    The old [`invalid-method-override`](#invalid-method-override) name is now an alias for [`incompatible-method-override`](#incompatible-method-override) only. If
+    you previously had any configuration for [`invalid-method-override`](#invalid-method-override) specifically, you should go
+    through [`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter) to see if you want to configure it in the same way.
 
 [liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override
@@ -4031,15 +4011,15 @@ alice = Person(name="Alice", age=30)
 print(f"The height of Alice is {alice['height']}")  # error
 ```
 
-**Migrating from `invalid-key`**
+**Rule history**
 
 
-ty used to have a rule called [`invalid-key`](#invalid-key) that covered [`invalid-typed-dict-key`](#invalid-typed-dict-key),
-[`unknown-typed-dict-constructor-key`](#unknown-typed-dict-constructor-key), and [`non-literal-typed-dict-key`](#non-literal-typed-dict-key).
+- v0.0.100: ty used to have a rule called [`invalid-key`](#invalid-key) that covered [`invalid-typed-dict-key`](#invalid-typed-dict-key),
+    [`unknown-typed-dict-constructor-key`](#unknown-typed-dict-constructor-key), and [`non-literal-typed-dict-key`](#non-literal-typed-dict-key).
 
-The old [`invalid-key`](#invalid-key) name is now an alias for [`invalid-typed-dict-key`](#invalid-typed-dict-key) only. If you previously had
-any configuration for [`invalid-key`](#invalid-key) specifically, you should go through the other two rules to see
-if you want to configure them in the same way.
+    The old [`invalid-key`](#invalid-key) name is now an alias for [`invalid-typed-dict-key`](#invalid-typed-dict-key) only. If you previously
+    had any configuration for [`invalid-key`](#invalid-key) specifically, you should go through the other two rules
+    to see if you want to configure them in the same way.
 
 ## `invalid-typed-dict-statement`
 
@@ -4497,13 +4477,15 @@ class A: ...
 A().foo  # error
 ```
 
-**Migrating from `unresolved-attribute`**
+**Rule history**
 
 
-ty used to have a rule called [`unresolved-attribute`](#unresolved-attribute) that covered both [`missing-attribute`](#missing-attribute) and
-[`missing-union-attribute`](#missing-union-attribute).
+- v0.0.100: ty used to have a rule called [`unresolved-attribute`](#unresolved-attribute) that covered both
+    [`missing-attribute`](#missing-attribute) and [`missing-union-attribute`](#missing-union-attribute).
 
-[`unresolved-attribute`](#unresolved-attribute) is now an alias for [`missing-attribute`](#missing-attribute).
+    The old [`unresolved-attribute`](#unresolved-attribute) name is now an alias for [`missing-attribute`](#missing-attribute) only. If you
+    previously had any configuration for [`unresolved-attribute`](#unresolved-attribute) specifically, you should go through
+    [`missing-union-attribute`](#missing-union-attribute) to see if you want to configure it in the same way.
 
 ## `missing-direct-dependency`
 
@@ -6332,17 +6314,21 @@ def foo(x: int) -> int:
     return x
 ```
 
-**Migrating from `invalid-overload`**
-
-
-In 0.0.100, `invalid-overload` was split into [`single-overload`](#single-overload), [`missing-overload-implementation`](#missing-overload-implementation),
-[`inconsistent-overload-implementation`](#inconsistent-overload-implementation), [`inconsistent-overload-decorator`](#inconsistent-overload-decorator), and
-[`misplaced-overload-decorator`](#misplaced-overload-decorator).
-
 **References**
 
 
 - [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)
+
+**Rule history**
+
+
+- v0.0.100: ty used to have a rule called `invalid-overload` that covered [`single-overload`](#single-overload),
+    [`missing-overload-implementation`](#missing-overload-implementation), [`inconsistent-overload-implementation`](#inconsistent-overload-implementation),
+    [`inconsistent-overload-decorator`](#inconsistent-overload-decorator), and [`misplaced-overload-decorator`](#misplaced-overload-decorator).
+
+    The old `invalid-overload` rule was removed. If you previously had any configuration for
+    `invalid-overload` specifically, you should go through the five rules to see if you want to
+    configure them in the same way.
 
 ## `static-assert-error`
 
