@@ -1260,6 +1260,29 @@ def chain(depth):
     return cur
 ```
 
+### Repeated partial application to a union of callables
+
+The configured factories share earlier partials. When the loop wraps them again, cycle recovery
+preserves each factory's return type.
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+Factory = Callable[..., bytes] | Callable[..., str] | Callable[..., bytearray] | Callable[..., int]
+
+def configure(factory: Factory, layers: list[int]):
+    build = partial(factory, width=32)
+    build = partial(build, height=32)
+    build = partial(build, channels=3)
+    build = partial(build, stride=2)
+    build = partial(build, padding=1)
+    build = partial(build, bias=False)
+    for units in layers:
+        build = partial(build, units=units)
+    reveal_type(build())  # revealed: bytes | str | bytearray | int | Divergent
+```
+
 ### Repeated partial application at module scope
 
 The same cycle at module scope retains the known return type alongside the recursive alternative.
