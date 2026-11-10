@@ -2519,6 +2519,28 @@ def collect(value: U) -> list[U]:
     return choose(choose(value, value), value)  # ok
 ```
 
+The two arguments can also match the bare `T` arm. Here `first(xs, [])` can return `list[int]`, so
+`choose` can take `T = list[list[str]] | list[int]`.
+
+```py
+def first(value: T, alternatives: list[T]) -> T:
+    return value
+
+def _(xs: list[int]):
+    choose([["x"]], first(xs, []))  # ok
+```
+
+The same nested call can supply two different parameters. With `T = int`, its `list[int]` return
+type fits both `Iterable[int]` and `list[int]`.
+
+```py
+from collections.abc import Iterable
+
+def store(values: T | Iterable[T], output: list[T]) -> None: ...
+def _(xs: list[int]):
+    store(first(xs, []), first(xs, []))  # ok
+```
+
 ## Inferring a union parameter from other arguments
 
 A sibling argument can independently fix `T` to a union that contains a list. Both members of that

@@ -1173,23 +1173,31 @@ fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
 /// expected type for the outer call, feeding the merged binding back into the inner call can
 /// add another `Declaration` layer on every inference pass.
 fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
-    let code = r#"
-        from __future__ import annotations
+    for (suffix, choices) in [
+        ("", "V | Declaration[K, V]"),
+        ("_aliased", "Choice[K, V] | None"),
+    ] {
+        let code = format!(
+            r#"
+            from __future__ import annotations
 
-        class Declaration[K, V]:
-            def __init__(self, key: K | None = None, *choices: V | Declaration[K, V]): ...
+            type Choice[K, V] = V | Declaration[K, V]
 
-        class Attribute[V](Declaration[str, V]): ...
-        class SubFactory[V](Declaration[str, V]): ...
+            class Declaration[K, V]:
+                def __init__(self, key: K | None = None, *choices: {choices}): ...
 
-        Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
-    "#;
+            class Attribute[V](Declaration[str, V]): ...
+            class SubFactory[V](Declaration[str, V]): ...
 
-    benchmark_micro_case(
-        criterion,
-        "ty_micro[nested_generic_constructor_arguments]",
-        code,
-    );
+            Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments{suffix}]"),
+            &code,
+        );
+    }
 }
 
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.

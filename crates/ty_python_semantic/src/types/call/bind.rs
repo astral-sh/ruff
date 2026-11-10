@@ -6084,6 +6084,30 @@ struct CallInference<'a, 'db> {
 }
 
 impl<'a, 'db> CallInference<'a, 'db> {
+    fn new(
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        binding: &'a Binding<'db>,
+        arguments: &'a CallArguments<'a, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Self {
+        Self {
+            db,
+            env,
+            signature: &binding.signature,
+            arguments,
+            argument_matches: &binding.argument_matches,
+            call_expression_tcx,
+            return_ty: binding.return_ty,
+            is_partial_application: binding.is_partial_application,
+            is_constructor: binding.constructor_context.is_some(),
+            inferable_typevars: binding
+                .signature
+                .generic_context
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
+        }
+    }
+
     /// Yields the effective formal and actual types for each matched argument-parameter pair.
     ///
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
@@ -8252,6 +8276,11 @@ fn nested_union_members<'db>(
     inferable: TypeVarSet<'db>,
 ) -> Option<(UnionType<'db>, Type<'db>)> {
     let union = ty.resolve_type_alias(db).as_union()?;
+    let union = if union.has_aliases(db) {
+        union.expand_aliases(db, env).as_union()?
+    } else {
+        union
+    };
     let bare = TypeVarSet::from_typevars(
         db,
         union
@@ -8964,7 +8993,7 @@ impl<'db> Binding<'db> {
                     && let Some(actual) = arguments_types
                         .get(argument_index)
                         .and_then(|argument| argument.matched_type(original_parameter_type, None))
-                    && let Some(nested_types) = cache.nested.get_or_init(|| {
+                    && let Some(nested_types) = *cache.nested.get_or_init(|| {
                         self.nested_union_specialization(
                             db,
                             env,
@@ -8973,18 +9002,18 @@ impl<'db> Binding<'db> {
                             call_expression_tcx,
                         )
                     })
-                    && actual.is_assignable_to(
-                        db,
-                        env,
-                        nested.apply_specialization(db, *nested_types),
-                    ) {
+                    // A gradual argument can be assignable to this member and still need the
+                    // bare arm. For example, `list[int] | Unknown` can match `Iterable[int]`
+                    // without giving us enough evidence to use it as the next argument context.
+                    && actual.is_redundant_with(db, env, nested.apply_specialization(db, nested_types))
+                {
                     union.map_leave_aliases(db, env, |&member| {
-                        let types = if nested == member
-                            || nested
-                                .as_union()
-                                .is_some_and(|union| union.contains_member(db, member))
-                        {
-                            *nested_types
+                        let is_nested = match nested {
+                            Type::Union(members) => members.contains_member(db, member),
+                            single => single == member,
+                        };
+                        let types = if is_nested {
+                            nested_types
                         } else {
                             specialization.types
                         };
@@ -9077,16 +9106,10 @@ impl<'db> Binding<'db> {
             return None;
         };
         let call = CallInference {
-            db,
-            env,
-            signature: &self.signature,
-            arguments: &arguments,
             argument_matches: &restricted,
-            call_expression_tcx: tcx,
             return_ty: self.unspecialized_return_type(db),
-            is_partial_application: self.is_partial_application,
-            is_constructor: self.constructor_context.is_some(),
             inferable_typevars: self.inferable_typevars,
+            ..CallInference::new(db, env, self, &arguments, tcx)
         };
         let result = call.infer(constraints);
         let inference = result.inference?;
@@ -9332,22 +9355,8 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred = CallInference {
-            db,
-            env,
-            signature: &self.signature,
-            arguments,
-            argument_matches: &self.argument_matches,
-            call_expression_tcx,
-            return_ty: self.return_ty,
-            is_partial_application: self.is_partial_application,
-            is_constructor: self.constructor_context.is_some(),
-            inferable_typevars: self
-                .signature
-                .generic_context
-                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
-        }
-        .infer(constraints);
+        let inferred =
+            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,
