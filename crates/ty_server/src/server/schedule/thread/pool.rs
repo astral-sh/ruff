@@ -14,7 +14,7 @@
 //! the threading utilities in [`crate::server::schedule::thread`].
 
 use super::{Builder, JoinHandle, ThreadPriority};
-use crate::server::{MAX_QUEUED_REQUESTS, log_queue_size};
+use crate::server::MAX_QUEUED_REQUESTS;
 use crossbeam::channel::{Receiver, Sender};
 use ruff_db::STACK_SIZE;
 use std::num::NonZeroUsize;
@@ -141,7 +141,15 @@ impl PendingJob<'_> {
             f,
         };
         sender.send(job).map_err(|_| DisconnectedError)?;
-        log_queue_size("worker", sender.len());
+        let queued = sender.len();
+        if queued != 0 && queued.is_multiple_of(256) {
+            tracing::info!(
+                queue = "worker",
+                queued,
+                capacity = MAX_QUEUED_REQUESTS,
+                "Request queue size"
+            );
+        }
         Ok(())
     }
 }
