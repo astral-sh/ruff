@@ -3396,6 +3396,28 @@ has_name.name = "updated"
 has_name.name = 1  # error: [invalid-assignment]
 ```
 
+### Setter-only descriptors
+
+Reading a protocol member decorated with a setter-only descriptor returns the descriptor itself.
+Assignments accept the setter's value type.
+
+```py
+from typing import Protocol
+
+class IntSetter:
+    def __init__(self, method: object) -> None: ...
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class HasValue(Protocol):
+    @IntSetter
+    def value(self) -> None: ...
+
+def update(obj: HasValue, descriptor: IntSetter) -> None:
+    reveal_type(obj.value)  # revealed: IntSetter
+    obj.value = 1  # ok
+    obj.value = descriptor  # error: [invalid-assignment]
+```
+
 ### `cached_property`
 
 The standard-library `cached_property` descriptor uses the same behavior:

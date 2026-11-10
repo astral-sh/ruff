@@ -2509,42 +2509,44 @@ fn descriptor_decorated_protocol_member<'db>(
         return None;
     }
 
-    let Place::Defined(DefinedPlace {
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = descriptor_ty
+    let getter = descriptor_ty
         .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-        .place
-    else {
+        .place;
+    let receiver_ty = Type::instance(db, env, protocol);
+    let write = if descriptor_ty.is_data_descriptor(db, env) {
+        match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
+            DescriptorSetterDomain::Missing => None,
+            DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
+                descriptor_ty,
+                Some(domain),
+                definition,
+            )),
+            DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
+                descriptor_ty,
+                None,
+                definition,
+            )),
+        }
+    } else {
+        None
+    };
+
+    let read_ty = if getter.is_definitely_bound() {
+        descriptor_ty
+            .try_call_dunder_get(
+                db,
+                env,
+                Some(receiver_ty),
+                receiver_ty.to_meta_type(db, env),
+            )
+            .unwrap_or_else(|error| Some(error.fallback()))?
+            .return_type
+    } else if write.is_some() {
+        descriptor_ty
+    } else {
         return None;
     };
-
-    let receiver_ty = Type::instance(db, env, protocol);
-    let read_ty = descriptor_ty
-        .try_call_dunder_get(
-            db,
-            env,
-            Some(receiver_ty),
-            receiver_ty.to_meta_type(db, env),
-        )
-        .unwrap_or_else(|error| Some(error.fallback()))?
-        .return_type;
     let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
-
-    let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
-        DescriptorSetterDomain::Missing => None,
-        DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
-            descriptor_ty,
-            Some(domain),
-            definition,
-        )),
-        DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
-            descriptor_ty,
-            None,
-            definition,
-        )),
-    };
-
     Some(ProtocolMemberData::property(read, write, definition))
 }
 
