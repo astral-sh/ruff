@@ -62,18 +62,17 @@ impl Scheduler {
                 builder: func,
                 ..
             }) => {
-                let (pool, priority) = match schedule {
+                let job = match schedule {
                     BackgroundSchedule::Worker => {
-                        (&mut self.background_pool, ThreadPriority::Worker)
+                        self.background_pool.spawn(ThreadPriority::Worker)
                     }
                     BackgroundSchedule::LatencySensitive => {
-                        (&mut self.background_pool, ThreadPriority::LatencySensitive)
+                        self.background_pool.spawn(ThreadPriority::LatencySensitive)
                     }
                     BackgroundSchedule::Fmt => {
-                        (&mut self.fmt_pool, ThreadPriority::LatencySensitive)
+                        self.fmt_pool.spawn(ThreadPriority::LatencySensitive)
                     }
-                };
-                let job = pool.spawn(priority)?;
+                }?;
                 let task = func(session);
                 let client = client.clone();
                 job.run(move || task(&client))?;
