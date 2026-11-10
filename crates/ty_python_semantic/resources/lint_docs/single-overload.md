@@ -21,12 +21,16 @@ def foo(x: int) -> int:
     return x
 ```
 
-## Migrating from `invalid-overload`
-
-In 0.0.100, `invalid-overload` was split into `single-overload`, `missing-overload-implementation`,
-`inconsistent-overload-implementation`, `inconsistent-overload-decorator`, and
-`misplaced-overload-decorator`.
-
 ## References
 
 - [Typing specification: Invalid overload definitions](https://typing.python.org/en/latest/spec/overload.html#invalid-overload-definitions)
+
+## Rule history
+
+- v0.0.100: ty used to have a rule called `invalid-overload` that covered `single-overload`,
+    `missing-overload-implementation`, `inconsistent-overload-implementation`,
+    `inconsistent-overload-decorator`, and `misplaced-overload-decorator`.
+
+    The old `invalid-overload` rule was removed. If you previously had any configuration for
+    `invalid-overload` specifically, you should go through the five rules to see if you want to
+    configure them in the same way.

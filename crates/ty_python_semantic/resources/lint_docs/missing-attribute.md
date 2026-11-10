@@ -20,9 +20,11 @@ class A: ...
 A().foo  # error
 ```
 
-## Migrating from `unresolved-attribute`
+## Rule history
 
-ty used to have a rule called `unresolved-attribute` that covered both `missing-attribute` and
-`missing-union-attribute`.
+- v0.0.100: ty used to have a rule called `unresolved-attribute` that covered both
+    `missing-attribute` and `missing-union-attribute`.
 
-`unresolved-attribute` is now an alias for `missing-attribute`.
+    The old `unresolved-attribute` name is now an alias for `missing-attribute` only. If you
+    previously had any configuration for `unresolved-attribute` specifically, you should go through
+    `missing-union-attribute` to see if you want to configure it in the same way.
