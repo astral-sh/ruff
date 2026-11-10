@@ -3639,12 +3639,14 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 
 ## List literals with ambiguous union parameters
 
-In `as_list([])`, the literal initially has type `list[Unknown]`. It can match `T` with
-`T = list[Unknown]` or `list[T]` with `T = Unknown`. Both bindings contribute to the return type.
+In `as_list([])`, the argument `[]` initially has type `list[Unknown]`. Matching it against `T`
+binds `T` to the whole list, `list[Unknown]`. Matching it against `list[T]` binds `T` to the element
+type, `Unknown`.
 
-We then revisit `[]` using the specialized parameter type as context. The `list[T]` arm gives the
-literal an element type of `Unknown`. Using both bindings here would give it an element type of
-`list[Unknown] | Unknown` and could add another list layer each time we revisit it.
+When we revisit `[]` using the specialized parameter type as context, the `list[T]` arm supplies
+`Unknown` as the literal's element type. Feeding the whole-list binding back into the literal could
+add another list layer each time we revisit it. The declared return type `list[T]` uses both
+bindings, so the element type of the returned list is `list[Unknown] | Unknown`.
 
 ```py
 def as_list[T](value: T | list[T]) -> list[T]:
@@ -3652,7 +3654,8 @@ def as_list[T](value: T | list[T]) -> list[T]:
         return value
     return [value]
 
-reveal_type(as_list([]))  # revealed: list[list[Unknown] | Unknown]
+result = as_list(reveal_type([]))  # revealed: list[Unknown]
+reveal_type(result)  # revealed: list[list[Unknown] | Unknown]
 ```
 
 ## Nested calls with ambiguous union parameters
