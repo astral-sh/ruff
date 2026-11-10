@@ -35,7 +35,7 @@
       "caller": "ruff",
       "environment": "automations",
       "caller_ref": "refs/heads/main",
-      "caller_workflow": "pull-request-labels.yml",
+      "caller_workflow": "pull-request-labels-and-title.yml",
       "on": ["workflow_dispatch"],
       "permissions": { "pull_requests": "write" },
       "target": "ruff"

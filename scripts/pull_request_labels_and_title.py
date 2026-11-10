@@ -21,7 +21,10 @@
 # disjoint-cast = "warn"
 # missing-direct-dependency = "warn"
 # ///
-"""Add each label whose path patterns cover every changed file in a pull request."""
+"""Add each label whose patterns match every changed path.
+
+Prefix the PR title with [ty] when the paths match the ty label.
+"""
 
 from __future__ import annotations
 
@@ -37,10 +40,15 @@ LABEL_PATHS = {
 }
 
 
-def gh_api(endpoint: str, *options: str, input_data: bytes | None = None) -> bytes:
-    return subprocess.check_output(
-        ["gh", "api", f"repos/astral-sh/ruff/{endpoint}", *options], input=input_data
-    )
+def gh_api(
+    endpoint: str, *options: str, data: dict[str, str | list[str]] | None = None
+) -> bytes:
+    command = ["gh", "api", f"repos/astral-sh/ruff/{endpoint}", *options]
+    input_data = None
+    if data is not None:
+        command.extend(["--input", "-"])
+        input_data = json.dumps(data).encode()
+    return subprocess.check_output(command, input=input_data)
 
 
 def main() -> None:
@@ -62,24 +70,27 @@ def main() -> None:
     if not files or len(files) != pull["changed_files"]:
         return
 
-    existing = {label["name"] for label in pull["labels"]}
-    labels = [
+    matching_labels = [
         label
         for label, patterns in LABEL_PATHS.items()
-        if label not in existing
-        and all(
+        if all(
             any(fnmatchcase(path, pattern) for pattern in patterns) for path in files
         )
     ]
-    if labels:
+    existing = {label["name"] for label in pull["labels"]}
+    labels_to_add = [label for label in matching_labels if label not in existing]
+    if labels_to_add:
         gh_api(
             f"issues/{args.pull_request}/labels",
             "--method",
             "POST",
-            "--input",
-            "-",
-            input_data=json.dumps({"labels": labels}).encode(),
+            data={"labels": labels_to_add},
         )
+
+    title = pull["title"]
+    if "ty" in matching_labels and not title.startswith("[ty] "):
+        new_title = f"[ty] {title.removeprefix('[ty]').lstrip()}"
+        gh_api(endpoint, "--method", "PATCH", data={"title": new_title})
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@
       "allow_draft": true,
       "allow_forks": true,
       "allow_stale_head": true,
-      "workflow": "pull-request-labels.yml"
+      "workflow": "pull-request-labels-and-title.yml"
     },
     {
       "repository": "ruff",

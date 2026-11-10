@@ -1,4 +1,4 @@
-name: Label pull requests
+name: Label pull requests and prefix ty titles
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 jobs:
-  label:
+  labels-and-title:
     if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main'
     runs-on: github-ubuntu-24.04-x86_64-2
     timeout-minutes: 5
@@ -34,7 +34,7 @@ jobs:
       - uses: $/.github/actions/setup-ruff-workspace
         with:
           python-version: "3.13"
-      - name: Get a labeling token
+      - name: Get a pull request token
         id: token
         uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
@@ -43,11 +43,11 @@ jobs:
           repository: astral-sh/ruff
           permissions: |
             pull_requests: write
-      - name: Apply labels matching every changed file
+      - name: Apply matching labels and prefix ty-only PR titles
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           PULL_REQUEST: ${{ inputs.pull_request }}
           HEAD_SHA: ${{ inputs.head_sha }}
         run: >-
-          uv run --locked --script scripts/pull_request_labels.py
+          uv run --locked --script scripts/pull_request_labels_and_title.py
           --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA"
