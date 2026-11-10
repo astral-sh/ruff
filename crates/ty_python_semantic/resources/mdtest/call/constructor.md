@@ -2393,7 +2393,6 @@ iterable whose element type is unknown or dynamic.
 from typing import Any
 
 def convert(value: str) -> str | None: ...
-
 def check(known: set[str], unknown: set, dynamic: set[Any]):  # error: [missing-type-argument]
     reveal_type(map(convert, known))  # revealed: map[str | None]
     reveal_type(map(convert, unknown))  # revealed: map[str | Unknown | None]
