@@ -29,7 +29,7 @@ use std::fmt;
 mod pool;
 mod priority;
 
-pub(super) use pool::Pool;
+pub(super) use pool::{DisconnectedError, FullError, Pool};
 pub(super) use priority::ThreadPriority;
 
 pub(super) struct Builder {
