@@ -224,9 +224,9 @@ impl Server {
 /// time out waiting for the main loop to handle `shutdown`.
 ///
 /// An edit can also interrupt a completion that's already running. Normally we retry it.
-/// If the queue is full by then, we return the completion handler's `ContentModified` error
-/// to the editor. Posting another retry could keep the main loop busy with that same
-/// completion until a worker frees a slot.
+/// If shutdown has started, we return `ContentModified` so we don't restart work that
+/// shutdown just cancelled. We also return `ContentModified` if the queue is full.
+/// Posting another retry could keep the main loop busy until a worker frees a slot.
 fn dispatch_request(
     scheduler: &mut Scheduler,
     request: Request,
@@ -240,6 +240,13 @@ fn dispatch_request(
         (Task::Background(background), RequestAttempt::Retry) => background.cancellation_error,
         _ => None,
     };
+    if session.is_shutdown_requested()
+        && let Some(cancelled) = retry_error
+    {
+        client.respond_err(id, cancelled());
+        return Ok(());
+    }
+
     match scheduler.dispatch(task, session, client) {
         Ok(()) => Ok(()),
         Err(TrySendError::Full(())) => {
@@ -351,5 +358,73 @@ impl UvSyncWakeups {
         debug_assert_eq!(index, connection_index);
         // Ignore disconnect errors, they're handled by the main loop (it will exit).
         Ok(operation.recv(connection).ok().map(Event::Message))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+    use std::sync::Arc;
+
+    use crossbeam::channel::unbounded;
+    use lsp_server::{ErrorCode, Request};
+    use lsp_types::{CompletionRequest, Request as _};
+    use ruff_db::system::TestSystem;
+    use serde_json::json;
+
+    use super::{Action, Event, RequestAttempt, dispatch_request};
+    use crate::PositionEncoding;
+    use crate::capabilities::ResolvedClientCapabilities;
+    use crate::server::schedule::Scheduler;
+    use crate::session::client::Client;
+    use crate::session::{ClientName, InitializationOptions, Session};
+
+    #[test]
+    fn shutdown_finishes_pending_completion_retry() -> anyhow::Result<()> {
+        let mut session = Session::new(
+            ResolvedClientCapabilities::empty(),
+            PositionEncoding::default(),
+            vec![],
+            InitializationOptions::default(),
+            Arc::new(TestSystem::default()),
+            ClientName::Other,
+            true,
+        )?;
+        // A retry that reaches the worker would return InvalidParams for this unopened file.
+        let request = Request::new(
+            42.into(),
+            CompletionRequest::METHOD.to_string(),
+            json!({"textDocument": {"uri": "file:///example.py"}, "position": {"line": 0, "character": 0}}),
+        );
+        let id = request.id.clone();
+        session
+            .request_queue_mut()
+            .incoming_mut()
+            .register(id.clone(), request.method.clone());
+        session.set_shutdown_requested(true);
+
+        let (sender, actions) = unbounded();
+        let (writer, _messages) = unbounded();
+        let client = Client::new(sender, writer);
+        let mut scheduler = Scheduler::new(NonZeroUsize::MIN);
+        dispatch_request(
+            &mut scheduler,
+            request,
+            &mut session,
+            &client,
+            RequestAttempt::Retry,
+        )?;
+        drop(scheduler);
+
+        let Event::Action(Action::SendResponse(response)) = actions.try_recv()? else {
+            anyhow::bail!("expected a response to the pending completion request");
+        };
+        assert_eq!(response.id, id);
+        assert_eq!(
+            response.response_result.unwrap_err().code,
+            ErrorCode::ContentModified as i32
+        );
+        assert!(actions.is_empty());
+        Ok(())
     }
 }
