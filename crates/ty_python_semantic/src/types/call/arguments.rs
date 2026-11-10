@@ -724,6 +724,24 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    /// The complete input to an implicit call with up to two pre-inferred positional arguments.
+    pub(crate) fn short_positional_types(&self) -> Option<[Option<Type<'db>>; 2]> {
+        if self.items.len() > 2 {
+            return None;
+        }
+        let mut positional = [None; 2];
+        for (output, argument) in positional.iter_mut().zip(&self.items) {
+            let CallArgument::Positional(types) = argument else {
+                return None;
+            };
+            if !matches!(types.types, ContextualArgumentTypes::Empty) {
+                return None;
+            }
+            *output = Some(types.fallback_type?);
+        }
+        Some(positional)
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.items.len()
     }

@@ -8397,17 +8397,54 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
+        self.try_call_with_context(db, env, argument_types, TypeContext::default())
+    }
+
+    fn try_call_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
+        #[salsa::tracked(returns(ref), no_eq, cycle_result=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn positional_call<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            callable: Type<'db>,
+            arguments: [Option<Type<'db>>; 2],
+            tcx: TypeContext<'db>,
+        ) -> Option<(Box<Bindings<'db>>, Option<CallErrorKind>)> {
+            let env = ProgramEnvironment::from_program(program);
+            let arguments = CallArguments::positional(arguments.into_iter().flatten());
+            Some(match callable.try_call_impl(db, &env, &arguments, tcx) {
+                Ok(bindings) => (Box::new(bindings), None),
+                Err(CallError(kind, bindings)) => (bindings, Some(kind)),
+            })
+        }
+        if let Some(positional) = arguments.short_positional_types()
+            && let Some((bindings, kind)) =
+                positional_call(db, env.program(db), self, positional, tcx)
+        {
+            return match kind {
+                None => Ok((**bindings).clone()),
+                Some(kind) => Err(CallError(*kind, bindings.clone())),
+            };
+        }
+        self.try_call_impl(db, env, arguments, tcx)
+    }
+
+    fn try_call_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
         let constraints = ConstraintSetBuilder::new();
         self.bindings(db, env)
-            .match_parameters(db, env, argument_types)
-            .check_types(
-                db,
-                env,
-                &constraints,
-                argument_types,
-                TypeContext::default(),
-                &[],
-            )
+            .match_parameters(db, env, arguments)
+            .check_types(db, env, &constraints, arguments, tcx, &[])
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -8493,11 +8530,7 @@ impl<'db> Type<'db> {
                 provenance,
                 ..
             }) => {
-                let constraints = ConstraintSetBuilder::new();
-                let bindings = dunder_callable
-                    .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
-                    .check_types(db, env, &constraints, argument_types, tcx, &[]);
+                let bindings = dunder_callable.try_call_with_context(db, env, argument_types, tcx);
 
                 let bindings = match bindings {
                     Ok(bindings) => bindings,
@@ -8540,11 +8573,7 @@ impl<'db> Type<'db> {
                 provenance,
                 ..
             }) => {
-                let constraints = ConstraintSetBuilder::new();
-                let bindings = dunder_callable
-                    .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
-                    .check_types(db, env, &constraints, argument_types, tcx, &[]);
+                let bindings = dunder_callable.try_call_with_context(db, env, argument_types, tcx);
 
                 let bindings = match bindings {
                     Ok(bindings) => bindings,
