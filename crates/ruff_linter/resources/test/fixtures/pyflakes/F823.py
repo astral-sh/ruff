@@ -80,3 +80,21 @@ def f():
     import sklearn
 
     mlflow
+
+reassigned = 1
+
+
+def multiple_assignments():
+    print(reassigned)
+    reassigned = 2
+    reassigned = 3
+
+
+counter = 0
+
+
+def repeated_augmented_assignments():
+    if True:
+        counter += 1
+    if False:
+        counter += 1
