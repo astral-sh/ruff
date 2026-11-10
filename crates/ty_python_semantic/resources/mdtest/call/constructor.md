@@ -1832,8 +1832,8 @@ Plain(1, "a")  # ok
 
 ## Union `self` annotations with variadic constructor parameters
 
-The `object` argument selects the `Any` constraint, even when the constructor also infers a
-`ParamSpec` or `TypeVarTuple`.
+The `object` argument supplies evidence for the `Any` constraint. When inferring a `ParamSpec`, ty
+also retains `str | None` from the receiver annotation.
 
 ```toml
 [environment]
@@ -1850,7 +1850,7 @@ class WithParamSpec[T: (str | None, Any)]:
 
 def callback() -> None: ...
 
-reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[str | None | Any]
 
 class WithTypeVarTuple[T: (str | None, Any)]:
     def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...

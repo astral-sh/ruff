@@ -2553,6 +2553,59 @@ A(f(1))
 A(f([]))
 ```
 
+## Type context and explicitly annotated `self`
+
+When `self` is explicitly annotated with a concrete specialization, ty uses it when inferring the
+type of unspecialized constructor calls:
+
+```py
+class Reader[T]:
+    def __init__(self: "Reader[int]") -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Reader())  # revealed: Reader[int]
+```
+
+When trying to specialize explicitly, the call will fail:
+
+```py
+Reader[str]()  # error: [invalid-argument-type]
+```
+
+`Reader[int]` is also inferred if it is assignable to the assignment context (`Reader` is covariant
+in `T`):
+
+```py
+# revealed: Reader[int]
+reader: Reader[int] = reveal_type(Reader())
+
+# revealed: Reader[int]
+reader: Reader[int | str] = reveal_type(Reader())
+```
+
+An error is emitted if the annotation is not compatible:
+
+```py
+invalid: Reader[bool] = Reader()  # error: [invalid-assignment]
+```
+
+When the receiver is annotated with a union ...
+
+```py
+class ReaderUnion[T]:
+    def __init__(self: "ReaderUnion[int | str]") -> None: ...
+
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str] = reveal_type(ReaderUnion())
+```
+
+When the receiver is annotated with a type that is too narrow, ty emits an error:
+
+```py
+invalid: ReaderUnion[int] = ReaderUnion()  # error: [invalid-assignment]
+```
+
 ## Conditional expressions
 
 The type context is propagated through both branches of conditional expressions:

@@ -6078,7 +6078,7 @@ struct CallInference<'a, 'db> {
     return_ty: Type<'db>,
     /// Whether a partial may leave variadic arguments for a later call.
     is_partial_application: bool,
-    is_constructor: bool,
+    constructor_kind: Option<ConstructorCallableKind>,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
 }
@@ -6433,7 +6433,7 @@ impl<'db> CallInference<'_, 'db> {
 
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
         // Their remaining parameters and return types must use the same specialization.
-        if self.is_partial_application || self.is_constructor {
+        if self.is_partial_application || self.constructor_kind.is_some() {
             return (specialize_return_ty(merged_specialization), false);
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
@@ -7564,7 +7564,31 @@ impl<'db> CallInference<'_, 'db> {
                 continue;
             }
 
-            if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
+            // An explicit initializer receiver supplies the specialization of a bare constructor.
+            // For self: Reader[int], infer from Reader[int] to Reader[T]. Binding still checks
+            // whether the specialized receiver can be passed to __init__.
+            let polarity = if self.constructor_kind == Some(ConstructorCallableKind::Init)
+                && relation.adjusted_argument_index.is_none()
+                && self.signature.has_explicit_positional_receiver_annotation()
+                && relation.argument_type == self.return_ty
+                && self
+                    .return_ty
+                    .class_specialization(db, self.env)
+                    .is_some_and(|(_, specialization)| {
+                        specialization.types(db).iter().all(|ty| {
+                            ty.as_typevar()
+                                .is_some_and(|var| var.is_inferable(db, self.inferable_typevars))
+                        })
+                    }) {
+                TypeVarVariance::Contravariant
+            } else {
+                TypeVarVariance::Covariant
+            };
+            if let Err(error) = builder.infer_with_polarity(
+                relation.declared_type,
+                relation.argument_type,
+                polarity,
+            ) {
                 constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
@@ -9173,7 +9197,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
-            is_constructor: self.constructor_context.is_some(),
+            constructor_kind: self.constructor_context.map(ConstructorContext::kind),
             inferable_typevars: self
                 .signature
                 .generic_context

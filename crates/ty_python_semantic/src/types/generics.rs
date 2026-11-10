@@ -4021,10 +4021,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        self.infer_with_polarity(formal, actual, TypeVarVariance::Covariant)
+    }
+
+    pub(crate) fn infer_with_polarity(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        polarity: TypeVarVariance,
+    ) -> Result<(), SpecializationError<'db>> {
         self.infer_map_impl(
             formal,
             actual,
-            TypeVarVariance::Covariant,
+            polarity,
             &InferSpecializationVisitor::new(Ok(())),
         )
     }
@@ -4508,11 +4517,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(db, self.inferable) =>
             {
+                // In a covariant comparison, `actual <= formal` gives a variable on the
+                // formal side a lower bound and a variable on the actual side an upper bound.
+                let polarity = if formal == Type::TypeVar(bound_typevar) {
+                    polarity
+                } else {
+                    polarity.flip()
+                };
                 match bound_typevar.typevar(db).bound_or_constraints(db, self.env) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if polarity.is_contravariant() {
-                            // In a contravariant position, the formal type variable is a subtype of
-                            // the actual type (`T <: ty`). Since we also have the upper bound
+                            // With upper-bound evidence, the type variable is a subtype of
+                            // the other type (`T <: ty`). Since we also have the upper bound
                             // constraint `T <: bound`, we just need to ensure that the intersection
                             // of `ty` and `bound` is non-empty. Since `Never` is always a valid
                             // intersection if the types are disjoint, we don't need to perform any
