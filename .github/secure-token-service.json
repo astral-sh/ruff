@@ -43,6 +43,15 @@
     {
       "caller": "ruff",
       "environment": "automations",
+      "caller_ref": "refs/heads/main",
+      "caller_workflow": "publish-pull-request-report.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "actions": "read", "pull_requests": "write" },
+      "target": "ruff"
+    },
+    {
+      "caller": "ruff",
+      "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ty-ecosystem-analyzer.yaml",
       "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",

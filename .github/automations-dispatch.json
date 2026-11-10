@@ -28,6 +28,30 @@
     {
       "repository": "ruff",
       "on": {
+        "workflow_run": ["completed"]
+      },
+      "conditions": {
+        "/workflow/path": {
+          "one_of": [
+            ".github/workflows/ty-ecosystem-analyzer.yaml",
+            ".github/workflows/typing_conformance.yaml",
+            ".github/workflows/memory_report.yaml"
+          ]
+        },
+        "/workflow_run/event": "pull_request",
+        "/workflow_run/head_repository/fork": true,
+        "/workflow_run/conclusion": { "one_of": ["success", "failure"] }
+      },
+      "workflow": "publish-pull-request-report.yml",
+      "inputs": {
+        "run_id": "/workflow_run/id",
+        "run_attempt": "/workflow_run/run_attempt",
+        "head_repository_id": "/workflow_run/head_repository/id"
+      }
+    },
+    {
+      "repository": "ruff",
+      "on": {
         "pull_request": ["labeled"]
       },
       "conditions": {

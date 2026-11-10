@@ -33,6 +33,21 @@ on:
         required: true
       STS_API_URL:
         required: true
+  # The automation app dispatches to main after a fork PR's report workflow completes.
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Report workflow run ID
+        required: true
+        type: string
+      run_attempt:
+        description: Completed run attempt
+        required: true
+        type: string
+      head_repository_id:
+        description: Repository ID of the pull request head
+        required: true
+        type: string
 
 permissions: {}
 
@@ -43,8 +58,8 @@ jobs:
   publish:
     if: >-
       github.repository == 'astral-sh/ruff' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     runs-on: github-ubuntu-24.04-x86_64-2
     timeout-minutes: 10
     environment:
@@ -54,7 +69,10 @@ jobs:
       contents: read
       id-token: write
     concurrency:
-      group: pull-request-report-${{ github.event.pull_request.number }}-${{ inputs.report }}
+      group: >-
+        ${{ github.event_name == 'workflow_dispatch'
+            && format('fork-ty-report-{0}', inputs.head_repository_id)
+            || format('pull-request-report-{0}-{1}', github.event.pull_request.number, inputs.report) }}
       cancel-in-progress: false
       queue: max
     steps:
@@ -66,6 +84,7 @@ jobs:
           persist-credentials: false
       - uses: $/.github/actions/setup-ruff-workspace
       - name: Read the stored comment ID
+        if: github.event_name == 'pull_request'
         id: comment-id
         uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
         with:
@@ -85,7 +104,7 @@ jobs:
             actions: read
             pull_requests: write
       - name: Get report upload credentials
-        if: inputs.upload-html && steps.token.outcome == 'success'
+        if: github.event_name == 'pull_request' && inputs.upload-html && steps.token.outcome == 'success'
         id: aws
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -96,7 +115,7 @@ jobs:
           role-session-name: report-${{ github.run_id }}-${{ github.run_attempt }}
           unset-current-credentials: true
       - name: Publish the report
-        if: steps.token.outcome == 'success'
+        if: github.event_name == 'pull_request' && steps.token.outcome == 'success'
         id: publish
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
@@ -132,3 +151,14 @@ jobs:
           scope: pull-request
           key: report-comment-${{ inputs.report }}
           value: ${{ steps.publish.outputs.comment-id }}
+      - name: Link to the fork report artifacts
+        if: github.event_name == 'workflow_dispatch' && steps.token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          RUN_ATTEMPT: ${{ inputs.run_attempt }}
+          HEAD_REPOSITORY_ID: ${{ inputs.head_repository_id }}
+        run: >-
+          uv run --script scripts/publish_pr_report.py
+          --fork-repository-id "$HEAD_REPOSITORY_ID"
+          --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
