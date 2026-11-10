@@ -9154,7 +9154,7 @@ impl<'db> Binding<'db> {
 
     /// A concrete string cannot satisfy a different literal-key parameter, irrespective of
     /// type variables in the rest of the signature. In an overload set this often distinguishes
-    /// a single candidate before generic inference, for example for a TypedDict lookup.
+    /// a single candidate before generic inference, for example for a `TypedDict` lookup.
     fn has_disjoint_literal_argument(&self, arguments: &CallArguments<'_, 'db>) -> bool {
         if self.is_partial_application
             || self
@@ -9187,7 +9187,7 @@ impl<'db> Binding<'db> {
                     return false;
                 };
                 argument
-                    .matched_type(declared, None)
+                    .matched_type(declared, matched.argument_type)
                     .and_then(Type::as_string_literal)
                     .is_some_and(|actual| actual != expected)
             })

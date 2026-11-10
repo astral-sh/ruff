@@ -115,8 +115,8 @@ More examples of this diagnostic can be found in the
 
 ### Overloads distinguished by a string literal
 
-A literal-valued variable can select an overload by keyword. If its other argument is
-incompatible, the call still reports the overload error.
+A literal-valued variable can select an overload by keyword. If its other argument is incompatible,
+the call still reports the overload error.
 
 ```py
 from typing import Literal, overload

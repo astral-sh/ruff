@@ -7051,7 +7051,7 @@ impl<'db> Type<'db> {
             && method.program(db) == env.program(db)
             && let Some(bindings) = Self::prepared_method_bindings(db, method)
         {
-            return bindings.as_ref().clone();
+            return bindings.clone();
         }
         self.bindings_impl(db, env, &ActiveRecursionDetector::default())
     }
@@ -7111,7 +7111,7 @@ impl<'db> Type<'db> {
     fn prepared_method_bindings(
         db: &'db dyn Db,
         method: BoundMethodType<'db>,
-    ) -> &'db Option<Box<Bindings<'db>>> {
+    ) -> Option<&'db Bindings<'db>> {
         #[salsa::tracked(returns(ref), no_eq, cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn prepare<'db>(
             db: &'db dyn Db,
@@ -7126,7 +7126,7 @@ impl<'db> Type<'db> {
             bindings.shrink_to_fit();
             Some(bindings)
         }
-        prepare(db, method)
+        prepare(db, method).as_deref()
     }
 
     fn bindings_impl(
@@ -8400,6 +8400,10 @@ impl<'db> Type<'db> {
         self.try_call_with_context(db, env, argument_types, TypeContext::default())
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa returns None when positional call inference re-enters this query"
+    )]
     fn try_call_with_context(
         self,
         db: &'db dyn Db,

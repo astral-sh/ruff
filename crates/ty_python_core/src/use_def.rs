@@ -1964,6 +1964,14 @@ fn pending_place_state_mut<'a>(
     }
 }
 
+/// The alternative path and the shared path after merging it into the current flow.
+#[derive(Clone, Copy)]
+struct PlaceStateJoin {
+    branch: PendingReachabilityId,
+    branch_reachability: ScopedReachabilityConstraintId,
+    merged_path: PendingReachabilityId,
+}
+
 impl PendingReachability {
     /// Merges an alternative branch's place states into the current control-flow path.
     ///
@@ -1974,9 +1982,7 @@ impl PendingReachability {
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
-        branch: PendingReachabilityId,
-        branch_reachability: ScopedReachabilityConstraintId,
-        merged_path: PendingReachabilityId,
+        join: PlaceStateJoin,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
@@ -1991,12 +1997,12 @@ impl PendingReachability {
                     reachability_constraints,
                 );
                 state.merge(
-                    PlaceState::undefined(branch_reachability),
+                    PlaceState::undefined(join.branch_reachability),
                     narrowing_constraints,
                     reachability_constraints,
                 );
-                current.reachability = merged_path;
-                current.narrowing = merged_path;
+                current.reachability = join.merged_path;
+                current.narrowing = join.merged_path;
                 continue;
             };
 
@@ -2028,14 +2034,14 @@ impl PendingReachability {
                 && inputs == previous
             {
                 Rc::make_mut(&mut current.state).set_singleton_constraints(merged);
-                current.reachability = merged_path;
-                current.narrowing = merged_path;
+                current.reachability = join.merged_path;
+                current.narrowing = join.merged_path;
                 continue;
             }
 
             self.materialize(
                 &mut branch_state,
-                branch,
+                join.branch,
                 narrowing_constraints,
                 reachability_constraints,
             );
@@ -2060,8 +2066,8 @@ impl PendingReachability {
                     reachability_constraints,
                 );
             }
-            current.reachability = merged_path;
-            current.narrowing = merged_path;
+            current.reachability = join.merged_path;
+            current.narrowing = join.merged_path;
         }
     }
 }
@@ -3154,12 +3160,15 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
+        let join = PlaceStateJoin {
+            branch,
+            branch_reachability: snapshot.reachability,
+            merged_path,
+        };
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
-            branch,
-            snapshot.reachability,
-            merged_path,
+            join,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
@@ -3167,9 +3176,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.pending_reachability.merge_place_states(
                 &mut self.member_states,
                 snapshot.member_states,
-                branch,
-                snapshot.reachability,
-                merged_path,
+                join,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );

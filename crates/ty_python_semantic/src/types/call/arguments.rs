@@ -516,7 +516,7 @@ impl<'db> CallArgumentTypes<'db> {
                     }
                 }
                 ContextualArgumentTypes::One { context, inferred } if *context == tcx => {
-                    *inferred = ty
+                    *inferred = ty;
                 }
                 ContextualArgumentTypes::One { context, inferred } => {
                     self.types = ContextualArgumentTypes::Many(
