@@ -285,6 +285,18 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_3.py"))]
+    fn protocol_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview_diff", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
+        );
+        Ok(())
+    }
+
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]

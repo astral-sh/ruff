@@ -236,6 +236,13 @@ pub(crate) const fn is_type_var_default_enabled(settings: &LinterSettings) -> bo
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/29481
+pub(crate) const fn is_non_pep695_generic_class_protocol_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
 // github.com/astral-sh/ruff/issues/20004
 pub(crate) const fn is_b006_check_guaranteed_mutable_expr_enabled(
     settings: &LinterSettings,
