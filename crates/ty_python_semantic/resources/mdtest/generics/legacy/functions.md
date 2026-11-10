@@ -2567,16 +2567,19 @@ def _(xs: list[int]):
     expected: list[list[list[str]] | list[int]] = result  # error: [invalid-assignment]
 ```
 
-With `T = int`, the `list[int]` returned by `first` fits both parameters of `store`. An empty list
-constructed for `values` can use the same element type.
+`first(xs, [])` can return `list[int]`, which fits both parameters of `store` with `T = int`. The
+empty `list()` can also use `int` as its element type.
 
 ```py
 from collections.abc import Iterable
 
-def store(values: T | Iterable[T | None], output: list[T]) -> None: ...
+def store(values: T | Iterable[T | None], output: list[T]) -> T:
+    return output[0]
+
 def _(xs: list[int]):
-    store(first(xs, []), first(xs, []))  # ok
-    store(list(), first(xs, []))  # ok
+    # TODO: Both calls should infer int from xs.
+    reveal_type(store(first(xs, []), first(xs, [])))  # revealed: Unknown
+    reveal_type(store(list(), first(xs, [])))  # revealed: Unknown
 ```
 
 ## Inferring a union parameter from other arguments
