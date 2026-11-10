@@ -1985,8 +1985,11 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
+        // Inferring a generic constructor can feed gradual argument types back into the
+        // receiver. Leave that inference to the solver (for example, for `map(fn, items)`).
         let self_typevar = if let Type::TypeVar(output) = self.return_ty
             && output.typevar(db).is_self(db)
+            && matches!(self_type, Type::NominalInstance(instance) if !instance.class(db, env).is_generic())
             && self.has_implicit_positional_receiver_annotation()
             && let Some((first, rest)) = self.parameters.as_slice().split_first()
             && matches!(first.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(output))
