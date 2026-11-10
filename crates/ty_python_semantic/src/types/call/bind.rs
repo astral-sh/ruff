@@ -9060,11 +9060,15 @@ impl<'db> Binding<'db> {
         ))
     }
 
-    /// For `x: T | list[T]`, an argument `list[int]` supplies two possible bindings for `T`.
-    /// Substituting their union back into `list[T]` would make the list itself a potential
-    /// element on the next pass. Solve for the context of the nested members with the matching
-    /// arguments bound to those members. The other arguments and the expected return type still
-    /// constrain this solution. For example, a sibling of type `list[T]` can independently fix `T`.
+    /// For `x: T | list[T]`, a `list[int]` argument can match `T` with `T = list[int]` or
+    /// `list[T]` with `T = int`. Using both bindings to specialize `list[T]` gives the next
+    /// inference pass a hint of `list[int | list[int]]`. Repeating this can add more list layers.
+    ///
+    /// To compute the hint for the `list[T]` arm, solve the call again as if `x` were declared
+    /// `list[T]`. The argument now contributes `int` as the element type. Apply the same
+    /// restriction to other arguments that can match a nested union member. The remaining
+    /// arguments and the expected return type still constrain `T`. The bare `T` arm uses the
+    /// ordinary specialization.
     fn nested_union_specialization(
         &self,
         db: &'db dyn Db,
