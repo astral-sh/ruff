@@ -2553,17 +2553,18 @@ def collect(value: U) -> list[U]:
     return reveal_type(choose(choose(value, value), value))  # revealed: list[U@collect]
 ```
 
-The two arguments can also match the bare `T` arm. Here `first(xs, [])` can return `list[int]`, so
-`choose` can take `T = list[list[str]] | list[int]`.
+The empty list in `first(xs, [])` initially contributes `Unknown`, but `xs` supplies the return type
+`list[int]` for `first`. Both arguments to `choose` can then match the bare `T` arm with
+`T = list[list[str]] | list[int]`.
 
 ```py
 def first(value: T, alternatives: list[T]) -> T:
     return value
 
 def _(xs: list[int]):
+    result = choose([["x"]], first(xs, []))  # ok
     # TODO: Revisiting [["x"]] adds extra list layers to the inferred return type.
-    # revealed: list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int]] | list[int] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int]]] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int]] | list[int] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int] | list[list[list[str]] | list[list[list[str]] | list[str]] | list[str] | list[int]]]]]
-    reveal_type(choose([["x"]], first(xs, [])))
+    expected: list[list[list[str]] | list[int]] = result  # error: [invalid-assignment]
 ```
 
 With `T = int`, the `list[int]` returned by `first` fits both parameters of `store`. An empty list
