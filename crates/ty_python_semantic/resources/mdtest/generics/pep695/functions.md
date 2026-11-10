@@ -3701,7 +3701,7 @@ def first[T](value: T, alternatives: list[T]) -> T:
 
 def _(xs: list[int]):
     result = choose([["x"]], first(xs, []))  # ok
-    # TODO: Revisiting [["x"]] adds extra list layers to the inferred return type.
+    # TODO: Revisiting [["x"]] still adds extra list layers to the inferred return type.
     expected: list[list[list[str]] | list[int]] = result  # error: [invalid-assignment]
 ```
 
