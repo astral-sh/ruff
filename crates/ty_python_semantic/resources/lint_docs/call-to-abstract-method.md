@@ -36,3 +36,9 @@ class Foo(ABC):
 # cannot call abstract classmethod
 Foo.method()  # error
 ```
+
+## Rule history
+
+- v0.0.101: Renamed from `call-abstract-method`.
+
+    `call-abstract-method` remains as a compatibility alias for this rule.
