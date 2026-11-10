@@ -1946,32 +1946,19 @@ impl<'db> BoundTypeVarIdentity<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct FreeTypeVars<'db> {
-    pub(super) variables: TypeVarSet<'db>,
-    pub(super) skipped_lazy: bool,
-}
-
-impl FreeTypeVars<'_> {
-    const EMPTY: Self = Self {
-        variables: TypeVarSet::None,
-        skipped_lazy: false,
-    };
-}
-
 impl<'db> Type<'db> {
-    /// Collects the free type variables in this type without forcing lazy attributes.
+    /// Returns the free type variables in this type and whether any lazy attributes were skipped.
     pub(super) fn free_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> FreeTypeVars<'db> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| FreeTypeVars::EMPTY, heap_size=ruff_memory_usage::heap_size)]
+    ) -> (TypeVarSet<'db>, bool) {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
         fn non_atomic_free_typevars<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             ty: NonAtomicType<'db>,
-        ) -> FreeTypeVars<'db> {
+        ) -> (TypeVarSet<'db>, bool) {
             struct CollectFreeTypeVars<'a, 'db> {
                 env: &'a ProgramEnvironment<'db>,
                 variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
@@ -2040,9 +2027,9 @@ impl<'db> Type<'db> {
                 }
 
                 fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                    let child = ty.free_typevars(db, self.env);
-                    self.variables.borrow_mut().extend(child.variables.iter(db));
-                    if child.skipped_lazy {
+                    let (typevars, skipped_lazy) = ty.free_typevars(db, self.env);
+                    self.variables.borrow_mut().extend(typevars.iter(db));
+                    if skipped_lazy {
                         self.notify_skipped_lazy_type_attributes();
                     }
                 }
@@ -2054,27 +2041,24 @@ impl<'db> Type<'db> {
                 skipped_lazy: Cell::new(false),
             };
             walk_non_atomic_type(db, ty, &collector);
-            FreeTypeVars {
-                variables: TypeVarSet::from_typevars(db, collector.variables.into_inner()),
-                skipped_lazy: collector.skipped_lazy.get(),
-            }
+            (
+                TypeVarSet::from_typevars(db, collector.variables.into_inner()),
+                collector.skipped_lazy.get(),
+            )
         }
 
         match TypeKind::from(self) {
-            TypeKind::Atomic => FreeTypeVars::EMPTY,
+            TypeKind::Atomic => (TypeVarSet::None, false),
             TypeKind::NonAtomic(NonAtomicType::TypeVar(variable)) => {
                 // Walking `Callable[P, R]` visits P.args and P.kwargs separately. Both
                 // projections also depend on P itself.
                 let unprojected = variable
                     .paramspec_attr(db)
                     .map(|_| variable.without_paramspec_attr(db));
-                FreeTypeVars {
-                    variables: TypeVarSet::from_typevars(
-                        db,
-                        std::iter::once(variable).chain(unprojected),
-                    ),
-                    skipped_lazy: false,
-                }
+                (
+                    TypeVarSet::from_typevars(db, std::iter::once(variable).chain(unprojected)),
+                    false,
+                )
             }
             TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty),
         }

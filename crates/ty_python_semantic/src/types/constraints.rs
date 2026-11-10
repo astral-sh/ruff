@@ -1297,9 +1297,9 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        let free = ty.free_typevars(db, env);
-        *support |= &Support::from_typevar_set(db, self, free.variables);
-        if free.skipped_lazy {
+        let (typevars, skipped_lazy) = ty.free_typevars(db, env);
+        *support |= &Support::from_typevar_set(db, self, typevars);
+        if skipped_lazy {
             support.mark_incomplete();
         }
     }
