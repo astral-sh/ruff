@@ -8275,12 +8275,7 @@ fn nested_union_members<'db>(
     ty: Type<'db>,
     inferable: TypeVarSet<'db>,
 ) -> Option<(UnionType<'db>, Type<'db>)> {
-    let union = ty.resolve_type_alias(db).as_union()?;
-    let union = if union.has_aliases(db) {
-        union.expand_aliases(db, env).as_union()?
-    } else {
-        union
-    };
+    let union = ty.expand_top_level_aliases(db, env).as_union()?;
     let bare = TypeVarSet::from_typevars(
         db,
         union
