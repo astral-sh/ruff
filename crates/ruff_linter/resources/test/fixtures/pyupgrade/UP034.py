@@ -59,3 +59,32 @@ def f():
 
 # OK
 sum((i for i in range(3)), [])
+
+# OK
+bases = (object,)
+
+
+class Foo((base for base in bases)):
+    pass
+
+
+# OK
+class Bar(object, (base for base in bases)):
+    pass
+
+
+# OK
+class Baz[T]((base for base in bases)):
+    pass
+
+
+# OK
+class Multi(
+    (base for base in bases)
+):
+    pass
+
+
+# UP034
+class Qux(f((base for base in bases))):
+    pass
