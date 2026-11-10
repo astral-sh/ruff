@@ -1447,6 +1447,23 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// The sole binding when it is visible on every path and has no narrowing to apply.
+    pub fn unconditional_definition(&self) -> Option<Definition<'db>> {
+        let [binding] = self.inner.as_slice() else {
+            return None;
+        };
+        if self.initial_unbound.is_some()
+            || binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            || binding.narrowing_constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            return None;
+        }
+        self.all_definitions
+            .get(binding.binding())
+            .state()
+            .definition()
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1533,6 +1550,22 @@ pub struct DeclarationsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> DeclarationsIterator<'map, 'db> {
+    /// The sole declaration when it is visible on every path.
+    pub fn unconditional_definition(&self) -> Option<Definition<'db>> {
+        let [declaration] = self.inner.as_slice() else {
+            return None;
+        };
+        if self.initial_undeclared.is_some()
+            || declaration.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+        {
+            return None;
+        }
+        self.all_definitions
+            .get(declaration.declaration())
+            .state()
+            .definition()
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }

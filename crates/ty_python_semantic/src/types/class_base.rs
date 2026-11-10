@@ -500,7 +500,7 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
+    ) -> ClassBaseMroIterator<'db> {
         match self {
             ClassBase::Protocol => {
                 ClassBaseMroIterator::length_3(db, env, self, ClassBase::Generic)
@@ -572,13 +572,22 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 
 /// An iterator over the MRO of a class base.
 #[derive(Clone)]
-enum ClassBaseMroIterator<'db> {
+pub(super) enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),
     FromClass(MroIterator<'db>),
 }
 
 impl<'db> ClassBaseMroIterator<'db> {
+    /// Materialize a complete parent sequence for C3 in a single allocation.
+    pub(super) fn into_vec(self) -> Vec<ClassBase<'db>> {
+        match self {
+            Self::Length2(iter) => iter.collect(),
+            Self::Length3(iter) => iter.collect(),
+            Self::FromClass(iter) => iter.into_vec(),
+        }
+    }
+
     /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
     fn length_2(
         db: &'db dyn Db,

@@ -89,9 +89,28 @@ impl<'db> Mro<'db> {
         }
 
         let env = &ProgramEnvironment::from_scope(class_literal.body_scope(db));
-        let class = class_literal.apply_optional_specialization(db, specialization);
-
         let original_bases = class_literal.explicit_bases(db);
+        // Protocol and Generic supply fixed ancestor lists for every specialization.
+        // Explicit Generic on a PEP 695 class still needs the full duplicate-base check.
+        match original_bases {
+            [
+                Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_))
+                | Type::SpecialForm(SpecialFormType::Protocol),
+            ] => {
+                return Ok(Box::new([
+                    ClassBase::Protocol,
+                    ClassBase::Generic,
+                    ClassBase::object(db, env),
+                ]));
+            }
+            [Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))]
+                if !class_literal.has_pep_695_type_params(db) =>
+            {
+                return Ok(Box::new([ClassBase::Generic, ClassBase::object(db, env)]));
+            }
+            _ => {}
+        }
+        let class = class_literal.apply_optional_specialization(db, specialization);
 
         match original_bases {
             // `builtins.object` is the special case:
@@ -153,7 +172,10 @@ impl<'db> Mro<'db> {
                         if single_base.has_cyclic_mro(db) {
                             Err(StaticMroErrorKind::InheritanceCycle)
                         } else {
-                            Ok(single_base.mro(db, env, specialization).collect())
+                            Ok(single_base
+                                .mro(db, env, specialization)
+                                .into_vec()
+                                .into_boxed_slice())
                         }
                     },
                 )
@@ -213,7 +235,7 @@ impl<'db> Mro<'db> {
                             StaticMroErrorKind::InheritanceCycle.into_mro_error(db, env, class)
                         );
                     }
-                    seqs.push(base.mro(db, env, specialization).collect());
+                    seqs.push(base.mro(db, env, specialization).into_vec());
                 }
                 // A single parent's MRO can also supply the implicit Generic and object
                 // at its end. In either case all C3 constraints already hold in that MRO.
@@ -402,7 +424,7 @@ impl<'db> Mro<'db> {
             if base.has_cyclic_mro(db) {
                 return Err(DynamicMroErrorKind::InheritanceCycle.into_error(db, env, dynamic));
             }
-            seqs.push(base.mro(db, env, None).collect());
+            seqs.push(base.mro(db, env, None).into_vec());
         }
         seqs.push(resolved_bases.clone());
 
@@ -498,7 +520,7 @@ impl<'db> Mro<'db> {
                     fallback_mro: fallback_mro(),
                 });
             }
-            seqs.push(base.mro(db, env, None).collect());
+            seqs.push(base.mro(db, env, None).into_vec());
         }
         seqs.push(resolved_bases.clone());
 
@@ -654,6 +676,18 @@ impl<'db> MroIterator<'db> {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
         }
+    }
+
+    /// Collects the current head and the cached slice of ancestors in visitation order.
+    pub(super) fn into_vec(mut self) -> Vec<ClassBase<'db>> {
+        let first = (!self.first_element_yielded).then(|| self.first_element());
+        let ancestors = self.full_mro_except_first_element().as_slice();
+        let mut result = Vec::with_capacity(usize::from(first.is_some()) + ancestors.len());
+        if let Some(first) = first {
+            result.push(first);
+        }
+        result.extend_from_slice(ancestors);
+        result
     }
 
     /// Materialize the full MRO of the class.
@@ -964,7 +998,7 @@ fn check_generic_reorder_fixes_mro<'db>(
         if base.has_cyclic_mro(db) {
             return None;
         }
-        seqs.push(base.mro(db, env, None).collect());
+        seqs.push(base.mro(db, env, None).into_vec());
     }
     seqs.push(reordered);
     c3_merge(db, seqs)?;

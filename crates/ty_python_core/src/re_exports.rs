@@ -27,7 +27,7 @@ use ruff_python_ast::{
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::static_dunder_all::static_dunder_all;
@@ -53,6 +53,121 @@ pub(super) fn exported_names(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Name]> 
     // or insertion order. See <https://github.com/astral-sh/ty/issues/444>
     exports.sort_unstable();
     exports.into()
+}
+
+/// Unconditional imports from a single provider in a stub that only declares names
+/// and re-exports other modules. A conditional or overlapping binding is excluded.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn unique_wildcard_sources<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> FxHashMap<Name, ty_module_resolver::Module<'db>> {
+    use ruff_python_ast::visitor::{Visitor, walk_expr};
+    struct Writes<'a>(&'a mut FxHashSet<Name>);
+    impl<'a> Visitor<'a> for Writes<'_> {
+        fn visit_expr(&mut self, expr: &'a ast::Expr) {
+            if let ast::Expr::Name(name) = expr {
+                if !name.ctx.is_load() {
+                    self.0.insert(name.id.clone());
+                }
+            } else if !matches!(expr, ast::Expr::StringLiteral(_)) {
+                walk_expr(self, expr);
+            }
+        }
+    }
+    fn collect<'db>(
+        db: &'db dyn Db,
+        file: ProgramFile<'db>,
+        body: &[ast::Stmt],
+        unconditional: bool,
+        blocked: &mut FxHashSet<Name>,
+        sources: &mut FxHashMap<Name, ty_module_resolver::Module<'db>>,
+    ) -> Option<()> {
+        for stmt in body {
+            match stmt {
+                ast::Stmt::ImportFrom(import) => {
+                    // Package/submodule imports can introduce an additional binding for a
+                    // component of the dotted name.
+                    if let Some(module) = &import.module {
+                        blocked.extend(module.as_str().split('.').map(Name::new));
+                    }
+                    for alias in &import.names {
+                        if alias.name.as_str() == "*" {
+                            let importing =
+                                ImportingFile::File(file.file(db), file.resolver_environment(db));
+                            let Some(module) =
+                                resolve_module_for_import_from(db, importing, import)
+                            else {
+                                continue;
+                            };
+                            let Some(source) = module.file(db) else {
+                                continue;
+                            };
+                            for name in
+                                exported_names(db, ProgramFile::new(db, source, file.program(db)))
+                            {
+                                if !unconditional || sources.insert(name.clone(), module).is_some()
+                                {
+                                    blocked.insert(name.clone());
+                                }
+                            }
+                        } else {
+                            blocked.insert(alias.asname.as_ref().unwrap_or(&alias.name).id.clone());
+                        }
+                    }
+                }
+                ast::Stmt::Import(import) => {
+                    for alias in &import.names {
+                        let name = alias.asname.as_ref().map_or_else(
+                            || alias.name.as_str().split('.').next().unwrap(),
+                            |id| id.as_str(),
+                        );
+                        blocked.insert(Name::new(name));
+                    }
+                }
+                ast::Stmt::If(node) => {
+                    Writes(blocked).visit_expr(&node.test);
+                    collect(db, file, &node.body, false, blocked, sources)?;
+                    for clause in &node.elif_else_clauses {
+                        if let Some(test) = &clause.test {
+                            Writes(blocked).visit_expr(test);
+                        }
+                        collect(db, file, &clause.body, false, blocked, sources)?;
+                    }
+                }
+                ast::Stmt::Assign(node) => {
+                    for target in &node.targets {
+                        blocked.insert(target.as_name_expr()?.id.clone());
+                    }
+                    Writes(blocked).visit_expr(&node.value);
+                }
+                ast::Stmt::AnnAssign(node) => {
+                    blocked.insert(node.target.as_name_expr()?.id.clone());
+                    Writes(blocked).visit_expr(&node.annotation);
+                    if let Some(value) = &node.value {
+                        Writes(blocked).visit_expr(value);
+                    }
+                }
+                ast::Stmt::Expr(node) if node.value.is_string_literal_expr() => {}
+                ast::Stmt::Pass(_) => {}
+                _ => return None,
+            }
+        }
+        Some(())
+    }
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    if !module.suite().iter().any(
+        |s| matches!(s,ast::Stmt::ImportFrom(i) if i.names.iter().any(|a|a.name.as_str()=="*")),
+    ) {
+        return FxHashMap::default();
+    }
+    let mut blocked = FxHashSet::default();
+    let mut sources = FxHashMap::default();
+    if collect(db, file, module.suite(), true, &mut blocked, &mut sources).is_none() {
+        return FxHashMap::default();
+    }
+    sources.retain(|name, _| !blocked.contains(name));
+    sources
 }
 
 struct ExportFinder<'db> {

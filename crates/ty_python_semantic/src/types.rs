@@ -12645,6 +12645,52 @@ impl<'db> ModuleLiteralType<'db> {
         Place::Undefined.into()
     }
 
+    /// Look up the value of a function forwarded unambiguously by a stub package.
+    /// The caller only consumes the type of the expression, so it need not obtain the
+    /// forwarding declaration in the package's own semantic index.
+    fn forwarded_function_value(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        let module = self.module(db);
+        if !module.kind(db).is_package() || name.starts_with('_') {
+            return None;
+        }
+        let file = module.file(db)?;
+        if !file.is_stub(db) {
+            return None;
+        }
+        let program_file = ProgramFile::new(db, file, env.program(db));
+        let source = *ty_python_core::unique_wildcard_sources(db, program_file).get(name)?;
+        if source.kind(db).is_package()
+            || self.available_submodule_attributes(db).any(|n| n == name)
+            || db
+                .analysis_settings(file)
+                .replace_imports_with_any
+                .matches(source.name(db))
+                .is_include()
+        {
+            return None;
+        }
+        let source_file = ProgramFile::new(db, source.file(db)?, env.program(db));
+        if !crate::dunder_all::dunder_all_names(db, source_file)?.contains(name) {
+            return None;
+        }
+        let member = imported_symbol(db, env, Some(source_file), name, None);
+        let Place::Defined(place) = member.place else {
+            return None;
+        };
+        if !member.qualifiers.is_empty() || place.definedness != Definedness::AlwaysDefined {
+            return None;
+        }
+        let ty @ Type::FunctionLiteral(_) = place.ty else {
+            return None;
+        };
+        Some(ty)
+    }
+
     /// Looks up a module member while preserving failed module-level `__getattr__` calls.
     ///
     /// The failed call and its recovery type are retained so direct attribute access and `from`

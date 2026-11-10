@@ -70,7 +70,9 @@ impl<'db> StaticClassLiteral<'db> {
         ClassMemberSources {
             scope,
             table: index.shared_place_table(scope.file_scope_id(db)),
-            implicit_names: collect_implicit_attribute_names(db, scope, true),
+            implicit_names: ty_python_core::receiver_attributes(db, scope)
+                .defined_names()
+                .into(),
         }
     }
 
@@ -477,7 +479,7 @@ pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, false)
+    collect_implicit_attribute_names(db, class_body_scope)
 }
 
 /// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
@@ -535,22 +537,17 @@ impl<'db> ClassMemberSources<'db> {
 fn collect_implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-    defined_only: bool,
 ) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
         let table = index.place_table(function_scope_id);
-        if defined_only {
-            names.extend(table.defined_instance_attribute_names().map(Name::new));
-        } else {
-            names.extend(
-                table
-                    .members()
-                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-            );
-        }
+        names.extend(
+            table
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
     }
 
     names.sort_unstable();

@@ -21,6 +21,35 @@ reveal_type(X)  # revealed: bool
 print(Y)  # error: [unresolved-reference]
 ```
 
+### Reading a function forwarded by a stub package
+
+`pkg/helpers.pyi`:
+
+```pyi
+__all__ = ["run", "other"]
+
+def run(value: int) -> str: ...
+def other(value: str) -> bool: ...
+```
+
+`pkg/__init__.pyi`:
+
+```pyi
+from .helpers import *
+
+other: int
+```
+
+`consumer.py`:
+
+```py
+import pkg
+
+reveal_type(pkg.run(1))  # revealed: str
+reveal_type(pkg.other)  # revealed: int
+pkg.run("x")  # error: [invalid-argument-type]
+```
+
 ### Overriding an existing definition
 
 `exporter.py`:

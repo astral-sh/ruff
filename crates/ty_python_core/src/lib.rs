@@ -55,6 +55,7 @@ pub mod platform;
 pub mod predicate;
 pub mod rank;
 mod re_exports;
+pub use re_exports::unique_wildcard_sources;
 pub mod reachability_constraints;
 pub mod scope;
 pub mod statement;
@@ -224,6 +225,57 @@ pub fn attribute_scopes<'db>(
             });
             once(func_id).chain(nested)
         })
+}
+
+/// The method and eager nested scopes in which each receiver attribute occurs.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct ReceiverAttributes {
+    sites: FxHashMap<
+        ruff_python_ast::name::Name,
+        SmallVec<[(FileScopeId, member::ScopedMemberId); 1]>,
+    >,
+    defined: Box<[ruff_python_ast::name::Name]>,
+}
+
+impl ReceiverAttributes {
+    pub fn sites(&self, name: &str) -> &[(FileScopeId, member::ScopedMemberId)] {
+        self.sites.get(name).map_or(&[], SmallVec::as_slice)
+    }
+
+    pub fn defined_names(&self) -> &[ruff_python_ast::name::Name] {
+        &self.defined
+    }
+}
+
+/// Index receiver attributes once instead of rescanning every place in every method
+/// separately for each attribute declaration or assignment.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn receiver_attributes<'db>(db: &'db dyn Db, class: ScopeId<'db>) -> ReceiverAttributes {
+    let index = semantic_index(db, class.program_file(db));
+    let mut sites: FxHashMap<_, SmallVec<[(FileScopeId, member::ScopedMemberId); 1]>> =
+        FxHashMap::default();
+    let mut defined = Vec::new();
+    for scope in attribute_scopes(db, class) {
+        for (ordinal, member) in index.place_table(scope).members().enumerate() {
+            let Some(name) = member.as_instance_attribute() else {
+                continue;
+            };
+            let name = ruff_python_ast::name::Name::new(name);
+            if member.is_bound() || member.is_declared() {
+                defined.push(name.clone());
+            }
+            let locations = sites.entry(name).or_default();
+            if locations.last().is_none_or(|(prev, _)| *prev != scope) {
+                locations.push((scope, member::ScopedMemberId::from_usize(ordinal)));
+            }
+        }
+    }
+    defined.sort_unstable();
+    defined.dedup();
+    ReceiverAttributes {
+        sites,
+        defined: defined.into_boxed_slice(),
+    }
 }
 
 /// Returns the module global scope of `file`.

@@ -54,6 +54,10 @@ use crate::{Db, program::Program};
     heap_size = ruff_memory_usage::heap_size
 )]
 pub struct ProgramFile<'db> {
+    /// The physical file is read independently of the parser key by semantic queries.
+    #[returns(copy)]
+    pub file: File,
+
     /// Cache the parser key even though its Python version is redundant with `program`:
     /// program files are created infrequently, but their parser keys are looked up extensively.
     #[returns(copy)]
@@ -68,12 +72,7 @@ impl get_size2::GetSize for ProgramFile<'_> {}
 impl<'db> ProgramFile<'db> {
     pub fn new(db: &'db dyn Db, file: File, program: Program<'db>) -> Self {
         let python_file = PythonFile::new(db, file, program.python_version(db));
-        Self::new_internal(db, python_file, program)
-    }
-
-    /// Returns the physical file represented by this program file.
-    pub fn file(self, db: &'db dyn Db) -> File {
-        self.python_file(db).file(db)
+        Self::new_internal(db, file, python_file, program)
     }
 
     /// Returns the module-resolution environment for this program file.

@@ -10276,7 +10276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::instance(db, env, collection_literal.identity_specialization(db));
                 let collection_generic_context = collection_literal.generic_context(db);
                 let identity_bindings = self
-                    .infer_attribute_load_impl(attribute, identity_instance)
+                    .infer_attribute_load_impl(attribute, identity_instance, false)
                     .unwrap_or_else(|recovery_ty| recovery_ty)
                     .inner_type()
                     .bindings(db, env)
@@ -11231,7 +11231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
-        self.infer_attribute_load_impl(attribute, value_type)
+        self.infer_attribute_load_impl(attribute, value_type, false)
     }
 
     /// Reject access to a generic instance attribute through a class while retaining the normal
@@ -11267,6 +11267,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
+        value_only: bool,
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
@@ -11322,17 +11323,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
         }
-        let member_lookup = value_type
-            .try_member_lookup(db, env, &attr.id)
-            .unwrap_or_else(|error| {
-                error.report_diagnostic(
-                    &self.context,
-                    value_type,
-                    attribute,
-                    assigned_type.map(|ty| ty.inner_type()),
-                );
-                error.fallback_member(db)
-            });
+        let forwarded = if value_only && let Type::ModuleLiteral(module) = value_type {
+            module.forwarded_function_value(db, env, &attr.id)
+        } else {
+            None
+        };
+        let lookup = forwarded.map_or_else(
+            || value_type.try_member_lookup(db, env, &attr.id),
+            |ty| Place::bound(ty).into(),
+        );
+        let member_lookup = lookup.unwrap_or_else(|error| {
+            error.report_diagnostic(
+                &self.context,
+                value_type,
+                attribute,
+                assigned_type.map(|ty| ty.inner_type()),
+            );
+            error.fallback_member(db)
+        });
         let fallback_place = member_lookup
             .member(db)
             .map_type(|ty| self.narrow_source_place(place_expr.as_ref(), ty, &constraint_keys));
@@ -11639,10 +11647,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = attribute;
 
         match ctx {
-            ExprContext::Load => self
-                .infer_attribute_load(attribute)
-                .unwrap_or_else(|recovery_ty| recovery_ty)
-                .inner_type(),
+            ExprContext::Load => {
+                let value_type =
+                    self.infer_maybe_standalone_expression(value, TypeContext::default());
+                self.infer_attribute_load_impl(attribute, value_type, true)
+                    .unwrap_or_else(|recovery_ty| recovery_ty)
+                    .inner_type()
+            }
             ExprContext::Store => {
                 self.infer_expression(value, TypeContext::default());
                 Type::Never

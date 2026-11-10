@@ -1870,6 +1870,21 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
+    if let Some(binding) = bindings_with_constraints.unconditional_definition()
+        && !matches!(
+            binding.kind(db),
+            DefinitionKind::LoopHeader(_) | DefinitionKind::DictKeyAssignment(_)
+        )
+        && !(requires_explicit_reexport.is_yes() && !is_reexported(db, binding))
+    {
+        return PlaceWithDefinition {
+            place: Place::Defined(
+                DefinedPlace::new(binding_type(db, binding)).with_definition(binding),
+            ),
+            first_definition: Some(binding),
+        };
+    }
+
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -2280,6 +2295,25 @@ fn place_from_declarations_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceFromDeclarationsResult<'db> {
+    if let Some(declaration) = declarations_iterator.unconditional_definition() {
+        if is_non_exported(db, declaration, requires_explicit_reexport) {
+            return PlaceFromDeclarationsResult::default();
+        }
+        let Some(declared) = inferred_declaration(db, declaration).declared() else {
+            return PlaceFromDeclarationsResult::default();
+        };
+        return PlaceFromDeclarationsResult {
+            place_and_quals: Place::Defined(
+                DefinedPlace::new(declared.inner_type())
+                    .with_origin(TypeOrigin::Declared)
+                    .with_definition(declaration),
+            )
+            .with_qualifiers(declared.qualifiers()),
+            conflicting_types: None,
+            first_declaration: Some(declaration),
+        };
+    }
+
     let predicates = declarations_iterator.predicates();
     let reachability_constraints = declarations_iterator.reachability_constraints();
     let boundness_analysis = declarations_iterator.boundness_analysis();
