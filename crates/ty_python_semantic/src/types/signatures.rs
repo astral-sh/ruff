@@ -1974,7 +1974,7 @@ impl<'db> Signature<'db> {
         Some(signature)
     }
 
-    /// Binds the `Self` receiver if it is unused in the rest of the signature.
+    /// Binds the receiver of a constructor when no other parameter supplies evidence for `Self`.
     ///
     /// This is purely a performance optimization. Eagerly binding the type of `Self` prevents
     /// unnecessary work from being performed by the constraint solver.
@@ -1985,7 +1985,19 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
-        let self_typevar = self.unused_self_typevar(db, env)?;
+        let self_typevar = if let Type::TypeVar(output) = self.return_ty
+            && output.typevar(db).is_self(db)
+            && self.has_implicit_positional_receiver_annotation()
+            && let Some((first, rest)) = self.parameters.as_slice().split_first()
+            && matches!(first.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(output))
+            && !rest.iter().any(|parameter| parameter.annotated_type().contains_self(db, env))
+        {
+            // In `__new__(cls, ...) -> Self`, the class being constructed supplies the
+            // receiver and fixes the returned instance. Keep other inference variables intact.
+            output
+        } else {
+            self.unused_self_typevar(db, env)?
+        };
 
         // Also ensure that the receiver satisfies the upper bound of `Self`.
         let bound = self_typevar.typevar(db).upper_bound(db, env)?;
@@ -2024,12 +2036,18 @@ impl<'db> Signature<'db> {
 
         let mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
-        Some(self.apply_type_mapping_impl(
+        let mut specialized = self.apply_type_mapping_impl(
             db,
             &mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
-        ))
+        );
+        // Constructor binding interprets a declared Self as the instance being constructed.
+        // Its final receiver can be narrower than the class used to prepare this signature.
+        if self.return_ty == Type::TypeVar(self_typevar) {
+            specialized.return_ty = self.return_ty;
+        }
+        Some(specialized)
     }
 
     fn apply_self_with_receiver(
