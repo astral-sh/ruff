@@ -80,6 +80,12 @@ impl Incoming {
         self.pending.contains_key(request_id)
     }
 
+    pub(crate) fn method(&self, request_id: &RequestId) -> Option<&str> {
+        self.pending
+            .get(request_id)
+            .map(|pending| pending.method.as_str())
+    }
+
     /// Returns the cancellation token for the given request id if the request is still pending.
     pub(crate) fn cancellation_token(
         &self,

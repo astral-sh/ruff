@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::server::{api, queue_full_error};
+use crate::server::{MAX_QUEUED_REQUESTS, api, queue_full_error};
 use crate::session::Session;
 use crossbeam::channel::TrySendError;
 use lsp_server::Request;
@@ -33,6 +33,7 @@ pub(crate) fn spawn_main_loop(
     )
 }
 
+#[derive(Clone, Copy, Debug)]
 pub(super) enum RequestAttempt {
     Initial,
     Retry,
@@ -68,12 +69,14 @@ impl Scheduler {
         match self.dispatch(task, session, client) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(())) => {
-                let error = if let Some(cancellation_error) = retry_error {
-                    tracing::debug!(%id, "Skipping retry because the worker queue is full");
-                    cancellation_error()
-                } else {
-                    queue_full_error()
-                };
+                tracing::warn!(
+                    %id,
+                    method = session.request_queue().incoming().method(&id),
+                    ?attempt,
+                    capacity = MAX_QUEUED_REQUESTS,
+                    "Worker queue is full, cannot schedule request"
+                );
+                let error = retry_error.map_or_else(queue_full_error, |cancelled| cancelled());
                 client.respond_err(id, error);
                 Ok(())
             }
