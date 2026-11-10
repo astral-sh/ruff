@@ -128,6 +128,16 @@ static FREQTRADE: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
+static NUMPY: Benchmark = Benchmark::new(RealWorldProject {
+    name: "numpy",
+    repository: "https://github.com/numpy/numpy",
+    commit: "b92fa9da0b7b2bc650d9298085876fc8db28df5e",
+    paths: &["numpy"],
+    dependencies: &["hypothesis", "packaging", "pytest", "typing-extensions"],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py312,
+});
+
 static PANDAS: Benchmark = Benchmark::new(RealWorldProject {
     name: "pandas",
     repository: "https://github.com/pandas-dev/pandas",
@@ -225,6 +235,11 @@ fn static_frame(bencher: Bencher) {
 #[bench(sample_size = 1, sample_count = 2)]
 fn colour_science(bencher: Bencher) {
     run_single_threaded(bencher, &COLOUR_SCIENCE);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn numpy(bencher: Bencher) {
+    run_single_threaded(bencher, &NUMPY);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
