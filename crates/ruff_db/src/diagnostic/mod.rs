@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
-use ruff_source_file::{LineColumn, SourceCode, SourceFile};
+use ruff_source_file::{SourceCode, SourceFile};
 
 use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -485,28 +485,6 @@ impl Diagnostic {
             .iter()
             .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
             .map(|sub| sub.inner.message.as_str())
-    }
-
-    /// Returns the filename for the message.
-    ///
-    /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn expect_ruff_filename(&self) -> String {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .name()
-            .to_string()
-    }
-
-    /// Computes the start source location for the message.
-    ///
-    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
-    /// or if the span has no range.
-    pub fn ruff_start_location(&self) -> Option<LineColumn> {
-        Some(
-            self.ruff_source_file()?
-                .to_source_code()
-                .line_column(self.range()?.start()),
-        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -1297,14 +1275,6 @@ impl Span {
             UnifiedFile::Ty(file) => file,
             UnifiedFile::Ruff(_) => panic!("Expected a ty `File`, found a ruff `SourceFile`"),
         }
-    }
-
-    /// Returns the [`SourceFile`] attached to this [`Span`].
-    ///
-    /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
-    fn expect_ruff_file(&self) -> &SourceFile {
-        self.as_ruff_file()
-            .expect("Expected a ruff `SourceFile`, found a ty `File`")
     }
 
     /// Returns the [`SourceFile`] attached to this [`Span`].
