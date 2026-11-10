@@ -3989,26 +3989,16 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
-        let mut deferred = SmallVec::<[usize; 4]>::new();
-        let mut has_checked_match = false;
-        for (index, overload) in self.matching_overloads_mut() {
-            if mode == CheckTypesMode::Finalize
-                && !should_retry_after_provisional_arity
-                && overload.has_disjoint_literal_argument(call_arguments.as_ref())
-            {
-                deferred.push(index);
-                continue;
-            }
+        let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
-            has_checked_match |= !overload.has_errors_affecting_overload_resolution();
-        }
-        for index in deferred {
-            let overload = &mut self.overloads[index];
-            if has_checked_match {
-                overload.mark_as_unmatched_overload();
-            } else {
-                // Infer complete diagnostics and the recovery return type on an erroneous call.
-                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        };
+        // Signature details and provisional inference need the types of losing candidates too.
+        // An expandable `*args` can also change which parameters the arguments match.
+        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
+            self.check_overloads_deferring_literal_mismatches(call_arguments.as_ref(), check_types);
+        } else {
+            for (_, overload) in self.matching_overloads_mut() {
+                check_types(overload);
             }
         }
 
@@ -4296,6 +4286,36 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+    }
+
+    /// Defer type checking for overloads ruled out by a string literal. If another candidate
+    /// matches, we can skip inference for those overloads entirely.
+    fn check_overloads_deferring_literal_mismatches(
+        &mut self,
+        arguments: &CallArguments<'_, 'db>,
+        check_types: impl Fn(&mut Binding<'db>),
+    ) {
+        let mut literal_mismatches = SmallVec::<[_; 4]>::new();
+        let mut found_match = false;
+        for (_, overload) in self.matching_overloads_mut() {
+            if overload.has_disjoint_literal_argument(arguments) {
+                literal_mismatches.push(overload);
+            } else {
+                check_types(overload);
+                found_match = found_match || !overload.has_errors_affecting_overload_resolution();
+            }
+        }
+
+        if found_match {
+            for overload in literal_mismatches {
+                overload.mark_as_unmatched_overload();
+            }
+        } else {
+            // A failed call needs each candidate's diagnostics and inferred return type for recovery.
+            for overload in literal_mismatches {
+                check_types(overload);
+            }
+        }
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
