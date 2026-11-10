@@ -2530,15 +2530,16 @@ def _(xs: list[int]):
     choose([["x"]], first(xs, []))  # ok
 ```
 
-The same nested call can supply two different parameters. With `T = int`, its `list[int]` return
-type fits both `Iterable[int]` and `list[int]`.
+With `T = int`, the `list[int]` returned by `first` fits both parameters of `store`. An empty list
+constructed for `values` can use the same element type.
 
 ```py
 from collections.abc import Iterable
 
-def store(values: T | Iterable[T], output: list[T]) -> None: ...
+def store(values: T | Iterable[T | None], output: list[T]) -> None: ...
 def _(xs: list[int]):
     store(first(xs, []), first(xs, []))  # ok
+    store(list(), first(xs, []))  # ok
 ```
 
 ## Inferring a union parameter from other arguments

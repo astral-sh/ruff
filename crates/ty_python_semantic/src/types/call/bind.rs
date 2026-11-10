@@ -8987,13 +8987,14 @@ impl<'db> Binding<'db> {
                     tcx_kind = parameter_tcx_kind;
                 }
 
-                parameter_type = if self.inference.is_some()
-                    && let Some((union, nested)) =
-                        nested_union_members(db, env, parameter_type, self.inferable_typevars)
-                    && let Some(actual) = arguments_types
-                        .get(argument_index)
-                        .and_then(|argument| argument.matched_type(original_parameter_type, None))
-                    && let Some(nested_types) = *cache.nested.get_or_init(|| {
+                let nested_context = || {
+                    self.inference?;
+                    let (union, nested) =
+                        nested_union_members(db, env, parameter_type, self.inferable_typevars)?;
+                    let actual = arguments_types
+                        .get(argument_index)?
+                        .matched_type(original_parameter_type, None)?;
+                    let nested_types = (*cache.nested.get_or_init(|| {
                         self.nested_union_specialization(
                             db,
                             env,
@@ -9001,13 +9002,17 @@ impl<'db> Binding<'db> {
                             arguments_types,
                             call_expression_tcx,
                         )
-                    })
-                    // A gradual argument can be assignable to this member and still need the
-                    // bare arm. For example, `list[int] | Unknown` can match `Iterable[int]`
-                    // without giving us enough evidence to use it as the next argument context.
-                    && actual.is_redundant_with(db, env, nested.apply_specialization(db, nested_types))
-                {
-                    union.map_leave_aliases(db, env, |&member| {
+                    }))?;
+                    let expected = nested.apply_specialization(db, nested_types);
+                    // An unsolved variable in the nested member supplies no evidence for the next
+                    // pass. A gradual argument can also still need the bare arm, even if it is
+                    // assignable to the nested member (e.g. `list[int] | Unknown` and `Iterable[int]`).
+                    if expected.has_unspecialized_type_var(db, env)
+                        || !actual.is_redundant_with(db, env, expected)
+                    {
+                        return None;
+                    }
+                    Some(union.map_leave_aliases(db, env, |&member| {
                         let is_nested = match nested {
                             Type::Union(members) => members.contains_member(db, member),
                             single => single == member,
@@ -9018,10 +9023,11 @@ impl<'db> Binding<'db> {
                             specialization.types
                         };
                         member.apply_specialization(db, types)
-                    })
-                } else {
-                    parameter_type.apply_specialization(db, specialization.types)
+                    }))
                 };
+                parameter_type = nested_context().unwrap_or_else(|| {
+                    parameter_type.apply_specialization(db, specialization.types)
+                });
             }
 
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
