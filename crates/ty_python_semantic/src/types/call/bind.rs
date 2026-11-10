@@ -339,7 +339,14 @@ impl<'db> CallableItem<'db> {
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.check_types(db, env, constraints, argument_types, call_expression_tcx);
+                binding.check_types(
+                    db,
+                    env,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    mode,
+                );
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(
@@ -3914,6 +3921,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -3973,8 +3981,27 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
+        let mut deferred = SmallVec::<[usize; 4]>::new();
+        let mut has_checked_match = false;
+        for (index, overload) in self.matching_overloads_mut() {
+            if !mode.is_provisional()
+                && !should_retry_after_provisional_arity
+                && overload.has_disjoint_literal_argument(call_arguments.as_ref())
+            {
+                deferred.push(index);
+                continue;
+            }
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            has_checked_match |= !overload.has_errors_affecting_overload_resolution();
+        }
+        for index in deferred {
+            let overload = &mut self.overloads[index];
+            if has_checked_match {
+                overload.mark_as_unmatched_overload();
+            } else {
+                // Infer complete diagnostics and the recovery return type on an erroneous call.
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            }
         }
 
         tracing::trace!(
@@ -9123,6 +9150,47 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish(db, env);
+    }
+
+    /// A concrete string cannot satisfy a different literal-key parameter, irrespective of
+    /// type variables in the rest of the signature. In an overload set this often distinguishes
+    /// a single candidate before generic inference, for example for a `TypedDict` lookup.
+    fn has_disjoint_literal_argument(&self, arguments: &CallArguments<'_, 'db>) -> bool {
+        if self.is_partial_application
+            || self
+                .signature
+                .parameters()
+                .as_paramspec_with_prefix()
+                .is_some()
+        {
+            return false;
+        }
+        self.argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .any(|(matched, argument)| {
+                if !matches!(
+                    argument,
+                    CallArgument::Positional(_) | CallArgument::Keyword { .. }
+                ) {
+                    return false;
+                }
+                let [matched] = matched.parameters.as_slice() else {
+                    return false;
+                };
+                let parameter = &self.signature.parameters()[matched.index];
+                if !parameter.is_positional() || matched.expected_type.is_some() {
+                    return false;
+                }
+                let declared = parameter.annotated_type();
+                let Some(expected) = declared.as_string_literal() else {
+                    return false;
+                };
+                argument
+                    .matched_type(declared, matched.argument_type)
+                    .and_then(Type::as_string_literal)
+                    .is_some_and(|actual| actual != expected)
+            })
     }
 
     fn check_types(
