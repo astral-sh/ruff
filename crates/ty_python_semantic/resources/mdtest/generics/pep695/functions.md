@@ -3723,8 +3723,8 @@ def _(xs: list[int]):
 
 ## Inferring a union parameter from other arguments
 
-A sibling argument can independently fix `T` to a union that contains a list. Both members of that
-union are needed when inferring the empty list.
+Matching `items` against `source: list[T]` fixes `T` to `int | list[str]`. The empty list can
+therefore match the bare `T` arm as a `list[str]` or the `list[T]` arm as a `list[int | list[str]]`.
 
 ```py
 def pick[T](source: list[T], *others: T | list[T]) -> T:
