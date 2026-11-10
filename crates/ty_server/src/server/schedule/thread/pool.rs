@@ -143,10 +143,7 @@ impl PendingJob<'_> {
         let queued = sender.len();
         if queued != 0 && queued.is_multiple_of(256) {
             tracing::info!(
-                queue = "worker",
-                queued,
-                capacity = MAX_QUEUED_REQUESTS,
-                "Request queue size"
+                "{queued} requests are waiting for a worker. The queue can hold up to {MAX_QUEUED_REQUESTS}."
             );
         }
         Ok(())
