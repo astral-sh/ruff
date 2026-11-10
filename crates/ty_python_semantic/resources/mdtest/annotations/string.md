@@ -263,9 +263,9 @@ def f1(
     # error: [invalid-type-form] "Bytes literals are not allowed in this context in a parameter annotation"
     e: b"int",
     f: "int",
-    # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
+    # error: [implicit-string-concatenation-in-type-annotation] "Type expressions cannot span multiple string literals"
     g: "in" "t",
-    # error: [implicit-concatenated-string-type-annotation] "Type expressions cannot span multiple string literals"
+    # error: [implicit-string-concatenation-in-type-annotation] "Type expressions cannot span multiple string literals"
     h: list["in" "t"],
     # error: [escape-character-in-forward-annotation] "Escape characters are not allowed in parameter annotations"
     i: "\N{LATIN SMALL LETTER I}nt",

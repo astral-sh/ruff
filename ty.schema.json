@@ -646,9 +646,9 @@
             }
           ]
         },
-        "implicit-concatenated-string-type-annotation": {
-          "title": "detects implicit concatenated strings in type annotations",
-          "description": "## What it does\n\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```",
+        "implicit-string-concatenation-in-type-annotation": {
+          "title": "detects implicit string concatenation in type annotations",
+          "description": "## What it does\n\nChecks for implicit string concatenation in type annotations.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use implicit string concatenation.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```\n\n## Rule history\n\n- v0.0.101: Renamed from `implicit-concatenated-string-type-annotation`.\n\n    `implicit-concatenated-string-type-annotation` remains as a compatibility alias for this rule.",
           "default": "error",
           "oneOf": [
             {

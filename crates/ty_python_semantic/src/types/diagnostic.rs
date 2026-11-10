@@ -27,7 +27,7 @@ use crate::types::overrides::{MethodKind, MethodOverrideViolation};
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
-    ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
+    ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_STRING_CONCATENATION_IN_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::tuple::TupleSpec;
@@ -232,7 +232,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
-    registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
+    registry.register_lint(&IMPLICIT_STRING_CONCATENATION_IN_TYPE_ANNOTATION);
+    registry.register_alias(
+        LintName::of("implicit-concatenated-string-type-annotation"),
+        &IMPLICIT_STRING_CONCATENATION_IN_TYPE_ANNOTATION,
+    );
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
 }
