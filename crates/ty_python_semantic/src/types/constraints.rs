@@ -103,20 +103,15 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::type_alias::TypeAliasType;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
-};
-use crate::types::variance::VarianceInferable;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
     NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Signature, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, walk_signature,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
+    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1276,137 +1271,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load_with_provenance(db, env, other, Some(provenance));
         ConstraintSet::from_node(self, node, source_order)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct FreeTypeVars<'db> {
-    variables: TypeVarSet<'db>,
-    skipped_lazy: bool,
-}
-
-impl FreeTypeVars<'_> {
-    const EMPTY: Self = Self {
-        variables: TypeVarSet::None,
-        skipped_lazy: false,
-    };
-}
-
-impl<'db> Type<'db> {
-    /// Collects free type variables in a constraint bound without forcing lazy attributes.
-    fn free_typevars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> FreeTypeVars<'db> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| FreeTypeVars::EMPTY, heap_size=ruff_memory_usage::heap_size)]
-        fn non_atomic_free_typevars<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
-            ty: NonAtomicType<'db>,
-        ) -> FreeTypeVars<'db> {
-            struct CollectFreeTypeVars<'a, 'db> {
-                env: &'a ProgramEnvironment<'db>,
-                variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-                skipped_lazy: Cell<bool>,
-            }
-
-            impl<'db> TypeVisitor<'db> for CollectFreeTypeVars<'_, 'db> {
-                fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                    self.env
-                }
-
-                fn should_visit_lazy_type_attributes(&self) -> bool {
-                    false
-                }
-
-                fn notify_skipped_lazy_type_attributes(&self) {
-                    self.skipped_lazy.set(true);
-                }
-
-                fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                    // Declaration bounds, constraints, and defaults are not occurrences in the
-                    // constraint itself and must not contribute to its support.
-                }
-
-                fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
-                    // Each overload binds its own type variables. A captured type variable is still
-                    // free in the callable and must contribute to the enclosing constraint.
-                    let Some(context) = signature.generic_context else {
-                        return walk_signature(db, signature, self);
-                    };
-                    let enclosing = self.variables.take();
-                    walk_signature(db, signature, self);
-                    let locals = context.inferable_typevars(db);
-                    let candidates = self.variables.replace(enclosing);
-                    self.variables
-                        .borrow_mut()
-                        .extend(candidates.into_iter().filter(|variable| {
-                            let mut identity = variable.identity(db);
-                            if variable.paramspec_attr(db).is_some() {
-                                identity = identity.without_paramspec_attr(db);
-                            }
-                            !identity.is_inferable(db, locals)
-                        }));
-                }
-
-                fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                    for ty in alias.specialization(db).types(db) {
-                        self.visit_type(db, *ty);
-                    }
-                }
-
-                fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                    self.notify_skipped_lazy_type_attributes();
-                    let Some(specialization) = alias.specialization(db) else {
-                        return;
-                    };
-                    let parameters = specialization.generic_context(db).variables(db);
-                    let origin = alias.unspecialized(db);
-                    for (parameter, &argument) in parameters.zip(specialization.types(db)) {
-                        // With `type Constant[T] = int`, the value of T has no effect on the bound.
-                        let variance = origin.variance_of(db, self.env, parameter.identity(db));
-                        if variance.evaluate(db) != TypeVarVariance::Bivariant {
-                            self.visit_type(db, argument);
-                        }
-                    }
-                }
-
-                fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                    let child = ty.free_typevars(db, self.env);
-                    self.variables.borrow_mut().extend(child.variables.iter(db));
-                    if child.skipped_lazy {
-                        self.notify_skipped_lazy_type_attributes();
-                    }
-                }
-            }
-
-            let collector = CollectFreeTypeVars {
-                env: &ProgramEnvironment::from_program(program),
-                variables: RefCell::default(),
-                skipped_lazy: Cell::new(false),
-            };
-            walk_non_atomic_type(db, ty, &collector);
-            FreeTypeVars {
-                variables: TypeVarSet::from_typevars(db, collector.variables.into_inner()),
-                skipped_lazy: collector.skipped_lazy.get(),
-            }
-        }
-
-        match TypeKind::from(self) {
-            TypeKind::Atomic => FreeTypeVars::EMPTY,
-            TypeKind::NonAtomic(NonAtomicType::TypeVar(variable)) => {
-                // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
-                // also depends on P itself, so solving or quantifying P must update it.
-                let unprojected = variable
-                    .paramspec_attr(db)
-                    .map(|_| variable.without_paramspec_attr(db));
-                FreeTypeVars {
-                    variables: TypeVarSet::from_typevars(
-                        db,
-                        iter::once(variable).chain(unprojected),
-                    ),
-                    skipped_lazy: false,
-                }
-            }
-            TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty),
-        }
     }
 }
 
@@ -5251,6 +5115,7 @@ mod tests {
     use crate::types::generics::ApplySpecialization;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarInstance,
     };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
