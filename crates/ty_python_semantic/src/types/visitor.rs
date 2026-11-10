@@ -387,7 +387,7 @@ type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
-enum SmallSet<T, const INLINE_CAPACITY: usize> {
+pub(super) enum SmallSet<T, const INLINE_CAPACITY: usize> {
     Inline(SmallVec<[T; INLINE_CAPACITY]>),
     Spilled(FxHashSet<T>),
 }
@@ -400,7 +400,7 @@ impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
 
 impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     #[inline]
-    fn insert(&mut self, value: T) -> bool
+    pub(super) fn insert(&mut self, value: T) -> bool
     where
         T: Hash + Eq,
     {

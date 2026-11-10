@@ -1516,6 +1516,20 @@ def _(a: A, b: B) -> None:
     reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
 ```
 
+## Type variables captured by a generic callback
+
+```py
+type Pair[T, U] = tuple[T, U]
+
+def pairs[T](captured: T):
+    def pair[U](value: U) -> Pair[T, U]:
+        return captured, value
+
+    callbacks = {pair}
+    callbacks |= {pair}
+    reveal_type(callbacks.pop()(1))  # revealed: tuple[T@pairs, Literal[1]]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

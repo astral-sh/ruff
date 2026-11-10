@@ -112,12 +112,13 @@ use crate::types::typevar::{
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    NonAtomicType, SmallSet, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
+    walk_non_atomic_type,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, IntersectionType, Type,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    walk_signature,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1295,7 +1296,7 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    /// Interns all of the typevars mentioned in a type in a stable order.
+    /// Interns the free type variables in a constraint bound in a stable order.
     fn intern_mentioned_typevars_in_type(
         &mut self,
         db: &'db dyn Db,
@@ -1307,7 +1308,8 @@ impl<'db> ConstraintSetStorage<'db> {
             env: &'a ProgramEnvironment<'db>,
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
             support: RefCell<&'a mut Support>,
-            recursion_guard: TypeCollector<'db>,
+            bound_typevars: Cell<TypeVarSet<'db>>,
+            visited: RefCell<SmallSet<(Type<'db>, TypeVarSet<'db>), 8>>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
@@ -1326,6 +1328,20 @@ impl<'db> ConstraintSetStorage<'db> {
             fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
                 // Declaration bounds, constraints, and defaults are not occurrences in the
                 // constraint itself and must not contribute to its support.
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                // Each overload binds its own type variables. A captured type variable is still
+                // free in the callable and must contribute to the enclosing constraint.
+                let enclosing = self.bound_typevars.get();
+                for signature in &callable.signatures(db).overloads {
+                    let locals = signature
+                        .generic_context
+                        .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
+                    self.bound_typevars.set(enclosing.merge(db, locals));
+                    walk_signature(db, signature, self);
+                }
+                self.bound_typevars.set(enclosing);
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -1352,19 +1368,33 @@ impl<'db> ConstraintSetStorage<'db> {
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if let Type::TypeVar(bound_typevar) = ty {
+                    let unprojected = if bound_typevar.paramspec_attr(db).is_some() {
+                        bound_typevar.without_paramspec_attr(db)
+                    } else {
+                        bound_typevar
+                    };
+                    if unprojected.is_inferable(db, self.bound_typevars.get()) {
+                        return;
+                    }
                     let mut storage = self.storage.borrow_mut();
                     let typevar = storage.intern_typevar(db, bound_typevar);
                     let mut support = self.support.borrow_mut();
                     support.insert(typevar);
                     // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
                     // also depends on P itself, so solving or quantifying P must update it.
-                    if bound_typevar.paramspec_attr(db).is_some() {
-                        support.insert(
-                            storage.intern_typevar(db, bound_typevar.without_paramspec_attr(db)),
-                        );
+                    if unprojected != bound_typevar {
+                        support.insert(storage.intern_typevar(db, unprojected));
                     }
                 }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                // A shared type can contain a free variable in one signature and a bound one in another.
+                if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty)
+                    && self
+                        .visited
+                        .borrow_mut()
+                        .insert((ty, self.bound_typevars.get()))
+                {
+                    walk_non_atomic_type(db, non_atomic, self);
+                }
             }
         }
 
@@ -1372,7 +1402,8 @@ impl<'db> ConstraintSetStorage<'db> {
             env,
             storage: RefCell::new(self),
             support: RefCell::new(support),
-            recursion_guard: TypeCollector::default(),
+            bound_typevars: Cell::new(TypeVarSet::None),
+            visited: RefCell::default(),
         }
         .visit_type(db, ty);
     }
