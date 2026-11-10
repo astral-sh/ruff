@@ -3715,7 +3715,8 @@ def store[T](values: T | Iterable[T | None], output: list[T]) -> T:
     return output[0]
 
 def _(xs: list[int]):
-    # TODO: Both calls should infer int from xs.
+    # TODO: Matching the union from `first(xs, [])` against `output: list[T]` skips the
+    # `list[int]` member that would give `T = int`. See https://github.com/astral-sh/ty/issues/4909
     reveal_type(store(first(xs, []), first(xs, [])))  # revealed: Unknown
     reveal_type(store(list(), first(xs, [])))  # revealed: Unknown
 ```
