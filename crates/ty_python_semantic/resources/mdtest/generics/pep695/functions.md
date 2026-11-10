@@ -3637,21 +3637,32 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
-## Nested calls with ambiguous union parameters
+## List literals with ambiguous union parameters
 
-In `choose([], [])`, each `[]` initially has type `list[Unknown]`. It can match `T` with
+In `as_list([])`, the literal initially has type `list[Unknown]`. It can match `T` with
 `T = list[Unknown]` or `list[T]` with `T = Unknown`. Both bindings contribute to the return type.
 
-We then revisit the same argument expressions using the specialized parameter types as context so
-that one argument can help determine the type of the other. The `list[T]` arm gives each `[]` an
-element type of `Unknown`. Using both bindings here would give the literal `list[Unknown] | Unknown`
-as its element type and could add another list layer each time we revisit it.
+We then revisit `[]` using the specialized parameter type as context. The `list[T]` arm gives the
+literal an element type of `Unknown`. Using both bindings here would give it an element type of
+`list[Unknown] | Unknown` and could add another list layer each time we revisit it.
+
+```py
+def as_list[T](value: T | list[T]) -> list[T]:
+    if isinstance(value, list):
+        return value
+    return [value]
+
+reveal_type(as_list([]))  # revealed: list[list[Unknown] | Unknown]
+```
+
+## Nested calls with ambiguous union parameters
+
+Each outer call to `choose` can use `T = None`. Its nested call returns `list[None]`, which matches
+`list[T]`, while its other argument, `None`, matches the bare `T` arm.
 
 ```py
 def choose[T](left: T | list[T], right: T | list[T]) -> list[T]:
     raise NotImplementedError
-
-reveal_type(choose([], []))  # revealed: list[list[Unknown] | Unknown]
 
 result: list[None] | list[int] = choose(choose(choose(None, None), None), None)
 reveal_type(result)  # revealed: list[None]
