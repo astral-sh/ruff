@@ -207,6 +207,20 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
         });
 }
 
+#[track_caller]
+fn run_multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+
+    bencher
+        .with_inputs(|| benchmark.setup_iteration())
+        .bench_local_values(|db| {
+            thread_pool.install(|| {
+                check_project(&db, benchmark.project.name);
+                db
+            })
+        });
+}
+
 #[bench(sample_size = 2, sample_count = 3)]
 fn altair(bencher: Bencher) {
     run_single_threaded(bencher, &ALTAIR);
@@ -239,7 +253,7 @@ fn colour_science(bencher: Bencher) {
 
 #[bench(sample_size = 1, sample_count = 2)]
 fn numpy(bencher: Bencher) {
-    run_single_threaded(bencher, &NUMPY);
+    run_multithreaded(bencher, &NUMPY);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
@@ -254,16 +268,7 @@ fn sympy(bencher: Bencher) {
 
 #[bench(sample_size = 3, sample_count = 8)]
 fn multithreaded(bencher: Bencher) {
-    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
-
-    bencher
-        .with_inputs(|| ALTAIR.setup_iteration())
-        .bench_local_values(|db| {
-            thread_pool.install(|| {
-                check_project(&db, ALTAIR.project.name);
-                db
-            })
-        });
+    run_multithreaded(bencher, &ALTAIR);
 }
 
 fn main() {
