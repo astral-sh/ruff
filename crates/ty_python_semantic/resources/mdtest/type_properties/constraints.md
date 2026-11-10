@@ -1613,6 +1613,16 @@ def uncovered[T: str, U: int | bytes]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
+When `T | str` is both a lower and an upper bound on `U`, the solution preserves the caller's `T`.
+Its declared bound restricts only the part of `U` outside `str`.
+
+```py
+def bounded_caller[T: int, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | str) & ConstraintSet.lower_bound(T | str, U)
+    # revealed: tuple[Solution[U=T@bounded_caller | str]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[U]))
+```
+
 For a gradual arm, we subtract its top materialization: `U & ~Top[A] ≤ T`. This preserves the
 portion of `U` that the gradual arm cannot accept.
 
@@ -1641,6 +1651,92 @@ def propagated_union[T, U, V]() -> None:
     constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, T | V)
     # revealed: tuple[Solution[T=U@propagated_union]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+### Upper bounds from intersections with exclusions
+
+If the part of `U` outside `str` fits in `int | bytes`, then `U` can span all three types. This
+limits the possible specializations even when `U` has a gradual declared bound.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions._internal import (
+    ConstraintSet,
+    is_assignable_to,
+    is_constraint_set_assignable_to,
+    is_constraint_set_subtype_of,
+    is_subtype_of,
+)
+
+def upper[U: Any]() -> None:
+    expected = ConstraintSet.upper_bound(U, int | bytes | str)
+    static_assert(is_constraint_set_assignable_to(Intersection[U, Not[str]], int | bytes) == expected)
+    static_assert(is_constraint_set_subtype_of(Intersection[U, Not[str], Not[bytes]], int) == expected)
+```
+
+For a static specialization of `U`, `(U & ~str) ≤ str` holds exactly when `U ≤ str`. With a bound of
+`Any`, assignability can materialize the bound to `str`, making the intersection `Never`. Subtyping
+also considers a bound of `object`, which permits `U = int`.
+
+```py
+def excluded_target[U: Any]() -> None:
+    when = is_constraint_set_assignable_to(Intersection[U, Not[str]], str)
+    static_assert(when == ConstraintSet.upper_bound(U, str))
+    static_assert(is_assignable_to(Intersection[U, Not[str]], str))
+    static_assert(not is_subtype_of(Intersection[U, Not[str]], str))
+
+def static_bound[U: object]() -> None:
+    static_assert(not is_assignable_to(Intersection[U, Not[str]], str))
+```
+
+Equivalence imposes the same upper bound. Choosing `U = int | str` satisfies `(U & ~str) = int`.
+
+```py
+def equivalent[T, U]() -> None:
+    equal = ConstraintSet.equality(T, Intersection[U, Not[str]]) & ConstraintSet.equality(T, int)
+    candidate = equal & ConstraintSet.equality(U, int | str)
+    static_assert(candidate.solutions_for(U, inferable=tuple[T, U]) is not None)
+```
+
+A declared bound can already establish the relation. In that case there is no evidence to override
+the type variable's default.
+
+```py
+def covered[U: int | str = int]() -> None:
+    constraints = is_constraint_set_assignable_to(Intersection[U, Not[int]], str)
+    reveal_type(constraints.solutions_for(U, inferable=tuple[U]))  # revealed: tuple[()]
+```
+
+Comparing the remaining part of a bound with a `TypedDict` can also infer a type variable from a
+field.
+
+```py
+from typing import TypedDict
+
+class StringField(TypedDict):
+    value: str
+
+def field[T, U: StringField | int]() -> None:
+    class Field(TypedDict):
+        value: T
+
+    constraints = is_constraint_set_assignable_to(Intersection[U, Not[int]], Field)
+    # revealed: tuple[Solution[T=str], Solution[]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+Excluding a `TypedDict` with an `Any` field may still leave values of `StringField`: the field could
+materialize to `int`. That exclusion cannot establish that the remainder is a subtype of `int`.
+
+```py
+class GradualField(TypedDict):
+    value: Any
+
+def gradual_exclusion[U]() -> None:
+    when = is_constraint_set_subtype_of(Intersection[U, Not[GradualField]], int)
+    candidate = when & ConstraintSet.equality(U, StringField)
+    static_assert(candidate.solutions_for(U, inferable=tuple[U]) is None)
 ```
 
 ### Substitution exceeding the derivation budget
