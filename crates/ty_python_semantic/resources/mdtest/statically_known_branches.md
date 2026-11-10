@@ -180,7 +180,6 @@ if IS_WIN_INFERRED:
 else:
     pass
 
-
 def annotated() -> None:
     if IS_WIN:
         sys.getwindowsversion()
@@ -192,11 +191,9 @@ def annotated() -> None:
     else:
         sys.getwindowsversion()
 
-
 def inferred() -> None:
     if IS_WIN_INFERRED:
         sys.getwindowsversion()
-
 
 def negated() -> None:
     if not IS_WIN:
@@ -204,12 +201,10 @@ def negated() -> None:
     else:
         sys.getwindowsversion()
 
-
 def not_final() -> None:
     if MAYBE_WIN:
         # error: [missing-attribute]
         sys.getwindowsversion()
-
 
 def revealed_types() -> None:
     reveal_type(IS_WIN)  # revealed: Literal[False]
@@ -237,7 +232,6 @@ from flags import IS_WIN
 
 if IS_WIN:
     sys.getwindowsversion()
-
 
 def check() -> None:
     if IS_WIN:
