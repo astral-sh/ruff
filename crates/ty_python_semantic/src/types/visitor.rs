@@ -448,6 +448,7 @@ pub(super) struct LegacyTypeVarSearch<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     candidates: RefCell<Option<FxOrderSet<BoundTypeVarInstance<'db>>>>,
     seen: TypeCollector<'db>,
+    expand_aliases: bool,
 }
 
 impl<'env, 'db> LegacyTypeVarSearch<'env, 'db> {
@@ -459,7 +460,15 @@ impl<'env, 'db> LegacyTypeVarSearch<'env, 'db> {
             env,
             candidates: RefCell::new(Some(initial.iter().copied().collect())),
             seen: TypeCollector::default(),
+            expand_aliases: true,
         }
+    }
+
+    /// An argument may disappear when its enclosing alias is specialized. Leave nested
+    /// aliases opaque until the full walk reaches them in the specialized body.
+    pub(super) fn without_alias_expansion(mut self) -> Self {
+        self.expand_aliases = false;
+        self
     }
 
     pub(super) fn finish(self) -> Option<Box<[BoundTypeVarInstance<'db>]>> {
@@ -528,7 +537,9 @@ impl<'db> TypeVisitor<'db> for LegacyTypeVarSearch<'_, 'db> {
     }
 
     fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        if let Some(vars) = alias.legacy_typevar_candidates(db) {
+        if self.expand_aliases
+            && let Some(vars) = alias.legacy_typevar_candidates(db)
+        {
             if let Some(candidates) = self.candidates.borrow_mut().as_mut() {
                 candidates.extend(vars.iter().copied());
             }

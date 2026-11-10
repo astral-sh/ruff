@@ -571,7 +571,7 @@ impl<'db> TypeAliasType<'db> {
             }
 
             let env = ProgramEnvironment::from_program(arguments.generic_context(db).program(db));
-            let search = LegacyTypeVarSearch::new(&env, body);
+            let search = LegacyTypeVarSearch::new(&env, body).without_alias_expansion();
             walk_specialization_types(db, arguments, &search);
             search.finish()
         }

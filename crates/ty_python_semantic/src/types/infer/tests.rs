@@ -1337,6 +1337,36 @@ fn overload_signatures_track_imported_annotations() -> anyhow::Result<()> {
 }
 
 #[test]
+fn discarded_alias_argument_does_not_load_its_dependencies() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_file("/src/leaf.py", "class Leaf: pass")?;
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from leaf import Leaf
+        type Payload = list[Leaf]
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from aliases import Payload
+        type First[X, Y] = X
+        def f(x: First[str, Payload]) -> None: pass
+        "#,
+    )?;
+
+    let leaf = system_path_to_file(&db, "/src/leaf.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, leaf), &events);
+    Ok(())
+}
+
+#[test]
 fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
