@@ -7,9 +7,10 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 
 ### `Final` with type
 
-A `Final` symbol in a module scope cannot be rebound, so its inferred type is used everywhere — not
-just locally, but also when it is accessed from another scope or imported from another module. This
-keeps statically known values such as `Literal` types intact. An explicit `Final[Unknown]` keeps the
+A `Final` symbol in a module scope cannot be rebound, so a `Literal[…]` value it is initialized with
+is used as its type everywhere — not just locally, but also when it is accessed from another scope or
+imported from another module. This keeps statically known values intact, so a platform or version
+check stored in a `Final` constant can prune branches. An explicit `Final[Unknown]` keeps the
 declared `Unknown` on the annotated assignment, while a bare `Final` takes its type from the value.
 
 `mod.py`:
@@ -53,6 +54,56 @@ reveal_type(FINAL_C)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
 reveal_type(FINAL_F)  # revealed: Literal[1]
 reveal_type(FINAL_G)  # revealed: Unknown
+```
+
+### Non-literal inferred types keep the declared type
+
+Only literal values are exposed. Any other inferred type stays hidden behind the declared type,
+because narrowing it would leak a subclass into every variable that is inferred from such a read.
+This is what makes it valid to widen a sentinel with an annotation:
+
+`mod.py`:
+
+```py
+from typing import Final
+
+class Base: ...
+class Sentinel(Base): ...
+
+WIDENED: Final[Base] = Sentinel()
+
+reveal_type(WIDENED)  # revealed: Sentinel
+```
+
+```py
+from mod import WIDENED, Base
+
+reveal_type(WIDENED)  # revealed: Base
+
+class Holder:
+    def __init__(self) -> None:
+        self.value = WIDENED
+
+def fill(holder: Holder) -> None:
+    # Assigning a `Base` is fine; the attribute is not narrowed to `Sentinel`.
+    holder.value = Base()
+    reveal_type(holder.value)  # revealed: Base
+```
+
+### `Final` in class scopes
+
+`Final` symbols declared in class scopes keep using the declared type when accessed, because a
+`Final` instance attribute may still be assigned in `__init__`:
+
+```py
+from typing import Final
+
+class C:
+    class_final: Final[int] = 1
+    class_var: int = 1
+
+reveal_type(C.class_final)  # revealed: int
+reveal_type(C.class_var)  # revealed: int
 ```
 
 ### Bare `Final` without a type
