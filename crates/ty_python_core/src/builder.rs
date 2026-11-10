@@ -103,7 +103,14 @@ struct NarrowingAlias<'ast> {
     first_definition_after_alias: ScopedDefinitionId,
 }
 
-struct ScopeInfo<'ast> {
+#[derive(Clone, Copy)]
+enum CollectionInitializer {
+    Literal,
+    Constructor,
+}
+
+struct ScopeInfo<'ast, 'db> {
+    collection_initializers: FxHashMap<Definition<'db>, CollectionInitializer>,
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
@@ -240,7 +247,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     file: ProgramFile<'db>,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
-    scope_stack: Vec<ScopeInfo<'ast>>,
+    scope_stack: Vec<ScopeInfo<'ast, 'db>>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
@@ -379,13 +386,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         builder
     }
 
-    fn current_scope_info(&self) -> &ScopeInfo<'ast> {
+    fn current_scope_info(&self) -> &ScopeInfo<'ast, 'db> {
         self.scope_stack
             .last()
             .expect("SemanticIndexBuilder should have created a root scope")
     }
 
-    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo<'ast> {
+    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo<'ast, 'db> {
         self.scope_stack
             .last_mut()
             .expect("SemanticIndexBuilder should have created a root scope")
@@ -536,6 +543,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // TODO: Cross-scope alias narrowing is not supported yet.
         let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
         self.scope_stack.push(ScopeInfo {
+            collection_initializers: FxHashMap::default(),
             file_scope_id,
             current_loop: None,
             narrowing_aliases: saved_aliases,
@@ -1095,22 +1103,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn unannotated_collection_initializer_binding(
         &self,
         use_id: ScopedUseId,
-    ) -> Option<Definition<'db>> {
+    ) -> Option<(Definition<'db>, CollectionInitializer)> {
+        let initializers = &self.current_scope_info().collection_initializers;
+        if initializers.is_empty() {
+            return None;
+        }
         let use_def = self.current_use_def_map();
-
         use_def
             .bindings_at_use(use_id)
-            .filter_map(|binding| use_def.definition(binding.binding()).definition())
-            .filter(|definition| {
-                definition
-                    .kind(self.db)
-                    .as_unannotated_assignment()
-                    .is_some_and(|assignment| {
-                        is_collection_initializer(assignment.value(self.module))
-                    })
+            .filter_map(|binding| {
+                let definition = use_def.definition(binding.binding()).definition()?;
+                Some((definition, *initializers.get(&definition)?))
             })
-            // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
-            // cycle-related panics.
             .exactly_one()
             .ok()
     }
@@ -1122,12 +1126,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let use_id = self
             .ast_ids
             .try_scoped_use(self.current_scope(), collection_use)?;
-        let definition = self.unannotated_collection_initializer_binding(use_id)?;
-        definition
-            .kind(self.db)
-            .as_unannotated_assignment()
-            .is_some_and(|assignment| is_collection_literal(assignment.value(self.module)))
-            .then_some(definition)
+        let (definition, kind) = self.unannotated_collection_initializer_binding(use_id)?;
+        matches!(kind, CollectionInitializer::Literal).then_some(definition)
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -1595,6 +1595,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let definition: Definition<'db> =
             Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
+
+        if let DefinitionNodeRef::Assignment(assignment) = definition_node {
+            let kind = if is_collection_literal(assignment.value) {
+                Some(CollectionInitializer::Literal)
+            } else if is_empty_collection_constructor_call(assignment.value) {
+                Some(CollectionInitializer::Constructor)
+            } else {
+                None
+            };
+            if let Some(kind) = kind {
+                self.current_scope_info_mut()
+                    .collection_initializers
+                    .insert(definition, kind);
+            }
+        }
 
         let num_definitions = if is_loop_header {
             // Loop headers are internal use-def definitions. They are retrieved through the loop
@@ -3494,10 +3509,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // and those bindings need to exist before we register parent/member associations.
                 let mut deferred_effects = None;
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
+                    if let PlaceExpr::Member(member) = &mut place_expr
                         && member.is_instance_attribute_candidate()
                         && let Some(attribute) = expr.as_attribute_expr()
+                        && let Some(method_scope_id) =
+                            self.is_method_or_eagerly_executed_in_method()
                     {
                         // We specifically mark direct attribute assignments to the first
                         // parameter of a method, i.e. typically `self` or `cls`.
@@ -3554,7 +3570,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let use_id = self.record_place_use(place_id, expr);
 
                         // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
+                        if let Some((collection_def, _)) =
                             self.unannotated_collection_initializer_binding(use_id)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {

@@ -146,7 +146,7 @@ impl<'db> ProtocolClass<'db> {
     fn for_each_member_candidate(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        _env: &ProgramEnvironment<'db>,
         mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
     ) {
         for (parent, specialization) in self
@@ -158,86 +158,8 @@ impl<'db> ProtocolClass<'db> {
                 Some((protocol_class.static_class_literal(db)?.0, specialization))
             })
         {
-            let parent_scope = parent.body_scope(db);
-            let class_binding_context = BindingContext::Definition(parent.definition(db));
-            let use_def_map = use_def_map(db, parent_scope);
-            let place_table = place_table(db, parent_scope);
-            let mut direct_members = FxHashMap::default();
-
-            // Bindings that are not declared in the class body are invalid protocol members, but
-            // runtime-checkable protocols still consider them members for `isinstance()` and
-            // `issubclass()`.
-            for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
-                // Defaults retain inherited annotations, just as they do for ordinary classes.
-                let member = class_member(db, parent_scope, name).inner;
-                if let Place::Defined(place) = member.place {
-                    // Function declarations below replace the class context with their own scope.
-                    let self_binding_context = place.ty.contains_self(db, env).then(|| {
-                        let class = inherited_class_body_declaration(db, parent_scope, symbol_id)
-                            .map_or(parent, |inherited| inherited.class);
-                        BindingContext::Definition(class.definition(db))
-                    });
-                    direct_members.insert(
-                        symbol_id,
-                        ProtocolMemberCandidate {
-                            ty: place.ty,
-                            qualifiers: member.qualifiers,
-                            definition: place.provenance.definition(),
-                            self_binding_context,
-                            bound_on_class: BoundOnClass::Yes,
-                        },
-                    );
-                }
-            }
-
-            for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-                let place_result = place_from_declarations(db, env, declarations)
-                    .with_imported_final(
-                        db,
-                        env,
-                        use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
-                    );
-                let first_declaration = place_result.first_declaration;
-                let place = place_result.ignore_conflicting_declarations();
-                if let Some(ty) = place.place.ignore_possibly_undefined() {
-                    let self_binding_context = ty.contains_self(db, env).then(|| {
-                        if let Some(definition) = first_declaration
-                            && definition.kind(db).is_function_def()
-                        {
-                            BindingContext::Definition(definition)
-                        } else {
-                            class_binding_context
-                        }
-                    });
-                    direct_members
-                        .entry(symbol_id)
-                        .and_modify(|candidate| {
-                            candidate.ty = ty;
-                            candidate.qualifiers = place.qualifiers;
-                            candidate.self_binding_context = self_binding_context;
-                        })
-                        .or_insert(ProtocolMemberCandidate {
-                            ty,
-                            qualifiers: place.qualifiers,
-                            definition: first_declaration,
-                            self_binding_context,
-                            bound_on_class: BoundOnClass::No,
-                        });
-                }
-            }
-
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "member names are unique within each class and both consumers are order-independent"
-            )]
-            for (symbol_id, candidate) in direct_members {
-                let name = place_table.symbol(symbol_id).name();
-                if excluded_from_proto_members(name) {
-                    continue;
-                }
-
-                visit(name, candidate, specialization);
+            for (name, candidate) in direct_protocol_members(db, parent) {
+                visit(name, *candidate, specialization);
             }
         }
     }
@@ -2687,6 +2609,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
 
+        if let Type::BoundMethod(method) = attribute_type
+            && let Some(target) = required.unbound_instance_method(db)
+            && let Some(source) = method.unbound_signatures(db)
+            && let Some(result) = self.try_check_nullary_methods(db, source, target)
+        {
+            return result;
+        }
+
         // `Self` in a protocol member names the value satisfying the protocol. `Self` in a
         // method on a class object names instances of that class: a `@classmethod` returning
         // `Self` returns `Factory`, not `type[Factory]`. Keep the bindings separate so a method
@@ -3088,6 +3018,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return ConstraintSet::from_bool(self.constraints, source.read().is_some());
         }
         let target = target_member.access(access);
+        if let (Some(source), Some(target)) = (
+            source.unbound_instance_method(db),
+            target.unbound_instance_method(db),
+        ) && let Some(result) = self.try_check_nullary_methods(db, source, target)
+        {
+            return result;
+        }
 
         let read_result = if target.read().is_none() {
             self.always()
@@ -3406,7 +3343,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
     ) || member.starts_with("_abc_")
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum BoundOnClass {
     Yes,
     No,
@@ -3418,7 +3355,7 @@ impl BoundOnClass {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ProtocolMemberCandidate<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
@@ -3567,6 +3504,96 @@ fn supports_protocol_variance_inference<'db>(
             supports_type(ty)
         }
     })
+}
+
+/// Direct requirements before any specialization of the protocol or its subclasses.
+#[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+fn direct_protocol_members<'db>(
+    db: &'db dyn Db,
+    parent: StaticClassLiteral<'db>,
+) -> Box<[(Name, ProtocolMemberCandidate<'db>)]> {
+    let env = &ProgramEnvironment::from_scope(parent.body_scope(db));
+    let parent_scope = parent.body_scope(db);
+    let class_binding_context = BindingContext::Definition(parent.definition(db));
+    let use_def_map = use_def_map(db, parent_scope);
+    let place_table = place_table(db, parent_scope);
+    let mut direct_members = FxHashMap::default();
+
+    // Bindings that are not declared in the class body are invalid protocol members, but
+    // runtime-checkable protocols still consider them members for `isinstance()` and
+    // `issubclass()`.
+    for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
+        let name = place_table.symbol(symbol_id).name();
+        // Defaults retain inherited annotations, just as they do for ordinary classes.
+        let member = class_member(db, parent_scope, name).inner;
+        if let Place::Defined(place) = member.place {
+            // Function declarations below replace the class context with their own scope.
+            let self_binding_context = place.ty.contains_self(db, env).then(|| {
+                let class = inherited_class_body_declaration(db, parent_scope, symbol_id)
+                    .map_or(parent, |inherited| inherited.class);
+                BindingContext::Definition(class.definition(db))
+            });
+            direct_members.insert(
+                symbol_id,
+                ProtocolMemberCandidate {
+                    ty: place.ty,
+                    qualifiers: member.qualifiers,
+                    definition: place.provenance.definition(),
+                    self_binding_context,
+                    bound_on_class: BoundOnClass::Yes,
+                },
+            );
+        }
+    }
+
+    for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+        let place_result = place_from_declarations(db, env, declarations).with_imported_final(
+            db,
+            env,
+            use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
+        );
+        let first_declaration = place_result.first_declaration;
+        let place = place_result.ignore_conflicting_declarations();
+        if let Some(ty) = place.place.ignore_possibly_undefined() {
+            let self_binding_context = ty.contains_self(db, env).then(|| {
+                if let Some(definition) = first_declaration
+                    && definition.kind(db).is_function_def()
+                {
+                    BindingContext::Definition(definition)
+                } else {
+                    class_binding_context
+                }
+            });
+            direct_members
+                .entry(symbol_id)
+                .and_modify(|candidate| {
+                    candidate.ty = ty;
+                    candidate.qualifiers = place.qualifiers;
+                    candidate.self_binding_context = self_binding_context;
+                })
+                .or_insert(ProtocolMemberCandidate {
+                    ty,
+                    qualifiers: place.qualifiers,
+                    definition: first_declaration,
+                    self_binding_context,
+                    bound_on_class: BoundOnClass::No,
+                });
+        }
+    }
+
+    let mut members = Vec::new();
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "members are sorted by name after collection"
+    )]
+    for (symbol_id, candidate) in direct_members {
+        let name = place_table.symbol(symbol_id).name();
+        if !excluded_from_proto_members(name) {
+            members.push((name.clone(), candidate));
+        }
+    }
+    members.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    members.into_boxed_slice()
 }
 
 /// Inner Salsa query for [`ProtocolClass::interface`].

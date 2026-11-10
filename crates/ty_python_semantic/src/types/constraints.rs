@@ -3934,9 +3934,24 @@ impl<'db> CandidateSolutions<'db> {
     ) -> ControlFlow<L::Break, Option<Self>> {
         let mentions_typevar =
             |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
+        let has_external_variable = std::cell::Cell::new(false);
+        let mut lower_bounds_only = true;
         let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
-            constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
-                && !mentions_typevar(bound)
+            if !constraint.provides_candidate_bound(
+                db,
+                env,
+                Some(bound),
+                unspecialized_type_var_policy,
+            ) {
+                return false;
+            }
+            !any_over_type_expanding_aliases(db, env, bound, |ty| {
+                let Some(variable) = ty.as_typevar() else {
+                    return false;
+                };
+                has_external_variable.set(true);
+                variable.is_inferable(db, inferable) || !variable.typevar(db).is_simple(db)
+            })
         };
 
         let mut constraints = Vec::default();
@@ -3971,6 +3986,8 @@ impl<'db> CandidateSolutions<'db> {
                         return ControlFlow::Continue(None);
                     };
 
+                    lower_bounds_only &= matches!(constraint, AtomicConstraint::ConcreteLower(_));
+
                     if !typevar.is_inferable(db, inferable) || !bound_is_eligible(constraint, bound)
                     {
                         return ControlFlow::Continue(None);
@@ -3986,6 +4003,13 @@ impl<'db> CandidateSolutions<'db> {
                     current = interior.if_true;
                 }
             }
+        }
+
+        // Unconstrained variables that we cannot infer are fixed parameters of the lower
+        // bounds. With only positive lower bounds their solutions are the same unions of
+        // evidence as for variable-free bounds.
+        if has_external_variable.get() && !lower_bounds_only {
+            return ControlFlow::Continue(None);
         }
 
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarSolver<'db>> =
@@ -4024,6 +4048,7 @@ impl<'db> CandidateSolutions<'db> {
         // evidence for.
         for (bound_typevar, bounds) in &mut mappings {
             let bound = match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+                Some(_) if has_external_variable.get() => return ControlFlow::Continue(None),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
                 // A constrained typevar introduces a disjunction over its declared constraints,
                 // which means we can't engage this fast path.

@@ -994,13 +994,6 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub(crate) fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
-        match self {
-            DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
-            _ => None,
-        }
-    }
-
     pub const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
     }

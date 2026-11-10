@@ -2911,6 +2911,50 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
+    /// A bound method that takes only an implicit receiver has no parameters left
+    /// to compare. When the receiver cannot affect its return, compare those returns
+    /// directly under the ordinary signature recursion guard.
+    pub(super) fn try_check_nullary_methods(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableSignature<'db>,
+        target: &CallableSignature<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let ([source], [target]) = (source.overloads.as_slice(), target.overloads.as_slice())
+        else {
+            return None;
+        };
+        if self.is_context_collection_enabled() {
+            return None;
+        }
+        for signature in [source, target] {
+            if signature.parameters.len() != 1
+                || !signature.parameters.is_standard()
+                || !signature.has_implicit_positional_receiver_annotation()
+                || signature.is_paramspec_value()
+                || signature.receiver_constraints().is_some()
+                || signature
+                    .generic_context
+                    .and_then(|context| {
+                        context
+                            .remove_self(db, signature.definition.map(BindingContext::Definition))
+                    })
+                    .is_some()
+                || signature.return_ty.contains_self(db, self.env)
+            {
+                return None;
+            }
+        }
+        Some(self.with_signature_recursion_guard(source, target, || {
+            let when = self.check_signature_return_pair(db, source, target);
+            if when.is_never_satisfied(db, self.env, self.inferable) {
+                self.never()
+            } else {
+                when
+            }
+        }))
+    }
+
     /// Implementation of subtyping and assignability for signature.
     fn check_signature_pair(
         &self,

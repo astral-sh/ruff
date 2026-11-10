@@ -11062,11 +11062,24 @@ impl<'db> Type<'db> {
         negated_cache: &mut Option<Type<'db>>,
     ) -> bool {
         if negated_cache.is_none()
-            && let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, target)
+            && matches!(
+                self,
+                Type::NominalInstance(_)
+                    | Type::FunctionLiteral(_)
+                    | Type::Callable(_)
+                    | Type::BoundMethod(_)
+                    | Type::ClassLiteral(_)
+                    | Type::ModuleLiteral(_)
+            )
+            && matches!(
+                target,
+                Type::NominalInstance(_) | Type::Callable(_) | Type::SubclassOf(_)
+            )
         {
-            // `~object` is `Never`. Every other nominal negation has only the implicit
-            // positive element `object`, which is a subtype of no other nominal type.
-            return source.is_object() || target.is_object();
+            // Apart from `~object`, these negations are intersections with only an
+            // implicit positive `object`. It cannot satisfy a callable or class-object
+            // type, and the only nominal type it satisfies is `object` itself.
+            return self == Type::object() || target == Type::object();
         }
 
         match self {
