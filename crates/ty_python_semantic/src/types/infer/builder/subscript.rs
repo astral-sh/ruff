@@ -13,9 +13,9 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    CALL_NON_CALLABLE, IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY,
+    NOT_SUBSCRIPTABLE, TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
 use crate::types::dict::dict_literal_key_value_types;
@@ -2106,7 +2106,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if emit_diagnostic
                             && let Some(builder) = self
                                 .context
-                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                                .report_lint(&IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, target)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Method `__setitem__` of type `{}` may be missing",
@@ -2381,7 +2381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     CallDunderError::PossiblyUnbound { .. } => {
                         if let Some(builder) = self
                             .context
-                            .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                            .report_lint(&IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, target)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Method `__delitem__` of type `{}` may be missing",

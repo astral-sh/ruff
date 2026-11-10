@@ -22,3 +22,9 @@ class A:
 # TypeError: 'A' object is not subscriptable
 A()[0]  # error
 ```
+
+## Rule history
+
+- v0.0.101: Renamed from `possibly-missing-implicit-call`.
+
+    `possibly-missing-implicit-call` remains as a compatibility alias for this rule.

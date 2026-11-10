@@ -67,12 +67,12 @@ use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, ABSTRACT_CLASS_INSTANTIATION, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
     CYCLIC_TYPE_ALIAS_DEFINITION, DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind,
-    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
+    IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
+    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
+    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
+    MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
     UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
     autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
@@ -9616,7 +9616,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let env = context.program_environment();
             if bindings.has_implicit_dunder_new_is_possibly_unbound() {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, call_expression)
+                    context.report_lint(&IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, call_expression)
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `__new__` on type `{}` may be missing.",
@@ -9627,7 +9627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if bindings.has_implicit_dunder_init_is_possibly_unbound() {
                 if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, call_expression)
+                    context.report_lint(&IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD, call_expression)
                 {
                     builder.into_diagnostic(format_args!(
                         "Method `__init__` on type `{}` may be missing.",
