@@ -444,14 +444,25 @@ impl<'db> KeywordArgument<'db> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
     fallback_type: Option<Type<'db>>,
-    types: FxHashMap<Type<'db>, Type<'db>>,
+    types: ContextualArgumentTypes<'db>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum ContextualArgumentTypes<'db> {
+    #[default]
+    Empty,
+    One {
+        context: Type<'db>,
+        inferred: Type<'db>,
+    },
+    Many(FxHashMap<Type<'db>, Type<'db>>),
 }
 
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             fallback_type: fallback_ty,
-            types: FxHashMap::default(),
+            types: ContextualArgumentTypes::Empty,
         }
     }
 
@@ -459,16 +470,16 @@ impl<'db> CallArgumentTypes<'db> {
     pub(crate) fn get_default(&self) -> Option<Type<'db>> {
         // If this type was inferred against exactly one declared type, or was inferred against
         // multiple, but resulted in a single inferred type, we have an exact type to return.
-        if let Ok(exact_ty) = self
-            .types
-            .values()
-            .exactly_one()
-            .or_else(|_| self.types.values().all_equal_value())
-        {
-            return Some(*exact_ty);
+        match &self.types {
+            ContextualArgumentTypes::Empty => self.fallback_type,
+            ContextualArgumentTypes::One { inferred, .. } => Some(*inferred),
+            ContextualArgumentTypes::Many(types) => types
+                .values()
+                .all_equal_value()
+                .ok()
+                .copied()
+                .or(self.fallback_type),
         }
-
-        self.fallback_type
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -476,7 +487,12 @@ impl<'db> CallArgumentTypes<'db> {
     /// If the type was not inferred against the declared type directly, this method will fall back to
     /// [`Self::get_default`].
     fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+        match &self.types {
+            ContextualArgumentTypes::Many(types) => {
+                types.get(&tcx).copied().or_else(|| self.get_default())
+            }
+            _ => self.get_default(),
+        }
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -492,15 +508,37 @@ impl<'db> CallArgumentTypes<'db> {
     fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().declared_type() {
             None => self.fallback_type = Some(ty),
-            Some(tcx) => {
-                self.types.insert(tcx, ty);
-            }
+            Some(tcx) => match &mut self.types {
+                ContextualArgumentTypes::Empty => {
+                    self.types = ContextualArgumentTypes::One {
+                        context: tcx,
+                        inferred: ty,
+                    }
+                }
+                ContextualArgumentTypes::One { context, inferred } if *context == tcx => {
+                    *inferred = ty
+                }
+                ContextualArgumentTypes::One { context, inferred } => {
+                    self.types = ContextualArgumentTypes::Many(
+                        [(*context, *inferred), (tcx, ty)].into_iter().collect(),
+                    );
+                }
+                ContextualArgumentTypes::Many(types) => {
+                    types.insert(tcx, ty);
+                }
+            },
         }
     }
 
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
-        self.types
-            .iter()
+        let contextual = match &self.types {
+            ContextualArgumentTypes::Empty => Either::Left(None.into_iter()),
+            ContextualArgumentTypes::One { context, inferred } => {
+                Either::Left(Some((context, inferred)).into_iter())
+            }
+            ContextualArgumentTypes::Many(types) => Either::Right(types.iter()),
+        };
+        contextual
             .map(|(tcx, ty)| (TypeContext::declared(Some(*tcx)), *ty))
             .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
