@@ -754,14 +754,30 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Base types for class metadata lookup, where the tuple's field types are irrelevant.
+    fn class_metadata_base_types(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> impl Iterator<Item = Type<'db>> {
+        self.explicit_bases(db).iter().copied().map(move |base| {
+            if base == Type::SpecialForm(SpecialFormType::NamedTuple) {
+                KnownClass::Tuple.to_class_literal(db, env)
+            } else {
+                base
+            }
+        })
+    }
+
     /// Iterate over the explicit bases that contribute to metaclass selection.
-    fn metaclass_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
-        self.explicit_bases(db)
-            .iter()
-            .copied()
+    fn metaclass_bases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        self.class_metadata_base_types(db, env)
             .filter_map(move |ty| {
-                ClassBase::try_from_type(db, &env, ty, Some(ClassLiteral::Static(self)))
+                ClassBase::try_from_type(db, env, ty, Some(ClassLiteral::Static(self)))
             })
             .filter(|base| matches!(base, ClassBase::Class(_) | ClassBase::Protocol))
     }
@@ -892,15 +908,68 @@ impl<'db> StaticClassLiteral<'db> {
         .map_err(Box::as_ref)
     }
 
+    /// Resolve ancestors in MRO order without specializing a synthetic tuple base with its fields.
+    fn try_class_metadata_ancestors(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<&'db [ClassBase<'db>], &'db StaticMroError<'db>> {
+        if !self
+            .explicit_bases(db)
+            .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
+        {
+            return self.try_mro_ancestors(db, None);
+        }
+
+        #[salsa::tracked(
+            returns(as_ref),
+            cycle_initial=mro_ancestors_cycle_initial,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn named_tuple_ancestors<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
+            let env = ProgramEnvironment::from_scope(class.body_scope(db));
+            let bases: Vec<_> = class.class_metadata_base_types(db, &env).collect();
+            Mro::ancestors_of_static_class(db, class, None, &bases).map_err(Box::new)
+        }
+
+        named_tuple_ancestors(db, self)
+            .map(Box::as_ref)
+            .map_err(Box::as_ref)
+    }
+
+    /// Return the dataclass transform an ordinary class inherits from its bases.
+    pub(super) fn dataclass_transformer_from_bases(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<DataclassTransformerParams<'db>> {
+        let ancestors = self
+            .try_class_metadata_ancestors(db)
+            .unwrap_or_else(StaticMroError::fallback_ancestors);
+        let params = ancestors.iter().find_map(|base| {
+            let (literal, _) = base.into_class()?.static_class_literal(db)?;
+            literal.dataclass_transformer_params(db)
+        })?;
+
+        // A subclass of `type` inherits the transform for use as a metaclass itself.
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        if KnownClass::Type
+            .try_to_class_literal(db, &env)
+            .is_some_and(|type_literal| {
+                let type_class = ClassType::NonGeneric(type_literal.into());
+                self.default_specialization(db) == type_class
+                    || ancestors.contains(&ClassBase::Class(type_class))
+            })
+        {
+            return None;
+        }
+        Some(params)
+    }
+
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
-            let env = ProgramEnvironment::from_scope(self_.body_scope(db));
-            Err(Box::new(StaticMroError::cycle(
-                db, &env,
-                self_.apply_optional_specialization(db, None),
-            )))
-        },
+        cycle_initial=mro_ancestors_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn try_mro_ancestors_unspecialized(
@@ -908,7 +977,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
     ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
         tracing::trace!("StaticClassLiteral::try_mro_ancestors: {}", self.name(db));
-        Mro::ancestors_of_static_class(db, self, None).map_err(Box::new)
+        Mro::ancestors_of_static_class(db, self, None, self.explicit_bases(db)).map_err(Box::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -1264,11 +1333,11 @@ impl<'db> StaticClassLiteral<'db> {
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
-            let mut base_classes = class.metaclass_bases(db).peekable();
+            let mut base_classes = class.metaclass_bases(db, &env).peekable();
 
             if (base_classes.peek().is_some() && class.inheritance_cycle(db).is_some())
                 || class
-                    .try_mro_ancestors(db, None)
+                    .try_class_metadata_ancestors(db)
                     .is_err_and(StaticMroError::is_cycle)
             {
                 // We emit diagnostics for cyclic class definitions elsewhere.
@@ -3716,6 +3785,19 @@ impl InheritanceCycle {
     pub(crate) const fn is_participant(self) -> bool {
         matches!(self, InheritanceCycle::Participant)
     }
+}
+
+fn mro_ancestors_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _: salsa::Id,
+    class: StaticClassLiteral<'db>,
+) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    Err(Box::new(StaticMroError::cycle(
+        db,
+        &env,
+        class.apply_optional_specialization(db, None),
+    )))
 }
 
 fn explicit_bases_cycle_initial<'db>(
