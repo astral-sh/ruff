@@ -142,11 +142,21 @@ impl SemanticSyntaxChecker {
                 if handled_lazy_error {
                     // Skip the regular `from`-import validations after reporting the lazy-specific
                     // syntax error with the highest precedence.
-                } else if *level == 0 && matches!(module.as_deref(), Some("__future__")) {
+                } else if matches!(module.as_deref(), Some("__future__"))
+                    && (*level == 0 || ctx.python_version() < PythonVersion::PY313)
+                {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
                             // from __future__ import annotations
+
+                            // test_ok relative_future_feature_py313
+                            // # parse_options: {"target-version": "3.13"}
+                            // from .__future__ import invalid_feature
+
+                            // test_err relative_future_feature_py312
+                            // # parse_options: {"target-version": "3.12"}
+                            // from .__future__ import invalid_feature
 
                             // test_err invalid_future_feature
                             // from __future__ import invalid_feature
@@ -889,7 +899,9 @@ impl SemanticSyntaxChecker {
             }) => {
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, always close the boundary.
-                if *is_lazy || *level > 0 || !matches!(module.as_deref(), Some("__future__")) {
+                let is_future = matches!(module.as_deref(), Some("__future__"))
+                    && (*level == 0 || ctx.python_version() < PythonVersion::PY313);
+                if *is_lazy || !is_future {
                     self.seen_futures_boundary = true;
                 }
             }

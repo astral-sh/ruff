@@ -3260,22 +3260,38 @@ lambda: fu
 
     #[test]
     fn relative_future_import() {
-        // Relative imports from a module named `__future__` are ordinary relative
-        // imports and should not trigger `LateFutureImport` or `FutureFeatureNotDefined`.
-        flakes(
+        // On Python >= 3.13, relative imports from a module named `__future__` are ordinary
+        // relative imports and should not trigger `LateFutureImport` or `FutureFeatureNotDefined`.
+        let diagnostics = test_snippet(
             r"
-        x = 5
-        from .__future__ import non_existent_future_feature
-        non_existent_future_feature
-        ",
-            &[],
+            x = 5
+            from .__future__ import non_existent_future_feature
+            non_existent_future_feature
+            ",
+            &LinterSettings::for_rules([Rule::FutureFeatureNotDefined, Rule::LateFutureImport])
+                .with_target_version(ruff_python_ast::PythonVersion::PY313),
         );
-        flakes(
+        assert!(diagnostics.is_empty());
+
+        let diagnostics = test_snippet(
             r"
-        from .__future__ import *
-        ",
-            &[Rule::UndefinedLocalWithImportStar],
+            from .__future__ import *
+            ",
+            &LinterSettings::for_rule(Rule::UndefinedLocalWithImportStar)
+                .with_target_version(ruff_python_ast::PythonVersion::PY313),
         );
+        assert_eq!(diagnostics.len(), 1);
+
+        // On Python < 3.13, relative imports from `__future__` are treated as compiler future imports.
+        let diagnostics = test_snippet(
+            r"
+            x = 5
+            from .__future__ import non_existent_future_feature
+            ",
+            &LinterSettings::for_rules([Rule::FutureFeatureNotDefined, Rule::LateFutureImport])
+                .with_target_version(ruff_python_ast::PythonVersion::PY312),
+        );
+        assert_eq!(diagnostics.len(), 2);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast::{PythonVersion, StmtImportFrom};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -50,7 +50,9 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     };
 
-    if *level > 0 || module_name != "__future__" {
+    let is_future = module_name == "__future__"
+        && (*level == 0 || checker.target_version() < PythonVersion::PY313);
+    if !is_future {
         return;
     }
 
