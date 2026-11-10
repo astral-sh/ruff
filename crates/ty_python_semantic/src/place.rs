@@ -1333,6 +1333,28 @@ pub(crate) fn place_by_id<'db>(
     };
 
     let qualifiers = declared.qualifiers();
+
+    // A `Final` symbol in a module scope can't be rebound, so the precise inferred type is safe to
+    // expose as its public type, just like a bare `Final`. Exposing the annotated type instead
+    // would drop statically known values, e.g. reading a `Final[bool]` platform check from a nested
+    // scope would lose the literal and the guarded branch could not be pruned anymore.
+    if scope.node(db).scope_kind().is_module()
+        && qualifiers.contains(TypeQualifiers::FINAL)
+        && let Some(declaration @ DefinedPlace { ty: Some(ty), .. }) = declared.place
+        && !ty.is_unknown()
+    {
+        let bindings = all_considered_bindings();
+        let inferred =
+            place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None).place;
+        return match inferred {
+            Place::Defined(defined) => Place::Defined(defined).with_qualifiers(qualifiers),
+            // `Final` without a value has no inference to fall back to.
+            Place::Undefined => {
+                Place::Defined(declaration.with_type(ty)).with_qualifiers(qualifiers)
+            }
+        };
+    }
+
     match declared.place {
         Some(
             declaration @ DefinedPlace {

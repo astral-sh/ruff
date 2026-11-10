@@ -7,9 +7,10 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 
 ### `Final` with type
 
-A symbol annotated with `Final[T]` uses its declared type when accessed from another scope. A local
-read can narrow to the assigned value. An explicit `Final[Unknown]` keeps the declared `Unknown` on
-the annotated assignment, while a bare `Final` takes its type from the value.
+A `Final` symbol in a module scope cannot be rebound, so its inferred type is used everywhere — not
+just locally, but also when it is accessed from another scope or imported from another module. This
+keeps statically known values such as `Literal` types intact. An explicit `Final[Unknown]` keeps the
+declared `Unknown` on the annotated assignment, while a bare `Final` takes its type from the value.
 
 `mod.py`:
 
@@ -33,11 +34,11 @@ reveal_type(FINAL_F)  # revealed: Literal[1]
 reveal_type(FINAL_G)  # revealed: Unknown
 
 def nonlocal_uses():
-    reveal_type(FINAL_A)  # revealed: int
-    reveal_type(FINAL_B)  # revealed: int
-    reveal_type(FINAL_C)  # revealed: int
-    reveal_type(FINAL_D)  # revealed: int
-    reveal_type(FINAL_F)  # revealed: int
+    reveal_type(FINAL_A)  # revealed: Literal[1]
+    reveal_type(FINAL_B)  # revealed: Literal[1]
+    reveal_type(FINAL_C)  # revealed: Literal[1]
+    reveal_type(FINAL_D)  # revealed: Literal[1]
+    reveal_type(FINAL_F)  # revealed: Literal[1]
     reveal_type(FINAL_G)  # revealed: Unknown
 ```
 
@@ -46,11 +47,11 @@ Imported types:
 ```py
 from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F, FINAL_G
 
-reveal_type(FINAL_A)  # revealed: int
-reveal_type(FINAL_B)  # revealed: int
-reveal_type(FINAL_C)  # revealed: int
-reveal_type(FINAL_D)  # revealed: int
-reveal_type(FINAL_F)  # revealed: int
+reveal_type(FINAL_A)  # revealed: Literal[1]
+reveal_type(FINAL_B)  # revealed: Literal[1]
+reveal_type(FINAL_C)  # revealed: Literal[1]
+reveal_type(FINAL_D)  # revealed: Literal[1]
+reveal_type(FINAL_F)  # revealed: Literal[1]
 reveal_type(FINAL_G)  # revealed: Unknown
 ```
 
