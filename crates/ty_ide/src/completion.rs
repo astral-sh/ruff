@@ -173,8 +173,8 @@ fn return_arrow_completion<'db>(
     let paren = TextRange::at(TextSize::of(before_paren), TextSize::of(')'));
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let node = covering_node(parsed.syntax().into(), paren);
-    let (AnyNodeRef::Parameters(parameters), Some(AnyNodeRef::StmtFunctionDef(function))) =
-        (node.node(), node.parent())
+    let (AnyNodeRef::Parameters(parameters), AnyNodeRef::StmtFunctionDef(function)) =
+        (node.node(), node.parent()?)
     else {
         return None;
     };
