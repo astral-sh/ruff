@@ -314,6 +314,7 @@ impl Rule {
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage
             | Rule::InvalidModuleName
+            | Rule::NonSnakeCaseModuleName
             | Rule::StdlibModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
