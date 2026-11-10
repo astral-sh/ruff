@@ -218,11 +218,14 @@ impl Server {
 
 /// Runs a synchronous request on the main loop or tries to queue a background request.
 ///
-/// If the worker queue is full, a new request receives `RequestFailed`.
-/// A retry receives the handler's cancellation error so the client can decide whether it still
-/// needs the result. Waiting for a slot would block the main loop from handling messages such as
-/// `shutdown`. Posting another retry could make the main loop repeatedly process the same request
-/// while the queue is still full.
+/// If a hover arrives while the worker queue is full, we tell the editor that ty is busy
+/// (`RequestFailed`). Waiting for a slot would prevent the main loop from reading the next
+/// message, even if it's `shutdown`.
+///
+/// An edit can also interrupt a completion that's already running. Normally we retry it.
+/// If the queue is full by then, we return the completion handler's `ContentModified` error
+/// to the editor. Posting another retry could keep the main loop busy with that same
+/// completion until a worker frees a slot.
 fn dispatch_request(
     scheduler: &mut Scheduler,
     request: Request,
