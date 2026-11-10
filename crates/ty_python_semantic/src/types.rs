@@ -12029,7 +12029,7 @@ impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
         self.inner
     }
 
-    pub(crate) fn with_type<U>(self, inner: U) -> TypeAndQualifiers<'db, U> {
+    fn with_type<U>(self, inner: U) -> TypeAndQualifiers<'db, U> {
         TypeAndQualifiers {
             inner,
             origin: self.origin,
