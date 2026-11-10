@@ -12025,7 +12025,7 @@ impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
         self.provenance
     }
 
-    pub(crate) fn inner_type(self) -> T {
+    pub(crate) fn inner_type(&self) -> T {
         self.inner
     }
 
