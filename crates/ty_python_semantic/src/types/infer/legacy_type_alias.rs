@@ -298,7 +298,7 @@ fn forwarding_alias_definition<'db>(
 
 /// Resolve a name to its unique reachable definition. Names parsed from a string annotation
 /// use the enclosing string's scope because they have no use site in the semantic index.
-fn referenced_name_definition<'db>(
+pub(super) fn referenced_name_definition<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     name: &ast::ExprName,
