@@ -6025,6 +6025,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We only need to attempt narrowing on generic calls, otherwise the type
             // context has no effect.
             .filter(|_| has_generic_context)
+            // Infer `field(..)` calls with the full type context, to prevent inferring
+            // unions like `Field[str] | Field[None]` from a `value: str | None = ...`
+            // type context. This allows the field's metadata to be accurately retained.
+            .filter(|_| {
+                !self
+                    .dataclass_field_specifiers
+                    .contains(&bindings.callable_type())
+            })
             .unwrap_or_default();
 
         let is_concrete_literal = |ty: &Type<'db>| {
