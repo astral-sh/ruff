@@ -216,7 +216,14 @@ impl Server {
     }
 }
 
-pub(super) fn dispatch_request(
+/// Runs a synchronous request on the main loop or tries to queue a background request.
+///
+/// If the worker queue is full, a new request receives `RequestFailed`.
+/// A retry receives the handler's cancellation error so the client can decide whether it still
+/// needs the result. Waiting for a slot would block the main loop from handling messages such as
+/// `shutdown`. Posting another retry could make the main loop repeatedly process the same request
+/// while the queue is still full.
+fn dispatch_request(
     scheduler: &mut Scheduler,
     request: Request,
     session: &mut Session,
@@ -255,7 +262,7 @@ pub(super) fn dispatch_request(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) enum RequestAttempt {
+enum RequestAttempt {
     Initial,
     Retry,
 }
