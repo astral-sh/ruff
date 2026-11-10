@@ -114,6 +114,28 @@ fn compound_statements() -> Result<(), ParseError> {
 }
 
 #[test]
+fn different_kinds_with_the_same_fields() -> Result<(), ParseError> {
+    for (left, right) in [
+        ("[x for x in xs]", "{x for x in xs}"),
+        ("[x for x in xs]", "(x for x in xs)"),
+        ("global x", "nonlocal x"),
+        ("def f[*T](): pass", "def f[**T](): pass"),
+        (
+            "match x:\n    case [1, 2]: pass",
+            "match x:\n    case 1 | 2: pass",
+        ),
+    ] {
+        let left = parse_module(left)?;
+        let right = parse_module(right)?;
+        assert_ne!(
+            ComparableStmt::from(&left.syntax().body[0]),
+            ComparableStmt::from(&right.syntax().body[0]),
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn match_patterns() -> Result<(), ParseError> {
     fn pattern(stmt: &ruff_python_ast::Stmt) -> ComparablePattern<'_> {
         ComparablePattern::from(&stmt.as_match_stmt().unwrap().cases[0].pattern)
@@ -176,6 +198,22 @@ fn concatenated_tstrings_compare_equal() -> Result<(), ParseError> {
     let value_contents = r#"t"{foo!r} this\\n raw and {bar!s} that""#;
 
     assert_comparable(split_contents, value_contents)
+}
+
+#[test]
+fn empty_interpolated_string_parts() -> Result<(), ParseError> {
+    assert_noncomparable("f'{x}' ''", "f'{x}'")?;
+    assert_comparable("f'{x}' '' 'a'", "f'{x}a'")?;
+    assert_comparable("t'' t'{x}' t'' t'{y}' t''", "t'{x}{y}'")
+}
+
+#[test]
+fn bytes_across_part_boundaries() -> Result<(), ParseError> {
+    let split = "b'' b'ab' b'c' b''";
+    assert_comparable(split, "b'a' b'bc'")?;
+    assert_noncomparable(split, "b'ab'")?;
+    assert_noncomparable("b'ab'", split)?;
+    assert_noncomparable(split, "b'a' b'bd'")
 }
 
 #[test]

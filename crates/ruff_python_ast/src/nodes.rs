@@ -2115,16 +2115,15 @@ impl PartialEq<[u8]> for BytesLiteralValue {
 
 impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
     fn from(value: &'a BytesLiteralValue) -> Self {
-        match &value.inner {
-            BytesLiteralValueInner::Single(BytesLiteral {
-                value: bytes_value, ..
-            }) => Cow::from(bytes_value.as_ref()),
-            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
-                bytes_literal_vec
-                    .iter()
-                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
-                    .collect::<Vec<u8>>(),
-            ),
+        match value.as_slice() {
+            [part] => Cow::Borrowed(part.as_slice()),
+            parts => {
+                let mut joined = Vec::with_capacity(value.len());
+                for part in parts {
+                    joined.extend_from_slice(part.as_slice());
+                }
+                Cow::Owned(joined)
+            }
         }
     }
 }
