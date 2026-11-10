@@ -53,14 +53,14 @@ enum LegacyTypeAliasReference<'db> {
     /// The definition is invalid as a type alias, and its use has been rejected.
     Invalid,
     /// Use ordinary value-to-type conversion, including recovery for invalid type arguments.
-    ValueFallback(Type<'db>),
+    ValueFallback,
 }
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     fn legacy_type_alias_reference(
         &mut self,
-        value_ty: impl FnOnce(&mut Self) -> Type<'db>,
+        value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
         reference: &ast::Expr,
     ) -> LegacyTypeAliasReference<'db> {
@@ -68,7 +68,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let Some(alias_definition) =
             definition.and_then(|definition| legacy_type_alias_definition(db, definition))
         else {
-            return LegacyTypeAliasReference::ValueFallback(value_ty(self));
+            return LegacyTypeAliasReference::ValueFallback;
         };
         let definition = alias_definition.definition;
         let parameters = legacy_type_alias_parameters(db, definition);
@@ -91,11 +91,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // For example, `Number = 1 + 2` is invalid because of its right-hand side,
             // independently of the resulting `Literal[3]` value. Generic subscriptions with
             // invalid arguments, such as `list[1]`, can still recover as `list[Unknown]`.
-            let value_ty = value_ty(self);
             return if self.reject_non_alias_reference(value_ty, Some(definition), reference) {
                 LegacyTypeAliasReference::Invalid
             } else {
-                LegacyTypeAliasReference::ValueFallback(value_ty)
+                LegacyTypeAliasReference::ValueFallback
             };
         }
         if inference.context.has_invalid_type_form {
@@ -252,7 +251,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         deferred_state: DeferredExpressionState,
     ) -> Type<'db> {
         let previous_deferred_state = self.replace_deferred_state(deferred_state);
-        let annotation_ty = if deferred_state.in_string_annotation()
+        // Loading the value of `State = Union[int, Items]` also loads `Items = list["State"]`.
+        // Infer the local alias first so its query can recover the recursive type before
+        // value inference unfolds the containers. Ordinary name lookup below still handles
+        // scope fallbacks and deprecation diagnostics.
+        if deferred_state.in_string_annotation()
             && let ast::Expr::Name(name) = expression
             && let Some(definition) = referenced_name_definition(
                 self.db(),
@@ -260,22 +263,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 name,
                 Some(self.scope().file_scope_id(self.db())),
             )
-            && legacy_type_alias_definition(self.db(), definition).is_some()
+            && definition.scope(self.db()) == self.scope()
+            && let Some(alias) = legacy_type_alias_definition(self.db(), definition)
         {
-            // A quoted alias name denotes the type of its definition. Computing its runtime
-            // value first can repeatedly unfold the containers in a recursive union.
-            let ty = self.with_type_expression_context(|builder| {
-                builder.infer_name_or_attribute_type_expression(
-                    |builder| builder.infer_type_expression_reference(expression).0,
-                    Some(definition),
-                    expression,
-                )
-            });
-            self.store_expression_type(expression, ty);
-            ty
-        } else {
-            self.infer_type_expression(expression)
-        };
+            let parameters = legacy_type_alias_parameters(self.db(), alias.definition);
+            infer_legacy_type_alias(self.db(), alias.definition, parameters);
+        }
+        let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
         annotation_ty
     }
@@ -314,13 +308,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn infer_name_or_attribute_type_expression(
         &mut self,
-        value_ty: impl FnOnce(&mut Self) -> Type<'db>,
+        ty: Type<'db>,
         definition: Option<Definition<'db>>,
         annotation: &ast::Expr,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ty = match self.legacy_type_alias_reference(value_ty, definition, annotation) {
+        match self.legacy_type_alias_reference(ty, definition, annotation) {
             LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =
                     parameters.map(|params| params.default_specialization(db, None));
@@ -328,8 +322,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return self.check_type_variable_scope(annotation, ty);
             }
             LegacyTypeAliasReference::Invalid => return Type::unknown(),
-            LegacyTypeAliasReference::ValueFallback(ty) => ty,
-        };
+            LegacyTypeAliasReference::ValueFallback => {}
+        }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
             && tvar.paramspec_attr(self.db()).is_some()
@@ -471,7 +465,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
                     let (ty, definition) = self.infer_type_expression_reference(expression);
-                    self.infer_name_or_attribute_type_expression(|_| ty, definition, expression)
+                    self.infer_name_or_attribute_type_expression(ty, definition, expression)
                 }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -484,11 +478,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     match attribute_expression.ctx {
                         ast::ExprContext::Load => {
                             let (ty, definition) = self.infer_type_expression_reference(expression);
-                            self.infer_name_or_attribute_type_expression(
-                                |_| ty,
-                                definition,
-                                expression,
-                            )
+                            self.infer_name_or_attribute_type_expression(ty, definition, expression)
                         }
                         ast::ExprContext::Invalid => Type::unknown(),
                         ast::ExprContext::Store | ast::ExprContext::Del => {
@@ -1305,11 +1295,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // A bare name has the same runtime value under either set of flags.
                 let (value, definition) = builder.infer_type_expression_reference(expr);
                 InferredUnionOperand {
-                    annotation: builder.infer_name_or_attribute_type_expression(
-                        |_| value,
-                        definition,
-                        expr,
-                    ),
+                    annotation: builder
+                        .infer_name_or_attribute_type_expression(value, definition, expr),
                     runtime_value: Some(value),
                 }
             }
@@ -1542,7 +1529,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let alias_reference =
-            self.legacy_type_alias_reference(|_| value_ty, definition, &subscript.value);
+            self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
         if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {

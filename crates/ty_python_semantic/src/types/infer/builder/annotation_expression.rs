@@ -163,11 +163,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             let annotation_ty = special_case.unwrap_or_else(|| {
-                TypeAndQualifiers::declared(builder.infer_name_or_attribute_type_expression(
-                    |_| ty,
-                    definition,
-                    annotation,
-                ))
+                TypeAndQualifiers::declared(
+                    builder.infer_name_or_attribute_type_expression(ty, definition, annotation),
+                )
             });
 
             if matches!(

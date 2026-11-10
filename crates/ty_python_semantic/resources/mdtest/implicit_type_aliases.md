@@ -1289,6 +1289,25 @@ def outer():
         reveal_type(x)  # revealed: set[int]
 ```
 
+An unreachable class binding gives the same result whether the argument or the entire annotation is
+quoted.
+
+```py
+Alias = list[int]
+
+class C:
+    if False:
+        Alias = list[str]
+
+    def f(
+        self,
+        x: tuple["Alias"],  # error: [invalid-type-form]
+        y: "tuple[Alias]",  # error: [invalid-type-form]
+    ):
+        reveal_type(x)  # revealed: tuple[Unknown]
+        reveal_type(y)  # revealed: tuple[Unknown]
+```
+
 #### Statically known conditions
 
 ```py
