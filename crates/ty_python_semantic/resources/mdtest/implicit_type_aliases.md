@@ -1289,6 +1289,25 @@ def outer():
         reveal_type(x)  # revealed: set[int]
 ```
 
+An unreachable class binding gives the same result whether the argument or the entire annotation is
+quoted.
+
+```py
+Alias = list[int]
+
+class C:
+    if False:
+        Alias = list[str]
+
+    def f(
+        self,
+        x: tuple["Alias"],  # error: [invalid-type-form]
+        y: "tuple[Alias]",  # error: [invalid-type-form]
+    ):
+        reveal_type(x)  # revealed: tuple[Unknown]
+        reveal_type(y)  # revealed: tuple[Unknown]
+```
+
 #### Statically known conditions
 
 ```py
@@ -3062,6 +3081,43 @@ def invalid_even() -> Even:
 
 def invalid_odd() -> Odd:
     return ((1,),)  # error: [invalid-return-type]
+```
+
+### Mutually recursive aliases using `typing.Union`
+
+```py
+from typing import Union
+
+DictState = dict[str, "State"]
+ListState = list["State"]
+State = Union[int, DictState, ListState]
+
+valid: State = {"children": [1]}
+invalid: State = [b"leaf"]  # error: [invalid-assignment]
+```
+
+### Forward references in mutually recursive aliases
+
+A union can refer forward to a single tuple alias. Both aliases converge even when nothing uses
+them.
+
+```py
+from typing import Union
+
+A = Union["B", int]
+B = tuple["A"]
+```
+
+### Displaying mutually recursive containers
+
+Two mutually recursive containers preserve the name of the outer alias when displaying its type.
+
+```py
+A = list["B"]
+B = tuple["A"]
+
+def f(x: A):
+    reveal_type(x)  # revealed: A
 ```
 
 ### Self-recursion within mutually recursive aliases
