@@ -51,7 +51,9 @@ use crate::reachability::{
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
-use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
+use crate::types::attribute_write::{
+    AssignmentAttributeMembers, assignment_attribute_members, nested_class_instance_override,
+};
 use crate::types::call::bind::{
     ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
     OverloadSet, inferable_typevar_occurrences, requires_overload_evaluation,
@@ -3248,6 +3250,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
+                let members = assignment_attribute_members(db, env, object_ty, attribute);
+                let read_only_receiver_member = members
+                    .as_ref()
+                    .and_then(AssignmentAttributeMembers::receiver_member)
+                    .is_some_and(PlaceAndQualifiers::is_read_only);
+                let type_member = members.and_then(AssignmentAttributeMembers::type_member);
+                if read_only_receiver_member
+                    || type_member.is_some_and(|member| {
+                        member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                            && !member
+                                .ignore_possibly_undefined()
+                                .is_some_and(|ty| ty.is_data_descriptor(db, env))
+                            && nested_class_instance_override(db, env, object_ty, attribute, None)
+                                .is_none()
+                    })
+                {
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot delete read-only attribute `{attribute}` on type `{}`",
+                            object_ty.display(db, env),
+                        ));
+                    }
+                    return false;
+                }
                 let frozen_dataclass_dispatch = object_ty
                     .nominal_class(db, env)
                     .and_then(|class| class.static_class_literal(db))
@@ -3376,8 +3404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }),
                     ..
-                }) = assignment_attribute_members(db, env, object_ty, attribute)
-                    .and_then(AssignmentAttributeMembers::type_member)
+                }) = type_member
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, env, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(
@@ -4601,15 +4628,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // inferred type (matching the name-target definition path); otherwise fall
             // back to the annotated type. If the value is not assignable to the declared
             // type, report an error and fall back to the annotated type.
-            let target_ty = if let Some(value_ty) = value_ty {
+            let target_ty = if let (Some(value), Some(value_ty)) = (value.as_deref(), value_ty) {
                 let declared_ty = annotated.inner_type();
                 if value_ty.is_assignable_to(db, env, declared_ty) {
+                    if let ast::Expr::Attribute(target) = target.as_ref()
+                        && let object_ty = self.expression_type(&target.value)
+                        && assignment_attribute_members(db, env, object_ty, target.attr.as_str())
+                            .is_some_and(|members| {
+                                members.effective_members().any(|member| {
+                                    member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                                })
+                            })
+                    {
+                        self.validate_attribute_assignment(
+                            target,
+                            value,
+                            object_ty,
+                            target.attr.as_str(),
+                            &mut |_, _| value_ty,
+                            true,
+                        );
+                    }
                     value_ty
                 } else {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_ASSIGNMENT, value.as_deref().unwrap())
-                    {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, value) {
                         let mut diag = builder.into_diagnostic(format_args!(
                             "Object of type `{}` is not assignable to `{}`",
                             value_ty.display(db, env),

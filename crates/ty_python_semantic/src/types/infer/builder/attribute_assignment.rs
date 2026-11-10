@@ -117,10 +117,10 @@ impl<'db> AttributeDeprecation<'db> {
         match requirement {
             AttributeWriteRequirement::All {
                 element_tys,
-                receiver,
+                lookup,
                 ..
             } => element_tys.iter().fold(Self::Missing, |deprecation, ty| {
-                let requirement = attribute_write_requirement(db, env, *ty, attribute, *receiver);
+                let requirement = lookup.requirement(db, env, *ty, attribute);
                 deprecation.union(db, Self::from_requirement(db, env, &requirement, attribute))
             }),
             AttributeWriteRequirement::Any {
@@ -293,13 +293,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::All {
                 object_ty,
                 element_tys,
-                receiver,
+                lookup,
             } => {
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
                 let attribute = self.attribute;
                 let mut requirements = element_tys
                     .iter()
-                    .map(|ty| attribute_write_requirement(db, env, *ty, attribute, *receiver));
+                    .map(|ty| lookup.requirement(db, env, *ty, attribute));
                 let valid = requirements.by_ref().all(|requirement| {
                     let mut current = AttributeDeprecation::Missing;
                     let valid = self.evaluate(

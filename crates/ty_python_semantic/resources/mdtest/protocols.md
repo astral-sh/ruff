@@ -2433,6 +2433,126 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Nested class members
+
+### Read-only nested classes
+
+A nested class declares a read-only member on both the protocol instance and its class. An
+implementation can provide a subclass of that nested class, so these accesses expose `type[Meta]`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class HasMeta(Protocol):
+    class Meta: ...
+
+class Implementation:
+    class Meta(HasMeta.Meta): ...
+
+static_assert(is_subtype_of(Implementation, HasMeta))
+static_assert(is_subtype_of(TypeOf[Implementation], type[HasMeta]))
+
+def access(obj: HasMeta, cls: type[HasMeta]) -> None:
+    reveal_type(obj.Meta)  # revealed: type[Meta]
+    reveal_type(cls.Meta)  # revealed: type[Meta]
+    obj.Meta = HasMeta.Meta  # error: [invalid-assignment]
+    del obj.Meta  # error: [invalid-assignment]
+    del cls.Meta  # error: [invalid-assignment]
+```
+
+A property returning the right class type satisfies instance reads, but class access returns the
+property itself. Such an implementation does not satisfy the nested class member's contract.
+
+```py
+class PropertyImplementation:
+    @property
+    def Meta(self) -> type[HasMeta.Meta]:
+        return HasMeta.Meta
+
+static_assert(not is_subtype_of(PropertyImplementation, HasMeta))
+static_assert(not is_subtype_of(TypeOf[PropertyImplementation], type[HasMeta]))
+```
+
+A protocol that permits replacing `Meta` rejects `Implementation`, even when its setter accepts only
+the exact nested class.
+
+```py
+class Writable(Protocol):
+    @property
+    def Meta(self) -> object: ...
+    @Meta.setter
+    def Meta(self, value: TypeOf[Implementation.Meta]) -> None: ...
+
+static_assert(not is_assignable_to(Implementation, Writable))
+```
+
+### Nested class descriptors
+
+A nested class with a descriptor setter permits instance writes accepted by that setter. Without a
+getter, reads through either the instance or its class still expose the nested class object.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Setter(type):
+    def __set__(cls, instance: object, value: type) -> None: ...
+
+class HasDescriptor(Protocol):
+    class attribute(metaclass=Setter): ...
+
+def access(obj: HasDescriptor, cls: type[HasDescriptor]):
+    reveal_type(obj.attribute)  # revealed: type[attribute]
+    reveal_type(cls.attribute)  # revealed: type[attribute]
+    obj.attribute = int  # ok
+    obj.attribute = 1  # error: [invalid-assignment]
+    cls.attribute = HasDescriptor.attribute  # error: [invalid-assignment]
+```
+
+An instance property cannot satisfy the class-side read contract.
+
+```py
+class InstanceOnly:
+    @property
+    def attribute(self) -> type[HasDescriptor.attribute]:
+        return HasDescriptor.attribute
+
+    @attribute.setter
+    def attribute(self, value: type) -> None: ...
+
+static_assert(not is_subtype_of(InstanceOnly, HasDescriptor))
+```
+
+When the metaclass defines `__get__`, its return type determines instance reads.
+
+```py
+class Getter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class HasGetter(Protocol):
+    class attribute(metaclass=Getter): ...
+
+def access(obj: HasGetter):
+    reveal_type(obj.attribute)  # revealed: str
+```
+
+Both instance reads return a string. On the class, `HasGetter.attribute` returns a string while
+`PropertyOnly.attribute` returns the property itself, so `PropertyOnly` does not implement the
+protocol.
+
+```py
+class PropertyOnly:
+    @property
+    def attribute(self) -> str:
+        return "value"
+
+static_assert(not is_subtype_of(PropertyOnly, HasGetter))
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through

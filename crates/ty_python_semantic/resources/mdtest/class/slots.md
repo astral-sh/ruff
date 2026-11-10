@@ -1085,6 +1085,58 @@ reveal_type(Child().missing)  # revealed: int
 Child().missing = 1
 ```
 
+## Receiver annotations do not create instance storage
+
+Redeclaring an inherited nested class as an instance attribute still requires a slot or an instance
+dictionary.
+
+```py
+class Base:
+    __slots__ = ()
+
+    class Inner: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [missing-slot]
+```
+
+## Conditional nested descriptors on slotted classes
+
+A descriptor can handle a write without storage. If only one alternative provides a descriptor, the
+ordinary alternative still requires storage or a custom `__setattr__`.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: type) -> None: ...
+
+class Conditional:
+    __slots__ = ()
+
+    if input():
+        class Inner(metaclass=Setter): ...
+
+    else:
+        class Inner: ...
+
+class Slotted(Conditional):
+    __slots__ = ()
+
+    def __init__(self):
+        self.Inner: type[Conditional.Inner]
+
+Slotted().Inner = Conditional.Inner  # error: [invalid-assignment]
+
+class CustomSetter(Slotted):
+    __slots__ = ()
+
+    def __setattr__(self, name: str, value: type) -> None: ...
+
+CustomSetter().Inner = Conditional.Inner  # ok
+```
+
 ## Class attributes cannot have the same name as a slot
 
 Assigning to a slot name in the class body prevents Python from creating the class.

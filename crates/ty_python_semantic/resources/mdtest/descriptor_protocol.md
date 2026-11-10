@@ -243,6 +243,91 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
+### Nested classes as data descriptors
+
+Assignments and deletions through an instance invoke the methods on the nested class's metaclass.
+
+```py
+class DescriptorMeta(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> object:
+        return 1
+
+    def __set__(cls, instance: object, value: int) -> None: ...
+    def __delete__(cls, instance: object) -> None: ...
+
+class Base:
+    class Inner(metaclass=DescriptorMeta): ...
+
+Base().Inner = 1  # ok
+del Base().Inner  # ok
+Base.Inner = Base.Inner  # error: [invalid-assignment]
+del Base.Inner  # error: [invalid-assignment]
+```
+
+A receiver annotation does not override the descriptor's setter contract, including during
+initialization.
+
+```py
+class Child(Base):
+    def __init__(self):
+        self.Inner: object = "wrong"  # error: [invalid-assignment]
+
+Child().Inner = 1  # ok
+Child().Inner = "wrong"  # error: [invalid-assignment]
+```
+
+On a metaclass, the nested descriptor takes precedence over a class's own attribute of the same
+name.
+
+```py
+class Meta(type):
+    class Inner(metaclass=DescriptorMeta): ...
+
+class C(metaclass=Meta):
+    class Inner: ...
+
+C.Inner = 1  # ok
+C.Inner = "wrong"  # error: [invalid-assignment]
+del C.Inner  # ok
+```
+
+### Conditional nested descriptors
+
+A receiver annotation only governs the ordinary class alternative of a conditional nested class.
+Assignments must also satisfy the setter when the descriptor alternative is present.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    if input():
+        class Inner(metaclass=Setter): ...
+
+    else:
+        class Inner: ...
+
+class Child(Base):
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [invalid-assignment]
+
+def write(obj: Child):
+    obj.Inner = 1  # error: [invalid-assignment]
+```
+
+When a metaclass inherits the same conditional member, a class attribute can shadow the ordinary
+class alternative. The descriptor alternative still checks the assignment against its setter.
+
+```py
+class Meta(Base, type): ...
+
+class Outer(metaclass=Meta):
+    Inner: int | str = 1
+
+Outer.Inner = 1  # ok
+Outer.Inner = "wrong"  # error: [invalid-assignment]
+```
+
 ### Classes with unknown bases are not automatically descriptors
 
 When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
