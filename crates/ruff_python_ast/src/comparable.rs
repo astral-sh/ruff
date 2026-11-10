@@ -21,6 +21,57 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
+// Equality checks the other node's kind before reading either node's fields.
+// Hashing and formatter diffs use the same projection. A variant with only
+// ignored fields spells out its AST pattern directly.
+macro_rules! compare_enum {
+    ($key:ident($ast:ident) {
+        $($variant:ident $(($ignored:pat))? $(=> $fields:ident)?,)*
+    }) => {
+        impl PartialEq for $key<'_> {
+            fn eq(&self, other: &Self) -> bool {
+                match self.0 {
+                    $(
+                        $(ast::$ast::$variant(left) => match other.0 {
+                            ast::$ast::$variant(right) => $fields(left) == $fields(right),
+                            _ => false,
+                        },)?
+                        $(ast::$ast::$variant($ignored) => matches!(other.0, ast::$ast::$variant(_)),)?
+                    )*
+                }
+            }
+        }
+
+        impl Eq for $key<'_> {}
+
+        impl Hash for $key<'_> {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                std::mem::discriminant::<ast::$ast>(&self.0).hash(state);
+                match self.0 {
+                    $(
+                        $(ast::$ast::$variant(node) => $fields(node).hash(state),)?
+                        $(ast::$ast::$variant($ignored) => {},)?
+                    )*
+                }
+            }
+        }
+
+        impl fmt::Debug for $key<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self.0 {
+                    $(
+                        $(ast::$ast::$variant(node) => f
+                            .debug_tuple(stringify!($variant))
+                            .field(&$fields(node))
+                            .finish(),)?
+                        $(ast::$ast::$variant($ignored) => f.write_str(stringify!($variant)),)?
+                    )*
+                }
+            }
+        }
+    };
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct ComparableAlias<'a> {
     name: &'a str,
@@ -94,80 +145,16 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
     }
 }
 
-impl fmt::Debug for ComparablePattern<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PartialEq for ComparablePattern<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match self.0 {
-            ast::Pattern::MatchValue(left) => match other.0 {
-                ast::Pattern::MatchValue(right) => {
-                    match_value_fields(left) == match_value_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchSingleton(left) => match other.0 {
-                ast::Pattern::MatchSingleton(right) => {
-                    match_singleton_fields(left) == match_singleton_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchSequence(left) => match other.0 {
-                ast::Pattern::MatchSequence(right) => {
-                    match_sequence_fields(left) == match_sequence_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchMapping(left) => match other.0 {
-                ast::Pattern::MatchMapping(right) => {
-                    match_mapping_fields(left) == match_mapping_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchClass(left) => match other.0 {
-                ast::Pattern::MatchClass(right) => {
-                    match_class_fields(left) == match_class_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchStar(left) => match other.0 {
-                ast::Pattern::MatchStar(right) => {
-                    match_star_fields(left) == match_star_fields(right)
-                }
-                _ => false,
-            },
-            ast::Pattern::MatchAs(left) => match other.0 {
-                ast::Pattern::MatchAs(right) => match_as_fields(left) == match_as_fields(right),
-                _ => false,
-            },
-            ast::Pattern::MatchOr(left) => match other.0 {
-                ast::Pattern::MatchOr(right) => match_or_fields(left) == match_or_fields(right),
-                _ => false,
-            },
-        }
-    }
-}
-
-impl Eq for ComparablePattern<'_> {}
-
-impl Hash for ComparablePattern<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self.0).hash(state);
-        match self.0 {
-            ast::Pattern::MatchValue(node) => match_value_fields(node).hash(state),
-            ast::Pattern::MatchSingleton(node) => match_singleton_fields(node).hash(state),
-            ast::Pattern::MatchSequence(node) => match_sequence_fields(node).hash(state),
-            ast::Pattern::MatchMapping(node) => match_mapping_fields(node).hash(state),
-            ast::Pattern::MatchClass(node) => match_class_fields(node).hash(state),
-            ast::Pattern::MatchStar(node) => match_star_fields(node).hash(state),
-            ast::Pattern::MatchAs(node) => match_as_fields(node).hash(state),
-            ast::Pattern::MatchOr(node) => match_or_fields(node).hash(state),
-        }
-    }
-}
+compare_enum!(ComparablePattern(Pattern) {
+    MatchValue => match_value_fields,
+    MatchSingleton => match_singleton_fields,
+    MatchSequence => match_sequence_fields,
+    MatchMapping => match_mapping_fields,
+    MatchClass => match_class_fields,
+    MatchStar => match_star_fields,
+    MatchAs => match_as_fields,
+    MatchOr => match_or_fields,
+});
 
 fn match_value_fields(node: &ast::PatternMatchValue) -> ComparableExpr<'_> {
     let ast::PatternMatchValue {
@@ -196,7 +183,7 @@ fn match_sequence_fields(node: &ast::PatternMatchSequence) -> ComparablePatternS
     ComparableSlice::new(patterns)
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchMappingFields<'a> {
     keys: ComparableExprSlice<'a>,
     patterns: ComparablePatternSlice<'a>,
@@ -218,7 +205,7 @@ fn match_mapping_fields(node: &ast::PatternMatchMapping) -> MatchMappingFields<'
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchClassFields<'a> {
     cls: ComparableExpr<'a>,
     patterns: ComparablePatternSlice<'a>,
@@ -254,7 +241,7 @@ fn match_star_fields(node: &ast::PatternMatchStar) -> Option<&str> {
     name.as_deref()
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchAsFields<'a> {
     pattern: Option<ComparablePattern<'a>>,
     name: Option<&'a str>,
@@ -331,6 +318,12 @@ impl<'a> From<&'a ast::Identifier> for ComparableText<'a> {
 }
 
 struct ComparableNumber<'a>(&'a ast::Number);
+
+impl fmt::Debug for ComparableNumber<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl PartialEq for ComparableNumber<'_> {
     fn eq(&self, other: &Self) -> bool {
@@ -643,6 +636,15 @@ impl PartialEq for ComparableStringElement<'_> {
     }
 }
 
+impl fmt::Debug for ComparableStringElement<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Literal(text) => text.fmt(f),
+            Self::Interpolation(element) => interpolation_fields(element).fmt(f),
+        }
+    }
+}
+
 impl Eq for ComparableStringElement<'_> {}
 
 impl Hash for ComparableStringElement<'_> {
@@ -671,7 +673,7 @@ fn normalize_newlines(contents: &str) -> Cow<'_, str> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct InterpolationFields<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<Cow<'a, str>>,
@@ -735,78 +737,14 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
     }
 }
 
-impl fmt::Debug for ComparableLiteral<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PartialEq for ComparableLiteral<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match self.0 {
-            ast::LiteralExpressionRef::StringLiteral(left) => match other.0 {
-                ast::LiteralExpressionRef::StringLiteral(right) => {
-                    string_literal_parts(left) == string_literal_parts(right)
-                }
-                _ => false,
-            },
-            ast::LiteralExpressionRef::BytesLiteral(left) => match other.0 {
-                ast::LiteralExpressionRef::BytesLiteral(right) => {
-                    bytes_literal_parts(left) == bytes_literal_parts(right)
-                }
-                _ => false,
-            },
-            ast::LiteralExpressionRef::NumberLiteral(left) => match other.0 {
-                ast::LiteralExpressionRef::NumberLiteral(right) => {
-                    number_literal_fields(left) == number_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::LiteralExpressionRef::BooleanLiteral(left) => match other.0 {
-                ast::LiteralExpressionRef::BooleanLiteral(right) => {
-                    boolean_literal_fields(left) == boolean_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::LiteralExpressionRef::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::LiteralExpressionRef::NoneLiteral(_)),
-            ast::LiteralExpressionRef::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::LiteralExpressionRef::EllipsisLiteral(_)),
-        }
-    }
-}
-
-impl Eq for ComparableLiteral<'_> {}
-
-impl Hash for ComparableLiteral<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(&self.0).hash(state);
-        match self.0 {
-            ast::LiteralExpressionRef::StringLiteral(node) => {
-                string_literal_parts(node).hash(state);
-            }
-            ast::LiteralExpressionRef::BytesLiteral(node) => bytes_literal_parts(node).hash(state),
-            ast::LiteralExpressionRef::NumberLiteral(node) => {
-                number_literal_fields(node).hash(state);
-            }
-            ast::LiteralExpressionRef::BooleanLiteral(node) => {
-                boolean_literal_fields(node).hash(state);
-            }
-            ast::LiteralExpressionRef::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => {}
-            ast::LiteralExpressionRef::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                range: _,
-                node_index: _,
-            }) => {}
-        }
-    }
-}
+compare_enum!(ComparableLiteral(LiteralExpressionRef) {
+    StringLiteral => string_literal_parts,
+    BytesLiteral => bytes_literal_parts,
+    NumberLiteral => number_literal_fields,
+    BooleanLiteral => boolean_literal_fields,
+    NoneLiteral(ast::ExprNoneLiteral { range: _, node_index: _ }),
+    EllipsisLiteral(ast::ExprEllipsisLiteral { range: _, node_index: _ }),
+});
 
 fn string_literal_parts(
     node: &ast::ExprStringLiteral,
@@ -875,211 +813,41 @@ impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
 #[derive(Clone, Copy)]
 pub struct ComparableExpr<'a>(ast::ExprRef<'a>);
 
-impl fmt::Debug for ComparableExpr<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PartialEq for ComparableExpr<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match self.0 {
-            ast::ExprRef::BoolOp(left) => match other.0 {
-                ast::ExprRef::BoolOp(right) => bool_op_fields(left) == bool_op_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Named(left) => match other.0 {
-                ast::ExprRef::Named(right) => named_fields(left) == named_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::BinOp(left) => match other.0 {
-                ast::ExprRef::BinOp(right) => bin_op_fields(left) == bin_op_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::UnaryOp(left) => match other.0 {
-                ast::ExprRef::UnaryOp(right) => unary_op_fields(left) == unary_op_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Lambda(left) => match other.0 {
-                ast::ExprRef::Lambda(right) => lambda_fields(left) == lambda_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::If(left) => match other.0 {
-                ast::ExprRef::If(right) => if_fields(left) == if_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Dict(left) => match other.0 {
-                ast::ExprRef::Dict(right) => dict_fields(left) == dict_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Set(left) => match other.0 {
-                ast::ExprRef::Set(right) => set_fields(left) == set_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::ListComp(left) => match other.0 {
-                ast::ExprRef::ListComp(right) => list_comp_fields(left) == list_comp_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::SetComp(left) => match other.0 {
-                ast::ExprRef::SetComp(right) => set_comp_fields(left) == set_comp_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::DictComp(left) => match other.0 {
-                ast::ExprRef::DictComp(right) => dict_comp_fields(left) == dict_comp_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Generator(left) => match other.0 {
-                ast::ExprRef::Generator(right) => generator_fields(left) == generator_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Await(left) => match other.0 {
-                ast::ExprRef::Await(right) => await_fields(left) == await_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Yield(left) => match other.0 {
-                ast::ExprRef::Yield(right) => yield_fields(left) == yield_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::YieldFrom(left) => match other.0 {
-                ast::ExprRef::YieldFrom(right) => {
-                    yield_from_fields(left) == yield_from_fields(right)
-                }
-                _ => false,
-            },
-            ast::ExprRef::Compare(left) => match other.0 {
-                ast::ExprRef::Compare(right) => compare_fields(left) == compare_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Call(left) => match other.0 {
-                ast::ExprRef::Call(right) => call_fields(left) == call_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::FString(left) => match other.0 {
-                ast::ExprRef::FString(right) => f_string_fields(left) == f_string_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::TString(left) => match other.0 {
-                ast::ExprRef::TString(right) => t_string_fields(left) == t_string_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::StringLiteral(left) => match other.0 {
-                ast::ExprRef::StringLiteral(right) => {
-                    string_literal_fields(left) == string_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::ExprRef::BytesLiteral(left) => match other.0 {
-                ast::ExprRef::BytesLiteral(right) => {
-                    bytes_literal_fields(left) == bytes_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::ExprRef::NumberLiteral(left) => match other.0 {
-                ast::ExprRef::NumberLiteral(right) => {
-                    number_literal_fields(left) == number_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::ExprRef::BooleanLiteral(left) => match other.0 {
-                ast::ExprRef::BooleanLiteral(right) => {
-                    boolean_literal_fields(left) == boolean_literal_fields(right)
-                }
-                _ => false,
-            },
-            ast::ExprRef::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::ExprRef::NoneLiteral(_)),
-            ast::ExprRef::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::ExprRef::EllipsisLiteral(_)),
-            ast::ExprRef::Attribute(left) => match other.0 {
-                ast::ExprRef::Attribute(right) => attribute_fields(left) == attribute_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Subscript(left) => match other.0 {
-                ast::ExprRef::Subscript(right) => subscript_fields(left) == subscript_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Starred(left) => match other.0 {
-                ast::ExprRef::Starred(right) => starred_fields(left) == starred_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Name(left) => match other.0 {
-                ast::ExprRef::Name(right) => name_fields(left) == name_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::List(left) => match other.0 {
-                ast::ExprRef::List(right) => list_fields(left) == list_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Tuple(left) => match other.0 {
-                ast::ExprRef::Tuple(right) => tuple_fields(left) == tuple_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::Slice(left) => match other.0 {
-                ast::ExprRef::Slice(right) => slice_fields(left) == slice_fields(right),
-                _ => false,
-            },
-            ast::ExprRef::IpyEscapeCommand(left) => match other.0 {
-                ast::ExprRef::IpyEscapeCommand(right) => {
-                    ipy_escape_command_fields(left) == ipy_escape_command_fields(right)
-                }
-                _ => false,
-            },
-        }
-    }
-}
-
-impl Eq for ComparableExpr<'_> {}
-
-impl Hash for ComparableExpr<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(&self.0).hash(state);
-        match self.0 {
-            ast::ExprRef::BoolOp(node) => bool_op_fields(node).hash(state),
-            ast::ExprRef::Named(node) => named_fields(node).hash(state),
-            ast::ExprRef::BinOp(node) => bin_op_fields(node).hash(state),
-            ast::ExprRef::UnaryOp(node) => unary_op_fields(node).hash(state),
-            ast::ExprRef::Lambda(node) => lambda_fields(node).hash(state),
-            ast::ExprRef::If(node) => if_fields(node).hash(state),
-            ast::ExprRef::Dict(node) => dict_fields(node).hash(state),
-            ast::ExprRef::Set(node) => set_fields(node).hash(state),
-            ast::ExprRef::ListComp(node) => list_comp_fields(node).hash(state),
-            ast::ExprRef::SetComp(node) => set_comp_fields(node).hash(state),
-            ast::ExprRef::DictComp(node) => dict_comp_fields(node).hash(state),
-            ast::ExprRef::Generator(node) => generator_fields(node).hash(state),
-            ast::ExprRef::Await(node) => await_fields(node).hash(state),
-            ast::ExprRef::Yield(node) => yield_fields(node).hash(state),
-            ast::ExprRef::YieldFrom(node) => yield_from_fields(node).hash(state),
-            ast::ExprRef::Compare(node) => compare_fields(node).hash(state),
-            ast::ExprRef::Call(node) => call_fields(node).hash(state),
-            ast::ExprRef::FString(node) => f_string_fields(node).hash(state),
-            ast::ExprRef::TString(node) => t_string_fields(node).hash(state),
-            ast::ExprRef::StringLiteral(node) => string_literal_fields(node).hash(state),
-            ast::ExprRef::BytesLiteral(node) => bytes_literal_fields(node).hash(state),
-            ast::ExprRef::NumberLiteral(node) => number_literal_fields(node).hash(state),
-            ast::ExprRef::BooleanLiteral(node) => boolean_literal_fields(node).hash(state),
-            ast::ExprRef::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => {}
-            ast::ExprRef::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                range: _,
-                node_index: _,
-            }) => {}
-            ast::ExprRef::Attribute(node) => attribute_fields(node).hash(state),
-            ast::ExprRef::Subscript(node) => subscript_fields(node).hash(state),
-            ast::ExprRef::Starred(node) => starred_fields(node).hash(state),
-            ast::ExprRef::Name(node) => name_fields(node).hash(state),
-            ast::ExprRef::List(node) => list_fields(node).hash(state),
-            ast::ExprRef::Tuple(node) => tuple_fields(node).hash(state),
-            ast::ExprRef::Slice(node) => slice_fields(node).hash(state),
-            ast::ExprRef::IpyEscapeCommand(node) => ipy_escape_command_fields(node).hash(state),
-        }
-    }
-}
+compare_enum!(ComparableExpr(ExprRef) {
+    BoolOp => bool_op_fields,
+    Named => named_fields,
+    BinOp => bin_op_fields,
+    UnaryOp => unary_op_fields,
+    Lambda => lambda_fields,
+    If => if_fields,
+    Dict => dict_fields,
+    Set => set_fields,
+    ListComp => list_comp_fields,
+    SetComp => set_comp_fields,
+    DictComp => dict_comp_fields,
+    Generator => generator_fields,
+    Await => await_fields,
+    Yield => yield_fields,
+    YieldFrom => yield_from_fields,
+    Compare => compare_fields,
+    Call => call_fields,
+    FString => f_string_fields,
+    TString => t_string_fields,
+    StringLiteral => string_literal_fields,
+    BytesLiteral => bytes_literal_fields,
+    NumberLiteral => number_literal_fields,
+    BooleanLiteral => boolean_literal_fields,
+    NoneLiteral(ast::ExprNoneLiteral { range: _, node_index: _ }),
+    EllipsisLiteral(ast::ExprEllipsisLiteral { range: _, node_index: _ }),
+    Attribute => attribute_fields,
+    Subscript => subscript_fields,
+    Starred => starred_fields,
+    Name => name_fields,
+    List => list_fields,
+    Tuple => tuple_fields,
+    Slice => slice_fields,
+    IpyEscapeCommand => ipy_escape_command_fields,
+});
 
 impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
     fn from(expr: &'a ast::Expr) -> Self {
@@ -1099,7 +867,7 @@ impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct BoolOpFields<'a> {
     op: ast::BoolOp,
     values: ComparableExprSlice<'a>,
@@ -1118,7 +886,7 @@ fn bool_op_fields(node: &ast::ExprBoolOp) -> BoolOpFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct NamedFields<'a> {
     target: ComparableExpr<'a>,
     value: ComparableExpr<'a>,
@@ -1137,7 +905,7 @@ fn named_fields(node: &ast::ExprNamed) -> NamedFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct BinOpFields<'a> {
     left: ComparableExpr<'a>,
     op: ast::Operator,
@@ -1159,7 +927,7 @@ fn bin_op_fields(node: &ast::ExprBinOp) -> BinOpFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct UnaryOpFields<'a> {
     op: ast::UnaryOp,
     operand: ComparableExpr<'a>,
@@ -1178,7 +946,7 @@ fn unary_op_fields(node: &ast::ExprUnaryOp) -> UnaryOpFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct LambdaFields<'a> {
     parameters: Option<ComparableParameters<'a>>,
     body: ComparableExpr<'a>,
@@ -1197,7 +965,7 @@ fn lambda_fields(node: &ast::ExprLambda) -> LambdaFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct IfFields<'a> {
     test: ComparableExpr<'a>,
     body: ComparableExpr<'a>,
@@ -1237,7 +1005,7 @@ fn set_fields(node: &ast::ExprSet) -> ComparableExprSlice<'_> {
     ComparableSlice::new(elts)
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct ComprehensionExprFields<'a> {
     elt: ComparableExpr<'a>,
     generators: ComparableComprehensionSlice<'a>,
@@ -1331,7 +1099,7 @@ fn yield_from_fields(node: &ast::ExprYieldFrom) -> ComparableExpr<'_> {
     value.into()
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct CompareFields<'a> {
     ops: &'a [ast::CmpOp],
     operands: ComparableExprSlice<'a>,
@@ -1350,7 +1118,7 @@ fn compare_fields(node: &ast::ExprCompare) -> CompareFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct CallFields<'a> {
     func: ComparableExpr<'a>,
     arguments: ComparableArguments<'a>,
@@ -1423,7 +1191,7 @@ fn boolean_literal_fields(node: &ast::ExprBooleanLiteral) -> bool {
     *value
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct AttributeFields<'a> {
     value: ComparableExpr<'a>,
     attr: &'a str,
@@ -1443,7 +1211,7 @@ fn attribute_fields(node: &ast::ExprAttribute) -> AttributeFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct SubscriptFields<'a> {
     value: ComparableExpr<'a>,
     slice: ComparableExpr<'a>,
@@ -1504,7 +1272,7 @@ fn tuple_fields(node: &ast::ExprTuple) -> ComparableExprSlice<'_> {
     ComparableSlice::new(elts)
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct SliceFields<'a> {
     lower: Option<ComparableExpr<'a>>,
     upper: Option<ComparableExpr<'a>>,
@@ -1526,7 +1294,7 @@ fn slice_fields(node: &ast::ExprSlice) -> SliceFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct IpyEscapeCommandFields<'a> {
     kind: ast::IpyEscapeKind,
     value: &'a str,
@@ -1642,6 +1410,12 @@ impl PartialEq for ComparableInterpolatedString<'_> {
     }
 }
 
+impl fmt::Debug for ComparableInterpolatedString<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.normalized_elements()).finish()
+    }
+}
+
 impl Eq for ComparableInterpolatedString<'_> {}
 
 impl Hash for ComparableInterpolatedString<'_> {
@@ -1689,6 +1463,12 @@ impl PartialEq for ComparableBytes<'_> {
     }
 }
 
+impl fmt::Debug for ComparableBytes<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Cow::from(self.0).fmt(f)
+    }
+}
+
 impl Eq for ComparableBytes<'_> {}
 
 impl Hash for ComparableBytes<'_> {
@@ -1719,45 +1499,13 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
     }
 }
 
-impl PartialEq for ComparableTypeParam<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match self.0 {
-            ast::TypeParam::TypeVar(left) => match other.0 {
-                ast::TypeParam::TypeVar(right) => type_var_fields(left) == type_var_fields(right),
-                _ => false,
-            },
-            ast::TypeParam::TypeVarTuple(left) => match other.0 {
-                ast::TypeParam::TypeVarTuple(right) => {
-                    type_var_tuple_fields(left) == type_var_tuple_fields(right)
-                }
-                _ => false,
-            },
-            ast::TypeParam::ParamSpec(left) => match other.0 {
-                ast::TypeParam::ParamSpec(right) => {
-                    param_spec_fields(left) == param_spec_fields(right)
-                }
-                _ => false,
-            },
-        }
-    }
-}
+compare_enum!(ComparableTypeParam(TypeParam) {
+    TypeVar => type_var_fields,
+    TypeVarTuple => type_var_tuple_fields,
+    ParamSpec => param_spec_fields,
+});
 
-impl Eq for ComparableTypeParam<'_> {}
-
-impl Hash for ComparableTypeParam<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self.0).hash(state);
-        match self.0 {
-            ast::TypeParam::TypeVar(node) => type_var_fields(node).hash(state),
-            ast::TypeParam::TypeVarTuple(node) => {
-                type_var_tuple_fields(node).hash(state);
-            }
-            ast::TypeParam::ParamSpec(node) => param_spec_fields(node).hash(state),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct TypeVarFields<'a> {
     name: &'a str,
     bound: Option<ComparableExpr<'a>>,
@@ -1779,7 +1527,7 @@ fn type_var_fields(node: &ast::TypeParamTypeVar) -> TypeVarFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct VariadicTypeParamFields<'a> {
     name: &'a str,
     default: Option<ComparableExpr<'a>>,
@@ -1821,180 +1569,35 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
     }
 }
 
-impl fmt::Debug for ComparableStmt<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
+compare_enum!(ComparableStmt(Stmt) {
+    FunctionDef => stmt_function_def_fields,
+    ClassDef => stmt_class_def_fields,
+    Return => stmt_return_fields,
+    Delete => stmt_delete_fields,
+    TypeAlias => stmt_type_alias_fields,
+    Assign => stmt_assign_fields,
+    AugAssign => stmt_aug_assign_fields,
+    AnnAssign => stmt_ann_assign_fields,
+    For => stmt_for_fields,
+    While => stmt_while_fields,
+    If => stmt_if_fields,
+    With => stmt_with_fields,
+    Match => stmt_match_fields,
+    Raise => stmt_raise_fields,
+    Try => stmt_try_fields,
+    Assert => stmt_assert_fields,
+    Import => stmt_import_fields,
+    ImportFrom => stmt_import_from_fields,
+    Global => stmt_global_fields,
+    Nonlocal => stmt_nonlocal_fields,
+    IpyEscapeCommand => stmt_ipy_escape_command_fields,
+    Expr => stmt_expr_fields,
+    Pass(ast::StmtPass { range: _, node_index: _ }),
+    Break(ast::StmtBreak { range: _, node_index: _ }),
+    Continue(ast::StmtContinue { range: _, node_index: _ }),
+});
 
-impl PartialEq for ComparableStmt<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match self.0 {
-            ast::Stmt::FunctionDef(left) => match other.0 {
-                ast::Stmt::FunctionDef(right) => {
-                    stmt_function_def_fields(left) == stmt_function_def_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::ClassDef(left) => match other.0 {
-                ast::Stmt::ClassDef(right) => {
-                    stmt_class_def_fields(left) == stmt_class_def_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::Return(left) => match other.0 {
-                ast::Stmt::Return(right) => stmt_return_fields(left) == stmt_return_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Delete(left) => match other.0 {
-                ast::Stmt::Delete(right) => stmt_delete_fields(left) == stmt_delete_fields(right),
-                _ => false,
-            },
-            ast::Stmt::TypeAlias(left) => match other.0 {
-                ast::Stmt::TypeAlias(right) => {
-                    stmt_type_alias_fields(left) == stmt_type_alias_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::Assign(left) => match other.0 {
-                ast::Stmt::Assign(right) => stmt_assign_fields(left) == stmt_assign_fields(right),
-                _ => false,
-            },
-            ast::Stmt::AugAssign(left) => match other.0 {
-                ast::Stmt::AugAssign(right) => {
-                    stmt_aug_assign_fields(left) == stmt_aug_assign_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::AnnAssign(left) => match other.0 {
-                ast::Stmt::AnnAssign(right) => {
-                    stmt_ann_assign_fields(left) == stmt_ann_assign_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::For(left) => match other.0 {
-                ast::Stmt::For(right) => stmt_for_fields(left) == stmt_for_fields(right),
-                _ => false,
-            },
-            ast::Stmt::While(left) => match other.0 {
-                ast::Stmt::While(right) => stmt_while_fields(left) == stmt_while_fields(right),
-                _ => false,
-            },
-            ast::Stmt::If(left) => match other.0 {
-                ast::Stmt::If(right) => stmt_if_fields(left) == stmt_if_fields(right),
-                _ => false,
-            },
-            ast::Stmt::With(left) => match other.0 {
-                ast::Stmt::With(right) => stmt_with_fields(left) == stmt_with_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Match(left) => match other.0 {
-                ast::Stmt::Match(right) => stmt_match_fields(left) == stmt_match_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Raise(left) => match other.0 {
-                ast::Stmt::Raise(right) => stmt_raise_fields(left) == stmt_raise_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Try(left) => match other.0 {
-                ast::Stmt::Try(right) => stmt_try_fields(left) == stmt_try_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Assert(left) => match other.0 {
-                ast::Stmt::Assert(right) => stmt_assert_fields(left) == stmt_assert_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Import(left) => match other.0 {
-                ast::Stmt::Import(right) => stmt_import_fields(left) == stmt_import_fields(right),
-                _ => false,
-            },
-            ast::Stmt::ImportFrom(left) => match other.0 {
-                ast::Stmt::ImportFrom(right) => {
-                    stmt_import_from_fields(left) == stmt_import_from_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::Global(left) => match other.0 {
-                ast::Stmt::Global(right) => stmt_global_fields(left) == stmt_global_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Nonlocal(left) => match other.0 {
-                ast::Stmt::Nonlocal(right) => {
-                    stmt_nonlocal_fields(left) == stmt_nonlocal_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::IpyEscapeCommand(left) => match other.0 {
-                ast::Stmt::IpyEscapeCommand(right) => {
-                    stmt_ipy_escape_command_fields(left) == stmt_ipy_escape_command_fields(right)
-                }
-                _ => false,
-            },
-            ast::Stmt::Expr(left) => match other.0 {
-                ast::Stmt::Expr(right) => stmt_expr_fields(left) == stmt_expr_fields(right),
-                _ => false,
-            },
-            ast::Stmt::Pass(ast::StmtPass {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::Stmt::Pass(_)),
-            ast::Stmt::Break(ast::StmtBreak {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::Stmt::Break(_)),
-            ast::Stmt::Continue(ast::StmtContinue {
-                range: _,
-                node_index: _,
-            }) => matches!(other.0, ast::Stmt::Continue(_)),
-        }
-    }
-}
-
-impl Eq for ComparableStmt<'_> {}
-
-impl Hash for ComparableStmt<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self.0).hash(state);
-        match self.0 {
-            ast::Stmt::FunctionDef(node) => stmt_function_def_fields(node).hash(state),
-            ast::Stmt::ClassDef(node) => stmt_class_def_fields(node).hash(state),
-            ast::Stmt::Return(node) => stmt_return_fields(node).hash(state),
-            ast::Stmt::Delete(node) => stmt_delete_fields(node).hash(state),
-            ast::Stmt::TypeAlias(node) => stmt_type_alias_fields(node).hash(state),
-            ast::Stmt::Assign(node) => stmt_assign_fields(node).hash(state),
-            ast::Stmt::AugAssign(node) => stmt_aug_assign_fields(node).hash(state),
-            ast::Stmt::AnnAssign(node) => stmt_ann_assign_fields(node).hash(state),
-            ast::Stmt::For(node) => stmt_for_fields(node).hash(state),
-            ast::Stmt::While(node) => stmt_while_fields(node).hash(state),
-            ast::Stmt::If(node) => stmt_if_fields(node).hash(state),
-            ast::Stmt::With(node) => stmt_with_fields(node).hash(state),
-            ast::Stmt::Match(node) => stmt_match_fields(node).hash(state),
-            ast::Stmt::Raise(node) => stmt_raise_fields(node).hash(state),
-            ast::Stmt::Try(node) => stmt_try_fields(node).hash(state),
-            ast::Stmt::Assert(node) => stmt_assert_fields(node).hash(state),
-            ast::Stmt::Import(node) => stmt_import_fields(node).hash(state),
-            ast::Stmt::ImportFrom(node) => stmt_import_from_fields(node).hash(state),
-            ast::Stmt::Global(node) => stmt_global_fields(node).hash(state),
-            ast::Stmt::Nonlocal(node) => stmt_nonlocal_fields(node).hash(state),
-            ast::Stmt::IpyEscapeCommand(node) => stmt_ipy_escape_command_fields(node).hash(state),
-            ast::Stmt::Expr(node) => stmt_expr_fields(node).hash(state),
-            ast::Stmt::Pass(ast::StmtPass {
-                range: _,
-                node_index: _,
-            }) => {}
-            ast::Stmt::Break(ast::StmtBreak {
-                range: _,
-                node_index: _,
-            }) => {}
-            ast::Stmt::Continue(ast::StmtContinue {
-                range: _,
-                node_index: _,
-            }) => {}
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtFunctionDefFields<'a> {
     is_async: bool,
     decorator_list: ComparableSlice<'a, ast::Decorator, ComparableExpr<'a>>,
@@ -2028,7 +1631,7 @@ fn stmt_function_def_fields(node: &ast::StmtFunctionDef) -> StmtFunctionDefField
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtClassDefFields<'a> {
     decorator_list: ComparableSlice<'a, ast::Decorator, ComparableExpr<'a>>,
     name: &'a str,
@@ -2074,7 +1677,7 @@ fn stmt_delete_fields(node: &ast::StmtDelete) -> ComparableExprSlice<'_> {
     ComparableSlice::new(targets)
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtTypeAliasFields<'a> {
     name: ComparableExpr<'a>,
     type_params: Option<ComparableTypeParams<'a>>,
@@ -2096,7 +1699,7 @@ fn stmt_type_alias_fields(node: &ast::StmtTypeAlias) -> StmtTypeAliasFields<'_> 
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtAssignFields<'a> {
     targets: ComparableExprSlice<'a>,
     value: ComparableExpr<'a>,
@@ -2115,7 +1718,7 @@ fn stmt_assign_fields(node: &ast::StmtAssign) -> StmtAssignFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtAugAssignFields<'a> {
     target: ComparableExpr<'a>,
     op: ast::Operator,
@@ -2137,7 +1740,7 @@ fn stmt_aug_assign_fields(node: &ast::StmtAugAssign) -> StmtAugAssignFields<'_> 
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtAnnAssignFields<'a> {
     target: ComparableExpr<'a>,
     annotation: ComparableExpr<'a>,
@@ -2162,7 +1765,7 @@ fn stmt_ann_assign_fields(node: &ast::StmtAnnAssign) -> StmtAnnAssignFields<'_> 
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtForFields<'a> {
     is_async: bool,
     target: ComparableExpr<'a>,
@@ -2190,7 +1793,7 @@ fn stmt_for_fields(node: &ast::StmtFor) -> StmtForFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtWhileFields<'a> {
     test: ComparableExpr<'a>,
     body: ComparableStmtSlice<'a>,
@@ -2212,7 +1815,7 @@ fn stmt_while_fields(node: &ast::StmtWhile) -> StmtWhileFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtIfFields<'a> {
     test: ComparableExpr<'a>,
     body: ComparableStmtSlice<'a>,
@@ -2234,7 +1837,7 @@ fn stmt_if_fields(node: &ast::StmtIf) -> StmtIfFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtWithFields<'a> {
     is_async: bool,
     items: ComparableSlice<'a, ast::WithItem, ComparableWithItem<'a>>,
@@ -2256,7 +1859,7 @@ fn stmt_with_fields(node: &ast::StmtWith) -> StmtWithFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtMatchFields<'a> {
     subject: ComparableExpr<'a>,
     cases: ComparableSlice<'a, ast::MatchCase, ComparableMatchCase<'a>>,
@@ -2275,7 +1878,7 @@ fn stmt_match_fields(node: &ast::StmtMatch) -> StmtMatchFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtRaiseFields<'a> {
     exc: Option<ComparableExpr<'a>>,
     cause: Option<ComparableExpr<'a>>,
@@ -2294,7 +1897,7 @@ fn stmt_raise_fields(node: &ast::StmtRaise) -> StmtRaiseFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtTryFields<'a> {
     body: ComparableStmtSlice<'a>,
     handlers: ComparableSlice<'a, ast::ExceptHandler, ComparableExceptHandler<'a>>,
@@ -2322,7 +1925,7 @@ fn stmt_try_fields(node: &ast::StmtTry) -> StmtTryFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtAssertFields<'a> {
     test: ComparableExpr<'a>,
     msg: Option<ComparableExpr<'a>>,
@@ -2341,7 +1944,7 @@ fn stmt_assert_fields(node: &ast::StmtAssert) -> StmtAssertFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtImportFields<'a> {
     names: ComparableSlice<'a, ast::Alias, ComparableAlias<'a>>,
     is_lazy: bool,
@@ -2360,7 +1963,7 @@ fn stmt_import_fields(node: &ast::StmtImport) -> StmtImportFields<'_> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtImportFromFields<'a> {
     module: Option<&'a str>,
     names: ComparableSlice<'a, ast::Alias, ComparableAlias<'a>>,
@@ -2435,38 +2038,10 @@ impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
     }
 }
 
-impl fmt::Debug for ComparableMod<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PartialEq for ComparableMod<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self.0, other.0) {
-            (ast::Mod::Module(left), ast::Mod::Module(right)) => {
-                mod_module_fields(left) == mod_module_fields(right)
-            }
-            (ast::Mod::Expression(left), ast::Mod::Expression(right)) => {
-                mod_expression_fields(left) == mod_expression_fields(right)
-            }
-            (ast::Mod::Module(_), ast::Mod::Expression(_))
-            | (ast::Mod::Expression(_), ast::Mod::Module(_)) => false,
-        }
-    }
-}
-
-impl Eq for ComparableMod<'_> {}
-
-impl Hash for ComparableMod<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self.0).hash(state);
-        match self.0 {
-            ast::Mod::Module(node) => mod_module_fields(node).hash(state),
-            ast::Mod::Expression(node) => mod_expression_fields(node).hash(state),
-        }
-    }
-}
+compare_enum!(ComparableMod(Mod) {
+    Module => mod_module_fields,
+    Expression => mod_expression_fields,
+});
 
 fn mod_module_fields(node: &ast::ModModule) -> ComparableStmtSlice<'_> {
     let ast::ModModule {

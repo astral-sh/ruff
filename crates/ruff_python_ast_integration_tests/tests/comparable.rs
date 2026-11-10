@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::hash::{BuildHasher, RandomState};
 
 use ruff_python_ast::comparable::{
-    ComparableExpr, ComparableLiteral, ComparablePattern, ComparableStmt, HashableExpr,
+    ComparableExpr, ComparableLiteral, ComparableMod, ComparablePattern, ComparableStmt,
+    HashableExpr,
 };
-use ruff_python_ast::{HasNodeIndex, NodeIndex};
+use ruff_python_ast::{HasNodeIndex, Mod, NodeIndex};
 use ruff_python_parser::{ParseError, parse_expression, parse_module};
 
 #[track_caller]
@@ -16,6 +17,7 @@ fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
     let right_compr = ComparableExpr::from(right_parsed.expr());
 
     assert_eq!(left_compr, right_compr);
+    assert_eq!(format!("{left_compr:#?}"), format!("{right_compr:#?}"));
     assert!(HashSet::from([left_compr]).contains(&right_compr));
     Ok(())
 }
@@ -92,6 +94,26 @@ fn assigned_node_index_preserves_hash_lookup() -> Result<(), ParseError> {
     parsed.expr().node_index().set(NodeIndex::from(7));
     assert_eq!(seen.hasher().hash_one(key), hash);
     assert!(seen.contains(&ComparableExpr::from(other.expr())));
+    Ok(())
+}
+
+#[test]
+fn formatter_ast_diff_shows_only_structural_changes() -> Result<(), ParseError> {
+    fn debug_module(source: &str) -> Result<String, ParseError> {
+        let module = Mod::Module(parse_module(source)?.into_syntax());
+        Ok(format!("{:#?}", ComparableMod::from(&module)))
+    }
+
+    let before = debug_module("x=1")?;
+    assert_eq!(before, debug_module("x = (0x1)")?);
+    let after = debug_module("x = 2")?;
+    assert_ne!(before, after);
+    assert_eq!(before.replacen('1', "2", 1), after);
+
+    assert_eq!(
+        debug_module("def f[T](x: T):\n match x:\n  case [1]: pass")?,
+        debug_module("def f[ T ](x: T):\n    match (x):\n        case [0x1]: pass")?,
+    );
     Ok(())
 }
 
