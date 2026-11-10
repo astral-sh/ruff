@@ -49,8 +49,8 @@ use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
-    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, NOT_CALLABLE, PARAMETER_ALREADY_ASSIGNED,
     POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
     add_invariant_generic_hints, note_numbers_module_not_supported,
 };
@@ -1583,7 +1583,7 @@ impl<'db> Bindings<'db> {
         // If all elements are not callable, report that the type as a whole is not callable.
         if self.elements.iter().all(|e| !e.is_callable()) {
             let range = all_arguments_range(node);
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+            if let Some(builder) = context.report_lint(&NOT_CALLABLE, range) {
                 builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type().display(db, env)
@@ -4755,7 +4755,7 @@ impl<'db> CallableBinding<'db> {
 
         if !self.is_callable() {
             let range = all_arguments_range(node);
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+            if let Some(builder) = context.report_lint(&NOT_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type.display(db, env),
@@ -4769,7 +4769,7 @@ impl<'db> CallableBinding<'db> {
 
         if self.dunder_call_is_possibly_unbound {
             let range = all_arguments_range(node);
-            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+            if let Some(builder) = context.report_lint(&NOT_CALLABLE, range) {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly missing `__call__` method)",
                     self.callable_type.display(db, env),
@@ -11056,7 +11056,7 @@ impl<'db> BindingError<'db> {
 
             Self::InternalCallError(reason) => {
                 let range = context.get_range(node, None);
-                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, range) {
+                if let Some(builder) = context.report_lint(&NOT_CALLABLE, range) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
                         describe_callable()

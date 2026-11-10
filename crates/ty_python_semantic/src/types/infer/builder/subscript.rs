@@ -13,8 +13,8 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
+    INVALID_TYPED_DICT_KEY, NOT_CALLABLE, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
@@ -2124,7 +2124,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             CallErrorKind::NotCallable => {
                                 if emit_diagnostic
                                     && let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                        self.context.report_lint(&NOT_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Method `__setitem__` of type `{}` is not callable \
@@ -2221,7 +2221,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             CallErrorKind::PossiblyNotCallable => {
                                 if emit_diagnostic
                                     && let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                        self.context.report_lint(&NOT_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Method `__setitem__` of type `{}` may not be callable \
@@ -2394,7 +2394,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         match call_error_kind {
                             CallErrorKind::NotCallable => {
                                 if let Some(builder) =
-                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                    self.context.report_lint(&NOT_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Method `__delitem__` of type `{}` \
@@ -2487,7 +2487,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             CallErrorKind::PossiblyNotCallable => {
                                 if let Some(builder) =
-                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                    self.context.report_lint(&NOT_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Method `__delitem__` of type `{}` may not be \

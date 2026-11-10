@@ -447,12 +447,12 @@ def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> No
 
 ```py
 def _():
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented()
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:3:11
   |
 3 |     raise NotImplemented()
@@ -461,7 +461,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
 help: Use `NotImplementedError` instead
   |
-2 |     # snapshot: call-non-callable
+2 |     # snapshot: not-callable
   -     raise NotImplemented()
 3 +     raise NotImplementedError()
 4 | def _():
@@ -471,12 +471,12 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```py
 def _():
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented("this module is not implemented yet!!!")
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:6:11
   |
 6 |     raise NotImplemented("this module is not implemented yet!!!")
@@ -485,7 +485,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
 help: Use `NotImplementedError` instead
   |
-5 |     # snapshot: call-non-callable
+5 |     # snapshot: not-callable
   -     raise NotImplemented("this module is not implemented yet!!!")
 6 +     raise NotImplementedError("this module is not implemented yet!!!")
 7 | def _(NotImplementedError: object):
@@ -498,12 +498,12 @@ not necessarily produce an exception, so we omit the fix.
 
 ```py
 def _(NotImplementedError: object):
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented()
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:9:11
   |
 9 |     raise NotImplemented()

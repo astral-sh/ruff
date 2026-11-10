@@ -1258,7 +1258,7 @@ info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 
 When intersection elements fail with different error types, we use a priority hierarchy to determine
 which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
-specific ones (like `call-top-callable` or `call-non-callable`).
+specific ones (like `call-top-callable` or `not-callable`).
 
 A specific argument error takes priority over a top-callable error:
 
@@ -1289,7 +1289,7 @@ def _(
     x: Callable[[int], str] & NotCallable,
 ) -> None:
     # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
-    # `NotCallable` would fail with call-non-callable
+    # `NotCallable` would fail with not-callable
     # We only show the more specific invalid-argument-type error
     # error: [invalid-argument-type]
     x("hello")
@@ -1309,7 +1309,7 @@ def _(
     x: Top[Callable[..., object]] & NotCallable,
 ) -> None:
     # `Top[Callable[..., object]]` fails with call-top-callable
-    # `NotCallable` would fail with call-non-callable
+    # `NotCallable` would fail with not-callable
     # We only show the call-top-callable error (it's more specific)
     # error: [call-top-callable]
     reveal_type(x())  # revealed: object
@@ -1426,7 +1426,7 @@ class A: ...
 class B: ...
 
 def _(x: A & B) -> None:
-    # error: [call-non-callable] "Object of type `A & B` is not callable"
+    # error: [not-callable] "Object of type `A & B` is not callable"
     reveal_type(x())  # revealed: Unknown
 ```
 

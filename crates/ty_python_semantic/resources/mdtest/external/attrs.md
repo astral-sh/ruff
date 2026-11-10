@@ -77,7 +77,7 @@ class Person:
     id: int = field()
     name: str = field()
 
-    # error: [call-non-callable] "Object of type `_MISSING_TYPE` is not callable"
+    # error: [not-callable] "Object of type `_MISSING_TYPE` is not callable"
     @id.default
     def _default_id(self) -> int:
         raise NotImplementedError
