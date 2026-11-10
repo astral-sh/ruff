@@ -12,7 +12,7 @@ use regex::bytes::Regex;
 
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ty_ide::{Completion, CompletionCapabilities};
+use ty_ide::{Completion, CompletionCapabilities, CompletionTrigger};
 use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
@@ -332,6 +332,7 @@ impl Task {
             CompletionCapabilities::default(),
             self.db.program_file(file),
             offset,
+            CompletionTrigger::Invoked,
         );
         Ok(completions)
     }

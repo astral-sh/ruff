@@ -275,7 +275,7 @@ class PlaygroundServer
     );
   }
 
-  triggerCharacters: string[] = ["."];
+  triggerCharacters: string[] = [".", ")", " ", "-"];
   signatureHelpTriggerCharacters: string[] = ["(", ","];
   signatureHelpRetriggerCharacters: string[] = [")"];
 
@@ -328,6 +328,7 @@ class PlaygroundServer
   provideCompletionItems(
     model: editor.ITextModel,
     position: Position,
+    context: languages.CompletionContext,
   ): languages.ProviderResult<languages.CompletionList> {
     const fileHandle = this.getFileHandleForModel(model);
     if (fileHandle == null) {
@@ -337,6 +338,7 @@ class PlaygroundServer
     const completions = this.props.workspace.completions(
       fileHandle,
       new TyPosition(position.lineNumber, position.column),
+      context.triggerCharacter,
     );
 
     // If completions is 100, this gives us "99" which has a length of two
@@ -368,10 +370,12 @@ class PlaygroundServer
         ),
         documentation: completion.documentation,
         detail: completion.detail,
-        // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
-        //  and omitting it works just fine? The LSP doesn't expose this information right now
-        //  which is why we go with undefined for now.
-        range: undefined as any,
+        // Monaco uses the word at the cursor when the range is undefined,
+        // although its CompletionItem type requires a range.
+        range:
+          completion.replace_range == null
+            ? (undefined as any)
+            : tyRangeToMonacoRange(completion.replace_range),
       })),
     };
   }

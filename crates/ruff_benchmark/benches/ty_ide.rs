@@ -7,7 +7,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_ide::{Completion, CompletionCapabilities, CompletionSettings};
+use ty_ide::{Completion, CompletionCapabilities, CompletionSettings, CompletionTrigger};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
@@ -377,6 +377,7 @@ BENCHMARK_CONSTANT_{index:03} = {index}
                 CompletionCapabilities::default(),
                 self.db.program_file(self.client),
                 self.fixture.cursor,
+                CompletionTrigger::Invoked,
             )
         }
 

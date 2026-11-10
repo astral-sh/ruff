@@ -28,7 +28,10 @@ expression: initialization_result
       "triggerCharacters": [
         ".",
         "\"",
-        "'"
+        "'",
+        ")",
+        " ",
+        "-"
       ]
     },
     "hoverProvider": true,

@@ -13,7 +13,7 @@ use clap::Parser;
 
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ty_ide::{Completion, CompletionCapabilities};
+use ty_ide::{Completion, CompletionCapabilities, CompletionTrigger};
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
@@ -144,6 +144,7 @@ fn get_completions<'db>(
         CompletionCapabilities::default(),
         db.program_file(file),
         offset,
+        CompletionTrigger::Invoked,
     ))
 }
 

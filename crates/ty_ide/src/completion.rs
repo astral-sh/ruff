@@ -33,18 +33,41 @@ use crate::goto::Definitions;
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
+/// How the client requested completions at the cursor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompletionTrigger {
+    Invoked,
+    Character(char),
+}
+
+impl From<Option<char>> for CompletionTrigger {
+    fn from(character: Option<char>) -> Self {
+        match character {
+            Some(character) => Self::Character(character),
+            None => Self::Invoked,
+        }
+    }
+}
+
 pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
     capabilities: CompletionCapabilities,
-    file: ProgramFile<'db>,
+    program_file: ProgramFile<'db>,
     offset: TextSize,
+    trigger: CompletionTrigger,
 ) -> Vec<Completion<'db>> {
-    let program_file = file;
-    let parsed = parsed_module(db, file.python_file(db)).load(db);
-    let file = file.file(db);
-    let source = source_text(db, file);
+    let source = source_text(db, program_file.file(db));
+    if let Some(arrow) = return_arrow_completion(db, program_file, &source, offset) {
+        return vec![arrow];
+    }
+    // These characters trigger completion specifically for the return arrow. In other
+    // contexts, typing a space, closing a call, or subtracting should leave the menu closed.
+    if matches!(trigger, CompletionTrigger::Character(')' | ' ' | '-')) {
+        return vec![];
+    }
 
+    let parsed = parsed_module(db, program_file.python_file(db)).load(db);
     let Some(context) = Context::new(db, program_file, &parsed, &source, offset) else {
         return vec![];
     };
@@ -132,6 +155,54 @@ pub fn completion<'db>(
     }
 
     completions.into_completions()
+}
+
+/// Suggests `->` after a function's parameter list, including when the user has typed the hyphen.
+fn return_arrow_completion<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    source: &str,
+    offset: TextSize,
+) -> Option<Completion<'db>> {
+    // Spaces are a frequent trigger. Check the text before requesting the parsed module.
+    let prefix = source.get(..offset.to_usize())?;
+    let before_arrow = prefix.strip_suffix('-').unwrap_or(prefix);
+    let before_paren = before_arrow
+        .trim_end_matches([' ', '\t'])
+        .strip_suffix(')')?;
+    let paren = TextRange::at(TextSize::of(before_paren), TextSize::of(')'));
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let node = covering_node(parsed.syntax().into(), paren);
+    let (AnyNodeRef::Parameters(parameters), Some(AnyNodeRef::StmtFunctionDef(function))) =
+        (node.node(), node.parent())
+    else {
+        return None;
+    };
+    if parameters.end() != paren.end() || function.returns.is_some() {
+        return None;
+    }
+
+    // An existing arrow can lack an annotation in the AST, as in `def f() ->:`.
+    // A lone hyphen can be completed when the cursor is immediately after it.
+    if let Some(next) = parsed.tokens().after(paren.end()).first()
+        && (next.kind() == TokenKind::Rarrow
+            || (next.kind() == TokenKind::Minus && next.end() != offset))
+    {
+        return None;
+    }
+
+    let start = TextSize::of(before_arrow);
+    let insert = if start == paren.end() { " ->" } else { "->" };
+    let mut item = Completion::builder("->").kind(CompletionKind::Text).build(
+        db,
+        file,
+        &CollectionContext::none(),
+        &UserQuery::fuzzy(None),
+    );
+    item.label = Some(item.name.clone());
+    item.insert = Some(CompactString::const_new(insert));
+    item.replace_range = Some(TextRange::new(start, offset));
+    Some(item)
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -333,6 +404,8 @@ pub struct Completion<'db> {
     ///
     /// When this is not set, [`Self::label`] is used.
     pub insert: Option<CompactString>,
+    /// The range to replace with the insertion text. If absent, the client chooses the range.
+    pub replace_range: Option<TextRange>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
     /// An editor action the client should perform after applying this
@@ -561,6 +634,7 @@ impl<'db> CompletionBuilder<'db> {
             label,
             qualified: self.qualified,
             insert,
+            replace_range: None,
             insert_text_format,
             command,
             ty: self.ty,
@@ -3429,7 +3503,7 @@ mod tests {
     use crate::completion::{Completion, completion};
     use crate::tests::{CursorTest, CursorTestBuilder, SitePackagesCursorTestBuilder};
 
-    use super::{CompletionKind, CompletionSettings, token_suffix_by_kinds};
+    use super::{CompletionKind, CompletionSettings, CompletionTrigger, token_suffix_by_kinds};
 
     #[test]
     fn token_suffixes_match() {
@@ -9159,6 +9233,92 @@ for foo, bar<CURSOR>
         );
     }
 
+    /// Returns the source after accepting the sole `->` suggestion, or `<no completions>`.
+    #[track_caller]
+    fn apply_return_arrow(source: &str, trigger: char) -> String {
+        let test = CursorTest::builder().source("main.py", source).build();
+        let cursor = &test.cursor;
+        let items = completion(
+            &test.db,
+            &CompletionSettings::default(),
+            CompletionCapabilities::default(),
+            test.program_file(cursor.file),
+            cursor.offset,
+            CompletionTrigger::Character(trigger),
+        );
+        if items.is_empty() {
+            return "<no completions>".to_owned();
+        }
+        let [arrow]: [_; 1] = items.try_into().unwrap();
+        assert_eq!(arrow.label(), "->");
+        let mut result = cursor.source.to_string();
+        result.replace_range(
+            arrow.replace_range.unwrap().to_std_range(),
+            arrow.insert.as_deref().unwrap_or(arrow.label()),
+        );
+        result
+    }
+
+    /// Closing a parameter list offers a spaced arrow even before the function has a body.
+    #[test]
+    fn return_arrow_after_parameters() {
+        assert_snapshot!(apply_return_arrow("def f()<CURSOR>", ')'), @"def f() ->");
+    }
+
+    /// The arrow preserves the space already typed after a method's parameters.
+    #[test]
+    fn return_arrow_after_space() {
+        let source = "\
+class C:
+    def method(self) <CURSOR>: ...";
+        assert_snapshot!(apply_return_arrow(source, ' '), @"
+        class C:
+            def method(self) ->: ...
+        ");
+    }
+
+    /// A hyphen after a space completes the arrow without doubling either character.
+    #[test]
+    fn return_arrow_after_spaced_hyphen() {
+        assert_snapshot!(apply_return_arrow("def f() -<CURSOR>: ...", '-'), @"def f() ->: ...");
+    }
+
+    /// A hyphen adjacent to the closing parenthesis gains a leading space.
+    #[test]
+    fn return_arrow_after_unspaced_hyphen() {
+        assert_snapshot!(apply_return_arrow("def f()-<CURSOR>: ...", '-'), @"def f() ->: ...");
+    }
+
+    /// Typing `)` before an existing return arrow offers no completions.
+    #[test]
+    fn return_arrow_before_existing_arrow() {
+        assert_snapshot!(apply_return_arrow("def f()<CURSOR> ->:", ')'), @"<no completions>");
+    }
+
+    /// A cursor between the two characters of an existing arrow receives no second arrow.
+    #[test]
+    fn return_arrow_inside_existing_arrow() {
+        assert_snapshot!(apply_return_arrow("def f() -<CURSOR>>:", '-'), @"<no completions>");
+    }
+
+    /// Closing a call inside a default argument offers no completions.
+    #[test]
+    fn return_arrow_inside_parameters() {
+        assert_snapshot!(apply_return_arrow("def f(x=g()<CURSOR>): ...", ')'), @"<no completions>");
+    }
+
+    /// Subtraction after a call leaves the completion menu closed.
+    #[test]
+    fn return_arrow_after_call() {
+        assert_snapshot!(apply_return_arrow("x = f() -<CURSOR>", '-'), @"<no completions>");
+    }
+
+    /// Typing a space after a complete arrow offers no completions.
+    #[test]
+    fn return_arrow_after_complete_arrow() {
+        assert_snapshot!(apply_return_arrow("def f() -> <CURSOR>: return 1", ' '), @"<no completions>");
+    }
+
     #[test]
     fn no_completions_in_function_param() {
         let builder = completion_test_builder(
@@ -11566,6 +11726,7 @@ raise <CURSOR>
                 self.capabilities,
                 self.cursor_test.program_file(self.cursor_test.cursor.file),
                 self.cursor_test.cursor.offset,
+                CompletionTrigger::Invoked,
             );
             let filtered = original
                 .iter()

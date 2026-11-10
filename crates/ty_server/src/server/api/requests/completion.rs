@@ -10,7 +10,7 @@ use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{
     CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
-    MarkupKind, completion,
+    CompletionTrigger, MarkupKind, completion,
 };
 use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::ProgramEnvironment;
@@ -64,6 +64,9 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         let client_capabilities = snapshot.resolved_client_capabilities();
         let program_file = db.program_file(file);
         let env = ProgramEnvironment::from_file(program_file);
+        let trigger_character = params
+            .context
+            .and_then(|context| context.trigger_character?.parse::<char>().ok());
         let completions = completion(
             db,
             snapshot.workspace_settings().completions(),
@@ -71,6 +74,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                 .snippets(client_capabilities.supports_completion_item_snippets()),
             program_file,
             offset,
+            CompletionTrigger::from(trigger_character),
         );
         if completions.is_empty() {
             return Ok(None);
@@ -81,7 +85,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
-            .map(|(i, comp)| {
+            .filter_map(|(i, comp)| {
                 let kind = comp.kind.map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db, &env).to_string());
                 let import_edit = comp.import.as_ref().and_then(|edit| {
@@ -96,6 +100,20 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                 });
 
                 let label = comp.label().to_string();
+                let mut insert_text = comp.insert.map(String::from);
+                let text_edit = if let Some(range) = comp.replace_range {
+                    Some(
+                        TextEdit {
+                            range: range
+                                .to_lsp_range(db, file, snapshot.encoding())?
+                                .local_range(),
+                            new_text: insert_text.take().unwrap_or_else(|| label.clone()),
+                        }
+                        .into(),
+                    )
+                } else {
+                    None
+                };
                 let import_suffix = comp
                     .module_name
                     .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
@@ -133,19 +151,19 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
                     Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
                 });
-                let insert_text = comp.insert.map(String::from);
                 let insert_text_format = match comp.insert_text_format {
                     CompletionInsertTextFormat::PlainText => None,
                     CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::Snippet),
                 };
 
-                CompletionItem {
+                Some(CompletionItem {
                     label,
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
                     detail: type_display,
                     label_details,
                     insert_text,
+                    text_edit,
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
@@ -153,7 +171,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .command
                         .and_then(|command| to_lsp_command(command, client_capabilities)),
                     ..Default::default()
-                }
+                })
             })
             .collect();
         let len = items.len();

@@ -5,6 +5,44 @@ use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
+/// The arrow edit replaces only the hyphen, even when the function name takes two UTF-16 code units.
+#[test]
+fn return_arrow_text_edit() -> Result<()> {
+    let path = SystemPath::new("src/main.py");
+    let source = "def 𝒇()-";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(path, source)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(path, source, 1);
+
+    let items = server.completion_request(&server.file_uri(path), Position::new(0, 9));
+    insta::assert_json_snapshot!(items, @r#"
+    [
+      {
+        "label": "->",
+        "kind": 1,
+        "sortText": "0",
+        "textEdit": {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            }
+          },
+          "newText": " ->"
+        }
+      }
+    ]
+    "#);
+    Ok(())
+}
+
 /// Tests that auto-import is enabled by default.
 #[test]
 fn default_auto_import() -> Result<()> {

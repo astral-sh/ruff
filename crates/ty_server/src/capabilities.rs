@@ -518,7 +518,12 @@ pub(crate) fn server_capabilities(
             .into(),
         ),
         completion_provider: Some(CompletionOptions {
-            trigger_characters: Some(vec!['.'.to_string(), '"'.to_string(), '\''.to_string()]),
+            trigger_characters: Some(
+                ['.', '"', '\'', ')', ' ', '-']
+                    .into_iter()
+                    .map(|ch| ch.to_string())
+                    .collect(),
+            ),
             ..Default::default()
         }),
         selection_range_provider: Some(true.into()),

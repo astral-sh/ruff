@@ -523,6 +523,7 @@ impl Workspace {
         &self,
         file_id: &FileHandle,
         position: Position,
+        trigger_character: Option<char>,
     ) -> Result<Vec<Completion>, Error> {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
@@ -538,6 +539,7 @@ impl Workspace {
             CompletionCapabilities::default(),
             program_file,
             offset,
+            ty_ide::CompletionTrigger::from(trigger_character),
         );
 
         Ok(completions
@@ -564,6 +566,9 @@ impl Workspace {
                     detail: type_display,
                     module_name: comp.module_name.map(ToString::to_string),
                     insert_text: comp.insert.map(String::from),
+                    replace_range: comp.replace_range.map(|range| {
+                        Range::from_text_range(range, &index, &source, self.position_encoding)
+                    }),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
@@ -1351,6 +1356,7 @@ pub struct Completion {
     pub kind: Option<CompletionKind>,
     #[wasm_bindgen(getter_with_clone)]
     pub insert_text: Option<String>,
+    pub replace_range: Option<Range>,
     #[wasm_bindgen(getter_with_clone)]
     pub additional_text_edits: Option<Vec<TextEdit>>,
     #[wasm_bindgen(getter_with_clone)]
