@@ -133,7 +133,8 @@ static NUMPY: Benchmark = Benchmark::new(RealWorldProject {
     repository: "https://github.com/numpy/numpy",
     commit: "b92fa9da0b7b2bc650d9298085876fc8db28df5e",
     paths: &["numpy"],
-    dependencies: &["hypothesis", "packaging", "pytest", "typing-extensions"],
+    // ty uses its vendored typeshed stub for `typing_extensions`, so we omit the package here.
+    dependencies: &["hypothesis", "packaging", "pytest"],
     max_dep_date: TY_ECOSYSTEM_PIN,
     python_version: SupportedPythonVersion::Py312,
 });
