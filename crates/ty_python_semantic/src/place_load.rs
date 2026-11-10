@@ -196,8 +196,9 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
                 }
                 ImplicitPlaceLoad::Builtin(name) => {
                     let context = self.procedure.context;
-                    if Some(context.index.scope_id(context.scope))
-                        == builtins_module_scope(db, self.env)
+                    if context.scope.is_global()
+                        && Some(context.index.scope_id(context.scope))
+                            == builtins_module_scope(db, self.env)
                     {
                         Place::Undefined.into()
                     } else {

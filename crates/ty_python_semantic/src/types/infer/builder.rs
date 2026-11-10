@@ -6867,11 +6867,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_expression_uncached(expression, tcx);
         };
 
+        // These expressions infer their value and their children independently of the
+        // expected type. A class value can still be specialized, and a literal can become
+        // unpromotable, when the surrounding context is applied to the root.
+        let share_value = tcx.declared_type().is_some_and(|target| {
+            matches!(
+                expression,
+                ast::Expr::Name(_)
+                    | ast::Expr::Attribute(_)
+                    | ast::Expr::Subscript(_)
+                    | ast::Expr::Compare(_)
+                    | ast::Expr::UnaryOp(_)
+                    | ast::Expr::FString(_)
+                    | ast::Expr::TString(_)
+                    | ast::Expr::Named(_)
+                    | ast::Expr::Slice(_)
+                    | ast::Expr::Yield(_)
+                    | ast::Expr::YieldFrom(_)
+                    | ast::Expr::NoneLiteral(_)
+                    | ast::Expr::NumberLiteral(_)
+                    | ast::Expr::BytesLiteral(_)
+                    | ast::Expr::BooleanLiteral(_)
+                    | ast::Expr::EllipsisLiteral(_)
+            ) && match target.resolve_type_alias(self.db()) {
+                Type::TypeForm(_) => false,
+                Type::Union(union) => !union.elements(self.db()).iter().any(|element| {
+                    matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                }),
+                _ => true,
+            }
+        });
+        let cache_tcx = if share_value {
+            TypeContext::default()
+        } else {
+            tcx
+        };
+
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
-        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+        let cache_entry = expression_cache
+            .borrow()
+            .get(expression_key, cache_tcx)
+            .cloned();
 
-        match cache_entry {
+        let ty = match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
                 self.store_expression_type(expression, ty);
                 ty
@@ -6886,7 +6925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {
                 // The expression is uncached, infer it independently and cache the inference results.
                 let mut speculative_builder = self.speculate();
-                let ty = speculative_builder.infer_expression_uncached(expression, tcx);
+                let ty = speculative_builder.infer_expression_uncached(expression, cache_tcx);
                 let inference = speculative_builder.into_expression_cache_entry();
 
                 let cached = if inference.is_single_expression(expression_key, ty) {
@@ -6900,11 +6939,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(expression_cache) = &self.expression_cache {
                     expression_cache
                         .borrow_mut()
-                        .insert(expression_key, tcx, cached);
+                        .insert(expression_key, cache_tcx, cached);
                 }
 
                 ty
             }
+        };
+        if share_value {
+            let ty = if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                self.specialize_generic_class_from_context(ty, tcx.declared_type().unwrap())
+            } else {
+                ty
+            };
+            let ty = self.apply_type_context(expression, ty, tcx);
+            *self.expressions.get_mut(&expression_key).unwrap() = ty;
+            ty
+        } else {
+            ty
         }
     }
 

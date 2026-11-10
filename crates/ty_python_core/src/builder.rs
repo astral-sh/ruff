@@ -4618,7 +4618,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     falsy = next_falsy;
                 }
 
-                for post_clause_state in post_clauses {
+                // Combine each clause with its own fallthrough before joining the preceding test.
+                for post_clause_state in post_clauses.into_iter().rev() {
                     self.flow_merge(post_clause_state);
                 }
 

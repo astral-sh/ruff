@@ -1151,6 +1151,11 @@ impl<'db> UnionBuilder<'db> {
         match (left, right) {
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
+            // Specializations of the same function can have equivalent signatures.
+            // Function literals with different origins cannot subsume each other.
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                left.literal(db) != right.literal(db)
+            }
             (Type::Dynamic(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Dynamic(_))
                 if !instance.is_object() =>

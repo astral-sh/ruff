@@ -829,6 +829,14 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        if let (Type::Callable(source), Type::Callable(target)) = (self, other)
+            && source
+                .signatures(db)
+                .rejects_call_domain(target.signatures(db))
+        {
+            return false;
+        }
+
         // Avoid creating a cached relation query for comparisons that class origins alone can
         // reject. The general relation below would also return false; this is only a shortcut.
         if let (Type::Intersection(source), Type::Intersection(target)) = (self, other)

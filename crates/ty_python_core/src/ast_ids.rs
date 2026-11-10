@@ -110,32 +110,33 @@ impl AstIdsBuilder {
     /// Stores use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
     pub(super) fn finish(self) -> AstIds {
-        let mut pages: Vec<UsePage> = Vec::new();
+        let mut pages = vec![UsePage::default(); self.root.len().div_ceil(64)];
         let mut use_ids = Vec::new();
         let mut places_plus_one = Vec::new();
         let mut scopes = Vec::new();
-        for (node, row) in (0..).map(ast::NodeIndex::from).zip(self.root) {
+        for (ordinal, row) in self.root.into_vec().into_iter().enumerate() {
+            let node = ast::NodeIndex::from(u32::try_from(ordinal).unwrap());
             if let Some(scope) = row.scope {
                 ScopeRange::record(&mut scopes, node, scope);
             }
             let Some(use_id) = row.use_id else { continue };
-            if let Some(page) = pages.last_mut()
-                && let Some(bit) = page.bit(node)
-            {
-                page.mask |= bit;
-            } else {
-                // Each set bit accounts for one distinct node in the use array.
-                let first_use = pages
-                    .last()
-                    .map_or(0, |last| last.first_use + last.mask.count_ones());
-                pages.push(UsePage {
-                    first_node: node,
-                    first_use,
-                    mask: 1,
-                });
-            }
+            pages[ordinal / 64].mask |= 1 << (ordinal % 64);
             use_ids.push(use_id);
             places_plus_one.push(row.place_plus_one);
+        }
+        let mut first_use = 0;
+        let mut first_scope = 0;
+        for (index, page) in pages.iter_mut().enumerate() {
+            let first_node = ast::NodeIndex::from(u32::try_from(index * 64).unwrap());
+            while scopes
+                .get(first_scope)
+                .is_some_and(|range| range.end < first_node)
+            {
+                first_scope += 1;
+            }
+            page.first_use = first_use;
+            page.first_scope = u32::try_from(first_scope).unwrap();
+            first_use += page.mask.count_ones();
         }
         AstIds {
             pages: pages.into_boxed_slice(),
@@ -146,23 +147,12 @@ impl AstIdsBuilder {
     }
 }
 
-/// The set bits locate uses within 64 node indices of the first use on this page.
-/// Gaps between pages occupy no storage.
-#[derive(Debug, get_size2::GetSize)]
+/// Each page addresses 64 consecutive AST node indices.
+#[derive(Clone, Default, Debug, get_size2::GetSize)]
 struct UsePage {
-    first_node: ast::NodeIndex,
-    first_use: u32,
     mask: u64,
-}
-
-impl UsePage {
-    fn bit(&self, node: ast::NodeIndex) -> Option<u64> {
-        if node == self.first_node {
-            return Some(1);
-        }
-        let offset = node.as_u32()?.checked_sub(self.first_node.as_u32()?)?;
-        1_u64.checked_shl(offset)
-    }
+    first_use: u32,
+    first_scope: u32,
 }
 
 #[derive(Debug, get_size2::GetSize)]
@@ -204,9 +194,9 @@ impl AstIds {
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
-        let end = self.pages.partition_point(|page| page.first_node <= node);
-        let page = self.pages[..end].last()?;
-        let bit = page.bit(node)?;
+        let node = node.as_u32()? as usize;
+        let page = self.pages.get(node / 64)?;
+        let bit = 1u64 << (node % 64);
         if page.mask & bit == 0 {
             return None;
         }
@@ -215,8 +205,21 @@ impl AstIds {
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
-        let index = self.scopes.partition_point(|range| range.end < node);
-        let range = self.scopes.get(index)?;
+        let page_id = node.as_u32()? as usize / 64;
+        let first = self.pages.get(page_id)?.first_scope as usize;
+        let range = self.scopes.get(first)?;
+        if node <= range.end {
+            return (range.start <= node).then_some(range.scope);
+        }
+        let last = self
+            .pages
+            .get(page_id + 1)
+            .map_or(self.scopes.len(), |next| {
+                (next.first_scope as usize + 1).min(self.scopes.len())
+            });
+        let ranges = &self.scopes[first + 1..last];
+        let index = ranges.partition_point(|range| range.end < node);
+        let range = ranges.get(index)?;
         (range.start <= node).then_some(range.scope)
     }
 

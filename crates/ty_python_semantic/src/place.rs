@@ -5,9 +5,7 @@ use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
-use ty_module_resolver::{
-    KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
-};
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module_confident};
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
@@ -673,10 +671,8 @@ fn builtins_symbol_impl<'db>(
     visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let program = env.program(db);
-    let resolver_environment = program.resolver_environment(db);
-    let resolver = |module: Module<'db>| {
-        let file = ProgramFile::new(db, module.file(db)?, program);
-        let scope = global_scope(db, file);
+    let resolver = |scope: ScopeId<'db>| {
+        let file = scope.program_file(db);
         let found_symbol = symbol_impl(
             db,
             scope,
@@ -703,16 +699,9 @@ fn builtins_symbol_impl<'db>(
         Some((scope, found_symbol))
     };
     // If this symbol is not present in project-level builtins, search in the default ones.
-    resolve_module_confident(
-        db,
-        resolver_environment,
-        &ModuleName::new_static("__builtins__").unwrap(),
-    )
-    .and_then(resolver)
-    .or_else(|| {
-        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
-            .and_then(resolver)
-    })
+    project_builtins_scope(db, program)
+        .and_then(resolver)
+        .or_else(|| builtin_scope(db, program).and_then(resolver))
 }
 
 /// Lookup the type of `symbol` in a given known module.
@@ -764,7 +753,32 @@ pub(crate) fn builtins_module_scope<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
 ) -> Option<ScopeId<'db>> {
-    core_module_scope(db, env, KnownModule::Builtins)
+    builtin_scope(db, env.program(db))
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn builtin_scope<'db>(
+    db: &'db dyn Db,
+    program: ty_python_core::Program<'db>,
+) -> Option<ScopeId<'db>> {
+    core_module_scope(
+        db,
+        &ProgramEnvironment::from_program(program),
+        KnownModule::Builtins,
+    )
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn project_builtins_scope<'db>(
+    db: &'db dyn Db,
+    program: ty_python_core::Program<'db>,
+) -> Option<ScopeId<'db>> {
+    let name = ModuleName::new_static("__builtins__").unwrap();
+    let module = resolve_module_confident(db, program.resolver_environment(db), &name)?;
+    Some(global_scope(
+        db,
+        ProgramFile::new(db, module.file(db)?, program),
+    ))
 }
 
 /// Get the scope of a core stdlib module.

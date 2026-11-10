@@ -201,6 +201,20 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
+    /// Whether the positional and keyword arguments alone rule out subtyping.
+    pub(super) fn rejects_call_domain(&self, target: &Self) -> bool {
+        let ([source], [target]) = (self.overloads.as_slice(), target.overloads.as_slice()) else {
+            return false;
+        };
+        !source.is_bottom()
+            && !target.is_top()
+            && source.receiver_constraints().is_none()
+            && target.receiver_constraints().is_none()
+            && source
+                .parameters
+                .rejects_positional_signature(&target.parameters)
+    }
+
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
@@ -2904,6 +2918,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if self.report_context().is_none()
+            && source.receiver_constraints().is_none()
+            && target.receiver_constraints().is_none()
+            && source
+                .parameters
+                .rejects_positional_signature(&target.parameters)
+        {
+            return self.with_signature_recursion_guard(source, target, || self.never());
+        }
+
         let may_contain_typevars = |signature: &Signature<'db>| {
             signature.generic_context.is_some()
                 || signature
@@ -5050,6 +5074,31 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
+    fn rejects_positional_signature(&self, target: &Self) -> bool {
+        if !self.is_standard() || !target.is_standard() {
+            return false;
+        }
+        if self
+            .iter()
+            .any(|p| p.is_variadic() || p.is_keyword_variadic())
+            || target
+                .iter()
+                .any(|p| p.is_variadic() || p.is_keyword_variadic())
+        {
+            return false;
+        }
+        if self.positional().count() < target.positional().count()
+            || self.iter().filter(|p| !p.has_default()).count()
+                > target.iter().filter(|p| !p.has_default()).count()
+        {
+            return true;
+        }
+        target
+            .iter()
+            .filter_map(Parameter::keyword_name)
+            .any(|keyword| self.keyword_by_name(keyword).is_none())
+    }
+
     /// Create a parameter list with an explicit kind.
     ///
     /// This constructor does not infer the kind from the parameter types or normalize an unpacked
