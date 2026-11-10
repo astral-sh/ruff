@@ -666,6 +666,10 @@ pub(crate) enum CheckTypesMode {
     /// evaluation.
     Finalize,
 
+    /// Finalize the call with inferred parameter types for every arity-compatible overload.
+    /// Signature help and keyword completion also display parameters from unmatched overloads.
+    SignatureDetails,
+
     /// Preserve all callable bindings, regardless of whether they evaluate successfully.
     ///
     /// Generic call inference may perform fixpoint iteration in order to unify
@@ -1426,14 +1430,18 @@ impl<'db> Bindings<'db> {
 
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
-        for constructor in self.iter_constructor_items_mut() {
-            constructor.check_downstream_constructor(
+        for downstream in self
+            .iter_constructor_items_mut()
+            .filter_map(ConstructorBinding::downstream_constructor_mut)
+        {
+            let _ = downstream.check_types_impl(
                 db,
                 env,
                 constraints,
                 call_arguments,
                 call_expression_tcx,
                 dataclass_field_specifiers,
+                mode,
             );
         }
 
@@ -3984,7 +3992,7 @@ impl<'db> CallableBinding<'db> {
         let mut deferred = SmallVec::<[usize; 4]>::new();
         let mut has_checked_match = false;
         for (index, overload) in self.matching_overloads_mut() {
-            if !mode.is_provisional()
+            if mode == CheckTypesMode::Finalize
                 && !should_retry_after_provisional_arity
                 && overload.has_disjoint_literal_argument(call_arguments.as_ref())
             {
