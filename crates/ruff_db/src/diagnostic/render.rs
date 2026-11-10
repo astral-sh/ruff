@@ -26,6 +26,7 @@ pub use full::FullRenderer;
 pub use github::GithubRenderer;
 #[cfg(feature = "serde")]
 pub use gitlab::GitlabRenderer;
+pub use grouped::GroupedRenderer;
 #[cfg(feature = "serde")]
 pub use json::JsonRenderer;
 #[cfg(feature = "serde")]
@@ -44,6 +45,7 @@ mod full;
 mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
+mod grouped;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -2483,6 +2485,7 @@ watermelon
         #[default]
         Full,
         Concise,
+        Grouped,
         Azure,
         Github,
         Pylint,
@@ -2689,6 +2692,9 @@ watermelon
                 }
                 DiagnosticFormat::Concise => {
                     ConciseRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Grouped => {
+                    GroupedRenderer::new(&self.db, &self.config).render(f, diagnostics)
                 }
                 DiagnosticFormat::Azure => {
                     AzureRenderer::new(&self.db, &self.config).render(f, diagnostics)

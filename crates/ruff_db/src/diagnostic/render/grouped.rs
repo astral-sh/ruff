@@ -1,31 +1,35 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
 
-use colored::Colorize;
-
-use ruff_db::diagnostic::render::Renderer;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
 use ruff_diagnostics::Applicability;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 
-use crate::fs::relativize_path;
+use crate::diagnostic::render::Renderer;
+use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
 
-pub(crate) struct GroupedRenderer<'a> {
+pub struct GroupedRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GroupedRenderer<'a> {
-    pub(crate) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
 impl Renderer for GroupedRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
-        for (filename, messages) in group_diagnostics_by_filename(diagnostics) {
+        let stylesheet = if self.config.color {
+            DiagnosticStylesheet::styled()
+        } else {
+            DiagnosticStylesheet::plain()
+        };
+        for (filename, messages) in group_diagnostics_by_filename(diagnostics, self.resolver) {
             // Compute the maximum number of digits in the row and column, for messages in
             // this file.
 
@@ -41,7 +45,7 @@ impl Renderer for GroupedRenderer<'_> {
             let column_length = max_column_length.digits();
 
             // Print the filename.
-            writeln!(f, "{}:", relativize_path(&*filename).underline())?;
+            writeln!(f, "{}:", fmt_styled(filename, stylesheet.underline))?;
 
             // Print each message.
             for message in messages {
@@ -54,6 +58,7 @@ impl Renderer for GroupedRenderer<'_> {
                             .notebook_index(message.expect_primary_span().file())
                             .as_ref(),
                         message,
+                        stylesheet: &stylesheet,
                         show_fix_status: self.config.show_fix_status(),
                         applicability: self.config.fix_applicability(),
                         row_length,
@@ -85,17 +90,27 @@ impl std::ops::Deref for MessageWithLocation<'_> {
     }
 }
 
-fn group_diagnostics_by_filename(
-    diagnostics: &[Diagnostic],
-) -> BTreeMap<String, Vec<MessageWithLocation<'_>>> {
+fn group_diagnostics_by_filename<'a>(
+    diagnostics: &'a [Diagnostic],
+    resolver: &'a dyn FileResolver,
+) -> BTreeMap<Cow<'a, str>, Vec<MessageWithLocation<'a>>> {
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
+        let span = diagnostic
+            .primary_span_ref()
+            .expect("Expected a primary span");
+        let file = span.file();
+        let start_location = span.range().map(|range| {
+            file.diagnostic_source(resolver)
+                .as_source_code()
+                .line_column(range.start())
+        });
         grouped_messages
-            .entry(diagnostic.expect_ruff_filename())
+            .entry(file.relative_path(resolver).to_string_lossy())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message: diagnostic,
-                start_location: diagnostic.ruff_start_location().unwrap_or_default(),
+                start_location: start_location.unwrap_or_default(),
             });
     }
     grouped_messages
@@ -103,6 +118,7 @@ fn group_diagnostics_by_filename(
 
 struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
+    stylesheet: &'a DiagnosticStylesheet,
     show_fix_status: bool,
     applicability: Applicability,
     row_length: NonZeroUsize,
@@ -133,7 +149,7 @@ impl Display for DisplayGroupedMessage<'_> {
                 cell = jupyter_index
                     .cell(start_location.line)
                     .unwrap_or(OneIndexed::MIN),
-                sep = ":".cyan()
+                sep = fmt_styled(":", self.stylesheet.separator)
             )?;
             (
                 jupyter_index
@@ -148,11 +164,12 @@ impl Display for DisplayGroupedMessage<'_> {
         writeln!(
             f,
             "{row}{sep}{col}{col_padding} {code_and_body}",
-            sep = ":".cyan(),
+            sep = fmt_styled(":", self.stylesheet.separator),
             col_padding =
                 " ".repeat(self.column_length.get() - start_location.column.digits().get()),
             code_and_body = RuleCodeAndBody {
                 message,
+                stylesheet: self.stylesheet,
                 show_fix_status: self.show_fix_status,
                 applicability: self.applicability,
                 preview: self.preview,
@@ -166,6 +183,7 @@ impl Display for DisplayGroupedMessage<'_> {
 
 pub(super) struct RuleCodeAndBody<'a> {
     message: &'a Diagnostic,
+    stylesheet: &'a DiagnosticStylesheet,
     show_fix_status: bool,
     applicability: Applicability,
     preview: bool,
@@ -175,23 +193,23 @@ pub(super) struct RuleCodeAndBody<'a> {
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let use_name = self.preview && !self.prefer_rule_codes;
-        if self.show_fix_status {
-            if let Some(fix) = self.message.fix() {
-                // Do not display an indicator for inapplicable fixes
-                if fix.applies(self.applicability) {
-                    let code = if use_name {
-                        self.message.id().as_str()
-                    } else {
-                        self.message.secondary_code_or_id()
-                    };
-                    write!(f, "{} ", code.red().bold())?;
-                    return write!(
-                        f,
-                        "{fix}{body}",
-                        fix = format_args!("[{}] ", "*".cyan()),
-                        body = self.message.concise_message(),
-                    );
-                }
+        if self.show_fix_status
+            && let Some(fix) = self.message.fix()
+        {
+            // Do not display an indicator for inapplicable fixes
+            if fix.applies(self.applicability) {
+                let code = if use_name {
+                    self.message.id().as_str()
+                } else {
+                    self.message.secondary_code_or_id()
+                };
+                write!(f, "{} ", fmt_styled(code, self.stylesheet.secondary_code))?;
+                return write!(
+                    f,
+                    "{fix}{body}",
+                    fix = format_args!("[{}] ", fmt_styled("*", self.stylesheet.separator)),
+                    body = self.message.concise_message(),
+                );
             }
         }
 
@@ -199,14 +217,14 @@ impl Display for RuleCodeAndBody<'_> {
             write!(
                 f,
                 "{code} {body}",
-                code = code.red().bold(),
+                code = fmt_styled(code, self.stylesheet.secondary_code),
                 body = self.message.concise_message(),
             )
         } else {
             write!(
                 f,
                 "{code}: {body}",
-                code = self.message.id().as_str().red().bold(),
+                code = fmt_styled(self.message.id().as_str(), self.stylesheet.secondary_code),
                 body = self.message.concise_message(),
             )
         }
@@ -215,59 +233,64 @@ impl Display for RuleCodeAndBody<'_> {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
-    use rustc_hash::FxHashMap;
-
-    use ruff_db::diagnostic::DisplayDiagnosticConfig;
-    use ruff_db::diagnostic::render::Renderer;
     use ruff_diagnostics::Applicability;
 
-    use crate::message::tests::{create_diagnostics, create_syntax_error_diagnostics};
-    use crate::message::{GroupedRenderer, RenderContext};
+    use super::super::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
+    };
 
     #[test]
     fn default() {
-        assert_snapshot!(
-            GroupedRenderer::new(
-                &RenderContext::new(&FxHashMap::default()),
-                &DisplayDiagnosticConfig::new("ruff"),
-            )
-            .display(&create_diagnostics())
-        );
+        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Grouped);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        fib.py:
+           1:8  F401 `os` imported but unused
+           6:5  F841 Local variable `x` is assigned to but never used
+          12:16 F821 Undefined name `fibonaccii`
+
+        undef.py:
+          1:4 F821 Undefined name `a`
+        ");
     }
 
     #[test]
     fn syntax_errors() {
-        assert_snapshot!(
-            GroupedRenderer::new(
-                &RenderContext::new(&FxHashMap::default()),
-                &DisplayDiagnosticConfig::new("ruff"),
-            )
-            .display(&create_syntax_error_diagnostics())
-        );
+        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Grouped);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        syntax_errors.py:
+          1:15 invalid-syntax: Expected one or more symbol names after import
+          3:12 invalid-syntax: Expected ')', found newline
+        ");
     }
 
     #[test]
     fn fix_status() {
-        assert_snapshot!(
-            GroupedRenderer::new(
-                &RenderContext::new(&FxHashMap::default()),
-                &DisplayDiagnosticConfig::new("ruff").with_show_fix_status(true),
-            )
-            .display(&create_diagnostics())
-        );
+        let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Grouped);
+        env.show_fix_status(true);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        fib.py:
+           1:8  F401 `os` imported but unused
+           6:5  F841 Local variable `x` is assigned to but never used
+          12:16 F821 Undefined name `fibonaccii`
+
+        undef.py:
+          1:4 F821 Undefined name `a`
+        ");
     }
 
     #[test]
     fn fix_status_unsafe() {
-        assert_snapshot!(
-            GroupedRenderer::new(
-                &RenderContext::new(&FxHashMap::default()),
-                &DisplayDiagnosticConfig::new("ruff")
-                    .with_show_fix_status(true)
-                    .with_fix_applicability(Applicability::Unsafe),
-            )
-            .display(&create_diagnostics())
-        );
+        let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Grouped);
+        env.show_fix_status(true);
+        env.fix_applicability(Applicability::Unsafe);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        fib.py:
+           1:8  F401 [*] `os` imported but unused
+           6:5  F841 [*] Local variable `x` is assigned to but never used
+          12:16 F821 Undefined name `fibonaccii`
+
+        undef.py:
+          1:4 F821 Undefined name `a`
+        ");
     }
 }
