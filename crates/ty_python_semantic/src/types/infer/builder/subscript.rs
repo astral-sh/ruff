@@ -45,6 +45,10 @@ use ty_python_core::{SemanticIndex, place_table};
 
 /// Repeated explicit specializations can share a finished bound check. A recursive bound must
 /// keep using the caller's relation and its cycle recovery.
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Salsa returns None when the type argument bound check encounters a cycle"
+)]
 fn rejects_type_argument<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
