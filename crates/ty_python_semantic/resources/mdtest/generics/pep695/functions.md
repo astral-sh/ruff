@@ -2079,7 +2079,7 @@ def bounded[S: str](value: S) -> None:
     reveal_type(box(value))  # revealed: list[S@bounded]
 
 def contextual[S](value: str, existing: S) -> list[S]:
-    return box(value)  # error: [invalid-return-type]
+    return box(value)  # error: [invalid-explicit-return]
 
 def compatible_context[S: str](value: S) -> list[S]:
     return box(value)  # ok
@@ -2801,7 +2801,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `T@bad_return`, found `int`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `T@bad_return`, found `int`"
     return x + 1
 ```
 
@@ -2828,7 +2828,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:
@@ -5519,7 +5519,7 @@ preserving the type variable through the constrained call would be unsound.
 ```py
 def bounded[U: bool](value: U) -> U:
     reveal_type(double(value))  # revealed: int
-    return double(value)  # error: [invalid-return-type]
+    return double(value)  # error: [invalid-explicit-return]
 
 def same_bound[U: int](value: U) -> None:
     reveal_type(double(value))  # revealed: int

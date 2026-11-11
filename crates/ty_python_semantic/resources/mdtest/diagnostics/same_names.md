@@ -197,7 +197,7 @@ class MyClass: ...
 def get_MyClass() -> MyClass:
     from . import make_MyClass
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1:7`, found `package.foo.MyClass @ src/package/foo.pyi:1:7`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1:7`, found `package.foo.MyClass @ src/package/foo.pyi:1:7`"
     return make_MyClass()
 ```
 
@@ -334,7 +334,7 @@ from typing import Iterator
 def f() -> Iterator[str]:
     import bad
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `typing.Iterator[str]`, found `bad.Iterator[str]"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `typing.Iterator[str]`, found `bad.Iterator[str]"
     return bad.bad()
 ```
 
@@ -412,7 +412,7 @@ class Model: ...
 def get_models_tuple() -> tuple[Model]:
     from module import Model
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
     return (Model(),)
 ```
 

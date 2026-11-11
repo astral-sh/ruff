@@ -41,7 +41,7 @@ WorkspaceDiagnosticReport {
                             ),
                             code: Some(
                                 String(
-                                    "invalid-return-type",
+                                    "invalid-explicit-return",
                                 ),
                             ),
                             code_description: Some(
@@ -60,7 +60,7 @@ WorkspaceDiagnosticReport {
                                         path: "/rules",
                                         query: None,
                                         fragment: Some(
-                                            "invalid-return-type",
+                                            "invalid-explicit-return",
                                         ),
                                     },
                                 },

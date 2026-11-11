@@ -4860,7 +4860,7 @@ class DateTime(Protocol[T]):
     def __sub__(self: DateTime[tzinfo], other: DateTime[tzinfo]) -> timedelta: ...
     @classmethod
     def now(cls, tz: Optional[tzinfo] = None) -> DateTime[Optional[tzinfo]]:
-        return datetime.now(tz)  # error: [invalid-return-type]
+        return datetime.now(tz)  # error: [invalid-explicit-return]
 ```
 
 ## Recursive protocol receiver binding with an incompatible override

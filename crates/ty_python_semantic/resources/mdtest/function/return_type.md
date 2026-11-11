@@ -67,7 +67,7 @@ class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
-    # error: [empty-body]
+    # error: [invalid-implicit-return-in-function-with-stub-body]
     def f(self) -> int: ...
 
 T = TypeVar("T", covariant=True)
@@ -107,7 +107,7 @@ class Bar[T](ABC):
     @abstractmethod
     def g[U](self, x: U) -> U: ...
 
-# error: [empty-body]
+# error: [invalid-implicit-return-in-function-with-stub-body]
 def f() -> int: ...
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
@@ -309,36 +309,36 @@ python-version = "3.12"
 ```
 
 ```py
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def f() -> int:
     1
 
 def f() -> str:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return 1
 
 def f() -> int:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return
 
 from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [empty-body]
+# error: [invalid-implicit-return-in-function-with-stub-body]
 def m(x: T) -> T: ...
 
 class A[T]: ...
 
 def f() -> A[int]:
     class A[T]: ...
-    return A[int]()  # error: [invalid-return-type]
+    return A[int]()  # error: [invalid-explicit-return]
 
 class B: ...
 
 def g() -> B:
     class B: ...
-    return B()  # error: [invalid-return-type]
+    return B()  # error: [invalid-explicit-return]
 ```
 
 ## Invalid return type in stub file
@@ -347,15 +347,15 @@ def g() -> B:
 
 ```pyi
 def f() -> int:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return ...
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def foo() -> int:
     print("...")
     ...
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def foo() -> int:
     f"""{foo} is a function that ..."""
     ...
@@ -370,15 +370,15 @@ def f(cond: bool) -> str:
     if cond:
         return "a"
     else:
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return 1
 
 def f(cond: bool) -> str:
     if cond:
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return 1
     else:
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return 2
 ```
 
@@ -391,17 +391,17 @@ def f() -> None:
     if False:
         return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def f(cond: bool) -> int:
     if cond:
         return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def f(cond: bool) -> int:
     if cond:
         raise ValueError()
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def f(cond: bool) -> int:
     if cond:
         cond = False
@@ -415,12 +415,11 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
-If the function has no `return` statement or if it has only bare `return` statement (no variable in
-the return statement), then we show a diagnostic hint that the return annotation should be `-> None`
-or a `return` statement should be added.
+If the function has no `return` statement and can fall through, then we show a diagnostic hint that
+the return annotation should be `-> None` or a `return` statement should be added.
 
 ```py
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def f() -> int:
     print("hello")
 ```
@@ -465,7 +464,7 @@ def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 
 def f(cond: bool) -> int:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `int`, found `Literal["hello"]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `int`, found `Literal["hello"]`"
     return "hello" if cond else NotImplemented
 ```
 
@@ -530,12 +529,12 @@ def i() -> typing.Iterable[int]:
 def i2() -> typing.Generator[int]:
     yield from i()
 
-def j() -> str:  # error: [invalid-return-type]
+def j() -> str:  # error: [invalid-generator-return-type]
     yield 42
 
 def invalid_return_type() -> typing.Generator[None, None, None]:
     yield
-    return ""  # error: [invalid-return-type]
+    return ""  # error: [invalid-explicit-return]
 ```
 
 The return value of the function must be assignable to the return type of the `Generator`. This is
@@ -544,7 +543,7 @@ specified in the third type parameter.
 ```py
 def wrong_return() -> typing.Generator[int, int, int]:
     yield 1
-    return ""  # error: [invalid-return-type]
+    return ""  # error: [invalid-explicit-return]
 ```
 
 If the function has no return and it's implicitly returning it is still type checked.
@@ -553,7 +552,7 @@ If the function has no return and it's implicitly returning it is still type che
 def bare_return_ok() -> typing.Generator[int, int, None]:
     yield 1
 
-def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
+def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-implicit-return]
     yield 1
 ```
 
@@ -562,7 +561,7 @@ Iterators must not return anything.
 ```py
 def iterator_must_not_return() -> typing.Iterator[int]:
     yield 2
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return "foo"
 ```
 
@@ -589,7 +588,7 @@ async def h() -> typing.AsyncIterator[int]:
 async def i() -> typing.AsyncIterable[int]:
     yield 42
 
-async def j() -> str:  # error: [invalid-return-type]
+async def j() -> str:  # error: [invalid-generator-return-type]
     yield 42
 
 async def k() -> typing.AsyncGenerator[int]:
@@ -597,7 +596,7 @@ async def k() -> typing.AsyncGenerator[int]:
     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
-## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
+## Diagnostics for `invalid-implicit-return-in-function-with-stub-body` on non-protocol subclasses of protocol classes
 
 <!-- snapshot-diagnostics -->
 
@@ -610,10 +609,10 @@ class Abstract(Protocol):
     def method(self) -> str: ...
 
 class Concrete(Abstract):
-    def method(self) -> str: ...  # error: [empty-body]
+    def method(self) -> str: ...  # error: [invalid-implicit-return-in-function-with-stub-body]
 ```
 
-## Diagnostics for `invalid-return-type` on dynamic type
+## Diagnostics for `invalid-implicit-return` on dynamic type
 
 ```toml
 environment.python-version = "3.12"
@@ -622,19 +621,19 @@ environment.python-version = "3.12"
 ```py
 from typing import Never, Any
 
-def f(func: Any) -> Never:  # error: [invalid-return-type]
+def f(func: Any) -> Never:  # error: [invalid-implicit-return]
     func()
 ```
 
-## `unsound-return-statement`
+## `unsound-return`
 
-In addition to `invalid-return-type`, we also offer a disabled-by-default stricter rule
-`unsound-return-statement`. This rule forbids `return` statements that return an instance of a type
-`A` unless `A` is a *subtype* of the annotated return type:
+In addition to `invalid-explicit-return`, we also offer a disabled-by-default stricter rule
+`unsound-return`. This rule forbids `return` statements that return an instance of a type `A` unless
+`A` is a *subtype* of the annotated return type:
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -647,17 +646,17 @@ def returns_any() -> Any:
     return "foo"
 
 def g() -> int:
-    # snapshot: unsound-return-statement
+    # snapshot: unsound-return
     return returns_any()
 ```
 
 ```snapshot
-error[unsound-return-statement]: Unsound return statement
+error[unsound-return]: Unsound return statement
   --> src/mdtest_snippet.py:11:12
    |
  9 | def g() -> int:
    |            --- Expected a subtype of `int` because of the return type
-10 |     # snapshot: unsound-return-statement
+10 |     # snapshot: unsound-return
 11 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
 info: `Any` is assignable to `int`, but not a subtype of `int`
@@ -668,17 +667,17 @@ An example with nested error context:
 
 ```py
 def h() -> tuple[tuple[int, int]]:
-    # snapshot: unsound-return-statement
+    # snapshot: unsound-return
     return ((42, returns_any()),)
 ```
 
 ```snapshot
-error[unsound-return-statement]: Unsound return statement
+error[unsound-return]: Unsound return statement
   --> src/mdtest_snippet.py:14:12
    |
 12 | def h() -> tuple[tuple[int, int]]:
    |            ---------------------- Expected a subtype of `tuple[tuple[int, int]]` because of the return type
-13 |     # snapshot: unsound-return-statement
+13 |     # snapshot: unsound-return
 14 |     return ((42, returns_any()),)
    |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
 info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
@@ -694,18 +693,18 @@ from typing import Generator
 
 def f() -> Generator[None, None, int]:
     yield
-    # snapshot: unsound-return-statement
+    # snapshot: unsound-return
     return returns_any()
 ```
 
 ```snapshot
-error[unsound-return-statement]: Unsound return statement
+error[unsound-return]: Unsound return statement
   --> src/mdtest_snippet.py:20:12
    |
 17 | def f() -> Generator[None, None, int]:
    |            -------------------------- Expected a subtype of `int` because of the return type
 18 |     yield
-19 |     # snapshot: unsound-return-statement
+19 |     # snapshot: unsound-return
 20 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
 info: `Any` is assignable to `int`, but not a subtype of `int`
@@ -755,17 +754,17 @@ Edge case: for `TypeIs`-annotated functions, we want the error message to say "n
 from typing_extensions import TypeIs
 
 def f(x: object) -> TypeIs[int]:
-    # snapshot: unsound-return-statement
+    # snapshot: unsound-return
     return returns_any()
 ```
 
 ```snapshot
-error[unsound-return-statement]: Unsound return statement
+error[unsound-return]: Unsound return statement
   --> src/mdtest_snippet.py:45:12
    |
 43 | def f(x: object) -> TypeIs[int]:
    |                     ----------- Expected a subtype of `bool` because of the return type
-44 |     # snapshot: unsound-return-statement
+44 |     # snapshot: unsound-return
 45 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
 info: `Any` is assignable to `bool`, but not a subtype of `bool`
@@ -787,17 +786,17 @@ rather than against the original `TypeIs` annotation:
 
 ```py
 def returns_type_is_alias_union(value: object, result: bool | Any) -> TypeIsAlias:
-    # snapshot: unsound-return-statement
+    # snapshot: unsound-return
     return result
 ```
 
 ```snapshot
-error[unsound-return-statement]: Unsound return statement
+error[unsound-return]: Unsound return statement
   --> src/mdtest_snippet.py:53:12
    |
 51 | def returns_type_is_alias_union(value: object, result: bool | Any) -> TypeIsAlias:
    |                                                                       ----------- Expected a subtype of `bool` because of the return type
-52 |     # snapshot: unsound-return-statement
+52 |     # snapshot: unsound-return
 53 |     return result
    |            ^^^^^^ Inferred as `bool | Any`
 info: `bool | Any` is assignable to `bool`, but not a subtype of `bool`
@@ -811,7 +810,7 @@ A `Never` return annotation is still a typed boundary, so returning `Any` must t
 from typing_extensions import Never
 
 def never_returns() -> Never:
-    return returns_any()  # error: [unsound-return-statement]
+    return returns_any()  # error: [unsound-return]
 ```
 
 The same applies when `Never` is the return type of a generator:
@@ -819,7 +818,7 @@ The same applies when `Never` is the return type of a generator:
 ```py
 def generator_never_returns() -> Generator[None, None, Never]:
     yield
-    return returns_any()  # error: [unsound-return-statement]
+    return returns_any()  # error: [unsound-return]
 ```
 
 There is currently a limitation in how this rule interacts with contextual inference for collection
@@ -836,7 +835,7 @@ def returns_list_containing_any() -> list[int]:
     return [returns_any()]
 ```
 
-## Regression test: `unsound-return-statement` with gradual generic declarations
+## Regression test: `unsound-return` with gradual generic declarations
 
 A specialized generic type is fully static if it has been specialized with fully static types, even
 if the type parameter(s) it is generic over have non-fully-static bounds, constraints, or defaults.
@@ -848,7 +847,7 @@ non-fully-static, leading to false negatives in the below examples:
 python-version = "3.13"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -861,13 +860,13 @@ class Defaulted[T = Any]: ...
 # `Bounded[int]`, `Constrained[int]` and `Defaulted[int]` are all fully static,
 # despite their bounds/constraints/defaults not being fully static
 def returns_bounded(value: Any) -> Bounded[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 
 def returns_constrained(value: Any) -> Constrained[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 
 def returns_defaulted(value: Any) -> Defaulted[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 ```
 
 The same applies to classes declared with legacy type variables:
@@ -882,13 +881,13 @@ class LegacyConstrained(Generic[ConstrainedT]): ...
 class LegacyDefaulted(Generic[DefaultedT]): ...
 
 def returns_legacy_bounded(value: Any) -> LegacyBounded[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 
 def returns_legacy_constrained(value: Any) -> LegacyConstrained[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 
 def returns_legacy_defaulted(value: Any) -> LegacyDefaulted[int]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 ```
 
 and to `return` statements in generator functions:
@@ -896,7 +895,7 @@ and to `return` statements in generator functions:
 ```py
 def generator_returns_bounded(value: Any) -> Generator[None, None, Bounded[int]]:
     yield
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 ```
 
 A specialized generic type is nonetheless considered to be non-fully-static if it is specialized
@@ -920,7 +919,7 @@ def returns_nested_gradual_bounded(value: Any) -> Bounded[list[Any]]:
     return value
 ```
 
-## Regression test: `unsound-return-statement` with tuple class objects
+## Regression test: `unsound-return` with tuple class objects
 
 A tuple class has only one generic parameter, so its element types are combined into a union. Its
 original element types must still determine whether the tuple class is fully static.
@@ -930,7 +929,7 @@ original element types must still determine whether the tuple class is fully sta
 python-version = "3.11"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 A tuple class with fully static elements forms a fully static return boundary:
@@ -939,7 +938,7 @@ A tuple class with fully static elements forms a fully static return boundary:
 from typing import Any
 
 def returns_static_tuple_class(value: Any) -> type[tuple[int, object]]:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 ```
 
 A tuple class with an `Any` element remains gradual even though the union `object | Any` simplifies
@@ -957,19 +956,18 @@ def returns_gradual_variadic_tuple_class(value: Any) -> type[tuple[object, *tupl
     return value
 ```
 
-## Regression test: `unsound-return-statement` uses "pure redundancy"
+## Regression test: `unsound-return` uses "pure redundancy"
 
 Internally, the rule uses "pure redundancy" rather than "impure redundancy". The following example
 is a regression test that shows why this internal implementation detail is important. As an
 optimisation as of 06 August 2026, `Phantom[str]` is not currently considered "impurely redundant"
 with `Phantom[int]` (we do not simplify the union `Phantom[str] | Phantom[int]`). But the two
 protocols are considered equivalent, are considered mutual subtypes of each other, and are
-considered mutually redundant, meaning that no `unsound-return-statement` error is reported on this
-snippet:
+considered mutually redundant, meaning that no `unsound-return` error is reported on this snippet:
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -988,7 +986,7 @@ def generator_returns_protocol(value: Phantom[int]) -> Generator[None, None, Pha
     return value
 ```
 
-## Regression test: `unsound-return-statement` with non-fully-static `TypedDict`s
+## Regression test: `unsound-return` with non-fully-static `TypedDict`s
 
 A `TypedDict` with a field or explicit extra items of type `Any` is not fully static, even when the
 dictionary is defined as a class or inherits its fields from another `TypedDict`. The rule is not
@@ -996,7 +994,7 @@ applied to `TypedDict`s like this that are not fully static:
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -1032,10 +1030,10 @@ def generator_returns_dynamic_typed_dict(
     return value
 
 def returns_static_typed_dict(value: Any) -> StaticPayload:
-    return value  # error: [unsound-return-statement]
+    return value  # error: [unsound-return]
 ```
 
-## Regression test: `unsound-return-statement` + recursive structural types
+## Regression test: `unsound-return` + recursive structural types
 
 Recursively specializing a protocol can produce infinitely many distinct types. Checking whether
 such a return annotation is fully static must recognize the recurring protocol definition and
@@ -1044,7 +1042,7 @@ overflow:
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -1075,7 +1073,7 @@ def returns_recursive_typed_dict(value: Any) -> GrowingPayload[int]:
     return value
 ```
 
-## Regression test: `unsound-return-statement` + recursive type aliases
+## Regression test: `unsound-return` + recursive type aliases
 
 Recursively specializing a generic type alias can also produce infinitely many distinct types. The
 check for whether a type is fully static must recognize repeated visits to the same alias
@@ -1086,7 +1084,7 @@ definition, including when `Any` appears elsewhere in the recursive alias.
 python-version = "3.12"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py

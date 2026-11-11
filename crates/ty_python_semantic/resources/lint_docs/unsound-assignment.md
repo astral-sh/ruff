@@ -102,8 +102,8 @@ Python code.
 
 ## See also
 
-- `unsound-return-statement` is a similar rule that triggers on unsound `return` statements rather
-    than unsound assignments
+- `unsound-return` is a similar rule that triggers on unsound `return` statements rather than
+    unsound assignments
 - `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound
     assignments
 

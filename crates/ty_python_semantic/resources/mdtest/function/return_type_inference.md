@@ -555,7 +555,7 @@ subclass method returns an incompatible value:
 ```py
 class IncompatibleChild(Parent):
     def method(self):
-        # TODO: This should be an invalid-return-type error.
+        # TODO: This should be an invalid-explicit-return error.
         return "a"
 
 reveal_type(IncompatibleChild().method())  # revealed: int | None
