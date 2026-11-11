@@ -7,14 +7,16 @@
 //!
 //! [`Empty`]: LineCoverage::Empty
 
+use std::fmt::Write as _;
+
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::line_index;
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::visitor::any_over_type;
 use crate::types::{ProgramEnvironment, Type};
@@ -37,17 +39,28 @@ pub enum LineCoverage {
     Dynamic,
 }
 
-/// Returns the coverage classification of each line in `file`, indexed by zero-based line number.
-pub fn line_coverage(db: &dyn Db, file: File) -> Vec<LineCoverage> {
+/// The coverage of a single line.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Line {
+    pub coverage: LineCoverage,
+    /// A note for each imprecise or dynamic node that starts on this line, naming the node and its
+    /// type, for example ``"`y.foo`: Unknown"``.
+    pub notes: Vec<String>,
+}
+
+/// Returns the coverage of each line in `file`, indexed by zero-based line number.
+pub fn line_coverage(db: &dyn Db, file: File) -> Vec<Line> {
     let line_index = line_index(db, file);
+    let source = source_text(db, file);
     let file = db.program_file(file);
     let model = SemanticModel::new(db, file);
 
     let mut visitor = CoverageVisitor {
-        lines: vec![LineCoverage::Empty; line_index.line_count()],
+        lines: vec![Line::default(); line_index.line_count()],
         env: model.program_environment(),
         model,
         line_index,
+        source,
     };
 
     let ast = parsed_module(db, file.python_file(db)).load(db);
@@ -59,23 +72,43 @@ struct CoverageVisitor<'db> {
     model: SemanticModel<'db>,
     env: ProgramEnvironment<'db>,
     line_index: LineIndex,
-    lines: Vec<LineCoverage>,
+    source: SourceText,
+    lines: Vec<Line>,
 }
 
 impl<'db> CoverageVisitor<'db> {
-    /// Records the type of a node that starts at `offset`.
+    /// Records the type of the node at `range` on the line where the node starts.
     ///
     /// Nodes without a type, such as expressions in unreachable code, are not recorded.
-    fn record(&mut self, ty: Option<Type<'db>>, offset: TextSize) {
+    fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
         let Some(ty) = ty else {
             return;
         };
 
-        let coverage = classify(self.model.db(), &self.env, ty);
-        let line = self.line_index.line_index(offset).to_zero_indexed();
+        let db = self.model.db();
+        let coverage = classify(db, &self.env, ty);
+        let line_number = self.line_index.line_index(range.start()).to_zero_indexed();
+        let Some(line) = self.lines.get_mut(line_number) else {
+            return;
+        };
 
-        if let Some(line_coverage) = self.lines.get_mut(line) {
-            *line_coverage = (*line_coverage).max(coverage);
+        line.coverage = line.coverage.max(coverage);
+
+        if coverage > LineCoverage::Precise {
+            // Show only the first line of a multi-line node, and shorten long nodes.
+            let text = self.source.as_str()[range]
+                .lines()
+                .next()
+                .unwrap_or_default();
+            let mut note = String::from("`");
+            if text.chars().count() > 40 {
+                note.extend(text.chars().take(39));
+                note.push('…');
+            } else {
+                note.push_str(text);
+            }
+            let _ = write!(note, "`: {}", ty.display(db, &self.env));
+            line.notes.push(note);
         }
     }
 }
@@ -109,10 +142,10 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             // Docstrings carry no type information, so their lines stay empty.
             stmt if is_docstring_stmt(stmt) => return,
             ast::Stmt::FunctionDef(function) => {
-                self.record(function.inferred_type(&self.model), function.name.start());
+                self.record(function.inferred_type(&self.model), function.name.range());
             }
             ast::Stmt::ClassDef(class) => {
-                self.record(class.inferred_type(&self.model), class.name.start());
+                self.record(class.inferred_type(&self.model), class.name.range());
             }
             _ => {}
         }
@@ -121,17 +154,17 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.start());
+        self.record(expr.inferred_type(&self.model), expr.range());
         source_order::walk_expr(self, expr);
     }
 
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
-        self.record(parameter.inferred_type(&self.model), parameter.name.start());
+        self.record(parameter.inferred_type(&self.model), parameter.name.range());
         source_order::walk_parameter(self, parameter);
     }
 
     fn visit_alias(&mut self, alias: &ast::Alias) {
-        self.record(alias.inferred_type(&self.model), alias.start());
+        self.record(alias.inferred_type(&self.model), alias.range());
         source_order::walk_alias(self, alias);
     }
 }
@@ -157,13 +190,17 @@ mod tests {
         let lines = line_coverage(&db, file);
         let mut output = String::new();
         for (line, coverage) in source.lines().zip(lines) {
-            let marker = match coverage {
+            let marker = match coverage.coverage {
                 LineCoverage::Empty => ' ',
                 LineCoverage::Precise => 'P',
                 LineCoverage::Imprecise => 'I',
                 LineCoverage::Dynamic => 'D',
             };
-            writeln!(output, "{marker} | {line}").unwrap();
+            write!(output, "{marker} | {line}").unwrap();
+            if !coverage.notes.is_empty() {
+                write!(output, "  # {}", coverage.notes.join(", ")).unwrap();
+            }
+            output.push('\n');
         }
         output
     }
@@ -195,21 +232,21 @@ mod tests {
         ), @r#"
           | 
           | """Docstring."""
-        D | import does_not_exist
+        D | import does_not_exist  # `does_not_exist`: Unknown
         P | from typing import Any
           | 
         P | def annotated(x: int) -> list[int]:
         P |     return [x]
           | 
-        D | def unannotated(y):
-        D |     return y
+        D | def unannotated(y):  # `y`: Unknown
+        D |     return y  # `y`: Unknown
           | 
-        D | def explicit_any(z: Any) -> list[Any]:
-        D |     return [z]
+        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any], `Any`: Any
+        D |     return [z]  # `[z]`: list[Any], `z`: Any
           | 
         P | a = annotated(1)
-        D | b = unannotated(1)
-        I | c = explicit_any(1)
+        D | b = unannotated(1)  # `b`: Unknown, `unannotated(1)`: Unknown
+        I | c = explicit_any(1)  # `c`: list[Any], `explicit_any(1)`: list[Any]
         P | d = annotated(
         P |     1,
           | )

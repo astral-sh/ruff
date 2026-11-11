@@ -12,14 +12,14 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_project::{Db as _, ProjectDatabase};
-use ty_python_semantic::coverage::{LineCoverage, line_coverage};
+use ty_python_semantic::coverage::{Line, LineCoverage, line_coverage};
 
 /// The coverage of a single project file.
 struct FileCoverage {
     path: SystemPathBuf,
     file: File,
-    /// The classification of each line, indexed by zero-based line number.
-    lines: Vec<LineCoverage>,
+    /// The coverage of each line, indexed by zero-based line number.
+    lines: Vec<Line>,
 }
 
 /// Line counts for a file, or for all files in the report.
@@ -157,7 +157,12 @@ fn file_page(
     let mut code = String::new();
 
     for (index, line) in source.as_str().lines().enumerate() {
-        let coverage = file.lines.get(index).copied().unwrap_or_default();
+        let (coverage, notes) = file
+            .lines
+            .get(index)
+            .map_or((LineCoverage::Empty, &[][..]), |line| {
+                (line.coverage, &line.notes[..])
+            });
         counts.add(coverage);
 
         let number = index + 1;
@@ -171,7 +176,13 @@ fn file_page(
             LineCoverage::Imprecise => "imprecise",
             LineCoverage::Dynamic => "dynamic",
         };
-        let _ = write!(code, "<span class=\"line-{class}\">");
+        let _ = write!(code, "<span class=\"line-{class}\"");
+        if !notes.is_empty() {
+            code.push_str(" title=\"");
+            escape_html(&mut code, &notes.join("\n"));
+            code.push('"');
+        }
+        code.push('>');
         escape_html(&mut code, line);
         code.push_str("</span>\n");
     }
