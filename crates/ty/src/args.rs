@@ -34,7 +34,7 @@ pub(crate) enum Command {
     /// Check a project for type errors.
     Check(CheckCommand),
 
-    /// Measure type-inference coverage for a project.
+    /// Report how precisely ty infers the types in a project, line by line.
     Coverage(CoverageCommand),
 
     /// Start the language server
@@ -70,7 +70,7 @@ pub(crate) struct CheckCommand {
         help = "List of files or directories to check [default: the project root]",
         value_name = "PATH"
     )]
-    pub paths: Vec<SystemPathBuf>,
+    pub(crate) paths: Vec<SystemPathBuf>,
 
     /// Apply fixes to resolve errors.
     #[arg(long)]
@@ -343,7 +343,7 @@ pub(crate) struct CoverageCommand {
         help = "List of files or directories to measure [default: the project root]",
         value_name = "PATH"
     )]
-    pub paths: Vec<SystemPathBuf>,
+    pub(crate) paths: Vec<SystemPathBuf>,
 
     /// Run the command within the given project directory.
     #[arg(long, value_name = "PROJECT")]
@@ -379,13 +379,9 @@ pub(crate) struct CoverageCommand {
     #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
-    /// Write a self-contained HTML coverage report to PATH.
-    #[arg(long, value_name = "PATH")]
-    pub(crate) html: Option<SystemPathBuf>,
-
-    /// Include the count of `Todo` types in the output.
-    #[arg(long, hide = true)]
-    pub(crate) todo: bool,
+    /// Write an HTML coverage report to the given directory.
+    #[arg(long, value_name = "DIR")]
+    pub(crate) html: SystemPathBuf,
 
     /// Control when colored output is used.
     #[arg(

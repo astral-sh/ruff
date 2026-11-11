@@ -15,7 +15,7 @@ ty <COMMAND>
 <h3 class="cli-reference">Commands</h3>
 
 <dl class="cli-reference"><dt><a href="#ty-check"><code>ty check</code></a></dt><dd><p>Check a project for type errors</p></dd>
-<dt><a href="#ty-coverage"><code>ty coverage</code></a></dt><dd><p>Measure type-inference coverage for a project</p></dd>
+<dt><a href="#ty-coverage"><code>ty coverage</code></a></dt><dd><p>Report how precisely ty infers the types in a project, line by line</p></dd>
 <dt><a href="#ty-server"><code>ty server</code></a></dt><dd><p>Start the language server</p></dd>
 <dt><a href="#ty-version"><code>ty version</code></a></dt><dd><p>Display ty's version</p></dd>
 <dt><a href="#ty-explain"><code>ty explain</code></a></dt><dd><p>Explain rules and other parts of ty</p></dd>
@@ -118,12 +118,12 @@ over all configuration files.</p>
 
 ## ty coverage
 
-Measure type-inference coverage for a project
+Report how precisely ty infers the types in a project, line by line
 
 <h3 class="cli-reference">Usage</h3>
 
 ```
-ty coverage [OPTIONS] [PATH]...
+ty coverage [OPTIONS] --html <DIR> [PATH]...
 ```
 
 <h3 class="cli-reference">Arguments</h3>
@@ -146,7 +146,7 @@ over all configuration files.</p>
 </dd><dt id="ty-coverage--config-file"><a href="#ty-coverage--config-file"><code>--config-file</code></a> <i>path</i></dt><dd><p>The path to a <code>ty.toml</code> file to use for configuration</p>
 <p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-coverage--extra-search-path"><a href="#ty-coverage--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
 </dd><dt id="ty-coverage--help"><a href="#ty-coverage--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
-</dd><dt id="ty-coverage--html"><a href="#ty-coverage--html"><code>--html</code></a> <i>path</i></dt><dd><p>Write a self-contained HTML coverage report to PATH</p>
+</dd><dt id="ty-coverage--html"><a href="#ty-coverage--html"><code>--html</code></a> <i>dir</i></dt><dd><p>Write an HTML coverage report to the given directory</p>
 </dd><dt id="ty-coverage--no-progress"><a href="#ty-coverage--no-progress"><code>--no-progress</code></a></dt><dd><p>Hide all progress outputs.</p>
 <p>For example, spinners or progress bars.</p>
 </dd><dt id="ty-coverage--project"><a href="#ty-coverage--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory</p>
