@@ -2,9 +2,11 @@ use ruff_python_ast::Alias;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
+use ruff_python_semantic::ModuleKind;
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
+use crate::preview::is_import_self_from_module_enabled;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -14,15 +16,20 @@ use crate::{Violation, checkers::ast::Checker};
 /// Importing a module from itself is a circular dependency and results
 /// in an `ImportError` exception.
 ///
+/// In [preview], this rule also flags imports of names from the current
+/// module, such as `from pkg.this_file import foo` or `from .this_file import foo`
+/// in `pkg/this_file.py`. These aren't flagged in a package's `__init__.py`,
+/// where `from pkg import foo` usually imports the submodule `pkg/foo.py`.
+///
 /// ## Example
 ///
 /// ```python
-/// # file: this_file.py
-/// from this_file import foo
-///
-///
-/// def foo(): ...
+/// # file: pkg/this_file.py
+/// import pkg.this_file
+/// from pkg import this_file
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.265", category = Category::Suspicious)]
 pub(crate) struct ImportSelf {
@@ -69,6 +76,28 @@ pub(crate) fn import_from_self(
         return;
     };
 
+    // `from pkg.mod import foo` or `from .mod import foo`, in `pkg/mod.py`. Every imported
+    // name is reported, matching pylint.
+    //
+    // This is skipped in a package's `__init__.py`, where `from pkg import foo` usually imports
+    // the submodule `pkg/foo.py` rather than a name defined in `pkg/__init__.py`, and the two
+    // cases can't be told apart here.
+    if is_import_self_from_module_enabled(checker.settings())
+        && !matches!(checker.module.kind, ModuleKind::Package)
+        && imported_module_path.split('.').eq(module_path)
+    {
+        for alias in names {
+            checker.report_diagnostic(
+                ImportSelf {
+                    name: imported_module_path.to_string(),
+                },
+                alias.range(),
+            );
+        }
+        return;
+    }
+
+    // `from pkg import mod` or `from . import mod`, in `pkg/mod.py`.
     if imported_module_path
         .split('.')
         .eq(&module_path[..module_path.len() - 1])

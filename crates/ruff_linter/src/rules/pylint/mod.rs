@@ -265,6 +265,8 @@ mod tests {
         Rule::UselessExceptionStatement,
         Path::new("useless_exception_statement.py")
     )]
+    #[test_case(Rule::ImportSelf, Path::new("import_self/from_self.py"))]
+    #[test_case(Rule::ImportSelf, Path::new("import_self/__init__.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 

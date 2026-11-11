@@ -1,0 +1,80 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 6
+
+--- Added ---
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:2:35
+  |
+1 | # Errors: importing names from the current module itself.
+2 | from import_self.from_self import foo
+  |                                   ^^^
+3 | from .from_self import foo as f2
+4 | from import_self.from_self import foo, bar
+  |
+
+
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:3:24
+  |
+1 | # Errors: importing names from the current module itself.
+2 | from import_self.from_self import foo
+3 | from .from_self import foo as f2
+  |                        ^^^^^^^^^
+4 | from import_self.from_self import foo, bar
+5 | from import_self.from_self import *
+  |
+
+
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:4:35
+  |
+2 | from import_self.from_self import foo
+3 | from .from_self import foo as f2
+4 | from import_self.from_self import foo, bar
+  |                                   ^^^
+5 | from import_self.from_self import *
+6 | from .from_self import *
+  |
+
+
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:4:40
+  |
+2 | from import_self.from_self import foo
+3 | from .from_self import foo as f2
+4 | from import_self.from_self import foo, bar
+  |                                        ^^^
+5 | from import_self.from_self import *
+6 | from .from_self import *
+  |
+
+
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:5:35
+  |
+3 | from .from_self import foo as f2
+4 | from import_self.from_self import foo, bar
+5 | from import_self.from_self import *
+  |                                   ^
+6 | from .from_self import *
+  |
+
+
+PLW0406 Module `import_self.from_self` imports itself
+ --> from_self.py:6:24
+  |
+4 | from import_self.from_self import foo, bar
+5 | from import_self.from_self import *
+6 | from .from_self import *
+  |                        ^
+7 |
+8 | # OK: importing from a sibling module or a different package.
+  |
