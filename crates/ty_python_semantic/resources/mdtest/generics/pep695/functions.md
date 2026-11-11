@@ -3756,6 +3756,20 @@ result = as_list(reveal_type([1]))  # revealed: list[int]
 reveal_type(result)  # revealed: list[list[int] | int]
 ```
 
+The return annotation also constrains the nested `Sequence[T]` arm. Widening its element type to
+`tuple[str]` would lose the literal required by the assignment.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def pick[T](items: T | Sequence[T]) -> T:
+    raise NotImplementedError
+
+red = ("red",)
+result: tuple[Literal["red"], ...] = pick([red])  # ok
+```
+
 ## Nested calls with ambiguous union parameters
 
 Each outer call to `choose` can use `T = None`. Its nested call returns `list[None]`, which matches
