@@ -1120,6 +1120,101 @@ reveal_type(C(1))  # revealed: C[tuple[int, int]]
 reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
 ```
 
+### A `Self` return preserves constraints from the constructor receiver
+
+The implicit `cls` parameter of `__new__` constrains `T` to `str`, even when the arguments provide
+no more specific type for `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any, Self
+
+class Tags[T: str](frozenset[T]):
+    def __new__(cls, values: list[T] | None = None, *, visit: Callable[[T], None] | None = None) -> Self:
+        return super().__new__(cls, values or ())
+
+reveal_type(Tags())  # revealed: Tags[str]
+reveal_type(Tags(visit=lambda tag: None))  # revealed: Tags[str]
+
+class EmptyTags[T: str](frozenset[T]):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+reveal_type(EmptyTags())  # revealed: EmptyTags[str]
+
+class MutableTags[T: str](EmptyTags[T]):
+    value: T
+
+reveal_type(MutableTags())  # revealed: MutableTags[str]
+
+class Registry[K: str, V](dict[K, V]): ...
+
+reveal_type(Registry())  # revealed: Registry[Unknown, Unknown]
+reveal_type(Registry({"one": 1}))  # revealed: Registry[str, int]
+
+def check(values: list[int] | list[bytes]):
+    Tags(values)  # error: [invalid-argument-type]
+
+def nested(errors: list[Any]):
+    first = ExceptionGroup("failed", errors).exceptions[0]
+    first.exceptions  # error: [unresolved-attribute]
+```
+
+A dictionary whose key type is bounded by `Never` rejects every key assignment.
+
+```py
+from typing import Never
+
+class EmptyMap[K: Never, V](dict[K, V]): ...
+
+empty = EmptyMap()
+reveal_type(empty)  # revealed: EmptyMap[Never, Unknown]
+empty["key"] = 1  # error: [invalid-assignment]
+```
+
+When the constructor receives no arguments, either callback signature in the annotation is possible.
+
+```py
+class Handler[**P]:
+    callback: Callable[P, int]
+
+    def __new__(cls, /, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+handler: Handler[[str]] | Handler[[int]] = Handler()
+reveal_type(handler)  # revealed: Handler[(str, /)] | Handler[(int, /)]
+```
+
+### An unpacked tuple before a keyword-only constructor parameter
+
+The keyword-only parameter keeps its declared type whether the tuple accepts zero or two arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+
+class Tagged:
+    def __new__(cls, *items: *tuple[()], label: str) -> Self:
+        return super().__new__(cls)
+
+class Pair:
+    def __new__(cls, *items: *tuple[int, int], label: str) -> Self:
+        return super().__new__(cls)
+
+Tagged(label="ok")
+Pair(1, 2, label="ok")
+Pair(1, 2, label=3)  # error: [invalid-argument-type]
+```
+
 ### `__new__` with arbitrary generic return types
 
 When `__new__` has method-level type variables in the return type that don't map to the class's type
