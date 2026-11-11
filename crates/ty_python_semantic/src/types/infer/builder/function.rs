@@ -161,28 +161,40 @@ fn expected_return_type<'db>(
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_body(&mut self, function: &'ast ast::StmtFunctionDef) {
         let env = self.program_environment();
         let db = self.db();
 
-        // Parameters are odd: they are Definitions in the function body scope, but have no
-        // constituent nodes that are part of the function body. In order to get diagnostics
-        // merged/emitted for them, we need to explicitly infer their definitions here.
-        let stub_body = is_stub_body(&function.body);
-        for parameter in &function.parameters {
-            if stub_body {
-                // A body containing only pass or ellipsis never reads a parameter binding.
-                // Check the definition directly instead of memoizing a result for each parameter.
-                self.infer_region_definition(self.index.expect_single_definition(parameter));
-            } else {
+        let parameters = function.parameters.as_ref();
+        let scope = self.scope().file_scope_id(db);
+        // In a stub body, every symbol comes from a parameter. Repeated names can produce
+        // assignment diagnostics when a later parameter rebinds an earlier one.
+        if is_stub_body(&function.body)
+            && self.index.place_table(scope).symbols().len() == parameters.len()
+        {
+            for parameter in parameters.iter_non_variadic_params() {
+                self.infer_parameter_definition(parameter, None);
+            }
+            for (parameter, component) in [
+                (parameters.vararg.as_deref(), ParamSpecAttrKind::Args),
+                (parameters.kwarg.as_deref(), ParamSpecAttrKind::Kwargs),
+            ] {
+                if let Some(annotation) = parameter.and_then(ast::Parameter::annotation) {
+                    self.variadic_parameter_annotation(annotation, component);
+                }
+            }
+        } else {
+            // Parameters have definitions in the body scope, but their annotations and defaults
+            // belong to enclosing scopes. Visit them explicitly to collect their diagnostics.
+            for parameter in parameters {
                 self.infer_definition(parameter);
             }
         }
 
-        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
+        validate_paramspec_components(&self.context, self.index, parameters, |expr| {
             self.file_expression_type(expr)
         });
-        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
+        self.validate_unpacked_typed_dict_kwargs(parameters);
 
         self.infer_scope_body(&function.body);
 
@@ -1066,8 +1078,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
-    /// in the function body scope.
+    /// Check a parameter's annotation and default. When a definition is supplied, record the
+    /// declared and inferred types of the parameter in the function body scope.
     ///
     /// The declared type is the annotated type, if any, or `Unknown`.
     ///
@@ -1088,7 +1100,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &'ast ast::ParameterWithDefault,
-        definition: Definition<'db>,
+        definition: Option<Definition<'db>>,
     ) {
         let env = self.program_environment();
         let ast::ParameterWithDefault {
@@ -1158,12 +1170,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            self.add_declaration_with_binding(
-                parameter.into(),
-                definition,
-                &DeclaredAndInferredType::are_the_same_type(declared_ty),
-            );
-        } else {
+            if let Some(definition) = definition {
+                self.add_declaration_with_binding(
+                    parameter.into(),
+                    definition,
+                    &DeclaredAndInferredType::are_the_same_type(declared_ty),
+                );
+            }
+        } else if let Some(definition) = definition {
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
                 UnionType::from_two_elements(db, env, Type::unknown(), default_ty)
@@ -1176,6 +1190,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(parameter.into(), definition)
                 .insert(self, ty);
         }
+    }
+
+    /// Check that a `ParamSpec` component annotates the corresponding variadic parameter.
+    /// A misplaced component or a bare `ParamSpec` gives the parameter an unknown element type.
+    fn variadic_parameter_annotation(
+        &self,
+        annotation: &ast::Expr,
+        expected: ParamSpecAttrKind,
+    ) -> Type<'db> {
+        let db = self.db();
+        let ty = self.file_expression_type(annotation);
+        let Type::TypeVar(typevar) = ty else {
+            return ty;
+        };
+        if !typevar.is_paramspec(db)
+            || typevar.paramspec_attr(db) == Some(expected)
+            || (expected == ParamSpecAttrKind::Args
+                && self
+                    .file_type_expression_flags(annotation)
+                    .contains(TypeExpressionFlags::UNPACK))
+        {
+            return ty;
+        }
+
+        // A bare ParamSpec is diagnosed when inferring the annotation.
+        if let Some(component) = typevar.paramspec_attr(db)
+            && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+        {
+            let name = typevar.name(db);
+            let parameter = match component {
+                ParamSpecAttrKind::Args => "*args",
+                ParamSpecAttrKind::Kwargs => "**kwargs",
+            };
+            let mut diag = builder.into_diagnostic(format_args!(
+                "`{name}.{component}` is valid only in `{parameter}` annotation",
+            ));
+            diag.set_primary_annotation_message(format_args!("Did you mean `{name}.{expected}`?"));
+            add_type_expression_reference_link(diag);
+        }
+        Type::unknown()
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -1193,7 +1247,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
+            let annotated_type =
+                self.variadic_parameter_annotation(annotation, ParamSpecAttrKind::Args);
             let has_unpacked_annotation = self
                 .file_type_expression_flags(annotation)
                 .contains(TypeExpressionFlags::UNPACK);
@@ -1210,37 +1265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ))
                 }
                 _ if has_unpacked_annotation => annotated_type,
-                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
-                    match typevar.paramspec_attr(db) {
-                        // `*args: P.args`
-                        Some(ParamSpecAttrKind::Args) => annotated_type,
-
-                        // `*args: P.kwargs`
-                        Some(ParamSpecAttrKind::Kwargs) => {
-                            // TODO: Should this diagnostic be raised as part of
-                            // `ArgumentTypeChecker`?
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                            {
-                                let name = typevar.name(db);
-                                let mut diag = builder.into_diagnostic(format_args!(
-                                    "`{name}.kwargs` is valid only in `**kwargs` annotation",
-                                ));
-                                diag.set_primary_annotation_message(format_args!(
-                                    "Did you mean `{name}.args`?"
-                                ));
-                                add_type_expression_reference_link(diag);
-                            }
-                            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
-                        }
-
-                        // `*args: P`
-                        None => {
-                            // The diagnostic for this case is handled in `in_type_expression`.
-                            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
-                        }
-                    }
-                }
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => annotated_type,
                 _ => Type::homogeneous_tuple(db, self.program_environment(), annotated_type),
             };
 
@@ -1327,52 +1352,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
-            let ty = if let Type::TypeVar(typevar) = annotated_type
-                && typevar.is_paramspec(db)
-            {
-                match typevar.paramspec_attr(db) {
-                    // `**kwargs: P.args`
-                    Some(ParamSpecAttrKind::Args) => {
-                        // TODO: Should this diagnostic be raised as part of `ArgumentTypeChecker`?
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                        {
-                            let name = typevar.name(db);
-                            let mut diag = builder.into_diagnostic(format_args!(
-                                "`{name}.args` is valid only in `*args` annotation",
-                            ));
-                            diag.set_primary_annotation_message(format_args!(
-                                "Did you mean `{name}.kwargs`?"
-                            ));
-                            add_type_expression_reference_link(diag);
-                        }
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            env,
-                            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
-                        )
-                    }
-
-                    // `**kwargs: P.kwargs`
-                    Some(ParamSpecAttrKind::Kwargs) => annotated_type,
-
-                    // `**kwargs: P`
-                    None => {
-                        // The diagnostic for this case is handled in `in_type_expression`.
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            env,
-                            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
-                        )
-                    }
-                }
-            } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                db,
-                annotated_type,
-                self.file_type_expression_flags(annotation),
-            )
-            .is_some()
+            let annotated_type =
+                self.variadic_parameter_annotation(annotation, ParamSpecAttrKind::Kwargs);
+            let ty = if matches!(annotated_type, Type::TypeVar(typevar) if typevar.is_paramspec(db))
+                || extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                    db,
+                    annotated_type,
+                    self.file_type_expression_flags(annotation),
+                )
+                .is_some()
             {
                 annotated_type
             } else {
