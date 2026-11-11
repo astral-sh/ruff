@@ -329,7 +329,7 @@ pub fn fixture_exposures_for_definition<'db>(
 ///
 /// Plugins registered by unrelated conftests or test modules can also be visible at runtime,
 /// depending on collection order, but we don't consider them.
-fn pytest_registered_plugin_files<'db>(
+pub fn pytest_registered_plugin_files<'db>(
     db: &'db dyn Db,
     request_file: ProgramFile<'db>,
 ) -> &'db [ProgramFile<'db>] {

@@ -3164,6 +3164,63 @@ class C:
     }
 
     #[test]
+    fn references_pytest_fixture_requested_by_registered_plugin() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["consumer"]
+                "#,
+            )
+            .site_packages(
+                "consumer.py",
+                r#"
+                import pytest
+
+                pytest_plugins = ["provider"]
+
+                @pytest.fixture
+                def consumer(resource): ...
+                "#,
+            )
+            .site_packages(
+                "provider.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                def test_use(resource<CURSOR>): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> site-packages/consumer.py:7:14
+          |
+        7 | def consumer(resource): ...
+          |              --------
+          |
+         ::: site-packages/provider.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+          |
+         ::: src/test_example.py:2:14
+          |
+        2 | def test_use(resource): ...
+          |              --------
+        ");
+    }
+
+    #[test]
     fn references_pytest_fixture_declaration_through_external_stub() {
         let definition_test = external_stub_fixture_definition_cursor_test();
         let import_test = external_stub_fixture_cursor_test(

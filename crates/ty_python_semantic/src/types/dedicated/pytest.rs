@@ -11,7 +11,7 @@ mod fixtures;
 pub use collection::{PytestTest, pytest_tests_in_file};
 pub use fixtures::{
     FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
-    fixture_exposures_for_definition, pytest_global_plugin_files,
+    fixture_exposures_for_definition, pytest_global_plugin_files, pytest_registered_plugin_files,
 };
 
 /// Returns whether `definition` remains bound in its defining scope and may exist at runtime.
