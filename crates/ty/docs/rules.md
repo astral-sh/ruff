@@ -1312,7 +1312,7 @@ total: Annotated[int, "item " "count"]  # ok
 **Rule history**
 
 
-- v0.0.101: Renamed from [`implicit-concatenated-string-type-annotation`](#implicit-concatenated-string-type-annotation).
+- v0.0.102: Renamed from [`implicit-concatenated-string-type-annotation`](#implicit-concatenated-string-type-annotation).
 
     [`implicit-concatenated-string-type-annotation`](#implicit-concatenated-string-type-annotation) remains as a compatibility alias for this rule.
 
