@@ -65,7 +65,7 @@ use ty_python_core::{
 use super::collection::{PytestTestKind, pytest_test_for_binding};
 use super::is_available_definition;
 use crate::lexical_name_path::lexical_name_path_for_definition;
-use crate::place::definitions::DefinitionResolution;
+use crate::place::definitions::{DefinitionResolution, definitions_for_module_global};
 use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
 use crate::types::signatures::Parameter as SignatureParameter;
@@ -191,10 +191,11 @@ pub fn fixture_bindings_for_parameter<'db>(
         }
     }
 
-    // Fourth, search the legacy temporary-directory plugin. Pytest registers it while
-    // configuring, after the core plugins and the plugins named by initial conftests, so it
-    // takes precedence over both. Plugins named by test modules are registered later, but we
-    // don't distinguish them here.
+    // Fourth, search the legacy temporary-directory plugin. Pytest registers it during
+    // configuration, after the default plugins and the plugins named by initial conftests, so it
+    // takes precedence over both. Plugins registered later during collection, such as those named
+    // by test modules, take precedence over it. As an approximation, we search it before all
+    // plugins named through `pytest_plugins`.
     if let Some(plugin) = pytest_legacy_tmpdir_plugin(db, request_file.program(db)) {
         let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(plugin));
         if !bindings.is_empty() {
@@ -466,14 +467,9 @@ impl<'db> PytestPluginRegistry<'db> {
 /// `if TYPE_CHECKING:`, are ignored.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn pytest_plugin_names<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[String]> {
-    let scope = global_scope(db, file);
-    let Some(symbol) = place_table(db, scope).symbol_id("pytest_plugins") else {
+    let Some(resolution) = definitions_for_module_global(db, file, "pytest_plugins") else {
         return Box::default();
     };
-    let resolution = DefinitionResolution::from_bindings(
-        db,
-        use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
-    );
 
     resolution
         .definitions()
@@ -1848,13 +1844,11 @@ fn end_of_scope_definition<'db>(
     file: ProgramFile<'db>,
     name: &str,
 ) -> Option<Definition<'db>> {
-    let scope = global_scope(db, file);
-    let symbol = place_table(db, scope).symbol_id(name)?;
-    let mut definitions = use_def_map(db, scope)
-        .end_of_scope_symbol_bindings(symbol)
-        .filter_map(|binding| binding.binding.definition());
-    let definition = definitions.next()?;
-    definitions.next().is_none().then_some(definition)
+    let resolution = definitions_for_module_global(db, file, name)?;
+    let [definition] = resolution.definitions() else {
+        return None;
+    };
+    Some(*definition)
 }
 
 #[cfg(test)]
