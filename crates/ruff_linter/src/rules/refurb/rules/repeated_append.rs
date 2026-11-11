@@ -43,6 +43,27 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// nums.extend((4, 5, 6))
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always marked as unsafe because it changes when the arguments
+/// are evaluated. With separate `append` calls, each argument is evaluated
+/// after the previous item has been added. With a single `extend` call, all
+/// arguments are evaluated before any item is added. An argument that reads the
+/// list can therefore see a different value, and if an argument raises an
+/// exception, the items before it are no longer added.
+///
+/// For example, the fix changes the final value of `nums` from `[1, 1]` to
+/// `[1, 0]`:
+/// ```python
+/// nums = []
+///
+/// nums.append(1)
+/// nums.append(len(nums))
+/// ```
+///
+/// The fix also changes behavior if the variable is annotated as a `list` but
+/// holds a subclass that overrides `append`, since the override is no longer
+/// called.
+///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
