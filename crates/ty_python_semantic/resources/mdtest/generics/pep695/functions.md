@@ -2848,6 +2848,7 @@ class Other:
         return self
 
 def negate[U: Number | Other](value: U) -> U:
+    # TODO: Since U is bounded by Number | Other, the revealed union could simplify to U@negate.
     return reveal_type(-value)  # revealed: (U@negate & Number) | (U@negate & Other)
 ```
 

@@ -1205,6 +1205,20 @@ fn map_member_lookup_type<'db>(
     }
 }
 
+/// Callers pass each union alternative as `element`. If a receiver is provided, this function
+/// intersects it with `element` before looking up the member.
+fn lookup_member_on_union_element<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    element: Type<'db>,
+    name: &str,
+    policy: MemberLookupPolicy,
+    receiver: Option<Type<'db>>,
+) -> MemberLookupResult<'db> {
+    let receiver = receiver.map(|ty| IntersectionType::from_two_elements(db, env, ty, element));
+    element.member_lookup_with_policy_and_receiver(db, env, name, policy, receiver)
+}
+
 fn distribute_member_lookup_over_bound_or_constraints<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5983,19 +5997,6 @@ impl<'db> Type<'db> {
             .member(db)
     }
 
-    /// Look up a member on this union element, narrowing the receiver to the element.
-    fn lookup_on_union_element(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-        policy: MemberLookupPolicy,
-        receiver: Option<Type<'db>>,
-    ) -> MemberLookupResult<'db> {
-        let receiver = receiver.map(|ty| IntersectionType::from_two_elements(db, env, ty, self));
-        self.member_lookup_with_policy_and_receiver(db, env, name, policy, receiver)
-    }
-
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
     /// receiver than the type whose members are being searched.
     ///
@@ -6194,8 +6195,9 @@ impl<'db> Type<'db> {
                         // the original receiver (`T`). Here, we distribute lookup over the union
                         // and intersect each member with that receiver to obtain `T & E1`
                         // and `T & E2`, respectively.
-                        let result =
-                            elem.lookup_on_union_element(db, env, name_str, policy, receiver);
+                        let result = lookup_member_on_union_element(
+                            db, env, *elem, name_str, policy, receiver,
+                        );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
                         let member = result.unwrap_or_else(|error| error.fallback_member(db));
                         properties = union_deprecated_properties(
@@ -8386,9 +8388,10 @@ impl<'db> Type<'db> {
         let tcx = TypeContext::default();
         if let (Type::Union(union), Some(receiver)) = (self, receiver) {
             return union.try_call_dunder(db, env, &mut arguments, tcx, |element| {
-                element.lookup_on_union_element(
+                lookup_member_on_union_element(
                     db,
                     env,
+                    element,
                     name,
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     Some(receiver),

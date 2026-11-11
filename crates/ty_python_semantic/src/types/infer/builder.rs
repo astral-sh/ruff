@@ -11849,8 +11849,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     }
-                    // A literal bound lets us fold the operation. A dunder returning `Self`
-                    // needs the original type variable as its receiver.
+                    // Recurse on the upper bound so literal bounds reach the constant-folding
+                    // cases above. If we fall back to a dunder call, keep the original type
+                    // variable as the receiver so a method returning `Self` preserves it.
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self
                         .infer_unary_expression_type(unary, bound, receiver.or(Some(operand_type))),
                     None => fallback_unary_expression_type(),

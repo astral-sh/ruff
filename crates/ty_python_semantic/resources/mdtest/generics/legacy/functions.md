@@ -1391,6 +1391,7 @@ class Other:
 U = TypeVar("U", bound=Number | Other)
 
 def negate(value: U) -> U:
+    # TODO: Since U is bounded by Number | Other, the revealed union could simplify to U@negate.
     return reveal_type(-value)  # revealed: (U@negate & Number) | (U@negate & Other)
 ```
 
