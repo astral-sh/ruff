@@ -2489,6 +2489,164 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## List literals with ambiguous union parameters
+
+When a type variable appears at different nesting levels in a union parameter, an argument can
+provide more than one binding for it. In `as_list([1])`, the literal initially has type `list[int]`.
+Matching it against `T` gives `T = list[int]`, and matching it against `list[T]` gives `T = int`.
+
+When a type variable occurs more than once, we can revisit the call's arguments using the
+specialized parameter types from the previous pass as context. This lets one argument help determine
+the type of another. For example, in `map(lambda s: s.upper(), ["foo"])`, the list of strings tells
+us that `s` is a `str`. See [Unified call inference](../../bidirectional.md#unified-call-inference).
+
+If we used both bindings to specialize the `list[T]` arm, it would become `list[list[int] | int]`.
+On the second pass, the bare arm would still allow `list[int]`, so the inferred type of `[1]` would
+be `list[int] | list[list[int] | int]`. Matching that union against the parameter again would give
+`T = list[list[int] | int] | list[int] | int`. Each pass would add another list layer until we hit
+the iteration limit.
+
+To avoid this, when we revisit `[1]`, we specialize the `list[T]` arm with the binding it
+contributed, `T = int`. That gives the literal just an expected element type of `int`, so its type
+stays `list[int]` and inference converges. Both bindings still contribute to the return type,
+`list[list[int] | int]`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def as_list(value: T | list[T]) -> list[T]:
+    if isinstance(value, list):
+        return value
+    return [value]
+
+result = as_list(reveal_type([1]))  # revealed: list[int]
+reveal_type(result)  # revealed: list[list[int] | int]
+```
+
+## Nested calls with ambiguous union parameters
+
+Each outer call to `choose` can use `T = None`. Its nested call returns `list[None]`, which matches
+`list[T]`, while its other argument, `None`, matches the bare `T` arm.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def choose(left: T | list[T], right: T | list[T]) -> list[T]:
+    raise NotImplementedError
+
+result: list[None] | list[int] = choose(choose(choose(None, None), None), None)
+reveal_type(result)  # revealed: list[None]
+```
+
+`collect` must return `list[U]` for any `U`. Both calls to `choose` can use `T = U`. The inner call
+takes `value` twice and returns `list[U]`. In the outer call, that list matches `list[T]` and
+`value` matches `T`, so the result is again `list[U]`.
+
+```py
+U = TypeVar("U")
+
+def collect(value: U) -> list[U]:
+    return reveal_type(choose(choose(value, value), value))  # revealed: list[U@collect]
+```
+
+The empty list in `first(xs, [])` initially contributes `Unknown`, but `xs` supplies the return type
+`list[int]` for `first`. Both arguments to `choose` can then match the bare `T` arm with
+`T = list[list[str]] | list[int]`.
+
+```py
+def first(value: T, alternatives: list[T]) -> T:
+    return value
+
+def _(xs: list[int]):
+    result = choose([["x"]], first(xs, []))  # ok
+    # TODO: Revisiting [["x"]] still adds extra list layers to the inferred return type.
+    expected: list[list[list[str]] | list[int]] = result  # error: [invalid-assignment]
+```
+
+`first(xs, [])` can return `list[int]`, which fits both parameters of `store` with `T = int`. The
+empty `list()` can also use `int` as its element type.
+
+```py
+from collections.abc import Iterable
+
+def store(values: T | Iterable[T | None], output: list[T]) -> T:
+    return output[0]
+
+def _(xs: list[int]):
+    # TODO: Matching the union from `first(xs, [])` against `output: list[T]` skips the
+    # `list[int]` member that would give `T = int`. See https://github.com/astral-sh/ty/issues/4909
+    reveal_type(store(first(xs, []), first(xs, [])))  # revealed: Unknown
+    reveal_type(store(list(), first(xs, [])))  # revealed: Unknown
+```
+
+## Inferring a union parameter from other arguments
+
+Matching `items` against `source: list[T]` fixes `T` to `int | list[str]`. The empty list can
+therefore match the bare `T` arm as a `list[str]` or the `list[T]` arm as a `list[int | list[str]]`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def pick(source: list[T], *others: T | list[T]) -> T:
+    return source[0]
+
+def _(items: list[int | list[str]]):
+    reveal_type(pick(items, []))  # revealed: int | list[str]
+```
+
+With `T = list[int]`, the empty list can take the `list[T]` arm and `items` can take the `T` arm.
+
+```py
+def _(nested: list[list[int]], items: list[int]):
+    reveal_type(pick(nested, [], items))  # revealed: list[int]
+```
+
+The element type can also come from an argument matched to a bare type variable.
+
+```py
+from collections.abc import Iterable
+
+def first(value: T, fallback: T | Iterable[T | None]) -> T:
+    return value
+
+def _(value: int):
+    reveal_type(first(value, list()))  # revealed: int
+```
+
+## Contextual typing of callbacks with ambiguous union parameters
+
+The two ways to match `shape` give different return types for the callback. In either case, `value`
+determines that the callback receives a `str`.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def visit(shape: T | tuple[T], value: U, seed: V, callback: Callable[[U], list[T | V]]) -> None:
+    callback(value)
+
+# error: [invalid-argument-type] "Argument to bound method `str.index`"
+visit((1,), "x", "", lambda x: [x.index(3)])
+```
+
+A callable supplied by the bare `T` arm can also provide the parameter type of a lambda.
+
+```py
+def register(handlers: list[T] | T, handler: T | Callable[[object], str]) -> None: ...
+def _(handlers: list[Callable[[str], str]]):
+    register(handlers, lambda s: reveal_type(s))  # revealed: str
+```
+
 ## Passing generic functions to generic functions
 
 ```py

@@ -53,8 +53,8 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
-    OverloadSet, inferable_typevar_occurrences, requires_overload_evaluation,
+    ArgumentContextCache, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
+    inferable_typevar_occurrences, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -6469,42 +6469,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Vec<Option<MatchingArgumentTypeContext<'db>>> {
-        type CachedSpecialization<'db> =
-            OnceCell<Option<Cow<'db, ArgumentContextSpecialization<'db>>>>;
-        type OverloadsWithBinding<'a, 'db> = Vec<(
-            &'a Binding<'db>,
-            &'a CallableBinding<'db>,
-            CachedSpecialization<'db>,
-        )>;
-
-        fn add_overloads_from_binding<'a, 'db>(
-            overloads_with_binding: &mut OverloadsWithBinding<'a, 'db>,
-            binding: &'a CallableBinding<'db>,
-        ) {
-            let mut matching_overloads = binding.matching_overloads().peekable();
-            if matching_overloads.peek().is_some() {
-                overloads_with_binding.extend(
-                    matching_overloads.map(|(_, overload)| (overload, binding, OnceCell::new())),
-                );
-            } else if let Some(overload) = binding.best_failing_overload() {
-                // If there is a single overload that does not match, we still infer the argument
-                // types for better diagnostics.
-                overloads_with_binding.push((overload, binding, OnceCell::new()));
-            }
-        }
         let db = self.db();
-
         let env = self.program_environment();
 
         // Collect the set of candidate overloads and bindings.
-        let mut overloads_with_binding: OverloadsWithBinding = Vec::new();
+        let mut overloads_with_binding = Vec::new();
+        let mut add_overload = |overload, binding| {
+            overloads_with_binding.push((overload, binding, ArgumentContextCache::default()));
+        };
         if let Some(candidates) = candidates {
-            bindings.visit_overload_set(candidates, &mut |overload, binding| {
-                overloads_with_binding.push((overload, binding, OnceCell::new()));
-            });
+            bindings.visit_overload_set(candidates, &mut add_overload);
         } else {
             bindings.visit_type_context_callables(&mut |binding| {
-                add_overloads_from_binding(&mut overloads_with_binding, binding);
+                let mut matches = binding.matching_overloads().peekable();
+                if matches.peek().is_some() {
+                    for (_, overload) in matches {
+                        add_overload(overload, binding);
+                    }
+                } else if let Some(overload) = binding.best_failing_overload() {
+                    // Infer argument types against the best failing overload for better diagnostics.
+                    add_overload(overload, binding);
+                }
             });
         }
 
@@ -6515,10 +6500,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 }
 
-                let parameter_tcx =
-                    |overload: &Binding<'db>,
-                     binding: &CallableBinding<'db>,
-                     specialization: &CachedSpecialization<'db>| {
+                let contexts = overloads_with_binding
+                    .iter()
+                    .map(|(overload, binding, cache)| {
                         overload.argument_type_context(
                             db,
                             env,
@@ -6527,41 +6511,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             argument_types,
                             argument_index,
                             call_expression_tcx,
-                            || {
-                                specialization
-                                    .get_or_init(|| {
-                                        overload.argument_type_context_specialization(
-                                            db,
-                                            env,
-                                            constraints,
-                                            call_expression_tcx,
-                                        )
-                                    })
-                                    .as_deref()
-                            },
+                            cache,
                         )
-                    };
-
-                let parameter_contexts = if let Ok((overload, binding, specialization)) =
-                    overloads_with_binding.iter().exactly_one()
-                {
-                    MatchingArgumentTypeContext::Unique(parameter_tcx(
-                        overload,
-                        binding,
-                        specialization,
-                    ))
-                } else {
-                    MatchingArgumentTypeContext::Many(
-                        overloads_with_binding
-                            .iter()
-                            .map(|(overload, binding, specialization)| {
-                                parameter_tcx(overload, binding, specialization)
-                            })
-                            .collect(),
-                    )
-                };
-
-                Some(parameter_contexts)
+                    });
+                Some(match contexts.exactly_one() {
+                    Ok(context) => MatchingArgumentTypeContext::Unique(context),
+                    Err(contexts) => MatchingArgumentTypeContext::Many(contexts.collect()),
+                })
             })
             .collect()
     }
