@@ -9118,10 +9118,15 @@ impl<'db> Binding<'db> {
         };
         let result = call.infer(constraints);
         let inference = result.inference?;
-        // If restricting one argument to its nested arm makes the call invalid, fall back
-        // for every argument, even those whose context depends on a different type variable.
-        // Inference can also recover by retrying without the expected return type. Preserve a
-        // compatible result from the unrestricted call in that case.
+        // A `list[int]` and a `list[str]` can each match `list[T]`, but they require different
+        // values for `T`. We compute one restricted specialization for the whole call. If it
+        // fails for any argument, use the ordinary specialization for all of them.
+        //
+        // `infer` can also succeed by retrying without the expected return type. For example,
+        // given `def f[T](x: T | list[T]) -> T` and `xs: list[int]`, the assignment
+        // `out: list[int] = f(xs)` works through the bare arm with `T = list[int]`. Restricting
+        // `x` to `list[T]` gives `T = int`. That accepts `xs`, but the return type is now `int`,
+        // so keep the ordinary specialization that made the assignment valid.
         if !result.errors.is_empty()
             || !call.accepts_arguments(inference.merged_specialization(db))
             || tcx.declared_type().is_some_and(|target| {
