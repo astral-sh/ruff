@@ -1247,12 +1247,12 @@ a = 20 / 0  # ty: ignore[division-by-zero]
 
 <a id="implicit-concatenated-string-type-annotation"></a>
 
-## `implicit-string-concatenation-in-type-annotation`
+## `implicit-string-concatenation-in-annotation`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22implicit-string-concatenation-in-type-annotation%22+OR+%22implicit-concatenated-string-type-annotation%22%29" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22implicit-string-concatenation-in-annotation%22+OR+%22implicit-concatenated-string-type-annotation%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fstring_annotation.rs#L23" target="_blank">View source</a>
 </small>
 
@@ -1260,12 +1260,12 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for implicit string concatenation in type annotations.
+Checks for [type expressions][type expression] written as two or more adjacent string literals.
 
 **Why is this bad?**
 
 
-Static analysis tools like ty can't analyze type annotations that use implicit string concatenation.
+ty can't resolve a string annotation when a [type expression] spans multiple string literals.
 
 **Examples**
 
@@ -1291,12 +1291,32 @@ def test() -> "Literal[5]":
     return 5
 ```
 
+Note that this rule is only applied to [type expressions][type expression] in annotations. Regions
+in type annotations that are interpreted as _value_ expressions -- for example, the second argument
+to `Annotated[]` -- are not reported by this rule:
+
+<!-- fmt:off -->
+
+```python
+from typing import Annotated
+
+# the first argument to `Annotated[]` is interpreted as a type expression, so is reported
+count: Annotated["in" "t", "item count"]  # error
+
+# all remaining arguments to `Annotated[]` are interpreted as value expressions, so are not reported
+total: Annotated[int, "item " "count"]  # ok
+```
+
+<!-- fmt:on -->
+
 **Rule history**
 
 
 - v0.0.101: Renamed from [`implicit-concatenated-string-type-annotation`](#implicit-concatenated-string-type-annotation).
 
     [`implicit-concatenated-string-type-annotation`](#implicit-concatenated-string-type-annotation) remains as a compatibility alias for this rule.
+
+[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
 <a id="unresolved-import"></a>
 
