@@ -55,16 +55,24 @@ impl CoverageCounts {
         }
     }
 
-    /// The CSS class that colors a summary row, using mypy's thresholds.
-    fn quality_class(self) -> &'static str {
-        let imprecision = self.imprecision();
-        if imprecision == 0.0 {
-            "quality-good"
-        } else if imprecision < 0.2 {
-            "quality-fair"
-        } else {
-            "quality-poor"
+    /// Writes a bar that shows the share of precise, imprecise, and dynamic lines. The rest of
+    /// the bar, the share of empty lines, shows the bar's background.
+    #[expect(clippy::cast_precision_loss)]
+    fn write_bar(self, out: &mut String, class: &str) {
+        let total = self.total().max(1) as f64;
+        let _ = write!(out, "<div class=\"{class}\">");
+        for (count, segment) in [
+            (self.precise, "precise"),
+            (self.imprecise, "imprecise"),
+            (self.dynamic, "dynamic"),
+        ] {
+            let width = count as f64 / total * 100.0;
+            let _ = write!(
+                out,
+                "<span class=\"{segment}\" style=\"width: {width:.2}%\"></span>"
+            );
         }
+        out.push_str("</div>");
     }
 }
 
@@ -109,15 +117,20 @@ pub(crate) fn write_html_report(
     for ((_, path), counts) in files.iter().zip(counts) {
         let relative_path = relative_path(path);
         total.merge(counts);
-        let page_path = page_path(&relative_path);
-        write_summary_row(&mut rows, relative_path.as_str(), Some(&page_path), counts);
+        write_summary_row(&mut rows, &relative_path, counts);
     }
-
-    let mut footer = String::new();
-    write_summary_row(&mut footer, "Total", None, total);
 
     let mut project = String::new();
     escape_html(&mut project, db.project().name(db));
+
+    let mut total_bar = String::new();
+    total.write_bar(&mut total_bar, "bar total");
+    let summary = format!(
+        "{:.2}% of {} lines in {} files are imprecise or dynamic",
+        total.imprecision() * 100.0,
+        total.total(),
+        files.len()
+    );
 
     let index = format!(
         "<!DOCTYPE html>
@@ -130,13 +143,15 @@ pub(crate) fn write_html_report(
 </head>
 <body>
 <h1>{project} type coverage</h1>
+<p class=\"subtitle\">{summary}</p>
+{total_bar}
+<div class=\"table-wrapper\">
 <table class=\"summary\">
-<thead><tr><th>File</th><th>Imprecision</th><th>Lines</th><th>Precise</th><th>Imprecise</th><th>Dynamic</th><th>Empty</th></tr></thead>
+<thead><tr><th>File</th><th></th><th>Imprecision</th><th>Lines</th><th>Precise</th><th>Imprecise</th><th>Dynamic</th><th>Empty</th></tr></thead>
 <tbody>
 {rows}</tbody>
-<tfoot>
-{footer}</tfoot>
 </table>
+</div>
 </body>
 </html>
 "
@@ -160,7 +175,6 @@ fn file_page(
     let source = source_text(db, file);
     let lines = line_coverage(db, file);
     let mut counts = CoverageCounts::default();
-    let mut line_numbers = String::new();
     let mut code = String::new();
 
     for (index, line) in source.as_str().lines().enumerate() {
@@ -172,31 +186,32 @@ fn file_page(
         counts.add(coverage);
 
         let number = index + 1;
-        let _ = writeln!(
-            line_numbers,
-            "<a id=\"L{number}\" href=\"#L{number}\">{number}</a>"
-        );
         let class = match coverage {
             LineCoverage::Empty => "empty",
             LineCoverage::Precise => "precise",
             LineCoverage::Imprecise => "imprecise",
             LineCoverage::Dynamic => "dynamic",
         };
-        let _ = write!(code, "<span class=\"line-{class}\"");
+        let _ = write!(code, "<div class=\"line {class}\" id=\"L{number}\"");
         if !notes.is_empty() {
             code.push_str(" title=\"");
             escape_html(&mut code, &notes.join("\n"));
             code.push('"');
         }
-        code.push('>');
+        let _ = write!(code, "><a href=\"#L{number}\">{number}</a><code>");
         escape_html(&mut code, line);
-        code.push_str("</span>\n");
+        code.push_str("</code></div>\n");
     }
 
     // Link back to `index.html` from the page's directory.
     let index_link = "../".repeat(page_path(relative_path).matches('/').count()) + "index.html";
     let mut title = String::new();
     escape_html(&mut title, relative_path.as_str());
+    let summary = format!(
+        "{} lines, {:.2}% imprecise or dynamic",
+        counts.total(),
+        counts.imprecision() * 100.0
+    );
 
     let page = format!(
         "<!DOCTYPE html>
@@ -208,10 +223,14 @@ fn file_page(
 <style>{STYLE}</style>
 </head>
 <body>
-<p><a href=\"{index_link}\">Index</a></p>
-<h2>{title}</h2>
-<p class=\"legend\"><span class=\"line-precise\">precise</span> <span class=\"line-imprecise\">imprecise</span> <span class=\"line-dynamic\">dynamic</span></p>
-<table class=\"source\"><tr><td class=\"lineno\"><pre>{line_numbers}</pre></td><td><pre>{code}</pre></td></tr></table>
+<header>
+<a href=\"{index_link}\">All files</a>
+<h1>{title}</h1>
+<span class=\"subtitle\">{summary}</span>
+<span class=\"legend\"><span class=\"precise\">precise</span><span class=\"imprecise\">imprecise</span><span class=\"dynamic\">dynamic</span></span>
+</header>
+<div class=\"source\"><div class=\"lines\">
+{code}</div></div>
 </body>
 </html>
 "
@@ -220,20 +239,13 @@ fn file_page(
     (page, counts)
 }
 
-fn write_summary_row(out: &mut String, name: &str, link: Option<&str>, counts: CoverageCounts) {
-    let _ = write!(
-        out,
-        "<tr class=\"{}\"><td class=\"name\">",
-        counts.quality_class()
-    );
-    match link {
-        Some(link) => {
-            let _ = write!(out, "<a href=\"{link}\">");
-            escape_html(out, name);
-            out.push_str("</a>");
-        }
-        None => escape_html(out, name),
-    }
+fn write_summary_row(out: &mut String, relative_path: &SystemPath, counts: CoverageCounts) {
+    out.push_str("<tr><td><a href=\"");
+    out.push_str(&page_path(relative_path));
+    out.push_str("\">");
+    escape_html(out, relative_path.as_str());
+    out.push_str("</a></td><td>");
+    counts.write_bar(out, "bar");
     let _ = writeln!(
         out,
         "</td><td>{:.2}%</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
@@ -284,28 +296,9 @@ fn common_parent<'a>(mut paths: impl Iterator<Item = &'a SystemPath>) -> SystemP
     prefix.to_path_buf()
 }
 
-/// The colors match mypy's report: precise lines are green, imprecise lines are yellow, and dynamic
-/// lines are red. Unlike mypy, we leave empty lines (comments, docstrings, and blank lines)
-/// uncolored, so that green only marks lines whose types ty checked and found precise. The page
-/// sets its own background and text colors so that it stays readable when the browser prefers a
-/// dark color scheme.
-const STYLE: &str = "
-body { font-family: sans-serif; margin: 2em; background-color: #fff; color: #000; }
-table.summary { border-collapse: collapse; }
-table.summary th, table.summary td { border: 1px solid #aaa; padding: 0.3em 0.6em; text-align: right; }
-table.summary .name, table.summary th:first-child { text-align: left; }
-table.summary a { text-decoration: none; }
-.quality-good { background-color: #dfd; }
-.quality-fair { background-color: #ffa; }
-.quality-poor { background-color: #faa; }
-table.source { border-collapse: collapse; }
-table.source td { padding: 0; vertical-align: top; }
-td.lineno pre { text-align: right; padding-right: 0.5em; }
-td.lineno a { color: #999; text-decoration: none; }
-pre { margin: 0; }
-pre span { display: inline-block; min-width: 100%; }
-.line-precise { background-color: #dfd; }
-.line-imprecise { background-color: #ffa; }
-.line-dynamic { background-color: #faa; }
-.legend span { padding: 0.1em 0.5em; }
-";
+/// The report's stylesheet, which is copied into every page so that each page works on its own.
+///
+/// Like mypy's report, precise lines are green, imprecise lines are yellow, and dynamic lines are
+/// a warning color. Unlike mypy, we leave empty lines (comments, docstrings, and blank lines)
+/// uncolored, so that green only marks lines whose types ty checked and found precise.
+const STYLE: &str = include_str!("coverage/report.css");
