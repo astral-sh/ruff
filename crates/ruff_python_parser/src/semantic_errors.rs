@@ -1037,7 +1037,7 @@ impl SemanticSyntaxChecker {
             Expr::Attribute(ast::ExprAttribute {
                 attr,
                 range,
-                ctx: expr_ctx,
+                ctx: expr_ctx @ (ExprContext::Store | ExprContext::Del),
                 ..
             }) if attr == "__debug__" => {
                 // test_err write_to_debug_attribute_py313
