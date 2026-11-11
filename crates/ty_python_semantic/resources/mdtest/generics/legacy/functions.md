@@ -2581,6 +2581,18 @@ def _(value: int, unknown: Unknown):
     reveal_type(first(value, identity([unknown])))  # revealed: int | Unknown
 ```
 
+A callback returning `list[Unknown]` also contributes its element type.
+
+```py
+from collections.abc import Callable
+
+def from_callback(get: Callable[[], list[U]]) -> list[U]:
+    return get()
+
+def _(value: int, unknown: Unknown):
+    reveal_type(first(value, from_callback(lambda: [unknown])))  # revealed: int | Unknown
+```
+
 The same holds when a constructor stores the list in an invariant generic class.
 
 ```py
@@ -2728,6 +2740,17 @@ def bounded(handler: I | Handler[I], samples: list[I]) -> I:
 def _(accept: Callable[[object], int], samples: list[int]):
     result = bounded(reveal_type(Handler(accept)), samples)  # revealed: Handler[int]
     reveal_type(result)  # revealed: int
+```
+
+An invariant list fixes the nested call's type argument to `object`. The sibling list cannot
+specialize that handler to `Handler[int]`.
+
+```py
+def from_list(values: list[T]) -> Handler[T]:
+    raise NotImplementedError
+
+def _(objects: list[object], samples: list[int]):
+    bounded(from_list(objects), samples)  # error: [invalid-argument-type] "Handler[object]"
 ```
 
 ## Passing generic functions to generic functions

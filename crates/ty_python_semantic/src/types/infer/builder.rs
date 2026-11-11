@@ -3,6 +3,7 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::{HashSet, hash_map};
 use std::convert::Infallible;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
@@ -54,7 +55,7 @@ use crate::types::annotation_target::{is_valid_annotation_target, receiver_metho
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
     ArgumentContextSpecialization, ArgumentTypeContext, CallableDescription, CheckTypesMode,
-    InitialArgumentTypes, OverloadSet, ProducerSignature, inferable_typevar_occurrences,
+    ExpressionConstraints, MAX_PRODUCER_RELATIONS, OverloadSet, inferable_typevar_occurrences,
     requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -62,7 +63,9 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
 };
-use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{
+    CandidateSolutions, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
+};
 use crate::types::context::{InferContext, InferContextResult};
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -126,7 +129,8 @@ use crate::types::type_alias::{
 };
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance,
+    TypeVarNonceGenerator, TypeVarSet,
 };
 use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
@@ -302,7 +306,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
+    producers: FxHashMap<ExpressionNodeKey, Arc<ExpressionConstraints<'db>>>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -846,7 +850,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inference
                 .producers
                 .iter()
-                .map(|(&key, p)| (key, Rc::clone(p))),
+                .map(|(&key, p)| (key, Arc::clone(p))),
         );
         self.comparison_truthiness.extend(
             inference
@@ -1026,6 +1030,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.expression_cache = Some(Rc::new(RefCell::new(ExpressionCache::default())));
             true
         }
+    }
+
+    fn capture_nonces(&self) -> Option<Rc<TypeVarNonceGenerator<'db>>> {
+        Some(Rc::clone(&self.expression_cache.as_ref()?.borrow().nonces))
     }
 
     fn teardown_expression_cache(&mut self) {
@@ -6361,10 +6369,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut iteration = 0;
         let mut first_pass = None;
-        let argument_expressions: Vec<_> = ast_arguments
-            .clone()
-            .map(ast::ArgOrKeyword::value)
-            .collect();
         let mut next_bindings = bindings.clone();
         let mut prev_argument_types = argument_types.clone();
 
@@ -6419,11 +6423,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Collect the argument constraints based on the newly inferred types.
             let next_arguments_tcx = self.collect_call_arguments_type_context(
                 &next_argument_types,
-                Some(speculative_builder.initial_argument_types(
-                    &next_argument_types,
-                    &argument_expressions,
-                    first_pass.as_ref(),
-                )),
+                Some(first_pass.as_ref().unwrap_or(&next_argument_types)),
                 &next_bindings,
                 Some(candidates),
                 constraints,
@@ -6440,11 +6440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Only retain the first pass once another iteration will discard its builder.
-            first_pass.get_or_insert_with(|| FirstArgumentPass {
-                arguments: next_argument_types.clone(),
-                expressions: std::mem::take(&mut speculative_builder.expressions),
-                producers: std::mem::take(&mut speculative_builder.producers),
-            });
+            first_pass.get_or_insert_with(|| next_argument_types.clone());
             iteration += 1;
             arguments_tcx = next_arguments_tcx;
             prev_argument_types = next_argument_types;
@@ -6464,11 +6460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if requires_overload_evaluation {
             let arguments_tcx = self.collect_call_arguments_type_context(
                 &converged_argument_types,
-                Some(converged_builder.initial_argument_types(
-                    &converged_argument_types,
-                    &argument_expressions,
-                    first_pass.as_ref(),
-                )),
+                Some(first_pass.as_ref().unwrap_or(&converged_argument_types)),
                 &next_bindings,
                 None,
                 constraints,
@@ -6494,29 +6486,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         result
     }
 
-    fn initial_argument_types<'a, 'call>(
-        &'a self,
-        arguments: &'a CallArguments<'call, 'db>,
-        expressions: &'a [&'a ast::Expr],
-        first_pass: Option<&'a FirstArgumentPass<'call, 'db>>,
-    ) -> InitialArgumentTypes<'a, 'call, 'db> {
-        let (arguments, observed, producers) = first_pass
-            .map_or((arguments, &self.expressions, &self.producers), |pass| {
-                (&pass.arguments, &pass.expressions, &pass.producers)
-            });
-        InitialArgumentTypes {
-            arguments,
-            expressions,
-            observed,
-            producers,
-        }
-    }
-
     /// Collects the type contexts used to infer the arguments of a call expression.
     fn collect_call_arguments_type_context<'bindings>(
         &self,
         argument_types: &CallArguments<'_, 'db>,
-        initial: Option<InitialArgumentTypes<'_, '_, 'db>>,
+        initial: Option<&CallArguments<'_, 'db>>,
         bindings: &'bindings Bindings<'db>,
         candidates: Option<&'bindings OverloadSet>,
         constraints: &ConstraintSetBuilder<'db>,
@@ -6654,22 +6628,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         mode: CallArgumentInferenceMode,
     ) {
-        let insert_argument_ty =
-            |argument_index,
-             inferred_ty,
-             argument_tcx: &Option<ArgumentTypeContext<'db>>,
-             argument_types: &mut CallArguments<'_, 'db>| {
-                if let Some(argument_tcx) = argument_tcx {
-                    argument_tcx.insert_inferred_type_into(
-                        argument_types,
-                        argument_index,
-                        inferred_ty,
-                    );
-                } else {
-                    argument_types.insert_type(argument_index, TypeContext::default(), inferred_ty);
-                }
-            };
-
         for (argument_index, ast_argument) in ast_arguments.enumerate() {
             // Splatted arguments are inferred before parameter matching to
             // determine their length.
@@ -6684,82 +6642,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
 
-            match argument_tcx {
-                MatchingArgumentTypeContext::Unique(argument_tcx) => {
-                    let tcx = argument_tcx
-                        .map(ArgumentTypeContext::type_context)
-                        .unwrap_or_default();
-                    let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
-                    insert_argument_ty(argument_index, inferred_ty, argument_tcx, argument_types);
-                }
-
-                MatchingArgumentTypeContext::Many(argument_tcx) => {
-                    let mut inferred_by_cache_key = FxHashMap::default();
-
-                    // If there are multiple applicable type contexts and we are not in
-                    // speculative mode, infer the argument without type context as the
-                    // default inference.
-                    if mode.requires_default_inference() {
-                        let inferred_ty = infer_argument_ty(
-                            self,
-                            (argument_index, ast_argument, TypeContext::default()),
-                        );
-
-                        argument_types.insert_type(
-                            argument_index,
-                            TypeContext::default(),
-                            inferred_ty,
-                        );
-
-                        inferred_by_cache_key.insert(None, inferred_ty);
-                    }
-
-                    // Cache expressions inferred across speculative inference attempts.
-                    //
-                    // This is important to avoid exponential blowup for deeply nested generic calls,
-                    // as inner expressions are repeatedly inferred with the same type context.
-                    let teardown_expression_cache = self.setup_expression_cache();
-
-                    for argument_tcx in argument_tcx {
-                        let inference_cache_key =
-                            argument_tcx.map(ArgumentTypeContext::inference_cache_key);
-                        if let Some(inferred_ty) =
-                            inferred_by_cache_key.get(&inference_cache_key).copied()
-                        {
-                            // Even when the inference cache key is identical, this overload may later
-                            // look up the inferred type through a different original `ParamSpec`
-                            // annotation, so insert through its own context.
-                            insert_argument_ty(
-                                argument_index,
-                                inferred_ty,
-                                argument_tcx,
-                                argument_types,
-                            );
-
-                            continue;
+            let mut infer = |builder: &mut Self, context: Option<ArgumentTypeContext<'db>>| {
+                let tcx = context
+                    .map(ArgumentTypeContext::type_context)
+                    .unwrap_or_default();
+                let ty = infer_argument_ty(builder, (argument_index, ast_argument, tcx));
+                let evidence = if builder.expression_cache.is_none() {
+                    None
+                } else if let Some(source) = builder.producers.get(&ast_argument.into()) {
+                    Some(Arc::clone(source))
+                } else {
+                    let can_receive_context = match ast_argument {
+                        ast::Expr::Name(_) | ast::Expr::Subscript(_) | ast::Expr::Attribute(_) => {
+                            false
                         }
+                        ast::Expr::Lambda(_) => true,
+                        _ => ty
+                            .class_specialization(builder.db(), builder.program_environment())
+                            .is_some(),
+                    };
+                    can_receive_context.then(|| Arc::new(ExpressionConstraints::fixed(ty)))
+                };
+                (ty, evidence)
+            };
 
-                        let tcx = argument_tcx
-                            .map(ArgumentTypeContext::type_context)
-                            .unwrap_or_default();
-
-                        let mut speculative_builder = self.speculate();
-                        let inferred_ty = infer_argument_ty(
-                            &mut speculative_builder,
-                            (argument_index, ast_argument, tcx),
-                        );
-
-                        insert_argument_ty(
-                            argument_index,
-                            inferred_ty,
-                            argument_tcx,
-                            argument_types,
-                        );
-
-                        inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
-                        self.union_expected_types(&speculative_builder.expected_types);
+            match argument_tcx {
+                MatchingArgumentTypeContext::Unique(context) => {
+                    argument_types.insert_inferred(
+                        argument_index,
+                        *context,
+                        &infer(self, *context),
+                    );
+                }
+                MatchingArgumentTypeContext::Many(contexts) => {
+                    if mode.requires_default_inference() {
+                        argument_types.insert_inferred(argument_index, None, &infer(self, None));
                     }
 
+                    // Share nested expression inference across overloads. Each overload still needs
+                    // its own lookup keys when the same inference serves different ParamSpecs.
+                    let teardown_expression_cache = self.setup_expression_cache();
+                    let mut inferred_by_cache_key = FxHashMap::default();
+                    for &context in contexts {
+                        let key = context.map(ArgumentTypeContext::inference_cache_key);
+                        let value = inferred_by_cache_key.entry(key).or_insert_with(|| {
+                            let mut builder = self.speculate();
+                            let result = infer(&mut builder, context);
+                            self.union_expected_types(&builder.expected_types);
+                            result
+                        });
+                        argument_types.insert_inferred(argument_index, context, value);
+                    }
                     if teardown_expression_cache {
                         self.teardown_expression_cache();
                     }
@@ -7083,7 +7016,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.finish_expression_type(expression, ty, tcx)
+        let ty = self.finish_expression_type(expression, ty, tcx);
+        if self.expression_cache.is_some()
+            && matches!(
+                expression,
+                ast::Expr::Tuple(_) | ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
+            )
+            && let Some(evidence) = self.literal_constraints(expression, ty)
+        {
+            self.producers.insert(expression.into(), Arc::new(evidence));
+        }
+        ty
     }
 
     /// Apply context before recording an inferred expression type.
@@ -7565,6 +7508,98 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         KnownClass::EllipsisType.to_instance(db, self.program_environment())
+    }
+
+    /// Preserve element types before collection-level promotion, so an enclosing call can
+    /// choose a compatible specialization of the literal.
+    fn literal_constraints(
+        &self,
+        expression: &ast::Expr,
+        closed: Type<'db>,
+    ) -> Option<ExpressionConstraints<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let mut children = Vec::new();
+        let mut open = |elt: &ast::Expr, ty: Type<'db>| {
+            if let Some(child) = self.producers.get(&elt.into()).filter(|c| c.closed == ty) {
+                children.push(child.as_ref());
+                Some(child.ty)
+            } else if elt.is_starred_expr() {
+                (!ty.is_dynamic()).then(|| ty.iterate(db, env).homogeneous_element_type(db, env))
+            } else {
+                ty.is_fully_static(db, env).then_some(ty)
+            }
+        };
+        let mut relations = Vec::new();
+        let (ty, specialization, empty) = if let ast::Expr::Tuple(tuple) = expression {
+            if self.producers.is_empty() || tuple.elts.len() > MAX_PRODUCER_RELATIONS {
+                return None;
+            }
+            let tuple_spec = closed.exact_tuple_instance_spec(db)?;
+            let fixed = tuple_spec.as_fixed_length()?;
+            if fixed.len() != tuple.elts.len() || tuple.elts.iter().any(ast::Expr::is_starred_expr)
+            {
+                return None;
+            }
+            let elements = tuple
+                .elts
+                .iter()
+                .zip(fixed.iter_all_elements())
+                .map(|(elt, ty)| open(elt, ty))
+                .collect::<Option<Vec<_>>>()?;
+            if children.is_empty() {
+                return None;
+            }
+            (Type::heterogeneous_tuple(db, env, elements), None, false)
+        } else {
+            let (class, spec) = closed.class_specialization(db, env)?;
+            let context = spec.generic_context(db);
+            if !matches!(closed, Type::NominalInstance(_))
+                || !context.variables(db).all(|v| v.typevar(db).is_simple(db))
+            {
+                return None;
+            }
+            let fresh =
+                ExpressionConstraints::renaming(db, env, context, self.capture_nonces()?.as_ref());
+            let mut constrain = |elt: &ast::Expr, i: usize| {
+                if relations.len() == MAX_PRODUCER_RELATIONS {
+                    return None;
+                }
+                relations.push((
+                    open(elt, self.try_expression_type(elt)?)?,
+                    *fresh.types(db).get(i)?,
+                ));
+                Some(())
+            };
+            match expression {
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
+                    for elt in elts {
+                        constrain(elt, 0)?;
+                    }
+                }
+                ast::Expr::Dict(dict) => {
+                    for item in &dict.items {
+                        constrain(item.key.as_ref()?, 0)?;
+                        constrain(&item.value, 1)?;
+                    }
+                }
+                _ => return None,
+            }
+            let ty = Type::instance(db, env, class.apply_specialization(db, |_| fresh));
+            (ty, Some((fresh, spec)), relations.is_empty())
+        };
+        let facts = ConstraintSetBuilder::new().into_owned(|arena| {
+            let nested = children
+                .iter()
+                .when_all(db, arena, |child| arena.load(db, env, &child.facts));
+            nested.and(db, arena, || {
+                relations.iter().when_all(db, arena, |(actual, formal)| {
+                    actual.when_constraint_set_assignable_to(db, env, *formal, arena)
+                })
+            })
+        });
+        ExpressionConstraints::new(db, closed, ty, facts, specialization, children, empty)
     }
 
     fn infer_tuple_expression(
@@ -9855,6 +9890,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments = self.prepare_call_arguments(arguments);
+        if !matches!(callable_type, Type::GenericAlias(_)) {
+            call_arguments.capture_nonces = self.capture_nonces();
+        }
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
@@ -10245,11 +10283,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
         let producer = if self.expression_cache.is_some()
-            && !matches!(callable_type, Type::GenericAlias(_))
-            && let Ok((binding, arguments)) = inferred.iter().exactly_one()
+            && let Ok((binding, _)) = inferred.iter().exactly_one()
         {
-            ProducerSignature::from_call(db, env, binding, arguments)
-                .map(|producer| (binding.return_type(db, env), producer))
+            if let Type::FunctionLiteral(func) = callable_type
+                && func.is_known(db, KnownFunction::RevealType)
+                && let [value] = &*arguments.args
+            {
+                self.producers.get(&value.into()).cloned()
+            } else {
+                binding.expression_constraints().cloned()
+            }
         } else {
             None
         };
@@ -10409,11 +10452,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
             arguments,
         );
-        if let Some((raw_result, producer)) = producer
-            && raw_result == return_ty
+        if let Some(producer) = producer
+            && producer.closed == return_ty
         {
-            self.producers
-                .insert(call_expression.into(), Rc::new(producer));
+            self.producers.insert(call_expression.into(), producer);
         }
         return_ty
     }
@@ -13037,19 +13079,13 @@ struct ChainedBooleanResult<'db> {
     preceding_truthiness: Truthiness,
 }
 
-/// Values needed from the first pass after its speculative builder has been discarded.
-struct FirstArgumentPass<'call, 'db> {
-    arguments: CallArguments<'call, 'db>,
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
-}
-
 /// An expression cache shared across builders during multi-inference.
 ///
 /// This provides a cheap way of reusing inference results without the overhead
 /// of Salsa standalone expressions.
 #[derive(Default)]
 struct ExpressionCache<'db> {
+    nonces: Rc<TypeVarNonceGenerator<'db>>,
     entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntries<'db>>,
 }
 
@@ -13130,7 +13166,7 @@ enum ExpressionCacheEntry<'db> {
 struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    producers: FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
+    producers: FxHashMap<ExpressionNodeKey, Arc<ExpressionConstraints<'db>>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,

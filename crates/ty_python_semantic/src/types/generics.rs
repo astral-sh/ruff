@@ -2548,13 +2548,13 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
 
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
-pub(crate) struct SpecializationBuilder<'db, 'c> {
+pub(crate) struct SpecializationBuilder<'db, 'env, 'c> {
     db: &'db dyn Db,
-    env: &'c ProgramEnvironment<'db>,
+    env: &'env ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
-    pending: ConstraintSet<'db, 'c>,
+    pub(super) pending: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
 }
 
@@ -2827,10 +2827,10 @@ fn relation_directions<T: Copy>(
     .flatten()
 }
 
-impl<'db, 'c> SpecializationBuilder<'db, 'c> {
+impl<'db, 'env, 'c> SpecializationBuilder<'db, 'env, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
     ) -> Self {
@@ -4064,6 +4064,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             TypeVarVariance::Covariant,
             &InferSpecializationVisitor::new(Ok(())),
         )
+    }
+
+    /// Collects one argument's contribution while retaining it in the call-wide set.
+    pub(super) fn infer_and_collect(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        fixed: &mut ConstraintSet<'db, 'c>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let previous = std::mem::replace(
+            &mut self.pending,
+            ConstraintSet::from_bool(self.constraints, true),
+        );
+        let result = self.infer(formal, actual);
+        let argument = std::mem::replace(&mut self.pending, previous);
+        fixed.intersect(self.db, self.constraints, argument);
+        self.record_constraint_set(argument);
+        result
     }
 
     /// Conservatively checks whether union matching may discard gradual evidence.
