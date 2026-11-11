@@ -12,28 +12,33 @@
 
 use std::rc::Rc;
 
+use itertools::Itertools;
+
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::ExpressionNodeKey;
 
-use super::{Binding, CallableBinding, ProducerSignature, matched_argument_relations};
+use super::{Binding, Bindings, CallableBinding, matched_argument_relations};
 use crate::db::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::{
-    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, Solution, SolutionPaths, Solutions,
+    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, ReportDiagnostics, SolutionPaths,
+    Solutions,
 };
 use crate::types::function::KnownFunction;
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{
+    GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::{BindingContext, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
-use crate::types::{BoundTypeVarInstance, ProgramEnvironment, Type, TypeContext, UnionType};
+use crate::types::{BoundTypeVarInstance, ProgramEnvironment, Type, TypeContext};
 
 // Opening arguments is optional. Bound the size of the graph we construct before the solver's
 // own traversal budgets take effect.
 const MAX_PRODUCER_DEPTH: usize = 8;
-pub(super) const MAX_LOCAL_TYPEVARS: usize = 16;
-pub(super) const MAX_PRODUCER_RELATIONS: usize = 32;
+const MAX_LOCAL_TYPEVARS: usize = 16;
+const MAX_PRODUCER_RELATIONS: usize = 32;
 
 /// Types inferred on the first argument-inference pass. Subsequent passes can refine these
 /// types, but must not add the refinements to these sources of evidence.
@@ -43,6 +48,79 @@ pub(crate) struct InitialArgumentTypes<'a, 'call, 'db> {
     pub(crate) expressions: &'a [&'a ast::Expr],
     pub(crate) observed: &'a FxHashMap<ExpressionNodeKey, Type<'db>>,
     pub(crate) producers: &'a FxHashMap<ExpressionNodeKey, Rc<ProducerSignature<'db>>>,
+}
+
+#[derive(Debug)]
+struct ProducerArgument<'db> {
+    source_index: Option<usize>,
+    actual: Type<'db>,
+    formal: Type<'db>,
+}
+
+/// Raw signature and operand types of a successfully resolved generic call.
+#[derive(Debug)]
+pub(crate) struct ProducerSignature<'db> {
+    inference: TypeVarInference<'db>,
+    return_ty: Type<'db>,
+    relations: Box<[ProducerArgument<'db>]>,
+}
+
+impl<'db> ProducerSignature<'db> {
+    pub(crate) fn from_call(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: &Bindings<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Option<Self> {
+        let callable = bindings.single_element()?;
+        if callable.overload_call_result.is_some() {
+            // Argument expansion and ambiguous results can each involve multiple signatures.
+            return None;
+        }
+        let (_, selected) = callable.selected_overloads().exactly_one().ok()?;
+        if let Some(constructor) = bindings.single_item()?.as_constructor()
+            && constructor.downstream_constructor.is_some()
+        {
+            // A downstream initializer can impose additional requirements on this constructor.
+            return None;
+        }
+        let generic_context = selected.signature.generic_context?;
+        let return_ty = selected.unspecialized_return_type(db);
+        if arguments.len() > MAX_PRODUCER_RELATIONS
+            || generic_context.len(db) > MAX_LOCAL_TYPEVARS
+            || generic_context
+                .variables(db)
+                .any(|v| v.is_paramspec(db) || v.is_typevartuple(db))
+            || !any_over_type_expanding_aliases(db, env, return_ty, |ty| {
+                ty.as_typevar()
+                    .is_some_and(|v| generic_context.contains(db, v.identity(db)))
+            })
+        {
+            return None;
+        }
+        let inference = selected.inference?;
+        let arguments = arguments.with_self(callable.bound_type);
+        let relations: Box<[_]> = matched_argument_relations(
+            selected.signature.parameters(),
+            &selected.argument_matches,
+            &arguments,
+        )
+        .map(|rel| ProducerArgument {
+            source_index: rel.adjusted_argument_index,
+            actual: rel.argument_type,
+            formal: rel.declared_type,
+        })
+        .take(MAX_PRODUCER_RELATIONS + 1)
+        .collect();
+        if relations.len() > MAX_PRODUCER_RELATIONS {
+            return None;
+        }
+        Some(Self {
+            inference,
+            return_ty,
+            relations,
+        })
+    }
 }
 
 struct ArgumentProducer<'a, 'db> {
@@ -56,6 +134,32 @@ struct ArgumentProducer<'a, 'db> {
 }
 
 impl<'db> ArgumentProducer<'_, 'db> {
+    /// Each occurrence of a constructor gets its own copy of its type parameters. Its original
+    /// specialization remains a preference when the enclosing call allows it.
+    fn freshen(
+        &mut self,
+        context: GenericContext<'db>,
+        intrinsic: Specialization<'db>,
+    ) -> Specialization<'db> {
+        let db = self.db;
+        let variables = context
+            .variables(db)
+            .map(|v| {
+                let fresh = BoundTypeVarInstance::new(
+                    db,
+                    v.typevar(db),
+                    BindingContext::Synthetic(self.env.program(db)),
+                    None,
+                    self.generator.next(),
+                );
+                self.locals
+                    .push((fresh, intrinsic.get(db, v).unwrap_or_else(Type::unknown)));
+                Type::TypeVar(fresh)
+            })
+            .collect::<Vec<_>>();
+        context.specialize(db, variables)
+    }
+
     fn open(
         &mut self,
         expression: &ast::Expr,
@@ -123,23 +227,10 @@ impl<'db> ArgumentProducer<'_, 'db> {
         else {
             return actual.is_fully_static(db, env).then_some(actual);
         };
-        let context = producer.generic_context;
-        let result = producer.return_ty;
-        let mut fresh_types = Vec::new();
-        let intrinsic = producer.inference.merged_specialization(db);
-        for v in context.variables(db) {
-            let fresh = BoundTypeVarInstance::new(
-                db,
-                v.typevar(db),
-                BindingContext::Synthetic(env.program(db)),
-                None,
-                self.generator.next(),
-            );
-            self.locals
-                .push((fresh, intrinsic.get(db, v).unwrap_or_else(Type::unknown)));
-            fresh_types.push(Type::TypeVar(fresh));
-        }
-        let renaming = context.specialize(db, fresh_types);
+        let renaming = self.freshen(
+            producer.inference.generic_context(db),
+            producer.inference.merged_specialization(db),
+        );
         for relation in &producer.relations {
             let actual = relation.actual;
             let formal = relation.formal.apply_specialization(db, renaming);
@@ -162,7 +253,7 @@ impl<'db> ArgumentProducer<'_, 'db> {
             };
             self.relations.push((lhs, formal));
         }
-        Some(result.apply_specialization(db, renaming))
+        Some(producer.return_ty.apply_specialization(db, renaming))
     }
 
     fn open_collection(
@@ -179,21 +270,11 @@ impl<'db> ArgumentProducer<'_, 'db> {
         if !matches!(actual, Type::NominalInstance(_)) || spec.tuple(db).is_some() {
             return None;
         }
-        let mut element_vars = Vec::new();
-        for (v, intrinsic) in spec.generic_context(db).variables(db).zip(spec.types(db)) {
-            if !v.typevar(db).is_simple(db) {
-                return None;
-            }
-            let fresh = BoundTypeVarInstance::new(
-                db,
-                v.typevar(db),
-                BindingContext::Synthetic(env.program(db)),
-                None,
-                self.generator.next(),
-            );
-            self.locals.push((fresh, *intrinsic));
-            element_vars.push(Type::TypeVar(fresh));
+        let context = spec.generic_context(db);
+        if !context.variables(db).all(|v| v.typevar(db).is_simple(db)) {
+            return None;
         }
+        let renaming = self.freshen(context, spec);
         let mut evidence = |expr: &ast::Expr, i| -> Option<()> {
             let value = child(expr)?;
             if matches!(value, Type::Dynamic(_)) {
@@ -204,7 +285,7 @@ impl<'db> ArgumentProducer<'_, 'db> {
             } else {
                 self.open(expr, value, depth + 1)?
             };
-            self.relations.push((shape, *element_vars.get(i)?));
+            self.relations.push((shape, *renaming.types(db).get(i)?));
             Some(())
         };
         match expression {
@@ -229,7 +310,7 @@ impl<'db> ArgumentProducer<'_, 'db> {
         Some(Type::instance(
             db,
             env,
-            class.apply_specialization(db, |g| g.specialize(db, element_vars)),
+            class.apply_specialization(db, |_| renaming),
         ))
     }
 }
@@ -342,7 +423,7 @@ impl<'db> Binding<'db> {
     pub(crate) fn joint_argument_contexts<'c>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &'c ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         binding: &CallableBinding<'db>,
         arguments: &CallArguments<'_, 'db>,
@@ -380,15 +461,13 @@ impl<'db> Binding<'db> {
             (rel, original)
         })
         .collect();
-        if !relations
+        let feedback = relations
             .iter()
-            .any(|(_, original)| original.is_some_and(|(_, _, risk)| risk != Feedback::None))
-        {
+            .filter_map(|(_, original)| original.map(|(_, _, risk)| risk))
+            .max()?;
+        if feedback == Feedback::None {
             return None;
         }
-        let repeated = relations
-            .iter()
-            .any(|(_, original)| original.is_some_and(|(_, _, risk)| risk == Feedback::Repeated));
         let mut independent = ConstraintSet::from_bool(constraints, true);
         if let Some(result) = tcx.declared_type() {
             independent = self
@@ -411,8 +490,8 @@ impl<'db> Binding<'db> {
         let mut producer_preferences = Vec::new();
         let mut shapes = vec![None; arguments.len()];
         for (rel, original) in relations {
-            let flexible = original.and_then(|(i, actual, feedback)| {
-                if feedback == Feedback::None && !repeated {
+            let flexible = original.and_then(|(i, actual, risk)| {
+                if risk == Feedback::None && feedback != Feedback::Repeated {
                     return None;
                 }
                 let mut producer = ArgumentProducer {
@@ -429,15 +508,11 @@ impl<'db> Binding<'db> {
                     // A conditional or boolean expression may construct either of several
                     // values. When its parameter accepts both a value and a container of that
                     // value, its closed result still determines the intrinsic container depth.
-                    if feedback == Feedback::Repeated
+                    if risk == Feedback::Repeated
                         && actual.class_specialization(db, env).is_some()
                         && any_over_type_expanding_aliases(db, env, rel.declared_type, |ty| {
                             matches!(ty, Type::Union(_) | Type::Intersection(_))
                         })
-                        && !matches!(
-                            initial.expressions[i],
-                            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
-                        )
                     {
                         shapes[i] = Some((actual, rel.declared_type));
                         return Some(actual);
@@ -473,26 +548,27 @@ impl<'db> Binding<'db> {
         let open = operand_relations
             .into_iter()
             .fold(ConstraintSet::from_bool(constraints, true), constrain);
-        let fresh_vars: Vec<_> = producer_preferences.iter().map(|(v, _)| *v).collect();
-        let variables =
-            TypeVarSet::from_typevars(db, fresh_vars.iter().copied().chain(outer.variables(db)));
+        let joint = GenericContext::from_typevar_instances(
+            db,
+            env,
+            outer
+                .variables(db)
+                .chain(producer_preferences.iter().map(|&(v, _)| v)),
+        );
         let solver = ProducerSolver {
             db,
             env,
             constraints,
             outer,
-            variables,
-            has_declared_bounds: outer
-                .variables(db)
-                .chain(fresh_vars.iter().copied())
-                .any(|v| v.typevar(db).bound_or_constraints(db, env).is_some()),
+            joint,
         };
         let mut graph = open.and(db, constraints, || independent);
         let mut contexts = vec![None; shapes.len()];
 
         // A sibling can fix K without fixing V. Apply its context to list[K] immediately,
         // but keep V open when inferring a second parameter of type V | list[V].
-        if let Some((chosen, remaining, fixed)) = solver.prefer_outer(independent, graph) {
+        if let Some((chosen, remaining, fixed)) = solver.prefer(independent, graph, outer, |_| None)
+        {
             graph = fixed;
             for (component, context) in shapes.iter_mut().zip(&mut contexts) {
                 if let Some((_, formal)) = *component
@@ -535,16 +611,15 @@ struct ProducerSolver<'a, 'db, 'c> {
     env: &'a ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
     outer: GenericContext<'db>,
-    variables: TypeVarSet<'db>,
-    has_declared_bounds: bool,
+    joint: GenericContext<'db>,
 }
 
-impl<'db, 'c> ProducerSolver<'_, 'db, 'c> {
+impl<'a: 'c, 'db, 'c> ProducerSolver<'a, 'db, 'c> {
     fn contains_inferable(&self, ty: Type<'db>) -> bool {
         any_over_type_expanding_aliases(self.db, self.env, ty, |nested| {
             nested
                 .as_typevar()
-                .is_some_and(|v| v.is_inferable(self.db, self.variables))
+                .is_some_and(|v| v.is_inferable(self.db, self.joint.inferable_typevars(self.db)))
         })
     }
 
@@ -569,77 +644,71 @@ impl<'db, 'c> ProducerSolver<'_, 'db, 'c> {
                 )
             })
         });
-        let feasible = if self.has_declared_bounds {
-            matches!(
-                fixed.solutions(db, env, self.variables).ok()?,
-                Solutions::Unconstrained | Solutions::Constrained(SolutionPaths::Complete(_))
-            )
-        } else {
-            !fixed.is_never_satisfied_bounded(db, env, self.variables)?
-        };
+        let feasible = matches!(
+            fixed
+                .solutions(db, env, self.joint.inferable_typevars(db))
+                .ok()?,
+            Solutions::Unconstrained | Solutions::Constrained(SolutionPaths::Complete(_))
+        );
         feasible.then_some(fixed)
     }
 
-    /// For `T | list[T]`, one caller can contribute both `int` and `list[int]`.
-    /// Try their union for `T` before specializing enclosing parameters. Specializing
-    /// `list[T]` separately would produce a union of invariant lists. If the combined
-    /// assignment is inconsistent, retain the associations from a single solution path.
-    fn prefer_outer(
+    /// Check the merged proposal first so that alternatives for `T` in `T | list[T]`
+    /// can contribute to a single `list[T]` context. Try individual solutions if that
+    /// merge, or promoting literals in it, conflicts with another argument.
+    fn prefer(
         &self,
         facts: ConstraintSet<'db, 'c>,
         graph: ConstraintSet<'db, 'c>,
+        context: GenericContext<'db>,
+        fallback: impl Fn(BoundTypeVarInstance<'db>) -> Option<Type<'db>>,
     ) -> Option<(Specialization<'db>, TypeVarSet<'db>, ConstraintSet<'db, 'c>)> {
         let db = self.db;
         let env = self.env;
-        let Solutions::Constrained(SolutionPaths::Complete(paths)) = facts
-            .solutions(db, env, self.outer.inferable_typevars(db))
-            .ok()?
-        else {
-            return None;
-        };
-        let paths: Vec<Vec<_>> = paths
-            .iter()
-            .map(|path| {
-                self.outer
-                    .variables(db)
-                    .map(|v| solution_for(path, v).map(|ty| ty.promote(db, env)))
-                    .collect::<Vec<_>>()
-            })
-            .filter(|values| {
-                !values
-                    .iter()
-                    .flatten()
-                    .any(|&ty| self.contains_inferable(ty))
-            })
-            .collect();
-        let first = paths.first()?;
-        let merged = (0..first.len())
-            .map(|i| {
-                let types = paths.iter().map(|p| p[i]).collect::<Option<Vec<_>>>()?;
-                Some(UnionType::from_elements(db, env, types))
-            })
-            .collect();
-        for values in std::iter::once(merged).chain(paths) {
-            if values.iter().all(Option::is_none) {
-                continue;
-            }
-            let assignment = self
-                .outer
+        let mut builder = SpecializationBuilder::new(db, env, self.constraints, context);
+        builder.record_constraint_set(facts);
+        let inference = builder
+            .build_inference_with(ReportDiagnostics::No, |_, _| None)
+            .ok()?;
+        inference.find_map_resolved_bindings(db, |candidate| {
+            let bindings: Vec<_> = context
                 .variables(db)
-                .zip(&values)
-                .filter_map(|(v, t)| Some((v, (*t)?)));
-            if let Some(fixed) = self.with_assignment(graph, assignment) {
-                let unsolved = TypeVarSet::from_typevars(
-                    db,
-                    self.outer
-                        .variables(db)
-                        .zip(&values)
-                        .filter_map(|(v, ty)| ty.is_none().then_some(v)),
-                );
-                return Some((self.outer.specialize_recursive(db, values), unsolved, fixed));
-            }
-        }
-        None
+                .zip(candidate)
+                .map(|(var, ty)| {
+                    ty.and_then(|ty| {
+                        if !self.contains_inferable(ty) {
+                            return Some(ty);
+                        }
+                        // A bound such as int | str | E still supplies the concrete proposal
+                        // int | str. The full graph below decides whether E can admit it.
+                        let union = ty.as_union()?;
+                        let closed = union.filter(db, |part| !self.contains_inferable(*part));
+                        (!closed.is_never()).then_some(closed)
+                    })
+                    .or_else(|| fallback(var))
+                })
+                .collect();
+            let free = TypeVarSet::from_typevars(
+                db,
+                context
+                    .variables(db)
+                    .zip(&bindings)
+                    .filter_map(|(var, ty)| ty.is_none().then_some(var)),
+            );
+            let promoted = bindings
+                .iter()
+                .map(|ty| ty.map(|ty| ty.promote(db, env)))
+                .collect();
+            [promoted, bindings].into_iter().find_map(|values| {
+                let pairs = context
+                    .variables(db)
+                    .zip(&values)
+                    .filter_map(|(var, ty)| Some((var, (*ty)?)));
+                pairs.clone().next()?;
+                let graph = self.with_assignment(graph, pairs)?;
+                Some((context.specialize_recursive(db, values), free, graph))
+            })
+        })
     }
 
     fn specialize_producers(
@@ -659,63 +728,11 @@ impl<'db, 'c> ProducerSolver<'_, 'db, 'c> {
                 graph = fixed;
             }
         }
-        let local_context =
-            GenericContext::from_typevar_instances(db, env, locals.iter().map(|&(v, _)| v));
-        let local_vars = local_context.inferable_typevars(db);
-        let outer_facts = graph.reduce_inferable_bounded(db, env, self.constraints, local_vars)?;
-        if let Some((_, _, fixed)) = self.prefer_outer(outer_facts, graph) {
+        if let Some((_, _, fixed)) = self.prefer(graph, graph, self.outer, |_| None) {
             graph = fixed;
         }
-
-        let projected = graph.reduce_inferable_bounded(
-            db,
-            env,
-            self.constraints,
-            self.outer.inferable_typevars(db),
-        )?;
-        let paths = match projected.solutions(db, env, local_vars).ok()? {
-            Solutions::Unconstrained => vec![None],
-            Solutions::Constrained(SolutionPaths::Complete(paths)) => {
-                paths.into_iter().map(Some).collect()
-            }
-            _ => return None,
-        };
-
-        // All producers must choose the same solution path. Picking values independently
-        // can give two arguments incompatible types for the caller's unchanged type variable.
-        for path in paths {
-            let exact: Vec<_> = locals
-                .iter()
-                .map(|&(v, fallback)| {
-                    path.as_ref()
-                        .and_then(|p| solution_for(p, v))
-                        .filter(|&ty| !self.contains_inferable(ty))
-                        .unwrap_or(fallback)
-                })
-                .collect();
-            let promoted = exact.iter().map(|t| t.promote(db, env)).collect::<Vec<_>>();
-            for candidate in [promoted, exact] {
-                if self
-                    .with_assignment(
-                        graph,
-                        locals.iter().zip(&candidate).map(|(&(v, _), &ty)| (v, ty)),
-                    )
-                    .is_some()
-                {
-                    return Some(local_context.specialize(db, candidate));
-                }
-            }
-        }
-        None
+        let default = |v| locals.iter().find(|&&(w, _)| w == v).map(|&(_, ty)| ty);
+        self.prefer(graph, graph, self.joint, default)
+            .map(|(specialization, _, _)| specialization)
     }
-}
-
-fn solution_for<'db>(
-    path: &Solution<'db>,
-    variable: BoundTypeVarInstance<'db>,
-) -> Option<Type<'db>> {
-    path.solved_typevars
-        .iter()
-        .find(|s| s.bound_typevar == variable)
-        .map(|s| s.solution)
 }

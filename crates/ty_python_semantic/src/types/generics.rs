@@ -2589,6 +2589,43 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Try the merged bindings and then each complete solution, preserving absent bindings.
+    /// An unresolved dependency also leaves its variable open. The consumer must check any
+    /// fallback it supplies against the original constraints, including correlations between variables.
+    pub(super) fn find_map_resolved_bindings<T>(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(&[Option<Type<'db>>]) -> Option<T>,
+    ) -> Option<T> {
+        let alternatives = match self.solutions(db) {
+            TypeVarInferenceSolutions::Single
+            | TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unconstrained) => {
+                &[][..]
+            }
+            TypeVarInferenceSolutions::Alternatives(paths) => &**paths,
+            _ => return None,
+        };
+        let merged = self.merged_specialization(db);
+        let bindings: Vec<_> = self
+            .merged_types(db)
+            .iter()
+            .zip(merged.types(db))
+            .map(|(inferred, ty)| inferred.map(|_| *ty))
+            .collect();
+        f(&bindings).or_else(|| {
+            alternatives.iter().find_map(|path| {
+                let bindings: Vec<_> = path
+                    .iter()
+                    .map(|binding| match binding {
+                        Some(SolutionType::Resolved(ty)) => Some(*ty),
+                        _ => None,
+                    })
+                    .collect();
+                f(&bindings)
+            })
+        })
+    }
+
     /// Whether inference supplied a type for this variable, before applying defaults.
     pub(super) fn has_inferred_type(
         self,

@@ -10,10 +10,8 @@
 
 mod constructor;
 mod producer;
-mod producer_signature;
 mod property;
-pub(crate) use producer::InitialArgumentTypes;
-pub(crate) use producer_signature::ProducerSignature;
+pub(crate) use producer::{InitialArgumentTypes, ProducerSignature};
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};

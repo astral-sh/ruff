@@ -3766,6 +3766,8 @@ An existing list fixes `T` for the whole call. Its entire element type is availa
 the empty list.
 
 ```py
+from typing import assert_type
+
 def unify[T](value: T | list[T], values: list[T]) -> T:
     return values[0]
 
@@ -3779,6 +3781,15 @@ When both arguments are literals, the second list can widen to include the first
 unify([["x"]], [1])  # ok
 ```
 
+With an empty first argument, the other two lists can widen to a common element type.
+
+```py
+def combine[T](value: T | list[T], first: list[T], second: list[T]) -> T:
+    return first[0]
+
+assert_type(combine([], [1], ["x"]), int | str)
+```
+
 The key determines the element type of the empty list. The other list supplies both possible types
 for a separate type variable.
 
@@ -3788,6 +3799,19 @@ def infer_pair[K, T](key: K, value: T | list[T], keys: list[K]) -> tuple[K, T]:
 
 def _(key: str):
     reveal_type(infer_pair(key, [1], []))  # revealed: tuple[str, list[int] | int]
+```
+
+The key list also fixes the value type because `repeat` returns the same type for both.
+
+```py
+def repeat[U](value: U) -> dict[U, U]:
+    return {value: value}
+
+def infer_from_mapping[K, T](value: T | list[T], mapping: dict[K, T], keys: list[K]) -> tuple[K, T]:
+    return next(iter(mapping.items()))
+
+def _(keys: list[int | str]):
+    assert_type(infer_from_mapping(["x"], repeat(1), keys), tuple[int | str, int | str])
 ```
 
 A sibling argument can also supply the parameter type of a lambda.
