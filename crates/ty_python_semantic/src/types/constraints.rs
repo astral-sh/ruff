@@ -3490,6 +3490,18 @@ impl<'db> CandidateTypeVarSolution<'db> {
             return PathBoundSolution::Unsolved;
         }
 
+        // A lower bound of `Unknown` or the first of two equivalent upper bounds can hide an
+        // explicit upper bound of `Any`. For example, `Callable[[Unknown], Any]` contributes
+        // both bounds when the return type is `Callable[[T], T]`.
+        if candidate.resolve_type_alias(db) == Type::unknown()
+            && let Some(declared_any) = self
+                .upper
+                .iter_evidence_without_validity(EvidenceSource::Declared)
+                .find(|bound| bound.resolve_type_alias(db) == Type::any())
+        {
+            return PathBoundSolution::Solved(declared_any);
+        }
+
         PathBoundSolution::Solved(candidate)
     }
 

@@ -1411,8 +1411,8 @@ def _():
 
 ## Declared type preference
 
-We prefer the declared solution of a given type variable if it is mutually assignable with the
-inferred solution.
+We prefer a type variable's declared solution when it is mutually assignable with the inferred
+solution. A bare `Unknown` supplies no preference, so the solver first tries the inferred solution.
 
 ```py
 from typing import Any, reveal_type

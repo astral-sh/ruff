@@ -5547,8 +5547,8 @@ def forward(items: list[Bound]):
     result: list = reveal_type(identity(items))  # revealed: list[Bound@forward]
 ```
 
-Both positions of a tuple can constrain the same type variable. Combining an omitted element type
-with an explicit `Any` in either order still accepts the caller's list.
+Both tuple elements constrain the same type variable. Only the `list[Any]` supplies a preference for
+its element type, so swapping the two annotations gives the same call result.
 
 ```py
 from typing import Any
@@ -5557,8 +5557,20 @@ def duplicate(items: list[Bound]) -> tuple[list[Bound], list[Bound]]:
     return items, items
 
 def forward_both(items: list[Bound]):
-    first: tuple[list, list[Any]] = duplicate(items)  # error: [missing-type-argument]
-    second: tuple[list[Any], list] = duplicate(items)  # error: [missing-type-argument]
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    first: tuple[list, list[Any]] = reveal_type(duplicate(items))
+    reveal_type(first)  # revealed: tuple[list[Unknown], list[Any]]
+
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    second: tuple[list[Any], list] = reveal_type(duplicate(items))
+    reveal_type(second)  # revealed: tuple[list[Any], list[Unknown]]
+
+    # The covariant `Sequence` annotations supply only upper bounds for the element type.
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    views: tuple[Sequence, Sequence[Any]] = reveal_type(duplicate(items))
 ```
 
 ## Return-context preferences across alternatives
