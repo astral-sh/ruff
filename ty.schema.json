@@ -466,6 +466,16 @@
             }
           ]
         },
+        "call-to-possibly-missing-constructor": {
+          "title": "detects instantiations of classes with possibly missing constructor methods",
+          "description": "## What it does\n\nChecks for calls to a class whose `__new__` or `__init__` method may be missing.\n\n## Why is this bad?\n\nIf the class defines a constructor method conditionally, Python may use an inherited method with a\ndifferent signature. Arguments accepted by the conditional method can then raise a `TypeError`.\n\n## Examples\n\n```python\ndef make_box(custom_init: bool):\n    class Box:\n        if custom_init:\n\n            def __init__(self, value: int) -> None:\n                self.value = value\n\n    # Without the custom initializer, Box takes no arguments.\n    return Box(1)  # error\n```\n\n## Rule history\n\n- v0.0.102: Renamed from `possibly-missing-implicit-call`.\n\n    `possibly-missing-implicit-call` remains as a compatibility alias for constructor calls.\n\n    Prior to v0.0.102, subscript operations on objects with possibly missing subscript methods were\n    also reported with this diagnostic code; these are now reported using `not-subscriptable` and/or\n    `invalid-assignment` instead.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "call-top-callable": {
           "title": "detects calls to the top callable type",
           "description": "## What it does\n\nChecks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all callable\ntypes with return type `T`).\n\n## Why is this bad?\n\nWhen `analysis.strict-generic-narrowing` is enabled, `callable(x)` and `isinstance(x, Callable)`\nnarrow an object to `Top[Callable[..., object]]`. We know the object is callable, but we don't know\nits precise signature. This type represents the set of all possible callable types (including, e.g.,\nfunctions that take no arguments and functions that require arguments), so no specific set of\narguments can be guaranteed to be valid.\n\n## Examples\n\n```toml\n[analysis]\nstrict-generic-narrowing = true\n```\n\n```python\ndef f(x: object):\n    if callable(x):\n        # We know `x` is callable, but not what arguments it accepts\n        x()  # error\n```",
@@ -646,16 +656,6 @@
             }
           ]
         },
-        "implicit-call-to-possibly-missing-method": {
-          "title": "detects implicit calls to possibly missing methods",
-          "description": "## What it does\n\nChecks for implicit calls to possibly missing methods.\n\n## Why is this bad?\n\nExpressions such as `x[y]` and `x * y` call methods under the hood (`__getitem__` and `__mul__`\nrespectively). Calling a missing method will raise an `AttributeError` at runtime.\n\n## Examples\n\n```python\nimport datetime\n\n\nclass A:\n    if datetime.date.today().weekday() != 6:\n\n        def __getitem__(self, v): ...\n\n\n# TypeError: 'A' object is not subscriptable\nA()[0]  # error\n```\n\n## Rule history\n\n- v0.0.102: Renamed from `possibly-missing-implicit-call`.\n\n    `possibly-missing-implicit-call` remains as a compatibility alias for this rule.",
-          "default": "warn",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "implicit-string-concatenation-in-annotation": {
           "title": "detects type expressions written as multiple adjacent string literals",
           "description": "## What it does\n\nChecks for [type expressions][type expression] written as two or more adjacent string literals.\n\n## Why is this bad?\n\nty can't resolve a string annotation when a [type expression] spans multiple string literals.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```\n\nNote that this rule is only applied to [type expressions][type expression] in annotations. Regions\nin type annotations that are interpreted as _value_ expressions -- for example, the second argument\nto `Annotated[]` -- are not reported by this rule:\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Annotated\n\n# the first argument to `Annotated[]` is interpreted as a type expression, so is reported\ncount: Annotated[\"in\" \"t\", \"item count\"]  # error\n\n# all remaining arguments to `Annotated[]` are interpreted as value expressions, so are not reported\ntotal: Annotated[int, \"item \" \"count\"]  # ok\n```\n\n<!-- fmt:on -->\n\n## Rule history\n\n- v0.0.102: Renamed from `implicit-concatenated-string-type-annotation`.\n\n    `implicit-concatenated-string-type-annotation` remains as a compatibility alias for this rule.\n\n[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
@@ -788,7 +788,7 @@
         },
         "invalid-assignment": {
           "title": "detects invalid assignments",
-          "description": "## What it does\n\nChecks for assignments where the type of the value is not [assignable to] the type of the assignee.\n\n## Why is this bad?\n\nSuch assignments break the rules of the type system and weaken a type checker's ability to\naccurately reason about your code.\n\n## Examples\n\n```python\na: int = \"\"  # error\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
+          "description": "## What it does\n\nChecks whether an assignment target can accept the value being stored.\n\nConcretely, an assignment can only be accepted by ty if the target is writable and the value being\nstored is [assignable to] the target's expected type.\n\n## Why is this bad?\n\nPython does not enforce variable annotations at runtime. Storing a string in a variable declared as\n`int` can cause an error later when code tries to use it as a number.\n\nWriting to a read-only target can fail at the assignment itself. For example, if an object has no\n`__setitem__` method, assigning to a subscript on that object will raise `TypeError` at runtime. If\nits class defines the method conditionally, the same assignment can succeed or fail depending on\nwhether the method is present at runtime.\n\n## Examples\n\nIn this first example, the target (the name `retries`) is writable, but the value (a `str` instance)\nisn't assignable to the expected type (`int`):\n\n```python\nretries: int = \"3\"  # error\n```\n\nMeanwhile, in this example the target is a subscript (`scores[\"Ada\"]`). This is still a writable\ntarget in this instance -- but again, the provided type (a `str`) does not match the target's\nexpected type (`int`):\n\n```py\nscores: dict[str, int] = {}\nscores[\"Ada\"] = \"three\"  # error\n```\n\nIn this last example, the value assigned has the expected element type: `0` is an integer! But `seq`\ncould be an immutable `tuple` with no `__setitem__` method, so `invalid-assignment` is emitted here\nto warn you that the target (`seq[0]`) might not be writable at all:\n\n```python\ndef reset_first(seq: list[int] | tuple[int, ...]) -> None:\n    if seq:\n        seq[0] = 0  # error\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
           "default": "error",
           "oneOf": [
             {
@@ -1428,7 +1428,7 @@
         },
         "not-subscriptable": {
           "title": "detects subscripting objects that do not support subscripting",
-          "description": "## What it does\n\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\n\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not subscriptable\n4[1]  # error\n```",
+          "description": "## What it does\n\nChecks for subscript operations that an object may not support, including reading or deleting an\nitem.\n\n## Why is this bad?\n\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\n# TypeError: 'int' object is not subscriptable\n4[1]  # error\n```",
           "default": "error",
           "oneOf": [
             {

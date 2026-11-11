@@ -71,10 +71,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
-    registry.register_lint(&IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD);
+    registry.register_lint(&CALL_TO_POSSIBLY_MISSING_CONSTRUCTOR);
     registry.register_alias(
         LintName::of("possibly-missing-implicit-call"),
-        &IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD,
+        &CALL_TO_POSSIBLY_MISSING_CONSTRUCTOR,
     );
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
@@ -274,9 +274,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/implicit-call-to-possibly-missing-method.md")]
-    pub(crate) static IMPLICIT_CALL_TO_POSSIBLY_MISSING_METHOD = {
-        summary: "detects implicit calls to possibly missing methods",
+    #[doc = include_str!("../../resources/lint_docs/call-to-possibly-missing-constructor.md")]
+    pub(crate) static CALL_TO_POSSIBLY_MISSING_CONSTRUCTOR = {
+        summary: "detects instantiations of classes with possibly missing constructor methods",
         status: LintStatus::stable("0.0.1-alpha.22"),
         default_level: Level::Warn,
     }

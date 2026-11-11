@@ -409,6 +409,18 @@ reveal_type(g[0])  # revealed: str
 del g[0]
 ```
 
+### Possibly missing `__delitem__`
+
+```py
+def _(deletable: bool) -> None:
+    class C:
+        if deletable:
+            def __delitem__(self, key: int) -> None: ...
+
+    c = C()
+    del c[0]  # error: [not-subscriptable] "Object of type `C` may not support subscript deletion"
+```
+
 ### TypedDict deletion
 
 Deleting a required key from a TypedDict is a type error because it would make the object no longer

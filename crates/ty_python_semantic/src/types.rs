@@ -8272,8 +8272,8 @@ impl<'db> Type<'db> {
                             // or unbound `__init__` method on a class, as all classes have `object` in MRO.
                             // Thus the following may only trigger if a custom typeshed is used.
                             // Custom/broken typeshed: no `__init__` available even after falling back
-                            // to `object`. Keep analysis going and surface the missing-implicit-call
-                            // lint via the builder.
+                            // to `object`. Keep analysis going and report the missing constructor
+                            // at the call site.
                             let mut bindings: Bindings<'db> = Binding::single(
                                 self_type,
                                 Signature::new(Parameters::gradual_form(), constructor_instance_ty),

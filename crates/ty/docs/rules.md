@@ -382,6 +382,55 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 - [`abstract-class-instantiation`](#abstract-class-instantiation) reports attempts to instantiate a protocol class or a class with
     unimplemented abstract methods.
 
+<a id="possibly-missing-implicit-call"></a>
+
+## `call-to-possibly-missing-constructor`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22call-to-possibly-missing-constructor%22+OR+%22possibly-missing-implicit-call%22%29" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L276" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for calls to a class whose `__new__` or `__init__` method may be missing.
+
+**Why is this bad?**
+
+
+If the class defines a constructor method conditionally, Python may use an inherited method with a
+different signature. Arguments accepted by the conditional method can then raise a `TypeError`.
+
+**Examples**
+
+
+```python
+def make_box(custom_init: bool):
+    class Box:
+        if custom_init:
+
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+    # Without the custom initializer, Box takes no arguments.
+    return Box(1)  # error
+```
+
+**Rule history**
+
+
+- v0.0.102: Renamed from [`possibly-missing-implicit-call`](#possibly-missing-implicit-call).
+
+    [`possibly-missing-implicit-call`](#possibly-missing-implicit-call) remains as a compatibility alias for constructor calls.
+
+    Prior to v0.0.102, subscript operations on objects with possibly missing subscript methods were
+    also reported with this diagnostic code; these are now reported using [`not-subscriptable`](#not-subscriptable) and/or
+    [`invalid-assignment`](#invalid-assignment) instead.
+
 ## `call-top-callable`
 
 <small>
@@ -1254,53 +1303,6 @@ Use instead:
 a = 20 / 0  # ty: ignore[division-by-zero]
 ```
 
-<a id="possibly-missing-implicit-call"></a>
-
-## `implicit-call-to-possibly-missing-method`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22implicit-call-to-possibly-missing-method%22+OR+%22possibly-missing-implicit-call%22%29" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L276" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for implicit calls to possibly missing methods.
-
-**Why is this bad?**
-
-
-Expressions such as `x[y]` and `x * y` call methods under the hood (`__getitem__` and `__mul__`
-respectively). Calling a missing method will raise an `AttributeError` at runtime.
-
-**Examples**
-
-
-```python
-import datetime
-
-
-class A:
-    if datetime.date.today().weekday() != 6:
-
-        def __getitem__(self, v): ...
-
-
-# TypeError: 'A' object is not subscriptable
-A()[0]  # error
-```
-
-**Rule history**
-
-
-- v0.0.102: Renamed from [`possibly-missing-implicit-call`](#possibly-missing-implicit-call).
-
-    [`possibly-missing-implicit-call`](#possibly-missing-implicit-call) remains as a compatibility alias for this rule.
-
 <a id="implicit-concatenated-string-type-annotation"></a>
 
 ## `implicit-string-concatenation-in-annotation`
@@ -2084,19 +2086,49 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for assignments where the type of the value is not [assignable to] the type of the assignee.
+Checks whether an assignment target can accept the value being stored.
+
+Concretely, an assignment can only be accepted by ty if the target is writable and the value being
+stored is [assignable to] the target's expected type.
 
 **Why is this bad?**
 
 
-Such assignments break the rules of the type system and weaken a type checker's ability to
-accurately reason about your code.
+Python does not enforce variable annotations at runtime. Storing a string in a variable declared as
+`int` can cause an error later when code tries to use it as a number.
+
+Writing to a read-only target can fail at the assignment itself. For example, if an object has no
+`__setitem__` method, assigning to a subscript on that object will raise `TypeError` at runtime. If
+its class defines the method conditionally, the same assignment can succeed or fail depending on
+whether the method is present at runtime.
 
 **Examples**
 
 
+In this first example, the target (the name `retries`) is writable, but the value (a `str` instance)
+isn't assignable to the expected type (`int`):
+
 ```python
-a: int = ""  # error
+retries: int = "3"  # error
+```
+
+Meanwhile, in this example the target is a subscript (`scores["Ada"]`). This is still a writable
+target in this instance -- but again, the provided type (a `str`) does not match the target's
+expected type (`int`):
+
+```py
+scores: dict[str, int] = {}
+scores["Ada"] = "three"  # error
+```
+
+In this last example, the value assigned has the expected element type: `0` is an integer! But `seq`
+could be an immutable `tuple` with no `__setitem__` method, so [`invalid-assignment`](#invalid-assignment) is emitted here
+to warn you that the target (`seq[0]`) might not be writable at all:
+
+```python
+def reset_first(seq: list[int] | tuple[int, ...]) -> None:
+    if seq:
+        seq[0] = 0  # error
 ```
 
 [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
@@ -5207,7 +5239,8 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for subscripting objects that do not support subscripting.
+Checks for subscript operations that an object may not support, including reading or deleting an
+item.
 
 **Why is this bad?**
 

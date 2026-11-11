@@ -115,11 +115,7 @@ def _(flag: bool):
 
     this_fails = ThisFails()
 
-    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
-    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
-    # that the cause of the error was a possibly missing `__getitem__` method
-    #
-    # error: [implicit-call-to-possibly-missing-method] "Method `__getitem__` of type `ThisFails` may be missing"
+    # error: [not-subscriptable] "Object of type `ThisFails` may not be subscriptable"
     reveal_type(this_fails[0])  # revealed: str
 ```
 
@@ -307,12 +303,17 @@ def _(flag: bool):
 
     c = C()
 
-    # TODO: this would be a friendlier diagnostic if we propagated the error up the stack
-    # and transformed it into a `[not-subscriptable]` error with a subdiagnostic explaining
-    # that the cause of the error was a possibly missing `__getitem__` method
-    #
-    # error: [implicit-call-to-possibly-missing-method] "Method `__getitem__` of type `C` may be missing"
+    # snapshot: not-subscriptable
     reveal_type(c[0])  # revealed: str
+```
+
+```snapshot
+error[not-subscriptable]: Object of type `C` may not be subscriptable
+  --> src/mdtest_snippet.py:10:17
+   |
+10 |     reveal_type(c[0])  # revealed: str
+   |                 ^^^^
+info: Its `__getitem__` method may be missing
 ```
 
 ## Intersection receivers
