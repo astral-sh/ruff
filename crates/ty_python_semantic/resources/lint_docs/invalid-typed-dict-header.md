@@ -25,3 +25,9 @@ def f(options: dict[str, object]):
     class Bar(TypedDict, **options):  # error: [invalid-typed-dict-header]
         ...
 ```
+
+## Rule history
+
+- v0.0.102: Split out `incompatible-typed-dict-openness`. To keep a custom severity for inherited
+    openness errors, set it on the new rule as well. Use the new name in ignore comments for those
+    errors, keeping both names if the same line also has a malformed header.

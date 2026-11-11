@@ -696,6 +696,16 @@
             }
           ]
         },
+        "incompatible-typed-dict-openness": {
+          "title": "detects `TypedDict` subclasses with incompatible extra items",
+          "description": "## What it does\n\nDetects `TypedDict` subclasses that violate a base class's restrictions on entries whose keys the\nbase does not declare. This can happen when a subclass declares a new key or changes the `closed` or\n`extra_items` setting.\n\n## Why is this bad?\n\nCode that accepts a closed `TypedDict` can assume that only the declared keys are present. If a base\nclass allows read-only extra items, code can read those items as the declared type. A subclass that\nwidens the type would break that guarantee. If the extra items are mutable, code can also write\nvalues of the declared type, so a subclass must preserve both the type and mutability.\n\n## Example\n\n```python\nfrom typing_extensions import ReadOnly, TypedDict\n\n\nclass Scores(TypedDict, extra_items=ReadOnly[int]): ...\n\n\n# error: [incompatible-typed-dict-openness]\nclass MixedScores(Scores, extra_items=ReadOnly[int | str]): ...\n```\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-typed-dict-header`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\n\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\n\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass A: ...\n\n\nclass B(A): ...\n\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...  # error\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
@@ -1208,7 +1218,7 @@
         },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
-          "description": "## What it does\n\nDetects errors in `TypedDict` class headers, such as unexpected arguments or invalid base classes.\n\n## Why is this bad?\n\nThe typing spec states that `TypedDict`s are not permitted to have custom metaclasses. Using `**`\nunpacking in a `TypedDict` header is also prohibited by ty, as it means that ty cannot statically\ndetermine whether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Meta(type): ...\n\n\nclass Foo(TypedDict, metaclass=Meta):  # error: [invalid-typed-dict-header]\n    ...\n\n\ndef f(options: dict[str, object]):\n    class Bar(TypedDict, **options):  # error: [invalid-typed-dict-header]\n        ...\n```",
+          "description": "## What it does\n\nDetects errors in `TypedDict` class headers, such as unexpected arguments or invalid base classes.\n\n## Why is this bad?\n\nThe typing spec states that `TypedDict`s are not permitted to have custom metaclasses. Using `**`\nunpacking in a `TypedDict` header is also prohibited by ty, as it means that ty cannot statically\ndetermine whether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Meta(type): ...\n\n\nclass Foo(TypedDict, metaclass=Meta):  # error: [invalid-typed-dict-header]\n    ...\n\n\ndef f(options: dict[str, object]):\n    class Bar(TypedDict, **options):  # error: [invalid-typed-dict-header]\n        ...\n```\n\n## Rule history\n\n- v0.0.102: Split out `incompatible-typed-dict-openness`. To keep a custom severity for inherited\n    openness errors, set it on the new rule as well. Use the new name in ignore comments for those\n    errors, keeping both names if the same line also has a malformed header.",
           "default": "error",
           "oneOf": [
             {

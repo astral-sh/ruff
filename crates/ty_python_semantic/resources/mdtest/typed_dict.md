@@ -8156,9 +8156,17 @@ class ClosedChild(Closed): ...
 
 static_assert(is_equivalent_to(ClosedChild, Closed))
 
-# error: [invalid-typed-dict-header] "Cannot add item `age` to closed TypedDict base `Closed`"
+# snapshot: incompatible-typed-dict-openness
 class BadChild(Closed):
     age: int
+```
+
+```snapshot
+error[incompatible-typed-dict-openness]: Cannot add item `age` to closed TypedDict base `Closed`
+  --> src/mdtest_snippet.py:14:7
+   |
+14 | class BadChild(Closed):
+   |       ^^^^^^^^^^^^^^^^
 ```
 
 ### Indexing into extra-items TypedDict with `str` key is allowed and returns extra-items type
@@ -8266,13 +8274,13 @@ from typing_extensions import TypedDict
 class ExtraBase(TypedDict, extra_items=int):
     name: str
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class BadChild1(ExtraBase, closed=False): ...
 
 class ClosedBase(TypedDict, closed=True):
     name: str
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class BadChild2(ClosedBase, closed=False): ...
 ```
 
@@ -8573,7 +8581,7 @@ class MutableChild(ReadOnlyBase, extra_items=int): ...
 # OK: close the subclass (only allowed when base extra_items is read-only)
 class ClosedChild(ReadOnlyBase, closed=True): ...
 
-# error: [invalid-typed-dict-header] "Extra items type `list[str]` is not assignable to `int | str` from base `ReadOnlyBase`"
+# error: [incompatible-typed-dict-openness] "Extra items type `list[str]` is not assignable to `int | str` from base `ReadOnlyBase`"
 class BadChild(ReadOnlyBase, extra_items=list[str]): ...
 ```
 
@@ -8583,10 +8591,10 @@ When the base has _mutable_ extra items, the child cannot change the extra-items
 class MutableBase(TypedDict, extra_items=int):
     name: str
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class BadNarrow(MutableBase, extra_items=bool): ...
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class BadClose(MutableBase, closed=True): ...
 ```
 
@@ -8602,11 +8610,11 @@ class Base(TypedDict, extra_items=int | None):
 class GoodChild(Base):
     year: NotRequired[int | None]
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class ChildWithBadRequiredItem(Base):
     year: int | None
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class ChildWithBadValueType(Base):
     year: NotRequired[int]
 ```
@@ -8617,7 +8625,7 @@ consistent with the base's `bool` extra items:
 ```py
 class RecursiveBase(TypedDict, extra_items=bool): ...
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class RecursiveChild(RecursiveBase):
     child: NotRequired["RecursiveChild"]
 ```
@@ -8638,7 +8646,7 @@ class WithYear(Base):
 class WithTag(Base):
     tag: NotRequired[str]
 
-# error: [invalid-typed-dict-header]
+# error: [incompatible-typed-dict-openness]
 class BadChild(Base):
     tags: list[str]
 ```
