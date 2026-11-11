@@ -19,11 +19,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
  4 |     attr: Callable[P, None]
  5 | 
  6 | def _(
- 7 |     # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+ 7 |     # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
  8 |     a: Callable[Concatenate[()], int],
- 9 |     # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+ 9 |     # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 10 |     b: Callable[Concatenate[int], int],
-11 |     # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+11 |     # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 12 |     c: Callable[Concatenate[(int,)], int],
 13 |     # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a parameter annotation"
 14 |     d: Callable[Concatenate, int],
@@ -32,11 +32,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
 17 |     reveal_type(b)  # revealed: (...) -> int
 18 |     reveal_type(c)  # revealed: (...) -> int
 19 | 
-20 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+20 | # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
 21 | reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
-22 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+22 | # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 23 | reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
-24 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+24 | # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 25 | reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None
 26 | # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
 27 | reveal_type(Foo[Concatenate]().attr)  # revealed: (...) -> None
@@ -69,7 +69,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
 # Diagnostics
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)
  --> src/mdtest_snippet.py:8:17
   |
 8 |     a: Callable[Concatenate[()], int],
@@ -78,7 +78,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 ```
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:10:17
    |
 10 |     b: Callable[Concatenate[int], int],
@@ -87,7 +87,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 ```
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:12:17
    |
 12 |     c: Callable[Concatenate[(int,)], int],
@@ -105,7 +105,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least two arguments w
 ```
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)
   --> src/mdtest_snippet.py:21:17
    |
 21 | reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
@@ -114,7 +114,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 ```
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:23:17
    |
 23 | reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
@@ -123,7 +123,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 ```
 
 ```
-error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
+error[invalid-type-argument-count]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:25:17
    |
 25 | reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None

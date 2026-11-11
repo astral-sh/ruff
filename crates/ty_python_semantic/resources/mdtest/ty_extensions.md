@@ -25,7 +25,7 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
 
 # error: "Special form `ty_extensions.Not` expected exactly 1 type argument, got 2"
 n: Not[int, str]
-# error: [invalid-type-form] "Special form `ty_extensions.Not` expected exactly 1 type argument, got 0"
+# error: [invalid-type-argument-count] "Special form `ty_extensions.Not` expected exactly 1 type argument, got 0"
 o: Not[()]
 
 p: Not[(int,)]
@@ -681,7 +681,7 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 2"
+# error: [invalid-type-argument-count] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 2"
 c1: CallableTypeOf[f1, f2]
 
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
@@ -696,7 +696,7 @@ def f(x: CallableTypeOf) -> None:
 
 c3: CallableTypeOf[(f3,)]
 
-# error: [invalid-type-form] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 0"
+# error: [invalid-type-argument-count] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 0"
 c4: CallableTypeOf[()]
 ```
 

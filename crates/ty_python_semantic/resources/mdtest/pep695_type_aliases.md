@@ -702,7 +702,7 @@ DefaultedT = TypeVar("DefaultedT", default=str)
 # error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
 InvalidOrder = TypeAliasType("InvalidOrder", tuple[DefaultedT, T], type_params=(DefaultedT, T))
 
-# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+# error: [invalid-type-argument-count] "Too many type arguments: expected 1, got 2"
 reveal_type(GenericAlias[int, str])  # revealed: <type alias 'GenericAlias[Unknown]'>
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@BoundedAlias`"

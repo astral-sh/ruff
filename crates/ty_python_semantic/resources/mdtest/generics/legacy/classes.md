@@ -803,10 +803,10 @@ reveal_type(C[int]())  # revealed: C[int]
 reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
-The specialization must match the generic types:
+ty reports an error if an explicit specialization supplies too many arguments:
 
 ```py
-# error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
+# error: [invalid-type-argument-count] "Too many type arguments to class `C`: expected 1, got 2"
 reveal_type(C[int, int]())  # revealed: C[Unknown]
 ```
 
@@ -870,7 +870,7 @@ class WithDefault(Generic[T, WithDefaultU]): ...
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 
-# error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+# error: [invalid-type-argument-count] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
@@ -907,6 +907,19 @@ Stop2T = TypeVar("Stop2T", default=int)
 
 # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
+```
+
+## Omitting a required type argument
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+too_few: Pair[int]  # error: [invalid-type-argument-count]
 ```
 
 ## Specializing generic class objects from context

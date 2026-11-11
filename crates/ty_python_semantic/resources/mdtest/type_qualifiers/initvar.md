@@ -148,7 +148,8 @@ from dataclasses import InitVar, dataclass
 
 @dataclass
 class Wrong:
-    x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` expected exactly 1 argument, got 2"
+    # error: [invalid-type-argument-count] "Type qualifier `dataclasses.InitVar` expected exactly 1 argument, got 2"
+    x: InitVar[int, str]
 ```
 
 A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully

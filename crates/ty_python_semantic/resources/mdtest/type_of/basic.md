@@ -277,7 +277,7 @@ class Bar: ...
 class A: ...
 class B: ...
 
-# error: [invalid-type-form]
+# error: [invalid-type-argument-count]
 _: type[A, B]
 ```
 
@@ -295,7 +295,7 @@ def f(
     # error: [missing-type-argument]
     x: type[Callable],  # error: [invalid-type-form]
     y: type[Callable[[int], str]],  # error: [invalid-type-form]
-    # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments"
+    # error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments"
     # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
     z: type[Callable[int]],  # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
 ):

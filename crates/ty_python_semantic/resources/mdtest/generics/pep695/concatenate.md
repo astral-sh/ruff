@@ -257,11 +257,11 @@ class Foo[**P]:
     attr: Callable[P, None]
 
 def _(
-    # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+    # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
     a: Callable[Concatenate[()], int],
-    # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
     b: Callable[Concatenate[int], int],
-    # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
     c: Callable[Concatenate[(int,)], int],
     # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a parameter annotation"
     d: Callable[Concatenate, int],
@@ -270,11 +270,11 @@ def _(
     reveal_type(b)  # revealed: (...) -> int
     reveal_type(c)  # revealed: (...) -> int
 
-# error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+# error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
 reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
-# error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+# error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
-# error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+# error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
 reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
 reveal_type(Foo[Concatenate]().attr)  # revealed: (...) -> None

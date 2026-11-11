@@ -979,8 +979,8 @@ class-object annotation.
 from ty_extensions import Bottom, Top
 
 def invalid_materialized_list_classes(
-    top: type[Top[int, str]],  # error: [invalid-type-form]
-    bottom: type[Bottom[int, str]],  # error: [invalid-type-form]
+    top: type[Top[int, str]],  # error: [invalid-type-argument-count]
+    bottom: type[Bottom[int, str]],  # error: [invalid-type-argument-count]
 ) -> None: ...
 ```
 
@@ -1558,8 +1558,8 @@ It is also invalid to use multiple arguments:
 
 ```py
 def _(
-    top_two: Top[int, str],  # error: [invalid-type-form]
-    bottom_two: Bottom[int, str],  # error: [invalid-type-form]
+    top_two: Top[int, str],  # error: [invalid-type-argument-count]
+    bottom_two: Bottom[int, str],  # error: [invalid-type-argument-count]
 ): ...
 ```
 

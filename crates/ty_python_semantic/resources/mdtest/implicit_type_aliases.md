@@ -1164,9 +1164,9 @@ MyList = list[T]
 MyDict = dict[T, U]
 
 def _(
-    # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+    # error: [invalid-type-argument-count] "Too many type arguments: expected 1, got 2"
     list_too_many_args: MyList[int, str],
-    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    # error: [invalid-type-argument-count] "No type argument provided for required type variable `U`"
     dict_too_few_args: MyDict[int],
 ):
     reveal_type(list_too_many_args)  # revealed: list[Unknown]
@@ -1492,7 +1492,7 @@ def _(just_none: JustNone):
 Invalid uses:
 
 ```py
-# error: [invalid-type-form] "`typing.Optional` requires exactly one argument"
+# error: [invalid-type-argument-count] "`typing.Optional` requires exactly one argument"
 Optional[int, str]
 ```
 
@@ -1586,7 +1586,7 @@ An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. 
 `Never` when used as a type expression, which seems reasonable for an empty union:
 
 ```py
-# error: [invalid-type-form] "`typing.Union` requires at least one type argument"
+# error: [invalid-type-argument-count] "`typing.Union` requires at least one type argument"
 EmptyUnion = Union[()]
 
 reveal_type(EmptyUnion)  # revealed: <types.UnionType special-form 'Never'>
@@ -1772,9 +1772,9 @@ class Pair(Generic[T, U]): ...
 PairAlias = Pair[T, U]
 
 def _(
-    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    # error: [invalid-type-argument-count] "No type argument provided for required type variable `U`"
     too_few: type[PairAlias[int]],
-    # error: [invalid-type-arguments] "Too many type arguments: expected 2, got 3"
+    # error: [invalid-type-argument-count] "Too many type arguments: expected 2, got 3"
     too_many: type[PairAlias[int, str, bool]],
 ):
     reveal_type(too_few)  # revealed: type[Pair[Unknown, Unknown]]
@@ -2155,7 +2155,7 @@ from typing import List, Dict
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidList = List[1]
 
-# error: [invalid-type-form] "`typing.List` requires exactly 1 argument, got 2"
+# error: [invalid-type-argument-count] "`typing.List` requires exactly 1 argument, got 2"
 ListTooManyArgs = List[int, str]
 
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -2164,10 +2164,10 @@ InvalidDict1 = Dict[1, str]
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 InvalidDict2 = Dict[str, 2]
 
-# error: [invalid-type-form] "`typing.Dict` requires exactly 2 arguments, got 1"
+# error: [invalid-type-argument-count] "`typing.Dict` requires exactly 2 arguments, got 1"
 DictTooFewArgs = Dict[str]
 
-# error: [invalid-type-form] "`typing.Dict` requires exactly 2 arguments, got 3"
+# error: [invalid-type-argument-count] "`typing.Dict` requires exactly 2 arguments, got 3"
 DictTooManyArgs = Dict[str, int, float]
 
 def _(
@@ -2225,7 +2225,7 @@ def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
 Invalid uses result in diagnostics:
 
 ```py
-# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 InvalidCallable1 = Callable[[int]]
 
 # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"

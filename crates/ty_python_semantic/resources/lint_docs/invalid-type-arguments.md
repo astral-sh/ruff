@@ -1,12 +1,12 @@
 ## What it does
 
-Checks for invalid type arguments in explicit type specialization.
+Checks that explicit type arguments satisfy their type parameter's bounds and constraints. It also
+checks whether arguments involving `ParamSpec` or `TypeVarTuple` are valid for their parameter.
 
 ## Why is this bad?
 
-Providing the wrong number of type arguments or type arguments that don't satisfy the type
-variable's bounds or constraints will lead to incorrect type inference and may indicate a
-misunderstanding of the generic type's interface.
+Providing type arguments that don't satisfy the type variable's bounds or constraints will lead to
+incorrect type inference and may indicate a misunderstanding of the generic type's interface.
 
 ## Examples
 
@@ -36,17 +36,6 @@ Foo1[bytes]  # error
 Foo2[str]  # error
 ```
 
-Using PEP 695 type variables:
+## Rule history
 
-```python
-class Foo[T]: ...
-
-
-class Bar[T, U]: ...
-
-
-# too many arguments
-Foo[int, str]  # error
-# too few arguments
-Bar[int]  # error
-```
+- v0.0.102: Wrong counts of explicit type arguments now use `invalid-type-argument-count`.

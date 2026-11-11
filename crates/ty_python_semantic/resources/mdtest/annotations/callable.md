@@ -151,7 +151,7 @@ Using a parameter list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -159,7 +159,7 @@ def _(c: Callable[[int, str]]):
 Or, an ellipsis:
 
 ```py
-# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -169,7 +169,7 @@ Or something else that's invalid in a type expression generally:
 ```py
 # fmt: off
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -199,7 +199,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -252,7 +252,7 @@ from typing import Callable
 # fmt: off
 
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             [int],
             [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
             [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
@@ -455,9 +455,9 @@ But providing fewer than 2 arguments to `Concatenate` is an error:
 # fmt: off
 
 def _(
-    c: Callable[Concatenate[int], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-    e: Callable[Concatenate[()], int]  # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
+    c: Callable[Concatenate[int], int],  # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    d: Callable[Concatenate[(int,)], int],  # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
+    e: Callable[Concatenate[()], int]  # error: [invalid-type-argument-count] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
 ):
     reveal_type(c)  # revealed: (...) -> int
     reveal_type(d)  # revealed: (...) -> int

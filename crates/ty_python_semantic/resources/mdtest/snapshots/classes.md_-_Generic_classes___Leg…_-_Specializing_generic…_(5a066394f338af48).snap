@@ -22,7 +22,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
  7 | 
  8 | reveal_type(C[int]())  # revealed: C[int]
  9 | reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
-10 | # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
+10 | # error: [invalid-type-argument-count] "Too many type arguments to class `C`: expected 1, got 2"
 11 | reveal_type(C[int, int]())  # revealed: C[Unknown]
 12 | from typing import Union
 13 | 
@@ -71,7 +71,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 56 | reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 57 | reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 58 | 
-59 | # error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+59 | # error: [invalid-type-argument-count] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
 60 | reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 61 | from typing_extensions import TypeVar, Generic
 62 | 
@@ -103,7 +103,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 # Diagnostics
 
 ```
-error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1, got 2
+error[invalid-type-argument-count]: Too many type arguments to class `C`: expected 1, got 2
   --> src/mdtest_snippet.py:11:20
    |
 11 | reveal_type(C[int, int]())  # revealed: C[Unknown]
@@ -155,7 +155,7 @@ error[invalid-type-arguments]: Type `object` does not satisfy constraints `int`,
 ```
 
 ```
-error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3
+error[invalid-type-argument-count]: Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3
   --> src/mdtest_snippet.py:60:35
    |
 60 | reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]

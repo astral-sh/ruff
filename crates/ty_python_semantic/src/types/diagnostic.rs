@@ -143,6 +143,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_NAMED_TUPLE_OVERRIDE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
+    registry.register_lint(&INVALID_TYPE_ARGUMENT_COUNT);
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
@@ -974,6 +975,15 @@ declare_lint! {
     pub(crate) static NOT_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-argument-count.md")]
+    pub(crate) static INVALID_TYPE_ARGUMENT_COUNT = {
+        summary: "detects the wrong number of explicit type arguments",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
@@ -3747,7 +3757,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
     } else {
         "type arguments"
     };
-    if let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) {
+    if let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript) {
         builder.into_diagnostic(format_args!(
             "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
             got {received_arguments}",
@@ -3852,7 +3862,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+    let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript) else {
         return;
     };
     builder.into_diagnostic(format_args!(

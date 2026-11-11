@@ -1126,9 +1126,19 @@
             }
           ]
         },
+        "invalid-type-argument-count": {
+          "title": "detects the wrong number of explicit type arguments",
+          "description": "## What it does\n\nChecks the number of arguments explicitly supplied in brackets to generic types and some typing\nforms, including `Callable`.\n\n## Why is this bad?\n\nA generic type needs an argument for each required type parameter. Parameters with defaults can be\nomitted, and a variadic parameter can accept multiple arguments. Typing forms such as `Callable`\nalso require a specific number of arguments.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import Callable\n\n\nclass Box[T]: ...\n\n\ntype Pair[T, U] = tuple[T, U]\n\n\na: Box[int, str]  # error\nb: Pair[int]  # error\nc: Callable[[], int, str]  # error\n```\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-type-arguments` and `invalid-type-form`. Use\n    `invalid-type-argument-count` in rule settings and ignore comments for the moved checks. Keep\n    the old selectors wherever you still want to control the checks they cover.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-arguments": {
           "title": "detects invalid type arguments in generic specialization",
-          "description": "## What it does\n\nChecks for invalid type arguments in explicit type specialization.\n\n## Why is this bad?\n\nProviding the wrong number of type arguments or type arguments that don't satisfy the type\nvariable's bounds or constraints will lead to incorrect type inference and may indicate a\nmisunderstanding of the generic type's interface.\n\n## Examples\n\nUsing legacy type variables:\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import Generic, TypeVar\n\nT1 = TypeVar(\"T1\", int, str)\nT2 = TypeVar(\"T2\", bound=int)\n\n\nclass Foo1(Generic[T1]): ...\n\n\nclass Foo2(Generic[T2]): ...\n\n\n# bytes does not satisfy T1's constraints\nFoo1[bytes]  # error\n# str does not satisfy T2's bound\nFoo2[str]  # error\n```\n\nUsing PEP 695 type variables:\n\n```python\nclass Foo[T]: ...\n\n\nclass Bar[T, U]: ...\n\n\n# too many arguments\nFoo[int, str]  # error\n# too few arguments\nBar[int]  # error\n```",
+          "description": "## What it does\n\nChecks that explicit type arguments satisfy their type parameter's bounds and constraints. It also\nchecks whether arguments involving `ParamSpec` or `TypeVarTuple` are valid for their parameter.\n\n## Why is this bad?\n\nProviding type arguments that don't satisfy the type variable's bounds or constraints will lead to\nincorrect type inference and may indicate a misunderstanding of the generic type's interface.\n\n## Examples\n\nUsing legacy type variables:\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import Generic, TypeVar\n\nT1 = TypeVar(\"T1\", int, str)\nT2 = TypeVar(\"T2\", bound=int)\n\n\nclass Foo1(Generic[T1]): ...\n\n\nclass Foo2(Generic[T2]): ...\n\n\n# bytes does not satisfy T1's constraints\nFoo1[bytes]  # error\n# str does not satisfy T2's bound\nFoo2[str]  # error\n```\n\n## Rule history\n\n- v0.0.102: Wrong counts of explicit type arguments now use `invalid-type-argument-count`.",
           "default": "error",
           "oneOf": [
             {
@@ -1148,7 +1158,7 @@
         },
         "invalid-type-form": {
           "title": "detects invalid type forms",
-          "description": "## What it does\n\nChecks for expressions that are used as [type expressions] but cannot validly be interpreted as\nsuch.\n\n## Why is this bad?\n\nSuch expressions cannot be understood by ty. In some cases, they might raise errors at runtime.\n\n## Examples\n\n```python\nfrom typing import Annotated\n\n# Int literals are not allowed in this context in type expressions\na: list[1]  # error\n# `Annotated` expects at least two arguments\nb: Annotated[int]  # error\n```\n\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+          "description": "## What it does\n\nChecks for expressions that are used as [type expressions] but cannot validly be interpreted as\nsuch.\n\n## Why is this bad?\n\nSuch expressions cannot be understood by ty. In some cases, they might raise errors at runtime.\n\n## Examples\n\n```python\nfrom typing import Annotated\n\n# Int literals are not allowed in this context in type expressions\na: list[1]  # error\n# `Annotated` requires at least one metadata argument after the type\nb: Annotated[int]  # error\n```\n\n## Rule history\n\n- v0.0.102: Wrong counts of explicit type arguments for forms such as `Callable` now use\n    `invalid-type-argument-count`.\n\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
           "default": "error",
           "oneOf": [
             {

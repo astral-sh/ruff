@@ -443,9 +443,9 @@ If we specialize with fewer or more type arguments than expected, we emit an err
 
 ```py
 def _(
-    # error: [invalid-type-arguments] "No type argument provided for required type variable `V`"
+    # error: [invalid-type-argument-count] "No type argument provided for required type variable `V`"
     too_few: MyAlias2[int, str],
-    # error: [invalid-type-arguments] "Too many type arguments: expected 3, got 4"
+    # error: [invalid-type-argument-count] "Too many type arguments: expected 3, got 4"
     too_many: MyAlias2[int, str, bytes, float],
 ): ...
 ```
