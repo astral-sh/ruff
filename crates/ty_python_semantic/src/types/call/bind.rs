@@ -5953,8 +5953,13 @@ impl<'db> ParameterContextKey<'db> {
     }
 }
 
-/// After the first pass, the inferred specialization accounts for both the return context
-/// and the arguments. Promote those types for use as context on the next pass.
+/// Given the type arguments inferred from a call's arguments and expected return type, returns
+/// the specialization of `generic_context` to apply to parameter annotations on the next pass.
+///
+/// Ordinary inference uses the result of solving against the full parameter types. For a union
+/// such as `T | list[T]`, we also solve the call with matching arguments restricted to `list[T]`
+/// and use that result to specialize just that arm. Both paths use the same rules for promoting
+/// inferred types within their bounds and marking unsolved variables that have no default.
 fn inferred_parameter_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
