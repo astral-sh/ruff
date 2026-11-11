@@ -2772,8 +2772,8 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for malformed generic class declarations, such as a class that declares type parameters
-both in brackets and through a `Generic[...]` base.
+Checks for malformed generic class declarations, such as a class that declares type parameters both
+in brackets and through a `Generic[...]` base.
 
 **Why is this bad?**
 
@@ -4316,8 +4316,8 @@ U = TypeVar("U", int, str, default=bytes)  # error: [invalid-type-variable-defau
 ```
 
 A class cannot supply a default from a type variable it never binds. Here, `T2` defaults to `T1`,
-but `OnlyT2` has no type parameter named `T1`. Include `T1` before `T2` in `Generic[T1, T2]`,
-or give `T2` a default that does not depend on `T1`.
+but `OnlyT2` has no type parameter named `T1`. Include `T1` before `T2` in `Generic[T1, T2]`, or
+give `T2` a default that does not depend on `T1`.
 
 ```python
 T1 = TypeVar("T1", default=int)
@@ -4327,16 +4327,16 @@ T2 = TypeVar("T2", default=T1)
 class OnlyT2(Generic[T2]): ...  # error: [invalid-type-variable-default]
 ```
 
-[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules
-[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules
-[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
-
 **Rule history**
 
 
-- v0.0.102: Split out [`invalid-type-parameter-order`](#invalid-type-parameter-order). This rule now also covers class type
-    parameter defaults that reference out-of-scope type variables, previously reported by
+- v0.0.102: Split out [`invalid-type-parameter-order`](#invalid-type-parameter-order). This rule now also covers class type parameter
+    defaults that reference out-of-scope type variables, previously reported by
     [`invalid-generic-class`](#invalid-generic-class).
+
+[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules
+[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules
+[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 
 ## `invalid-type-variable-variance`
 
@@ -4351,16 +4351,16 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102<
 **What it does**
 
 
-Checks whether the declared variance of a type variable is compatible with how a generic class
-uses it in its methods and base classes. In a generic protocol, the declared variance must match
-the variance inferred from its interface.
+Checks whether the declared variance of a type variable is compatible with how a generic class uses
+it in its methods and base classes. In a generic protocol, the declared variance must match the
+variance inferred from its interface.
 
 **Why is this bad?**
 
 
-A covariant class allows a value of type `Box[int]` to be used where `Box[object]` is expected.
-If a method could then store any `object` in that box, callers reading from the original
-`Box[int]` could receive a value of the wrong type.
+A covariant class allows a value of type `Box[int]` to be used where `Box[object]` is expected. If a
+method could then store any `object` in that box, callers reading from the original `Box[int]` could
+receive a value of the wrong type.
 
 **Examples**
 
