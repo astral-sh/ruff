@@ -23,8 +23,8 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #fbf2fc; /* lunar */
-    --panel: #ffffff;
+    --bg: #ffffff;
+    --panel: #fbf2fc; /* lunar */
     --text: #261230; /* galaxy */
     --text-dim: #6f5d6f; /* comet */
     --accent: #6340ac; /* flare */
