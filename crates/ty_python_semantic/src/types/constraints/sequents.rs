@@ -14,8 +14,8 @@ use crate::types::constraints::variables::{
     TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
-    OwnedConstraintSet,
+    ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, EvidenceSource,
+    Node, OwnedConstraintSet,
 };
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
@@ -24,8 +24,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
-    TypeContext, TypeMapping, TypeVarVariance, UnionType,
+    ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType,
+    IntersectionType, Type, TypeContext, TypeMapping, TypeVarVariance, UnionType,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -354,11 +354,30 @@ impl<'db> SequentMapBuilder<'db> {
         ante: AtomicConstraint<'db>,
         post: AtomicConstraint<'db>,
     ) {
+        // Consider a call to an identity function with a gradual bound.
+        //
+        //   from typing import Any
+        //
+        //   def keep[L: list[Any]](items: L) -> L: return items
+        //   def forward[T](items: list[T]) -> list[T]: return keep(items)
+        //
+        // The argument gives us `list[T] ≤ L`, and the return annotation gives us
+        // `L ≤ list[T]`. Combining these with `L ≤ list[Any]` implies `T = Any`
+        // because `list` is invariant. Substitution then gives us `list[Any] ≤ L`.
+        // Keep that implication and the original argument bound so the solver can
+        // infer the `list[T]` supplied by the caller. A bare `list` bound works the
+        // same way with `Unknown` in place of `Any`.
+        let keep_argument_constraint = EvidenceSource::Inferred.includes(substituted.provenance())
+            && ante.provenance().contains(ConstraintProvenance::DECLARED)
+            && matches!(
+                ante.as_concrete(),
+                Some((_, Type::Dynamic(DynamicType::Unknown | DynamicType::Any)))
+            );
         self.pending.push(Sequent::PairImplication {
             ante1: InternedSequentConstraint::new(self.db, substituted),
             ante2: InternedSequentConstraint::new(self.db, ante),
             post: InternedSequentConstraint::new(self.db, post),
-            is_substitution: true,
+            is_substitution: !keep_argument_constraint,
             fuel_cost: (),
         });
     }
