@@ -6319,7 +6319,7 @@ class Outer[T]:
 ## `single-overload`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.100">0.0.100</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22single-overload%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L723" target="_blank">View source</a>
@@ -6359,6 +6359,8 @@ def foo(x: int) -> int:
 
 **Rule history**
 
+
+- v0.0.102: Changed the default severity from `error` to `warn`.
 
 - v0.0.100: ty used to have a rule called `invalid-overload` that covered [`single-overload`](#single-overload),
     [`missing-overload-implementation`](#missing-overload-implementation), [`inconsistent-overload-implementation`](#inconsistent-overload-implementation),

@@ -35,7 +35,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error[single-overload]: Overloaded function `func` requires at least two overloads
+warning[single-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.py:5:5
   |
 3 | @overload
@@ -47,7 +47,7 @@ error[single-overload]: Overloaded function `func` requires at least two overloa
 ```
 
 ```
-error[single-overload]: Overloaded function `func` requires at least two overloads
+warning[single-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.pyi:5:5
   |
 3 | @overload
