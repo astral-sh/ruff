@@ -24,7 +24,7 @@ fn html_report() -> anyhow::Result<()> {
     assert!(index.contains(r#"<a href="files/precise.py.html">precise.py</a>"#));
 
     let page = std::fs::read_to_string(case.root().join("report/files/dynamic.py.html"))?;
-    assert!(page.contains(r#"<span class="line-dynamic">def f(y):</span>"#));
+    assert!(page.contains(r#"<span class="line-dynamic" title="`y`: Unknown">def f(y):</span>"#));
 
     Ok(())
 }

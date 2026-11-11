@@ -7,20 +7,12 @@
 use std::fmt::Write as _;
 
 use anyhow::Context;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_project::{Db as _, ProjectDatabase};
-use ty_python_semantic::coverage::{Line, LineCoverage, line_coverage};
-
-/// The coverage of a single project file.
-struct FileCoverage {
-    path: SystemPathBuf,
-    file: File,
-    /// The coverage of each line, indexed by zero-based line number.
-    lines: Vec<Line>,
-}
+use ty_python_semantic::coverage::{LineCoverage, line_coverage};
 
 /// Line counts for a file, or for all files in the report.
 #[derive(Debug, Default, Clone, Copy)]
@@ -85,33 +77,39 @@ pub(crate) fn write_html_report(
     db: &ProjectDatabase,
     output_dir: &SystemPath,
 ) -> anyhow::Result<CoverageCounts> {
-    let files: Vec<File> = db.project().files(db).iter().collect();
-
-    // Salsa databases can't be shared between threads, so each Rayon job gets its own handle.
-    let mut files: Vec<FileCoverage> = files
-        .into_par_iter()
-        .map_with(db.clone(), |db, file| {
-            let path = file.path(db).as_system_path()?.to_path_buf();
-            let lines = line_coverage(db, file);
-            Some(FileCoverage { path, file, lines })
-        })
-        .flatten()
+    let mut files: Vec<(File, SystemPathBuf)> = db
+        .project()
+        .files(db)
+        .iter()
+        .filter_map(|file| Some((file, file.path(db).as_system_path()?.to_path_buf())))
         .collect();
-    files.sort_by(|a, b| a.path.cmp(&b.path));
+    files.sort_by(|(_, a), (_, b)| a.cmp(b));
 
     // Show paths relative to the deepest directory that contains all files.
-    let prefix = common_parent(files.iter().map(|file| file.path.as_path()));
+    let prefix = common_parent(files.iter().map(|(_, path)| path.as_path()));
+    let relative_path =
+        |path: &SystemPathBuf| path.strip_prefix(&prefix).unwrap_or(path).to_path_buf();
+
+    // Write the file pages in parallel, keeping only their line counts so that the coverage of all
+    // files is never in memory at once. Salsa databases can't be shared between threads, so each
+    // Rayon job gets its own handle.
+    let counts: Vec<CoverageCounts> = files
+        .par_iter()
+        .map_with(db.clone(), |db, (file, path)| {
+            let relative_path = relative_path(path);
+            let (page, counts) = file_page(db, *file, &relative_path);
+            write_file(&output_dir.join(page_path(&relative_path)), &page)?;
+            Ok(counts)
+        })
+        .collect::<anyhow::Result<_>>()?;
 
     let mut rows = String::new();
     let mut total = CoverageCounts::default();
 
-    for file in &files {
-        let relative_path = file.path.strip_prefix(&prefix).unwrap_or(&file.path);
-        let page_path = format!("files/{relative_path}.html");
-        let (page, counts) = file_page(db, file, relative_path, &page_path);
-        write_file(&output_dir.join(&page_path), &page)?;
-
+    for ((_, path), counts) in files.iter().zip(counts) {
+        let relative_path = relative_path(path);
         total.merge(counts);
+        let page_path = page_path(&relative_path);
         write_summary_row(&mut rows, relative_path.as_str(), Some(&page_path), counts);
     }
 
@@ -144,21 +142,25 @@ pub(crate) fn write_html_report(
     Ok(total)
 }
 
+/// The path of a file's page, relative to the report directory.
+fn page_path(relative_path: &SystemPath) -> String {
+    format!("files/{relative_path}.html")
+}
+
 /// Renders the page for a single file and counts its lines.
 fn file_page(
     db: &ProjectDatabase,
-    file: &FileCoverage,
+    file: File,
     relative_path: &SystemPath,
-    page_path: &str,
 ) -> (String, CoverageCounts) {
-    let source = source_text(db, file.file);
+    let source = source_text(db, file);
+    let lines = line_coverage(db, file);
     let mut counts = CoverageCounts::default();
     let mut line_numbers = String::new();
     let mut code = String::new();
 
     for (index, line) in source.as_str().lines().enumerate() {
-        let (coverage, notes) = file
-            .lines
+        let (coverage, notes) = lines
             .get(index)
             .map_or((LineCoverage::Empty, &[][..]), |line| {
                 (line.coverage, &line.notes[..])
@@ -188,7 +190,7 @@ fn file_page(
     }
 
     // Link back to `index.html` from the page's directory.
-    let index_link = "../".repeat(page_path.matches('/').count()) + "index.html";
+    let index_link = "../".repeat(page_path(relative_path).matches('/').count()) + "index.html";
     let mut title = String::new();
     escape_html(&mut title, relative_path.as_str());
 
