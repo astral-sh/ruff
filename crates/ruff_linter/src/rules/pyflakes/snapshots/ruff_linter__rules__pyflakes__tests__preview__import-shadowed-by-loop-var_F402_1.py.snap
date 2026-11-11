@@ -1,0 +1,33 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F402 Import `abc` from line 2 shadowed by loop variable
+ --> F402_1.py:7:13
+  |
+5 | def f(xs, c):
+6 |     if c:
+7 |         for abc in xs:
+  |             ^^^
+8 |             pass
+  |
+
+F402 Import `abc` from line 2 shadowed by loop variable
+  --> F402_1.py:14:17
+   |
+12 |     if c:
+13 |         if d:
+14 |             for abc in xs:
+   |                 ^^^
+15 |                 pass
+   |
+
+F402 Import `abc` from line 2 shadowed by loop variable
+  --> F402_1.py:20:13
+   |
+18 | def f(xs):
+19 |     try:
+20 |         for abc in xs:
+   |             ^^^
+21 |             pass
+22 |     except ValueError:
+   |

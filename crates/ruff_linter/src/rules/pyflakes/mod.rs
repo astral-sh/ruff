@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
+    #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402_1.py"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
@@ -264,6 +265,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
+    #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

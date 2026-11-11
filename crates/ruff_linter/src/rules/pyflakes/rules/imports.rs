@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::preview::is_import_shadowed_by_loop_var_dominance_enabled;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -17,6 +18,10 @@ use crate::codes::Category;
 /// variable is intended to be used as the imported binding.
 ///
 /// Consider using a different name for the loop variable.
+///
+/// In [preview], this rule also flags loop variables nested in a branch (such as
+/// an `if` or `try` body) that the import always runs before, not only those in
+/// the same branch as the import.
 ///
 /// ## Example
 /// ```python
@@ -34,6 +39,8 @@ use crate::codes::Category;
 /// for filename in files:
 ///     print(filename)
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.44", category = Category::Suspicious)]
 pub(crate) struct ImportShadowedByLoopVar {
@@ -71,11 +78,17 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
                 continue;
             }
 
-            // If the bindings are in different forks, abort.
+            // If the bindings are in different forks, abort. In preview, only abort if the import
+            // doesn't dominate the loop variable (e.g., they're in different branches of an `if`
+            // statement), so a loop nested in a branch below the import is still reported.
             if shadowed.source.is_none_or(|left| {
-                binding
-                    .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                binding.source.is_none_or(|right| {
+                    if is_import_shadowed_by_loop_var_dominance_enabled(checker.settings()) {
+                        !checker.semantic().dominates(left, right)
+                    } else {
+                        !checker.semantic().same_branch(left, right)
+                    }
+                })
             }) {
                 continue;
             }
