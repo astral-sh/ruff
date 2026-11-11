@@ -4238,9 +4238,13 @@ impl<'db> CandidateSolutions<'db> {
         }
         .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
-        // Prefer the declared candidate when it is mutually assignable with the inferred
-        // candidate. Otherwise, prefer the inferred candidate.
+        // Prefer a mutually assignable declared candidate. An `Unknown` from the return
+        // context supplies no information about this type variable, so try the argument
+        // evidence first. For example, `Sequence[Unknown]` can accept `Sequence[int]`.
         let candidates = match (inferred, declared) {
+            (Some(inferred), Some(declared)) if declared == Type::unknown() => {
+                [Some(inferred), Some(declared)]
+            }
             (Some(inferred), Some(declared))
                 if inferred.is_assignable_to(db, env, declared)
                     && declared.is_assignable_to(db, env, inferred) =>

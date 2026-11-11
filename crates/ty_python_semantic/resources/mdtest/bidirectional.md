@@ -831,11 +831,13 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
-## Missing annotations do not supply declared type context
+## Calls with an unknown expected type
 
-A missing annotation does not supply type context for a return or argument expression:
+A generic call infers its return type from its arguments when a parameter or return annotation is
+omitted or specifies `Unknown`.
 
 ```py
+from typing import Final
 from ty_extensions._internal import Unknown
 
 def identity[T](x: T) -> T:
@@ -845,10 +847,32 @@ def unannotated(x):
     return reveal_type(identity(1))  # revealed: Literal[1]
 
 def annotated(x: Unknown) -> Unknown:
-    return reveal_type(identity(1))  # revealed: Unknown
+    return reveal_type(identity(1))  # revealed: Literal[1]
 
 unannotated(reveal_type(identity(1)))  # revealed: Literal[1]
-annotated(reveal_type(identity(1)))  # revealed: Unknown
+annotated(reveal_type(identity(1)))  # revealed: Literal[1]
+```
+
+A bare `Final` and a call to an unannotated callable also leave the result type to inference.
+
+```py
+ONE: Final = reveal_type(identity(1))  # revealed: Literal[1]
+reveal_type(ONE)  # revealed: Literal[1]
+
+def call(sink):
+    sink(reveal_type(identity(1)))  # revealed: Literal[1]
+```
+
+In a generator with no return annotation, the operands of `yield` and `yield from` retain their
+inferred types.
+
+```py
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def generate():
+    yield reveal_type(identity(1))  # revealed: Literal[1]
+    yield from reveal_type(singleton(1))  # revealed: list[int]
 ```
 
 ## Upper-bound type context
@@ -1497,7 +1521,8 @@ def _(dynamic: Any):
     x3: Invariant[int] = reveal_type(invariant(dynamic))
 ```
 
-Note that the heuristic applies independently to each type variable:
+The heuristic applies independently to each type variable. When `Sequence` omits its element type,
+ty preserves the type inferred from the argument, even when it contains `Any`.
 
 ```py
 from collections.abc import Sequence
@@ -1505,9 +1530,13 @@ from collections.abc import Sequence
 def pair[T, U](first: T, second: U) -> tuple[list[T], list[U]]:
     return [first], [second]
 
-def _(first: int, second: str):
+def _(first: int, second: str, row: tuple[int, Any]):
     # revealed: tuple[list[Any], list[str]]
     result: tuple[Sequence[Any], Sequence[object]] = reveal_type(pair(first, second))
+
+    # error: [missing-type-argument]
+    # revealed: tuple[list[tuple[int, Any]], list[str]]
+    partial: tuple[Sequence, Sequence[object]] = reveal_type(pair(row, second))
 ```
 
 This behavior also applies to invariant collection types:

@@ -5514,6 +5514,53 @@ def check(setter: ConstrainedSetter) -> None:
     writable: HasValue = setter  # error: [invalid-assignment]
 ```
 
+## Unknown type argument in the return context
+
+A bare `Sequence` annotation leaves the call's element type to inference. The annotated variable
+takes the declared type because the two sequence types are mutually assignable.
+
+```py
+from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def singleton(value: T) -> Sequence[T]:
+    return [value]
+
+# error: [missing-type-argument]
+items: Sequence = reveal_type(singleton(1))  # revealed: Sequence[Literal[1]]
+reveal_type(items)  # revealed: Sequence[Unknown]
+```
+
+A bare `list` in the return context also preserves a bounded type variable from the caller. The call
+takes and returns a list of that same element type.
+
+```py
+Bound = TypeVar("Bound", bound=int)
+
+def identity(items: list[Bound]) -> list[Bound]:
+    return items
+
+def forward(items: list[Bound]):
+    # error: [missing-type-argument]
+    result: list = reveal_type(identity(items))  # revealed: list[Bound@forward]
+```
+
+Both positions of a tuple can constrain the same type variable. Combining an omitted element type
+with an explicit `Any` in either order still accepts the caller's list.
+
+```py
+from typing import Any
+
+def duplicate(items: list[Bound]) -> tuple[list[Bound], list[Bound]]:
+    return items, items
+
+def forward_both(items: list[Bound]):
+    first: tuple[list, list[Any]] = duplicate(items)  # error: [missing-type-argument]
+    second: tuple[list[Any], list] = duplicate(items)  # error: [missing-type-argument]
+```
+
 ## Return-context preferences across alternatives
 
 When forwarding a generic call, an upper-only bound from one return-context alternative must not
