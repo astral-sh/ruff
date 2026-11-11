@@ -5559,7 +5559,7 @@ def cast_leaf(entry: tuple[V, V]) -> V:
     return cast(V, subtree(entry))  # ok
 
 def leaf(entry: tuple[V, V]) -> V:
-    # error: [invalid-return-type] "expected `V@leaf`, found `Tree[V@leaf]`"
+    # error: [invalid-explicit-return] "expected `V@leaf`, found `Tree[V@leaf]`"
     return subtree(entry)
 ```
 
