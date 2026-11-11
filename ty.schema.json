@@ -646,9 +646,9 @@
             }
           ]
         },
-        "implicit-concatenated-string-type-annotation": {
-          "title": "detects implicit concatenated strings in type annotations",
-          "description": "## What it does\n\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```",
+        "implicit-string-concatenation-in-annotation": {
+          "title": "detects type expressions written as multiple adjacent string literals",
+          "description": "## What it does\n\nChecks for [type expressions][type expression] written as two or more adjacent string literals.\n\n## Why is this bad?\n\nty can't resolve a string annotation when a [type expression] spans multiple string literals.\n\n## Examples\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Literal\n\ndef test() -> \"Literal[\" \"5\" \"]\":  # error\n    return 5\n```\n\n<!-- fmt:on -->\n\nUse instead:\n\n```python\nfrom typing import Literal\n\n\ndef test() -> \"Literal[5]\":\n    return 5\n```\n\nNote that this rule is only applied to [type expressions][type expression] in annotations. Regions\nin type annotations that are interpreted as _value_ expressions -- for example, the second argument\nto `Annotated[]` -- are not reported by this rule:\n\n<!-- fmt:off -->\n\n```python\nfrom typing import Annotated\n\n# the first argument to `Annotated[]` is interpreted as a type expression, so is reported\ncount: Annotated[\"in\" \"t\", \"item count\"]  # error\n\n# all remaining arguments to `Annotated[]` are interpreted as value expressions, so are not reported\ntotal: Annotated[int, \"item \" \"count\"]  # ok\n```\n\n<!-- fmt:on -->\n\n## Rule history\n\n- v0.0.102: Renamed from `implicit-concatenated-string-type-annotation`.\n\n    `implicit-concatenated-string-type-annotation` remains as a compatibility alias for this rule.\n\n[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
           "default": "error",
           "oneOf": [
             {
