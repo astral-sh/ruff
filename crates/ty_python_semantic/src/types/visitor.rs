@@ -1058,7 +1058,7 @@ where
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
 /// are visited or not.
-pub(super) fn any_over_type<'db>(
+pub(crate) fn any_over_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
