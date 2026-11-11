@@ -32,7 +32,7 @@ use crate::{
         diagnostic::{
             INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_METHOD_OVERRIDE,
             INCOMPATIBLE_MUTABLE_OVERRIDE, INCOMPATIBLE_PROPERTY_OVERRIDE, INVALID_ASSIGNMENT,
-            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
+            INVALID_DATACLASS_POST_INIT, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, LOST_KEYWORD_FOR_REGULAR_PARAMETER,
             MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
             report_incompatible_base_method, report_incompatible_method_override,
@@ -1960,7 +1960,7 @@ bitflags! {
         const FINAL_METHOD_OVERRIDDEN = 1 << 3;
         const INVALID_NAMED_TUPLE = 1 << 4;
         const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 5;
-        const INVALID_DATACLASS = 1 << 6;
+        const INVALID_DATACLASS_POST_INIT = 1 << 6;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
         const MISSING_OVERRIDE_DECORATOR = 1 << 9;
@@ -2005,8 +2005,8 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE_OVERRIDE)) {
             config |= OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE;
         }
-        if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
-            config |= OverrideRulesConfig::INVALID_DATACLASS;
+        if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS_POST_INIT)) {
+            config |= OverrideRulesConfig::INVALID_DATACLASS_POST_INIT;
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
             config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
@@ -2060,8 +2060,8 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE)
     }
 
-    const fn check_invalid_dataclasses(self) -> bool {
-        self.contains(OverrideRulesConfig::INVALID_DATACLASS)
+    const fn check_invalid_dataclass_post_init(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_DATACLASS_POST_INIT)
     }
 
     const fn check_final_variable_overridden(self) -> bool {
@@ -2260,7 +2260,7 @@ fn check_post_init_signature<'db>(
 ) {
     let db = context.db();
 
-    if !configuration.check_invalid_dataclasses() {
+    if !configuration.check_invalid_dataclass_post_init() {
         return;
     }
     let Some((static_class, spec)) = class.static_class_literal(db) else {
@@ -2301,7 +2301,7 @@ fn check_post_init_signature<'db>(
     }
 
     let Some(builder) = context.report_lint(
-        &INVALID_DATACLASS,
+        &INVALID_DATACLASS_POST_INIT,
         definition.focus_range(db, context.module()),
     ) else {
         return;

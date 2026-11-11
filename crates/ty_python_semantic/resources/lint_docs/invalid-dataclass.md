@@ -36,4 +36,10 @@ class Foo(NamedTuple):  # error: [invalid-dataclass]
 
 See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
 
+## Rule history
+
+- v0.0.102: Split out `invalid-dataclass-post-init`. To keep a custom rule level for incompatible
+    `__post_init__` signatures, apply it to the new rule as well. Use `invalid-dataclass-post-init`
+    in suppression comments for those signatures.
+
 [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support

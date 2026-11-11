@@ -74,6 +74,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
+    registry.register_lint(&INVALID_DATACLASS_POST_INIT);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -384,6 +385,15 @@ declare_lint! {
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
         status: LintStatus::stable("0.0.12"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-dataclass-post-init.md")]
+    pub(crate) static INVALID_DATACLASS_POST_INIT = {
+        summary: "detects incompatible dataclass `__post_init__` signatures",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
