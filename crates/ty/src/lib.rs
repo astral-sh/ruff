@@ -964,8 +964,15 @@ fn current_directory() -> Result<SystemPathBuf> {
     })
 }
 
-/// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.
+/// Initializes the global Rayon thread pool. A positive `TY_MAX_PARALLELISM` takes
+/// precedence over `RAYON_NUM_THREADS` for both file discovery and type checking.
 fn setup_rayon() {
+    if let Ok(value) = std::env::var(EnvVars::TY_MAX_PARALLELISM)
+        && let Ok(limit) = value.parse()
+    {
+        ruff_db::set_max_parallelism(limit).expect("parallelism already initialized");
+    }
+
     ThreadPoolBuilder::default()
         .num_threads(max_parallelism().get())
         .stack_size(STACK_SIZE)
