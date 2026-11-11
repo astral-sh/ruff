@@ -69,12 +69,13 @@ use crate::types::diagnostic::{
     CYCLIC_TYPE_ALIAS_DEFINITION, DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind,
     INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
-    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_PARAMSPEC_COMPONENTS, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE,
+    MISSING_UNION_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD,
+    UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -4491,7 +4492,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if let Some(builder) = self
                     .context
-                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                    .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation.as_ref())
                 {
                     builder.into_diagnostic(format_args!(
                         "`{name}.{attr_name}` is only valid \
@@ -4514,7 +4515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
                     if let Some(builder) = self
                         .context
-                        .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                        .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation.as_ref())
                     {
                         builder.into_diagnostic(format_args!(
                             "`{name}.{attr_name}` is only valid \
@@ -4727,7 +4728,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ParamSpecAttrKind::Args => ("args", "*args"),
                 ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
             };
-            if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation)
+            {
                 builder.into_diagnostic(format_args!(
                     "`{name}.{attr_name}` is only valid \
                     for annotating `{variadic}` function parameters",
@@ -4749,7 +4753,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     "**kwargs"
                 };
-                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation)
+                {
                     builder.into_diagnostic(format_args!(
                         "`{name}.{attr_name}` is only valid \
                         for annotating `{variadic}` function parameters",

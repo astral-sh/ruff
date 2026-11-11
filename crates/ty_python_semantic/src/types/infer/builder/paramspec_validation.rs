@@ -3,7 +3,7 @@ use crate::{
     types::{
         ParamSpecAttrKind, Type,
         context::InferContext,
-        diagnostic::{INVALID_PARAMSPEC, UNBOUND_TYPE_VARIABLE},
+        diagnostic::{INVALID_PARAMSPEC_COMPONENTS, UNBOUND_TYPE_VARIABLE},
         generics::resolve_typevar_reference,
     },
 };
@@ -67,7 +67,9 @@ pub(super) fn validate_paramspec_components<'db>(
                 let args_name = args_tv.name(db);
                 let vararg = vararg_name.unwrap_or("args");
                 let kwarg = kwarg_name.unwrap_or("kwargs");
-                if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, kwargs_annotation) {
+                if let Some(builder) =
+                    context.report_lint(&INVALID_PARAMSPEC_COMPONENTS, kwargs_annotation)
+                {
                     builder.into_diagnostic(format_args!(
                         "`*{vararg}: {args_name}.args` must be accompanied \
                              by `**{kwarg}: {args_name}.kwargs`",
@@ -121,8 +123,8 @@ pub(super) fn validate_paramspec_components<'db>(
                     let name = args_tv.name(db);
                     let vararg = vararg_name.unwrap_or("args");
                     let kwarg = kwarg_name.unwrap_or("kwargs");
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_PARAMSPEC, &parameters.kwonlyargs[0])
+                    if let Some(builder) = context
+                        .report_lint(&INVALID_PARAMSPEC_COMPONENTS, &parameters.kwonlyargs[0])
                     {
                         builder.into_diagnostic(format_args!(
                             "No parameters may appear between \
@@ -147,7 +149,7 @@ pub(super) fn validate_paramspec_components<'db>(
             } else {
                 args_annotation.range()
             };
-            if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, range) {
+            if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC_COMPONENTS, range) {
                 builder.into_diagnostic(format_args!(
                     "`*{vararg}: {name}.args` must be accompanied by `**{kwarg}: {name}.kwargs`",
                 ));
@@ -168,18 +170,10 @@ pub(super) fn validate_paramspec_components<'db>(
             } else {
                 kwargs_annotation.range()
             };
-            if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, range) {
+            if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC_COMPONENTS, range) {
                 builder.into_diagnostic(format_args!(
                     "`**{kwarg}: {name}.kwargs` must be accompanied by `*{vararg}: {name}.args`",
                 ));
-            } else {
-                // No *args at all
-                if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, kwargs_annotation) {
-                    builder.into_diagnostic(format_args!(
-                        "`**{kwarg}: {name}.kwargs` must be accompanied by \
-                             `*{kwarg}: {name}.args`",
-                    ));
-                }
             }
         }
 

@@ -15,7 +15,7 @@ use crate::{
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
-            INVALID_PARAMSPEC, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+            INVALID_PARAMSPEC_COMPONENTS, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
             TYPE_ASSERTION_FAILURE, UNSOUND_RETURN, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
@@ -1129,7 +1129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if let Some(builder) = self
                     .context
-                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                    .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation.as_ref())
                 {
                     builder.into_diagnostic(format_args!(
                         "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
@@ -1216,7 +1216,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // A bare ParamSpec is diagnosed when inferring the annotation.
         if let Some(component) = typevar.paramspec_attr(db)
-            && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_PARAMSPEC_COMPONENTS, annotation)
         {
             let name = typevar.name(db);
             let parameter = match component {
