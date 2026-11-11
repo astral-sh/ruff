@@ -1398,15 +1398,20 @@ impl<'a> SemanticModel<'a> {
             })
     }
 
-    /// Push an AST node [`NodeRef`] onto the stack.
-    pub fn push_node<T: Into<NodeRef<'a>>>(&mut self, node: T) {
-        self.node_id = Some(self.nodes.insert(node.into(), self.node_id, self.branch_id));
+    /// Push an AST node [`NodeRef`] onto the stack, returning its parent for [`Self::pop_node`].
+    pub fn push_node<T: Into<NodeRef<'a>>>(&mut self, node: T) -> Option<NodeId> {
+        let parent = self.node_id;
+        self.node_id = Some(self.nodes.insert(node.into(), parent, self.branch_id));
+        parent
     }
 
     /// Pop the current AST node [`NodeRef`] off the stack.
-    pub fn pop_node(&mut self) {
-        let node_id = self.node_id.expect("Attempted to pop without node");
-        self.node_id = self.nodes.parent_id(node_id);
+    pub fn pop_node(&mut self, parent: Option<NodeId>) {
+        debug_assert!(
+            self.node_id
+                .is_some_and(|id| self.nodes.parent_id(id) == parent)
+        );
+        self.node_id = parent;
     }
 
     /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.

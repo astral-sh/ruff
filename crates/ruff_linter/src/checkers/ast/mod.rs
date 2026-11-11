@@ -1047,7 +1047,7 @@ impl SemanticSyntaxContext for Checker<'_> {
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // Step 0: Pre-processing
-        self.semantic.push_node(stmt);
+        let parent_node_id = self.semantic.push_node(stmt);
 
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
@@ -1767,7 +1767,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_node();
+        self.semantic.pop_node(parent_node_id);
         self.last_stmt_end = stmt.end();
     }
 
@@ -1814,7 +1814,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
-        self.semantic.push_node(expr);
+        let parent_node_id = self.semantic.push_node(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
@@ -2404,7 +2404,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
-        self.semantic.pop_node();
+        self.semantic.pop_node(parent_node_id);
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
