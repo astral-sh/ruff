@@ -2301,9 +2301,8 @@ pub enum ApplySpecialization<'a, 'db> {
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
-        /// Index of the variable whose binding we're resolving. Map it to `Never` even inside
-        /// alias arguments, so substituting `U = tuple[Tree[U], ...]` into another binding
-        /// cannot add a tuple layer on every pass.
+        /// An optional typevar to _not_ substitute when applying the specialization. We use this to
+        /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
