@@ -326,40 +326,39 @@ pub fn fixture_exposures_for_definition<'db>(
 /// Returns the plugins registered through `pytest_plugins` by `request_file` and its conftest
 /// hierarchy, in registration order.
 ///
-/// Pytest imports conftests from the outermost directory inward and registers the plugins named by
-/// each module depth-first, since a plugin can name further plugins. Plugins registered by
-/// unrelated conftests or test modules can also be visible at runtime, depending on collection
-/// order, but we don't consider them.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+/// Plugins registered by unrelated conftests or test modules can also be visible at runtime,
+/// depending on collection order, but we don't consider them.
 fn pytest_registered_plugin_files<'db>(
     db: &'db dyn Db,
     request_file: ProgramFile<'db>,
-) -> Box<[ProgramFile<'db>]> {
-    let program = request_file.program(db);
-    let mut registry = PytestPluginRegistry {
-        builtin_names: pytest_builtin_plugin_names(db, program),
-        // Pytest registers its core plugins before importing any conftest.
-        registered_files: pytest_global_plugin_files(db, program)
-            .iter()
-            .copied()
-            .collect(),
-        registered_names: FxHashSet::default(),
-        plugins: Vec::new(),
+) -> &'db [ProgramFile<'db>] {
+    // A file without registrations of its own sees the same plugins as its nearest conftest.
+    // Selecting that conftest before entering the tracked query lets the test modules that share a
+    // conftest also share its cached registrations.
+    let registration_file = if pytest_plugin_names(db, request_file).is_empty() {
+        conftest_files(db, request_file).into_iter().next()
+    } else {
+        Some(request_file)
     };
 
-    // Pytest reads `request_file`'s own registrations when it loads the file as a conftest, test
-    // module, or plugin. As an approximation, we always read them.
-    let mut modules = conftest_files(db, request_file);
-    modules.reverse();
-    modules.push(request_file);
+    registration_file
+        .map(|file| pytest_registered_plugin_files_from(db, file))
+        .unwrap_or_default()
+}
 
-    for module in modules {
-        if registry.registered_files.insert(module) {
-            registry.consider_module(db, module);
-        }
-    }
-
-    registry.plugins.into_boxed_slice()
+/// Returns the plugins registered through `pytest_plugins` by `registration_file` and its conftest
+/// hierarchy, in registration order.
+///
+/// Pytest imports conftests from the outermost directory inward and registers the plugins named by
+/// each module depth-first, since a plugin can name further plugins.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn pytest_registered_plugin_files_from<'db>(
+    db: &'db dyn Db,
+    registration_file: ProgramFile<'db>,
+) -> Box<[ProgramFile<'db>]> {
+    let mut registry = PytestPluginRegistry::new(db, registration_file.program(db));
+    registry.register_plugins_in_hierarchy(db, registration_file);
+    registry.into_plugins()
 }
 
 /// Follows the plugin registrations that pytest performs for `pytest_plugins` variables.
@@ -371,22 +370,66 @@ struct PytestPluginRegistry<'db> {
 }
 
 impl<'db> PytestPluginRegistry<'db> {
+    fn new(db: &'db dyn Db, program: Program<'db>) -> Self {
+        Self {
+            builtin_names: pytest_builtin_plugin_names(db, program),
+            // Pytest registers its default plugins before importing any conftest.
+            registered_files: pytest_global_plugin_files(db, program)
+                .iter()
+                .copied()
+                .collect(),
+            registered_names: FxHashSet::default(),
+            plugins: Vec::new(),
+        }
+    }
+
+    /// Registers the plugins named by `registration_file`'s conftests, from the outermost
+    /// directory inward, followed by the plugins named by `registration_file` itself.
+    fn register_plugins_in_hierarchy(
+        &mut self,
+        db: &'db dyn Db,
+        registration_file: ProgramFile<'db>,
+    ) {
+        let mut modules = conftest_files(db, registration_file);
+        modules.reverse();
+        // Pytest reads `registration_file`'s own registrations when it loads the file as a
+        // conftest, test module, or plugin. As an approximation, we always read them.
+        modules.push(registration_file);
+
+        for module in modules {
+            if self.registered_files.insert(module) {
+                self.register_plugins(db, module);
+            }
+        }
+    }
+
+    /// Returns the registered plugins in registration order.
+    fn into_plugins(self) -> Box<[ProgramFile<'db>]> {
+        self.plugins.into_boxed_slice()
+    }
+
     /// Registers the plugins named by `module`'s `pytest_plugins` variable, in order.
-    fn consider_module(&mut self, db: &'db dyn Db, module: ProgramFile<'db>) {
+    fn register_plugins(&mut self, db: &'db dyn Db, module: ProgramFile<'db>) {
         for name in pytest_plugin_names(db, module) {
-            self.import_plugin(db, module, name);
+            self.register_plugin_by_name(db, module, name);
         }
     }
 
     /// Registers the plugin `name`, followed by the plugins that it names in turn.
-    fn import_plugin(&mut self, db: &'db dyn Db, module: ProgramFile<'db>, name: &'db str) {
-        // Pytest skips names that are already registered, and imports built-in plugins such as
-        // `pytester` from `_pytest`, even when a project module has the same name.
+    fn register_plugin_by_name(
+        &mut self,
+        db: &'db dyn Db,
+        module: ProgramFile<'db>,
+        name: &'db str,
+    ) {
+        // Pytest skips names that are already registered.
         // https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/config/__init__.py#L900-L903
         if self.registered_names.contains(name) {
             return;
         }
 
+        // Pytest imports built-in plugins such as `pytester` from `_pytest`, even when a project
+        // module has the same name.
         let module_name = if self.builtin_names.iter().any(|builtin| builtin == name) {
             ModuleName::new(&format!("_pytest.{name}"))
         } else {
@@ -410,7 +453,7 @@ impl<'db> PytestPluginRegistry<'db> {
         let plugin = ProgramFile::new(db, plugin, module.program(db));
         if self.registered_files.insert(plugin) {
             self.plugins.push(plugin);
-            self.consider_module(db, plugin);
+            self.register_plugins(db, plugin);
         }
     }
 }
@@ -1825,6 +1868,7 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast as ast;
     use ruff_text_size::Ranged;
     use test_case::test_case;
@@ -3709,6 +3753,39 @@ def test_use(resource, nested_only, conftest_override, module_override, core_val
 
         test.function("test_use")
             .assert_fixture("resource", "/src/tests/helper.py", "resource");
+    }
+
+    #[test]
+    fn test_modules_share_conftest_plugin_registrations() {
+        let mut test = PytestTestCase::with_files(
+            "/src/tests/test_one.py",
+            &[
+                ("/src/tests/conftest.py", r#"pytest_plugins = ["shared"]"#),
+                (
+                    "/src/tests/shared.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/tests/test_one.py", "def test_one(resource): ..."),
+                ("/src/tests/test_two.py", "def test_two(resource): ..."),
+            ],
+        );
+        test.function("test_one")
+            .assert_fixture("resource", "/src/tests/shared.py", "resource");
+
+        // Neither test module registers plugins of its own, so the second request reuses the
+        // registrations already collected for their shared conftest.
+        test.db.clear_salsa_events();
+        test.path = "/src/tests/test_two.py";
+        test.function("test_two")
+            .assert_fixture("resource", "/src/tests/shared.py", "resource");
+
+        let events = test.db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &test.db,
+            "pytest_registered_plugin_files_from",
+            None,
+            &events,
+        );
     }
 
     #[test_case(
