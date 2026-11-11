@@ -1,16 +1,21 @@
 ## What it does
 
-Detects nonempty functions that can reach the end of their body when their return type does not
-allow `None`.
+Detects nonempty functions that can reach the end of their body and implicitly return `None`,
+despite the fact that their return-type annotations do not allow `None` to be returned.
 
-If a generator annotated with `Generator[YieldType, SendType, ReturnType]` "falls off" the end of
-the function in certain code paths, the implicit return type in those code paths will be `None`, so
-`ReturnType` must allow `None` in these cases.
+This rule only covers functions with non-empty bodies. Functions with empty "stub" bodies are
+covered by the separate `invalid-implicit-return-in-function-with-stub-body` rule.
 
 ## Why is this bad?
 
-When execution reaches the end of a function, Python implicitly returns `None`. A caller relying on
-the annotated return type can then fail at runtime.
+When execution reaches the end of a function, Python implicitly returns `None`. If the return-type
+annotation does not permit `None` to be returned, a caller relying on the annotated return type can
+then fail at runtime.
+
+For a regular non-generator function, an implicit return is only allowed if the return-type
+annotation is `None` or a supertype of `None`. For a synchronous generator function annotated with
+`Generator[YieldType, SendType, ReturnType]` or similar, an implicit return is only allowed if
+`ReturnType` is `None` or a supertype of `None`.
 
 ## Examples
 
@@ -93,4 +98,6 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 
 ## Rule history
 
-- v0.0.101: Split from `invalid-return-type`.
+- v0.0.0-alpha.2: First added to ty as part of the `invalid-return-type` diagnostic (since renamed
+    to `invalid-explicit-return`).
+- v0.0.101: Split out from `invalid-return-type` as a standalone rule.

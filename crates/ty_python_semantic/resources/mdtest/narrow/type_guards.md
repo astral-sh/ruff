@@ -25,10 +25,10 @@ def _(
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
 
-# error: [invalid-implicit-return-in-stub-function] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
+# error: [invalid-implicit-return-in-function-with-stub-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
 
-# error: [invalid-implicit-return-in-stub-function] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
+# error: [invalid-implicit-return-in-function-with-stub-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
 def _(a) -> TypeIs[str]: ...
 def f(a) -> TypeGuard[str]:
     return True

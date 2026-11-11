@@ -2572,18 +2572,14 @@ def gen_func(coinflip: bool) -> Generator[int, None, str]:
 **Rule history**
 
 
-- v0.0.14: Split out [`empty-body`](#empty-body) (now [`invalid-implicit-return-in-stub-function`](#invalid-implicit-return-in-stub-function)) for missing
-    returns in stub-like bodies.
+- v0.0.0-alpha.2: Initially added under the name [`invalid-return-type`](#invalid-return-type)
 
-- v0.0.101: Split out [`invalid-implicit-return`](#invalid-implicit-return) for missing returns in nonempty bodies.
+- v0.0.14: [`empty-body`](#empty-body) (since renamed as [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body)) was
+    split into a separate rule.
 
-- v0.0.101: Split out [`invalid-generator-return-type`](#invalid-generator-return-type) for incompatible generator return annotations.
-
-- v0.0.101: Renamed from [`invalid-return-type`](#invalid-return-type).
-
-    ty accepts [`invalid-return-type`](#invalid-return-type) in configuration and ignore comments for explicit returns and
-    warns about the rename. To configure or suppress fallthrough or incompatible generator
-    annotations, use [`invalid-implicit-return`](#invalid-implicit-return) or [`invalid-generator-return-type`](#invalid-generator-return-type), respectively.
+- v0.0.101: [`invalid-implicit-return`](#invalid-implicit-return) and [`invalid-generator-return-type`](#invalid-generator-return-type) were split into separate
+    rules, and the rule was renamed as [`invalid-explicit-return`](#invalid-explicit-return). [`invalid-return-type`](#invalid-return-type) remains as a
+    compatibility alias for this rule.
 
 ## `invalid-frozen-dataclass-subclass`
 
@@ -2649,14 +2645,15 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101<
 
 
 Checks whether a generator function's return annotation allows the generator object it produces.
-This applies to both synchronous and asynchronous generators.
 
 **Why is this bad?**
 
 
-A caller that relies on an incompatible annotation can fail at runtime. For example, calling a
-generator function annotated with `-> int` produces a generator object even if every value it yields
-is an integer.
+Calling a generator function produces a generator object. A synchronous generator function's
+return-type annotation must be a supertype of `types.GeneratorType[Never, object, Never]`, and an
+asynchronous generator function's return-type annotation must be a supertype of
+`types.AsyncGeneratorType[Never, object]`. Other return-type annotations contradict what the
+function does, so must be disallowed.
 
 **Examples**
 
@@ -2671,20 +2668,44 @@ def numbers() -> int:
 
 
 # error: [invalid-generator-return-type]
-async def async_numbers() -> Generator[int]:
+async def numbers() -> Generator[int]:
     yield 1
 ```
 
-Both functions yield integers. Annotate `numbers` with `collections.abc.Generator[int]` and
-`async_numbers` with `collections.abc.AsyncGenerator[int]`.
+Use instead:
 
-An incompatible explicit `return` inside a synchronous generator is reported by
-[`invalid-explicit-return`](#invalid-explicit-return).
+```py
+from collections.abc import AsyncGenerator, Generator
+
+
+def numbers() -> Generator[int]:
+    yield 1
+
+
+async def numbers() -> AsyncGenerator[int]:
+    yield 1
+```
+
+**See also**
+
+
+- [`invalid-explicit-return`](#invalid-explicit-return) emits errors on synchronous generator functions where the return-type
+    annotation is a valid supertype of `types.GeneratorType` but specific `return` statements in the
+    body of the generator function are not consistent with the third type parameter supplied to
+    `types.GeneratorType`, `collections.abc.Generator` or similar in the return-type annotation.
+
+- [`invalid-implicit-return`](#invalid-implicit-return) emits errors on synchronous generator functions where a non-`None` type
+    is provided in the return-type annotation as the third type argument to `types.GeneratorType`,
+    `collections.abc.Generator` or similar, yet the function body includes code paths that
+    implicitly return `None`.
 
 **Rule history**
 
 
-- v0.0.101: Split from [`invalid-return-type`](#invalid-return-type).
+- v0.0.0-alpha.5: First added to ty as part of the pre-existing [`invalid-return-type`](#invalid-return-type) diagnostic
+
+- v0.0.101: [`invalid-generator-return-type`](#invalid-generator-return-type) was split out as a standalone rule from
+    [`invalid-return-type`](#invalid-return-type), and [`invalid-return-type`](#invalid-return-type) was renamed as [`invalid-explicit-return`](#invalid-explicit-return)
 
 ## `invalid-generic-class`
 
@@ -2843,18 +2864,23 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101<
 **What it does**
 
 
-Detects nonempty functions that can reach the end of their body when their return type does not
-allow `None`.
+Detects nonempty functions that can reach the end of their body and implicitly return `None`,
+despite the fact that their return-type annotations do not allow `None` to be returned.
 
-If a generator annotated with `Generator[YieldType, SendType, ReturnType]` "falls off" the end of
-the function in certain code paths, the implicit return type in those code paths will be `None`, so
-`ReturnType` must allow `None` in these cases.
+This rule only covers functions with non-empty bodies. Functions with empty "stub" bodies are
+covered by the separate [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body) rule.
 
 **Why is this bad?**
 
 
-When execution reaches the end of a function, Python implicitly returns `None`. A caller relying on
-the annotated return type can then fail at runtime.
+When execution reaches the end of a function, Python implicitly returns `None`. If the return-type
+annotation does not permit `None` to be returned, a caller relying on the annotated return type can
+then fail at runtime.
+
+For a regular non-generator function, an implicit return is only allowed if the return-type
+annotation is `None` or a supertype of `None`. For a synchronous generator function annotated with
+`Generator[YieldType, SendType, ReturnType]` or similar, an implicit return is only allowed if
+`ReturnType` is `None` or a supertype of `None`.
 
 **Examples**
 
@@ -2939,16 +2965,18 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 **Rule history**
 
 
-- v0.0.101: Split from [`invalid-return-type`](#invalid-return-type).
+- v0.0.0-alpha.2: First added to ty as part of the [`invalid-return-type`](#invalid-return-type) diagnostic (since renamed
+    to [`invalid-explicit-return`](#invalid-explicit-return)).
+- v0.0.101: Split out from [`invalid-return-type`](#invalid-return-type) as a standalone rule.
 
 <a id="empty-body"></a>
 
-## `invalid-implicit-return-in-stub-function`
+## `invalid-implicit-return-in-function-with-stub-body`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-implicit-return-in-stub-function%22+OR+%22empty-body%22%29" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-implicit-return-in-function-with-stub-body%22+OR+%22empty-body%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L554" target="_blank">View source</a>
 </small>
 
@@ -2985,10 +3013,10 @@ rather than implementations:
 
 
 ```python
-def foo() -> int: ...  # error: [invalid-implicit-return-in-stub-function]
+def foo() -> int: ...  # error: [invalid-implicit-return-in-function-with-stub-body]
 
 
-def bar() -> str:  # error: [invalid-implicit-return-in-stub-function]
+def bar() -> str:  # error: [invalid-implicit-return-in-function-with-stub-body]
     """A function that does nothing."""
     pass
 ```
@@ -2996,8 +3024,9 @@ def bar() -> str:  # error: [invalid-implicit-return-in-stub-function]
 **Rule history**
 
 
-- v0.0.14: Split from [`invalid-return-type`](#invalid-return-type) as [`empty-body`](#empty-body).
-- v0.0.101: Renamed from [`empty-body`](#empty-body) to [`invalid-implicit-return-in-stub-function`](#invalid-implicit-return-in-stub-function).
+- v0.0.0-alpha.2: First added to ty as part of the [`invalid-return-type`](#invalid-return-type) diagnostic (since renamed to [`invalid-explicit-return`](#invalid-explicit-return)).
+- v0.0.14: Split out from [`invalid-return-type`](#invalid-return-type) as a new [`empty-body`](#empty-body) diagnostic.
+- v0.0.101: Renamed from [`empty-body`](#empty-body) to [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body).
 
 ## `invalid-init-type-variable`
 
@@ -7658,8 +7687,8 @@ Python code.
 
 
 - v0.0.70: Added as [`unsound-return-statement`](#unsound-return-statement).
-- v0.0.101: Renamed to [`unsound-return`](#unsound-return). ty accepts [`unsound-return-statement`](#unsound-return-statement) in configuration and
-    ignore comments and warns about the rename.
+- v0.0.101: Renamed to [`unsound-return`](#unsound-return). [`unsound-return-statement`](#unsound-return-statement) remains as a compatibility alias
+    for this rule.
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/

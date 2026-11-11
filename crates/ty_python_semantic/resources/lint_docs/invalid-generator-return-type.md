@@ -46,6 +46,7 @@ async def numbers() -> AsyncGenerator[int]:
     annotation is a valid supertype of `types.GeneratorType` but specific `return` statements in the
     body of the generator function are not consistent with the third type parameter supplied to
     `types.GeneratorType`, `collections.abc.Generator` or similar in the return-type annotation.
+
 - `invalid-implicit-return` emits errors on synchronous generator functions where a non-`None` type
     is provided in the return-type annotation as the third type argument to `types.GeneratorType`,
     `collections.abc.Generator` or similar, yet the function body includes code paths that
@@ -53,7 +54,7 @@ async def numbers() -> AsyncGenerator[int]:
 
 ## Rule history
 
-- v0.0.1-alpha.1: The `invalid-return-type` rule was added to ty
+- v0.0.0-alpha.5: First added to ty as part of the pre-existing `invalid-return-type` diagnostic
 
 - v0.0.101: `invalid-generator-return-type` was split out as a standalone rule from
     `invalid-return-type`, and `invalid-return-type` was renamed as `invalid-explicit-return`

@@ -84,10 +84,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
-    registry.register_lint(&INVALID_IMPLICIT_RETURN_IN_STUB_FUNCTION);
+    registry.register_lint(&INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY);
     registry.register_alias(
         LintName::of("empty-body"),
-        &INVALID_IMPLICIT_RETURN_IN_STUB_FUNCTION,
+        &INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY,
     );
     registry.register_lint(&EXPERIMENTAL_SYNTAX);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
@@ -552,8 +552,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-implicit-return-in-stub-function.md")]
-    pub(crate) static INVALID_IMPLICIT_RETURN_IN_STUB_FUNCTION = {
+    #[doc = include_str!("../../resources/lint_docs/invalid-implicit-return-in-function-with-stub-body.md")]
+    pub(crate) static INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY = {
         summary: "detects functions with stub-like bodies whose return type excludes `None`",
         status: LintStatus::stable("0.0.101"),
         default_level: Level::Error,
@@ -3166,7 +3166,7 @@ pub(super) fn report_implicit_return_type(
     let db = context.db();
 
     let lint_to_use = if has_empty_body {
-        &INVALID_IMPLICIT_RETURN_IN_STUB_FUNCTION
+        &INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY
     } else {
         &INVALID_IMPLICIT_RETURN
     };

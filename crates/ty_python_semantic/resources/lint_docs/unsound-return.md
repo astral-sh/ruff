@@ -119,8 +119,8 @@ Python code.
 ## Rule history
 
 - v0.0.70: Added as `unsound-return-statement`.
-- v0.0.101: Renamed to `unsound-return`. ty accepts `unsound-return-statement` in configuration and
-    ignore comments and warns about the rename.
+- v0.0.101: Renamed to `unsound-return`. `unsound-return-statement` remains as a compatibility alias
+    for this rule.
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/

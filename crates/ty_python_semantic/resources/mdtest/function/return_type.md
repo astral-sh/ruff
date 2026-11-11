@@ -67,7 +67,7 @@ class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
-    # error: [invalid-implicit-return-in-stub-function]
+    # error: [invalid-implicit-return-in-function-with-stub-body]
     def f(self) -> int: ...
 
 T = TypeVar("T", covariant=True)
@@ -107,7 +107,7 @@ class Bar[T](ABC):
     @abstractmethod
     def g[U](self, x: U) -> U: ...
 
-# error: [invalid-implicit-return-in-stub-function]
+# error: [invalid-implicit-return-in-function-with-stub-body]
 def f() -> int: ...
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
@@ -325,7 +325,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-implicit-return-in-stub-function]
+# error: [invalid-implicit-return-in-function-with-stub-body]
 def m(x: T) -> T: ...
 
 class A[T]: ...
@@ -443,14 +443,14 @@ def f(flag: bool) -> int:  # error: [invalid-implicit-return]
 def numbers() -> int:  # error: [invalid-generator-return-type]
     yield 1
 
-def placeholder() -> int: ...  # error: [invalid-implicit-return-in-stub-function]
+def placeholder() -> int: ...  # error: [invalid-implicit-return-in-function-with-stub-body]
 ```
 
 The old `empty-body` selector still suppresses a missing return in a stub body. ty warns about the
 renamed rule in the ignore comment.
 
 ```py
-# error: [renamed-rule-in-ignore-comment] "Rule `empty-body` has been renamed to `invalid-implicit-return-in-stub-function`"
+# error: [renamed-rule-in-ignore-comment] "Rule `empty-body` has been renamed to `invalid-implicit-return-in-function-with-stub-body`"
 def unfinished() -> int: ...  # ty: ignore[empty-body]
 ```
 
@@ -640,7 +640,7 @@ async def k() -> typing.AsyncGenerator[int]:
     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
-## `invalid-implicit-return-in-stub-function` in a concrete subclass of a protocol
+## `invalid-implicit-return-in-function-with-stub-body` in a concrete subclass of a protocol
 
 <!-- snapshot-diagnostics -->
 
@@ -653,7 +653,7 @@ class Abstract(Protocol):
     def method(self) -> str: ...
 
 class Concrete(Abstract):
-    def method(self) -> str: ...  # error: [invalid-implicit-return-in-stub-function]
+    def method(self) -> str: ...  # error: [invalid-implicit-return-in-function-with-stub-body]
 ```
 
 ## Diagnostics for `invalid-implicit-return` on dynamic type

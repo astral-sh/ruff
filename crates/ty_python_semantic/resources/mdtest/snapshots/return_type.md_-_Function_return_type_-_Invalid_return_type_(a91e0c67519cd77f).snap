@@ -29,7 +29,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 14 | 
 15 | T = TypeVar("T")
 16 | 
-17 | # error: [invalid-implicit-return-in-stub-function]
+17 | # error: [invalid-implicit-return-in-function-with-stub-body]
 18 | def m(x: T) -> T: ...
 19 | 
 20 | class A[T]: ...
@@ -82,7 +82,7 @@ error[invalid-explicit-return]: Return type does not match returned value
 ```
 
 ```
-error[invalid-implicit-return-in-stub-function]: Function always implicitly returns `None`, which is not assignable to return type `T@m`
+error[invalid-implicit-return-in-function-with-stub-body]: Function always implicitly returns `None`, which is not assignable to return type `T@m`
   --> src/mdtest_snippet.py:18:16
    |
 18 | def m(x: T) -> T: ...
