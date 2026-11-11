@@ -29,13 +29,11 @@ pub struct Cli {
     pub(crate) command: Command,
 }
 
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
     Check(CheckCommand),
-
-    /// Report how precisely ty infers the types in a project, line by line.
-    Coverage(CoverageCommand),
 
     /// Start the language server
     Server(ServerCommand),
@@ -70,7 +68,7 @@ pub(crate) struct CheckCommand {
         help = "List of files or directories to check [default: the project root]",
         value_name = "PATH"
     )]
-    pub(crate) paths: Vec<SystemPathBuf>,
+    pub paths: Vec<SystemPathBuf>,
 
     /// Apply fixes to resolve errors.
     #[arg(long)]
@@ -87,6 +85,11 @@ pub(crate) struct CheckCommand {
     /// Create or update the configured diagnostic baseline (preview).
     #[arg(long, conflicts_with_all = ["watch", "fix", "add_ignore"])]
     pub(crate) update_baseline: bool,
+
+    /// Write an HTML report of how precisely ty infers the types on each line to the given
+    /// directory (preview).
+    #[arg(long, value_name = "DIR", conflicts_with_all = ["fix", "add_ignore", "update_baseline"])]
+    pub(crate) html_report: Option<SystemPathBuf>,
 
     /// Run the command within the given project directory.
     ///
@@ -333,96 +336,6 @@ pub(crate) struct ServerCommand {
     /// Exit with status 0 if ty is found, 1 if discovery fails, or 2 on an unexpected error.
     #[arg(long, hide = true)]
     pub(crate) find_executable: bool,
-}
-
-/// Arguments for `ty coverage`.
-#[derive(Debug, Parser)]
-pub(crate) struct CoverageCommand {
-    /// List of files or directories to measure coverage for.
-    #[clap(
-        help = "List of files or directories to measure [default: the project root]",
-        value_name = "PATH"
-    )]
-    pub(crate) paths: Vec<SystemPathBuf>,
-
-    /// Run the command within the given project directory.
-    #[arg(long, value_name = "PROJECT")]
-    pub(crate) project: Option<SystemPathBuf>,
-
-    /// Path to your project's Python environment or interpreter.
-    #[arg(long, value_name = "PATH", alias = "venv")]
-    pub(crate) python: Option<SystemPathBuf>,
-
-    /// Custom directory to use for stdlib typeshed stubs.
-    #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    pub(crate) typeshed: Option<SystemPathBuf>,
-
-    /// Additional path to use as a module-resolution source (can be passed multiple times).
-    #[arg(long, value_name = "PATH")]
-    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
-
-    /// Python version to assume when resolving types.
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
-    pub(crate) python_version: Option<PythonVersion>,
-
-    /// Target platform to assume when resolving types.
-    #[arg(long, value_name = "PLATFORM", alias = "platform")]
-    pub(crate) python_platform: Option<String>,
-
-    #[clap(flatten)]
-    pub(crate) verbosity: Verbosity,
-
-    #[clap(flatten)]
-    pub(crate) config: ConfigsArg,
-
-    /// The path to a `ty.toml` file to use for configuration.
-    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
-    pub(crate) config_file: Option<SystemPathBuf>,
-
-    /// Write an HTML coverage report to the given directory.
-    #[arg(long, value_name = "DIR")]
-    pub(crate) html: SystemPathBuf,
-
-    /// Control when colored output is used.
-    #[arg(
-        long,
-        value_name = "WHEN",
-        help_heading = "Global options",
-        display_order = 1000
-    )]
-    pub(crate) color: Option<TerminalColor>,
-
-    /// Hide all progress outputs.
-    ///
-    /// For example, spinners or progress bars.
-    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
-    pub(crate) no_progress: bool,
-}
-
-impl CoverageCommand {
-    pub(crate) fn into_options(self) -> Options {
-        let options = Options {
-            environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
-                python_platform: self
-                    .python_platform
-                    .map(|platform| RangedValue::cli(platform.into())),
-                python: self.python.map(RelativePathBuf::cli),
-                typeshed: self.typeshed.map(RelativePathBuf::cli),
-                extra_paths: self.extra_search_path.map(|extra_search_paths| {
-                    extra_search_paths
-                        .into_iter()
-                        .map(RelativePathBuf::cli)
-                        .collect()
-                }),
-                ..EnvironmentOptions::default()
-            }),
-            ..Options::default()
-        };
-        options.combine(self.config.into_options().unwrap_or_default())
-    }
 }
 
 /// A list of rules to enable or disable with a given severity.

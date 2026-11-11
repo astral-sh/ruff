@@ -1,4 +1,4 @@
-//! Line-level type coverage, as reported by `ty coverage`.
+//! Line-level type coverage, as reported by `ty check --html-report`.
 //!
 //! This follows mypy's line-precision reports (`mypy --html-report`). Every expression, parameter,
 //! and import is classified by its inferred type, and each line takes the least precise
@@ -164,7 +164,7 @@ mod tests {
                 LineCoverage::Dynamic => 'D',
             };
             writeln!(output, "{marker} | {line}").unwrap();
-            }
+        }
         output
     }
 

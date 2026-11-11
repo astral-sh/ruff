@@ -1,4 +1,4 @@
-//! Writes the HTML report for `ty coverage`.
+//! Writes the HTML coverage report for `ty check --html-report`.
 //!
 //! The report follows the layout of mypy's `--html-report`: an `index.html` page with one row per
 //! file, and one page per file that shows its source with each line colored by its
@@ -7,19 +7,19 @@
 use std::fmt::Write as _;
 
 use anyhow::Context;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ty_project::ProjectDatabase;
-use ty_python_semantic::coverage::LineCoverage;
+use ty_project::{Db as _, ProjectDatabase};
+use ty_python_semantic::coverage::{LineCoverage, line_coverage};
 
 /// The coverage of a single project file.
-#[derive(Debug)]
-pub(crate) struct FileCoverage {
-    pub(crate) path: SystemPathBuf,
-    pub(crate) file: File,
+struct FileCoverage {
+    path: SystemPathBuf,
+    file: File,
     /// The classification of each line, indexed by zero-based line number.
-    pub(crate) lines: Vec<LineCoverage>,
+    lines: Vec<LineCoverage>,
 }
 
 /// Line counts for a file, or for all files in the report.
@@ -76,12 +76,27 @@ impl CoverageCounts {
     }
 }
 
-/// Writes the report into `output_dir` and returns the line counts over all files.
+/// Writes the report for all project files into `output_dir`, and returns the line counts over
+/// all files.
+///
+/// This runs after `ty check` has inferred the types of all project files, so it mostly reads
+/// cached results.
 pub(crate) fn write_html_report(
     db: &ProjectDatabase,
-    mut files: Vec<FileCoverage>,
     output_dir: &SystemPath,
 ) -> anyhow::Result<CoverageCounts> {
+    let files: Vec<File> = db.project().files(db).iter().collect();
+
+    // Salsa databases can't be shared between threads, so each Rayon job gets its own handle.
+    let mut files: Vec<FileCoverage> = files
+        .into_par_iter()
+        .map_with(db.clone(), |db, file| {
+            let path = file.path(db).as_system_path()?.to_path_buf();
+            let lines = line_coverage(db, file);
+            Some(FileCoverage { path, file, lines })
+        })
+        .flatten()
+        .collect();
     files.sort_by(|a, b| a.path.cmp(&b.path));
 
     // Show paths relative to the deepest directory that contains all files.
@@ -188,7 +203,11 @@ fn file_page(
 }
 
 fn write_summary_row(out: &mut String, name: &str, link: Option<&str>, counts: CoverageCounts) {
-    let _ = write!(out, "<tr class=\"{}\"><td class=\"name\">", counts.quality_class());
+    let _ = write!(
+        out,
+        "<tr class=\"{}\"><td class=\"name\">",
+        counts.quality_class()
+    );
     match link {
         Some(link) => {
             let _ = write!(out, "<a href=\"{link}\">");

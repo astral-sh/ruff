@@ -9,17 +9,15 @@ fn html_report() -> anyhow::Result<()> {
         ("pkg/dynamic.py", "def f(y):\n    return y\n"),
     ])?;
 
-    assert_cmd_snapshot!(
-        case.command_with_subcommand("coverage").args(["--html", "report"]),
-        @"
+    assert_cmd_snapshot!(case.command().args(["--html-report", "report"]), @"
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
     Wrote coverage report to <temp_dir>/report/index.html (66.67% imprecise)
 
     ----- stderr -----
-    "
-    );
+    ");
 
     let index = std::fs::read_to_string(case.root().join("report/index.html"))?;
     assert!(index.contains(r#"<a href="files/dynamic.py.html">dynamic.py</a>"#));
@@ -32,21 +30,21 @@ fn html_report() -> anyhow::Result<()> {
 }
 
 #[test]
-fn nonexistent_path() -> anyhow::Result<()> {
+fn html_report_conflicts_with_fix() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "x = 1\n")?;
 
-    assert_cmd_snapshot!(
-        case.command_with_subcommand("coverage").args(["missing.py", "--html", "report"]),
-        @"
+    assert_cmd_snapshot!(case.command().args(["--html-report", "report", "--fix"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    ty failed
-      Cause: path does not exist: <temp_dir>/missing.py
-    "
-    );
+    error: the argument '--html-report <DIR>' cannot be used with '--fix'
+
+    Usage: ty check --html-report <DIR> [PATH]...
+
+    For more information, try '--help'.
+    ");
 
     Ok(())
 }
