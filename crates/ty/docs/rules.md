@@ -5343,7 +5343,7 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 **Rule history**
 
 
-- v0.0.101: Renamed from [`call-non-callable`](#call-non-callable), which remains as a deprecated alias for this rule.
+- v0.0.102: Renamed from [`call-non-callable`](#call-non-callable), which remains as a deprecated alias for this rule.
 
 ## `not-iterable`
 

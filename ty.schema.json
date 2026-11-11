@@ -1418,7 +1418,7 @@
         },
         "not-callable": {
           "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.\n\n## Rule history\n\n- v0.0.101: Renamed from `call-non-callable`, which remains as a deprecated alias for this rule.",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.\n\n## Rule history\n\n- v0.0.102: Renamed from `call-non-callable`, which remains as a deprecated alias for this rule.",
           "default": "error",
           "oneOf": [
             {
