@@ -435,7 +435,7 @@ in the same MRO:
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [inconsistent-generic-bases]
 ```
 
 ## Truthiness

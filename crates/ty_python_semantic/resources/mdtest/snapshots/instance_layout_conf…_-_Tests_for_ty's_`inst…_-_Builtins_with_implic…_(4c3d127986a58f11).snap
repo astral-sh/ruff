@@ -54,7 +54,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict
 39 |     H
 40 | ): ...
 41 | # fmt: on
-42 | # error: [invalid-generic-class]
+42 | # error: [inconsistent-generic-bases]
 43 | class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
@@ -179,7 +179,7 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 ```
 
 ```
-error[invalid-generic-class]: Inconsistent type arguments for `Sequence` among class bases
+error[inconsistent-generic-bases]: Inconsistent type arguments for `Sequence` among class bases
   --> src/mdtest_snippet.py:43:7
    |
 43 | class Foo(range, str): ...  # error: [subclass-of-final-class]

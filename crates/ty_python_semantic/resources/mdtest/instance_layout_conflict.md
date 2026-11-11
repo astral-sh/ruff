@@ -261,11 +261,11 @@ class I(  # error: [instance-layout-conflict]
 
 We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
 `range` is `@final`, so we'll complain about the `class` statement anyway. (We also emit
-`invalid-generic-class` here, as `Sequence[str]` and `Sequence[int]` coexist invalidly in this
+`inconsistent-generic-bases` here, as `Sequence[str]` and `Sequence[int]` coexist invalidly in this
 class's MRO.)
 
 ```py
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 
