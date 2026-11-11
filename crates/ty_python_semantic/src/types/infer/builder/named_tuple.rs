@@ -1,5 +1,6 @@
 use crate::{
-    Db,
+    Db, ProgramEnvironment,
+    lint::LintMetadata,
     types::{
         ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
         TypeContext, UnionType,
@@ -8,12 +9,14 @@ use crate::{
         },
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
-            PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-            report_mismatched_type_name,
+            NON_LITERAL_NAMED_TUPLE_FIELDS, PARAMETER_ALREADY_ASSIGNED,
+            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
         extract_fixed_length_iterable_element_types,
         function::KnownFunction,
         infer::TypeInferenceBuilder,
+        object_type_form,
+        tuple::TupleLength,
     },
 };
 use char_str::format_char;
@@ -559,8 +562,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::List(list) => (&list.elts, SequenceKind::List),
             ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
             _ => {
-                self.infer_expression(fields_arg, TypeContext::default());
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
+                let ty = self.infer_expression(fields_arg, TypeContext::default());
+                let lint = FieldArgument::Fields.lint(db, env, ty);
+                if let Some(builder) = self.context.report_lint(lint, fields_arg) {
                     let mut diagnostic = builder.into_diagnostic(
                         "Invalid argument to parameter `fields` of `NamedTuple()`",
                     );
@@ -579,7 +583,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
                 ast::Expr::List(list) => (&list.elts, SequenceKind::List),
                 _ => {
-                    self.infer_expression(element, TypeContext::default());
+                    let ty = self.infer_expression(element, TypeContext::default());
                     for element in &elements[(i + 1)..] {
                         self.infer_expression(element, TypeContext::default());
                     }
@@ -595,8 +599,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::homogeneous_tuple(db, env, Type::unknown()),
                         ),
                     }
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                    let argument = if element.is_starred_expr() {
+                        FieldArgument::Fields
+                    } else {
+                        FieldArgument::Pair
+                    };
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(argument.lint(db, env, ty), fields_arg)
                     {
                         let mut diagnostic = builder.into_diagnostic(
                             "Invalid argument to parameter `fields` of `NamedTuple()`",
@@ -610,7 +620,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             let [name_expr, declaration_expr] = &**field_spec_elts else {
-                self.infer_expression(element, TypeContext::default());
+                let ty = self.infer_expression(element, TypeContext::default());
                 for element in &elements[(i + 1)..] {
                     self.infer_expression(element, TypeContext::default());
                 }
@@ -626,7 +636,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::homogeneous_tuple(db, env, Type::unknown()),
                     ),
                 }
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
+                let fixed_items = field_spec_elts
+                    .iter()
+                    .filter(|expr| !expr.is_starred_expr())
+                    .count();
+                let lint = if fixed_items <= 2 && fixed_items < field_spec_elts.len() {
+                    let pair =
+                        extract_fixed_length_iterable_element_types(db, env, element, |expr| {
+                            self.expression_type(expr)
+                        })
+                        .map(|items| Type::heterogeneous_tuple(db, env, items))
+                        .unwrap_or(ty);
+                    FieldArgument::Pair.lint(db, env, pair)
+                } else {
+                    &INVALID_NAMED_TUPLE
+                };
+                if let Some(builder) = self.context.report_lint(lint, fields_arg) {
                     let mut diagnostic = builder.into_diagnostic(
                         "Invalid argument to parameter `fields` of `NamedTuple()`",
                     );
@@ -674,7 +699,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::homogeneous_tuple(db, env, Type::unknown()),
                     ),
                 }
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, name_expr) {
+                let str_ty = KnownClass::Str.to_instance(db, env);
+                let compatible = if name_expr.is_starred_expr() {
+                    can_unpack_as(db, env, name_type, &[str_ty])
+                } else {
+                    name_type.is_assignable_to(db, env, str_ty)
+                };
+                let lint = if compatible {
+                    &NON_LITERAL_NAMED_TUPLE_FIELDS
+                } else {
+                    &INVALID_NAMED_TUPLE
+                };
+                if let Some(builder) = self.context.report_lint(lint, name_expr) {
                     let mut diagnostic =
                         builder.into_diagnostic("Invalid `NamedTuple` field name definition");
                     diagnostic.set_primary_annotation_message(format_args!(
@@ -751,6 +787,76 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
     }
+}
+
+/// The part of a functional `NamedTuple` definition supplied by a non-literal expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldArgument {
+    Fields,
+    Pair,
+}
+
+impl FieldArgument {
+    /// Selects the diagnostic for a computed pair or collection of pairs. Each pair must be
+    /// compatible with a string field name followed by an annotation.
+    fn lint<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> &'static LintMetadata {
+        let str_ty = KnownClass::Str.to_instance(db, env);
+        let annotation_ty =
+            UnionType::from_elements(db, env, [object_type_form(db), str_ty, Type::none(db, env)]);
+        let is_pair = |ty: Type<'db>| {
+            !ty.is_subtype_of(db, env, str_ty)
+                && can_unpack_as(db, env, ty, &[str_ty, annotation_ty])
+        };
+        let compatible_pair = |ty: Type<'db>| match ty.expand_top_level_aliases(db, env) {
+            Type::Union(union) => union.elements(db).iter().copied().all(is_pair),
+            ty => is_pair(ty),
+        };
+        let compatible = match self {
+            Self::Fields => ty
+                .try_iterate(db, env)
+                .is_ok_and(|fields| fields.iter_element_types(db).all(compatible_pair)),
+            Self::Pair => compatible_pair(ty),
+        };
+        if compatible {
+            &NON_LITERAL_NAMED_TUPLE_FIELDS
+        } else {
+            &INVALID_NAMED_TUPLE
+        }
+    }
+}
+
+/// Checks whether an iterable's elements are compatible with an expected tuple of field components.
+fn can_unpack_as<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    expected: &[Type<'db>],
+) -> bool {
+    let Ok(items) = ty.try_iterate(db, env) else {
+        return false;
+    };
+    if let Some(fixed) = items.as_fixed_length() {
+        return fixed.len() == expected.len()
+            && fixed
+                .iter_all_elements()
+                .zip(expected)
+                .all(|(actual, &expected)| actual.is_assignable_to(db, env, expected));
+    }
+    // A `list[str | type]` can contain `["host", str]`, but its type guarantees neither two
+    // items nor their order. Check whether the element types overlap at the required length.
+    items
+        .resize(db, env, TupleLength::Fixed(expected.len()))
+        .is_ok_and(|items| {
+            items
+                .iter_element_types(db)
+                .zip(expected)
+                .all(|(actual, &expected)| !actual.is_disjoint_from(db, env, expected))
+        })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

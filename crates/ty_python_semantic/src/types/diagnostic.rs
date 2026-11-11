@@ -140,6 +140,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_NAMED_TUPLE);
+    registry.register_lint(&NON_LITERAL_NAMED_TUPLE_FIELDS);
     registry.register_lint(&INVALID_NAMED_TUPLE_OVERRIDE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
@@ -421,6 +422,15 @@ declare_lint! {
     pub(crate) static INVALID_NAMED_TUPLE = {
         summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::stable("0.0.1-alpha.19"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/non-literal-named-tuple-fields.md")]
+    pub(crate) static NON_LITERAL_NAMED_TUPLE_FIELDS = {
+        summary: "detects functional `NamedTuple` definitions whose fields cannot be determined statically",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
