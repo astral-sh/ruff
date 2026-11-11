@@ -18,8 +18,8 @@ use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::types::visitor::any_over_type;
-use crate::types::{ProgramEnvironment, Type};
+use crate::types::visitor::any_over_type_except_protocol_members;
+use crate::types::{KnownClass, ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
 /// The coverage classification of a single line.
@@ -129,7 +129,16 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return LineCoverage::Precise;
     }
 
-    if any_over_type(db, env, ty, true, |ty| ty.is_dynamic()) {
+    // ty infers `CoroutineType[Any, Any, T]` for a call to an `async def` function. Since ty adds
+    // those `Any`s itself, we classify the coroutine by its result type `T`, much as mypy treats
+    // `Any`s it creates for special forms as precise.
+    if let Some(specialization) = ty.known_specialization(db, env, KnownClass::CoroutineType)
+        && let [_, _, result] = specialization.types(db)
+    {
+        return classify(db, env, *result).min(LineCoverage::Imprecise);
+    }
+
+    if any_over_type_except_protocol_members(db, env, ty, |ty| ty.is_dynamic()) {
         LineCoverage::Imprecise
     } else {
         LineCoverage::Precise
@@ -203,6 +212,52 @@ mod tests {
             output.push('\n');
         }
         output
+    }
+
+    #[test]
+    fn async_protocols_and_aliases() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            from typing import Any, Iterable
+
+            async def fetch() -> int:
+                return 1
+
+            async def main() -> None:
+                coroutine = fetch()
+                result = await coroutine
+
+            def chunks() -> Iterable[bytes]:
+                return [b""]
+
+            type Json = dict[str, Any]
+
+            def parse() -> Json:
+                return {}
+
+            data = parse()
+            "#
+        ), @r#"
+          | 
+        P | from typing import Any, Iterable
+          | 
+        P | async def fetch() -> int:
+        P |     return 1
+          | 
+        P | async def main() -> None:
+        P |     coroutine = fetch()
+        P |     result = await coroutine
+          | 
+        P | def chunks() -> Iterable[bytes]:
+        P |     return [b""]
+          | 
+        D | type Json = dict[str, Any]  # `Json`: TypeAliasType, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+          | 
+        I | def parse() -> Json:  # `Json`: Json
+        I |     return {}  # `{}`: dict[str, Any]
+          | 
+        I | data = parse()  # `data`: Json, `parse()`: Json
+        "#);
     }
 
     #[test]

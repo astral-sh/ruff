@@ -46,6 +46,14 @@ pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
 
+    /// Should the visitor visit the member signatures of protocols?
+    ///
+    /// Protocol members are lazily-inferred type attributes, so this defaults to
+    /// [`TypeVisitor::should_visit_lazy_type_attributes`].
+    fn should_visit_protocol_members(&self) -> bool {
+        self.should_visit_lazy_type_attributes()
+    }
+
     /// Notify the visitor that lazily-inferred type attributes were not visited.
     fn notify_skipped_lazy_type_attributes(&self) {}
 
@@ -963,12 +971,21 @@ pub(super) fn contains_growing_type<'db>(
 enum TypeSearchMode {
     SkipLazyAttributes,
     IncludeLazyAttributes,
+    /// Visit all lazy attributes except the member signatures of protocols.
+    IncludeLazyAttributesExceptProtocolMembers,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
 }
 
 impl TypeSearchMode {
     const fn should_visit_lazy_type_attributes(self) -> bool {
+        matches!(
+            self,
+            Self::IncludeLazyAttributes | Self::IncludeLazyAttributesExceptProtocolMembers
+        )
+    }
+
+    const fn should_visit_protocol_members(self) -> bool {
         matches!(self, Self::IncludeLazyAttributes)
     }
 
@@ -1007,6 +1024,10 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.mode.should_visit_lazy_type_attributes()
+        }
+
+        fn should_visit_protocol_members(&self) -> bool {
+            self.mode.should_visit_protocol_members()
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1058,7 +1079,7 @@ where
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
 /// are visited or not.
-pub(crate) fn any_over_type<'db>(
+pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
@@ -1071,6 +1092,27 @@ pub(crate) fn any_over_type<'db>(
         TypeSearchMode::SkipLazyAttributes
     };
     any_over_type_impl(db, env, ty, mode, query)
+}
+
+/// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
+///
+/// This visits lazy type attributes, such as the values of type aliases, except for the member
+/// signatures of protocols. It answers whether a type is written in terms of a type that matches,
+/// so `Iterable[bytes]` does not match `Any` just because a method of `Iterable`'s interface
+/// mentions `Any`, but `Iterable[Any]` does.
+pub(crate) fn any_over_type_except_protocol_members<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(
+        db,
+        env,
+        ty,
+        TypeSearchMode::IncludeLazyAttributesExceptProtocolMembers,
+        query,
+    )
 }
 
 /// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other

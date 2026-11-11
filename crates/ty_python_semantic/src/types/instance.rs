@@ -1680,7 +1680,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     protocol: ProtocolInstanceType<'db>,
     visitor: &V,
 ) {
-    if visitor.should_visit_lazy_type_attributes() {
+    if visitor.should_visit_protocol_members() {
         walk_protocol_interface(db, protocol.interface(db), visitor);
     } else {
         match protocol.inner {
