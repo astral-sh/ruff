@@ -116,16 +116,20 @@ pub(crate) fn write_html_report(
     let mut footer = String::new();
     write_summary_row(&mut footer, "Total", None, total);
 
+    let mut project = String::new();
+    escape_html(&mut project, db.project().name(db));
+
     let index = format!(
         "<!DOCTYPE html>
 <html lang=\"en\">
 <head>
 <meta charset=\"utf-8\">
-<title>ty coverage report</title>
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<title>{project} type coverage</title>
 <style>{STYLE}</style>
 </head>
 <body>
-<h1>ty coverage report</h1>
+<h1>{project} type coverage</h1>
 <table class=\"summary\">
 <thead><tr><th>File</th><th>Imprecision</th><th>Lines</th><th>Precise</th><th>Imprecise</th><th>Dynamic</th><th>Empty</th></tr></thead>
 <tbody>
@@ -199,6 +203,7 @@ fn file_page(
 <html lang=\"en\">
 <head>
 <meta charset=\"utf-8\">
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 <title>{title}</title>
 <style>{STYLE}</style>
 </head>
@@ -280,9 +285,10 @@ fn common_parent<'a>(mut paths: impl Iterator<Item = &'a SystemPath>) -> SystemP
 }
 
 /// The colors match mypy's report: empty and precise lines are green, imprecise lines are yellow,
-/// and dynamic lines are red.
+/// and dynamic lines are red. The page sets its own background and text colors so that it stays
+/// readable when the browser prefers a dark color scheme.
 const STYLE: &str = "
-body { font-family: sans-serif; margin: 2em; }
+body { font-family: sans-serif; margin: 2em; background-color: #fff; color: #000; }
 table.summary { border-collapse: collapse; }
 table.summary th, table.summary td { border: 1px solid #aaa; padding: 0.3em 0.6em; text-align: right; }
 table.summary .name, table.summary th:first-child { text-align: left; }
