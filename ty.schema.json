@@ -397,6 +397,16 @@
             }
           ]
         },
+        "abstract-method-call": {
+          "title": "detects calls to abstract methods with trivial bodies on class objects",
+          "description": "## What it does\n\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s with \"trivial bodies\" when accessed\non the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`, a docstring, and/or\n`raise NotImplementedError`.\n\n## Why is this bad?\n\nAn abstract method with a trivial body has no concrete implementation to execute, so calling such a\nmethod directly on the class will probably not have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike other methods, ty permits\nabstract methods with trivial bodies to have non-`None` return types even though they always return\n`None` at runtime. This is because it is expected that these methods will always be overridden\nrather than being called directly. As a result of this exception to the normal rule, ty may infer an\nincorrect type if one of these methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed, since the actual runtime\ntype could be a concrete subclass with an implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\n\n# cannot call abstract classmethod\nFoo.method()  # error\n```\n\n## Rule history\n\n- v0.0.102: Renamed from `call-abstract-method`.\n\n    `call-abstract-method` remains as a compatibility alias for this rule.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "abstract-method-in-final-class": {
           "title": "detects `@final` classes with unimplemented abstract methods",
           "description": "## What it does\n\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\n\nA class decorated with `@final` cannot be subclassed. If such a class has abstract methods that are\nnot implemented, the class can never be properly instantiated, as the abstract methods can never be\nimplemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only prevented for\nclasses that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also\nenforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is\nclear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n@final\n# `Derived` does not implement `method`\nclass Derived(Base):  # error\n    pass\n```",
@@ -440,16 +450,6 @@
           "title": "detects blanket `ty: ignore` comments",
           "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the applicable line or\nfile. Specifying rule codes documents which diagnostics are expected and prevents the comment from\nsilencing unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
           "default": "ignore",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "call-abstract-method": {
-          "title": "detects calls to abstract methods with trivial bodies on class objects",
-          "description": "## What it does\n\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s with \"trivial bodies\" when accessed\non the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`, a docstring, and/or\n`raise NotImplementedError`.\n\n## Why is this bad?\n\nAn abstract method with a trivial body has no concrete implementation to execute, so calling such a\nmethod directly on the class will probably not have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike other methods, ty permits\nabstract methods with trivial bodies to have non-`None` return types even though they always return\n`None` at runtime. This is because it is expected that these methods will always be overridden\nrather than being called directly. As a result of this exception to the normal rule, ty may infer an\nincorrect type if one of these methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed, since the actual runtime\ntype could be a concrete subclass with an implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\n\n# cannot call abstract classmethod\nFoo.method()  # error\n```",
-          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

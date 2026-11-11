@@ -164,7 +164,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
-    registry.register_lint(&CALL_ABSTRACT_METHOD);
+    registry.register_lint(&ABSTRACT_METHOD_CALL);
+    registry.register_alias(LintName::of("call-abstract-method"), &ABSTRACT_METHOD_CALL);
     registry.register_lint(&ABSTRACT_CLASS_INSTANTIATION);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
@@ -1102,8 +1103,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/call-abstract-method.md")]
-    pub(crate) static CALL_ABSTRACT_METHOD = {
+    #[doc = include_str!("../../resources/lint_docs/abstract-method-call.md")]
+    pub(crate) static ABSTRACT_METHOD_CALL = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
         status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
@@ -4083,7 +4084,7 @@ pub(crate) fn report_call_to_abstract_method(
     function: FunctionType,
     method_kind: &str,
 ) {
-    let Some(builder) = context.report_lint(&CALL_ABSTRACT_METHOD, call) else {
+    let Some(builder) = context.report_lint(&ABSTRACT_METHOD_CALL, call) else {
         return;
     };
     let db = context.db();
