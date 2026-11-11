@@ -72,7 +72,7 @@ does_exist2 = 2
 ```
 
 ```py
-from a import does_exist1, does_not_exist, does_exist2  # error: [import-not-found]
+from a import does_exist1, does_not_exist, does_exist2  # error: [missing-module-member]
 ```
 
 ## An unresolvable import that does not use `from`

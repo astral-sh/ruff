@@ -1,7 +1,7 @@
 # Allowed unresolved imports
 
-ty should not emit a diagnostic for unresolved modules matching a pattern in
-`allowed-unresolved-imports`.
+Patterns in `allowed-unresolved-imports` can suppress diagnostics for missing modules and missing
+names in resolved modules.
 
 ## Literal matches
 
@@ -223,9 +223,7 @@ from test.foo import bar
 
 ## Missing module member
 
-When importing a member from a module that exists but doesn't have that member, ty would normally
-emit "Module `X` has no member `Y`". Setting `allow-unresolved-imports` can suppress this diagnostic
-also:
+For `from pkg import nonexistent`, the pattern `pkg.nonexistent` suppresses `missing-module-member`.
 
 ```toml
 [analysis]
@@ -235,11 +233,11 @@ allowed-unresolved-imports = ["pkg.nonexistent"]
 `pkg/__init__.py`:
 
 ```py
-x = 1
 ```
 
 `pkg/a.py`:
 
 ```py
-from pkg import nonexistent
+from pkg import nonexistent  # ok
+from pkg import also_missing  # error: [missing-module-member]
 ```
