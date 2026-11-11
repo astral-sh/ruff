@@ -29,7 +29,7 @@ use crate::{
         TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
-        diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
+        diagnostic::{INVALID_TYPE_VARIABLE_VARIANCE, report_undeclared_protocol_member},
         generics::Specialization,
         member::{class_member, inherited_class_body_declaration},
         signatures::{CallableSignature, walk_signature},
@@ -325,7 +325,7 @@ impl<'db> ProtocolClass<'db> {
 
     /// Validate explicitly declared type-variable variance against this protocol's interface.
     pub(super) fn validate_type_parameter_variance(self, context: &InferContext) {
-        if !context.is_lint_enabled(&INVALID_PROTOCOL) {
+        if !context.is_lint_enabled(&INVALID_TYPE_VARIABLE_VARIANCE) {
             return;
         }
 
@@ -376,7 +376,9 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            if let Some(builder) = context.report_lint(&INVALID_PROTOCOL, class.header_range(db)) {
+            if let Some(builder) =
+                context.report_lint(&INVALID_TYPE_VARIABLE_VARIANCE, class.header_range(db))
+            {
                 builder.into_diagnostic(format_args!(
                     "Type variable `{}` in protocol `{}` should be {}, but is {}",
                     typevar.typevar(db).name(db),

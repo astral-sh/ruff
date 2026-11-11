@@ -374,7 +374,7 @@ reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 
-# error: [invalid-generic-class] "Default of `U` cannot reference out-of-scope type variable `T`"
+# error: [invalid-type-variable-default] "Default of `U` cannot reference out-of-scope type variable `T`"
 class Invalid(Generic[U]): ...
 ```
 

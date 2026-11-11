@@ -699,7 +699,7 @@ BoundedAlias = TypeAliasType("BoundedAlias", list[BoundedT], type_params=(Bounde
 NonGenericAlias = TypeAliasType("NonGenericAlias", list[int])
 DefaultedT = TypeVar("DefaultedT", default=str)
 
-# error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+# error: [invalid-type-parameter-order] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
 InvalidOrder = TypeAliasType("InvalidOrder", tuple[DefaultedT, T], type_params=(DefaultedT, T))
 
 # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
@@ -781,14 +781,14 @@ DefaultedT = TypeVar("DefaultedT", default=int)
 DefaultAfterTypeVarTuple = TypeAliasType(
     "DefaultAfterTypeVarTuple",
     tuple[Unpack[Ts], DefaultedT],
-    # error: [invalid-type-variable-default] "Type parameter `DefaultedT` with a default follows TypeVarTuple `Ts`"
+    # error: [invalid-type-parameter-order] "Type parameter `DefaultedT` with a default follows TypeVarTuple `Ts`"
     type_params=(Ts, DefaultedT),
 )
 
 InvalidOrderAndEntries = TypeAliasType(
     "InvalidOrderAndEntries",
     tuple[DefaultedT, T],
-    # error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+    # error: [invalid-type-parameter-order] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
     # error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
     # error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
     type_params=(DefaultedT, T, T, "V"),

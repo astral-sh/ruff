@@ -696,6 +696,16 @@
             }
           ]
         },
+        "inconsistent-generic-bases": {
+          "title": "detects conflicting specializations of a common generic base class",
+          "description": "## What it does\n\nChecks for classes that inherit conflicting specializations of the same generic base class.\n\n## Why is this bad?\n\nCallers can use a subclass through either of its bases. Conflicting type arguments can give them\nincompatible expectations for the same inherited attribute.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nclass Box[T]:\n    value: T\n\n\nclass IntBox(Box[int]): ...\n\n\nclass StrBox(Box[str]): ...\n\n\nclass MixedBox(IntBox, StrBox): ...  # error: [inconsistent-generic-bases]\n```\n\nA function accepting `IntBox` can write an integer to the `value` attribute of a `MixedBox`\ninstance. A function accepting `StrBox` would then read that integer as a `str`.\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-generic-class`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "inconsistent-mro": {
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\n\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\n\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nclass A: ...\n\n\nclass B(A): ...\n\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...  # error\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
@@ -908,7 +918,7 @@
         },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
-          "description": "## What it does\n\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\n\nThere are several requirements that you must follow when defining a generic class. Many of these\nresult in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n\n# class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...  # error\n\n\n# type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...  # error\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\n\nChecks for malformed generic class declarations, such as a class that declares type parameters\nboth in brackets and through a `Generic[...]` base.\n\n## Why is this bad?\n\nThere are several requirements that you must follow when defining a generic class. Many of these\nresult in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\n\n# class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...  # error\n```\n\n## References\n\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)\n\n## Rule history\n\n- v0.0.102: Split out `invalid-type-variable-variance`, `inconsistent-generic-bases`, and\n    `invalid-type-parameter-order`. Defaults that reference out-of-scope type variables now use\n    `invalid-type-variable-default`.",
           "default": "error",
           "oneOf": [
             {
@@ -1068,7 +1078,7 @@
         },
         "invalid-protocol": {
           "title": "detects invalid protocol class definitions",
-          "description": "## What it does\n\nChecks for protocol classes that are invalid at runtime or do not satisfy the typing specification.\n\n## Why is this bad?\n\nAn invalidly defined protocol class may lead to the type checker inferring unexpected things or\naccepting unsafe operations. Some invalid protocol definitions also raise `TypeError` at runtime.\n\n## Examples\n\nA `Protocol` class cannot inherit from a non-`Protocol` class; this raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```\n\nA generic protocol's declared type-variable variance must match how that variable is used by its\nprotocol members. For example, a type variable that appears only in a method's return type must be\ncovariant:\n\n```py\nfrom typing import Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Source(Protocol[T]):  # error: [invalid-protocol]\n    def read(self) -> T: ...\n```\n\nAlthough Python constructs this protocol successfully at runtime, it is invalid for static typing.\nDeclare the type variable with `TypeVar(\"T\", covariant=True)` instead.",
+          "description": "## What it does\n\nChecks for protocol classes that are invalid at runtime or do not satisfy the typing specification.\n\n## Why is this bad?\n\nAn invalidly defined protocol class may lead to the type checker inferring unexpected things or\naccepting unsafe operations. Some invalid protocol definitions also raise `TypeError` at runtime.\n\n## Examples\n\nA `Protocol` class cannot inherit from a non-`Protocol` class; this raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```\n\n## Rule history\n\n- v0.0.102: Split out `invalid-type-variable-variance`.",
           "default": "error",
           "oneOf": [
             {
@@ -1166,6 +1176,16 @@
             }
           ]
         },
+        "invalid-type-parameter-order": {
+          "title": "detects invalid ordering of type parameters",
+          "description": "## What it does\n\nChecks for type parameters in an invalid order. Required parameters must precede parameters with\ndefaults, and a default can only refer to type parameters that precede it. A `TypeVar` with a\ndefault cannot follow a `TypeVarTuple`.\n\n## Why is this bad?\n\nType arguments are assigned to parameters by position. If a required parameter follows one with a\ndefault, a caller cannot supply the required argument while omitting the optional one. After a\n`TypeVarTuple`, it would be ambiguous whether a positional argument belongs to the tuple or to the\nparameter with the default.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n\nclass C(Generic[U, T]): ...  # error: [invalid-type-parameter-order]\n\n\ntype Alias[*Ts, V = int] = tuple[*Ts, V]  # error: [invalid-type-parameter-order]\n```\n\nA default can depend on another parameter in the same declaration only if that parameter comes\nfirst. Here, both parameters have defaults, but `T2` depends on `T1`.\n\n```python\nT1 = TypeVar(\"T1\", default=int)\nT2 = TypeVar(\"T2\", default=T1)\n\n\nclass ForwardReference(Generic[T2, T1]): ...  # error: [invalid-type-parameter-order]\n```\n\nPutting `T1` first, as in `Generic[T1, T2]`, makes its value available to `T2`.\n\nPython itself rejects a required parameter after a default in a PEP 695 parameter list, such as\n`class C[U = int, T]: ...`. ty reports that case as `invalid-syntax`.\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-generic-class` and `invalid-type-variable-default`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-variable-bound": {
           "title": "detects invalid type variable bounds",
           "description": "## What it does\n\nChecks for [type variables][type variable] whose bounds reference type variables.\n\n## Why is this bad?\n\nThe bound of a type variable must be a concrete type.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeVar\n\n# error: [invalid-type-variable-bound]\nRecursiveT = TypeVar(\"RecursiveT\", bound=list[\"RecursiveT\"])\nU = TypeVar(\"U\")\n# error: [invalid-type-variable-bound]\nBoundT = TypeVar(\"BoundT\", bound=U)\n\n\ndef f[T: list[T]](): ...  # error: [invalid-type-variable-bound]\ndef g[U, T: U](): ...  # error: [invalid-type-variable-bound]\n```\n\n[type variable]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
@@ -1188,7 +1208,17 @@
         },
         "invalid-type-variable-default": {
           "title": "detects invalid type variable defaults",
-          "description": "## What it does\n\nChecks for [type variables] whose default type is not compatible with the type variable's bound or\nconstraints.\n\n## Why is this bad?\n\nIf a type variable has a bound, the default must be assignable to that bound (see: [bound rules]).\nIf a type variable has constraints, the default must be one of the constraints (see:\n[constraint rules]).\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
+          "description": "## What it does\n\nChecks for [type variables] whose default type is not compatible with the type variable's bound or\nconstraints, or whose default references an out-of-scope type variable.\n\n## Why is this bad?\n\nIf a type variable has a bound, the default must be assignable to that bound (see: [bound rules]).\nIf a type variable has constraints, the default must be one of the constraints (see:\n[constraint rules]).\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\nA class cannot supply a default from a type variable it never binds. Here, `T2` defaults to `T1`,\nbut `OnlyT2` has no type parameter named `T1`. Include `T1` before `T2` in `Generic[T1, T2]`,\nor give `T2` a default that does not depend on `T1`.\n\n```python\nT1 = TypeVar(\"T1\", default=int)\nT2 = TypeVar(\"T2\", default=T1)\n\n\nclass OnlyT2(Generic[T2]): ...  # error: [invalid-type-variable-default]\n```\n\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar\n\n## Rule history\n\n- v0.0.102: Split out `invalid-type-parameter-order`. This rule now also covers class type\n    parameter defaults that reference out-of-scope type variables, previously reported by\n    `invalid-generic-class`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-variable-variance": {
+          "title": "detects type variables whose declared variance is incompatible with their use",
+          "description": "## What it does\n\nChecks whether the declared variance of a type variable is compatible with how a generic class\nuses it in its methods and base classes. In a generic protocol, the declared variance must match\nthe variance inferred from its interface.\n\n## Why is this bad?\n\nA covariant class allows a value of type `Box[int]` to be used where `Box[object]` is expected.\nIf a method could then store any `object` in that box, callers reading from the original\n`Box[int]` could receive a value of the wrong type.\n\n## Examples\n\n```python\nfrom typing import Generic, TypeVar\n\nT_co = TypeVar(\"T_co\", covariant=True)\n\n\nclass Box(Generic[T_co]):\n    def put(self, value: T_co) -> None: ...  # error: [invalid-type-variable-variance]\n```\n\nThe protocol below returns `T` directly from its only method, so `T` must be covariant.\n\n```py\nfrom typing import Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Source(Protocol[T]):  # error: [invalid-type-variable-variance]\n    def read(self) -> T: ...\n```\n\nDeclare the protocol’s type variable with `TypeVar(\"T\", covariant=True)` instead.\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-generic-class` and `invalid-protocol`.",
           "default": "error",
           "oneOf": [
             {

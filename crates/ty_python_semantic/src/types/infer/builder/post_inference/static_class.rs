@@ -27,15 +27,16 @@ use crate::{
             DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
             INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
-            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
-            report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_attribute_assignment,
-            report_invalid_named_tuple_field_qualifier, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference, report_missing_type_arguments,
-            report_named_tuple_field_with_leading_underscore,
+            INVALID_PROTOCOL, INVALID_TYPE_PARAMETER_ORDER, INVALID_TYPE_VARIABLE_DEFAULT,
+            INVALID_TYPE_VARIABLE_VARIANCE, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            SHADOWED_TYPE_VARIABLE, SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS,
+            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
+            report_conflicting_metaclass_from_bases, report_duplicate_bases,
+            report_inconsistent_generic_bases, report_instance_layout_conflict,
+            report_invalid_attribute_assignment, report_invalid_named_tuple_field_qualifier,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -317,7 +318,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
     let expanded_base_entries =
         expanded_class_base_entries(db, class.known(db), class_node, class_definition);
-    let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
+    let check_explicit_base_variance = context.is_lint_enabled(&INVALID_TYPE_VARIABLE_VARIANCE);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
@@ -420,7 +421,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 None
                             }
                         })
-                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
+                    && let Some(builder) =
+                        context.report_lint(&INVALID_TYPE_VARIABLE_VARIANCE, source_node)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Variance of type variable `{}` is incompatible with base class `{}`",
@@ -893,125 +895,127 @@ pub(crate) fn check_static_class_definitions<'db>(
         );
     }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-        if !class.has_pep_695_type_params(db)
-            && let Some(generic_context) = class.legacy_generic_context(db)
-        {
-            struct State<'db> {
-                typevar_with_default: TypeVarInstance<'db>,
-                invalid_later_tvars: Vec<TypeVarInstance<'db>>,
-            }
+    if context.is_lint_enabled(&INVALID_TYPE_PARAMETER_ORDER)
+        && !class.has_pep_695_type_params(db)
+        && let Some(generic_context) = class.legacy_generic_context(db)
+    {
+        struct State<'db> {
+            typevar_with_default: TypeVarInstance<'db>,
+            invalid_later_tvars: Vec<TypeVarInstance<'db>>,
+        }
 
-            let mut state: Option<State<'db>> = None;
+        let mut state: Option<State<'db>> = None;
 
-            for bound_typevar in generic_context.variables(db) {
-                let typevar = bound_typevar.typevar(db);
-                let has_default = typevar.default_type(db, env).is_some();
+        for bound_typevar in generic_context.variables(db) {
+            let typevar = bound_typevar.typevar(db);
+            let has_default = typevar.default_type(db, env).is_some();
 
-                if let Some(state) = state.as_mut() {
-                    if !has_default {
-                        state.invalid_later_tvars.push(typevar);
-                    }
-                } else if has_default {
-                    state = Some(State {
-                        typevar_with_default: typevar,
-                        invalid_later_tvars: vec![],
-                    });
+            if let Some(state) = state.as_mut() {
+                if !has_default {
+                    state.invalid_later_tvars.push(typevar);
                 }
+            } else if has_default {
+                state = Some(State {
+                    typevar_with_default: typevar,
+                    invalid_later_tvars: vec![],
+                });
             }
+        }
 
-            if let Some(state) = state
-                && !state.invalid_later_tvars.is_empty()
-            {
-                report_invalid_type_param_order(
+        if let Some(state) = state
+            && !state.invalid_later_tvars.is_empty()
+        {
+            report_invalid_type_param_order(
+                context,
+                class,
+                class_node,
+                state.typevar_with_default,
+                &state.invalid_later_tvars,
+            );
+        }
+    }
+
+    // Check that type variable defaults only reference type variables
+    // that precede them in the type parameter list.
+    if (context.is_lint_enabled(&INVALID_TYPE_PARAMETER_ORDER)
+        || context.is_lint_enabled(&INVALID_TYPE_VARIABLE_DEFAULT))
+        && let Some(generic_context) = class
+            .pep695_generic_context(db)
+            .or_else(|| class.legacy_generic_context(db))
+    {
+        let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
+
+        // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
+        // a `std::slice::Iter` under the hood.
+        for (i, typevar) in typevars.clone().enumerate() {
+            let Some(default_ty) = typevar.default_type(db, env) else {
+                continue;
+            };
+
+            let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
+                let tvar = match t {
+                    Type::TypeVar(tvar) => tvar.typevar(db),
+                    Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                    _ => return None,
+                };
+                if !typevars.clone().take(i).contains(&tvar) {
+                    Some(tvar)
+                } else {
+                    None
+                }
+            });
+            if let Some(bad_typevar) = first_bad_tvar {
+                let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
+                report_invalid_typevar_default_reference(
                     context,
                     class,
-                    class_node,
-                    state.typevar_with_default,
-                    &state.invalid_later_tvars,
+                    typevar,
+                    bad_typevar,
+                    is_later_in_list,
                 );
             }
         }
+    }
 
-        // Check that type variable defaults only reference type variables
-        // that precede them in the type parameter list.
-        if let Some(generic_context) = class
-            .pep695_generic_context(db)
-            .or_else(|| class.legacy_generic_context(db))
-        {
-            let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
-
-            // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
-            // a `std::slice::Iter` under the hood.
-            for (i, typevar) in typevars.clone().enumerate() {
-                let Some(default_ty) = typevar.default_type(db, env) else {
-                    continue;
-                };
-
-                let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
-                    let tvar = match t {
-                        Type::TypeVar(tvar) => tvar.typevar(db),
-                        Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                        _ => return None,
-                    };
-                    if !typevars.clone().take(i).contains(&tvar) {
-                        Some(tvar)
-                    } else {
-                        None
+    if context.is_lint_enabled(&SHADOWED_TYPE_VARIABLE)
+        && let Some(parent) = class.body_scope(db).scope(db).parent()
+    {
+        // Check that the class's own type parameters don't shadow
+        // type variables from enclosing scopes (by name).
+        if let Some(generic_context) = class.generic_context(db) {
+            for self_typevar in generic_context.variables(db) {
+                let name = self_typevar.typevar(db).name(db);
+                for enclosing in enclosing_generic_contexts(db, index, parent) {
+                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
+                        report_shadowed_type_variable(
+                            context,
+                            name,
+                            "class",
+                            &class_node.name.id,
+                            class.header_range(db),
+                            self_typevar.kind(db),
+                            other_typevar,
+                        );
                     }
-                });
-                if let Some(bad_typevar) = first_bad_tvar {
-                    let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
-                    report_invalid_typevar_default_reference(
-                        context,
-                        class,
-                        typevar,
-                        bad_typevar,
-                        is_later_in_list,
-                    );
                 }
             }
         }
 
-        let scope = class.body_scope(db).scope(db);
-        if let Some(parent) = scope.parent() {
-            // Check that the class's own type parameters don't shadow
-            // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(db) {
-                for self_typevar in generic_context.variables(db) {
-                    let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(db, index, parent) {
-                        if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
-                            report_shadowed_type_variable(
-                                context,
-                                name,
-                                "class",
-                                &class_node.name.id,
-                                class.header_range(db),
-                                self_typevar.kind(db),
-                                other_typevar,
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Check that the class's base classes don't reference type
-            // variables from enclosing scopes (by identity).
-            for base_typevar in class.typevars_referenced_in_bases(db) {
-                let typevar = base_typevar.typevar(db);
-                for enclosing in enclosing_generic_contexts(db, index, parent) {
-                    if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
-                        report_shadowed_type_variable(
-                            context,
-                            typevar.name(db),
-                            "class",
-                            &class_node.name.id,
-                            class.header_range(db),
-                            base_typevar.kind(db),
-                            other_typevar,
-                        );
-                    }
+        // Check that the class's base classes don't reference type
+        // variables from enclosing scopes (by identity).
+        for base_typevar in class.typevars_referenced_in_bases(db) {
+            let typevar = base_typevar.typevar(db);
+            for enclosing in enclosing_generic_contexts(db, index, parent) {
+                if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
+                    report_shadowed_type_variable(
+                        context,
+                        typevar.name(db),
+                        "class",
+                        &class_node.name.id,
+                        class.header_range(db),
+                        base_typevar.kind(db),
+                        other_typevar,
+                    );
                 }
             }
         }

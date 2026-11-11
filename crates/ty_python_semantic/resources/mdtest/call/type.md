@@ -611,10 +611,10 @@ reveal_type(container.value)  # revealed: int
 class IntContainerBase(Container[int]): ...
 class StrContainerBase(Container[str]): ...
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 ConflictingContainer = type("ConflictingContainer", (IntContainerBase, StrContainerBase), {})
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 conflicting_container = type("InlineConflictingContainer", (IntContainerBase, StrContainerBase), {})()
 ```
 

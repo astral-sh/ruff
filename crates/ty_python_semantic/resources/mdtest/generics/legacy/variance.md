@@ -298,6 +298,11 @@ It is not possible to construct a legacy typevar that is explicitly bivariant.
 
 ## Variance in method signatures
 
+```toml
+[rules]
+invalid-generic-class = "ignore"
+```
+
 Methods must respect the declared variance of the class's type variables. Covariant variables can be
 returned but cannot be consumed, while contravariant variables can be consumed but not returned.
 
@@ -311,20 +316,20 @@ class Covariant(Generic[T_co]):
     def returns(self) -> T_co:
         raise NotImplementedError
 
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def accepts(self, value: T_co) -> None: ...
     def accepts_callback(self, callback: Callable[[T_co], None]) -> None: ...
 
 class Contravariant(Generic[T_contra]):
     def accepts(self, value: T_contra) -> None: ...
 
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def returns(self) -> T_contra:
         raise NotImplementedError
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `accepts`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `accepts`
   --> src/mdtest_snippet.py:11:30
    |
 11 |     def accepts(self, value: T_co) -> None: ...
@@ -338,17 +343,17 @@ only the `value` parameter violates it.
 
 ```py
 class InvariantMethods(Generic[T_co]):
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def values(self) -> list[T_co]:
         raise NotImplementedError
 
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
         return value
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `values`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `values`
   --> src/mdtest_snippet.py:22:25
    |
 22 |     def values(self) -> list[T_co]:
@@ -356,7 +361,7 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
 info: Type variable `T_co` is declared as covariant, but this method requires it to be invariant
 
 
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `identity`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `identity`
   --> src/mdtest_snippet.py:26:65
    |
 26 |     def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
@@ -387,10 +392,10 @@ class ClassMethods(Generic[T_co]):
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts(cls, value: T_co) -> None: ...
     @staticmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def static_accepts(value: T_co) -> None: ...
 ```
 
@@ -408,10 +413,10 @@ T_co = TypeVar("T_co", covariant=True)
 class Marker: ...
 
 class Returns(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def union(self) -> list[T_co] | tuple[T_co, ...]:
         raise NotImplementedError
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def intersection(self) -> Intersection[list[T_co], Marker]:
         raise NotImplementedError
     def readonly(self) -> tuple[T_co, ...] | None:
@@ -423,7 +428,7 @@ elements, and the callables consume `T_co`.
 
 ```py
 class Callbacks(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def callbacks(self) -> tuple[Callable[[T_co], None], ...]:
         raise NotImplementedError
 ```
@@ -451,7 +456,7 @@ methods until we can account for these relationships, and miss this invalid use 
 
 ```py
 class Correlated(Generic[V_co]):
-    # TODO: Emit `invalid-generic-class`; this use of `V_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `V_co` requires contravariance.
     def get(self, value: V_co | T, other: T) -> T:
         raise NotImplementedError
 ```
@@ -514,7 +519,7 @@ T_co = TypeVar("T_co", covariant=True)
 
 class Overloaded(Generic[T_co]):
     @overload
-    # TODO: Emit `invalid-generic-class`; this use of `T_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `T_co` requires contravariance.
     def method(self, value: T_co) -> int: ...
     @overload
     def method(self, value: int, other: int) -> int: ...
@@ -539,18 +544,18 @@ from typing import Generic, Self, TypeVar
 T_co = TypeVar("T_co", covariant=True)
 
 class Unrestricted(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts_self(self: Self, value: T_co) -> None: ...
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts_identity(self: "Unrestricted[T_co]", value: T_co) -> None: ...
     def returns(self: "Unrestricted[T_co]") -> T_co:
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_accepts_self(cls: type[Self], value: T_co) -> None: ...
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_accepts_identity(cls: type["Unrestricted[T_co]"], value: T_co) -> None: ...
     @classmethod
     def class_returns(cls: type[Self]) -> T_co:
@@ -562,10 +567,10 @@ valid. These methods still consume the class's type variable.
 
 ```py
 class Restricted(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts(self: "Restricted[int]", value: T_co) -> None: ...
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_accepts(cls: type["Restricted[int]"], value: T_co) -> None: ...
 ```
 
@@ -576,7 +581,7 @@ constrain the class's variance.
 ```py
 class Redundant(Generic[T_co]):
     # TODO: Do not report an error; the receiver makes the `T_co` arm redundant.
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts(self: "Redundant[int]", value: T_co | int) -> None: ...
 ```
 
@@ -627,7 +632,7 @@ An explicit use of `T_co` still constrains variance, even in a method that also 
 
 ```py
 class InvalidParameter(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def consume(self, other: Self, value: T_co) -> None: ...
 ```
 
@@ -635,7 +640,7 @@ Accepting `InvalidCovariant[T_co]` also constrains variance, unlike accepting `S
 
 ```py
 class InvalidCovariant(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def consume_class(self, other: "InvalidCovariant[T_co]") -> Self:
         return self
 ```
@@ -671,7 +676,7 @@ def preserve_signature(func: Callable[P, R]) -> Callable[P, R]:
 
 class PreservedSignature(Generic[T_co]):
     @preserve_signature
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self, value: T_co) -> None: ...
 ```
 
@@ -706,13 +711,13 @@ def consume_result(func: Callable[..., R]) -> Callable[[object, R], None]:
 
 class Consumer(Generic[T_co]):
     @consume_result
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def method(self) -> T_co:
         raise NotImplementedError
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `method`
   --> src/mdtest_snippet.py:39:9
    |
 39 |     def method(self) -> T_co:
@@ -755,7 +760,7 @@ def mutable(func: Callable[..., R]) -> list[R]:
 
 class Covariant(Generic[T_co]):
     @mutable
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def mutable(self) -> T_co:
         raise NotImplementedError
 ```
@@ -785,7 +790,7 @@ An ordinary parameter accepting `T_co` still makes covariance invalid.
 ```py
 class OptionalConsumer(Generic[T_co]):
     @optional
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self: "OptionalConsumer[T_co]", value: T_co) -> None: ...
 ```
 
@@ -836,7 +841,7 @@ class Contravariant(Generic[T_contra]):
             raise NotImplementedError
 
     else:
-        # error: [invalid-generic-class]
+        # error: [invalid-type-variable-variance]
         def value(self) -> T_contra:
             raise NotImplementedError
 ```
@@ -851,12 +856,12 @@ class UncheckedFirst(Generic[T_co]):
         def method(self, value: object) -> None: ...
 
     else:
-        # error: [invalid-generic-class]
+        # error: [invalid-type-variable-variance]
         def method(self, value: T_co) -> None: ...
 
 class UncheckedLast(Generic[T_co]):
     if condition():
-        # error: [invalid-generic-class]
+        # error: [invalid-type-variable-variance]
         def method(self, value: T_co) -> None: ...
 
     else:
@@ -892,7 +897,7 @@ method.
 ```py
 class Contravariant(Generic[T_contra]):
     @Descriptor
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 ```
@@ -915,7 +920,7 @@ class Writable(Generic[R]):
 
 class Covariant(Generic[T_co]):
     @Writable
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_co:
         raise NotImplementedError
 ```
@@ -955,7 +960,7 @@ class Descriptor(Generic[R]):
 
 class Contravariant(Generic[T_contra]):
     @Descriptor
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 ```
@@ -973,7 +978,7 @@ T_contra = TypeVar("T_contra", contravariant=True)
 
 class WithCachedProperty(Generic[T_contra]):
     @cached_property
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 ```
@@ -985,7 +990,7 @@ from functools import cache
 
 class WithCachedMethod(Generic[T_contra]):
     @cache
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def cached(self) -> T_contra:
         raise NotImplementedError
 ```
@@ -1012,7 +1017,7 @@ T_co = TypeVar("T_co", covariant=True)
 
 class Deleted(Generic[T_co]):
     # TODO: Do not report an error; the method is absent from the final class interface.
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self, value: T_co) -> None: ...
 
     del method
@@ -1063,7 +1068,7 @@ def condition() -> bool:
 
 class Conditional(Generic[T_co]):
     if condition():
-        # snapshot: invalid-generic-class
+        # snapshot: invalid-type-variable-variance
         def method(self, value: T_co) -> None: ...
 
     else:
@@ -1071,7 +1076,7 @@ class Conditional(Generic[T_co]):
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `method`
   --> src/mdtest_snippet.py:11:33
    |
 11 |         def method(self, value: T_co) -> None: ...
@@ -1087,12 +1092,12 @@ class Reversed(Generic[T_co]):
         def method(self, value: object) -> None: ...
 
     else:
-        # snapshot: invalid-generic-class
+        # snapshot: invalid-type-variable-variance
         def method(self, value: T_co) -> None: ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `method`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with method `method`
   --> src/mdtest_snippet.py:21:33
    |
 21 |         def method(self, value: T_co) -> None: ...
@@ -1111,7 +1116,7 @@ from typing import Generic, TypeVar
 T_co = TypeVar("T_co", covariant=True)
 
 class Aliased(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self, value: T_co) -> None: ...
 
     alias = method
@@ -1123,7 +1128,7 @@ overwritten.
 
 ```py
 class MultipleAliases(Generic[T_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self, value: T_co) -> None: ...
 
     first = method
@@ -1159,7 +1164,7 @@ class Covariant(Generic[T_co]):
         raise NotImplementedError
 
     @value.setter
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self, value: T_co) -> None: ...
 ```
 
@@ -1168,7 +1173,7 @@ A contravariant class can accept `T_contra` in the setter, but cannot return it 
 ```py
 class Contravariant(Generic[T_contra]):
     @property
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 
@@ -1183,7 +1188,7 @@ from typing import no_type_check
 
 class UncheckedSetter(Generic[T_contra]):
     @property
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 
@@ -1202,7 +1207,7 @@ class UncheckedGetter(Generic[T_co]):
         raise NotImplementedError
 
     @value.setter
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self, value: T_co) -> None: ...
 ```
 
@@ -1226,14 +1231,14 @@ def preserve(func: Callable[P, R]) -> Callable[P, R]:
 class Cached(Generic[T_contra]):
     @property
     @cache
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 
 class Preserved(Generic[T_contra]):
     @property
     @preserve
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self) -> T_contra:
         raise NotImplementedError
 
@@ -1257,7 +1262,7 @@ class Setter(Generic[T_co]):
 
     @value.setter
     @preserve
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self, value: T_co) -> None: ...
 ```
 
@@ -1279,7 +1284,7 @@ class Changed(Generic[T_co]):
 
     @value.setter
     @replace_setter
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def value(self, value: object) -> T_co:
         raise NotImplementedError
 ```
@@ -1321,6 +1326,11 @@ class ReplacedGetter(Generic[T_contra]):
 
 ## Generic protocol variance
 
+```toml
+[rules]
+invalid-protocol = "ignore"
+```
+
 A protocol's declared variance must match whether its members consume or produce that type variable.
 
 ```py
@@ -1330,19 +1340,19 @@ T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
 T_contra = TypeVar("T_contra", contravariant=True)
 
-# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
 class InvariantSource(Protocol[T]):
     def read(self) -> T: ...
 
-# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSink` should be contravariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `InvariantSink` should be contravariant, but is invariant"
 class InvariantSink(Protocol[T]):
     def write(self, value: T) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
 class CovariantSink(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantSource` should be covariant, but is contravariant"
+# error: [invalid-type-variable-variance] "Type variable `T_contra` in protocol `ContravariantSource` should be covariant, but is contravariant"
 class ContravariantSource(Protocol[T_contra]):
     def read(self) -> T_contra: ...
 
@@ -1356,12 +1366,12 @@ class InvariantReadWrite(Protocol[T]):
     def read(self) -> T: ...
     def write(self, value: T) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantReadWrite` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantReadWrite` should be invariant, but is covariant"
 class CovariantReadWrite(Protocol[T_co]):
     def read(self) -> T_co: ...
     def write(self, value: T_co) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantReadWrite` should be invariant, but is contravariant"
+# error: [invalid-type-variable-variance] "Type variable `T_contra` in protocol `ContravariantReadWrite` should be invariant, but is contravariant"
 class ContravariantReadWrite(Protocol[T_contra]):
     def read(self) -> T_contra: ...
     def write(self, value: T_contra) -> None: ...
@@ -1399,7 +1409,7 @@ class WritableProperty(Protocol[T]):
 class WritableAttribute(Protocol[T]):
     _value: T
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantAttribute` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantAttribute` should be invariant, but is covariant"
 class CovariantAttribute(Protocol[T_co]):
     _value: T_co
 
@@ -1431,7 +1441,7 @@ T_co = TypeVar("T_co", covariant=True)
 class WritableClassAttribute(Protocol[T]):
     value: type[T]
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantClassAttribute` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantClassAttribute` should be invariant, but is covariant"
 class CovariantClassAttribute(Protocol[T_co]):
     value: type[T_co]
 
@@ -1470,7 +1480,7 @@ class Descriptor(Generic[T_co]):
         raise NotImplementedError
     def __set__(self, instance: object, value: object) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T` in protocol `InvariantDescriptor` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `InvariantDescriptor` should be covariant, but is invariant"
 class InvariantDescriptor(Protocol[T]):
     @Descriptor
     def value(self) -> T: ...
@@ -1500,7 +1510,7 @@ from typing import Protocol, TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-protocol] "Type variable `T` in protocol `ConstructorOnly` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `ConstructorOnly` should be covariant, but is invariant"
 class ConstructorOnly(Protocol[T]):
     def __init__(self, value: T) -> None: ...
 ```
@@ -1522,7 +1532,7 @@ class ExplicitReceivers(Protocol[T_contra]):
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantExplicitReceivers` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantExplicitReceivers` should be contravariant, but is covariant"
 class CovariantExplicitReceivers(Protocol[T_co]):
     def send(self: "CovariantExplicitReceivers[T_co]", value: T_co) -> None: ...
     @classmethod
@@ -1571,7 +1581,7 @@ T = TypeVar("T")
 class Marker(Protocol):
     def ready(self) -> bool: ...
 
-# error: [invalid-protocol] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
 class Source(Protocol[T]):
     def read(self) -> T: ...
     def marker(self) -> Marker: ...
@@ -1595,7 +1605,7 @@ class Reader(Protocol[T_co]):
 class NestedReader(Protocol[T_co]):
     def reader(self) -> Reader[T_co]: ...
 
-# error: [invalid-protocol] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `Source` should be covariant, but is invariant"
 class Source(Protocol[T]):
     def reader(self) -> NestedReader[T]: ...
 
@@ -1621,7 +1631,7 @@ class Marker(Protocol[T_co]):
 class Sink(Protocol[T_contra]):
     def accept(self, value: Marker[T_contra]) -> None: ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
 class CovariantSink(Protocol[T_co]):
     def accept(self, value: Marker[T_co]) -> None: ...
 ```
@@ -1648,12 +1658,12 @@ class Sink(Protocol[T_contra]):
     def write(self, value: T_contra) -> None: ...
     def next(self) -> "Sink[T_contra]": ...
 
-# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
+# error: [invalid-type-variable-variance] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
 class InvariantSource(Protocol[T]):
     def read(self) -> T: ...
     def next(self) -> "InvariantSource[T]": ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Recursive` should be contravariant, but is covariant"
 class Recursive(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
     def next(self) -> "Recursive[T_co]": ...
@@ -1663,7 +1673,7 @@ An expanding recursive reference composes variance with its type arguments. `lis
 `Expanding` invariant even though its only direct use of `T_co` is a method parameter.
 
 ```py
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Expanding` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Expanding` should be invariant, but is covariant"
 class Expanding(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
     def next(self) -> "Expanding[list[T_co]]": ...
@@ -1673,7 +1683,7 @@ Passing the recursive protocol as an argument introduces the opposite variance a
 with the direct return of `T_co`, this makes the protocol invariant.
 
 ```py
-# error: [invalid-protocol] "Type variable `T_co` in protocol `RecursiveArgument` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `RecursiveArgument` should be invariant, but is covariant"
 class RecursiveArgument(Protocol[T_co]):
     def combine(self, other: "RecursiveArgument[T_co]") -> T_co: ...
 ```
@@ -1682,12 +1692,12 @@ The input position in `Left.write` also makes `Right` contravariant through its 
 covariant declarations are rejected.
 
 ```py
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Left` should be contravariant, but is covariant"
 class Left(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
     def right(self) -> "Right[T_co]": ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be contravariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Right` should be contravariant, but is covariant"
 class Right(Protocol[T_co]):
     def left(self) -> Left[T_co]: ...
 ```
@@ -1782,11 +1792,11 @@ class Wrapper[T]:
     def value(self) -> Next[T]:
         raise NotImplementedError
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Forward` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Forward` should be invariant, but is covariant"
 class Forward(Protocol[T_co]):
     def value(self) -> Wrapper[T_co]: ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Recursive` should be invariant, but is covariant"
 class Recursive(Protocol[T_co]):
     def read(self) -> T_co: ...
     def next(self) -> Forward[T_co]: ...
@@ -1822,12 +1832,12 @@ from typing import Protocol, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Left` should be invariant, but is covariant"
 class Left(Protocol[T_co]):
     def items(self) -> list[T_co]: ...
     def next(self) -> "Right[T_co]": ...
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be invariant, but is covariant"
+# error: [invalid-type-variable-variance] "Type variable `T_co` in protocol `Right` should be invariant, but is covariant"
 class Right(Protocol[T_co]):
     def left(self) -> Left[T_co]: ...
 ```
@@ -1957,6 +1967,11 @@ class Child(Base[T], Protocol[T]): ...
 
 ## Inheriting from generic classes with explicit variance
 
+```toml
+[rules]
+invalid-generic-class = "ignore"
+```
+
 A generic subclass cannot claim a variance that is less restrictive than the variance required by
 one of its specialized bases. This validation also applies after composing nested generic types or
 resolving aliases used as bases.
@@ -1978,31 +1993,31 @@ class GoodCovariant(Covariant[T_co]): ...
 class GoodContravariant(Contravariant[T_contra]): ...
 class GoodNested(Contravariant[Contravariant[T_co]]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: invalid-type-variable-variance
 class BadInvariantCo(Invariant[T_co]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: invalid-type-variable-variance
 class BadInvariantContra(Invariant[T_contra]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: invalid-type-variable-variance
 class BadCovariant(Covariant[T_contra]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: invalid-type-variable-variance
 class BadContravariant(Contravariant[T_co]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadNested(Contravariant[Covariant[T_co]]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadComposed(Contravariant[Covariant[Contravariant[T_contra]]]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadSecond(CoContra[T_co, T_co]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadFirst(CoContra[T_contra, T_contra]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadSecondNested(CoContra[Covariant[T_co], Covariant[T_co]]): ...
 
 InvariantAlias: TypeAlias = Invariant[T_co]
@@ -2011,15 +2026,15 @@ NestedAlias: TypeAlias = Contravariant[T_contra]
 
 class GoodAlias(CovariantAlias[T_co]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadAlias(InvariantAlias[T_co]): ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-variance]
 class BadNestedAlias(NestedAlias[NestedAlias[NestedAlias[T_co]]]): ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with base class `Invariant`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with base class `Invariant`
   --> src/mdtest_snippet.py:18:22
    |
 18 | class BadInvariantCo(Invariant[T_co]): ...
@@ -2027,7 +2042,7 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
 help: Type variable `T_co` is declared as covariant, but base class `Invariant` requires it to be invariant
 
 
-error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `Invariant`
+error[invalid-type-variable-variance]: Variance of type variable `T_contra` is incompatible with base class `Invariant`
   --> src/mdtest_snippet.py:21:26
    |
 21 | class BadInvariantContra(Invariant[T_contra]): ...
@@ -2035,7 +2050,7 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
 help: Type variable `T_contra` is declared as contravariant, but base class `Invariant` requires it to be invariant
 
 
-error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `Covariant`
+error[invalid-type-variable-variance]: Variance of type variable `T_contra` is incompatible with base class `Covariant`
   --> src/mdtest_snippet.py:24:20
    |
 24 | class BadCovariant(Covariant[T_contra]): ...
@@ -2043,7 +2058,7 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
 help: Type variable `T_contra` is declared as contravariant, but base class `Covariant` requires it to be covariant
 
 
-error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with base class `Contravariant`
+error[invalid-type-variable-variance]: Variance of type variable `T_co` is incompatible with base class `Contravariant`
   --> src/mdtest_snippet.py:27:24
    |
 27 | class BadContravariant(Contravariant[T_co]): ...
@@ -2057,12 +2072,12 @@ here, while a contravariant one is incompatible with the tuple base.
 ```py
 class GoodTuple(tuple[T_co, object], Generic[T_co]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: invalid-type-variable-variance
 class BadTuple(tuple[T_contra, object], Generic[T_contra]): ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `T_contra` is incompatible with base class `tuple`
+error[invalid-type-variable-variance]: Variance of type variable `T_contra` is incompatible with base class `tuple`
   --> src/mdtest_snippet.py:58:16
    |
 58 | class BadTuple(tuple[T_contra, object], Generic[T_contra]): ...

@@ -121,6 +121,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_TYPE_VARIABLE_VARIANCE);
+    registry.register_lint(&INCONSISTENT_GENERIC_BASES);
+    registry.register_lint(&INVALID_TYPE_PARAMETER_ORDER);
     registry.register_lint(&INVALID_INIT_TYPE_VARIABLE);
     registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
@@ -664,6 +667,33 @@ declare_lint! {
     pub(crate) static INVALID_GENERIC_CLASS = {
         summary: "detects invalid generic classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-variable-variance.md")]
+    pub(crate) static INVALID_TYPE_VARIABLE_VARIANCE = {
+        summary: "detects type variables whose declared variance is incompatible with their use",
+        status: LintStatus::stable("0.0.102"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-generic-bases.md")]
+    pub(crate) static INCONSISTENT_GENERIC_BASES = {
+        summary: "detects conflicting specializations of a common generic base class",
+        status: LintStatus::stable("0.0.102"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-parameter-order.md")]
+    pub(crate) static INVALID_TYPE_PARAMETER_ORDER = {
+        summary: "detects invalid ordering of type parameters",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
@@ -4956,7 +4986,8 @@ pub(crate) fn report_invalid_type_param_order<'db>(
         .unwrap_or(base_node)
         .range();
 
-    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, primary_diagnostic_range)
+    let Some(builder) =
+        context.report_lint(&INVALID_TYPE_PARAMETER_ORDER, primary_diagnostic_range)
     else {
         return;
     };
@@ -5014,7 +5045,12 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
+    let lint = if is_later_in_list {
+        &INVALID_TYPE_PARAMETER_ORDER
+    } else {
+        &INVALID_TYPE_VARIABLE_DEFAULT
+    };
+    let Some(builder) = context.report_lint(lint, class.header_range(db)) else {
         return;
     };
 
@@ -5134,7 +5170,8 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     if earlier.base_index == base_index {
                         return true;
                     }
-                    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
+                    let Some(builder) =
+                        context.report_lint(&INCONSISTENT_GENERIC_BASES, header_range)
                     else {
                         return true;
                     };

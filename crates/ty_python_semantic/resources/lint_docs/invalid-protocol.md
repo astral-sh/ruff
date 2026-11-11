@@ -20,19 +20,6 @@ Traceback (most recent call last):
 TypeError: Protocols can only inherit from other protocols, got <class 'int'>
 ```
 
-A generic protocol's declared type-variable variance must match how that variable is used by its
-protocol members. For example, a type variable that appears only in a method's return type must be
-covariant:
+## Rule history
 
-```py
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-
-
-class Source(Protocol[T]):  # error: [invalid-protocol]
-    def read(self) -> T: ...
-```
-
-Although Python constructs this protocol successfully at runtime, it is invalid for static typing.
-Declare the type variable with `TypeVar("T", covariant=True)` instead.
+- v0.0.102: Split out `invalid-type-variable-variance`.

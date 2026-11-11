@@ -163,12 +163,12 @@ class Base[T, U]: ...
 class First(Base[int, Any]): ...
 class Second(Base[Any, str]): ...
 
-# snapshot: invalid-generic-class
+# snapshot: inconsistent-generic-bases
 class Mixed(First, Second, Base[bytes, str]): ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Inconsistent type arguments for `Base` among class bases
+error[inconsistent-generic-bases]: Inconsistent type arguments for `Base` among class bases
  --> src/mdtest_snippet.py:8:7
   |
 8 | class Mixed(First, Second, Base[bytes, str]): ...
@@ -2489,10 +2489,10 @@ Type variable defaults can reference earlier type variables, but not later ones:
 # This is fine: U's default references T, which comes before U
 class Good[T, U = T]: ...
 
-# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+# error: [invalid-type-parameter-order] "Default of `S` cannot reference later type parameter `T`"
 class Bad[S = T, T = int]: ...
 
-# error: [invalid-generic-class]
+# error: [invalid-type-parameter-order]
 class AlsoBad[S = list[T], T = int]: ...
 ```
 
@@ -2764,30 +2764,38 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-type-variable-default = "ignore"
+```
+
 A `TypeVar` with a default cannot follow a `TypeVarTuple`, even if a required `TypeVar` comes
 between them. A specialization could use the default and bind one more argument to the pack.
 
 ```py
-# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+# error: [invalid-type-parameter-order] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
 class Foo[*Ts, T = int]: ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Bar[T1, *Ts, T2 = int]: ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Baz[*Ts, T1 = int, T2 = str]: ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Separated[*Ts, U, T = int]: ...
 
 # A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
 # CPython raises TypeError here (https://github.com/python/typing/issues/2211).
 class Qux[*Ts, **P = [int, str]]: ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Quux[*Ts, T1 = int, **P = [int, str]]: ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 
 # error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"

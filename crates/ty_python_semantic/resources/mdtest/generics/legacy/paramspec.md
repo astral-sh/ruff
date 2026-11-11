@@ -177,7 +177,7 @@ P_contra = ParamSpec("P_contra", contravariant=True)
 class Covariant(Generic[P_co]):
     def accepts(self, callback: Callable[P_co, None]) -> None: ...
 
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def returns(self) -> Callable[P_co, None]:
         raise NotImplementedError
 
@@ -185,12 +185,12 @@ class Contravariant(Generic[P_contra]):
     def returns(self) -> Callable[P_contra, None]:
         raise NotImplementedError
 
-    # error: [invalid-generic-class] "Variance of type variable `P_contra` is incompatible with method `accepts`"
+    # error: [invalid-type-variable-variance] "Variance of type variable `P_contra` is incompatible with method `accepts`"
     def accepts(self, callback: Callable[P_contra, None]) -> None: ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `returns`
+error[invalid-type-variable-variance]: Variance of type variable `P_co` is incompatible with method `returns`
   --> src/mdtest_snippet.py:10:26
    |
 10 |     def returns(self) -> Callable[P_co, None]:
@@ -202,7 +202,7 @@ Forwarding `P.args` and `P.kwargs` also consumes `P`.
 
 ```py
 class CovariantForwarder(Generic[P_co]):
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
 
 class ContravariantForwarder(Generic[P_contra]):
@@ -212,7 +212,7 @@ class ContravariantForwarder(Generic[P_contra]):
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `call`
+error[invalid-type-variable-variance]: Variance of type variable `P_co` is incompatible with method `call`
   --> src/mdtest_snippet.py:21:27
    |
 21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
@@ -243,10 +243,10 @@ to its variance.
 ```py
 class MethodKinds(Generic[P_contra]):
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_method(cls, callback: Callable[P_contra, None]) -> None: ...
     @staticmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def static_method(callback: Callable[P_contra, None]) -> None: ...
 ```
 
@@ -263,7 +263,7 @@ P_co = ParamSpec("P_co", covariant=True)
 
 class Overloaded(Generic[P_co]):
     @overload
-    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `P_co` requires contravariance.
     def method(self, value: int) -> Callable[P_co, None]: ...
     @overload
     def method(self, value: str) -> None: ...
@@ -301,15 +301,15 @@ reported.
 P_co = ParamSpec("P_co", covariant=True)
 
 class GenericMethods(Generic[P_co]):
-    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `P_co` requires contravariance.
     def legacy(self, value: T) -> Callable[P_co, T]:
         raise NotImplementedError
 
-    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `P_co` requires contravariance.
     def pep695[U](self, value: U) -> Callable[P_co, U]:
         raise NotImplementedError
 
-    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `P_co` requires contravariance.
     def returned_callable(self) -> Callable[P_co, T]:
         raise NotImplementedError
 ```
@@ -330,12 +330,12 @@ from typing import Callable, Generic, ParamSpec, Self
 P_co = ParamSpec("P_co", covariant=True)
 
 class Unrestricted(Generic[P_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self: Self) -> Callable[P_co, None]:
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_method(cls: type["Unrestricted[P_co]"]) -> Callable[P_co, None]:
         raise NotImplementedError
 
@@ -346,7 +346,7 @@ A specialized receiver does not make this contravariant use of `P_co` valid.
 
 ```py
 class Restricted(Generic[P_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
         raise NotImplementedError
 ```
@@ -1231,13 +1231,13 @@ reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 # Un-ordered type variables as the default of `PAnother` is `P`
-# error: [invalid-generic-class]
-# error: [invalid-generic-class]
+# error: [invalid-type-parameter-order]
+# error: [invalid-type-parameter-order]
 class ParamSpecWithDefault5(Generic[PAnother, P]):
     attr: Callable[PAnother, None]
 
 # PAnother has default as P (another ParamSpec) which is not in scope
-# error: [invalid-generic-class]
+# error: [invalid-type-variable-default]
 class ParamSpecWithDefault6(Generic[PAnother]):
     attr: Callable[PAnother, None]
 ```

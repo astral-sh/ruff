@@ -6,8 +6,8 @@ use crate::{
         TypeVarVariance,
         context::InferContext,
         diagnostic::{
-            INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
-            INVALID_TYPE_VARIABLE_DEFAULT, UNBOUND_TYPE_VARIABLE,
+            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_PARAMETER_ORDER,
+            INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPE_VARIABLE_VARIANCE, UNBOUND_TYPE_VARIABLE,
         },
         function::{FunctionDecorators, FunctionType, OverloadLiteral},
         generics::GenericContext,
@@ -78,7 +78,7 @@ pub(super) fn check_class_method_typevar_variance<'db>(
     class: StaticClassLiteral<'db>,
 ) {
     let db = context.db();
-    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+    if !context.is_lint_enabled(&INVALID_TYPE_VARIABLE_VARIANCE) {
         return;
     }
 
@@ -251,7 +251,7 @@ fn check_method_typevar_variance<'db>(
                 })
             })
             .unwrap_or_else(|| node.name.range());
-        if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {
+        if let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_VARIANCE, range) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Variance of type variable `{}` is incompatible with method `{}`",
                 typevar.name(db),
@@ -464,8 +464,12 @@ fn check_legacy_typevar_defaults<'db>(
         let primary_range =
             find_typevar_annotation_range(context, node, typevar, file_expression_type);
 
-        let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
-        else {
+        let lint = if is_later_in_list {
+            &INVALID_TYPE_PARAMETER_ORDER
+        } else {
+            &INVALID_TYPE_VARIABLE_DEFAULT
+        };
+        let Some(builder) = context.report_lint(lint, primary_range) else {
             continue;
         };
         let typevar_name = typevar.name(db);
@@ -530,9 +534,6 @@ fn find_typevar_annotation_range<'db>(
 
 /// Check that legacy `TypeVar`s without defaults don't follow `TypeVar`s with defaults
 /// in a function's generic context.
-///
-/// This mirrors the class-level check using `report_invalid_type_param_order`, but for
-/// function/method generic contexts using the `invalid-type-variable-default` lint.
 fn check_legacy_typevar_ordering<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
@@ -599,7 +600,7 @@ fn check_legacy_typevar_ordering<'db>(
         file_expression_type,
     );
 
-    let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range) else {
+    let Some(builder) = context.report_lint(&INVALID_TYPE_PARAMETER_ORDER, primary_range) else {
         return;
     };
 
