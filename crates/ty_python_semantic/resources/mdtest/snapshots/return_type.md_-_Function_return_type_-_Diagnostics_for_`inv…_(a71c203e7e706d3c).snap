@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: return_type.md - Function return type - `invalid-implicit-return-in-function-with-stub-body` in a concrete subclass of a protocol
+mdtest name: return_type.md - Function return type - Diagnostics for `invalid-implicit-return-in-function-with-stub-body` on non-protocol subclasses of protocol classes
 mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ---
 

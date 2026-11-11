@@ -931,8 +931,8 @@ def return_unpack(src: TD) -> TD:
     return dict(**src)
 
 def return_invalid_literal() -> TD:
-    # TODO: Report only the missing key here, as in `return_invalid_dict` below.
-    #
+    # TODO: ideally, this would only emit the first error, but not `invalid-explicit-return` (like
+    # the `return_invalid_dict` case below).
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
     # error: [invalid-explicit-return]
     return {}
@@ -2160,7 +2160,8 @@ def a_from_b(b: B) -> A:
     # error: [invalid-explicit-return] "Return type does not match returned value: expected `A`, found `B`"
     return b
 
-# The error on the return statement above prevents us from assigning an invalid value to c['y'].
+# The [invalid-explicit-return] error above is the only thing that keeps us from corrupting the
+# type of c['y'].
 c: C = {"x": 1, "y": "hello"}
 a: A = a_from_b(b_from_c(c))
 a["y"] = 42

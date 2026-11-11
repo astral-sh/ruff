@@ -2224,8 +2224,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ),
                     Type::Never => {
                         // In unreachable code, we infer `Never` for decorators like `typing.overload`.
-                        // Treat these decorators as overloads to avoid reporting missing returns
-                        // in unreachable overload declarations.
+                        // Return `true` here to avoid false positive
+                        // `invalid-implicit-return-in-function-with-stub-body` lints for
+                        // `@overload`ed functions without a body in unreachable code.
                         true
                     }
                     Type::Divergent(_) => true,

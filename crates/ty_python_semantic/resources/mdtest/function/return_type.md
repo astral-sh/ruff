@@ -415,8 +415,8 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
-When a function can fall through and contains no `return` statements, ty suggests changing the
-annotation to `-> None` or returning a value of the annotated type.
+If the function has no `return` statement and can fall through, then we show a diagnostic hint that
+the return annotation should be `-> None` or a `return` statement should be added.
 
 ```py
 # error: [invalid-implicit-return]
@@ -596,7 +596,7 @@ async def k() -> typing.AsyncGenerator[int]:
     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```
 
-## `invalid-implicit-return-in-function-with-stub-body` in a concrete subclass of a protocol
+## Diagnostics for `invalid-implicit-return-in-function-with-stub-body` on non-protocol subclasses of protocol classes
 
 <!-- snapshot-diagnostics -->
 

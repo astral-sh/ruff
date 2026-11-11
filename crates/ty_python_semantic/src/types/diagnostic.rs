@@ -3165,6 +3165,8 @@ pub(super) fn report_implicit_return_type(
 ) {
     let db = context.db();
 
+    // Use INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY lint for functions with empty bodies,
+    // INVALID_IMPLICIT_RETURN for others.
     let lint_to_use = if has_empty_body {
         &INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY
     } else {
