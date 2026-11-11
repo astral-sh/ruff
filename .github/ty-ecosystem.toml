@@ -16,7 +16,7 @@ possibly-missing-import = "warn"
 possibly-unresolved-reference = "warn"
 unsound-assignment = "warn"
 # The ecosystem run configures both the base and PR versions of ty with this file.
-# Keep the old name while the base can predate 0.0.101.
+# Keep the old name while the base can predate 0.0.102.
 unsound-return-statement = "warn"
 unsound-yield = "warn"
 unsupported-dynamic-base = "warn"

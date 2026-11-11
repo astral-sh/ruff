@@ -2577,7 +2577,7 @@ def gen_func(coinflip: bool) -> Generator[int, None, str]:
 - v0.0.14: [`empty-body`](#empty-body) (since renamed as [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body)) was
     split into a separate rule.
 
-- v0.0.101: [`invalid-implicit-return`](#invalid-implicit-return) and [`invalid-generator-return-type`](#invalid-generator-return-type) were split into separate
+- v0.0.102: [`invalid-implicit-return`](#invalid-implicit-return) and [`invalid-generator-return-type`](#invalid-generator-return-type) were split into separate
     rules, and the rule was renamed as [`invalid-explicit-return`](#invalid-explicit-return). [`invalid-return-type`](#invalid-return-type) remains as a
     compatibility alias for this rule.
 
@@ -2635,7 +2635,7 @@ class NonFrozenChild(FrozenBase):  # error
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-generator-return-type%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L491" target="_blank">View source</a>
 </small>
@@ -2704,7 +2704,7 @@ async def numbers() -> AsyncGenerator[int]:
 
 - v0.0.0-alpha.5: First added to ty as part of the pre-existing [`invalid-return-type`](#invalid-return-type) diagnostic
 
-- v0.0.101: [`invalid-generator-return-type`](#invalid-generator-return-type) was split out as a standalone rule from
+- v0.0.102: [`invalid-generator-return-type`](#invalid-generator-return-type) was split out as a standalone rule from
     [`invalid-return-type`](#invalid-return-type), and [`invalid-return-type`](#invalid-return-type) was renamed as [`invalid-explicit-return`](#invalid-explicit-return)
 
 ## `invalid-generic-class`
@@ -2855,7 +2855,7 @@ a = 20 / 0  # type: ignore
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-implicit-return%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L509" target="_blank">View source</a>
 </small>
@@ -2971,7 +2971,7 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 
 - v0.0.0-alpha.2: First added to ty as part of the [`invalid-return-type`](#invalid-return-type) diagnostic (since renamed
     to [`invalid-explicit-return`](#invalid-explicit-return)).
-- v0.0.101: Split out from [`invalid-return-type`](#invalid-return-type) as a standalone rule.
+- v0.0.102: Split out from [`invalid-return-type`](#invalid-return-type) as a standalone rule.
 
 <a id="empty-body"></a>
 
@@ -3031,7 +3031,7 @@ def bar() -> str:  # error: [invalid-implicit-return-in-function-with-stub-body]
 - v0.0.0-alpha.2: First added to ty as part of the [`invalid-return-type`](#invalid-return-type) diagnostic (since renamed
     to [`invalid-explicit-return`](#invalid-explicit-return)).
 - v0.0.14: Split out from [`invalid-return-type`](#invalid-return-type) as a new [`empty-body`](#empty-body) diagnostic.
-- v0.0.101: Renamed from [`empty-body`](#empty-body) to [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body).
+- v0.0.102: Renamed from [`empty-body`](#empty-body) to [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body).
 
 ## `invalid-init-type-variable`
 
@@ -7692,7 +7692,7 @@ Python code.
 
 
 - v0.0.70: Added as [`unsound-return-statement`](#unsound-return-statement).
-- v0.0.101: Renamed to [`unsound-return`](#unsound-return). [`unsound-return-statement`](#unsound-return-statement) remains as a compatibility alias
+- v0.0.102: Renamed to [`unsound-return`](#unsound-return). [`unsound-return-statement`](#unsound-return-statement) remains as a compatibility alias
     for this rule.
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/

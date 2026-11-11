@@ -104,4 +104,4 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 
 - v0.0.0-alpha.2: First added to ty as part of the `invalid-return-type` diagnostic (since renamed
     to `invalid-explicit-return`).
-- v0.0.101: Split out from `invalid-return-type` as a standalone rule.
+- v0.0.102: Split out from `invalid-return-type` as a standalone rule.

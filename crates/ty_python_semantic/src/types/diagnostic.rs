@@ -492,7 +492,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-generator-return-type.md")]
     pub(crate) static INVALID_GENERATOR_RETURN_TYPE = {
         summary: "detects generator functions with incompatible return annotations",
-        status: LintStatus::stable("0.0.101"),
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
@@ -510,7 +510,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-implicit-return.md")]
     pub(crate) static INVALID_IMPLICIT_RETURN = {
         summary: "detects nonempty functions that can implicitly return an incompatible `None`",
-        status: LintStatus::stable("0.0.101"),
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }
