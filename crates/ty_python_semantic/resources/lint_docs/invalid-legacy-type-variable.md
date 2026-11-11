@@ -23,3 +23,9 @@ def f(t: TypeVar("U")): ...  # ty: ignore[invalid-type-form]
 ## References
 
 - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+
+## Rule history
+
+- v0.0.102: A `TypeVar` call with exactly one constraint now triggers
+    `invalid-type-variable-constraints`. Use that selector in rule settings and ignore comments for
+    this error.
