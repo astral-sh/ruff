@@ -644,7 +644,7 @@ impl PathAssignments {
                         ante1,
                         ante2,
                         post,
-                        is_substitution,
+                        can_replace_ante1,
                         ..
                     } => {
                         let ante1 = storage.intern_atomic_constraint(db, env, ante1.constraint(db));
@@ -663,7 +663,7 @@ impl PathAssignments {
                             ante2,
                             post,
                             fuel_cost,
-                            is_substitution: *is_substitution,
+                            can_replace_ante1: *can_replace_ante1,
                         }
                     }
                     Sequent::SingleImplication { ante, post, .. } => {
@@ -1039,7 +1039,7 @@ impl PathAssignments {
                 ante1,
                 ante2,
                 post,
-                is_substitution,
+                can_replace_ante1,
                 fuel_cost,
             } => {
                 self.check_pair_implication(
@@ -1048,7 +1048,7 @@ impl PathAssignments {
                     ante1,
                     ante2,
                     post,
-                    is_substitution,
+                    can_replace_ante1,
                     fuel_cost,
                 );
                 Ok(())
@@ -1162,7 +1162,7 @@ impl PathAssignments {
         ante1: AtomicConstraintId,
         ante2: AtomicConstraintId,
         post: AtomicConstraintId,
-        is_substitution: bool,
+        can_replace_ante1: bool,
         fuel_cost: u16,
     ) {
         let constraint = storage.atomic_constraint_data(post);
@@ -1175,7 +1175,7 @@ impl PathAssignments {
         let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
             return;
         };
-        if is_substitution {
+        if can_replace_ante1 {
             self.pending_substitutions.push((ante1, post));
         }
         let available_fuel = ante1_fuel.min(ante2_fuel);

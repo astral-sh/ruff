@@ -147,8 +147,8 @@ pub(super) enum Sequent<C, FuelCost = ()> {
         ante1: C,
         ante2: C,
         post: C,
-        /// Whether this sequent represents a _substitution_ of `ante1` with `post`.
-        is_substitution: bool,
+        /// Whether `post` can replace `ante1` when choosing a solution.
+        can_replace_ante1: bool,
         fuel_cost: FuelCost,
     },
 }
@@ -343,15 +343,16 @@ impl<'db> SequentMapBuilder<'db> {
             ante1: InternedSequentConstraint::new(self.db, ante1),
             ante2: InternedSequentConstraint::new(self.db, ante2),
             post: InternedSequentConstraint::new(self.db, post),
-            is_substitution: false,
+            can_replace_ante1: false,
             fuel_cost: (),
         });
     }
 
+    /// Adds an implication whose `post` was derived by rewriting `original` using `equivalence`.
     fn add_substitution(
         &mut self,
-        substituted: AtomicConstraint<'db>,
-        ante: AtomicConstraint<'db>,
+        original: AtomicConstraint<'db>,
+        equivalence: AtomicConstraint<'db>,
         post: AtomicConstraint<'db>,
     ) {
         // Consider a call to an identity function with a gradual bound.
@@ -361,23 +362,26 @@ impl<'db> SequentMapBuilder<'db> {
         //   def keep[L: list[Any]](items: L) -> L: return items
         //   def forward[T](items: list[T]) -> list[T]: return keep(items)
         //
-        // The argument gives us `list[T] ≤ L`, and the return annotation gives us
-        // `L ≤ list[T]`. Combining these with `L ≤ list[Any]` implies `T = Any`
-        // because `list` is invariant. Substitution then gives us `list[Any] ≤ L`.
-        // Keep that implication and the original argument bound so the solver can
-        // infer the `list[T]` supplied by the caller. A bare `list` bound works the
-        // same way with `Unknown` in place of `Any`.
-        let keep_argument_constraint = EvidenceSource::Inferred.includes(substituted.provenance())
-            && ante.provenance().contains(ConstraintProvenance::DECLARED)
+        // The solver combines `list[T] ≤ L ≤ list[T]` with the declared bound `L ≤ list[Any]`
+        // and records `T = Any`, even though `T` is fixed by the caller. Substitution gives
+        // us `list[Any] ≤ L`. We still need the argument's `list[T] ≤ L` to infer `list[T]`.
+        //
+        // TODO(https://github.com/astral-sh/ty/issues/4696): Keep non-inferable type variables
+        // out of constraint solving. Until then, keeping the original argument constraint is a
+        // narrow workaround to avoid losing the caller's `T` to `Any` or `Unknown`.
+        let keep_argument_constraint = EvidenceSource::Inferred.includes(original.provenance())
+            && equivalence
+                .provenance()
+                .contains(ConstraintProvenance::DECLARED)
             && matches!(
-                ante.as_concrete(),
+                equivalence.as_concrete(),
                 Some((_, Type::Dynamic(DynamicType::Unknown | DynamicType::Any)))
             );
         self.pending.push(Sequent::PairImplication {
-            ante1: InternedSequentConstraint::new(self.db, substituted),
-            ante2: InternedSequentConstraint::new(self.db, ante),
+            ante1: InternedSequentConstraint::new(self.db, original),
+            ante2: InternedSequentConstraint::new(self.db, equivalence),
             post: InternedSequentConstraint::new(self.db, post),
-            is_substitution: !keep_argument_constraint,
+            can_replace_ante1: !keep_argument_constraint,
             fuel_cost: (),
         });
     }
