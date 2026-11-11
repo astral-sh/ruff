@@ -1462,10 +1462,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 self.visit.functions.push(self.semantic.snapshot());
 
-                // Extract any global bindings from the function body.
-                if let Some(globals) = Globals::from_body(body) {
-                    self.semantic.set_globals(globals);
-                }
+                self.record_globals(body);
                 let scope_id = self.semantic.scope_id;
                 self.analyze.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Function scope
@@ -1527,10 +1524,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.push_scope(ScopeKind::Class(class_def));
                 self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
-                // Extract any global bindings from the class body.
-                if let Some(globals) = Globals::from_body(body) {
-                    self.semantic.set_globals(globals);
-                }
+                self.record_globals(body);
 
                 // Set the docstring state before visiting the class body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Class);
@@ -2612,11 +2606,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
 impl<'a> Checker<'a> {
     /// Visit a [`Module`].
     fn visit_module(&mut self, python_ast: &'a Suite) {
-        // Extract any global bindings from the module body.
-        if let Some(globals) = Globals::from_body(python_ast) {
+        self.record_globals(python_ast);
+        analyze::module(python_ast, self);
+    }
+
+    /// Record declarations for the current scope before resolving its names.
+    fn record_globals(&mut self, body: &'a [Stmt]) {
+        if self.indexer.has_global_keyword()
+            && let Some(globals) = Globals::from_body(body)
+        {
             self.semantic.set_globals(globals);
         }
-        analyze::module(python_ast, self);
     }
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a

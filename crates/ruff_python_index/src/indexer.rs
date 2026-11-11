@@ -26,6 +26,8 @@ pub struct Indexer {
 
     /// The range of all comments in the source document.
     comment_ranges: CommentRanges,
+
+    has_global_keyword: bool,
 }
 
 impl Indexer {
@@ -36,6 +38,7 @@ impl Indexer {
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
         let mut comment_ranges = Vec::new();
+        let mut has_global_keyword = false;
 
         // Token, end
         let mut prev_end = TextSize::default();
@@ -66,6 +69,7 @@ impl Indexer {
             }
 
             match token.kind() {
+                TokenKind::Global => has_global_keyword = true,
                 TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     line_start = token.end();
                 }
@@ -99,7 +103,13 @@ impl Indexer {
             interpolated_string_ranges: interpolated_string_ranges_builder.finish(),
             multiline_ranges: multiline_ranges_builder.finish(),
             comment_ranges: CommentRanges::new(comment_ranges),
+            has_global_keyword,
         }
+    }
+
+    /// Returns whether the source contains a `global` keyword.
+    pub const fn has_global_keyword(&self) -> bool {
+        self.has_global_keyword
     }
 
     /// Returns the byte offset ranges of comments.
@@ -237,6 +247,12 @@ mod tests {
     fn new_indexer(contents: &str) -> Indexer {
         let parsed = parse_module(contents).unwrap();
         Indexer::from_tokens(parsed.tokens(), contents)
+    }
+
+    #[test]
+    fn global_keyword() {
+        assert!(!new_indexer("global_name = 'global'  # global name").has_global_keyword());
+        assert!(new_indexer("def f():\n    global name").has_global_keyword());
     }
 
     #[test]
