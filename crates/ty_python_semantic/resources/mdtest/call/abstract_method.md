@@ -12,12 +12,12 @@ class Foo(ABC):
     @abstractmethod
     def method(cls) -> int: ...
 
-# snapshot: call-to-abstract-method
+# snapshot: abstract-method-call
 Foo.method()
 ```
 
 ```snapshot
-error[call-to-abstract-method]: Cannot call `method` on class object
+error[abstract-method-call]: Cannot call `method` on class object
  --> src/mdtest_snippet.py:9:1
   |
 4 | /     @classmethod
@@ -25,7 +25,7 @@ error[call-to-abstract-method]: Cannot call `method` on class object
 6 | |     def method(cls) -> int: ...
   | |_______________________________- Method `method` defined here
 7 |
-8 |   # snapshot: call-to-abstract-method
+8 |   # snapshot: abstract-method-call
 9 |   Foo.method()
   |   ^^^^^^^^^^^^ `method` is an abstract classmethod with a trivial body
 ```
@@ -42,7 +42,7 @@ class Foo(ABC):
     @abstractmethod
     def method() -> int: ...
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -103,7 +103,7 @@ class Foo(ABC):
     def method(cls) -> int:
         pass
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -118,7 +118,7 @@ class Foo(ABC):
     def method(cls) -> int:
         raise NotImplementedError
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -156,7 +156,7 @@ class Base(ABC):
 class StillAbstract(Base):
     pass
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 StillAbstract.method()
 ```
 
@@ -172,7 +172,7 @@ class Foo(ABC):
     @classmethod
     def method(cls) -> int: ...
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -190,7 +190,7 @@ class Foo(ABC):
         """This method should be overridden."""
         ...
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -206,7 +206,7 @@ class P(Protocol):
     @classmethod
     def method(cls) -> int: ...
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 P.method()
 ```
 
@@ -219,7 +219,7 @@ class P(Protocol):
     @staticmethod
     def method() -> int: ...
 
-# error: [call-to-abstract-method] "Cannot call `method` on class object"
+# error: [abstract-method-call] "Cannot call `method` on class object"
 P.method()
 ```
 
@@ -245,7 +245,7 @@ class Foo(ABC):
 ```py
 from foo import Foo
 
-# These should not trigger `call-to-abstract-method` since the methods are defined in a stub.
+# These should not trigger `abstract-method-call` since the methods are defined in a stub.
 Foo.classmethod()
 Foo.staticmethod()
 ```
