@@ -851,6 +851,49 @@ unannotated(reveal_type(identity(1)))  # revealed: Literal[1]
 annotated(reveal_type(identity(1)))  # revealed: Unknown
 ```
 
+A generic call in a bare `Final` initializer infers its return type from its argument.
+
+```py
+from typing import Final
+
+ONE: Final = reveal_type(identity(1))  # revealed: Literal[1]
+```
+
+A call through an unannotated parameter supplies no expected type for its arguments. A callable with
+a parameter annotated as `Any` supplies `Any` as context.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def call(sink, typed_sink: Callable[[Any], None]):
+    sink(reveal_type(identity(1)))  # revealed: Literal[1]
+    typed_sink(reveal_type(identity(1)))  # revealed: Any
+```
+
+A generator without a return annotation leaves the operands of `yield` and `yield from` to
+inference. An explicit return annotation supplies its declared element type, including `Any` or
+`Unknown`.
+
+```py
+from collections.abc import Iterator
+
+def singleton[T](x: T) -> list[T]:
+    return [x]
+
+def values():
+    yield reveal_type(identity(1))  # revealed: Literal[1]
+    yield from reveal_type(singleton(1))  # revealed: list[int]
+
+def annotated_values() -> Iterator[Any]:
+    yield reveal_type(identity(1))  # revealed: Any
+    yield from reveal_type(singleton(1))  # revealed: list[Any]
+
+def unknown_values() -> Iterator[Unknown]:
+    yield reveal_type(identity(1))  # revealed: Unknown
+    yield from reveal_type(singleton(1))  # revealed: list[Unknown]
+```
+
 ## Upper-bound type context
 
 The declared upper bound of a type variable provides type context for a nested generic call:

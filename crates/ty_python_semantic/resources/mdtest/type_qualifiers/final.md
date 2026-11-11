@@ -66,8 +66,10 @@ symbol cannot be modified:
 from typing import Final
 
 FINAL_A: Final = 1
+IMAGE: Final = bytes.fromhex("fd")
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
+reveal_type(IMAGE)  # revealed: bytes
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: Literal[1]

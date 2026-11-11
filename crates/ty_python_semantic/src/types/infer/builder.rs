@@ -10360,6 +10360,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
+    /// An unannotated generator's signature uses `Unknown` for its return type.
+    /// Only an explicit return annotation provides an expected type for yielded values.
+    fn declared_yield_type(
+        &self,
+        function: FunctionType<'db>,
+        yield_ty: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let definition = function.literal(db).last_definition;
+        yield_ty.filter(|_| definition.has_explicit_return_annotation(db))
+    }
+
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -10388,7 +10400,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yield_ty;
+        let expected_yield_ty =
+            self.declared_yield_type(enclosing_function, generator_type_params.yield_ty);
         let tcx = TypeContext::declared(expected_yield_ty);
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
@@ -10439,7 +10452,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let tcx = TypeContext::declared(outer_expected.yield_ty.map(|yielded_ty| {
+        let outer_yield_ty = self.declared_yield_type(enclosing_function, outer_expected.yield_ty);
+        let tcx = TypeContext::declared(outer_yield_ty.map(|yielded_ty| {
             KnownClass::Iterable.to_specialized_instance(db, env, &[yielded_ty])
         }));
         let iterable_type = self.infer_expression(value, tcx);
@@ -10452,7 +10466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if let Some(outer_yield_ty) = outer_expected.yield_ty
+        if let Some(outer_yield_ty) = outer_yield_ty
             && let Some(known_inner_yield_type) = known_inner_yield_type
         {
             self.validate_generator_yield_type(
