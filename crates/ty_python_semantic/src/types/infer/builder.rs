@@ -1930,10 +1930,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
-            DeclaredAndInferredType::FromDeclaration(declared_ty) => (
-                declared_ty,
-                declared_ty.inner_type().unwrap_or_else(Type::unknown),
-            ),
+            DeclaredAndInferredType::FromDeclaration(declared_ty) => {
+                (declared_ty, declared_ty.inner_type_or_unknown())
+            }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
@@ -4972,7 +4971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 Type::bool_literal(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                declared.inner_type().unwrap_or_else(Type::unknown)
+                declared.inner_type_or_unknown()
             } else {
                 inferred_ty
             };
@@ -5003,11 +5002,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(name_expr) = target.as_name_expr()
                     && !name_expr.id.starts_with("__")
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
-                    && (
-                        // Not bare Final (bare Final is allowed on enum members)
-                        !(declared.qualifiers.contains(TypeQualifiers::FINAL)
-                            && declared.inner_type().is_none())
-                    )
+                    // Bare Final is allowed on enum members.
+                    && !declared.is_bare_final()
                     && (
                         // Value type would be an enum member at runtime (exclude callables,
                         // which are never members)
@@ -5054,7 +5050,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 declared.inner = Some(Type::unknown());
             }
-            let target_ty = declared.inner_type().unwrap_or_else(Type::unknown);
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
@@ -5065,7 +5060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration(target.into(), definition, declared);
             }
 
-            self.store_expression_type(target, target_ty);
+            self.store_expression_type(target, declared.inner_type_or_unknown());
         }
     }
 

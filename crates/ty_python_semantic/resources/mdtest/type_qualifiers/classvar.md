@@ -97,15 +97,56 @@ reveal_type(Child.header)  # revealed: bytes
 reveal_type(Child.other)  # revealed: Unknown
 ```
 
-A bare `ClassVar` supplies no declared type for a subclass override. The subclass infers the type of
-its own initializer and keeps the restriction on writes through instances.
+A subclass can replace the default with another value of the inferred type. An incompatible
+assignment is rejected, including through an intermediate subclass.
 
 ```py
-class TextHeader(C):
-    header = "header"
+class TextHeader(Child):
+    header = "header"  # error: [invalid-assignment]
 
-reveal_type(TextHeader.header)  # revealed: str
-TextHeader().header = "new header"  # error: [invalid-attribute-access]
+reveal_type(TextHeader.header)  # revealed: bytes
+TextHeader().header = b"new header"  # error: [invalid-attribute-access]
+```
+
+## Overriding a mutable class variable
+
+The inferred public type also constrains subclass annotations. For a mutable class variable, an
+override must support the reads and writes allowed by the base class.
+
+```py
+from typing import ClassVar
+
+class Base:
+    count: ClassVar = 0
+    items: ClassVar = [1]
+
+class Compatible(Base):
+    count = 1  # ok
+    items = []
+    reveal_type(items)  # revealed: list[int]
+
+class Redeclared(Compatible):
+    count: ClassVar[int] = 2  # ok
+
+class Incompatible(Base):
+    count: ClassVar = "one"  # error: [incompatible-attribute-override]
+
+class Narrower(Base):
+    count: ClassVar[bool] = True  # error: [incompatible-mutable-override]
+```
+
+Without an initializer the base supplies only the qualifier. A subclass can supply the first value.
+
+```py
+class Uninitialized:
+    items: ClassVar
+
+class Initialized(Uninitialized):
+    items = [1]
+
+class Grandchild(Initialized):
+    items = []
+    reveal_type(items)  # revealed: list[int]
 ```
 
 ## From stubs
@@ -136,6 +177,13 @@ reveal_type(C.untyped)  # revealed: Unknown
 reveal_type(C.placeholder)  # revealed: Unknown
 C.untyped = 2  # ok
 c.untyped = 2  # error: [invalid-attribute-access]
+
+class Child(C):
+    untyped = 1
+    placeholder = "ready"
+
+reveal_type(Child.untyped)  # revealed: int
+reveal_type(Child.placeholder)  # revealed: str
 ```
 
 ## Conflicting type qualifiers
@@ -182,6 +230,11 @@ class C:
 
 reveal_type(C.x)  # revealed: Literal["a"] | int
 C.x = 3.14  # error: [invalid-assignment]
+
+class Child(C):
+    x = "a"  # ok
+
+reveal_type(Child.x)  # revealed: Literal["a"] | int
 ```
 
 ## Too many arguments

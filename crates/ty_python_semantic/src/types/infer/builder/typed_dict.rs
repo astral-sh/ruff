@@ -196,7 +196,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let annotation = self.infer_extra_items_kwarg(&kw.value);
                         extra_items = Some(TypedDictOpenness::extra(
                             db,
-                            annotation.inner_type().unwrap_or_else(Type::unknown),
+                            annotation.inner_type_or_unknown(),
                             annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                         ));
                     }
@@ -730,7 +730,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             schema.insert(
                 Name::new(key_literal.value(db)),
                 functional_typed_dict_field(
-                    annotation.inner_type().unwrap_or_else(Type::unknown),
+                    annotation.inner_type_or_unknown(),
                     annotation.qualifiers(),
                     total,
                 ),

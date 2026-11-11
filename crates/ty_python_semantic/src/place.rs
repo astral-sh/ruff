@@ -90,21 +90,6 @@ pub(crate) enum PublicTypePolicy {
     Promote,
 }
 
-impl PublicTypePolicy {
-    /// Apply the public-type policy to the raw type.
-    fn apply_if_needed<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        match self {
-            Self::Raw => ty,
-            Self::Promote => ty.promote(db, env).promote_singletons(db, env),
-        }
-    }
-}
-
 /// The source definition provenance for a place.
 #[derive(
     Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
@@ -204,6 +189,15 @@ impl<'db, T> DefinedPlace<'db, T> {
 
     pub(crate) const fn is_definitely_defined(&self) -> bool {
         matches!(self.definedness, Definedness::AlwaysDefined)
+    }
+}
+
+impl<'db> DefinedPlace<'db> {
+    pub(crate) fn public_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.public_type_policy {
+            PublicTypePolicy::Raw => self.ty,
+            PublicTypePolicy::Promote => self.ty.promote(db, env).promote_singletons(db, env),
+        }
     }
 }
 
@@ -1158,7 +1152,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.public_type_policy.apply_if_needed(db, env, place.ty);
+                let ty = place.public_type(db, env);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_provenance(place.provenance);
                 match place.definedness {

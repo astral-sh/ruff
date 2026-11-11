@@ -29,7 +29,7 @@ struct AnnotationExpressionInference<'db> {
 impl<'db> AnnotationExpressionInference<'db> {
     fn new(annotation_ty: DeclaredType<'db>) -> Self {
         Self {
-            expression_ty: annotation_ty.inner_type().unwrap_or_else(Type::unknown),
+            expression_ty: annotation_ty.inner_type_or_unknown(),
             annotation_ty,
         }
     }
@@ -335,9 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if slice.is_tuple_expr() {
                                 self.store_expression_type(
                                     slice,
-                                    type_and_qualifiers
-                                        .inner_type()
-                                        .unwrap_or_else(Type::unknown),
+                                    type_and_qualifiers.inner_type_or_unknown(),
                                 );
                             }
                             type_and_qualifiers

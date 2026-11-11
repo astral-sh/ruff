@@ -3248,37 +3248,28 @@ impl<'db> StaticClassLiteral<'db> {
                             Member::unbound()
                         }
                     } else {
-                        // A bare `Final` can be initialized in `__init__`. Its type comes from
-                        // the instance assignment, while the class declaration prevents writes.
-                        if qualifier_only && !declared.is_undefined() {
-                            let initializer = sources.final_initializer(db, name).inner.place;
-                            let place = if initializer.is_undefined() {
-                                declared
-                            } else {
-                                initializer
-                            };
-                            return Member {
-                                inner: place.with_qualifiers(qualifiers),
-                            };
-                        }
-
                         // The attribute is declared but not bound in the class body.
                         // We take this as a sign that this is intended to be a pure
                         // instance attribute, and we trust the declared type, unless
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
-
-                        if declaredness == Definedness::PossiblyUndefined
+                        if qualifier_only && !declared.is_undefined() {
+                            // A bare `Final` gets its type from the initializer assignment.
+                            // The class-body declaration still prevents reassignment.
+                            let initializer = sources.final_initializer(db, name).inner.place;
+                            if !initializer.is_undefined() {
+                                declared = initializer;
+                            }
+                        } else if declaredness == Definedness::PossiblyUndefined
                             && let Place::Defined(implicit) = sources
                                 .implicit_attribute(db, name, MethodDecorator::None)
                                 .inner
                                 .place
                         {
-                            union_with_implicit(implicit)
-                        } else {
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
-                            }
+                            return union_with_implicit(implicit);
+                        }
+                        Member {
+                            inner: declared.with_qualifiers(qualifiers),
                         }
                     }
                 }

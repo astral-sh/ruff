@@ -5,7 +5,9 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use ruff_text_size::Ranged;
 
 use crate::place::{Place, place_from_declarations};
-use crate::types::annotation_target::is_instance_attribute_assignment;
+use crate::types::annotation_target::{
+    is_final_attribute_initializer, is_instance_attribute_assignment,
+};
 use crate::{
     TypeQualifiers,
     types::{
@@ -14,7 +16,7 @@ use crate::{
     },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::semantic_index;
+use ty_python_core::{place_table, use_def_map};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
@@ -58,11 +60,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             let class_body_scope = class_literal.body_scope(db);
-            let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.program_file(db));
-            let place_table = class_index.place_table(class_scope_id);
-            if let Some(symbol_id) = place_table.symbol_id(attribute) {
-                let use_def = class_index.use_def_map(class_scope_id);
+            if let Some(symbol_id) = place_table(db, class_body_scope).symbol_id(attribute) {
+                let use_def = use_def_map(db, class_body_scope);
                 let declarations = place_from_declarations(
                     db,
                     env,
@@ -108,7 +107,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let is_in_allowed_initializer = self
             .current_function_definition()
-            .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
+            .is_some_and(|method| is_final_attribute_initializer(db, self.index, method));
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
@@ -166,7 +165,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
-            let class_body_scope = class_literal.body_scope(db);
             if owner_and_declaration.is_some_and(|(owner, _)| owner != class_literal) {
                 // Name mangling gives each class its own attribute for this spelling.
                 if is_mangled_private(attribute) {
@@ -188,11 +186,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 return true;
             }
-            let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.program_file(db));
-            let pt = class_index.place_table(class_scope_id);
-
-            if let Some(symbol) = pt.symbol_by_name(attribute)
+            let table = place_table(db, class_literal.body_scope(db));
+            if let Some(symbol) = table.symbol_by_name(attribute)
                 && symbol.is_bound()
             {
                 if let Some(diag_builder) = self

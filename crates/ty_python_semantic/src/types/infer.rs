@@ -58,8 +58,7 @@ use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, DeclaredType, KnownClass, RecursiveType, StaticClassLiteral, Type,
-    TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, DeclaredType, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -1241,7 +1240,8 @@ enum DefinitionTypes<'db> {
     Empty,
     Binding(Type<'db>),
     Declaration(DeclaredType<'db>),
-    BindingAndDeclaration(TypeAndQualifiers<'db>),
+    /// The binding takes the declaration's type, or `Unknown` for a bare qualifier.
+    BindingAndDeclaration(DeclaredType<'db>),
     Other(Box<OtherDefinitionTypes<'db>>),
 }
 
@@ -1267,9 +1267,9 @@ impl<'db> DefinitionTypes<'db> {
             ([(binding, binding_ty)], [(declaration, declaration_ty)])
                 if *binding == owner
                     && binding == declaration
-                    && Some(*binding_ty) == declaration_ty.inner_type() =>
+                    && *binding_ty == declaration_ty.inner_type_or_unknown() =>
             {
-                Self::BindingAndDeclaration(declaration_ty.with_type(*binding_ty))
+                Self::BindingAndDeclaration(*declaration_ty)
             }
             _ => Self::Other(Box::new(OtherDefinitionTypes {
                 bindings: bindings.into_boxed_slice(),
@@ -1354,7 +1354,7 @@ impl<'db> DefinitionTypes<'db> {
                     cycle,
                     owner,
                     owner,
-                    declaration_ty.inner_type(),
+                    declaration_ty.inner_type_or_unknown(),
                 );
                 let declaration_ty = Self::normalize_declaration(
                     db,
@@ -1363,11 +1363,11 @@ impl<'db> DefinitionTypes<'db> {
                     cycle,
                     owner,
                     owner,
-                    declaration_ty.into(),
+                    declaration_ty,
                 );
 
-                if Some(binding_ty) == declaration_ty.inner_type() {
-                    Self::BindingAndDeclaration(declaration_ty.with_type(binding_ty))
+                if binding_ty == declaration_ty.inner_type_or_unknown() {
+                    Self::BindingAndDeclaration(declaration_ty)
                 } else {
                     Self::Other(Box::new(OtherDefinitionTypes {
                         bindings: Box::new([(owner, binding_ty)]),
@@ -1396,9 +1396,9 @@ impl<'db> DefinitionTypes<'db> {
                     ([(binding, binding_ty)], [(declaration, declaration_ty)])
                         if *binding == owner
                             && binding == declaration
-                            && Some(*binding_ty) == declaration_ty.inner_type() =>
+                            && *binding_ty == declaration_ty.inner_type_or_unknown() =>
                     {
-                        Self::BindingAndDeclaration(declaration_ty.with_type(*binding_ty))
+                        Self::BindingAndDeclaration(*declaration_ty)
                     }
                     _ => Self::Other(other),
                 }
@@ -1412,9 +1412,10 @@ impl<'db> DefinitionTypes<'db> {
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
         match self {
             Self::Binding(ty) => Either::Left(std::iter::once((owner, *ty))),
-            Self::BindingAndDeclaration(declaration) => {
-                Either::Left(std::iter::once((owner, declaration.inner_type())))
-            }
+            Self::BindingAndDeclaration(declaration) => Either::Left(std::iter::once((
+                owner,
+                declaration.inner_type_or_unknown(),
+            ))),
             Self::Other(other) => Either::Right(other.bindings.iter().copied()),
             Self::Empty | Self::Declaration(..) => Either::Right([].iter().copied()),
         }
@@ -1425,9 +1426,8 @@ impl<'db> DefinitionTypes<'db> {
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = DefinitionDeclaration<'db>> {
         match self {
-            Self::Declaration(declaration) => Either::Left(std::iter::once((owner, *declaration))),
-            Self::BindingAndDeclaration(declaration) => {
-                Either::Left(std::iter::once((owner, (*declaration).into())))
+            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
+                Either::Left(std::iter::once((owner, *declaration)))
             }
             Self::Other(other) => Either::Right(other.declarations.iter().copied()),
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),

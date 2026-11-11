@@ -49,8 +49,8 @@ enum AttributeMethodKind {
     Other,
 }
 
-/// An inferred default has no declared attribute contract, but its value can still
-/// provide a call signature that an overriding method needs to preserve.
+/// An unannotated default without an inherited declaration can still provide a call
+/// signature that an overriding method needs to preserve.
 enum MemberContract<'db, A> {
     Attribute(A),
     Inferred(Type<'db>),
@@ -244,17 +244,19 @@ fn unbound_member_contract<'db>(
                 .place
                 .ignore_possibly_undefined()
                 .is_some());
-    // Unannotated defaults with an inherited annotation already have a declared type.
-    // Other inferred bindings do not define an independent write contract: their raw
-    // types can retain literals that ordinary attribute access widens.
-    if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
+    let ty = if own_place.origin.is_declared() || is_descriptor {
+        own_place.ty
+    } else if is_class_var && !qualifiers.contains(TypeQualifiers::FINAL) {
+        // A bare mutable `ClassVar` promises the public type inferred from its initializer.
+        own_place.public_type(db, env)
+    } else {
         return Some(MemberContract::Inferred(own_place.ty));
-    }
+    };
     // A decorator can turn a function into a property, in which case its exposed
     // value must be checked instead of the original function's signature.
     Some(MemberContract::Attribute(UnboundAttribute {
         literal,
-        ty: own_place.ty,
+        ty,
         class_member,
         instance_member,
         is_descriptor,

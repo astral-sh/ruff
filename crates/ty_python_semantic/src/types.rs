@@ -12029,15 +12029,6 @@ impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
         self.inner
     }
 
-    fn with_type<U>(self, inner: U) -> TypeAndQualifiers<'db, U> {
-        TypeAndQualifiers {
-            inner,
-            origin: self.origin,
-            qualifiers: self.qualifiers,
-            provenance: self.provenance,
-        }
-    }
-
     pub(crate) fn origin(&self) -> TypeOrigin {
         self.origin
     }
@@ -12054,15 +12045,10 @@ impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
     }
 }
 
-impl<'db> From<TypeAndQualifiers<'db>> for DeclaredType<'db> {
-    fn from(ty: TypeAndQualifiers<'db>) -> Self {
-        ty.with_type(Some(ty.inner))
-    }
-}
-
 impl<'db> TypeAndQualifiers<'db> {
-    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        self.with_type(f(self.inner))
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = f(self.inner);
+        self
     }
 }
 
@@ -12071,8 +12057,17 @@ impl<'db> DeclaredType<'db> {
         Self::new(Some(ty), TypeOrigin::Declared, TypeQualifiers::empty())
     }
 
-    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        self.with_type(self.inner.map(f))
+    fn inner_type_or_unknown(self) -> Type<'db> {
+        self.inner.unwrap_or_else(Type::unknown)
+    }
+
+    fn is_bare_final(self) -> bool {
+        self.inner.is_none() && self.qualifiers.contains(TypeQualifiers::FINAL)
+    }
+
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = self.inner.map(f);
+        self
     }
 }
 

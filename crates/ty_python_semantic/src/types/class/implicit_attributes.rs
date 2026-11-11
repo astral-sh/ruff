@@ -8,7 +8,9 @@ use crate::{
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
+        KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        annotation_target::is_final_attribute_initializer,
+        definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
@@ -159,7 +161,7 @@ impl<'db> StaticClassLiteral<'db> {
             // final evaluated type, which may be wrapped by other decorators like @cache.
             let function_node = method_def.node(&module);
             let method_name = function_node.name.as_str();
-            if initializer_only && !matches!(method_name, "__init__" | "__post_init__") {
+            if initializer_only && !is_final_attribute_initializer(db, index, function_node) {
                 return false;
             }
             let definition = index.expect_single_definition(method_def);
@@ -224,9 +226,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let all_qualifiers =
                     annotation.qualifiers() | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
-                let place = if annotation.inner_type().is_none()
-                    && all_qualifiers.contains(TypeQualifiers::FINAL)
-                {
+                let place = if annotation.is_bare_final() {
                     let Some(value) = assignment.value(&module) else {
                         // A separate assignment supplies the type for this final attribute.
                         qualifiers |= all_qualifiers;
@@ -239,7 +239,7 @@ impl<'db> StaticClassLiteral<'db> {
                         TypeContext::default(),
                     ))
                 } else {
-                    Place::declared(annotation.inner_type().unwrap_or_else(Type::unknown))
+                    Place::declared(annotation.inner_type_or_unknown())
                 };
 
                 return ControlFlow::Continue(ImplicitAttribute {

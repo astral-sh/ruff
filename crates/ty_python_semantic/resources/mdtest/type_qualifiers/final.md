@@ -24,7 +24,6 @@ FINAL_D: "Final[int]" = 1
 FINAL_F: Final[int]
 FINAL_F = 1
 FINAL_G: Final[Unknown] = b""
-FINAL_H: Final = b""
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
 reveal_type(FINAL_B)  # revealed: Literal[1]
@@ -32,7 +31,6 @@ reveal_type(FINAL_C)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
 reveal_type(FINAL_F)  # revealed: Literal[1]
 reveal_type(FINAL_G)  # revealed: Unknown
-reveal_type(FINAL_H)  # revealed: Literal[b""]
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: int
@@ -41,13 +39,12 @@ def nonlocal_uses():
     reveal_type(FINAL_D)  # revealed: int
     reveal_type(FINAL_F)  # revealed: int
     reveal_type(FINAL_G)  # revealed: Unknown
-    reveal_type(FINAL_H)  # revealed: Literal[b""]
 ```
 
 Imported types:
 
 ```py
-from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F, FINAL_G, FINAL_H
+from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F, FINAL_G
 
 reveal_type(FINAL_A)  # revealed: int
 reveal_type(FINAL_B)  # revealed: int
@@ -55,7 +52,6 @@ reveal_type(FINAL_C)  # revealed: int
 reveal_type(FINAL_D)  # revealed: int
 reveal_type(FINAL_F)  # revealed: int
 reveal_type(FINAL_G)  # revealed: Unknown
-reveal_type(FINAL_H)  # revealed: Literal[b""]
 ```
 
 ### Bare `Final` without a type
@@ -1420,8 +1416,7 @@ class C:
 
 ### `__post_init__`
 
-`__post_init__` is a dunder that runs as part of instance initialization, so `Final` instance
-attributes may be declared and assigned in it, regardless of whether the class is a dataclass:
+A dataclass can declare and assign a `Final` instance attribute in `__post_init__`.
 
 ```py
 from dataclasses import dataclass
@@ -1439,12 +1434,42 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-```py
-from typing import Final
+Classes with a dataclass transform can also initialize a bare `Final` in `__post_init__`. Its public
+type comes from that assignment.
 
-class NonDataclass:
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Model: ...
+
+class Record(Model):
+    value: Final
+
+    def __init__(self):
+        self.__post_init__()
+
     def __post_init__(self):
-        self.x: Final[int] = 1
+        self.value = b""
+
+reveal_type(Record().value)  # revealed: bytes
+```
+
+In an ordinary class, `__post_init__` is a regular method. Assignments there cannot initialize a
+final attribute or change its inferred type.
+
+```py
+class NonDataclass:
+    value: Final
+
+    def __init__(self):
+        self.value = b""
+
+    def __post_init__(self):
+        self.x: Final[int] = 1  # error: [invalid-assignment]
+        self.value = 1  # error: [invalid-assignment]
+
+reveal_type(NonDataclass().value)  # revealed: bytes
 ```
 
 Assigning to a `Final` attribute via the class literal on a dataclass-like class mentions
