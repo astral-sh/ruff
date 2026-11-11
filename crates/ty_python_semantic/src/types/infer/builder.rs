@@ -1424,7 +1424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )) => {
                 self.infer_parameter_definition(
                     parameter_with_default.node(self.module()),
-                    definition,
+                    Some(definition),
                 );
             }
             DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
