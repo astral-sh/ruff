@@ -102,10 +102,10 @@ class AttributeTarget[T](Protocol):
     def z_member(self, value: int | str) -> int | str: ...
 
 def property_convert(value: PropertySource[int]) -> PropertyTarget[int]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def attribute_convert(value: AttributeSource[int]) -> AttributeTarget[int]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 ```
 
 ## Structural alternatives after nominal constraints
@@ -246,13 +246,13 @@ class AliasPropertyTarget[T](Protocol):
     def z_child(self) -> TargetAlias[T]: ...
 
 def parameter_convert(value: ParameterSource[int]) -> ParameterTarget[int]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def alias_method_convert(value: AliasMethodSource[int]) -> AliasMethodTarget[int]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def alias_property_convert(value: AliasPropertySource[int]) -> AliasPropertyTarget[int]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 ```
 
 ## Recursive self-binding
@@ -261,8 +261,8 @@ The nominal shortcut must not bind an unconstrained TypeVar to another specializ
 protocol or one supplied by a sibling union arm. We check that in two ways: First, we directly
 construct constraint sets representing these restrictions, and verify that those constraint sets are
 always satisfiable. Second, if we _did_ violate these restrictions, we would have unbounded
-recursive growth in the types that we infer. The `invalid-return-type` checks in the function bodies
-ensure that recursive inference terminates without accepting invalid returns.
+recursive growth in the types that we infer. The `invalid-explicit-return` checks in the function
+bodies ensure that recursive inference terminates without accepting invalid returns.
 
 ```py
 from collections.abc import Iterable
@@ -277,7 +277,7 @@ class Recursive(Protocol[T_co]):
 
 def convert(value: Any | Recursive[T_co]) -> list[T_co]:
     result = [value]
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return result
 
 U = TypeVar("U", covariant=True)
@@ -300,6 +300,6 @@ Options: TypeAlias = Iterable[U] | F[U] | M
 
 def s(value: Options[U]) -> list[U]:
     result = [value]
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return result
 ```

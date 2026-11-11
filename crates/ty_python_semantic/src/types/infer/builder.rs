@@ -1427,7 +1427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )) => {
                 self.infer_parameter_definition(
                     parameter_with_default.node(self.module()),
-                    definition,
+                    Some(definition),
                 );
             }
             DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
@@ -2041,7 +2041,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return false;
         }
 
-        // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN_STATEMENT`;
+        // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN`;
         // update those too if updating this!
         if self.context.is_lint_enabled(&UNSOUND_ASSIGNMENT)
             && !self.file().is_stub(db)
@@ -2229,7 +2229,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ),
                     Type::Never => {
                         // In unreachable code, we infer `Never` for decorators like `typing.overload`.
-                        // Return `true` here to avoid false positive `invalid-return-type` lints for
+                        // Return `true` here to avoid false positive
+                        // `invalid-implicit-return-in-function-with-stub-body` lints for
                         // `@overload`ed functions without a body in unreachable code.
                         true
                     }
@@ -10559,7 +10560,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && expected_yield_ty.is_fully_static(db, env)
             && !yielded_ty.is_pure_redundant_with(db, env, expected_yield_ty)
         {
-            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT` and `UNSOUND_ASSIGNMENT`;
+            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN` and `UNSOUND_ASSIGNMENT`;
             // update those too if updating this!
             report_unsound_yield(
                 &self.context,

@@ -1348,7 +1348,7 @@ def _(meta: type[Meta]):
                 assert_never(cls)
 
     def as_int(cls: type[C]) -> int:
-        return cls  # error: [invalid-return-type]
+        return cls  # error: [invalid-explicit-return]
 ```
 
 ## Diagnostic range

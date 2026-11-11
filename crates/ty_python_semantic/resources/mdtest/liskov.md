@@ -3255,6 +3255,28 @@ class Same(Base):
     shared: ClassVar[int]
 ```
 
+A subclass can redeclare an `Any` attribute as `type[Any]` and still assign class objects to it.
+
+```py
+class DataType:
+    kind: Any
+
+class ConcreteDataType(DataType):
+    kind: type[Any]  # ok
+
+ConcreteDataType().kind = int  # ok
+```
+
+The attribute remains writable when its type also permits a descriptor with only a getter.
+
+```py
+class Getter:
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class WithGetter(DataType):
+    kind: Getter | type[Any]  # ok
+```
+
 ## Property value types
 
 Read-only properties may narrow their result types. They cannot return an unrelated type, even when
@@ -3314,7 +3336,7 @@ contract of an inherited attribute or property. The same check applies when an a
 method.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class PropertyBase:
     @property
@@ -3355,6 +3377,20 @@ class CallablePropertyBase:
 class CompatibleMethod(CallablePropertyBase):
     def value(self) -> int:  # ok
         return 1
+```
+
+The base attribute accepts callables returning any object. An overriding method that returns `int`
+would reject some of those writes.
+
+```py
+class Domain:
+    dtype: type[Any] | Callable[[int], object]
+
+Domain().dtype = str  # ok
+
+class Field(Domain):
+    def dtype(self, value: int) -> int:  # error: [incompatible-mutable-override]
+        return value
 ```
 
 ## Decorators preserving method binding
@@ -4165,6 +4201,29 @@ def check(child: Child) -> None:
     child.value = True
     child.value = 1  # error: [invalid-assignment]
     value: HasValue = child  # error: [invalid-assignment]
+```
+
+## Overriding setter-only descriptors
+
+A descriptor with only `__set__` returns itself on instance reads. An overriding property can
+preserve that read type and still reject values accepted by the descriptor's setter.
+
+```py
+class AcceptsInt:
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class Base:
+    value = AcceptsInt()
+
+Base().value = 1  # ok
+
+class Child(Base):
+    @property
+    def value(self) -> AcceptsInt:
+        return AcceptsInt()
+
+    @value.setter
+    def value(self, value: str) -> None: ...  # error: [incompatible-property-override]
 ```
 
 ## Descriptor decorators

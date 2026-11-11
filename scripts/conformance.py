@@ -10,7 +10,7 @@
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
+# unsound-return = "warn"
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
@@ -534,6 +534,7 @@ def collect_ty_diagnostics(
             "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
+            "--error=single-overload",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),
