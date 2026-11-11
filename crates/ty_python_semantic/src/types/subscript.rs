@@ -16,8 +16,8 @@ use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
-    report_not_subscriptable, report_slice_step_size_zero, typed_dict_subscript_key_lint,
+    report_index_out_of_bounds, report_invalid_key_on_typed_dict, report_not_subscriptable,
+    report_slice_step_size_zero, typed_dict_subscript_key_lint,
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
@@ -345,13 +345,12 @@ impl<'db> SubscriptErrorKind<'db> {
                 }
             }
             Self::DunderPossiblyUnbound { method, value_ty } => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` may be missing",
+                if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Object of type `{}` may not be subscriptable",
                         value_ty.display(db, env),
                     ));
+                    diagnostic.info(format_args!("Its `{method}` method may be missing"));
                 }
             }
             Self::DunderCallError {

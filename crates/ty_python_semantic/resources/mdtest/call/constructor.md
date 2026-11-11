@@ -682,10 +682,10 @@ def _(flag: bool) -> None:
             def __new__(cls):
                 return object.__new__(cls)
 
-    # error: [possibly-missing-implicit-call]
+    # error: [call-to-possibly-missing-constructor]
     reveal_type(Foo())  # revealed: Foo
 
-    # error: [possibly-missing-implicit-call]
+    # error: [call-to-possibly-missing-constructor]
     # error: [too-many-positional-arguments]
     reveal_type(Foo(1))  # revealed: Foo
 ```

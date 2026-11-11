@@ -14,9 +14,9 @@ use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
+    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, TypedDictDeleteErrorKind,
+    report_cannot_delete_typed_dict_key, report_invalid_arguments_to_annotated,
+    report_not_subscriptable, typed_dict_subscript_key_lint,
 };
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
@@ -2104,14 +2104,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match call_dunder_err {
                     CallDunderError::PossiblyUnbound { .. } => {
                         if emit_diagnostic
-                            && let Some(builder) = self
-                                .context
-                                .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                            && let Some(builder) =
+                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Method `__setitem__` of type `{}` may be missing",
+                                "Object of type `{}` may not support subscript assignment",
                                 object_ty.display(db, env),
                             ));
+                            diagnostic.info("Its `__setitem__` method may be missing");
                             attach_original_type_info(&mut diagnostic);
                         }
                         false
@@ -2379,14 +2379,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match err {
                     CallDunderError::PossiblyUnbound { .. } => {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                        if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, target)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Method `__delitem__` of type `{}` may be missing",
+                                "Object of type `{}` may not support subscript deletion",
                                 object_ty.display(db, env),
                             ));
+                            diagnostic.info("Its `__delitem__` method may be missing");
                             attach_original_type_info(&mut diagnostic);
                         }
                     }

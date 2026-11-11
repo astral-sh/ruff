@@ -177,6 +177,18 @@ a = NoSetitem()
 a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
 ```
 
+## Subscript store with a possibly missing `__setitem__`
+
+```py
+def _(writable: bool) -> None:
+    class C:
+        if writable:
+            def __setitem__(self, key: int, value: int) -> None: ...
+
+    c = C()
+    c[0] = 1  # error: [invalid-assignment] "Object of type `C` may not support subscript assignment"
+```
+
 ## `__setitem__` not callable
 
 ```py
