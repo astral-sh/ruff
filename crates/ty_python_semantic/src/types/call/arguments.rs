@@ -3,6 +3,11 @@ use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
 use std::hash::BuildHasherDefault;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use super::bind::{ArgumentTypeContext, ExpressionConstraints};
+use crate::types::typevar::TypeVarNonceGenerator;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -45,6 +50,7 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     items: Vec<CallArgument<'a, 'db>>,
+    pub(crate) capture_nonces: Option<Rc<TypeVarNonceGenerator<'db>>>,
 }
 
 /// An argument to a call and its inferred types, when available.
@@ -437,21 +443,35 @@ impl<'db> KeywordArgument<'db> {
     }
 }
 
-/// Inferred types for a given argument.
-///
-/// Note that a single argument may produce multiple distinct inferred types when inferred
-/// with type context across multiple bindings.
+#[derive(Clone, Debug)]
+struct InferredArgument<'db> {
+    ty: Type<'db>,
+    constraints: Option<Arc<ExpressionConstraints<'db>>>,
+}
+
+// Convergence compares the inferred types. Each pass can give its local variables fresh identities.
+impl PartialEq for InferredArgument<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty
+    }
+}
+impl Eq for InferredArgument<'_> {}
+
+/// A call argument can have a different inferred type and constraints for each overload.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    fallback_type: Option<Type<'db>>,
-    types: FxHashMap<Type<'db>, Type<'db>>,
+    fallback_type: Option<InferredArgument<'db>>,
+    types: FxHashMap<Type<'db>, InferredArgument<'db>>,
 }
 
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
-            fallback_type: fallback_ty,
-            types: FxHashMap::default(),
+            fallback_type: fallback_ty.map(|ty| InferredArgument {
+                ty,
+                constraints: None,
+            }),
+            ..Self::default()
         }
     }
 
@@ -459,16 +479,12 @@ impl<'db> CallArgumentTypes<'db> {
     pub(crate) fn get_default(&self) -> Option<Type<'db>> {
         // If this type was inferred against exactly one declared type, or was inferred against
         // multiple, but resulted in a single inferred type, we have an exact type to return.
-        if let Ok(exact_ty) = self
-            .types
+        self.types
             .values()
-            .exactly_one()
-            .or_else(|_| self.types.values().all_equal_value())
-        {
-            return Some(*exact_ty);
-        }
-
-        self.fallback_type
+            .map(|value| value.ty)
+            .all_equal_value()
+            .ok()
+            .or_else(|| self.fallback_type.as_ref().map(|value| value.ty))
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -476,7 +492,10 @@ impl<'db> CallArgumentTypes<'db> {
     /// If the type was not inferred against the declared type directly, this method will fall back to
     /// [`Self::get_default`].
     fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+        self.types
+            .get(&tcx)
+            .map(|value| value.ty)
+            .or_else(|| self.get_default())
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -488,12 +507,27 @@ impl<'db> CallArgumentTypes<'db> {
             .unwrap_or(Type::unknown())
     }
 
+    pub(crate) fn expression_constraints(
+        &self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Option<&ExpressionConstraints<'db>> {
+        let value = self.types.get(&formal).or(self.fallback_type.as_ref())?;
+        value.constraints.as_deref().filter(|e| e.closed == actual)
+    }
+
     /// Insert the type of this argument when inferred with the provided type context.
-    fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
+    fn insert(
+        &mut self,
+        tcx: impl Into<TypeContext<'db>>,
+        ty: Type<'db>,
+        constraints: Option<Arc<ExpressionConstraints<'db>>>,
+    ) {
+        let inferred = InferredArgument { ty, constraints };
         match tcx.into().declared_type() {
-            None => self.fallback_type = Some(ty),
+            None => self.fallback_type = Some(inferred),
             Some(tcx) => {
-                self.types.insert(tcx, ty);
+                self.types.insert(tcx, inferred);
             }
         }
     }
@@ -501,12 +535,44 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, ty)| (TypeContext::declared(Some(*tcx)), *ty))
-            .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
+            .map(|(tcx, ty)| (TypeContext::declared(Some(*tcx)), ty.ty))
+            .chain(
+                self.fallback_type
+                    .as_ref()
+                    .map(|v| (TypeContext::default(), v.ty)),
+            )
     }
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
+    /// Store the type and its constraints together under each declaration that may request it.
+    /// Forwarded arguments can also be looked up through the original P.args or P.kwargs.
+    pub(crate) fn insert_inferred(
+        &mut self,
+        index: usize,
+        context: Option<ArgumentTypeContext<'db>>,
+        (ty, evidence): &(Type<'db>, Option<Arc<ExpressionConstraints<'db>>>),
+    ) {
+        let types = self.items[index].source_types_mut();
+        let mut insert =
+            |formal| types.insert(TypeContext::declared(formal), *ty, evidence.clone());
+        match context {
+            None => insert(None),
+            Some(ArgumentTypeContext::Standard {
+                raw_parameter_type, ..
+            }) => insert(Some(raw_parameter_type)),
+            Some(ArgumentTypeContext::ParamSpec {
+                declared_type,
+                paramspec_parameter_type,
+            }) => {
+                insert(Some(declared_type));
+                if paramspec_parameter_type != declared_type {
+                    insert(Some(paramspec_parameter_type));
+                }
+            }
+        }
+    }
+
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized.
@@ -516,6 +582,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
+            ..Self::default()
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
@@ -718,7 +785,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .get_mut(index)
             .expect("argument index should be valid")
             .source_types_mut()
-            .insert(tcx, ty);
+            .insert(tcx, ty, None);
     }
 
     pub(crate) fn clear_types(&mut self, index: usize) {
@@ -744,7 +811,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             let mut items = Vec::with_capacity(self.items.len() + 1);
             items.push(CallArgument::new(Argument::Synthetic, bound_self));
             items.extend(self.items.iter().cloned());
-            Cow::Owned(CallArguments { items })
+            Cow::Owned(Self {
+                items,
+                capture_nonces: self.capture_nonces.clone(),
+            })
         } else {
             Cow::Borrowed(self)
         }
@@ -758,6 +828,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
+            ..Self::default()
         }
     }
 
@@ -799,6 +870,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     argument
                 })
                 .collect(),
+            ..Self::default()
         }
     }
 
@@ -1071,6 +1143,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument::new(argument, ty));
         }
 
-        Self { items }
+        Self {
+            items,
+            ..Self::default()
+        }
     }
 }

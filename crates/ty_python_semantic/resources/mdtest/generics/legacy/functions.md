@@ -2489,6 +2489,270 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Literal arguments matching more than one union member
+
+A `list[int]` argument matches `T | list[T]` in two ways. Both matches contribute to the return
+type. The literal's element type stays `int` unless the call has an independent reason to widen it.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def as_list(value: T | list[T]) -> list[T]:
+    if isinstance(value, list):
+        return value
+    return [value]
+
+result = as_list(reveal_type([1]))  # revealed: list[int]
+reveal_type(result)  # revealed: list[list[int] | int]
+
+wider: list[int | str] = as_list(reveal_type([1]))  # revealed: list[int | str]
+
+def _(values: list[int]):
+    result = as_list(reveal_type([*values]))  # revealed: list[int]
+    reveal_type(result)  # revealed: list[list[int] | int]
+```
+
+A type alias preserves the two matches, including when the argument chooses between list literals.
+
+```py
+from typing_extensions import TypeAliasType
+
+MaybeList = TypeAliasType("MaybeList", T | list[T], type_params=(T,))
+
+def wrap(value: MaybeList[T]) -> list[T]:
+    raise NotImplementedError
+
+def _(flag: bool):
+    reveal_type(wrap([1] if flag else [2]))  # revealed: list[list[int] | int]
+```
+
+Context also flows between elements of one tuple argument. The second list fixes `T` to `int | str`,
+so the first list literal widens to match.
+
+```py
+def together(items: tuple[T | list[T], list[T]]) -> list[T]:
+    return items[1]
+
+def _(values: list[int | str]):
+    result = together((reveal_type([1]), values))  # revealed: list[int | str]
+    reveal_type(result)  # revealed: list[int | str]
+```
+
+## Nested calls matching more than one union member
+
+The first argument of `first` determines the element type of its empty list. Revisiting that call
+with more information leaves the nesting depth of the other argument to `choose` unchanged.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def first(value: U, alternatives: list[U]) -> U:
+    return value
+
+def choose(left: T | list[T], right: T | list[T]) -> list[T]:
+    raise NotImplementedError
+
+def _(xs: list[int]):
+    result = choose([["x"]], first(xs, []))
+    reveal_type(result)  # revealed: list[list[list[str]] | list[int]]
+
+    nonempty = choose([["x"]], first(xs, [xs]))
+    reveal_type(nonempty)  # revealed: list[list[list[str]] | list[int]]
+```
+
+An empty list supplies no element type. A list containing an element of type `Unknown` contributes
+that type to the result. Passing either list through an identity function preserves the distinction.
+
+```py
+from ty_extensions._internal import Unknown
+
+def identity(value: U) -> U:
+    return value
+
+def _(value: int, unknown: Unknown):
+    reveal_type(first(value, []))  # revealed: int
+    reveal_type(first(value, [unknown]))  # revealed: int | Unknown
+    reveal_type(first(value, identity([])))  # revealed: int
+    reveal_type(first(value, identity([unknown])))  # revealed: int | Unknown
+```
+
+A callback returning `list[Unknown]` also contributes its element type.
+
+```py
+from collections.abc import Callable
+
+def from_callback(get: Callable[[], list[U]]) -> list[U]:
+    return get()
+
+def _(value: int, unknown: Unknown):
+    reveal_type(first(value, from_callback(lambda: [unknown])))  # revealed: int | Unknown
+```
+
+The same holds when a constructor stores the list in an invariant generic class.
+
+```py
+from typing import Generic
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+def first_boxed(value: U, alternatives: Box[list[U]]) -> U:
+    return value
+
+def _(value: int, unknown: Unknown):
+    reveal_type(first_boxed(value, Box([])))  # revealed: int
+    reveal_type(first_boxed(value, Box([unknown])))  # revealed: int | Unknown
+```
+
+## Inferring the iterable and its elements from an intersection
+
+`first_or_self` can return either an element or the iterable itself. The result includes both
+possibilities even when the argument is a constructor call whose element type is unknown.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+def first_or_self(items: Intersection[T, Iterable[T]]) -> T:
+    return next(iter(items), items)
+
+def _(items: frozenset[int]):
+    reveal_type(first_or_self(items))  # revealed: frozenset[int] | int
+
+reveal_type(first_or_self(frozenset()))  # revealed: frozenset[Unknown] | Unknown
+```
+
+Wrapping the intersection in a tuple preserves both bounds.
+
+```py
+def wrapped(items: tuple[Intersection[T, Iterable[T]]]) -> T:
+    return first_or_self(items[0])
+
+reveal_type(wrapped((frozenset(),)))  # revealed: frozenset[Unknown] | Unknown
+```
+
+## Inferring union parameter types from sibling arguments
+
+An existing list fixes `T` for the whole call. Its entire element type is available when inferring
+the empty list.
+
+```py
+from typing_extensions import assert_type
+
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def unify(value: T | list[T], values: list[T]) -> T:
+    return values[0]
+
+def _(items: list[int | list[str]]):
+    reveal_type(unify([], items))  # revealed: list[str] | int
+```
+
+When both arguments are literals, the second list can widen to include the first argument's type.
+
+```py
+unify([["x"]], [1])  # ok
+```
+
+With an empty first argument, the other two lists can widen to a common element type.
+
+```py
+def combine(value: T | list[T], first: list[T], second: list[T]) -> T:
+    return first[0]
+
+assert_type(combine([], [1], ["x"]), int | str)
+```
+
+The key determines the element type of the empty list. The other list supplies both possible types
+for a separate type variable.
+
+```py
+K = TypeVar("K")
+
+def infer_pair(key: K, value: T | list[T], keys: list[K]) -> tuple[K, T]:
+    raise NotImplementedError
+
+def _(key: str):
+    reveal_type(infer_pair(key, [1], []))  # revealed: tuple[str, list[int] | int]
+```
+
+The key list also fixes the value type because `repeat` returns the same type for both.
+
+```py
+def repeat(value: T) -> dict[T, T]:
+    return {value: value}
+
+def infer_from_mapping(value: T | list[T], mapping: dict[K, T], keys: list[K]) -> tuple[K, T]:
+    return next(iter(mapping.items()))
+
+def _(keys: list[int | str]):
+    assert_type(infer_from_mapping(["x"], repeat(1), keys), tuple[int | str, int | str])
+```
+
+A sibling argument can also supply the parameter type of a lambda.
+
+```py
+from collections.abc import Callable
+
+def register(handlers: list[T] | T, handler: T | Callable[[object], str]) -> None: ...
+def _(handlers: list[Callable[[str], str]]):
+    register(handlers, lambda s: "ascii" if s.isascii() else "unicode")  # ok
+```
+
+A callback nested in a constructor also receives its parameter type from a sibling argument, even
+when a different argument matches both members of a union.
+
+```py
+from typing import Generic
+
+S = TypeVar("S")
+
+class Handler(Generic[T]):
+    def __init__(self, fn: Callable[[T], int]) -> None:
+        self.fn = fn
+
+def visit(shape: S | list[S], handler: Handler[T], samples: list[T]) -> None: ...
+def _(samples: list[str]):
+    visit([1], Handler(lambda s: len(reveal_type(s))), samples)  # revealed: str
+    visit([1], Handler(lambda s: s.index(3)), samples)  # error: [invalid-argument-type] "Expected `str`, found `Literal[3]`"
+```
+
+A callback accepting `object` also accepts `int`. The sibling list fixes the bounded type variable
+to `int` and lets us construct a `Handler[int]`.
+
+```py
+I = TypeVar("I", bound=int)
+
+def bounded(handler: I | Handler[I], samples: list[I]) -> I:
+    return samples[0]
+
+def _(accept: Callable[[object], int], samples: list[int]):
+    result = bounded(reveal_type(Handler(accept)), samples)  # revealed: Handler[int]
+    reveal_type(result)  # revealed: int
+```
+
+An invariant list fixes the nested call's type argument to `object`. The sibling list cannot
+specialize that handler to `Handler[int]`.
+
+```py
+def from_list(values: list[T]) -> Handler[T]:
+    raise NotImplementedError
+
+def _(objects: list[object], samples: list[int]):
+    bounded(from_list(objects), samples)  # error: [invalid-argument-type] "Handler[object]"
+```
+
 ## Passing generic functions to generic functions
 
 ```py

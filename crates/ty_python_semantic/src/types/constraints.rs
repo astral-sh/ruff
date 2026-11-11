@@ -106,6 +106,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::type_alias::TypeAliasType;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
@@ -870,6 +871,20 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization)),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -1223,26 +1238,33 @@ impl<'db> ConstraintSetBuilder<'db> {
         self,
         f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
     ) -> OwnedConstraintSet<'db> {
+        self.into_owned_with(|arena| (f(arena), ())).0
+    }
+
+    /// Freezes the callback's constraint set and returns its other result alongside it.
+    pub(super) fn into_owned_with<T>(
+        self,
+        f: impl for<'c> FnOnce(&'c Self) -> (ConstraintSet<'db, 'c>, T),
+    ) -> (OwnedConstraintSet<'db>, T) {
         // NOTE: We do not store any of the builder's memoization caches in the result. Owned
         // constraint sets can only be used by adding them to a new builder. Operation caches from
         // the original builder aren't relevant to the new builder, and don't need to be retained.
-        let constraint = f(&self);
+        let (constraint, result) = f(&self);
         let node = constraint.node;
-        let root = match node.node() {
-            Node::Interior(interior) => interior,
-            Node::AlwaysTrue | Node::AlwaysFalse => {
-                return OwnedConstraintSet {
-                    node,
-                    source_order: None,
-                    inner: None,
-                };
+        let owned = match node.node() {
+            Node::Interior(root) => {
+                let order = constraint
+                    .source_order
+                    .expect("non-terminal BDD should have source_order");
+                OwnedConstraintSetBuilder::build(self.storage.into_inner(), root, order)
             }
+            Node::AlwaysTrue | Node::AlwaysFalse => OwnedConstraintSet {
+                node,
+                source_order: None,
+                inner: None,
+            },
         };
-        let source_order = constraint
-            .source_order
-            .expect("non-terminal BDD should have source_order");
-        let storage = self.storage.into_inner();
-        OwnedConstraintSetBuilder::build(storage, root, source_order)
+        (owned, result)
     }
 
     /// Loads an [`OwnedConstraintSet`] into this builder.
@@ -5185,7 +5207,6 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::ApplySpecialization;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     };
