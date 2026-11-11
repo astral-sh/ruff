@@ -991,14 +991,32 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         for n in group.nodes:
             out.append(f"{n.variant}(crate::{n.name}<'a>) = NodeKind::{n.name} as u8,")
         out.append("}")
-        out.append(
-            f"impl<'a> crate::{name}<'a> {{ #[inline] pub fn classify(self) -> {name}Kind<'a> {{ match self.node_kind() {{"
-        )
+        if name == "Stmt":
+            out.append(
+                "#[cold] #[inline(never)] "
+                'fn invalid_group() -> ! { unreachable!("typed node belongs to this group") }'
+            )
+        if name in ("Expr", "Stmt"):
+            # Checking the family before the match lets LLVM reduce a caller's
+            # single-variant match to tests on the row tag.
+            out.append(f"""impl<'a> crate::{name}<'a> {{
+                #[expect(clippy::inline_always, reason = "let callers test the row tag directly")]
+                #[inline(always)]
+                pub fn classify(self) -> {name}Kind<'a> {{
+                    let tag = self.node_kind();
+                    if !crate::kind::{name}::matches(tag) {{ invalid_group(); }}
+                    match tag {{""")
+            fallback = "invalid_group()"
+        else:
+            out.append(
+                f"impl<'a> crate::{name}<'a> {{ #[inline] pub fn classify(self) -> {name}Kind<'a> {{ match self.node_kind() {{"
+            )
+            fallback = 'unreachable!("typed node belongs to this group")'
         for n in group.nodes:
             out.append(
                 f"NodeKind::{n.name} => {name}Kind::{n.variant}(self.syntax.retype()),"
             )
-        out.append('_ => unreachable!("typed node belongs to this group"), } } }')
+        out.append(f"_ => {fallback}, }} }} }}")
     for n in ast.all_nodes:
         fields = [field_codec(f, nodes) for f in n.fields]
         paired_lists = n.name in {"ExprCompare", "Arguments", "PatternArguments"}

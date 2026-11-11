@@ -138,10 +138,23 @@ pub enum StmtKind<'a> {
     Continue(crate::StmtContinue<'a>) = NodeKind::StmtContinue as u8,
     IpyEscapeCommand(crate::StmtIpyEscapeCommand<'a>) = NodeKind::StmtIpyEscapeCommand as u8,
 }
+#[cold]
+#[inline(never)]
+fn invalid_group() -> ! {
+    unreachable!("typed node belongs to this group")
+}
 impl<'a> crate::Stmt<'a> {
-    #[inline]
+    #[expect(
+        clippy::inline_always,
+        reason = "let callers test the row tag directly"
+    )]
+    #[inline(always)]
     pub fn classify(self) -> StmtKind<'a> {
-        match self.node_kind() {
+        let tag = self.node_kind();
+        if !crate::kind::Stmt::matches(tag) {
+            invalid_group();
+        }
+        match tag {
             NodeKind::StmtFunctionDef => StmtKind::FunctionDef(self.syntax.retype()),
             NodeKind::StmtClassDef => StmtKind::ClassDef(self.syntax.retype()),
             NodeKind::StmtReturn => StmtKind::Return(self.syntax.retype()),
@@ -167,7 +180,7 @@ impl<'a> crate::Stmt<'a> {
             NodeKind::StmtBreak => StmtKind::Break(self.syntax.retype()),
             NodeKind::StmtContinue => StmtKind::Continue(self.syntax.retype()),
             NodeKind::StmtIpyEscapeCommand => StmtKind::IpyEscapeCommand(self.syntax.retype()),
-            _ => unreachable!("typed node belongs to this group"),
+            _ => invalid_group(),
         }
     }
 }
@@ -297,9 +310,17 @@ pub enum ExprKind<'a> {
     IpyEscapeCommand(crate::ExprIpyEscapeCommand<'a>) = NodeKind::ExprIpyEscapeCommand as u8,
 }
 impl<'a> crate::Expr<'a> {
-    #[inline]
+    #[expect(
+        clippy::inline_always,
+        reason = "let callers test the row tag directly"
+    )]
+    #[inline(always)]
     pub fn classify(self) -> ExprKind<'a> {
-        match self.node_kind() {
+        let tag = self.node_kind();
+        if !crate::kind::Expr::matches(tag) {
+            invalid_group();
+        }
+        match tag {
             NodeKind::ExprBoolOp => ExprKind::BoolOp(self.syntax.retype()),
             NodeKind::ExprNamed => ExprKind::Named(self.syntax.retype()),
             NodeKind::ExprBinOp => ExprKind::BinOp(self.syntax.retype()),
@@ -333,7 +354,7 @@ impl<'a> crate::Expr<'a> {
             NodeKind::ExprTuple => ExprKind::Tuple(self.syntax.retype()),
             NodeKind::ExprSlice => ExprKind::Slice(self.syntax.retype()),
             NodeKind::ExprIpyEscapeCommand => ExprKind::IpyEscapeCommand(self.syntax.retype()),
-            _ => unreachable!("typed node belongs to this group"),
+            _ => invalid_group(),
         }
     }
 }
