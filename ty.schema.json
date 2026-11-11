@@ -1598,7 +1598,7 @@
         },
         "required-dataclass-field-after-default": {
           "title": "detects dataclass definitions with required fields after fields with default values",
-          "description": "## What it does\n\nChecks for dataclass definitions where required fields are defined after fields with default values.\n\n## Why is this bad?\n\nIn dataclasses, all required fields (fields without default values) must be defined before fields\nwith default values. This is a Python requirement that will raise a `TypeError` at runtime if\nviolated.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Example:\n    x: int = 1  # Field with default value\n    # Required field after field with default\n    y: str  # error\n```\n\n## Rule history\n\n- v0.0.101: Renamed from `dataclass-field-order`.\n\n    `dataclass-field-order` remains as a compatibility alias for this rule.",
+          "description": "## What it does\n\nChecks for dataclass definitions where required fields are defined after fields with default values.\n\n## Why is this bad?\n\nIn dataclasses, all required fields (fields without default values) must be defined before fields\nwith default values. This is a Python requirement that will raise a `TypeError` at runtime if\nviolated.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Example:\n    x: int = 1  # Field with default value\n    # Required field after field with default\n    y: str  # error\n```\n\n## Rule history\n\n- v0.0.102: Renamed from `dataclass-field-order`.\n\n    `dataclass-field-order` remains as a compatibility alias for this rule.",
           "default": "error",
           "oneOf": [
             {
