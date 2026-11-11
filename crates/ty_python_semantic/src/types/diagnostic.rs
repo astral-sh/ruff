@@ -501,7 +501,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-explicit-return.md")]
     pub(crate) static INVALID_EXPLICIT_RETURN = {
         summary: "detects return statements whose value is incompatible with the expected return type",
-        status: LintStatus::stable("0.0.101"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -528,7 +528,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unsound-return.md")]
     pub(crate) static UNSOUND_RETURN = {
         summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
-        status: LintStatus::stable("0.0.101"),
+        status: LintStatus::stable("0.0.70"),
         default_level: Level::Ignore,
     }
 }
@@ -555,7 +555,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-implicit-return-in-function-with-stub-body.md")]
     pub(crate) static INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY = {
         summary: "detects functions with stub-like bodies whose return type excludes `None`",
-        status: LintStatus::stable("0.0.101"),
+        status: LintStatus::stable("0.0.14"),
         default_level: Level::Error,
     }
 }

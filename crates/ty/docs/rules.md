@@ -2486,7 +2486,7 @@ class D(A):
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-explicit-return%22+OR+%22invalid-return-type%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L500" target="_blank">View source</a>
 </small>
@@ -2975,7 +2975,7 @@ def read_chunks(source: BinaryIO) -> Generator[bytes, None, str]:
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.14">0.0.14</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-implicit-return-in-function-with-stub-body%22+OR+%22empty-body%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L554" target="_blank">View source</a>
 </small>
@@ -7554,7 +7554,7 @@ Python code.
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.101">0.0.101</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.70">0.0.70</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22unsound-return%22+OR+%22unsound-return-statement%22%29" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L527" target="_blank">View source</a>
 </small>
