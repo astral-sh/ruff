@@ -6351,6 +6351,8 @@ def foo(x: int) -> int:
 **Rule history**
 
 
+- v0.0.102: Changed the default severity from `error` to `warn`.
+
 - v0.0.100: ty used to have a rule called `invalid-overload` that covered [`single-overload`](#single-overload),
     [`missing-overload-implementation`](#missing-overload-implementation), [`inconsistent-overload-implementation`](#inconsistent-overload-implementation),
     [`inconsistent-overload-decorator`](#inconsistent-overload-decorator), and [`misplaced-overload-decorator`](#misplaced-overload-decorator).
