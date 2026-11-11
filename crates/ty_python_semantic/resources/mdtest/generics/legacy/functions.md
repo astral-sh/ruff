@@ -5573,6 +5573,25 @@ def forward_both(items: list[Bound]):
     views: tuple[Sequence, Sequence[Any]] = reveal_type(duplicate(items))
 ```
 
+For a callable, the parameter and return positions can supply different bounds. An `Unknown`
+parameter leaves the return annotation to guide inference. A return type of `str` therefore rejects
+a captured value whose type is bounded by `int`.
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
+
+def constant(value: T) -> Callable[[T], T]:
+    return lambda _: value
+
+def callbacks(value: Bound, dynamic: Any):
+    invalid: Callable[[Unknown], str] = constant(value)  # error: [invalid-argument-type]
+
+    # revealed: (int & Unknown, /) -> int & Unknown
+    partial: Callable[[Unknown], Intersection[int, Unknown]] = reveal_type(constant(dynamic))
+```
+
 ## Return-context preferences across alternatives
 
 When forwarding a generic call, an upper-only bound from one return-context alternative must not

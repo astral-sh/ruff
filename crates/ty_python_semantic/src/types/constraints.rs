@@ -3459,47 +3459,33 @@ impl<'db> CandidateTypeVarSolution<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> PathBoundSolution<'db> {
-        // Avoid restricting the range of a gradual declared type using validity bounds, preferring
-        // the declared type as written by the caller.
-        let candidate = match self.lower_bound(EvidenceSource::Declared) {
-            Some(lower) => lower,
-
-            None if self
-                .upper
-                .has_evidence_without_validity(EvidenceSource::Declared) =>
-            {
-                let upper_bounds = self
-                    .upper
-                    .iter_evidence_without_validity(EvidenceSource::Declared);
-
-                let candidate =
-                    UpperBound::single_bound_from_iterator(db, env, upper_bounds.clone())
-                        .or_else(|| IntersectionType::bounded_from_elements(db, env, upper_bounds));
-
-                match candidate {
-                    Some(candidate) => candidate,
-                    None => return PathBoundSolution::BudgetExceeded { fallback: None },
-                }
+        // Avoid restricting the range of a gradual declared type using validity bounds.
+        let upper = self
+            .upper
+            .iter_evidence_without_validity(EvidenceSource::Declared);
+        let informative = |ty: &Type<'db>| ty.resolve_type_alias(db) != Type::unknown();
+        let mut preferred = upper.clone().filter(informative).peekable();
+        let candidate = match self.declared_lower {
+            // A bare `Unknown` supplies no preference when another bound is available.
+            Some(lower) if informative(&lower) || preferred.peek().is_none() => lower,
+            _ if upper.clone().next().is_some() => {
+                // Try informative clauses first when several are equivalent. Keep all clauses
+                // when constructing the intersection, including an explicit `int & Unknown`.
+                let unknown = upper.clone().find(|ty| !informative(ty));
+                let Some(candidate) =
+                    UpperBound::single_bound_from_iterator(db, env, preferred.chain(unknown))
+                        .or_else(|| IntersectionType::bounded_from_elements(db, env, upper))
+                else {
+                    return PathBoundSolution::BudgetExceeded { fallback: None };
+                };
+                candidate
             }
-
-            None => return PathBoundSolution::Unsolved,
+            _ => return PathBoundSolution::Unsolved,
         };
 
         // Static candidates are promoted to the selected type variable constraint.
         if self.selected_declared_constraint.is_some() && candidate.is_fully_static(db, env) {
             return PathBoundSolution::Unsolved;
-        }
-
-        // A lower bound of `Unknown` or the first of two equivalent upper bounds can hide an
-        // explicit upper bound of `Any`. For example, `Callable[[Unknown], Any]` contributes
-        // both bounds when the return type is `Callable[[T], T]`.
-        if candidate.resolve_type_alias(db) == Type::unknown()
-            && let Some(declared_any) = self
-                .upper
-                .iter_evidence_without_validity(EvidenceSource::Declared)
-                .find(|bound| bound.resolve_type_alias(db) == Type::any())
-        {
-            return PathBoundSolution::Solved(declared_any);
         }
 
         PathBoundSolution::Solved(candidate)
