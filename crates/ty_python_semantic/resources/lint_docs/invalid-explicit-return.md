@@ -74,15 +74,9 @@ def gen_func(coinflip: bool) -> Generator[int, None, str]:
 
 ## Rule history
 
-- v0.0.14: Split out `empty-body` (now `invalid-implicit-return-in-stub-function`) for missing
-    returns in stub-like bodies.
+- v0.0.1-alpha.1: Initially added under the name `invalid-return-type`
 
-- v0.0.101: Split out `invalid-implicit-return` for missing returns in nonempty bodies.
+- v0.0.14: `empty-body` (since renamed as `invalid-implicit-return-in-stub-function`) was split into a separate rule.
 
-- v0.0.101: Split out `invalid-generator-return-type` for incompatible generator return annotations.
-
-- v0.0.101: Renamed from `invalid-return-type`.
-
-    ty accepts `invalid-return-type` in configuration and ignore comments for explicit returns and
-    warns about the rename. To configure or suppress fallthrough or incompatible generator
-    annotations, use `invalid-implicit-return` or `invalid-generator-return-type`, respectively.
+- v0.0.101: `invalid-implicit-return` and `invalid-generator-return-type` were split into separate rules, and
+    the rule was renamed as `invalid-explicit-return`. `invalid-return-type` remains as a compatibility alias for this rule.
