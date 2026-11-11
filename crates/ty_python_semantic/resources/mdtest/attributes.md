@@ -1532,13 +1532,18 @@ reveal_type(Derived().pure_undeclared)  # revealed: str
 
 ## Nested class attributes
 
-A nested class is a read-only attribute. Access on the defining class retains the exact class
-object. Access through an instance or an unspecified subclass accounts for possible overrides.
+We treat a nested class defined by a `class` statement in another class's body as a read-only
+attribute. Subclasses can override it with a narrower class. Some libraries use this pattern for
+metadata or configuration.
+
+### Attribute access types
+
+Access on the defining class retains the exact class object. Access through an instance or an
+unspecified subclass accounts for possible overrides.
 
 ```py
 class Outer:
     class Inner: ...
-    Alias = Inner
 
 reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
 
@@ -1547,45 +1552,52 @@ def read(cls: type[Outer], obj: Outer):
     reveal_type(obj.Inner)  # revealed: type[Inner]
 ```
 
-Rebinding or deleting the nested class could invalidate a subclass's narrower type. An ordinary
-assignment such as `Alias = Inner` remains writable.
+### On final classes
+
+On an instance of a final class, even an inherited nested class is known exactly.
 
 ```py
+from typing import final
+
+class Outer:
+    class Inner: ...
+
+@final
+class FinalOuter(Outer): ...
+
+def read(obj: FinalOuter):
+    reveal_type(obj.Inner)  # revealed: <class 'Inner'>
+```
+
+### Writes are not allowed
+
+Rebinding or deleting the nested class could invalidate a subclass's narrower type.
+
+```py
+class Outer:
+    class Inner: ...
+
 def write(cls: type[Outer], obj: Outer):
     cls.Inner = Outer.Inner  # error: [invalid-assignment]
     obj.Inner = Outer.Inner  # error: [invalid-assignment]
     del Outer.Inner  # error: [invalid-assignment]
     del obj.Inner  # error: [invalid-assignment]
-
-Outer.Alias = Outer.Inner  # ok
 ```
 
-## Nested classes on instances of final classes
+### Class statements only
 
-A subclass of `Outer` can override `Inner` with a concrete class. On an instance of `FinalOuter`,
-the inherited nested class is known exactly, while `Alias` remains writable.
+An unannotated attribute initialized by assigning a class object remains writable.
 
 ```py
-from abc import ABC, abstractmethod
-from typing import final
+class NotReallyInner: ...
 
 class Outer:
-    class Inner(ABC):
-        @abstractmethod
-        def method(self) -> None: ...
+    Inner = NotReallyInner
 
-    Alias = Inner
-
-@final
-class FinalOuter(Outer): ...
-
-def construct(outer: Outer, final_outer: FinalOuter):
-    outer.Inner()  # ok
-    final_outer.Inner()  # error: [abstract-class-instantiation]
-    reveal_type(final_outer.Alias)  # revealed: type[Inner]
+Outer.Inner = NotReallyInner  # ok
 ```
 
-## Redeclaring nested class attributes on instances
+### Redeclaring nested class attributes on instances
 
 A subclass can explicitly redeclare an inherited nested class as a writable instance attribute. The
 annotation governs writes on its instances and further subclasses.
@@ -1620,7 +1632,7 @@ class ReadOnly(Writable):
 del ReadOnly().Inner  # error: [invalid-assignment]
 ```
 
-## Nested classes on metaclasses
+### On metaclasses
 
 A class object cannot rebind or delete a nested class inherited from its metaclass.
 

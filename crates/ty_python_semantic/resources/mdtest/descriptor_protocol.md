@@ -291,41 +291,21 @@ C.Inner = "wrong"  # error: [invalid-assignment]
 del C.Inner  # ok
 ```
 
-### Conditional nested descriptors
-
-A receiver annotation only governs the ordinary class alternative of a conditional nested class.
-Assignments must also satisfy the setter when the descriptor alternative is present.
+If only one definition of a nested class is a data descriptor, we conservatively reject the write,
+even when both the descriptor and the class attribute accept the value.
 
 ```py
-class Setter(type):
-    def __set__(cls, instance: object, value: int) -> None: ...
-
-class Base:
+class ConditionalMeta(type):
     if input():
-        class Inner(metaclass=Setter): ...
+        class Inner(metaclass=DescriptorMeta): ...
 
     else:
         class Inner: ...
 
-class Child(Base):
-    def __init__(self):
-        self.Inner: type[Base.Inner] = Base.Inner  # error: [invalid-assignment]
+class Outer(metaclass=ConditionalMeta):
+    Inner: int = 0
 
-def write(obj: Child):
-    obj.Inner = 1  # error: [invalid-assignment]
-```
-
-When a metaclass inherits the same conditional member, a class attribute can shadow the ordinary
-class alternative. The descriptor alternative still checks the assignment against its setter.
-
-```py
-class Meta(Base, type): ...
-
-class Outer(metaclass=Meta):
-    Inner: int | str = 1
-
-Outer.Inner = 1  # ok
-Outer.Inner = "wrong"  # error: [invalid-assignment]
+Outer.Inner = 1  # error: [invalid-assignment]
 ```
 
 ### Classes with unknown bases are not automatically descriptors

@@ -36,11 +36,11 @@ use crate::{Program, ProgramEnvironment};
 /// decide whether assigning to a `Final` member is allowed: those decisions differ
 /// between its two consumers.
 pub(super) enum AttributeWriteRequirement<'db> {
-    /// A write must be valid for every receiver or member alternative.
+    /// A write must be valid for every union element or type-variable constraint.
     All {
         object_ty: Type<'db>,
         element_tys: &'db [Type<'db>],
-        lookup: AttributeWriteLookup<'db>,
+        receiver: Option<Type<'db>>,
     },
     /// A write to an intersection may target any positive intersection element.
     Any {
@@ -77,47 +77,6 @@ pub(super) enum AttributeWriteRequirement<'db> {
         object_ty: Type<'db>,
         member: ClassAttributeWriteMember<'db>,
     },
-}
-
-/// Resolve alternatives without conflating a union of receivers with a union of their members.
-#[derive(Clone, Copy)]
-pub(super) enum AttributeWriteLookup<'db> {
-    Receiver {
-        receiver: Option<Type<'db>>,
-    },
-    TypeMember {
-        object_ty: Type<'db>,
-        member: PlaceAndQualifiers<'db>,
-        receiver: Option<Type<'db>>,
-    },
-}
-
-impl<'db> AttributeWriteLookup<'db> {
-    pub(super) fn requirement(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-        attribute: &str,
-    ) -> AttributeWriteRequirement<'db> {
-        match self {
-            Self::Receiver { receiver } => {
-                attribute_write_requirement(db, env, ty, attribute, receiver)
-            }
-            Self::TypeMember {
-                object_ty,
-                member,
-                receiver,
-            } => attribute_write_requirement_for_type_member(
-                db,
-                env,
-                object_ty,
-                attribute,
-                receiver,
-                member.map_type(|_| ty),
-            ),
-        }
-    }
 }
 
 /// How a writable protocol member validates an assigned value.
@@ -394,7 +353,7 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::Union(union) => AttributeWriteRequirement::All {
             object_ty: receiver.unwrap_or(object_ty),
             element_tys: union.elements(db),
-            lookup: AttributeWriteLookup::Receiver { receiver },
+            receiver,
         },
 
         Type::Intersection(intersection) => {
@@ -439,9 +398,7 @@ pub(super) fn attribute_write_requirement<'db>(
                     AttributeWriteRequirement::All {
                         object_ty,
                         element_tys: constraints.elements(db),
-                        lookup: AttributeWriteLookup::Receiver {
-                            receiver: Some(receiver.unwrap_or(object_ty)),
-                        },
+                        receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
                 _ => member_attribute_write_requirement(db, env, object_ty, attribute, receiver),
@@ -561,46 +518,18 @@ fn member_attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
-    attribute_write_requirement_for_type_member(
-        db,
-        env,
-        object_ty,
-        attribute,
-        receiver,
-        assignment_type_member(db, env, object_ty, attribute),
-    )
-}
-
-fn attribute_write_requirement_for_type_member<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    object_ty: Type<'db>,
-    attribute: &str,
-    receiver: Option<Type<'db>>,
-    type_member: PlaceAndQualifiers<'db>,
-) -> AttributeWriteRequirement<'db> {
-    // A conditional nested class can be either a data descriptor or an ordinary class object.
-    // Resolve each alternative before applying receiver annotations or metaclass precedence.
-    if type_member
-        .qualifiers
-        .contains(TypeQualifiers::NESTED_CLASS)
-        && let Some(ty) = type_member.place.ignore_possibly_undefined()
-        && let Type::Union(union) = ty.resolve_type_alias(db)
+    let members = assignment_attribute_members(db, env, object_ty, attribute);
+    // A conditional nested class can dispatch to a descriptor setter on one branch and
+    // ordinary storage on another. Conservatively reject the write when those paths differ.
+    if let Some(AssignmentAttributeMembers::TypeMember { member, .. }) = &members
+        && member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let Some(ty) = member.ignore_possibly_undefined()
+        && ty.resolve_type_alias(db).is_union()
         && ty.may_be_data_descriptor(db, env)
         && !ty.is_data_descriptor(db, env)
     {
-        return AttributeWriteRequirement::All {
-            object_ty: receiver.unwrap_or(object_ty),
-            element_tys: union.elements(db),
-            lookup: AttributeWriteLookup::TypeMember {
-                object_ty,
-                member: type_member,
-                receiver,
-            },
-        };
+        return AttributeWriteRequirement::CannotAssign;
     }
-    let members =
-        assignment_attribute_members_for_type_member(db, env, object_ty, attribute, type_member);
     if matches!(
         object_ty,
         Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
@@ -1250,29 +1179,13 @@ pub(super) fn assignment_attribute_members<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<AssignmentAttributeMembers<'db>> {
-    assignment_attribute_members_for_type_member(
-        db,
-        env,
-        object_ty,
-        attribute,
-        assignment_type_member(db, env, object_ty, attribute),
-    )
-}
-
-fn assignment_type_member<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    object_ty: Type<'db>,
-    attribute: &str,
-) -> PlaceAndQualifiers<'db> {
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
-    if attribute == "__call__"
+    let type_member = if attribute == "__call__"
         && matches!(
             object_ty,
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
-        )
-    {
+        ) {
         object_ty.member(db, env, attribute)
     } else if let Type::ProtocolInstance(protocol) = object_ty
         && let Some(origin) = protocol.materialized_origin_property(db, attribute)
@@ -1280,16 +1193,7 @@ fn assignment_type_member<'db>(
         Type::instance(db, env, *origin).class_member(db, env, attribute)
     } else {
         object_ty.class_member(db, env, attribute)
-    }
-}
-
-fn assignment_attribute_members_for_type_member<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    object_ty: Type<'db>,
-    attribute: &str,
-    type_member: PlaceAndQualifiers<'db>,
-) -> Option<AssignmentAttributeMembers<'db>> {
+    };
     if let Some(members) =
         class_object_assignment_members(db, env, object_ty, attribute, type_member)
     {
@@ -1660,13 +1564,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match requirement {
             AttributeWriteRequirement::All {
                 element_tys,
-                lookup,
+                receiver,
                 ..
             } => {
                 let env = self.env;
                 let mut result = self.always();
                 for element_ty in *element_tys {
-                    let requirement = lookup.requirement(db, env, *element_ty, member_name);
+                    let requirement =
+                        attribute_write_requirement(db, env, *element_ty, member_name, *receiver);
                     let element_result = self.check_attribute_write_requirement(
                         db,
                         &requirement,
