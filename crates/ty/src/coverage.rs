@@ -284,9 +284,11 @@ fn common_parent<'a>(mut paths: impl Iterator<Item = &'a SystemPath>) -> SystemP
     prefix.to_path_buf()
 }
 
-/// The colors match mypy's report: empty and precise lines are green, imprecise lines are yellow,
-/// and dynamic lines are red. The page sets its own background and text colors so that it stays
-/// readable when the browser prefers a dark color scheme.
+/// The colors match mypy's report: precise lines are green, imprecise lines are yellow, and dynamic
+/// lines are red. Unlike mypy, we leave empty lines (comments, docstrings, and blank lines)
+/// uncolored, so that green only marks lines whose types ty checked and found precise. The page
+/// sets its own background and text colors so that it stays readable when the browser prefers a
+/// dark color scheme.
 const STYLE: &str = "
 body { font-family: sans-serif; margin: 2em; background-color: #fff; color: #000; }
 table.summary { border-collapse: collapse; }
@@ -302,7 +304,7 @@ td.lineno pre { text-align: right; padding-right: 0.5em; }
 td.lineno a { color: #999; text-decoration: none; }
 pre { margin: 0; }
 pre span { display: inline-block; min-width: 100%; }
-.line-empty, .line-precise { background-color: #dfd; }
+.line-precise { background-color: #dfd; }
 .line-imprecise { background-color: #ffa; }
 .line-dynamic { background-color: #faa; }
 .legend span { padding: 0.1em 0.5em; }
