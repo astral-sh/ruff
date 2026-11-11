@@ -37,6 +37,7 @@ def bar() -> str:  # error: [invalid-implicit-return-in-function-with-stub-body]
 
 ## Rule history
 
-- v0.0.0-alpha.2: First added to ty as part of the `invalid-return-type` diagnostic (since renamed to `invalid-explicit-return`).
+- v0.0.0-alpha.2: First added to ty as part of the `invalid-return-type` diagnostic (since renamed
+    to `invalid-explicit-return`).
 - v0.0.14: Split out from `invalid-return-type` as a new `empty-body` diagnostic.
 - v0.0.101: Renamed from `empty-body` to `invalid-implicit-return-in-function-with-stub-body`.

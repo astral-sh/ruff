@@ -22,19 +22,22 @@ annotation is `None` or a supertype of `None`. For a synchronous generator funct
 ```python
 from collections.abc import Generator
 from hashlib import sha256
+from pathlib import Path
 from typing import BinaryIO
 
 
 # error: [invalid-implicit-return]
-def sign(x: int) -> int:
-    """Compute the sign of the integer passed in"""
-    if x < 0:
-        return -1
-    if x > 0:
-        return 1
+def find_pyproject() -> Path:
+    """Search upward for pyproject.toml, returning None if no such file is found."""
+    cwd = Path.cwd()
+    for directory in (cwd, *cwd.parents):
+        config = directory / "pyproject.toml"
+        if config.is_file():
+            return config
 
-    # if `x == 0`, we get to here, and the function implicitly returns `None`.
-    # No valid sign exists for `0`, so adjusting the return annotation is appropriate here
+    # If no `pyproject.toml` file was found, we get to here, and the function implicitly
+    # returns `None`. The docstring states that this is intentional, so adjusting the return
+    # annotation is appropriate here.
 
 
 # error: [invalid-implicit-return]
@@ -66,16 +69,17 @@ Use instead:
 ```py
 from collections.abc import Generator
 from hashlib import sha256
+from pathlib import Path
 from typing import BinaryIO
 
 
-def sign(x: int) -> int | None:
-    """Compute the sign of the integer passed in"""
-    if x < 0:
-        return -1
-    if x > 0:
-        return 1
-    return None
+def find_pyproject() -> Path | None:
+    """Search upward for pyproject.toml, returning None if no such file is found."""
+    cwd = Path.cwd()
+    for directory in (cwd, *cwd.parents):
+        config = directory / "pyproject.toml"
+        if config.is_file():
+            return config
 
 
 def sale_price(price_in_cents: int, *, on_sale: bool) -> int:

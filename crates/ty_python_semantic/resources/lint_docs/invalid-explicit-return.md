@@ -74,7 +74,7 @@ def gen_func(coinflip: bool) -> Generator[int, None, str]:
 
 ## Rule history
 
-- v0.0.0-alpha.2: Initially added under the name `invalid-return-type`
+- v0.0.1-alpha.1: Initially added under the name `invalid-return-type`
 
 - v0.0.14: `empty-body` (since renamed as `invalid-implicit-return-in-function-with-stub-body`) was
     split into a separate rule.
