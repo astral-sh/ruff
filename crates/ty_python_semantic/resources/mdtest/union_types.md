@@ -174,6 +174,20 @@ def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknow
     reveal_type(u3)  # revealed: str | Unknown
 ```
 
+## `Any` subsumes `Unknown`
+
+When both appear in a union, ty preserves the explicit `Any` in either order.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def _(a: Unknown | Any, b: Any | Unknown, c: Unknown | str | Any):
+    reveal_type(a)  # revealed: Any
+    reveal_type(b)  # revealed: Any
+    reveal_type(c)  # revealed: Any | str
+```
+
 ## Subsume multiple elements
 
 Simplifications still apply when `Unknown` is present.

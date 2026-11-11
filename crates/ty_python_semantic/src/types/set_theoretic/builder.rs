@@ -1211,6 +1211,14 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // `Any` and `Unknown` are equivalent. Keep the explicit `Any` in either order.
+            if (ty == Type::any() && element_type == Type::unknown())
+                || (ty == Type::unknown() && element_type == Type::any())
+            {
+                *element = UnionElement::Type(Type::any());
+                return;
+            }
+
             if Self::is_incomparable_for_union(db, ty, element_type) {
                 continue;
             }
