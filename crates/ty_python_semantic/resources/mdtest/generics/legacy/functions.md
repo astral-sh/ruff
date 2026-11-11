@@ -2635,7 +2635,8 @@ V = TypeVar("V")
 def visit(shape: T | tuple[T], value: U, seed: V, callback: Callable[[U], list[T | V]]) -> None:
     callback(value)
 
-visit((1,), "x", "", lambda x: [x.index(3)])  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to bound method `str.index`"
+visit((1,), "x", "", lambda x: [x.index(3)])
 ```
 
 A callable supplied by the bare `T` arm can also provide the parameter type of a lambda.
@@ -2643,7 +2644,7 @@ A callable supplied by the bare `T` arm can also provide the parameter type of a
 ```py
 def register(handlers: list[T] | T, handler: T | Callable[[object], str]) -> None: ...
 def _(handlers: list[Callable[[str], str]]):
-    register(handlers, lambda s: "ascii" if s.isascii() else "unicode")  # ok
+    register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
 ## Passing generic functions to generic functions

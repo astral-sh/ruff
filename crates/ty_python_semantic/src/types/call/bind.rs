@@ -8994,26 +8994,25 @@ impl<'db> Binding<'db> {
                         call_expression_tcx,
                     )
                 }))?;
-                let expected = nested.apply_specialization(db, nested_types);
+                let specialized_nested = nested.apply_specialization(db, nested_types);
                 // An unsolved variable in the nested member supplies no evidence for the next
                 // pass. A gradual argument can also still need the bare arm, even if it is
                 // assignable to the nested member (e.g. `list[int] | Unknown` and `Iterable[int]`).
-                if expected.has_unspecialized_type_var(db, env)
-                    || !actual.is_redundant_with(db, env, expected)
+                if specialized_nested.has_unspecialized_type_var(db, env)
+                    || !actual.is_redundant_with(db, env, specialized_nested)
                 {
                     return None;
                 }
                 Some(union.map_leave_aliases(db, env, |&member| {
-                    let is_nested = match nested {
-                        Type::Union(members) => members.contains_member(db, member),
-                        single => single == member,
-                    };
-                    let types = if is_nested {
-                        nested_types
+                    if member == nested {
+                        specialized_nested
+                    } else if let Type::Union(members) = nested
+                        && members.contains_member(db, member)
+                    {
+                        member.apply_specialization(db, nested_types)
                     } else {
-                        specialization.types
-                    };
-                    member.apply_specialization(db, types)
+                        member.apply_specialization(db, specialization.types)
+                    }
                 }))
             };
             parameter_type = nested_context()
@@ -9056,7 +9055,8 @@ impl<'db> Binding<'db> {
     /// `list[T]`. The argument now contributes `int` as the element type. Apply the same
     /// restriction to other arguments that can match a nested union member. The remaining
     /// arguments and the expected return type still constrain `T`. The bare `T` arm uses the
-    /// ordinary specialization.
+    /// ordinary specialization. Nested members share a specialization, so in a union like
+    /// `T | list[T] | list[list[T]]` the two nested members can still add list layers.
     fn nested_union_specialization(
         &self,
         db: &'db dyn Db,
@@ -9108,8 +9108,8 @@ impl<'db> Binding<'db> {
         };
         let result = call.infer(constraints);
         let inference = result.inference?;
-        // Different arguments can require different members of the same union. Use the
-        // restricted context only if it gives one specialization that works for all of them.
+        // If restricting one argument to its nested arm makes the call invalid, fall back
+        // for every argument, even those whose context depends on a different type variable.
         // Inference can also recover by retrying without the expected return type. Preserve a
         // compatible result from the unrestricted call in that case.
         if !result.errors.is_empty()
