@@ -5960,7 +5960,7 @@ impl<'db> ParameterContextKey<'db> {
 /// such as `T | list[T]`, we also solve the call with matching arguments restricted to `list[T]`
 /// and use that result to specialize just that arm. Both paths use the same rules for promoting
 /// inferred types within their bounds and marking unsolved variables that have no default.
-fn inferred_parameter_types<'db>(
+fn inferred_parameter_specialization<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
@@ -6023,7 +6023,7 @@ fn parameter_context_specialization<'db>(
     return_context_kind: TypeContextKind,
 ) -> ArgumentContextSpecialization<'db> {
     let types = if let Some(inference) = inference {
-        inferred_parameter_types(db, env, generic_context, inference)
+        inferred_parameter_specialization(db, env, generic_context, inference)
     } else {
         // Mark variables without a solution so the concrete parts of the parameter type can
         // still provide context for argument inference.
@@ -9126,7 +9126,9 @@ impl<'db> Binding<'db> {
         {
             return None;
         }
-        Some(inferred_parameter_types(db, env, generic, inference))
+        Some(inferred_parameter_specialization(
+            db, env, generic, inference,
+        ))
     }
 
     /// Returns the specialization that should be applied to the parameters of this overload for
