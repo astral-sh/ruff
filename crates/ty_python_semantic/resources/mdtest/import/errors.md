@@ -8,15 +8,15 @@ import bar  # error: "Cannot resolve imported module `bar`"
 reveal_type(bar)  # revealed: Unknown
 ```
 
-## Unresolved import from statement
+## Missing module in `from ... import ...`
 
 ```py
-from bar import baz  # error: "Cannot resolve imported module `bar`"
+from bar import baz  # error: [import-not-found] "Cannot resolve imported module `bar`"
 
 reveal_type(baz)  # revealed: Unknown
 ```
 
-## Unresolved import from resolved module
+## Missing name in a resolved module
 
 `a.py`:
 
@@ -24,15 +24,57 @@ reveal_type(baz)  # revealed: Unknown
 ```
 
 ```py
-from a import thing  # error: "Module `a` has no member `thing`"
+from a import thing  # error: [module-attribute-not-found] "Module `a` has no member `thing`"
 
 reveal_type(thing)  # revealed: Unknown
+```
+
+## Disabling `import-not-found`
+
+With `import-not-found` disabled, ty still reports missing names in modules it can resolve. The
+`module-attribute-not-found` selector also works in ignore comments with this configuration.
+
+```toml
+[rules]
+import-not-found = "ignore"
+```
+
+```py
+import missing_module  # ok
+from missing_module import name  # ok
+from math import sine  # error: [module-attribute-not-found]
+from math import cosine  # ty: ignore[module-attribute-not-found]
+```
+
+## Disabling `module-attribute-not-found`
+
+With `module-attribute-not-found` disabled, ty still reports missing modules.
+
+```toml
+[rules]
+module-attribute-not-found = "ignore"
+```
+
+```py
+import missing_module  # error: [import-not-found]
+from missing_module import name  # error: [import-not-found]
+from math import sine  # ok
+```
+
+## Suppressing the import rules independently
+
+```py
+import missing_module  # ty: ignore[import-not-found]
+from math import sine  # ty: ignore[module-attribute-not-found]
+
+from missing_package import name  # type: ignore[ty:import-not-found]
+from math import cosine  # type: ignore[ty:module-attribute-not-found]
 ```
 
 ## Suppressing `import-not-found` with the previous rule name
 
 `unresolved-import` is an alias for `import-not-found`. Existing ignore comments that use the old
-name still suppress errors for both a missing module and a missing member.
+name still suppress errors for missing modules.
 
 ```toml
 [rules]
@@ -41,7 +83,7 @@ renamed-rule-in-ignore-comment = "ignore"
 
 ```py
 import missing_module  # ty: ignore[unresolved-import]
-from math import missing_member  # type: ignore[ty:unresolved-import]
+from missing_package import name  # type: ignore[ty:unresolved-import]
 ```
 
 ## Reporting an unused `unresolved-import` suppression

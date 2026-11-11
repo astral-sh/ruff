@@ -190,7 +190,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package` has no member `nonexistent_submodule`
+    error[module-attribute-not-found]: Module `package` has no member `nonexistent_submodule`
      --> src/package/__init__.py:1:15
       |
     1 | from . import nonexistent_submodule
@@ -1275,7 +1275,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
-    error[import-not-found]: Module `typing` has no member `TypeAliasType`
+    error[module-attribute-not-found]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
     6 | from typing import TypeAliasType  # added in Python 3.12
@@ -1495,7 +1495,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1513,7 +1513,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1531,7 +1531,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1549,7 +1549,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[module-attribute-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1568,7 +1568,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1589,7 +1589,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1608,7 +1608,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[module-attribute-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1627,7 +1627,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[module-attribute-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1646,7 +1646,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1786,7 +1786,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1804,7 +1804,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[module-attribute-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1823,7 +1823,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[module-attribute-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1844,7 +1844,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[module-attribute-not-found]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1863,7 +1863,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[module-attribute-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1882,7 +1882,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[module-attribute-not-found]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1901,7 +1901,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[module-attribute-not-found]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda

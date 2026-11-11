@@ -117,7 +117,7 @@ from b import Y
 from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
-from c import Y  # error: [import-not-found]
+from c import Y  # error: [module-attribute-not-found]
 ```
 
 ## Esoteric definitions and redefinitions

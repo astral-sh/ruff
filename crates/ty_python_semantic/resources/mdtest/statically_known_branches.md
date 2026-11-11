@@ -1637,7 +1637,7 @@ if False:
 ```
 
 ```py
-# error: [import-not-found]
+# error: [module-attribute-not-found]
 from module import symbol
 
 reveal_type(symbol)  # revealed: Unknown
@@ -1684,7 +1684,7 @@ if False:
 ```
 
 ```py
-# error: [import-not-found]
+# error: [module-attribute-not-found]
 from module import symbol
 
 reveal_type(symbol)  # revealed: Unknown

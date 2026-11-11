@@ -140,7 +140,7 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `shared_package` has no member `FromLocalVenv`
+    error[module-attribute-not-found]: Module `shared_package` has no member `FromLocalVenv`
      --> test.py:9:28
       |
     9 | from shared_package import FromLocalVenv
