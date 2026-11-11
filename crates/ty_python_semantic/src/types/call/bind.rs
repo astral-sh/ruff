@@ -6022,7 +6022,7 @@ fn parameter_context_specialization<'db>(
     return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
     return_context_kind: TypeContextKind,
 ) -> ArgumentContextSpecialization<'db> {
-    let types = if let Some(inference) = inference {
+    let specialization = if let Some(inference) = inference {
         inferred_parameter_specialization(db, env, generic_context, inference)
     } else {
         // Mark variables without a solution so the concrete parts of the parameter type can
@@ -6040,7 +6040,7 @@ fn parameter_context_specialization<'db>(
         )
     };
 
-    let kinds = types
+    let kinds = specialization
         .generic_context(db)
         .variables(db)
         .map(|typevar| {
@@ -6055,7 +6055,10 @@ fn parameter_context_specialization<'db>(
         })
         .collect();
 
-    ArgumentContextSpecialization { types, kinds }
+    ArgumentContextSpecialization {
+        specialization,
+        kinds,
+    }
 }
 
 /// Completed inference and its diagnostics, passed together to argument validation.
@@ -8317,7 +8320,7 @@ pub(crate) struct ArgumentContextCache<'db> {
 /// The call specialization inferred during fixpoint generic call inference.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ArgumentContextSpecialization<'db> {
-    types: Specialization<'db>,
+    specialization: Specialization<'db>,
     kinds: Vec<Option<TypeContextKind>>,
 }
 
@@ -8328,7 +8331,7 @@ impl<'db> ArgumentContextSpecialization<'db> {
         variable: BoundTypeVarInstance<'db>,
     ) -> Option<TypeContextKind> {
         let index = self
-            .types
+            .specialization
             .generic_context(db)
             .variable_index(db, variable.identity(db))?;
 
@@ -8780,14 +8783,15 @@ impl<'db> Binding<'db> {
                 // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
                 // type variables in the same way as for arguments to an ordinary generic call.
                 if let Some(generic) = specialized_overload.signature.generic_context {
-                    let specialization = specialized_overload.argument_type_context_specialization(
+                    let context = specialized_overload.argument_type_context_specialization(
                         db,
                         env,
                         generic,
                         constraints,
                         call_expression_tcx,
                     );
-                    parameter_type = parameter_type.apply_specialization(db, specialization.types);
+                    parameter_type =
+                        parameter_type.apply_specialization(db, context.specialization);
                 }
                 contexts.push(parameter_type);
             }
@@ -8933,7 +8937,7 @@ impl<'db> Binding<'db> {
 
         // If this is a generic call, specialize the parameter type using the computed constraints.
         if let Some(generic_context) = self.signature.generic_context {
-            let specialization = || {
+            let ordinary_context = || {
                 cache.ordinary.get_or_init(|| {
                     self.argument_type_context_specialization(
                         db,
@@ -8957,7 +8961,7 @@ impl<'db> Binding<'db> {
                 let paramspec_value = self
                     .merged_specialization(db)
                     .and_then(|merged| merged.get(db, paramspec))
-                    .or_else(|| specialization().types.get(db, paramspec))?
+                    .or_else(|| ordinary_context().specialization.get(db, paramspec))?
                     .as_paramspec_value(db)?;
                 let specialized_parameter_type =
                     self.paramspec_argument_context(&ParamSpecArgumentContext {
@@ -8976,9 +8980,9 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            let specialization = specialization();
+            let ordinary_context = ordinary_context();
             if let Type::TypeVar(variable) = parameter_type.resolve_type_alias(db)
-                && let Some(parameter_tcx_kind) = specialization.kind_for(db, variable)
+                && let Some(parameter_tcx_kind) = ordinary_context.kind_for(db, variable)
             {
                 tcx_kind = parameter_tcx_kind;
             }
@@ -8990,7 +8994,7 @@ impl<'db> Binding<'db> {
                 let actual = arguments_types
                     .get(argument_index)?
                     .matched_type(original_parameter_type, None)?;
-                let nested_types = (*cache.nested.get_or_init(|| {
+                let nested_specialization = (*cache.nested.get_or_init(|| {
                     self.nested_union_specialization(
                         db,
                         env,
@@ -8999,7 +9003,7 @@ impl<'db> Binding<'db> {
                         call_expression_tcx,
                     )
                 }))?;
-                let specialized_nested = nested.apply_specialization(db, nested_types);
+                let specialized_nested = nested.apply_specialization(db, nested_specialization);
                 // An unsolved variable in the nested member supplies no evidence for the next
                 // pass. A gradual argument can also still need the bare arm, even if it is
                 // assignable to the nested member (e.g. `list[int] | Unknown` and `Iterable[int]`).
@@ -9014,14 +9018,15 @@ impl<'db> Binding<'db> {
                     } else if let Type::Union(members) = nested
                         && members.contains_member(db, member)
                     {
-                        member.apply_specialization(db, nested_types)
+                        member.apply_specialization(db, nested_specialization)
                     } else {
-                        member.apply_specialization(db, specialization.types)
+                        member.apply_specialization(db, ordinary_context.specialization)
                     }
                 }))
             };
-            parameter_type = nested_context()
-                .unwrap_or_else(|| parameter_type.apply_specialization(db, specialization.types));
+            parameter_type = nested_context().unwrap_or_else(|| {
+                parameter_type.apply_specialization(db, ordinary_context.specialization)
+            });
             if let Some(expected_return_ty) = call_expression_tcx.declared_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
@@ -9163,7 +9168,7 @@ impl<'db> Binding<'db> {
             let (generic_context, program, inference) = match key {
                 ParameterContextKey::Uninferred(context) => {
                     return Some(ArgumentContextSpecialization {
-                        types: context.repeat_specialization(
+                        specialization: context.repeat_specialization(
                             db,
                             Type::Dynamic(DynamicType::UnspecializedTypeVar),
                         ),
