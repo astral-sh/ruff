@@ -24,6 +24,12 @@ it. For changes to existing diagnostics, snapshot tests are only usually necessa
 annotations or subdiagnostics. If you want to add a snapshot, inline `# snapshot` comments are preferred over the legacy
 `<!-- snapshot-annotations -->` directive.
 
+Rule renames usually need no new tests. Update existing test expectations to use the new name.
+Skip tests that only demonstrate that the old name still works in configuration or ignore comments.
+The [rule-selection tests](../../../crates/ty/tests/cli/rule_selection.rs) and
+[suppression mdtests](../../../crates/ty_python_semantic/resources/mdtest/import/errors.md#suppressing-import-not-found-with-the-previous-rule-name)
+already cover those cases.
+
 When adding a ty rule that is disabled by default, normally enable it at `warn` in `.github/ty-ecosystem.toml` so the
 ecosystem-analyzer workflows report its effects.
 

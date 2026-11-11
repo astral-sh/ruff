@@ -424,50 +424,6 @@ def f() -> int:
     print("hello")
 ```
 
-## Configuring return diagnostics
-
-Disabling `invalid-explicit-return` under its old name, `invalid-return-type`, suppresses the error
-on a bare `return`. ty still reports missing returns and incompatible generator annotations.
-
-```toml
-[rules]
-invalid-return-type = "ignore"
-unsound-return-statement = "error"
-```
-
-```py
-def f(flag: bool) -> int:  # error: [invalid-implicit-return]
-    if flag:
-        return
-
-def numbers() -> int:  # error: [invalid-generator-return-type]
-    yield 1
-
-def placeholder() -> int: ...  # error: [invalid-implicit-return-in-function-with-stub-body]
-```
-
-The old `empty-body` selector still suppresses a missing return in a stub body. ty warns about the
-renamed rule in the ignore comment.
-
-```py
-# error: [renamed-rule-in-ignore-comment] "Rule `empty-body` has been renamed to `invalid-implicit-return-in-function-with-stub-body`"
-def unfinished() -> int: ...  # ty: ignore[empty-body]
-```
-
-Enabling `unsound-return` under its old name also works. ty reports the new name and accepts the old
-name in an ignore comment:
-
-```py
-from typing import Any
-
-def as_int(value: Any) -> int:
-    return value  # error: [unsound-return]
-
-def as_str(value: Any) -> str:
-    # error: [renamed-rule-in-ignore-comment] "Rule `unsound-return-statement` has been renamed to `unsound-return`"
-    return value  # ty: ignore[unsound-return-statement]
-```
-
 ## NotImplemented
 
 ### Default Python version

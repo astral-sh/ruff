@@ -22,7 +22,7 @@ def bad() -> int:
     return "not a number"  # error: [invalid-explicit-return]
 ```
 
-This principle applies the same way to async functions:
+This applies in the same way to async functions:
 
 ```py
 async def meaning_of_life_async() -> int:

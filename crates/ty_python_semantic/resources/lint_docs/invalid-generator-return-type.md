@@ -8,7 +8,8 @@ Calling a generator function produces a generator object. A synchronous generato
 return-type annotation must be a supertype of `types.GeneratorType[Never, object, Never]`, and an
 asynchronous generator function's return-type annotation must be a supertype of
 `types.AsyncGeneratorType[Never, object]`. Other return-type annotations contradict what the
-function does, so must be disallowed.
+function does; a caller relying on the annotated return type could receive a generator object
+instead of the expected type and fail at runtime.
 
 ## Examples
 

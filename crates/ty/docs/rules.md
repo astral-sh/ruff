@@ -2519,7 +2519,7 @@ def bad() -> int:
     return "not a number"  # error: [invalid-explicit-return]
 ```
 
-This principle applies the same way to async functions:
+This applies in the same way to async functions:
 
 ```py
 async def meaning_of_life_async() -> int:
@@ -2653,7 +2653,8 @@ Calling a generator function produces a generator object. A synchronous generato
 return-type annotation must be a supertype of `types.GeneratorType[Never, object, Never]`, and an
 asynchronous generator function's return-type annotation must be a supertype of
 `types.AsyncGeneratorType[Never, object]`. Other return-type annotations contradict what the
-function does, so must be disallowed.
+function does; a caller relying on the annotated return type could receive a generator object
+instead of the expected type and fail at runtime.
 
 **Examples**
 
@@ -2988,8 +2989,7 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.14">0.0.14</a
 **What it does**
 
 
-Detects functions with stub-like bodies whose return type excludes `None`. ty accepts the old name
-[`empty-body`](#empty-body) and warns about the rename in configuration and inline ignores.
+Detects functions with stub-like bodies whose return-type annotations exclude `None`.
 
 The errors reported by this rule have the same motivation as the [`invalid-implicit-return`](#invalid-implicit-return) rule. The
 diagnostic exists as a separate error code to allow users to disable this rule while prototyping
@@ -3030,8 +3030,12 @@ def bar() -> str:  # error: [invalid-implicit-return-in-function-with-stub-body]
 
 - v0.0.0-alpha.2: First added to ty as part of the [`invalid-return-type`](#invalid-return-type) diagnostic (since renamed
     to [`invalid-explicit-return`](#invalid-explicit-return)).
+
 - v0.0.14: Split out from [`invalid-return-type`](#invalid-return-type) as a new [`empty-body`](#empty-body) diagnostic.
+
 - v0.0.102: Renamed from [`empty-body`](#empty-body) to [`invalid-implicit-return-in-function-with-stub-body`](#invalid-implicit-return-in-function-with-stub-body).
+
+    [`empty-body`](#empty-body) remains as a compatibility alias for this rule.
 
 ## `invalid-init-type-variable`
 
