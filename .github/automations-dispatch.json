@@ -18,6 +18,16 @@
     {
       "repository": "ruff",
       "on": {
+        "pull_request": ["opened"]
+      },
+      "allow_draft": true,
+      "allow_forks": true,
+      "allow_stale_head": true,
+      "workflow": "pull-request-labels-and-title.yml"
+    },
+    {
+      "repository": "ruff",
+      "on": {
         "pull_request": ["labeled"]
       },
       "conditions": {

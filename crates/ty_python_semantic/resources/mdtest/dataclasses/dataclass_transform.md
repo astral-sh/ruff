@@ -152,6 +152,39 @@ less useful in practice, and Pydantic relies on the behavior we implement.
 reveal_type(RegistryMeta.__init__)
 ```
 
+### Metaclass with an aliased `builtins.type`
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class _type: ...
+
+type = _type
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+def dataclass_transform(): ...
+```
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class RegistryMeta(ModelMeta): ...
+
+RegistryMeta.__dataclass_fields__  # error: [missing-attribute]
+```
+
 ### Decorating a base class
 
 ```py

@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload base ty binary
         if: matrix.revision == 'base'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ty-build-base
           compression-level: 1
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload PR ty binary, flaky project list, config, and constraints
         if: matrix.revision == 'pr'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ty-build-pr
           compression-level: 1
@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload ecosystem-analyzer dependency metadata
         if: matrix.revision == 'pr'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ty-build-dependencies
           path: |
@@ -159,7 +159,7 @@ jobs:
           enable-cache: false
 
       - name: Download ty binaries, flaky project list, config, constraints, and dependency metadata
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ty-build-*
           merge-multiple: true
@@ -194,7 +194,7 @@ jobs:
             --output-new "diagnostics-PR-${SHARD}.json"
 
       - name: Upload diagnostics
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: diagnostics-shard-${{ matrix.shard }}
           path: |
@@ -215,12 +215,12 @@ jobs:
           enable-cache: false
 
       - name: Download ecosystem-analyzer dependency metadata
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ty-build-dependencies
 
       - name: Download shard diagnostics
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: diagnostics-shard-*
           merge-multiple: true
@@ -284,13 +284,13 @@ jobs:
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
       - name: "Upload full report"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: full-report
           path: dist/
 
       - name: Upload comment
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: comment.md
           path: comment.md

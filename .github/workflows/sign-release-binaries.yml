@@ -50,13 +50,13 @@ jobs:
             }
 
       - name: "Download built wheels and source distribution"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: wheels-*
           path: wheel-artifacts
 
       - name: "Download built GitHub release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: artifacts-*
           path: github-archives
@@ -96,7 +96,7 @@ jobs:
 
       - name: "Upload unsigned macOS executables"
         id: macos
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-binaries-macos-${{ github.run_id }}-${{ github.run_attempt }}
           path: prepared/unsigned/macos
@@ -104,7 +104,7 @@ jobs:
 
       - name: "Upload unsigned Windows executables"
         id: windows
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-binaries-windows-${{ github.run_id }}-${{ github.run_attempt }}
           path: prepared/unsigned/windows
@@ -112,7 +112,7 @@ jobs:
 
       - name: "Upload assembly inputs"
         id: assembly
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signing-assembly-inputs-${{ github.run_id }}-${{ github.run_attempt }}
           compression-level: 0
@@ -135,7 +135,7 @@ jobs:
       artifact: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: "Download unsigned executable wheel members"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.unsigned-macos }}
           path: unsigned
@@ -161,7 +161,7 @@ jobs:
 
       - name: "Upload signed executable wheel members"
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-binaries-macos-${{ github.run_id }}-${{ github.run_attempt }}
           path: signed
@@ -179,7 +179,7 @@ jobs:
       artifact: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: "Download unsigned executable wheel members"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.unsigned-windows }}
           path: unsigned
@@ -200,7 +200,7 @@ jobs:
 
       - name: "Upload signed executable wheel members"
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-binaries-windows-${{ github.run_id }}-${{ github.run_attempt }}
           path: signed
@@ -219,20 +219,20 @@ jobs:
       github-archives: ${{ steps.github-archives.outputs.artifact-id }}
     steps:
       - name: "Download assembly inputs"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.prepare.outputs.assembly }}
           merge-multiple: true
 
       - name: "Download signed macOS executables"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-macos.outputs.artifact }}
           path: signed
           merge-multiple: true
 
       - name: "Download signed Windows executables"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-windows.outputs.artifact }}
           path: signed
@@ -265,7 +265,7 @@ jobs:
 
       - name: "Upload signed macOS wheels"
         id: macos-wheels
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-wheels-macos-${{ github.run_id }}-${{ github.run_attempt }}
           compression-level: 0
@@ -274,7 +274,7 @@ jobs:
 
       - name: "Upload signed Windows wheels"
         id: windows-wheels
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-wheels-windows-${{ github.run_id }}-${{ github.run_attempt }}
           compression-level: 0
@@ -283,7 +283,7 @@ jobs:
 
       - name: "Upload PyPI distributions"
         id: pypi-artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-pypi-${{ github.run_id }}-${{ github.run_attempt }}
           compression-level: 0
@@ -292,7 +292,7 @@ jobs:
 
       - name: "Upload signed GitHub release archives"
         id: github-archives
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-github-archives-${{ github.run_id }}-${{ github.run_attempt }}
           compression-level: 0
@@ -316,25 +316,25 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           cache: ""
-          python-version: "3.14"
+          python-version: "3.15"
           architecture: ${{ matrix.platform.python-architecture }}
 
       - name: "Download signed executables"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-macos.outputs.artifact }}
           path: signed
           merge-multiple: true
 
       - name: "Download signed wheels"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.assemble.outputs.macos-wheels }}
           path: wheels
           merge-multiple: true
 
       - name: "Download signed GitHub release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.assemble.outputs.github-archives }}
           path: github-archives
@@ -378,25 +378,25 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           cache: ""
-          python-version: "3.14"
+          python-version: "3.15"
           architecture: ${{ matrix.platform.python-architecture }}
 
       - name: "Download signed executables"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-windows.outputs.artifact }}
           path: signed
           merge-multiple: true
 
       - name: "Download signed wheels"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.assemble.outputs.windows-wheels }}
           path: wheels
           merge-multiple: true
 
       - name: "Download signed GitHub release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.assemble.outputs.github-archives }}
           path: github-archives

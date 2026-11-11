@@ -1,0 +1,53 @@
+name: Label pull requests and prefix ty titles
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number
+        required: true
+        type: string
+      head_sha:
+        description: Pull request head commit
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  labels-and-title:
+    if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main'
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 5
+    environment:
+      name: automations
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          python-version: "3.13"
+      - name: Get a pull request token
+        id: token
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            pull_requests: write
+      - name: Apply matching labels and prefix ty-only PR titles
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: >-
+          uv run --locked --script scripts/pull_request_labels_and_title.py
+          --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA"

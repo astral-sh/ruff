@@ -37,7 +37,7 @@ use itertools::{Either, Itertools};
 pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
-    /// Resolve the ancestors of a static class in MRO order. The iterator supplies the
+    /// Resolve a static class's ancestors in MRO order from the supplied base types. The iterator supplies the
     /// class itself before requesting these entries. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
     /// literal][StaticClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
@@ -56,6 +56,7 @@ impl<'db> Mro<'db> {
         db: &'db dyn Db,
         class_literal: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
+        original_bases: &[Type<'db>],
     ) -> Result<Box<[ClassBase<'db>]>, StaticMroError<'db>> {
         /// Possibly add `Generic` to the resolved bases list.
         ///
@@ -90,8 +91,6 @@ impl<'db> Mro<'db> {
 
         let env = &ProgramEnvironment::from_scope(class_literal.body_scope(db));
         let class = class_literal.apply_optional_specialization(db, specialization);
-
-        let original_bases = class_literal.explicit_bases(db);
 
         match original_bases {
             // `builtins.object` is the special case:
@@ -795,7 +794,7 @@ impl<'db> StaticMroError<'db> {
     }
 
     /// Return the ancestors used for lookup when this class has an invalid MRO.
-    fn fallback_ancestors(&self) -> &[ClassBase<'db>] {
+    pub(super) fn fallback_ancestors(&self) -> &[ClassBase<'db>] {
         &self.fallback_mro[1..]
     }
 }
