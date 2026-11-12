@@ -1870,7 +1870,7 @@ def narrow_defaulted_tuple(value: object) -> None:
 
 After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
 false-branch residual should be impossible. This avoids retaining a `classmethod[...] & Top[...]`
-arm that later causes `call-top-callable` false positives.
+arm that later causes `call-to-function-with-unknown-signature` false positives.
 
 ```toml
 [environment]
