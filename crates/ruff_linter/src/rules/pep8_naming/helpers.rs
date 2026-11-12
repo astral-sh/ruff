@@ -106,6 +106,31 @@ pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &Sema
 ///     Attachment = apps.get_model("zerver", "Attachment")
 /// ```
 pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    // Django accepts either a dotted label or two positional names. In both
+    // forms the last positional argument supplies the model name.
+    fn model_name(arguments: &ast::Arguments) -> Option<&Expr> {
+        let mut last = None;
+        let mut unpacked = false;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Keyword(keyword)
+                    if keyword
+                        .arg
+                        .as_ref()
+                        .is_some_and(|name| name == "model_name") =>
+                {
+                    return Some(&keyword.value);
+                }
+                ast::ArgOrKeyword::Arg(arg) => {
+                    unpacked |= arg.is_starred_expr();
+                    last = Some(arg);
+                }
+                ast::ArgOrKeyword::Keyword(_) => {}
+            }
+        }
+        if unpacked { None } else { last }
+    }
+
     fn match_model_import(name: &str, expr: &Expr, semantic: &SemanticModel) -> bool {
         let Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -121,9 +146,7 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
         if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
             if matches!(unqualified_name.segments(), [.., "get_model"]) {
-                if let Some(argument) = arguments
-                    .find_argument_value("model_name", arguments.args().count().saturating_sub(1))
-                {
+                if let Some(argument) = model_name(arguments) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
                         if string_literal.value.to_str() == name {
                             return true;

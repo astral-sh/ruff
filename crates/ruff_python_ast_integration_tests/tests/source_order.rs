@@ -29,6 +29,9 @@ fn find_multiple_keywords_in_source_order() {
         .as_call_expr()
         .unwrap();
     let arguments = &call.arguments;
+    let requests = ["last", "positional", "sep", "missing", "sep"];
+    let expected = std::array::from_fn(|i| arguments.find_argument_value(requests[i], i));
+    assert_eq!(arguments.find_argument_values(requests), expected);
     let values = arguments
         .find_keywords(["last", "sep", "missing", "sep"])
         .map(|keyword| keyword.map(|kw| &source[kw.value.range()]));

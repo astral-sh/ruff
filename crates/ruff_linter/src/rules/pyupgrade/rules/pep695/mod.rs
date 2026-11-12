@@ -6,8 +6,8 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion,
-    Stmt, StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    self as ast, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion, Stmt,
+    StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     name::Name,
     visitor::{self, Visitor},
 };
@@ -429,14 +429,14 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
 /// any), along with its index in the class's bases tuple.
 pub(crate) fn find_generic<'a>(
-    class_bases: &'a Arguments,
+    mut class_bases: impl Iterator<Item = &'a Expr>,
     semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
-    class_bases.args().enumerate().find_map(|(idx, expr)| {
+) -> Option<&'a ExprSubscript> {
+    class_bases.find_map(|expr| {
         expr.as_subscript_expr().and_then(|sub_expr| {
             semantic
                 .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
+                .then_some(sub_expr)
         })
     })
 }
