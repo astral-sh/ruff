@@ -1552,9 +1552,35 @@ def read(cls: type[Outer], obj: Outer):
     reveal_type(obj.Inner)  # revealed: type[Inner]
 ```
 
+### Generic nested classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Outer:
+    class Inner[T]: ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def inspect(obj: Outer, cls: type[Outer]) -> None:
+    reveal_type(obj.Inner)  # revealed: type[Inner[Unknown]]
+    reveal_type(cls.Inner)  # revealed: type[Inner[Unknown]]
+```
+
+The nested class can be used in annotations, explicit specializations, and base classes.
+
+```py
+class Integer(Outer.Inner[int]): ...  # ok
+
+value: Outer.Inner[int] = Integer()  # ok
+```
+
 ### On final classes
 
-On an instance of a final class, even an inherited nested class is known exactly.
+On (an instance of) a final class, even an inherited nested class is known exactly.
 
 ```py
 from typing import final
@@ -1565,7 +1591,8 @@ class Outer:
 @final
 class FinalOuter(Outer): ...
 
-def read(obj: FinalOuter):
+def read(cls: type[FinalOuter], obj: FinalOuter):
+    reveal_type(cls.Inner)  # revealed: <class 'Inner'>
     reveal_type(obj.Inner)  # revealed: <class 'Inner'>
 ```
 
@@ -1578,15 +1605,21 @@ class Outer:
     class Inner: ...
 
 def write(cls: type[Outer], obj: Outer):
+    Outer.Inner = Outer.Inner  # error: [invalid-assignment]
     cls.Inner = Outer.Inner  # error: [invalid-assignment]
     obj.Inner = Outer.Inner  # error: [invalid-assignment]
     del Outer.Inner  # error: [invalid-assignment]
+    del cls.Inner  # error: [invalid-assignment]
     del obj.Inner  # error: [invalid-assignment]
 ```
 
 ### Class statements only
 
-An unannotated attribute initialized by assigning a class object remains writable.
+An unannotated attribute initialized by assigning a class object remains writable. Only nested
+`class` statements create an implicitly non-writable attribute. (It would be surprising to
+implicitly make an attribute non-writable just based on what type it happens to have; giving this
+special treatment to nested `class` statements seems more defensible, and matches the motivating
+real-world patterns.)
 
 ```py
 class NotReallyInner: ...
