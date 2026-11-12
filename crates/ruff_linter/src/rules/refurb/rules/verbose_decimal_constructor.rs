@@ -179,10 +179,7 @@ pub(crate) fn verbose_decimal_constructor(
             }
 
             // Must have exactly one argument, which is a string literal.
-            if !arguments.keywords().is_empty() {
-                return;
-            }
-            let Some([float]) = arguments.args().as_array() else {
+            let Some(float) = arguments.as_single_positional() else {
                 return;
             };
             let Some(float_str) = as_non_finite_float_string_literal(float) else {

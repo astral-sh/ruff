@@ -276,7 +276,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: Stmt<'a>) -> Option<Appen
     let arguments = call_node.arguments();
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args().as_array()?;
+    let argument = arguments.as_single_positional()?;
 
     // The called function should be an attribute, ie `value.attr`.
     let ExprKind::Attribute(attribute_node) = func.classify() else {
@@ -286,7 +286,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: Stmt<'a>) -> Option<Appen
     let attr = attribute_node.attr();
 
     // `attr` should be `append` and it shouldn't have any keyword arguments.
-    if attr != "append" || !arguments.keywords().is_empty() {
+    if attr != "append" {
         return None;
     }
 

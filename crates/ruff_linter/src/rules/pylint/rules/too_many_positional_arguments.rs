@@ -86,8 +86,7 @@ pub(crate) fn too_many_positional_arguments(
     // Count the number of positional arguments.
     let num_positional_args = function_def_fields
         .parameters
-        .posonlyargs()
-        .chain(function_def_fields.parameters.args())
+        .iter_positional_params()
         .filter(|param| {
             !checker
                 .settings()

@@ -84,12 +84,10 @@ pub(crate) fn no_explicit_stacklevel(
         .find_argument_value("stacklevel", 2)
         .is_some()
         || is_skip_file_prefixes_param_set(call.arguments)
-        || call.arguments.args().iter().any(ast::Expr::is_starred_expr)
         || call
             .arguments
-            .keywords()
-            .iter()
-            .any(|keyword| keyword.arg().is_none())
+            .iter_source_order()
+            .any(ast::ArgOrKeyword::is_variadic)
     {
         return;
     }

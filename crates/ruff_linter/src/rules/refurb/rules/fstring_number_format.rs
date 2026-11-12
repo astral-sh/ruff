@@ -97,11 +97,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     let func = call_node.func();
     let arguments = call_node.arguments();
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
-    let Some([arg]) = arguments.args().as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

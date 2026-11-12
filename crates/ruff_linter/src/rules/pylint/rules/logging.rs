@@ -98,24 +98,16 @@ impl Violation for LoggingTooManyArgs {
 /// PLE1205
 /// PLE1206
 pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    // If there are any starred arguments, abort.
-    if call
-        .arguments
-        .args()
-        .iter()
-        .any(ruff_python_ast::Expr::is_starred_expr)
-    {
-        return;
-    }
-
-    // If there are any starred keyword arguments, abort.
-    if call
-        .arguments
-        .keywords()
-        .iter()
-        .any(|keyword| keyword.arg().is_none())
-    {
-        return;
+    let mut first = None;
+    let mut num_positional = 0;
+    for argument in call.arguments.iter_source_order() {
+        if argument.is_variadic() {
+            return;
+        }
+        if let ast::ArgOrKeyword::Arg(expr) = argument {
+            first.get_or_insert(expr);
+            num_positional += 1;
+        }
     }
 
     match call.func.classify() {
@@ -148,7 +140,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     }
 
     let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
-        call.arguments.find_positional(0).map(Expr::fields)
+        first.map(Expr::fields)
     else {
         return;
     };
@@ -165,8 +157,8 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
         return;
     }
 
-    let num_message_args = call.arguments.args().len() - 1;
-    let num_keywords = call.arguments.keywords().len();
+    let num_message_args = num_positional - 1;
+    let has_keywords = call.arguments.len() != num_positional;
 
     if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {

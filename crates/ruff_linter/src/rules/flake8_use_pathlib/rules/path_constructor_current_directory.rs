@@ -76,14 +76,9 @@ pub(crate) fn path_constructor_current_directory(
         return;
     }
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
-    let Some([ExprKind::StringLiteral(arg)]) = arguments
-        .args()
-        .as_array()
-        .map(|items| items.map(ruff_python_ast::Expr::classify))
+    let Some(arg) = arguments
+        .as_single_positional()
+        .and_then(ruff_python_ast::Expr::as_string_literal_expr)
     else {
         return;
     };

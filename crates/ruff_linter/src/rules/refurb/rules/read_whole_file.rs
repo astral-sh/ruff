@@ -157,11 +157,7 @@ fn match_read_call(expr: Expr<'_>) -> Option<Expr<'_>> {
     let attr = call.func().as_attribute_expr()?;
     let method_name = attr.attr();
 
-    if method_name != "read"
-        || !attr.value().is_name_expr()
-        || !call.arguments().args().is_empty()
-        || !call.arguments().keywords().is_empty()
-    {
+    if method_name != "read" || !attr.value().is_name_expr() || !call.arguments().is_empty() {
         return None;
     }
 

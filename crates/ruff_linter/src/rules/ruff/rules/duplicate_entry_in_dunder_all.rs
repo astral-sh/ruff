@@ -93,10 +93,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     call: &ast::ExprCallFields<'_>,
 ) {
     let func = call.func;
-    let (Some([value_passed]), true) = (
-        call.arguments.args().as_array(),
-        call.arguments.keywords().is_empty(),
-    ) else {
+    let Some(value_passed) = call.arguments.as_single_positional() else {
         return;
     };
     let ExprKind::Attribute(attribute) = func.classify() else {

@@ -182,11 +182,7 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ExprCallFields<'_>) {
         return;
     };
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
-    let Some([arg]) = arguments.args().as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

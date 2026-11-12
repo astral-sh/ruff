@@ -116,7 +116,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     }
 
     // Identify the `self` parameter.
-    let Some(parameter) = parameters.posonlyargs().chain(parameters.args()).next() else {
+    let Some(parameter) = parameters.iter_positional_params().next() else {
         return;
     };
 

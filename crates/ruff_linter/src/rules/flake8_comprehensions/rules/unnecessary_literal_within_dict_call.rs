@@ -61,17 +61,8 @@ pub(crate) fn unnecessary_literal_within_dict_call(
     call_fields: &ast::ExprCallFields<'_>,
 ) {
     let call = call_fields.node;
-    if !call_fields.arguments.keywords().is_empty() {
-        return;
-    }
-    if call_fields.arguments.args().len() > 1 {
-        return;
-    }
-    let Some(argument) = helpers::first_argument_with_matching_function(
-        "dict",
-        call_fields.func,
-        call_fields.arguments.args(),
-    ) else {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", call_fields)
+    else {
         return;
     };
     let Some(argument_kind) = DictKind::try_from_expr(argument) else {

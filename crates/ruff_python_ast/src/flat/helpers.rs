@@ -120,9 +120,7 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if let Some([argument]) = arguments.args().as_array()
-                            && arguments.keywords().is_empty()
-                        {
+                        } else if let Some(argument) = arguments.as_single_positional() {
                             // Ex) `list([1, 2, 3])`
                             match argument.classify() {
                                 // Return Unknown for types with definite truthiness that might

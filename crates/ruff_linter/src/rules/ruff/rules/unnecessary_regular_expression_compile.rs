@@ -89,18 +89,16 @@ pub(crate) fn unnecessary_regular_expression_compile(
 /// `split` are a positional prefix of the top-level functions', so any explicit argument shape
 /// reduces; unpacked (`*`/`**`) arguments have an unknown shape and never reduce.
 fn reducible_re_method(attr: &str, arguments: Arguments<'_>) -> Option<&'static str> {
-    if arguments
-        .args()
-        .iter()
-        .any(ruff_python_ast::Expr::is_starred_expr)
-        || arguments
-            .keywords()
-            .iter()
-            .any(|keyword| keyword.arg().is_none())
-    {
-        return None;
-    }
-    let only_string_argument = arguments.args().len() == 1 && arguments.keywords().is_empty();
+    let only_string_argument = || {
+        arguments
+            .as_single_positional()
+            .is_some_and(|expr| !expr.is_starred_expr())
+    };
+    let only_explicit_arguments = || {
+        !arguments
+            .iter_source_order()
+            .any(ast::ArgOrKeyword::is_variadic)
+    };
     Some(match attr {
         "search" if only_string_argument() => "search",
         "match" if only_string_argument() => "match",

@@ -143,11 +143,7 @@ fn extract_name_from_reversed<'a>(
     let func = expr_call.func();
     let arguments = expr_call.arguments();
 
-    if !arguments.keywords().is_empty() {
-        return None;
-    }
-
-    let [arg] = arguments.args().as_array()?;
+    let arg = arguments.as_single_positional()?;
 
     if !semantic.match_builtin_expr(func, "reversed") {
         return None;

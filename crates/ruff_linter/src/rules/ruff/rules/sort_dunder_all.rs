@@ -136,10 +136,7 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &Checker, node: &ast::StmtAugA
 /// Sort a tuple or list passed to `__all__.extend()`.
 pub(crate) fn sort_dunder_all_extend_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let func = call.func;
-    let (Some([value_passed]), true) = (
-        call.arguments.args().as_array(),
-        call.arguments.keywords().is_empty(),
-    ) else {
+    let Some(value_passed) = call.arguments.as_single_positional() else {
         return;
     };
     if let Some(attribute) = func.as_attribute_expr()

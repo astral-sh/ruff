@@ -74,23 +74,22 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_args: Vec<Expr<'_>> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, Expr<'_>> = FxHashMap::default();
 
-        for arg in arguments.args() {
-            if matches!(arg.classify(), ExprKind::Starred(..))
-                || contains_quotes(locator.slice(arg))
-                || locator.contains_line_break(arg.range())
-            {
-                return None;
-            }
-            extracted_args.push(arg);
-        }
-        for keyword in arguments.keywords() {
-            let arg = keyword.arg();
-            let value = keyword.value();
-            let key = arg?;
+        for item in arguments.iter_source_order() {
+            let (name, value) = match item {
+                ast::ArgOrKeyword::Arg(arg) if arg.is_starred_expr() => return None,
+                ast::ArgOrKeyword::Arg(arg) => (None, arg),
+                ast::ArgOrKeyword::Keyword(keyword) => {
+                    (Some(keyword.arg()?.as_str()), keyword.value())
+                }
+            };
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }
-            extracted_kwargs.insert(key.as_str(), value);
+            if let Some(name) = name {
+                extracted_kwargs.insert(name, value);
+            } else {
+                extracted_args.push(value);
+            }
         }
 
         if extracted_args.is_empty() && extracted_kwargs.is_empty() {

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::ExprKind;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
@@ -185,9 +185,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
 fn duplicates(arguments: ast::Arguments<'_>) -> FxHashSet<&str> {
-    let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords().len(), FxBuildHasher);
-    let mut duplicates =
-        FxHashSet::with_capacity_and_hasher(arguments.keywords().len(), FxBuildHasher);
+    let mut seen = FxHashSet::default();
+    let mut duplicates = FxHashSet::default();
     for keyword in arguments.keywords() {
         if let Some(name) = keyword.arg() {
             if !seen.insert(name.as_str()) {

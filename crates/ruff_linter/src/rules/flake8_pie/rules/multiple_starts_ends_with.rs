@@ -89,14 +89,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, &expr: &Expr<'_>) {
         };
         let func = call_node.func();
         let arguments = call_node.arguments();
-        let args = arguments.args();
-        let keywords = arguments.keywords();
-
-        if !keywords.is_empty() {
-            continue;
-        }
-
-        let Some([arg]) = args.as_array() else {
+        let Some(arg) = arguments.as_single_positional() else {
             continue;
         };
 

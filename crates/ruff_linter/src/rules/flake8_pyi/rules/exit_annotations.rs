@@ -155,11 +155,8 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &ast::StmtFunctio
         return;
     };
 
-    let non_self_positional_args: SmallVec<[ParameterWithDefault<'_>; 3]> = parameters
-        .posonlyargs()
-        .chain(parameters.args())
-        .skip(1)
-        .collect();
+    let non_self_positional_args: SmallVec<[ParameterWithDefault<'_>; 3]> =
+        parameters.iter_positional_params().skip(1).collect();
 
     if is_overload(decorator_list, semantic) {
         check_positional_args_for_overloaded_method(

@@ -82,11 +82,13 @@ pub(crate) fn redundant_log_base(
     call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
-    if !call.arguments.keywords().is_empty() {
-        return;
-    }
-
-    let Some([arg, base]) = call.arguments.args().as_array() else {
+    let Some(
+        [
+            ruff_python_ast::ArgOrKeyword::Arg(arg),
+            ruff_python_ast::ArgOrKeyword::Arg(base),
+        ],
+    ) = call.arguments.items().as_array()
+    else {
         return;
     };
 

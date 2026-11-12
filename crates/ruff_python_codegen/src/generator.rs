@@ -1230,8 +1230,7 @@ impl<'a> Generator<'a> {
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
-                if arguments.keywords().is_empty()
-                    && let Some([argument]) = arguments.args().as_array()
+                if let Some(argument) = arguments.as_single_positional()
                     && let Some(generator) = argument.as_generator_expr()
                 {
                     let ast::ExprGeneratorFields {

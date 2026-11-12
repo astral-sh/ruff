@@ -305,10 +305,7 @@ fn handle_non_finite_float_special_case(
     }
 
     // Must have exactly one argument, which is a string literal.
-    if !arguments.keywords().is_empty() {
-        return None;
-    }
-    let [float_arg] = arguments.args().as_array()?;
+    let float_arg = arguments.as_single_positional()?;
     let normalized = as_non_finite_float_string_literal(float_arg)?;
     let replacement_text = format!(
         r#"{constructor_name}("{}")"#,

@@ -70,28 +70,21 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: ExprCompare<'_>
             // Ex) `id(foo) == id(foo)`
             (ExprKind::Call(left_call), ExprKind::Call(right_call)) => {
                 // Both calls must take a single argument, of the same name.
-                if !left_call.arguments().keywords().is_empty()
-                    || !right_call.arguments().keywords().is_empty()
-                {
-                    continue;
-                }
-                let Some([ExprKind::Name(left_arg)]) = left_call
+                let Some(left_arg) = left_call
                     .arguments()
-                    .args()
-                    .as_array()
-                    .map(|items| items.map(ruff_python_ast::Expr::classify))
+                    .as_single_positional()
+                    .and_then(ruff_python_ast::Expr::as_name_expr)
                 else {
                     continue;
                 };
-                let Some([ExprKind::Name(right_right)]) = right_call
+                let Some(right_arg) = right_call
                     .arguments()
-                    .args()
-                    .as_array()
-                    .map(|items| items.map(ruff_python_ast::Expr::classify))
+                    .as_single_positional()
+                    .and_then(ruff_python_ast::Expr::as_name_expr)
                 else {
                     continue;
                 };
-                if left_arg.id() != right_right.id() {
+                if left_arg.id() != right_arg.id() {
                     continue;
                 }
 

@@ -422,6 +422,13 @@ impl<'a> ParameterItems<'a> {
         &self.0.ast.extra[start..start + self.len()]
     }
 
+    pub(super) fn is_in_binding_order(self) -> bool {
+        self.roles()
+            .iter()
+            .copied()
+            .is_sorted_by(|a, b| a < b || (a == b && !matches!(*a, Self::VARARG | Self::KWARG)))
+    }
+
     /// Check the role before looking up the child row.
     pub(super) fn matching<N: AstNode<'a>>(
         self,

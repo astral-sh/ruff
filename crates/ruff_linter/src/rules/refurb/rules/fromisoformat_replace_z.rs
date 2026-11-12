@@ -90,11 +90,7 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ast::ExprCallFie
 
     let (func, arguments) = (call.func, call.arguments);
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
-    let Some([argument]) = arguments.args().as_array() else {
+    let Some(argument) = arguments.as_single_positional() else {
         return;
     };
 
@@ -233,11 +229,7 @@ fn strip_z_date(call: ExprCall<'_>) -> Option<(Expr<'_>, Expr<'_>)> {
         return None;
     }
 
-    if !arguments.keywords().is_empty() {
-        return None;
-    }
-
-    let [z] = arguments.args().as_array()?;
+    let z = arguments.as_single_positional()?;
 
     if !is_upper_case_z_string(z) {
         return None;

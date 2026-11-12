@@ -108,14 +108,7 @@ pub(crate) fn bad_generator_return_type(
 
     let parameters = function_def.parameters;
 
-    if parameters.kwonlyargs().next().is_some()
-        || parameters.kwarg().is_some()
-        || parameters.vararg().is_some()
-    {
-        return;
-    }
-
-    if (parameters.args().count() + parameters.posonlyargs().count()) != 1 {
+    if parameters.len() != 1 || parameters.iter_positional_params().next().is_none() {
         return;
     }
 

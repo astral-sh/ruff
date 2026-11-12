@@ -23,6 +23,8 @@ pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
     index: &SemanticIndex<'db>,
     parameters: ast::Parameters<'_>,
+    vararg_parameter: Option<ast::Parameter<'_>>,
+    kwarg_parameter: Option<ast::Parameter<'_>>,
     infer_type: impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
@@ -56,8 +58,8 @@ pub(super) fn validate_paramspec_components<'db>(
         }
     });
 
-    let vararg_name = parameters.vararg().map(|v| v.name().as_str());
-    let kwarg_name = parameters.kwarg().map(|k| k.name().as_str());
+    let vararg_name = vararg_parameter.map(|v| v.name().as_str());
+    let kwarg_name = kwarg_parameter.map(|k| k.name().as_str());
 
     match (args_paramspec, kwargs_paramspec) {
         // Both *args: P.args and **kwargs: P.kwargs present

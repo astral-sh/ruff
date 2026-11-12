@@ -95,12 +95,9 @@ pub(crate) fn len_test(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     }
 
     // Single argument and no keyword arguments
-    let Some([argument]) = arguments.args().as_array() else {
+    let Some(argument) = arguments.as_single_positional() else {
         return;
     };
-    if !arguments.keywords().is_empty() {
-        return;
-    }
 
     // Simple inferred sequence type (e.g., list, set, dict, tuple, string, bytes, varargs, kwargs).
     if !is_sequence(argument, semantic) && !is_indirect_sequence(argument, semantic) {

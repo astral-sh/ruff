@@ -342,6 +342,28 @@ impl<'a> crate::Parameters<'a> {
         })
     }
 
+    /// Visits parameters that can have defaults and returns `*args` and `**kwargs`.
+    /// Callers that process variadic parameters last can do so in the same pass.
+    pub fn split_variadic(
+        self,
+        mut non_variadic: impl FnMut(ParameterWithDefault<'a>),
+    ) -> (Option<Parameter<'a>>, Option<Parameter<'a>>) {
+        let mut vararg = None;
+        let mut kwarg = None;
+        for item in self.items().iter() {
+            match item {
+                crate::ParameterItem::PositionalOnly(p)
+                | crate::ParameterItem::PositionalOrKeyword(p)
+                | crate::ParameterItem::KeywordOnly(p) => non_variadic(p),
+                crate::ParameterItem::Vararg(p) => {
+                    vararg.get_or_insert(p);
+                }
+                crate::ParameterItem::Kwarg(p) => kwarg = Some(p),
+            }
+        }
+        (vararg, kwarg)
+    }
+
     pub fn find(self, name: &str) -> Option<ParameterWithDefault<'a>> {
         self.iter_non_variadic_params()
             .find(|p| p.parameter().name().as_str() == name)
@@ -362,6 +384,24 @@ impl<'a> crate::Parameters<'a> {
         self.items()
             .iter()
             .map(crate::ParameterItem::into_parameter)
+    }
+
+    /// Iterates parameter roles and nodes in argument-binding order, including in recovered syntax.
+    pub fn items_in_binding_order(
+        self,
+    ) -> impl DoubleEndedIterator<Item = crate::ParameterItem<ParameterWithDefault<'a>, Parameter<'a>>>
+    {
+        if self.items().is_in_binding_order() {
+            return itertools::Either::Left(self.items().iter());
+        }
+        itertools::Either::Right(
+            self.posonlyargs()
+                .map(crate::ParameterItem::PositionalOnly)
+                .chain(self.args().map(crate::ParameterItem::PositionalOrKeyword))
+                .chain(self.vararg().map(crate::ParameterItem::Vararg))
+                .chain(self.kwonlyargs().map(crate::ParameterItem::KeywordOnly))
+                .chain(self.kwarg().map(crate::ParameterItem::Kwarg)),
+        )
     }
 
     /// Iterates parameters in argument-binding order.
@@ -697,6 +737,14 @@ impl<'a> crate::Arguments<'a> {
         self.items().iter()
     }
 
+    /// Return the argument if the call contains exactly one positional argument and no keywords.
+    pub fn as_single_positional(self) -> Option<Expr<'a>> {
+        let [ArgOrKeyword::Arg(arg)] = self.items().as_array()? else {
+            return None;
+        };
+        Some(arg)
+    }
+
     pub fn args(self) -> super::FilteredNodes<'a, crate::kind::Expr> {
         super::FilteredNodes::new(self.items())
     }
@@ -715,17 +763,28 @@ impl<'a> crate::Arguments<'a> {
         from_keyword: impl FnOnce(crate::Keyword<'a>) -> T,
         from_positional: impl FnOnce(Expr<'a>) -> T,
     ) -> Option<T> {
-        self.keywords()
-            .iter()
-            .find(|kw| kw.arg().is_some_and(|arg| arg == name))
-            .map(from_keyword)
-            .or_else(|| {
-                self.args()
-                    .iter()
-                    .take_while(|arg| !arg.is_starred_expr())
-                    .nth(position)
-                    .map(from_positional)
-            })
+        let mut position = Some(position);
+        let mut positional = None;
+        for item in self.iter_source_order() {
+            match item {
+                ArgOrKeyword::Keyword(keyword) if keyword.arg().is_some_and(|arg| arg == name) => {
+                    // An explicit keyword takes precedence over a positional argument.
+                    return Some(from_keyword(keyword));
+                }
+                ArgOrKeyword::Arg(arg) if let Some(index) = position => {
+                    if arg.is_starred_expr() {
+                        position = None;
+                    } else if index == 0 {
+                        positional = Some(arg);
+                        position = None;
+                    } else {
+                        position = Some(index - 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        positional.map(from_positional)
     }
 }
 

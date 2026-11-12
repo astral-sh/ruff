@@ -81,10 +81,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCallFields<'_>) {
         return;
     }
 
-    if !call.arguments.keywords().is_empty() {
-        return;
-    }
-    let Some([arg]) = call.arguments.args().as_array() else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 
@@ -104,10 +101,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCallFields<'_>) {
     let func = call_node.func();
     let arguments = call_node.arguments();
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-    let Some([arg]) = arguments.args().as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

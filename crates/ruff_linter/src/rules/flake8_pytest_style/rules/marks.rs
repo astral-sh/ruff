@@ -159,10 +159,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: Decorator<'_>, marker: &
         ExprKind::Call(expr_call) => {
             let arguments = expr_call.arguments();
 
-            if !checker.settings().flake8_pytest_style.mark_parentheses
-                && arguments.args().is_empty()
-                && arguments.keywords().is_empty()
-            {
+            if !checker.settings().flake8_pytest_style.mark_parentheses && arguments.is_empty() {
                 let fix = Fix::applicable_edit(
                     Edit::range_deletion(arguments.range()),
                     if checker.comment_ranges().intersects(arguments.range()) {

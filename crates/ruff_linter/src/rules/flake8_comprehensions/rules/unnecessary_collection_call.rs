@@ -65,33 +65,26 @@ pub(crate) fn unnecessary_collection_call(
     settings: &Settings,
 ) {
     let call = call_fields.node;
-    if !call_fields.arguments.args().is_empty() {
+    let empty = call_fields.arguments.is_empty();
+    if !empty
+        && (settings.allow_dict_calls_with_keyword_arguments
+            || call_fields
+                .arguments
+                .iter_source_order()
+                .any(|item| match item {
+                    ast::ArgOrKeyword::Arg(_) => true,
+                    ast::ArgOrKeyword::Keyword(keyword) => keyword.arg().is_none(),
+                }))
+    {
         return;
     }
     let Some(builtin) = checker.semantic().resolve_builtin_symbol(call_fields.func) else {
         return;
     };
     let collection = match builtin {
-        "dict"
-            if call_fields.arguments.keywords().is_empty()
-                || (!settings.allow_dict_calls_with_keyword_arguments
-                    && call_fields
-                        .arguments
-                        .keywords()
-                        .iter()
-                        .all(|kw| kw.arg().is_some())) =>
-        {
-            // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
-            Collection::Dict
-        }
-        "list" if call_fields.arguments.keywords().is_empty() => {
-            // `list()
-            Collection::List
-        }
-        "tuple" if call_fields.arguments.keywords().is_empty() => {
-            // `tuple()`
-            Collection::Tuple
-        }
+        "dict" => Collection::Dict,
+        "list" if empty => Collection::List,
+        "tuple" if empty => Collection::Tuple,
         _ => return,
     };
 
@@ -101,7 +94,7 @@ pub(crate) fn unnecessary_collection_call(
     );
 
     // Convert `dict()` to `{}`.
-    if call_fields.arguments.keywords().is_empty() {
+    if empty {
         diagnostic.set_fix({
             // Replace from the start of the call to the start of the argument.
             let call_start = Edit::replacement(

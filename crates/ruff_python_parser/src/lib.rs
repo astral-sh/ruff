@@ -938,6 +938,12 @@ mod tests {
             .find_map(AstNode::cast::<ruff_python_ast::Parameters>)
             .expect("function has parameters");
 
+        assert!(
+            parameters
+                .items_in_binding_order()
+                .map(|item| item.into_parameter().name().as_str())
+                .eq(["x", "kw"])
+        );
         let mut iter = parameters.iter().map(|parameter| parameter.name().as_str());
         assert_eq!(iter.next_back(), Some("kw"));
         assert_eq!(iter.next(), Some("x"));

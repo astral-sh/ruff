@@ -3209,10 +3209,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn declare_parameters(&mut self, parameters: Parameters<'ast>) {
-        for parameter in parameters.iter_non_variadic_params() {
-            self.declare_parameter(parameter);
-        }
-        if let Some(vararg) = parameters.vararg() {
+        let (vararg, kwarg) = parameters.split_variadic(|p| self.declare_parameter(p));
+        if let Some(vararg) = vararg {
             let symbol = self.add_symbol(vararg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
@@ -3222,7 +3220,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
-        if let Some(kwarg) = parameters.kwarg() {
+        if let Some(kwarg) = kwarg {
             let symbol = self.add_symbol(kwarg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
@@ -3252,17 +3250,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         parameters: Parameters<'ast>,
         lambda: ExprLambda<'ast>,
     ) {
-        let mut index = 0;
-        for parameter in parameters.posonlyargs() {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        for parameter in parameters.args() {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(vararg) = parameters.vararg() {
-            let symbol = self.add_symbol(vararg.name().id().clone());
+        for (index, item) in parameters.items_in_binding_order().enumerate() {
+            let (p, parameter) = match item {
+                ast::ParameterItem::PositionalOnly(p)
+                | ast::ParameterItem::PositionalOrKeyword(p)
+                | ast::ParameterItem::KeywordOnly(p) => {
+                    self.declare_lambda_parameter(index, p, lambda);
+                    continue;
+                }
+                ast::ParameterItem::Vararg(p) => (
+                    p,
+                    ParameterDefinitionNodeRef::VariadicPositionalParameter(p),
+                ),
+                ast::ParameterItem::Kwarg(p) => {
+                    (p, ParameterDefinitionNodeRef::VariadicKeywordParameter(p))
+                }
+            };
+            let symbol = self.add_symbol(p.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3272,26 +3276,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     index,
                     parameter,
                     lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
-                },
-            );
-            index += 1;
-        }
-        for parameter in parameters.kwonlyargs() {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(kwarg) = parameters.kwarg() {
-            let symbol = self.add_symbol(kwarg.name().id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                LambdaParameterDefinitionNodeRef {
-                    index,
-                    lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
                 },
             );
         }

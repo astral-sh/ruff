@@ -52,20 +52,7 @@ pub(crate) fn unnecessary_list_call(
     &expr: &Expr<'_>,
     call: &ast::ExprCallFields<'_>,
 ) {
-    let func = call.func;
-    let arguments = call.arguments;
-
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
-    if arguments.args().len() > 1 {
-        return;
-    }
-
-    let args = arguments.args();
-
-    let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", call) else {
         return;
     };
     if !argument.is_list_comp_expr() {

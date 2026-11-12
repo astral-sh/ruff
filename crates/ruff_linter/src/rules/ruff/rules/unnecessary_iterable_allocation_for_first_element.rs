@@ -94,10 +94,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
             let func = expr_call.func();
             let arguments = expr_call.arguments();
 
-            if !arguments.keywords().is_empty() {
-                return;
-            }
-            let Some([arg]) = arguments.args().as_array() else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
             if !is_zero(arg) {

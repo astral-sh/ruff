@@ -89,11 +89,7 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: Expr<'_>) {
         return;
     };
 
-    let Some(self_or_cls) = parameters
-        .posonlyargs()
-        .next()
-        .or_else(|| parameters.args().next())
-    else {
+    let Some(self_or_cls) = parameters.iter_positional_params().next() else {
         return;
     };
 

@@ -4205,12 +4205,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     else {
                         return;
                     };
-                    if function_type.known(db) != Some(KnownFunction::Len)
-                        || !call.arguments().keywords().is_empty()
-                    {
+                    if function_type.known(db) != Some(KnownFunction::Len) {
                         return;
                     }
-                    let Some([arg]) = call.arguments().args().as_array() else {
+                    let Some(arg) = call.arguments().as_single_positional() else {
                         return;
                     };
                     let Some(length) = length_type.resolve_type_alias(db).as_int_like_literal()
@@ -4603,11 +4601,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
             // (str, list, etc.) are kept unchanged.
             Type::FunctionLiteral(function_type)
-                if expr_call.arguments().args().len() == 1
-                    && expr_call.arguments().keywords().is_empty()
+                if let Some(arg) = expr_call.arguments().as_single_positional()
                     && function_type.known(db) == Some(KnownFunction::Len) =>
             {
-                let arg = expr_call.arguments().args().at(0);
                 let arg_ty = inference.expression_type(arg);
 
                 // Narrow only the parts of the type that are safe to narrow based on len().
@@ -4707,15 +4703,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
             Type::ClassLiteral(class_type)
-                if expr_call.arguments().args().len() == 1
-                    && expr_call.arguments().keywords().is_empty()
+                if let Some(arg) = expr_call.arguments().as_single_positional()
                     && class_type.is_known(db, KnownClass::Bool) =>
             {
-                self.evaluate_expression_node_predicate(
-                    expr_call.arguments().args().at(0),
-                    expression,
-                    is_positive,
-                )
+                self.evaluate_expression_node_predicate(arg, expression, is_positive)
             }
             _ => None,
         }
