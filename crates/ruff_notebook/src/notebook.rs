@@ -103,7 +103,7 @@ impl Notebook {
             reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
-        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        let raw_notebook: RawNotebook = match serde_json::from_reader(reader) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
