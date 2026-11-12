@@ -401,8 +401,7 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: [node.into()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(node.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

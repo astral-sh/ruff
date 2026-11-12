@@ -189,7 +189,7 @@ fn find_func_parent_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -
         ["os", "makedirs"] => call
             .arguments
             .find_keyword("parent_mode")
-            .map(|keyword| &keyword.value),
+            .map(|keyword| keyword.value.as_ref()),
         _ => None,
     }
 }
@@ -204,7 +204,7 @@ fn find_method_parent_mode_arg<'a>(
         (["pathlib", "Path" | "PosixPath" | "WindowsPath"], "mkdir") => call
             .arguments
             .find_keyword("parent_mode")
-            .map(|keyword| &keyword.value),
+            .map(|keyword| keyword.value.as_ref()),
         _ => None,
     }
 }

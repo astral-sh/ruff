@@ -112,13 +112,12 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let Some(last_base) = bases.args.last() else {
+    let Some(last_base) = bases.args().next_back() else {
         return;
     };
 
     let mut generic_base_iter = bases
-        .args
-        .iter()
+        .args()
         .filter(|base| semantic.match_typing_expr(map_subscript(base), "Generic"));
 
     let Some(generic_base) = generic_base_iter.next() else {

@@ -100,7 +100,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let [arg] = args else {
+            let [ast::Argument::Positional(arg)] = args.items.as_slice() else {
                 return;
             };
 
@@ -122,7 +122,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
             if tuple.len() != args.len()
-                || std::iter::zip(tuple, args)
+                || std::iter::zip(tuple, args.args())
                     .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
             {
                 return;
@@ -320,8 +320,9 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
     ast::ExprCall {
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
-            args: [func.clone(), iter.clone()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [func.clone(), iter.clone()]
+                .map(ast::Argument::Positional)
+                .into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -341,8 +342,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
     ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: [call.into()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(call.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -374,16 +374,14 @@ fn match_comprehension_target(
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
+fn match_call(element: &Expr) -> Option<(&ast::Arguments, &Expr)> {
     let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = element.as_call_expr()?;
 
-    if !keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return None;
     }
 
-    Some((args, func))
+    Some((arguments, func))
 }

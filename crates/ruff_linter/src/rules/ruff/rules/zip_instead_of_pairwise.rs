@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, Int};
+use ruff_python_ast::{self as ast, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -115,13 +116,11 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 /// RUF007
 pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     } = call;
 
     // Require exactly two positional arguments.
-    let [first, second] = args.as_ref() else {
+    let Some([first, second]) = arguments.args().collect_array() else {
         return;
     };
 

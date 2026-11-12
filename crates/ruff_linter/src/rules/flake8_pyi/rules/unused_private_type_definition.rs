@@ -267,7 +267,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        if !class_def.bases().iter().any(|base| {
+        if !class_def.bases().any(|base| {
             checker
                 .semantic()
                 .match_typing_expr(map_subscript(base), "Protocol")
@@ -390,7 +390,7 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
         //     y: T
         // ```
         Stmt::ClassDef(class_def @ ast::StmtClassDef { name, .. }) => {
-            if class_def.bases().iter().any(is_typeddict) {
+            if class_def.bases().any(is_typeddict) {
                 Some(name)
             } else {
                 None

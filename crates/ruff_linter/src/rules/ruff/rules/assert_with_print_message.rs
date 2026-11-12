@@ -275,10 +275,10 @@ mod print_arguments {
             .and_then(
                 // If the `sep` argument is `None`, treat this as default behavior.
                 |keyword| {
-                    if let Expr::NoneLiteral(_) = keyword.value {
+                    if let Expr::NoneLiteral(_) = keyword.value.as_ref() {
                         None
                     } else {
-                        Some(&keyword.value)
+                        Some(keyword.value.as_ref())
                     }
                 },
             )
@@ -294,8 +294,7 @@ mod print_arguments {
             });
 
         let args = arguments
-            .args
-            .iter()
+            .args()
             .map(expr_to_fstring_elements)
             .collect::<Vec<_>>();
 

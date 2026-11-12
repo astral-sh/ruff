@@ -604,7 +604,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // `f(x=value(), *items())` would evaluate `items()` first and could
                             // pass `x` twice.
                             let is_last_positional =
-                                positional_index + 1 == call.arguments.args.len();
+                                positional_index + 1 == call.arguments.args().count();
                             // For `def f(ｉｆ): ...`, `name` is already normalized to the
                             // reserved word `if`. Inserting `if=` would be a syntax error.
                             // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.

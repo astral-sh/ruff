@@ -3481,10 +3481,10 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
     );
 }
 
-pub(crate) fn report_instance_layout_conflict(
+pub(crate) fn report_instance_layout_conflict<'ast>(
     context: &InferContext,
     header_range: TextRange,
-    base_nodes: Option<&[ast::Expr]>,
+    base_node_at: impl Fn(usize) -> Option<&'ast ast::Expr>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
@@ -3516,7 +3516,7 @@ pub(crate) fn report_instance_layout_conflict(
         } = disjoint_base_info;
 
         // Get the span for this base from the AST (if available)
-        let Some(base_node) = base_nodes.and_then(|nodes| nodes.get(*node_index)) else {
+        let Some(base_node) = base_node_at(*node_index) else {
             continue;
         };
 
@@ -4912,7 +4912,9 @@ pub(crate) fn report_invalid_type_param_order<'db>(
             not inherit from `Protocol[]` or `Generic[]`",
         );
 
-    let base_node = &node.bases()[base_index];
+    let Some(base_node) = node.bases().nth(base_index) else {
+        return;
+    };
 
     let primary_diagnostic_range = base_node
         .as_subscript_expr()
@@ -5045,11 +5047,11 @@ struct GenericBaseConstraint<'db> {
 ///
 /// Returns `true` if an inconsistency was found, even when it is inherited or the diagnostic is
 /// disabled.
-pub(crate) fn report_inconsistent_generic_bases<'db>(
+pub(crate) fn report_inconsistent_generic_bases<'db, 'ast>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
-    base_nodes: Option<&[ast::Expr]>,
+    base_node_at: impl Fn(usize) -> Option<&'ast ast::Expr>,
 ) -> bool {
     let db = context.db();
     let env = &context.program_environment();
@@ -5111,10 +5113,9 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         Type::GenericAlias(alias) if alias.origin(db) == origin
                     );
 
-                    if let (Some(earlier_base), Some(later_base)) = (
-                        base_nodes.and_then(|nodes| nodes.get(earlier.base_index)),
-                        base_nodes.and_then(|nodes| nodes.get(base_index)),
-                    ) {
+                    if let (Some(earlier_base), Some(later_base)) =
+                        (base_node_at(earlier.base_index), base_node_at(base_index))
+                    {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
                             earlier.alias.display(db, env)

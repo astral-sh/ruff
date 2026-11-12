@@ -561,14 +561,14 @@ impl Violation for StringDotFormatMixingAutomatic {
     }
 }
 
-fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
-    keywords
-        .iter()
+fn has_star_star_kwargs(arguments: &ast::Arguments) -> bool {
+    arguments
+        .keywords()
         .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
 }
 
-fn has_star_args(args: &[Expr]) -> bool {
-    args.iter().any(Expr::is_starred_expr)
+fn has_star_args(arguments: &ast::Arguments) -> bool {
+    arguments.args().any(Expr::is_starred_expr)
 }
 
 /// F502
@@ -794,15 +794,15 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    keywords: &[Keyword],
 ) {
     // If there are any **kwargs, abort.
-    if has_star_star_kwargs(keywords) {
+    if has_star_star_kwargs(&call.arguments) {
         return;
     }
 
-    let keyword_names = keywords
-        .iter()
+    let keyword_names = call
+        .arguments
+        .keywords()
         .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
 
     let mut side_effects = false;
@@ -854,18 +854,17 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    args: &[Expr],
 ) {
     // We can only fix if the positional arguments we're removing don't require re-indexing
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
     // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-    fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
+    fn is_contiguous_from_end(indexes: &[usize], target_len: usize) -> bool {
         if indexes.is_empty() {
             return true;
         }
 
-        let mut expected_index = target.len() - 1;
+        let mut expected_index = target_len - 1;
         for &index in indexes.iter().rev() {
             if index != expected_index {
                 return false;
@@ -882,8 +881,9 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     let mut side_effects = false;
-    let missing: Vec<usize> = args
-        .iter()
+    let missing: Vec<usize> = call
+        .arguments
+        .args()
         .enumerate()
         .filter(|(i, arg)| {
             !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
@@ -908,7 +908,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         call.range(),
     );
 
-    if is_contiguous_from_end(&missing, args) {
+    if is_contiguous_from_end(&missing, call.arguments.args().count()) {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
@@ -934,26 +934,26 @@ pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    args: &[Expr],
-    keywords: &[Keyword],
 ) {
-    if has_star_args(args) || has_star_star_kwargs(keywords) {
+    if has_star_args(&call.arguments) || has_star_star_kwargs(&call.arguments) {
         return;
     }
 
-    let keywords: FxHashSet<_> = keywords
-        .iter()
+    let keywords: FxHashSet<_> = call
+        .arguments
+        .keywords()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;
             arg.as_ref().map(ruff_python_ast::Identifier::id)
         })
         .collect();
 
+    let positional_count = call.arguments.args().count();
     let missing: Vec<String> = summary
         .autos
         .iter()
         .chain(&summary.indices)
-        .filter(|&&i| i >= args.len())
+        .filter(|&&i| i >= positional_count)
         .map(ToString::to_string)
         .chain(
             summary

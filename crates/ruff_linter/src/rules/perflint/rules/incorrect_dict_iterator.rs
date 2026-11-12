@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -84,14 +84,12 @@ fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
         return;
     };
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = iter
     else {
         return;
     };
-    if !args.is_empty() {
+    if arguments.args().next().is_some() {
         return;
     }
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {

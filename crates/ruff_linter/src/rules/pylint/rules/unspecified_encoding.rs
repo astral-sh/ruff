@@ -210,14 +210,13 @@ fn is_binary_mode(expr: &Expr) -> Option<bool> {
 /// Returns `true` if the given call lacks an explicit `encoding`.
 fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
-    if call.arguments.args.iter().any(Expr::is_starred_expr) {
+    if call.arguments.args().any(Expr::is_starred_expr) {
         return false;
     }
     // If we have something like `**kwargs`, which might contain the encoding argument, abort.
     if call
         .arguments
-        .keywords
-        .iter()
+        .keywords()
         .any(|keyword| keyword.arg.is_none())
     {
         return false;

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -317,28 +317,23 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
     // Verify that this is an `isinstance` call.
     let ast::ExprCall {
         func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
+        arguments,
         range_start: _,
         node_index: _,
     } = call.as_call_expr()?;
-    if args.len() != 2 {
+    let [
+        ast::Argument::Positional(target),
+        ast::Argument::Positional(_),
+    ] = arguments.items.as_slice()
+    else {
         return None;
-    }
-    if !keywords.is_empty() {
-        return None;
-    }
+    };
     if !semantic.match_builtin_expr(func, "isinstance") {
         return None;
     }
 
     // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
-    Some(&args[0])
+    Some(target)
 }
 
 /// SIM101
@@ -382,12 +377,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let Expr::Call(ast::ExprCall {
-                arguments: Arguments { args, .. },
-                ..
-            }) = &values[indices[0]]
-            {
-                args.first()
+            let target = if let Expr::Call(ast::ExprCall { arguments, .. }) = &values[indices[0]] {
+                arguments
+                    .args()
+                    .next()
                     .expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
@@ -409,14 +402,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                 let flattened: Vec<&Expr> = indices
                     .iter()
                     .flat_map(|index| {
-                        let Expr::Call(ast::ExprCall {
-                            arguments: Arguments { args, .. },
-                            ..
-                        }) = &values[*index]
-                        else {
+                        let Expr::Call(ast::ExprCall { arguments, .. }) = &values[*index] else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
-                        let value = args.get(1).expect("`isinstance` should have two arguments");
+                        let value = arguments
+                            .args()
+                            .nth(1)
+                            .expect("`isinstance` should have two arguments");
                         if let Expr::Tuple(tuple) = value {
                             &tuple.elts
                         } else {

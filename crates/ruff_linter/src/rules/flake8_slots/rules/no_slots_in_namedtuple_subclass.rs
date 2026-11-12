@@ -84,11 +84,11 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(arguments) = class.arguments.as_deref() else {
         return;
     };
 
-    if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
+    if let Some(namedtuple_kind) = namedtuple_base(arguments, checker.semantic()) {
         if !has_slots(&class.body) {
             checker.report_diagnostic(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
@@ -100,9 +100,9 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
 
 /// If the class's bases consist solely of named tuples, return the kind of named tuple
 /// (either `collections.namedtuple()`, or `typing.NamedTuple()`). Otherwise, return `None`.
-fn namedtuple_base(bases: &[Expr], semantic: &SemanticModel) -> Option<NamedTupleKind> {
+fn namedtuple_base(arguments: &Arguments, semantic: &SemanticModel) -> Option<NamedTupleKind> {
     let mut kind = None;
-    for base in bases {
+    for base in arguments.args() {
         if let Expr::Call(ast::ExprCall { func, .. }) = base {
             // Ex) `collections.namedtuple()`
             let qualified_name = semantic.resolve_qualified_name(func)?;

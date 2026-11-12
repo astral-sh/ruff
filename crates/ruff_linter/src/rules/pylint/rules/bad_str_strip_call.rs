@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::fmt;
 
 use ruff_python_ast::{self as ast, Expr};
@@ -179,11 +180,11 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
 
-    let [arg] = arguments.args.as_ref() else {
+    let Some([arg]) = arguments.args().collect_array() else {
         return;
     };
 

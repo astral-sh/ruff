@@ -277,8 +277,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
             arguments: Arguments {
-                args: [*operand.clone()].into(),
-                keywords: std::iter::empty().collect(),
+                items: [ast::Argument::Positional(*operand.clone())].into(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

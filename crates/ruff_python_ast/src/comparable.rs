@@ -443,24 +443,58 @@ type ComparableComprehensionSlice<'a> =
     ComparableSlice<'a, ast::Comprehension, ComparableComprehension<'a>>;
 type ComparableExprSlice<'a> = ComparableSlice<'a, Expr, ComparableExpr<'a>>;
 
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
-struct ComparableArguments<'a> {
-    args: ComparableExprSlice<'a>,
-    keywords: ComparableSlice<'a, ast::Keyword, ComparableKeyword<'a>>,
+#[derive(Default)]
+struct ComparableArguments<'a>(&'a [ast::Argument]);
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum ComparableArgument<'a> {
+    Positional(ComparableExpr<'a>),
+    Keyword(ComparableKeyword<'a>),
+}
+
+impl<'a> ComparableArguments<'a> {
+    fn iter(&self) -> impl Iterator<Item = ComparableArgument<'a>> {
+        // Calls evaluate all positional arguments before their keywords, including a starred
+        // argument written after a named argument.
+        let positional = self.0.iter().filter_map(ast::Argument::as_positional);
+        let keywords = self.0.iter().filter_map(ast::Argument::as_keyword);
+        positional
+            .map(|expr| ComparableArgument::Positional(expr.into()))
+            .chain(keywords.map(|keyword| ComparableArgument::Keyword(keyword.into())))
+    }
+}
+
+impl fmt::Debug for ComparableArguments<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for ComparableArguments<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len() && self.iter().eq(other.iter())
+    }
+}
+
+impl Eq for ComparableArguments<'_> {}
+
+impl Hash for ComparableArguments<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.len().hash(state);
+        for argument in self.iter() {
+            argument.hash(state);
+        }
+    }
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
         let ast::Arguments {
-            args,
-            keywords,
+            items,
             range: _,
             node_index: _,
         } = arguments;
-        Self {
-            args: ComparableSlice::new(args),
-            keywords: ComparableSlice::new(keywords),
-        }
+        Self(items)
     }
 }
 
@@ -580,7 +614,7 @@ impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
         } = keyword;
         Self {
             arg: arg.as_ref().map(ast::Identifier::as_str),
-            value: value.into(),
+            value: value.as_ref().into(),
         }
     }
 }

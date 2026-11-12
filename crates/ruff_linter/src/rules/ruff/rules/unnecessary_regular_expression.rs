@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Argument;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprBytesLiteral, ExprCall, ExprCompare, ExprContext,
@@ -353,8 +354,7 @@ impl<'a> ReFunc<'a> {
         Expr::Call(ExprCall {
             func: Box::new(method),
             arguments: Arguments {
-                args: args.into(),
-                keywords: std::iter::empty().collect(),
+                items: args.into_iter().map(Argument::Positional).collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

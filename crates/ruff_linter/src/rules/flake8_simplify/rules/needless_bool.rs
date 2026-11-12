@@ -274,8 +274,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: [if_test.clone()].into(),
-                    keywords: std::iter::empty().collect(),
+                    items: [ast::Argument::Positional(if_test.clone())].into(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },

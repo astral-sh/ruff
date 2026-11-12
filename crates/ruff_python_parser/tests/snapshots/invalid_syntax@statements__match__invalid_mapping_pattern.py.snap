@@ -479,17 +479,18 @@ Module(
                                                     arguments: Arguments {
                                                         range: 492..500,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 493..499,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 493..499,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),

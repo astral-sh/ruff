@@ -29,28 +29,29 @@ Module(
                             arguments: Arguments {
                                 range: 44..51,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 45..50,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("a"),
-                                                range: 46..47,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 49..50,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 45..50,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("a"),
+                                                    range: 46..47,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 49..50,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -76,28 +77,29 @@ Module(
                             arguments: Arguments {
                                 range: 53..62,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 54..61,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("a"),
-                                                range: 55..56,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 60..61,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 54..61,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("a"),
+                                                    range: 55..56,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 60..61,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -123,28 +125,29 @@ Module(
                             arguments: Arguments {
                                 range: 64..76,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 66..75,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("a"),
-                                                range: 68..69,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 74..75,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 66..75,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("a"),
+                                                    range: 68..69,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 74..75,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },

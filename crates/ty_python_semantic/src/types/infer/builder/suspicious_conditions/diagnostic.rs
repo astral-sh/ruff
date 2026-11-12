@@ -860,9 +860,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
                 (left, single_comparator)
             && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
-            && let ast::Arguments { args, keywords, .. } = &call.arguments
-            && keywords.is_empty()
-            && let [single_arg] = &**args
+            && let [ast::Argument::Positional(single_arg)] = call.arguments.items.as_slice()
             && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
             && function.is_known(db, KnownFunction::Len)
             && self.expression_type(other).is_int_literal()
@@ -1502,7 +1500,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let (left, _, right) = compare.as_single()?;
                 [Some(left), Some(right)]
             }
-            ast::Expr::Call(call) => [call.arguments.args.first(), None],
+            ast::Expr::Call(call) => [call.arguments.args().next(), None],
             _ => return None,
         };
 

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -60,14 +60,14 @@ impl AlwaysFixableViolation for InDictKeys {
 fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, parent: AnyNodeRef) {
     let Expr::Call(ast::ExprCall {
         func,
-        arguments: Arguments { args, keywords, .. },
+        arguments,
         range_start: _,
         node_index: _,
     }) = &right
     else {
         return;
     };
-    if !(args.is_empty() && keywords.is_empty()) {
+    if !(arguments.is_empty()) {
         return;
     }
 

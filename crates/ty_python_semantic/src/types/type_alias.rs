@@ -308,9 +308,13 @@ impl<'db> PEP695TypeAliasType<'db> {
 /// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
 /// twice, use the positional argument for error recovery.
 pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
-    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
-    let name = arguments.args.first().or_else(|| keyword("name"))?;
-    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+    let keyword = |name| {
+        arguments
+            .find_keyword(name)
+            .map(|keyword| keyword.value.as_ref())
+    };
+    let name = arguments.args().next().or_else(|| keyword("name"))?;
+    let value = arguments.args().nth(1).or_else(|| keyword("value"))?;
     Some((name, value))
 }
 

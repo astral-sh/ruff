@@ -138,7 +138,7 @@ mod tests {
             let AnyNodeRef::ExprCall(call) = covering.node() else {
                 return Err("expected a call expression".into());
             };
-            let argument = call.arguments.args.first().ok_or("missing argument")?;
+            let argument = call.arguments.args().next().ok_or("missing argument")?;
             let replacement =
                 unwrapped_call_argument(call, argument, covering.parent(), parsed.tokens(), source);
 

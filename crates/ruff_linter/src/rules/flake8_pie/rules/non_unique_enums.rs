@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_semantic::SemanticModel;
 use rustc_hash::FxHashSet;
 
@@ -63,7 +64,7 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
         return;
     };
 
-    if !parent.bases().iter().any(|expr| {
+    if !parent.bases().any(|expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
@@ -123,11 +124,14 @@ fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
                 return false;
             }
 
-            if !arguments.keywords.is_empty() {
+            if arguments.keywords().next().is_some() {
                 return false;
             }
 
-            matches!(arguments.args.as_ref(), [_, Expr::EllipsisLiteral(_)])
+            matches!(
+                arguments.args().collect_array(),
+                Some([_, Expr::EllipsisLiteral(_)])
+            )
         }
 
         _ => false,

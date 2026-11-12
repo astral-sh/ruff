@@ -43,7 +43,7 @@ where
         func: &mut dyn FnMut(&Expr) -> bool,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
-        class_def.bases().iter().any(|expr| {
+        class_def.bases().any(|expr| {
             // If the base class itself matches the pattern, then this does too.
             // Ex) `class Foo(BaseModel): ...`
             if func(expr) {
@@ -71,7 +71,7 @@ where
         })
     }
 
-    if class_def.bases().is_empty() {
+    if class_def.bases().next().is_none() {
         return false;
     }
 
@@ -432,7 +432,7 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
         (false, _) => {
             // If it has >1 base class and a metaclass-like signature for `__new__`,
             // then it might be a metaclass.
-            if class_def.bases().is_empty() {
+            if class_def.bases().next().is_none() {
                 IsMetaclass::No
             } else if has_metaclass_new_signature(class_def, semantic) {
                 IsMetaclass::Maybe
@@ -457,7 +457,7 @@ pub fn might_be_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel)
         return true;
     }
 
-    class_def.bases().iter().any(|base| {
+    class_def.bases().any(|base| {
         let Expr::Subscript(ExprSubscript { slice, .. }) = base else {
             return false;
         };

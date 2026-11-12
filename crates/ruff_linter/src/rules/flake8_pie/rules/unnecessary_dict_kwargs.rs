@@ -90,13 +90,13 @@ impl Violation for UnnecessaryDictKwargs {
 /// PIE804
 pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
-    for keyword in &*call.arguments.keywords {
+    for keyword in call.arguments.keywords() {
         // keyword is a spread operator (indicated by None).
         if keyword.arg.is_some() {
             continue;
         }
 
-        let Expr::Dict(dict) = &keyword.value else {
+        let Expr::Dict(dict) = keyword.value.as_ref() else {
             continue;
         };
 
@@ -191,15 +191,15 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
 fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
     let mut seen =
-        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords().count(), FxBuildHasher);
     let mut duplicates =
-        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
-    for keyword in &*call.arguments.keywords {
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords().count(), FxBuildHasher);
+    for keyword in call.arguments.keywords() {
         if let Some(name) = &keyword.arg {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());
             }
-        } else if let Expr::Dict(dict) = &keyword.value {
+        } else if let Expr::Dict(dict) = keyword.value.as_ref() {
             for key in dict.iter_keys() {
                 if let Some(name) = key.and_then(as_kwarg) {
                     if !seen.insert(name) {

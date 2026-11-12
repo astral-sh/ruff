@@ -64,7 +64,7 @@ pub(crate) fn unnecessary_collection_call(
     call: &ast::ExprCall,
     settings: &Settings,
 ) {
-    if !call.arguments.args.is_empty() {
+    if call.arguments.args().next().is_some() {
         return;
     }
     let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
@@ -72,18 +72,18 @@ pub(crate) fn unnecessary_collection_call(
     };
     let collection = match builtin {
         "dict"
-            if call.arguments.keywords.is_empty()
+            if call.arguments.keywords().next().is_none()
                 || (!settings.allow_dict_calls_with_keyword_arguments
-                    && call.arguments.keywords.iter().all(|kw| kw.arg.is_some())) =>
+                    && call.arguments.keywords().all(|kw| kw.arg.is_some())) =>
         {
             // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
             Collection::Dict
         }
-        "list" if call.arguments.keywords.is_empty() => {
+        "list" if call.arguments.keywords().next().is_none() => {
             // `list()
             Collection::List
         }
-        "tuple" if call.arguments.keywords.is_empty() => {
+        "tuple" if call.arguments.keywords().next().is_none() => {
             // `tuple()`
             Collection::Tuple
         }
@@ -94,7 +94,7 @@ pub(crate) fn unnecessary_collection_call(
         checker.report_diagnostic(UnnecessaryCollectionCall { kind: collection }, call.range());
 
     // Convert `dict()` to `{}`.
-    if call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_none() {
         diagnostic.set_fix({
             // Replace from the start of the call to the start of the argument.
             let call_start = Edit::replacement(

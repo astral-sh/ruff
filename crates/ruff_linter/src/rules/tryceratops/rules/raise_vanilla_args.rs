@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -58,15 +58,13 @@ impl Violation for RaiseVanillaArgs {
 /// TRY003
 pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = expr
     else {
         return;
     };
 
-    let Some(arg) = args.first() else {
+    let Some(arg) = arguments.args().next() else {
         return;
     };
 

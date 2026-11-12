@@ -182,9 +182,7 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
                 .iter()
                 .any(|s| semantic.match_builtin_expr(func, s))
             {
-                return arguments.args.len() == 1
-                    && arguments.keywords.is_empty()
-                    && is_infinity_string_literal(&arguments.args[0]).is_some();
+                return matches!(arguments.items.as_slice(), [ast::Argument::Positional(arg)] if is_infinity_string_literal(arg).is_some());
             }
 
             false

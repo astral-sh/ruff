@@ -337,7 +337,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
     let command_argument = match call_kind {
         Some(CallKind::Subprocess) => find_subprocess_argument(&call.arguments),
-        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args().next(),
         None => None,
     };
 
@@ -383,7 +383,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     // S605
     if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
-            if let Some(arg) = call.arguments.args.first() {
+            if let Some(arg) = call.arguments.args().next() {
                 checker.report_diagnostic(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
@@ -438,8 +438,8 @@ fn find_subprocess_argument(arguments: &Arguments) -> Option<&Expr> {
         // A starred first argument (`subprocess.run(*cmd)`) prevents us from locating the
         // command with `find_argument_value`; treat it as untrusted input.
         arguments
-            .args
-            .first()
+            .args()
+            .next()
             .filter(|argument| argument.is_starred_expr())
     })
 }

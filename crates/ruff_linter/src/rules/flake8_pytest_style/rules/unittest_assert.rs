@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, bail};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -227,20 +227,18 @@ impl UnittestAssert {
     }
 
     /// Create a map from argument name to value.
-    fn args_map<'a>(
-        &'a self,
-        args: &'a [Expr],
-        keywords: &'a [Keyword],
-    ) -> Result<FxHashMap<&'a str, &'a Expr>> {
+    fn args_map<'a>(&'a self, arguments: &'a Arguments) -> Result<FxHashMap<&'a str, &'a Expr>> {
         // If we have variable-length arguments, abort.
-        if args.iter().any(Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none()) {
+        if arguments.args().any(Expr::is_starred_expr)
+            || arguments.keywords().any(|kw| kw.arg.is_none())
+        {
             bail!("Variable-length arguments are not supported");
         }
 
         let arg_spec = self.arg_spec();
 
         // If any of the keyword arguments are not in the argument spec, abort.
-        if keywords.iter().any(|kw| {
+        if arguments.keywords().any(|kw| {
             kw.arg
                 .as_ref()
                 .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
@@ -250,16 +248,16 @@ impl UnittestAssert {
 
         // Generate a map from argument name to value.
         let mut args_map: FxHashMap<&str, &Expr> =
-            FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
+            FxHashMap::with_capacity_and_hasher(arguments.len(), FxBuildHasher);
 
         // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(args) {
+        for (arg_name, value) in arg_spec.iter().zip(arguments.args()) {
             args_map.insert(arg_name, value);
         }
 
         // Process keyword arguments.
-        for arg_name in arg_spec.iter().skip(args.len()) {
-            if let Some(value) = keywords.iter().find_map(|keyword| {
+        for arg_name in arg_spec.iter().skip(arguments.args().count()) {
+            if let Some(value) = arguments.keywords().find_map(|keyword| {
                 if keyword
                     .arg
                     .as_ref()
@@ -277,8 +275,8 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
-        let args = self.args_map(args, keywords)?;
+    pub(crate) fn generate_assert(self, arguments: &Arguments) -> Result<Stmt> {
+        let args = self.args_map(arguments)?;
         match self {
             UnittestAssert::True
             | UnittestAssert::False
@@ -391,8 +389,9 @@ impl UnittestAssert {
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: [(**obj).clone(), (**cls).clone()].into(),
-                        keywords: std::iter::empty().collect(),
+                        items: [(**obj).clone(), (**cls).clone()]
+                            .map(ast::Argument::Positional)
+                            .into(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
@@ -440,8 +439,9 @@ impl UnittestAssert {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: [(**regex).clone(), (**text).clone()].into(),
-                        keywords: std::iter::empty().collect(),
+                        items: [(**regex).clone(), (**text).clone()]
+                            .map(ast::Argument::Positional)
+                            .into(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },

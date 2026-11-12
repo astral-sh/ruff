@@ -66,34 +66,50 @@ help: Use `pytest.raises()` as a context-manager
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:35:15
+  --> RUF061_raises.py:35:5
    |
-34 | def test_error_multi_statement():
-35 |     excinfo = pytest.raises(ValueError, int, "hello")
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |     assert excinfo.match("^invalid literal")
-   |
+34 | def test_error_mixed_argument_order(args):
+35 |     pytest.raises(ZeroDivisionError, func, b=0, *args)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-34 | def test_error_multi_statement():
-   -     excinfo = pytest.raises(ValueError, int, "hello")
-35 +     with pytest.raises(ValueError) as excinfo:
-36 +         int("hello")
-37 |     assert excinfo.match("^invalid literal")
+34 | def test_error_mixed_argument_order(args):
+   -     pytest.raises(ZeroDivisionError, func, b=0, *args)
+35 +     with pytest.raises(ZeroDivisionError):
+36 +         func(b=0, *args)
+37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
-  --> RUF061_raises.py:40:5
+  --> RUF061_raises.py:39:15
    |
-39 | def test_error_lambda():
-40 |     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
+38 | def test_error_multi_statement():
+39 |     excinfo = pytest.raises(ValueError, int, "hello")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 |     assert excinfo.match("^invalid literal")
+   |
+help: Use `pytest.raises()` as a context-manager
+   |
+38 | def test_error_multi_statement():
+   -     excinfo = pytest.raises(ValueError, int, "hello")
+39 +     with pytest.raises(ValueError) as excinfo:
+40 +         int("hello")
+41 |     assert excinfo.match("^invalid literal")
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF061 [*] Use context-manager form of `pytest.raises()`
+  --> RUF061_raises.py:44:5
+   |
+43 | def test_error_lambda():
+44 |     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.raises()` as a context-manager
    |
-39 | def test_error_lambda():
+43 | def test_error_lambda():
    -     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
-40 +     with pytest.raises(ZeroDivisionError):
-41 +         (lambda: 1 / 0)()
+44 +     with pytest.raises(ZeroDivisionError):
+45 +         (lambda: 1 / 0)()
    |
 note: This is an unsafe fix and may change runtime behavior

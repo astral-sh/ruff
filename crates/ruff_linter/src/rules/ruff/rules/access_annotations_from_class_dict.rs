@@ -127,7 +127,7 @@ pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, cal
     //    - One or two positional arguments.
     //    - First positional argument must be the string literal "__annotations__".
     //    - The value of the second positional argument (if present) does not affect the match.
-    if !call.arguments.keywords.is_empty() || call.arguments.len() > 2 {
+    if call.arguments.keywords().next().is_some() || call.arguments.len() > 2 {
         return;
     }
 

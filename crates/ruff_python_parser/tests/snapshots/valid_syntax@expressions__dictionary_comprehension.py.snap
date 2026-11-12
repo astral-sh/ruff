@@ -219,18 +219,19 @@ Module(
                                             arguments: Arguments {
                                                 range: 69..72,
                                                 node_index: NodeIndex(None),
-                                                args: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 70..71,
-                                                            value: Int(
-                                                                5,
-                                                            ),
-                                                        },
+                                                items: [
+                                                    Positional(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 70..71,
+                                                                value: Int(
+                                                                    5,
+                                                                ),
+                                                            },
+                                                        ),
                                                     ),
                                                 ],
-                                                keywords: [],
                                             },
                                         },
                                     ),

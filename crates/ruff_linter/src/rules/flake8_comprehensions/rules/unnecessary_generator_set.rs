@@ -70,12 +70,9 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
 
 /// C401 (`set(generator)`)
 pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "set",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("set", &call.func, &call.arguments)
+    else {
         return;
     };
 

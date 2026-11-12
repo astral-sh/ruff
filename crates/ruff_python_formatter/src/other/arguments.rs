@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatContext, write};
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringFlags, StringLike};
+use ruff_python_ast::{ArgOrKeyword, Argument, Arguments, Expr, StringFlags, StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -17,8 +17,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
     fn fmt_fields(&self, item: &Arguments, f: &mut PyFormatter) -> FormatResult<()> {
         let Arguments {
             range,
-            args,
-            keywords,
+            items,
             node_index: _,
         } = item;
         // We have a case with `f()` without any argument, which is a special case because we can
@@ -28,7 +27,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         //      # This call has a dangling comment.
         // )
         // ```
-        if args.is_empty() && keywords.is_empty() {
+        if items.is_empty() {
             let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
@@ -37,8 +36,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_ref() {
-                [arg] if keywords.is_empty() => {
+            match items.as_slice() {
+                [Argument::Positional(arg)] => {
                     match arg {
                         Expr::Generator(generator_exp) => joiner.entry(
                             generator_exp,
@@ -171,9 +170,11 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 /// of those collections.
 fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (arguments.args.as_ref(), arguments.keywords.as_ref()) {
-        ([arg], []) => arg,
-        ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
+    let arg = match arguments.items.as_slice() {
+        [Argument::Positional(arg)] => arg,
+        [Argument::Keyword(keyword)]
+            if keyword.arg.is_none() && !context.comments().has(keyword) =>
+        {
             &keyword.value
         }
         _ => return false,

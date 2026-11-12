@@ -65,22 +65,16 @@ fn map_call_with_two_arguments<'a>(
 ) -> Option<(&'a ast::Expr, &'a ast::Expr)> {
     let ast::ExprCall {
         func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
+        arguments,
         range_start: _,
         node_index: _,
     } = call;
 
-    if !keywords.is_empty() {
-        return None;
-    }
-
-    let [first, second] = &**args else {
+    let [
+        ast::Argument::Positional(first),
+        ast::Argument::Positional(second),
+    ] = arguments.items.as_slice()
+    else {
         return None;
     };
 

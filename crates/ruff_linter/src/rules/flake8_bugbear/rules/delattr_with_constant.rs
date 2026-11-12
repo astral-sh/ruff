@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -62,15 +63,22 @@ impl AlwaysFixableViolation for DelAttrWithConstant {
 }
 
 /// B043
-pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn delattr_with_constant(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    arguments: &ast::Arguments,
+) {
     if !checker.semantic().match_builtin_expr(func, "delattr") {
         return;
     }
 
-    let [
-        obj,
-        Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
-    ] = args
+    let Some(
+        [
+            obj,
+            Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
+        ],
+    ) = arguments.args().collect_array()
     else {
         return;
     };

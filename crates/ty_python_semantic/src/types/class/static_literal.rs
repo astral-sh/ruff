@@ -1180,9 +1180,9 @@ impl<'db> StaticClassLiteral<'db> {
             if let Some(arguments) = &class_def.node(&module).arguments {
                 let mut flags = transformer_params.flags(db);
 
-                for ast::Keyword { arg, value, .. } in &arguments.keywords {
+                for ast::Keyword { arg, value, .. } in arguments.keywords() {
                     if let Some(arg_name) = arg
-                        && let ast::Expr::BooleanLiteral(is_set) = value
+                        && let ast::Expr::BooleanLiteral(is_set) = value.as_ref()
                     {
                         for (flag_name, flag) in DATACLASS_FLAGS {
                             if arg_name == *flag_name {
@@ -3504,7 +3504,7 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
         // but this causes more problems than it fixes.
         Some(KnownClass::NotImplementedType) => vec![],
         _ => {
-            let mut expanded_bases = Vec::with_capacity(class_stmt.bases().len());
+            let mut expanded_bases = Vec::with_capacity(class_stmt.bases().count());
 
             for base_node in class_stmt.bases() {
                 if let Some(tuple) =
@@ -3810,7 +3810,7 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::divergent(id); class_stmt.bases().len()].into_boxed_slice()
+    vec![Type::divergent(id); class_stmt.bases().count()].into_boxed_slice()
 }
 
 fn explicit_bases_cycle_fn<'db>(

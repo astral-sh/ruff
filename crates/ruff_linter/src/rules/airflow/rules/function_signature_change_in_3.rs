@@ -162,7 +162,7 @@ fn check_method_arguments(
     arguments: &Arguments,
 ) {
     let has_positional_args =
-        arguments.find_positional(0).is_some() || arguments.args.iter().any(Expr::is_starred_expr);
+        arguments.find_positional(0).is_some() || arguments.args().any(Expr::is_starred_expr);
 
     if let ["airflow", "lineage", "hook", "HookLineageCollector"] = qualified_name.segments() {
         if attr.as_str() == "create_asset" && has_positional_args {

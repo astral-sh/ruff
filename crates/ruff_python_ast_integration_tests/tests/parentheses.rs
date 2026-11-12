@@ -146,8 +146,8 @@ fn test_call_arguments_not_counted() {
 
     let arg = call
         .arguments
-        .args
-        .first()
+        .args()
+        .next()
         .expect("call should have an argument");
     let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
     // The parentheses belong to the call, not the argument
@@ -172,8 +172,8 @@ fn test_call_with_parenthesized_argument() {
 
     let arg = call
         .arguments
-        .args
-        .first()
+        .args()
+        .next()
         .expect("call should have an argument");
     let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
 

@@ -1,7 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
-};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Stmt, Suite};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -171,14 +169,21 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 fn create_class_def_stmt(
     class_name: &str,
     body: Suite,
-    keywords: &[Keyword],
+    class_keywords: Option<&Arguments>,
     base_class: &Expr,
 ) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: [base_class.clone()].into(),
-            keywords: keywords.into(),
+            items: std::iter::once(ast::Argument::Positional(base_class.clone()))
+                .chain(
+                    class_keywords
+                        .into_iter()
+                        .flat_map(Arguments::keywords)
+                        .cloned()
+                        .map(ast::Argument::Keyword),
+                )
+                .collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
@@ -220,26 +225,18 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
     }
 }
 
-fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Suite> {
+fn fields_from_dict_call(func: &Expr, arguments: &Arguments) -> Option<Suite> {
     let ast::ExprName { id, .. } = func.as_name_expr()?;
     if id != "dict" {
         return None;
     }
-
-    if keywords.is_empty() {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
-        Some(Suite::from([node]))
-    } else {
-        fields_from_keywords(keywords)
-    }
+    fields_from_keywords(arguments)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
-    if keywords.is_empty() {
+fn fields_from_keywords(arguments: &Arguments) -> Option<Suite> {
+    let mut keywords = arguments.keywords().peekable();
+    if keywords.peek().is_none() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -248,7 +245,6 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
     }
 
     keywords
-        .iter()
         .map(|keyword| {
             keyword
                 .arg
@@ -259,36 +255,21 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
 }
 
 /// Match the fields and class keywords from a `TypedDict` call.
-fn match_fields_and_keywords(arguments: &Arguments) -> Option<(Suite, &[Keyword])> {
-    match (&*arguments.args, &*arguments.keywords) {
-        // Ex) `TypedDict("MyType", {"a": int, "b": str})`
-        ([_typename, fields], keywords) => match fields {
-            Expr::Dict(ast::ExprDict {
-                items,
-                range: _,
-                node_index: _,
-            }) => Some((fields_from_dict_literal(items)?, keywords)),
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments {
-                    keywords: fields, ..
-                },
-                range_start: _,
-                node_index: _,
-            }) => Some((fields_from_dict_call(func, fields)?, keywords)),
-            _ => None,
-        },
-        // Ex) `TypedDict("MyType")`
-        ([_typename], []) => {
-            let node = Stmt::Pass(ast::StmtPass {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            Some((Suite::from([node]), &[]))
+fn match_fields_and_keywords(arguments: &Arguments) -> Option<(Suite, Option<&Arguments>)> {
+    let mut args = arguments.args();
+    let _typename = args.next()?;
+    match (args.next(), args.next()) {
+        // Ex) `TypedDict("MyType", {"a": int}, total=False)`
+        (Some(fields), None) => {
+            let suite = match fields {
+                Expr::Dict(dict) => fields_from_dict_literal(&dict.items)?,
+                Expr::Call(call) => fields_from_dict_call(&call.func, &call.arguments)?,
+                _ => return None,
+            };
+            Some((suite, Some(arguments)))
         }
-        // Ex) `TypedDict("MyType", a=int, b=str)`
-        ([_typename], fields) => Some((fields_from_keywords(fields)?, &[])),
-        // Ex) `TypedDict()`
+        // Ex) `TypedDict("MyType", a=int)`
+        (None, _) => Some((fields_from_keywords(arguments)?, None)),
         _ => None,
     }
 }
@@ -298,7 +279,7 @@ fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
     body: Suite,
-    keywords: &[Keyword],
+    class_keywords: Option<&Arguments>,
     base_class: &Expr,
     generator: Generator,
     comment_ranges: &CommentRanges,
@@ -306,7 +287,10 @@ fn convert_to_class(
     Fix::applicable_edit(
         Edit::range_replacement(
             generator.stmt(&create_class_def_stmt(
-                class_name, body, keywords, base_class,
+                class_name,
+                body,
+                class_keywords,
+                base_class,
             )),
             stmt.range(),
         ),

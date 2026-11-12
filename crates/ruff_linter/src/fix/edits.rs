@@ -276,7 +276,7 @@ pub(crate) fn remove_argument<T: Ranged>(
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
-    if let Some(keyword) = arguments.keywords.first() {
+    if let Some(keyword) = arguments.keywords().next() {
         // The keyword's range starts at its name, even if its value is parenthesized.
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.iter_source_order().last() {

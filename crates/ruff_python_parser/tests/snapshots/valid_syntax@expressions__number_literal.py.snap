@@ -615,8 +615,7 @@ Module(
                             arguments: Arguments {
                                 range: 354..356,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -701,8 +700,7 @@ Module(
                             arguments: Arguments {
                                 range: 431..433,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -789,42 +787,42 @@ Module(
                             arguments: Arguments {
                                 range: 486..507,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Call(
-                                        ExprCall {
-                                            node_index: NodeIndex(None),
-                                            range: 487..506,
-                                            func: Attribute(
-                                                ExprAttribute {
-                                                    node_index: NodeIndex(None),
-                                                    range: 487..504,
-                                                    value: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 487..493,
-                                                            value: Int(
-                                                                11,
-                                                            ),
-                                                        },
-                                                    ),
-                                                    attr: Identifier {
-                                                        id: Name("bit_length"),
-                                                        range: 494..504,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            arguments: Arguments {
-                                                range: 504..506,
+                                items: [
+                                    Positional(
+                                        Call(
+                                            ExprCall {
                                                 node_index: NodeIndex(None),
-                                                args: [],
-                                                keywords: [],
+                                                range: 487..506,
+                                                func: Attribute(
+                                                    ExprAttribute {
+                                                        node_index: NodeIndex(None),
+                                                        range: 487..504,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 487..493,
+                                                                value: Int(
+                                                                    11,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        attr: Identifier {
+                                                            id: Name("bit_length"),
+                                                            range: 494..504,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 504..506,
+                                                    node_index: NodeIndex(None),
+                                                    items: [],
+                                                },
                                             },
-                                        },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),
@@ -872,8 +870,7 @@ Module(
                             arguments: Arguments {
                                 range: 529..531,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -921,8 +918,7 @@ Module(
                             arguments: Arguments {
                                 range: 553..555,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -1007,8 +1003,7 @@ Module(
                             arguments: Arguments {
                                 range: 593..595,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -1159,17 +1154,18 @@ Module(
                             arguments: Arguments {
                                 range: 696..700,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 697..699,
-                                            id: Name("no"),
-                                            ctx: Load,
-                                        },
+                                items: [
+                                    Positional(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 697..699,
+                                                id: Name("no"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),

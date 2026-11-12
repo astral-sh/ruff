@@ -567,20 +567,22 @@ pub(crate) fn check_static_class_definitions<'db>(
                             .map(|base| base.display(db, env))
                             .join(", ")
                     ));
-                    let can_rewrite_bases = bases_list.len() == class_node.bases().len()
-                        && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
+                    let can_rewrite_bases = bases_list.len() == class_node.bases().count()
+                        && !class_node.bases().any(ast::Expr::is_starred_expr);
+                    let mut bases = class_node.bases();
                     if can_rewrite_bases
                         && let Some(index) = *generic_index
-                        && let [first_base, .., last_base] = class_node.bases()
+                        && let Some(generic_base) = class_node.bases().nth(index)
+                        && let (Some(first_base), Some(last_base)) =
+                            (bases.next(), bases.next_back())
                     {
                         let source = source_text(db, context.file());
-                        let generic_base = &source[class_node.bases()[index].range()];
+                        let generic_base = &source[generic_base.range()];
                         diagnostic.help(format_args!(
                             "Move `{generic_base}` to the end of the bases list"
                         ));
                         let reordered_bases = class_node
                             .bases()
-                            .iter()
                             .enumerate()
                             .filter(|(i, _)| *i != index)
                             .map(|(_, base)| &source[base.range()])
@@ -618,20 +620,20 @@ pub(crate) fn check_static_class_definitions<'db>(
                 report_instance_layout_conflict(
                     context,
                     class.header_range(db),
-                    Some(class_node.bases()),
+                    |index| class_node.bases().nth(index),
                     &disjoint_bases,
                 );
             }
 
             let explicit_bases = class.explicit_bases(context.db());
-            let base_nodes = (class_node.bases().len() == explicit_bases.len()
-                && !class_node.bases().iter().any(ast::Expr::is_starred_expr))
-            .then_some(class_node.bases());
+            let base_nodes = (class_node.bases().count() == explicit_bases.len()
+                && !class_node.bases().any(ast::Expr::is_starred_expr))
+            .then_some(class_node);
             inconsistent_generic_bases = report_inconsistent_generic_bases(
                 context,
                 class.header_range(db),
                 explicit_bases,
-                base_nodes,
+                |index| base_nodes.and_then(|node| node.bases().nth(index)),
             );
         }
     }
@@ -750,7 +752,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 || class.typed_dict_module(db) == Some(TypingModule::TypingExtensions)
                 || env.python_version(db) >= PythonVersion::PY315;
 
-            for keyword in &args.keywords {
+            for keyword in args.keywords() {
                 if !supports_pep_728
                     && let Some(arg_name @ ("closed" | "extra_items")) = keyword.arg.as_deref()
                     && let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, keyword)
@@ -811,8 +813,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         } else {
             let call_args: CallArguments = args
-                .keywords
-                .iter()
+                .keywords()
                 .filter_map(|keyword| match keyword.arg.as_ref() {
                     // We mimic the runtime behaviour and discard the metaclass argument
                     Some(name) if name.id.as_str() == "metaclass" => None,

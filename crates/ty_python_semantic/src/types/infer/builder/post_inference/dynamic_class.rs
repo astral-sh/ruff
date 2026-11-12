@@ -74,7 +74,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
             report_instance_layout_conflict(
                 context,
                 dynamic_class.header_range(db),
-                bases_tuple_elts,
+                |index| bases_tuple_elts.and_then(|nodes| nodes.get(index)),
                 &disjoint_bases,
             );
         }

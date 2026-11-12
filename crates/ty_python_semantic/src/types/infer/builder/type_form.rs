@@ -138,8 +138,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let arguments = &call_expression.arguments;
 
-        if let [argument] = &*arguments.args
-            && arguments.keywords.is_empty()
+        if let [ast::Argument::Positional(argument)] = arguments.items.as_slice()
             && !matches!(argument, ast::Expr::Starred(_))
         {
             return TypeFormType::from_type_expression(
@@ -148,10 +147,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        for argument in &*arguments.args {
+        for argument in arguments.args() {
             self.infer_expression(argument, TypeContext::default());
         }
-        for keyword in &*arguments.keywords {
+        for keyword in arguments.keywords() {
             self.infer_expression(&keyword.value, TypeContext::default());
         }
 

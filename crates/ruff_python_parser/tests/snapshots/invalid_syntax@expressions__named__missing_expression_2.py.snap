@@ -57,8 +57,7 @@ Module(
                             arguments: Arguments {
                                 range: 75..77,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),

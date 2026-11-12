@@ -29,29 +29,30 @@ Module(
                             arguments: Arguments {
                                 range: 4..15,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 5..14,
-                                        node_index: NodeIndex(None),
-                                        arg: None,
-                                        value: Yield(
-                                            ExprYield {
-                                                node_index: NodeIndex(None),
-                                                range: 7..14,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 13..14,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 5..14,
+                                            node_index: NodeIndex(None),
+                                            arg: None,
+                                            value: Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 7..14,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 13..14,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
                                                     ),
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -77,28 +78,29 @@ Module(
                             arguments: Arguments {
                                 range: 20..27,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 21..26,
-                                        node_index: NodeIndex(None),
-                                        arg: None,
-                                        value: Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 24..26,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 25..26,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 21..26,
+                                            node_index: NodeIndex(None),
+                                            arg: None,
+                                            value: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 24..26,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 25..26,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -124,28 +126,29 @@ Module(
                             arguments: Arguments {
                                 range: 32..38,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 33..37,
-                                        node_index: NodeIndex(None),
-                                        arg: None,
-                                        value: Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 35..37,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 36..37,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 33..37,
+                                            node_index: NodeIndex(None),
+                                            arg: None,
+                                            value: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 35..37,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 36..37,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -171,31 +174,33 @@ Module(
                             arguments: Arguments {
                                 range: 44..54,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 45..48,
                                             node_index: NodeIndex(None),
-                                            range: 52..53,
-                                            value: Int(
-                                                1,
+                                            arg: None,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 47..48,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
                                             ),
                                         },
                                     ),
-                                ],
-                                keywords: [
-                                    Keyword {
-                                        range: 45..48,
-                                        node_index: NodeIndex(None),
-                                        arg: None,
-                                        value: Name(
-                                            ExprName {
+                                    Positional(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 47..48,
-                                                id: Name("x"),
-                                                ctx: Load,
+                                                range: 52..53,
+                                                value: Int(
+                                                    1,
+                                                ),
                                             },
                                         ),
-                                    },
+                                    ),
                                 ],
                             },
                         },

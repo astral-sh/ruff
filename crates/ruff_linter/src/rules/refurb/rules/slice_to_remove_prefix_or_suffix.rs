@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -295,11 +296,9 @@ fn affix_removal_data<'a>(
         .id
         .as_str();
 
-    let func_args = &test.as_call_expr()?.arguments.args;
+    let func_args = test.as_call_expr()?.arguments.args();
 
-    let [affix] = func_args.as_ref() else {
-        return None;
-    };
+    let [affix] = func_args.collect_array()?;
     if compr_value != compr_test_expr || compr_test_expr != compr_else_or_target {
         return None;
     }
