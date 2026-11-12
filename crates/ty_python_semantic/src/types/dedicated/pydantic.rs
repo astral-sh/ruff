@@ -335,40 +335,57 @@ impl<'db> FieldMetadata<'db> {
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        if let Some(default) = call.arguments().find_argument_value("default", 0) {
+        let arguments = call.arguments();
+        let [
+            default,
+            default_factory,
+            init,
+            validation_alias,
+            alias,
+            strict,
+            frozen,
+        ] = arguments.find_keywords([
+            "default",
+            "default_factory",
+            "init",
+            "validation_alias",
+            "alias",
+            "strict",
+            "frozen",
+        ]);
+        if let Some(default) = default
+            .map(Keyword::value)
+            .or_else(|| arguments.find_positional(0))
+        {
             let default_type = field_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(db, specialization));
             }
-        } else if call.arguments().find_keyword("default_factory").is_some() {
+        } else if default_factory.is_some() {
             self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
         }
 
-        if let Some(init) = call.arguments().find_keyword("init") {
+        if let Some(init) = init {
             let init = field_expression_type(db, definition, init.value());
             let env = ProgramEnvironment::from_scope(definition.scope);
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
-        if let Some(alias) = call
-            .arguments()
-            .find_keyword("validation_alias")
-            .or_else(|| call.arguments().find_keyword("alias"))
-        {
+        if let Some(alias) = validation_alias.or(alias) {
             self.alias = field_expression_type(db, definition, alias.value())
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
-        if let Some(strict) = call.arguments().find_keyword("strict") {
+        if let Some(strict) = strict {
             let strict = field_expression_type(db, definition, strict.value());
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
         }
 
-        if let Some(frozen) = call.arguments().find_keyword("frozen") {
+        if let Some(frozen) = frozen {
             let frozen = field_expression_type(db, definition, frozen.value());
             self.frozen = if frozen.is_none(db) {
                 ConfigBoolean::Disabled

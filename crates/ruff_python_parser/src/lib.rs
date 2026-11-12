@@ -747,6 +747,35 @@ mod tests {
     }
 
     #[test]
+    fn mapping_pattern_rest_finds_the_last_capture_in_recovered_syntax() {
+        for (pattern, expected) in [
+            ("{}", None),
+            ("{1: a, 2: b}", None),
+            ("{1: a, **only}", Some("only")),
+            ("{**first, **last, 1: a, 2: b}", Some("last")),
+            ("{**first, 1: a, **last, 2: b}", Some("last")),
+        ] {
+            let source = format!("match x:\n    case {pattern}: pass");
+            let parsed = parse_unchecked_source(&source, PySourceType::Python);
+            let mapping = parsed
+                .root()
+                .descendants()
+                .find_map(AstNode::cast::<ruff_python_ast::PatternMatchMapping>)
+                .expect("fixture contains a mapping pattern");
+            let items = mapping.items();
+            assert_eq!(
+                items.rest().map(ruff_python_ast::Identifier::as_str),
+                expected,
+                "{pattern}"
+            );
+            assert!(
+                items.keys().eq(items.entries().map(|(key, _)| key)),
+                "{pattern}"
+            );
+        }
+    }
+
+    #[test]
     fn dictionary_entries_are_nodes_in_source_order() -> Result<(), ParseError> {
         let source = "{(key): (value), **(rest)}";
         let parsed = parse_expression(source)?;

@@ -135,8 +135,8 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'
         }
     }
 
-    // If the call has keywords, abort.
-    if !call.arguments.keywords().is_empty() {
+    let singleton = call.arguments.as_single_positional();
+    if singleton.is_none() && !call.arguments.is_empty() && !call.arguments.keywords().is_empty() {
         return;
     }
 
@@ -146,8 +146,10 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'
     let mut title: Option<String> = None;
 
     if let Some(dunder) = DunderReplacement::from_method(attr.as_str()) {
-        match (call.arguments.args(), dunder) {
-            (args, DunderReplacement::Builtin(replacement, message)) if args.is_empty() => {
+        match (singleton, dunder) {
+            (None, DunderReplacement::Builtin(replacement, message))
+                if call.arguments.is_empty() =>
+            {
                 if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
@@ -157,9 +159,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'
                 ));
                 title = Some(message.to_string());
             }
-            (args, DunderReplacement::Operator(replacement, message, precedence))
-                if let Some([arg]) = args.as_array() =>
-            {
+            (Some(arg), DunderReplacement::Operator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value);
                 let arg_slice = checker.locator().slice(arg);
 
@@ -179,9 +179,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'
 
                 title = Some(message.to_string());
             }
-            (args, DunderReplacement::ROperator(replacement, message, precedence))
-                if let Some([arg]) = args.as_array() =>
-            {
+            (Some(arg), DunderReplacement::ROperator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value);
                 let arg_slice = checker.locator().slice(arg);
 

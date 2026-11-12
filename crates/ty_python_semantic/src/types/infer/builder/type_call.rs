@@ -35,6 +35,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
 
         let arguments_node = call_expr.arguments();
+        if let Some(arg) = arguments_node.as_single_positional() {
+            return self
+                .infer_expression(arg, TypeContext::default())
+                .dunder_class(db, env);
+        }
         let args = arguments_node.args();
         let keywords = arguments_node.keywords();
 
@@ -44,23 +49,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let [name_arg, bases_arg, namespace_arg] = match args {
             args if let Some([single]) = args.as_array() => {
-                let arg_type = self.infer_expression(single, TypeContext::default());
-
-                return if keywords.is_empty() {
-                    arg_type.dunder_class(db, env)
-                } else {
-                    if keywords.iter().any(|keyword| !keyword.is_variadic())
-                        && let Some(builder) =
-                            self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
-                    {
-                        let mut diagnostic = builder
-                            .into_diagnostic("No overload of class `type` matches arguments");
-                        diagnostic.help(format_args!(
-                            "`builtins.type()` expects no keyword arguments",
-                        ));
-                    }
-                    SubclassOfType::subclass_of_unknown()
-                };
+                self.infer_expression(single, TypeContext::default());
+                if keywords.iter().any(|keyword| !keyword.is_variadic())
+                    && let Some(builder) =
+                        self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
+                {
+                    let mut diagnostic =
+                        builder.into_diagnostic("No overload of class `type` matches arguments");
+                    diagnostic.help(format_args!(
+                        "`builtins.type()` expects no keyword arguments",
+                    ));
+                }
+                return SubclassOfType::subclass_of_unknown();
             }
 
             args if let Some([first, second]) = args.as_array()

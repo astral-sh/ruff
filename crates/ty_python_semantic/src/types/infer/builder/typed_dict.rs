@@ -37,7 +37,7 @@ enum TypedDictConstructorForm<'expr> {
     /// // Ex) `TD({"x": 1}, y=2)`
     MixedLiteralAndKeywords(ast::ExprDict<'expr>),
     /// // Ex) `TD(other, y=2)`
-    MixedPositionalAndKeywords,
+    MixedPositionalAndKeywords(ast::Expr<'expr>),
     /// // Ex) `TD(*args)` or `TD(*args, y=2)`
     VariadicPositional,
     /// // Ex) `TD(arg1, arg2)`
@@ -47,20 +47,19 @@ enum TypedDictConstructorForm<'expr> {
 impl<'expr> TypedDictConstructorForm<'expr> {
     /// Return the constructor form for `arguments`.
     fn from_arguments(arguments: ast::Arguments<'expr>) -> Self {
-        let Some([argument]) = arguments.args().as_array() else {
-            return if arguments.args().is_empty() {
-                Self::KeywordOnly
-            } else {
-                Self::MultiplePositionalArguments
-            };
+        let mut positional = arguments.args().iter();
+        let Some(argument) = positional.next() else {
+            return Self::KeywordOnly;
         };
-
-        match (argument.classify(), arguments.keywords().is_empty()) {
-            (argument, _) if argument.view().is_starred_expr() => Self::VariadicPositional,
+        if positional.next().is_some() {
+            return Self::MultiplePositionalArguments;
+        }
+        match (argument.classify(), arguments.len() == 1) {
+            (ExprKind::Starred(_), _) => Self::VariadicPositional,
             (ExprKind::Dict(_), true) => Self::LiteralOnly(argument),
             (ExprKind::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords(dict_expr),
             (_, true) => Self::SinglePositional(argument),
-            (_, false) => Self::MixedPositionalAndKeywords,
+            (_, false) => Self::MixedPositionalAndKeywords(argument),
         }
     }
 }
@@ -576,7 +575,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let target_ty = Type::TypedDict(typed_dict);
                 self.get_or_infer_expression(argument, TypeContext::declared(Some(target_ty)));
             }
-            TypedDictConstructorForm::MixedPositionalAndKeywords => {
+            TypedDictConstructorForm::MixedPositionalAndKeywords(argument) => {
                 let unpacked_keyword_types =
                     infer_unpacked_keyword_types(arguments, |expr, tcx| {
                         self.get_or_infer_expression(expr, tcx)
@@ -591,14 +590,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
                 let positional_target = typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
                 let target_ty = Type::TypedDict(positional_target);
-                self.get_or_infer_expression(
-                    arguments.args().at(0),
-                    TypeContext::declared(Some(target_ty)),
-                );
+                self.get_or_infer_expression(argument, TypeContext::declared(Some(target_ty)));
             }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
-                self.store_expression_type(arguments.args().at(0), Type::unknown());
+                self.store_expression_type(dict_expr.into(), Type::unknown());
             }
             TypedDictConstructorForm::KeywordOnly
             | TypedDictConstructorForm::VariadicPositional

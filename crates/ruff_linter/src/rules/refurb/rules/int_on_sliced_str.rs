@@ -74,23 +74,23 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ast::ExprCallFields<'_
     }
 
     // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
-    let (expression, base) = match (call.arguments.args(), call.arguments.keywords()) {
-        (args, keywords)
-            if let Some([expression]) = args.as_array()
-                && let Some([base]) = keywords.as_array()
-                && base.arg().map(ruff_python_ast::Identifier::as_str) == Some("base") =>
-        {
-            (expression, base.value())
-        }
-        (args, keywords)
-            if let Some([expression, base]) = args.as_array()
-                && keywords.is_empty() =>
-        {
-            (expression, base)
-        }
-        _ => {
-            return;
-        }
+    let Some(pair) = call.arguments.items().as_array() else {
+        return;
+    };
+    let (expression, base) = match pair {
+        [
+            ast::ArgOrKeyword::Arg(expression),
+            ast::ArgOrKeyword::Arg(base),
+        ] => (expression, base),
+        [
+            ast::ArgOrKeyword::Arg(expression),
+            ast::ArgOrKeyword::Keyword(base),
+        ]
+        | [
+            ast::ArgOrKeyword::Keyword(base),
+            ast::ArgOrKeyword::Arg(expression),
+        ] if base.arg().is_some_and(|name| name == "base") => (expression, base.value()),
+        _ => return,
     };
 
     // The base must be a number literal with a value of 2, 8, or 16.

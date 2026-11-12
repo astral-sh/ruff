@@ -2952,7 +2952,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             PatternKind::MatchMapping(match_mapping) => {
                 let items = match_mapping.items();
-                for (key, _) in items.entries() {
+                for key in items.keys() {
                     self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
                 let mut rest = None;
@@ -3745,34 +3745,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let arguments = call_expr.arguments();
 
-        if !arguments.keywords().is_empty() {
-            return error(
-                &self.context,
-                "Keyword arguments are not supported in `NewType` creation",
-                call_expr,
-            );
+        let mut name_arg = None;
+        let mut first_starred = None;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Keyword(_) => {
+                    return error(
+                        &self.context,
+                        "Keyword arguments are not supported in `NewType` creation",
+                        call_expr,
+                    );
+                }
+                ast::ArgOrKeyword::Arg(arg) => {
+                    name_arg.get_or_insert(arg);
+                    if first_starred.is_none() && arg.is_starred_expr() {
+                        first_starred = Some(arg);
+                    }
+                }
+            }
         }
-
-        if let Some(starred) = arguments.args().iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = first_starred {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `NewType` creation",
                 starred,
             );
         }
-
-        if arguments.args().len() != 2 {
+        let Some(name_arg) = name_arg.filter(|_| arguments.len() == 2) else {
             return error(
                 &self.context,
                 format!(
                     "Wrong number of arguments in `NewType` creation: expected 2, found {}",
-                    arguments.args().len()
+                    arguments.len()
                 ),
                 call_expr,
             );
-        }
+        };
 
-        let name_param_ty = self.infer_expression(arguments.args().at(0), TypeContext::default());
+        let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
@@ -3794,7 +3804,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name != target_name {
             report_mismatched_type_name(
                 &self.context,
-                arguments.args().at(0),
+                name_arg,
                 "NewType",
                 target_name,
                 Some(name),
@@ -3825,28 +3835,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node_view.id();
 
-        let arguments_node = call_expr.arguments();
-        let args = arguments_node.args();
-        let keywords = arguments_node.keywords();
-
-        if args.iter().any(ast::Expr::is_starred_expr) {
+        let arguments = call_expr.arguments();
+        if !(1..=2).contains(&arguments.len()) {
             return None;
         }
-
-        let (name_arg, mut repr_arg) = match args {
-            args if let Some([name_arg]) = args.as_array() => (name_arg, None),
-            args if let Some([name_arg, repr_arg]) = args.as_array() => (name_arg, Some(repr_arg)),
-            _ => return None,
-        };
-
-        for keyword in keywords {
-            let keyword_name = keyword.arg()?;
-
-            if keyword_name.as_str() != "repr" || repr_arg.is_some() {
-                return None;
+        let mut name_arg = None;
+        let mut repr_arg = None;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Arg(arg) if arg.is_starred_expr() => return None,
+                ast::ArgOrKeyword::Arg(arg) if name_arg.is_none() => name_arg = Some(arg),
+                ast::ArgOrKeyword::Arg(arg) => repr_arg = Some(arg),
+                ast::ArgOrKeyword::Keyword(kw) if kw.arg().is_some_and(|name| name == "repr") => {
+                    repr_arg = Some(kw.value());
+                }
+                ast::ArgOrKeyword::Keyword(_) => return None,
             }
-
-            repr_arg = Some(keyword.value());
         }
         let name_arg = name_arg?;
 
@@ -9368,8 +9372,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
         if !class.is_known(self.db(), KnownClass::Range)
-            || !arguments.keywords().is_empty()
-            || arguments.args().iter().any(ast::Expr::is_starred_expr)
+            || !matches!(arguments.len(), 1..=3)
+            || arguments.iter_source_order().any(|item| match item {
+                ast::ArgOrKeyword::Arg(arg) => arg.is_starred_expr(),
+                ast::ArgOrKeyword::Keyword(_) => true,
+            })
         {
             return None;
         }
@@ -9381,7 +9388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_int_literal()
         };
 
-        let is_non_empty = match arguments.args().len() {
+        let is_non_empty = match arguments.len() {
             1 => int_literal(0)? > 0,
             2 => int_literal(0)? < int_literal(1)?,
             3 => {
@@ -9583,7 +9590,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")
-                && !arguments.args().is_empty()
                 && let Some(first_arg) = (
                     // Validate the key argument for `TypedDict` methods
                     arguments.args().first()
@@ -9614,12 +9620,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Type::unknown();
                     }
 
-                    if !is_declared
-                        && method_name == "get"
-                        && arguments.keywords().is_empty()
-                        && matches!(arguments.args().len(), 1 | 2)
-                    {
-                        let default_ty = if let Some(default) = arguments.args().get(1) {
+                    let default = arguments
+                        .as_positional_array::<2>()
+                        .map(|[_, default]| default);
+                    // The key is already known to be a positional argument.
+                    let takes_key_and_optional_default = arguments.len() == 1 || default.is_some();
+                    if !is_declared && method_name == "get" && takes_key_and_optional_default {
+                        let default_ty = if let Some(default) = default {
                             self.get_or_infer_expression(
                                 default,
                                 TypeContext::declared(Some(field.declared_ty)),
@@ -9637,18 +9644,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if field.is_read_only() {
                         let mutation = match method_name {
-                            "pop"
-                                if arguments.keywords().is_empty()
-                                    && matches!(arguments.args().len(), 1 | 2) =>
-                            {
-                                Some(("pop", "from"))
-                            }
-                            "setdefault"
-                                if arguments.keywords().is_empty()
-                                    && arguments.args().len() == 2 =>
-                            {
-                                Some(("set default for", "on"))
-                            }
+                            "pop" if takes_key_and_optional_default => Some(("pop", "from")),
+                            "setdefault" if default.is_some() => Some(("set default for", "on")),
                             _ => None,
                         };
                         if let Some((action, preposition)) = mutation {
@@ -9674,30 +9671,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // use their extra-items type even when arbitrary `str` keys are unsafe.
                     if !is_declared && !field.is_read_only() {
                         match method_name {
-                            "pop"
-                                if arguments.keywords().is_empty()
-                                    && matches!(arguments.args().len(), 1 | 2) =>
-                            {
-                                return arguments.args().get(1).map_or(
-                                    field.declared_ty,
-                                    |default| {
-                                        UnionType::from_two_elements(
-                                            db,
-                                            env,
-                                            field.declared_ty,
-                                            self.get_or_infer_expression(
-                                                default,
-                                                TypeContext::declared(Some(field.declared_ty)),
-                                            ),
-                                        )
-                                    },
-                                );
+                            "pop" if takes_key_and_optional_default => {
+                                return default.map_or(field.declared_ty, |default| {
+                                    UnionType::from_two_elements(
+                                        db,
+                                        env,
+                                        field.declared_ty,
+                                        self.get_or_infer_expression(
+                                            default,
+                                            TypeContext::declared(Some(field.declared_ty)),
+                                        ),
+                                    )
+                                });
                             }
-                            "setdefault"
-                                if arguments.keywords().is_empty()
-                                    && arguments.args().len() == 2 =>
-                            {
-                                let default = arguments.args().at(1);
+                            "setdefault" if let Some(default) = default => {
                                 let default_ty = self.get_or_infer_expression(
                                     default,
                                     TypeContext::declared(Some(field.declared_ty)),

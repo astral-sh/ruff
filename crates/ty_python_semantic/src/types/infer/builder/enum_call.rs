@@ -303,6 +303,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let args = arguments_node.args();
         let keywords = arguments_node.keywords();
 
+        let [mut value_kw, mut names_kw, mut start_kw, mut type_kw] = [None; 4];
         for kw in keywords {
             let Some(name) = kw.arg() else {
                 continue;
@@ -329,14 +330,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        let value_kw = call_expr.arguments().find_keyword("value");
-        let names_kw = call_expr.arguments().find_keyword("names");
-        let start_kw = call_expr.arguments().find_keyword("start");
-        let type_kw = call_expr.arguments().find_keyword("type");
-
+        let mut positional = args.iter();
+        let first = positional.next();
+        let second = positional.next();
         let has_positional_keyword_conflict =
-            (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
-        if !args.is_empty()
+            (first.is_some() && value_kw.is_some()) || (second.is_some() && names_kw.is_some());
+        if first.is_some()
             && let Some(keyword) = value_kw
             && let Some(builder) = self
                 .context
@@ -347,7 +346,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base_name = base_class.name(self.program_environment().python_version(db)),
             ));
         }
-        if args.len() >= 2
+        if second.is_some()
             && let Some(keyword) = names_kw
             && let Some(builder) = self
                 .context
@@ -359,8 +358,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let name_arg = args.first().or_else(|| value_kw.map(ast::Keyword::value));
-        let names_arg = args.get(1).or_else(|| names_kw.map(ast::Keyword::value));
+        let name_arg = first.or_else(|| value_kw.map(ast::Keyword::value));
+        let names_arg = second.or_else(|| names_kw.map(ast::Keyword::value));
 
         let name_arg = name_arg?;
         let env = self.program_environment();
@@ -408,15 +407,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
-        let has_too_many_positional = args.len() > 2;
-        if has_too_many_positional
+        let first_extra = positional.next();
+        let has_too_many_positional = first_extra.is_some();
+        if let Some(extra) = first_extra
             && let Some(builder) = self
                 .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, args.at(2))
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, extra)
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
-                args.len(),
+                3 + positional.count(),
                 base_name = base_class.name(self.program_environment().python_version(db)),
             ));
         }

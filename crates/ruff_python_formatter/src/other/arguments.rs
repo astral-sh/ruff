@@ -16,8 +16,6 @@ pub struct FormatArguments;
 impl FormatNodeRule<ruff_python_ast::kind::Arguments> for FormatArguments {
     fn fmt_fields(&self, item: Arguments<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let range = item.range();
-        let args = item.args();
-        let keywords = item.keywords();
         // We have a case with `f()` without any argument, which is a special case because we can
         // have a comment with no node attachment inside:
         // ```python
@@ -25,7 +23,7 @@ impl FormatNodeRule<ruff_python_ast::kind::Arguments> for FormatArguments {
         //      # This call has a dangling comment.
         // )
         // ```
-        if args.is_empty() && keywords.is_empty() {
+        if item.is_empty() {
             let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
@@ -34,8 +32,8 @@ impl FormatNodeRule<ruff_python_ast::kind::Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_array() {
-                Some([arg]) if keywords.is_empty() => {
+            match item.as_single_positional() {
+                Some(arg) => {
                     match arg.classify() {
                         ExprKind::Generator(generator_exp) => joiner.entry(
                             &generator_exp,

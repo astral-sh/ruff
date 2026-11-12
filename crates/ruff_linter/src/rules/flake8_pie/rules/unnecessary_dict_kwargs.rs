@@ -120,9 +120,9 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
         // `foo(**{"bar-bar": 1})`).
         let Some(kwargs) = dict
             .iter_keys()
-            .filter_map(|key| key.and_then(as_kwarg))
-            .collect();
-        if kwargs.len() != dict.items().len() {
+            .map(|key| key.and_then(as_kwarg))
+            .collect::<Option<Vec<_>>>()
+        else {
             continue;
         };
 

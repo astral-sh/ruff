@@ -208,9 +208,7 @@ fn check_useless_usefixtures(checker: &Checker, decorator: Decorator<'_>, marker
         // @pytest.mark.usefixtures(...)
         ast::ExprKind::Call(call) => {
             let arguments = call.arguments();
-            let args = arguments.args();
-            let keywords = arguments.keywords();
-            if !args.is_empty() || !keywords.is_empty() {
+            if !arguments.is_empty() {
                 return;
             }
         }

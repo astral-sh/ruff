@@ -11,9 +11,7 @@ fn is_simple_call(expr: Expr<'_>) -> bool {
             let func = expr_call.func();
             let arguments = expr_call.arguments();
 
-            let args = arguments.args();
-            let keywords = arguments.keywords();
-            args.is_empty() && keywords.is_empty() && is_simple_callee(func)
+            arguments.is_empty() && is_simple_callee(func)
         }
         _ => false,
     }

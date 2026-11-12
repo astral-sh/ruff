@@ -200,17 +200,11 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
     arguments: Arguments<'_>,
     allowed: &[&str],
 ) -> bool {
-    if arguments
-        .args()
-        .iter()
-        .any(ruff_python_ast::Expr::is_starred_expr)
-    {
-        return true;
-    }
-
-    arguments.keywords().iter().any(|kw| match kw.arg() {
-        Some(arg) => !allowed.contains(&arg.as_str()),
-        None => true,
+    arguments.iter_source_order().any(|arg| match arg {
+        ruff_python_ast::ArgOrKeyword::Arg(arg) => arg.is_starred_expr(),
+        ruff_python_ast::ArgOrKeyword::Keyword(kw) => kw
+            .arg()
+            .is_none_or(|name| !allowed.contains(&name.as_str())),
     })
 }
 

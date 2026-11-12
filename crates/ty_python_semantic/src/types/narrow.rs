@@ -4114,10 +4114,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     let func = expr_call.func();
                     let arguments = expr_call.arguments();
 
-                    let args = arguments.args();
-                    let keywords = arguments.keywords();
-                    if keywords.is_empty()
-                        && let Some([single_argument]) = args.as_array()
+                    if let Some(single_argument) = arguments.as_single_positional()
                         && let Type::ClassLiteral(called_class) = inference.expression_type(func)
                         && called_class.is_known(db, KnownClass::Type)
                     {
@@ -4621,8 +4618,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             Type::FunctionLiteral(function_type) => {
-                let [first_arg, second_arg] = expr_call.arguments().as_positional_array()?;
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let [first_expr, second_arg] = expr_call.arguments().as_positional_array()?;
+                let first_arg = PlaceExpr::try_from_expr(first_expr)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -4680,9 +4677,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         };
                         let mut constraints =
                             NarrowingConstraints::from_iter([(place, constraint)]);
-                        let argument = expr_call.arguments().args().at(0);
                         if let ExprKind::Subscript(subscript) =
-                            argument.expression_value().classify()
+                            first_expr.expression_value().classify()
                             && let Some((tuple_place, tuple_constraint)) = self
                                 .narrow_tuple_subscript_by_type(
                                     inference,

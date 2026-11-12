@@ -100,10 +100,6 @@ pub(crate) fn unnecessary_map(checker: &Checker, call_fields: &ast::ExprCallFiel
     let semantic = checker.semantic();
     let (func, arguments) = (call_fields.func, call_fields.arguments);
 
-    if !arguments.keywords().is_empty() {
-        return;
-    }
-
     let Some(object_type) = ObjectType::from(func, semantic) else {
         return;
     };
@@ -130,10 +126,9 @@ pub(crate) fn unnecessary_map(checker: &Checker, call_fields: &ast::ExprCallFiel
         }
 
         ObjectType::List | ObjectType::Set | ObjectType::Dict => {
-            let Some([ExprKind::Call(inner_call)]) = arguments
-                .args()
-                .as_array()
-                .map(|items| items.map(Expr::classify))
+            let Some(inner_call) = arguments
+                .as_single_positional()
+                .and_then(Expr::as_call_expr)
             else {
                 return;
             };

@@ -184,15 +184,15 @@ impl SemanticModel<'_> {
             }
             // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
             ExprKind::Call(expr_call)
-                if expr_call.arguments().keywords().is_empty()
-                    && expr_call.arguments().args().len() <= 1
+                if (expr_call.arguments().is_empty()
+                    || expr_call.arguments().as_single_positional().is_some())
                     && self
                         .resolve_builtin_symbol(map_subscript(expr_call.func()))
                         .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
             {
                 let arguments = expr_call.arguments();
 
-                let Some([arg]) = arguments.args().as_array() else {
+                let Some(arg) = arguments.as_single_positional() else {
                     return (None, DunderAllFlags::empty());
                 };
                 match arg.fields() {

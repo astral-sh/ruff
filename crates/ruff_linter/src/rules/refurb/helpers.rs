@@ -233,15 +233,6 @@ fn find_file_open<'a>(
     let args = arguments.args();
     let keywords = arguments.keywords();
 
-    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
-    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
-    // arguments, like `buffering`.
-    if args.iter().any(ast::Expr::is_starred_expr)
-        || keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
-    {
-        return None;
-    }
-
     if !semantic.match_builtin_expr(func, "open") {
         return None;
     }
@@ -283,21 +274,16 @@ fn find_path_open<'a>(
     let arguments = expr_call.arguments();
     let args = arguments.args();
     let keywords = arguments.keywords();
-    if args.iter().any(ast::Expr::is_starred_expr)
-        || keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
-    {
-        return None;
-    }
 
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
 
     let attr = func.as_attribute_expr()?;
-    let mode = if args.is_empty() {
-        OpenMode::ReadText
-    } else {
-        match_open_mode(args.first()?)?
+    let mut positional = args.iter();
+    let mode = match positional.next() {
+        Some(mode) => match_open_mode(mode)?,
+        None => OpenMode::ReadText,
     };
     if positional.any(Expr::is_starred_expr) {
         return None;
@@ -319,13 +305,10 @@ fn find_path_open<'a>(
 
 /// Match positional arguments. Return expression for the file name and open mode.
 fn match_open_args(args: ast::FilteredNodes<'_, ast::kind::Expr>) -> Option<(Expr<'_>, OpenMode)> {
-    match args {
-        args if let Some([filename]) = args.as_array() => Some((filename, OpenMode::ReadText)),
-        args if let Some([filename, mode_literal]) = args.as_array() => {
-            match_open_mode(mode_literal).map(|mode| (filename, mode))
-        }
-        // The third positional argument is `buffering` and the pathlib methods don't support it.
-        _ => None,
+    let mut args = args.iter();
+    let filename = args.next()?;
+    if filename.is_starred_expr() {
+        return None;
     }
     let mode = match args.next() {
         Some(mode) => match_open_mode(mode)?,

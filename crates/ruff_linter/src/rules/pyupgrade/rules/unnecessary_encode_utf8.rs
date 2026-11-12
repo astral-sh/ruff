@@ -104,32 +104,21 @@ enum EncodingArg<'a> {
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
 fn match_encoding_arg(arguments: Arguments<'_>) -> Option<EncodingArg<'_>> {
-    match (arguments.args(), arguments.keywords()) {
-        // Ex `"".encode()`
-        (args, keywords) if args.is_empty() && keywords.is_empty() => {
-            return Some(EncodingArg::Empty);
+    if arguments.is_empty() {
+        return Some(EncodingArg::Empty);
+    }
+    match arguments.items().as_array()? {
+        [ruff_python_ast::ArgOrKeyword::Arg(arg)] if is_utf8_encoding_arg(arg) => {
+            Some(EncodingArg::Positional(arg))
         }
-        // Ex `"".encode(encoding)`
-        (args, keywords)
-            if let Some([arg]) = args.as_array()
-                && keywords.is_empty()
-                && is_utf8_encoding_arg(arg) =>
-        {
-            return Some(EncodingArg::Positional(arg));
-        }
-        // Ex `"".encode(kwarg=kwarg)`
-        (args, keywords)
-            if args.is_empty()
-                && let Some([keyword]) = keywords.as_array()
-                && keyword.arg().is_some_and(|arg| arg == "encoding")
+        [ruff_python_ast::ArgOrKeyword::Keyword(keyword)]
+            if keyword.arg().is_some_and(|arg| arg == "encoding")
                 && is_utf8_encoding_arg(keyword.value()) =>
         {
-            return Some(EncodingArg::Keyword(keyword));
+            Some(EncodingArg::Keyword(keyword))
         }
-        // Ex `"".encode(*args, **kwargs)`
-        _ => {}
+        _ => None,
     }
-    None
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.

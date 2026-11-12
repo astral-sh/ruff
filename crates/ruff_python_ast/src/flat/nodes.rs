@@ -564,6 +564,34 @@ impl<'a> crate::Arguments<'a> {
             .find(|kw| kw.arg().is_some_and(|arg| arg == name))
     }
 
+    /// Look up the first explicit keyword for each requested name.
+    pub fn find_keywords<const N: usize>(
+        self,
+        names: [&str; N],
+    ) -> [Option<crate::Keyword<'a>>; N] {
+        let mut values = [None; N];
+        if N == 0 {
+            return values;
+        }
+        let mut remaining = N;
+        for keyword in self.keywords() {
+            let Some(name) = keyword.arg() else {
+                continue;
+            };
+            let name = name.as_str();
+            for (requested, slot) in names.iter().zip(&mut values) {
+                if slot.is_none() && *requested == name {
+                    *slot = Some(keyword);
+                    remaining -= 1;
+                    if remaining == 0 {
+                        return values;
+                    }
+                }
+            }
+        }
+        values
+    }
+
     pub fn find_positional(self, position: usize) -> Option<Expr<'a>> {
         self.args()
             .iter()

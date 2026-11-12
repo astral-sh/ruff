@@ -530,21 +530,14 @@ fn to_pytest_raises_args<'a>(
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (arguments.args(), arguments.keywords()) {
+            match arguments.items().as_array()? {
                 // Ex) `assertRaises(Exception)`
-                (args, keywords)
-                    if let Some([arg]) = args.as_array()
-                        && keywords.is_empty() =>
-                {
-                    Cow::Borrowed(checker.locator().slice(arg))
-                }
+                [ast::ArgOrKeyword::Arg(arg)] => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
-                (args, keywords)
-                    if args.is_empty()
-                        && let Some([kwarg]) = keywords.as_array()
-                        && kwarg
-                            .arg()
-                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                [ast::ArgOrKeyword::Keyword(kwarg)]
+                    if kwarg
+                        .arg()
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
                 {
                     Cow::Borrowed(checker.locator().slice(kwarg.value().range()))
                 }
@@ -552,12 +545,9 @@ fn to_pytest_raises_args<'a>(
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (arguments.args(), arguments.keywords()) {
+            match arguments.items().as_array()? {
                 // Ex) `assertRaisesRegex(Exception, regex)`
-                (args, keywords)
-                    if let Some([arg1, arg2]) = args.as_array()
-                        && keywords.is_empty() =>
-                {
+                [ast::ArgOrKeyword::Arg(arg1), ast::ArgOrKeyword::Arg(arg2)] => {
                     Cow::Owned(format!(
                         "{}, match={}",
                         checker.locator().slice(arg1),
@@ -565,12 +555,16 @@ fn to_pytest_raises_args<'a>(
                     ))
                 }
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
-                (args, keywords)
-                    if let Some([arg]) = args.as_array()
-                        && let Some([kwarg]) = keywords.as_array()
-                        && kwarg
-                            .arg()
-                            .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                [
+                    ast::ArgOrKeyword::Arg(arg),
+                    ast::ArgOrKeyword::Keyword(kwarg),
+                ]
+                | [
+                    ast::ArgOrKeyword::Keyword(kwarg),
+                    ast::ArgOrKeyword::Arg(arg),
+                ] if kwarg
+                    .arg()
+                    .is_some_and(|arg| arg.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
@@ -579,15 +573,15 @@ fn to_pytest_raises_args<'a>(
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
-                (args, keywords)
-                    if args.is_empty()
-                        && let Some([kwarg1, kwarg2]) = keywords.as_array()
-                        && kwarg1
-                            .arg()
-                            .is_some_and(|id| id.as_str() == "expected_exception")
-                        && kwarg2
-                            .arg()
-                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                [
+                    ast::ArgOrKeyword::Keyword(kwarg1),
+                    ast::ArgOrKeyword::Keyword(kwarg2),
+                ] if kwarg1
+                    .arg()
+                    .is_some_and(|id| id.as_str() == "expected_exception")
+                    && kwarg2
+                        .arg()
+                        .is_some_and(|id| id.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
@@ -596,15 +590,15 @@ fn to_pytest_raises_args<'a>(
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
-                (args, keywords)
-                    if args.is_empty()
-                        && let Some([kwarg1, kwarg2]) = keywords.as_array()
-                        && kwarg1
-                            .arg()
-                            .is_some_and(|id| id.as_str() == "expected_regex")
-                        && kwarg2
-                            .arg()
-                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                [
+                    ast::ArgOrKeyword::Keyword(kwarg1),
+                    ast::ArgOrKeyword::Keyword(kwarg2),
+                ] if kwarg1
+                    .arg()
+                    .is_some_and(|id| id.as_str() == "expected_regex")
+                    && kwarg2
+                        .arg()
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",

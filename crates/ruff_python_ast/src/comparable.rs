@@ -238,7 +238,9 @@ impl PartialEq for MatchMappingFields<'_> {
 impl Eq for MatchMappingFields<'_> {}
 impl Hash for MatchMappingFields<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.into_iter().count().hash(state);
+        // The child count prefixes the sequence. Each entry also hashes its variant, so a
+        // key-pattern pair and two captures remain distinguishable.
+        self.0.child_count().hash(state);
         for entry in self.entries() {
             entry.hash(state);
         }

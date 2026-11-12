@@ -25,16 +25,13 @@ fn find_multiple_keywords_in_source_order() {
         .syntax()
         .as_expression()
         .unwrap()
-        .body
+        .body()
         .as_call_expr()
         .unwrap();
-    let arguments = &call.arguments;
-    let requests = ["last", "positional", "sep", "missing", "sep"];
-    let expected = std::array::from_fn(|i| arguments.find_argument_value(requests[i], i));
-    assert_eq!(arguments.find_argument_values(requests), expected);
+    let arguments = call.arguments();
     let values = arguments
         .find_keywords(["last", "sep", "missing", "sep"])
-        .map(|keyword| keyword.map(|kw| &source[kw.value.range()]));
+        .map(|keyword| keyword.map(|kw| &source[kw.value().range()]));
     assert_eq!(values, [Some("end"), Some("first"), None, Some("first")]);
     assert!(arguments.find_keywords([]).is_empty());
 }

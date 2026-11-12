@@ -94,14 +94,10 @@ pub(crate) fn unreliable_callable_check(
     func: Expr<'_>,
     arguments: Arguments<'_>,
 ) {
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-    if !keywords.is_empty() {
-        return;
-    }
-    let mut positional = args.iter();
-    let (Some(obj), Some(attr)) = (positional.next(), positional.next()) else {
-        return;
+    let (obj, attr) = match arguments.len() {
+        2 if let Some([obj, attr]) = arguments.as_positional_array() => (obj, attr),
+        3 if let Some([obj, attr, _]) = arguments.as_positional_array() => (obj, attr),
+        _ => return,
     };
     let ExprKind::StringLiteral(string_literal) = attr.classify() else {
         return;
@@ -114,20 +110,8 @@ pub(crate) fn unreliable_callable_check(
         return;
     };
 
-    // Validate function arguments based on function name
-    let valid_args = match builtins_function {
-        "hasattr" => {
-            // hasattr should have exactly 2 positional arguments and no keywords
-            args.len() == 2
-        }
-        "getattr" => {
-            // getattr should have 2 or 3 positional arguments and no keywords
-            args.len() == 2 || args.len() == 3
-        }
-        _ => return,
-    };
-
-    if !valid_args {
+    if !(builtins_function == "getattr" || (builtins_function == "hasattr" && arguments.len() == 2))
+    {
         return;
     }
 

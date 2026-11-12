@@ -257,11 +257,6 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, &expr: &Expr<'_>) {
     };
     let func = call.func();
     let arguments = call.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-    if !keywords.is_empty() {
-        return;
-    }
     let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
@@ -270,13 +265,17 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, &expr: &Expr<'_>) {
     if attr != "get" {
         return;
     }
-    let Some(key) = args.first() else {
+    let mut items = arguments.iter_source_order();
+    let (
+        Some(ruff_python_ast::ArgOrKeyword::Arg(key)),
+        Some(ruff_python_ast::ArgOrKeyword::Arg(default)),
+    ) = (items.next(), items.next())
+    else {
         return;
     };
-    let Some(default) = args.get(1) else {
-        return;
-    };
-    if !default.is_none_literal_expr() {
+    if !default.is_none_literal_expr()
+        || items.any(|item| matches!(item, ruff_python_ast::ArgOrKeyword::Keyword(_)))
+    {
         return;
     }
 

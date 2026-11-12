@@ -186,8 +186,6 @@ pub(crate) fn native_literals(
 ) {
     let func = call_fields.func;
     let arguments = call_fields.arguments;
-    let args = arguments.args();
-    let keywords = arguments.keywords();
 
     let semantic = checker.semantic();
 
@@ -195,16 +193,18 @@ pub(crate) fn native_literals(
         return;
     };
 
-    let call_arg = match (args.len(), keywords.len()) {
-        (0, 0) => None,
-        (1, 0) => args.first(),
-        (0, 1)
-            if let Some(keyword) = keywords.first()
-                && is_redundant_keyword(builtin, keyword) =>
-        {
-            Some(keyword.value())
+    let call_arg = if arguments.is_empty() {
+        None
+    } else {
+        match arguments.items().as_array() {
+            Some([ast::ArgOrKeyword::Arg(arg)]) => Some(arg),
+            Some([ast::ArgOrKeyword::Keyword(keyword)])
+                if is_redundant_keyword(builtin, keyword) =>
+            {
+                Some(keyword.value())
+            }
+            _ => return,
         }
-        _ => return,
     };
 
     let tokens = checker.tokens();

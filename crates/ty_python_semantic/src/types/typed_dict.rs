@@ -2608,14 +2608,14 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     let typed_dict_ty = Type::TypedDict(typed_dict);
     let env = context.program_environment();
 
-    if arguments.args().len() > 1 {
-        if let Some(builder) =
-            context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, arguments.args().at(1))
-        {
+    let mut positional = arguments.args().iter();
+    let positional_arg = positional.next();
+    if let Some(extra) = positional.next() {
+        if let Some(builder) = context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, extra) {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to TypedDict `{}` constructor: expected 1, got {}",
                 typed_dict_ty.display(db, env),
-                arguments.args().len(),
+                2 + positional.count(),
             ));
         }
         // TODO: Consider validating the first positional argument too, without producing
@@ -2624,15 +2624,13 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     }
 
     // Check for a single positional argument, and whether it's a dict literal.
-    let has_single_positional_arg = arguments.args().len() == 1;
-    let positional_dict_literal = arguments
-        .args()
-        .first()
-        .and_then(ruff_python_ast::Expr::as_dict_expr);
+    let positional_dict_literal = positional_arg.and_then(ast::Expr::as_dict_expr);
 
     let unpacked_keyword_types = infer_unpacked_keyword_types(arguments, &mut expression_type_fn);
 
-    if has_single_positional_arg && !arguments.keywords().is_empty() {
+    if let Some(arg) = positional_arg
+        && arguments.len() > 1
+    {
         // Mixed positional-and-keyword construction: guaranteed keyword-provided keys override the
         // positional mapping, so validate the positional argument against the remaining schema.
         let keyword_keys = validate_from_keywords(
@@ -2653,7 +2651,6 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
                 &keyword_keys,
             )
         } else {
-            let arg = arguments.args().at(0);
             let positional_inference_target =
                 typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
@@ -2710,12 +2707,11 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             &OrderSet::new(),
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
-    } else if has_single_positional_arg {
+    } else if let Some(arg) = positional_arg {
         // Single positional argument: check if assignable to the target TypedDict.
         // This handles TypedDict, intersections, unions, and type aliases correctly.
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
-        let arg = arguments.args().at(0);
         let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {

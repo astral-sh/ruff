@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, ExprKind};
+use ruff_python_ast::ExprKind;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
@@ -148,33 +148,29 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: StmtAssign<'_>
         return;
     };
 
-    let Some([ExprKind::StringLiteral(name), value]) = arguments
-        .args()
-        .as_array()
-        .map(|items| items.map(ruff_python_ast::Expr::classify))
-    else {
+    if !(2..=3).contains(&arguments.len()) {
+        return;
+    }
+    let mut positional = arguments.args().iter();
+    let (Some(name), Some(value)) = (positional.next(), positional.next()) else {
         return;
     };
-
+    let Some(name) = name.as_string_literal_expr() else {
+        return;
+    };
     if name.value() != target_name.id().as_str() {
         return;
     }
 
-    let type_params = match arguments.keywords() {
-        keywords if keywords.is_empty() => None,
-        keywords
-            if let Some([keyword]) = keywords.as_array()
-                && let ast::KeywordFields {
-                    arg: Some(name),
-                    value,
-                    ..
-                } = keyword.fields()
-                && let ExprKind::Tuple(type_params) = value.classify()
-                && name.as_str() == "type_params" =>
-        {
-            Some(type_params.elts())
-        }
-        _ => return,
+    let type_params = if arguments.len() == 2 {
+        None
+    } else if let Some(keyword) = arguments.keywords().first()
+        && keyword.arg().is_some_and(|name| name == "type_params")
+        && let Some(tuple) = keyword.value().as_tuple_expr()
+    {
+        Some(tuple.elts())
+    } else {
+        return;
     };
 
     if !checker.semantic().match_typing_expr(func, "TypeAliasType") {
@@ -207,7 +203,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: StmtAssign<'_>
         TypeAliasKind::TypeAliasType,
         &unwrapped_call_argument(
             call,
-            value.view(),
+            value,
             Some(stmt.into()),
             checker.tokens(),
             checker.source(),

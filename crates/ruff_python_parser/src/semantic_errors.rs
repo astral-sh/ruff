@@ -802,7 +802,7 @@ impl SemanticSyntaxChecker {
 
     fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(args: ast::Arguments<'_>, ctx: &Ctx) {
         let keywords = args.keywords();
-        if keywords.len() < 2
+        if args.len() < 2
             || !names_may_repeat(
                 keywords
                     .iter()
@@ -2393,8 +2393,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
 
                 let mut seen = FxHashSet::default();
                 for key in items
-                    .entries()
-                    .map(|(key, _)| key)
+                    .keys()
                     // Signed and complex numbers are allowed as keys but are represented as unary
                     // or binary expressions rather than literals.
                     .filter(|key| {

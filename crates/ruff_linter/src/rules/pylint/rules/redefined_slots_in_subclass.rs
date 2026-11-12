@@ -87,11 +87,11 @@ struct Slot<'a> {
 }
 
 impl<'a> Slot<'a> {
-    fn from_expr(expr: &'a Expr) -> Option<Self> {
+    fn from_expr(expr: Expr<'a>) -> Option<Self> {
         let string = expr.as_string_literal_expr()?;
         Some(Self {
-            name: string.value.to_str(),
-            range: string.range,
+            name: string.value().to_str(),
+            range: string.range(),
         })
     }
 }
@@ -151,7 +151,7 @@ fn slots_members(body: Suite<'_>) -> FxHashSet<Slot<'_>> {
                     .as_name_expr()
                     .is_some_and(|name| name.id() == "__slots__")
                 {
-                    members.extend(slots_attributes(value));
+                    collect_slots(value, &mut members);
                 }
             }
 
@@ -189,47 +189,21 @@ fn slots_members(body: Suite<'_>) -> FxHashSet<Slot<'_>> {
     members
 }
 
-fn slots_attributes(expr: Expr<'_>) -> impl Iterator<Item = Slot<'_>> {
-    // Ex) `__slots__ = ("name",)`
-    let elts_iter = match expr.fields() {
+fn collect_slots<'a>(expr: Expr<'a>, members: &mut FxHashSet<Slot<'a>>) {
+    match expr.fields() {
         ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
         | ast::ExprFields::List(ast::ExprListFields { elts, .. })
         | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
-            Some(elts.iter().filter_map(|elt| match elt.classify() {
-                ExprKind::StringLiteral(expr_string_literal) => {
-                    let value = expr_string_literal.value();
-                    let range = expr_string_literal.range();
-                    Some(Slot {
-                        name: value.to_str(),
-                        range,
-                    })
-                }
-                _ => None,
-            }))
+            members.extend(elts.iter().filter_map(Slot::from_expr));
         }
-        _ => None,
-    };
-
-    // Ex) `__slots__ = {"name": ...}`
-    let keys_iter = match expr.classify() {
-        ExprKind::Dict(_) => Some(expr.as_dict_expr().unwrap().iter_keys().filter_map(|key| {
-            match key.map(Expr::fields) {
-                Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                    value,
-                    range,
-                    node: _,
-                })) => Some(Slot {
-                    name: value.to_str(),
-                    range,
-                }),
-                _ => None,
-            }
-        })),
-        _ => None,
-    };
-
-    elts_iter
-        .into_iter()
-        .flatten()
-        .chain(keys_iter.into_iter().flatten())
+        ast::ExprFields::Dict(ast::ExprDictFields { items, .. }) => {
+            members.extend(
+                items
+                    .iter()
+                    .filter_map(ast::DictItem::key)
+                    .filter_map(Slot::from_expr),
+            );
+        }
+        _ => {}
+    }
 }

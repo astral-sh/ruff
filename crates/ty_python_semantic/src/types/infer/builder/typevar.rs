@@ -783,7 +783,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args().len() > 1 {
+        let mut positional = arguments.args().iter();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`TypeVarTuple` can only have one positional argument",
@@ -791,7 +793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args().iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `TypeVarTuple` creation",
@@ -809,7 +811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match identifier.id().as_str() {
                 "name" => {
-                    if !arguments.args().is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVarTuple` can only be provided once",
@@ -1053,7 +1055,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args().len() > 1 {
+        let mut positional = arguments.args().iter();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`ParamSpec` can only have one positional argument",
@@ -1061,7 +1065,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args().iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `ParamSpec` creation",
@@ -1081,7 +1085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if !arguments.args().is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `ParamSpec` can only be provided once",

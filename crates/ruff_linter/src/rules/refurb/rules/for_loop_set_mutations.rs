@@ -82,9 +82,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt_fields: &StmtFo
     let ExprKind::Attribute(expr_attr) = expr_call.func().classify() else {
         return;
     };
-    if !expr_call.arguments().keywords().is_empty() {
-        return;
-    }
 
     let (method_name, batch_method_name) = match expr_attr.attr().as_str() {
         "add" => ("add", "update"),
@@ -94,6 +91,9 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt_fields: &StmtFo
         }
     };
 
+    let Some(arg) = expr_call.arguments().as_single_positional() else {
+        return;
+    };
     let ExprKind::Name(set) = expr_attr.value().classify() else {
         return;
     };
@@ -105,9 +105,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt_fields: &StmtFo
     {
         return;
     }
-    let Some([arg]) = expr_call.arguments().args().as_array() else {
-        return;
-    };
 
     let locator = checker.locator();
     let content = match (for_stmt_fields.target.classify(), arg.classify()) {

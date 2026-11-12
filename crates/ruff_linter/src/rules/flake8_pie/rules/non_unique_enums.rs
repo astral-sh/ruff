@@ -126,17 +126,9 @@ fn member_has_unknown_value(semantic: &SemanticModel, expr: Expr<'_>) -> bool {
                 return false;
             }
 
-            if !arguments.keywords().is_empty() {
-                return false;
-            }
-
-            matches!(
-                arguments
-                    .args()
-                    .as_array()
-                    .map(|items| items.map(Expr::classify)),
-                Some([_, ExprKind::EllipsisLiteral(_)])
-            )
+            arguments
+                .as_positional_array()
+                .is_some_and(|[_, value]| value.is_ellipsis_literal_expr())
         }
 
         _ => false,

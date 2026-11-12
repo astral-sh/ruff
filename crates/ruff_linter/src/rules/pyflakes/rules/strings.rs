@@ -621,31 +621,14 @@ pub(crate) fn percent_format_extra_named_arguments(
             // An unpacked mapping can supply any key.
             return;
         };
-        let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key else {
+        let Some(string) = key.as_string_literal_expr() else {
             continue;
         };
-        let name = value.to_str();
+        let name = string.value().to_str();
         if !summary.keywords.contains(name) {
             missing.push((index, name));
         }
     }
-
-    let missing: Vec<(usize, &str)> = dict
-        .iter_keys()
-        .enumerate()
-        .filter_map(|(index, key)| match key.map(Expr::fields) {
-            Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                value, ..
-            })) => {
-                if summary.keywords.contains(value.to_str()) {
-                    None
-                } else {
-                    Some((index, value.to_str()))
-                }
-            }
-            _ => None,
-        })
-        .collect();
 
     if missing.is_empty() {
         return;
@@ -696,17 +679,12 @@ pub(crate) fn percent_format_missing_arguments(
     };
 
     let mut keywords = FxHashSet::default();
-    for key in dict.iter_keys().flatten() {
-        match key.classify() {
-            ExprKind::StringLiteral(expr_string_literal) => {
-                let value = expr_string_literal.value();
-
-                keywords.insert(value.to_str());
-            }
-            _ => {
-                return; // Dynamic keys present
-            }
-        }
+    for key in dict.iter_keys() {
+        let Some(string) = key.and_then(Expr::as_string_literal_expr) else {
+            // A dynamic key or an unpacked mapping can supply any missing argument.
+            return;
+        };
+        keywords.insert(string.value().to_str());
     }
 
     let missing: Vec<&String> = summary

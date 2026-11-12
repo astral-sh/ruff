@@ -82,120 +82,36 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'
         return;
     }
 
-    match call.arguments.args().as_array() {
-        // Ex) `print("")` or `print("", sep="\t")`
-        Some([arg]) if is_empty_string(arg) => {
-            let reason = if call.arguments.find_keyword("sep").is_some() {
-                Reason::Both
-            } else {
-                Reason::EmptyArgument
+    let mut positional = call.arguments.args().iter();
+    let first = positional.next();
+    let (reason, separator) = if let Some(second) = positional.next() {
+        // An unpacked mapping can supply the separator at runtime.
+        let mut sep = None;
+        for kw in call.arguments.keywords() {
+            let Some(name) = kw.arg() else {
+                return;
             };
-
-            let mut diagnostic = checker.report_diagnostic(PrintEmptyString { reason }, call.range);
-
-            diagnostic.set_fix(
-                EmptyStringFix::from_call(
-                    call.node,
-                    Separator::Remove,
-                    checker.generator(),
-                    checker.comment_ranges(),
-                )
-                .into_fix(),
-            );
-        }
-
-        Some([arg]) if arg.is_starred_expr() => {
-            // If there's a starred argument, we can't remove the empty string.
-        }
-
-        // Ex) `print(sep="\t")` or `print(obj, sep="\t")`
-        _ if call.arguments.args().len() <= 1 => {
-            // If there's a `sep` argument, remove it, regardless of what it is.
-            if call.arguments.find_keyword("sep").is_some() {
-                let mut diagnostic = checker.report_diagnostic(
-                    PrintEmptyString {
-                        reason: Reason::UselessSeparator,
-                    },
-                    call.range,
-                );
-
-                diagnostic.set_fix(
-                    EmptyStringFix::from_call(
-                        call.node,
-                        Separator::Remove,
-                        checker.generator(),
-                        checker.comment_ranges(),
-                    )
-                    .into_fix(),
-                );
+            if name == "sep" && sep.is_none() {
+                sep = Some(kw.value());
             }
         }
         if !sep.is_some_and(is_empty_string) {
             return;
         }
 
-        // Ex) `print("foo", "", "bar", sep="")`
-        _ => {
-            // Ignore `**kwargs`.
-            let has_kwargs = call
-                .arguments
-                .keywords()
-                .iter()
-                .any(ruff_python_ast::Keyword::is_variadic);
-            if has_kwargs {
-                return;
-            }
-
-            // Require an empty `sep` argument.
-            let empty_separator = call
-                .arguments
-                .find_keyword("sep")
-                .is_some_and(|keyword| is_empty_string(keyword.value()));
-            if !empty_separator {
-                return;
-            }
-
-            // Count the number of empty and non-empty arguments.
-            let empty_arguments = call
-                .arguments
-                .args()
-                .iter()
-                .filter(|arg| is_empty_string(*arg))
-                .count();
-            if empty_arguments == 0 {
-                return;
-            }
-
-            // If removing the arguments would leave us with one or fewer, then we can remove the
-            // separator too.
-            let separator = if call.arguments.args().len() - empty_arguments > 1
-                || call.arguments.args().iter().any(ast::Expr::is_starred_expr)
-            {
-                Separator::Retain
+        let mut has_empty = false;
+        let mut remaining = 0;
+        let mut starred = false;
+        for arg in first.into_iter().chain([second]).chain(positional) {
+            if is_empty_string(arg) {
+                has_empty = true;
             } else {
-                Separator::Remove
-            };
-
-            let mut diagnostic = checker.report_diagnostic(
-                PrintEmptyString {
-                    reason: if separator == Separator::Retain {
-                        Reason::EmptyArgument
-                    } else {
-                        Reason::Both
-                    },
-                },
-                call.range,
-            );
-
-            diagnostic.set_fix(
-                EmptyStringFix::from_call(
-                    call.node,
-                    separator,
-                    checker.generator(),
-                    checker.comment_ranges(),
-                )
-                .into_fix(),
-            );
+                remaining += 1;
+                starred = starred || arg.is_starred_expr();
+            }
+            if has_empty && (remaining > 1 || starred) {
+                break;
+            }
         }
         if !has_empty {
             return;
@@ -206,7 +122,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'
             (Reason::Both, Separator::Remove)
         }
     } else {
-        if first.is_some_and(Expr::is_starred_expr) {
+        if first.is_some_and(ast::Expr::is_starred_expr) {
             return;
         }
         let has_sep = call.arguments.find_keyword("sep").is_some();
@@ -219,10 +135,10 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'
         (reason, Separator::Remove)
     };
 
-    let mut diagnostic = checker.report_diagnostic(PrintEmptyString { reason }, call.range());
+    let mut diagnostic = checker.report_diagnostic(PrintEmptyString { reason }, call.range);
     diagnostic.set_fix(
         EmptyStringFix::from_call(
-            call,
+            call.node,
             separator,
             checker.generator(),
             checker.comment_ranges(),

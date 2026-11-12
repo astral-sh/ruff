@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{ExprCall, ExprKind, PythonVersion};
+use ruff_python_ast::{ArgOrKeyword, ExprCall, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -65,64 +65,43 @@ pub(crate) fn starmap_zip(
     call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
-    let semantic = checker.semantic();
-
-    if !call.arguments.keywords().is_empty() {
+    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
         return;
     }
-
-    let Some([_map_func, ExprKind::Call(iterable_call)]) = call
-        .arguments
-        .args()
-        .as_array()
-        .map(|items| items.map(ruff_python_ast::Expr::classify))
-    else {
+    let Some([_, iterable]) = call.arguments.as_positional_array() else {
+        return;
+    };
+    let Some(iterable_call) = iterable.as_call_expr() else {
         return;
     };
     if !checker
         .semantic()
-        .match_builtin_expr(&iterable_call.func, "zip")
+        .match_builtin_expr(iterable_call.func(), "zip")
     {
         return;
     }
 
-    let keywords = iterable_call.arguments().keywords();
-
-    match checker.target_version().cmp(&PythonVersion::PY314) {
-        // Keyword arguments not supported for `map` before Python 3.14
-        std::cmp::Ordering::Less => {
-            if !keywords.is_empty() {
-                return;
+    let mut has_positional = false;
+    let mut has_plain_positional = false;
+    let mut has_strict = false;
+    for item in iterable_call.arguments().iter_source_order() {
+        match item {
+            ArgOrKeyword::Arg(arg) => {
+                has_positional = true;
+                has_plain_positional = has_plain_positional || !arg.is_starred_expr();
             }
-        }
-        // Only supported keyword argument is `strict` starting in 3.14
-        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-            if keywords.len() > 1 {
-                return;
-            }
-            if keywords.len() == 1 && iterable_call.arguments().find_keyword("strict").is_none() {
-                return;
+            ArgOrKeyword::Keyword(keyword)
+                if !has_strict
+                    && checker.target_version() >= PythonVersion::PY314
+                    && keyword.arg().is_some_and(|name| name == "strict") =>
+            {
+                has_strict = true;
             }
             ArgOrKeyword::Keyword(_) => return,
         }
     }
-
-    let positionals = iterable_call.arguments().args();
-
-    // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
-    if !positionals.is_empty()
-        && positionals
-            .iter()
-            .all(ruff_python_ast::Expr::is_starred_expr)
-    {
-        return;
-    }
-
-    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
-        return;
-    }
-
-    if !semantic.match_builtin_expr(iterable_call.func(), "zip") {
+    // `zip(*a)` can be empty, whereas `map(func, *a)` requires an iterable.
+    if has_positional && !has_plain_positional {
         return;
     }
 

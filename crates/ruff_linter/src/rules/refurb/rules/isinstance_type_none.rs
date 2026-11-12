@@ -97,17 +97,9 @@ fn is_none(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
                     return false;
                 }
 
-                if !arguments.keywords().is_empty() {
-                    return false;
-                }
-
-                matches!(
-                    arguments
-                        .args()
-                        .as_array()
-                        .map(|items| items.map(Expr::classify)),
-                    Some([ExprKind::NoneLiteral(_)])
-                )
+                arguments
+                    .as_single_positional()
+                    .is_some_and(Expr::is_none_literal_expr)
             }
 
             // Ex) `(type(None),)`

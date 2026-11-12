@@ -154,13 +154,8 @@ impl<'a> ReplaceTimeZone<'a> {
 
     /// Returns `Some` if the call expression is a call to `str.replace` and matches `date.replace("Z", "+00:00")`
     fn from_call(call: ExprCall<'a>) -> Option<Self> {
-        let arguments = call.arguments();
-
-        if !arguments.keywords().is_empty() {
-            return None;
-        }
-
-        let expr_attribute = call.func().as_attribute_expr()?;
+        let func = call.func();
+        let expr_attribute = func.as_attribute_expr()?;
         let value = expr_attribute.value();
         let attr = expr_attribute.attr();
 
@@ -168,21 +163,15 @@ impl<'a> ReplaceTimeZone<'a> {
             return None;
         }
 
-        let Some([z, ExprKind::StringLiteral(zero_offset)]) = arguments
-            .args()
-            .as_array()
-            .map(|items| items.map(Expr::classify))
-        else {
-            return None;
-        };
-
-        if !is_upper_case_z_string(z.view()) {
+        let [z, zero_offset] = call.arguments().as_positional_array()?;
+        let zero_offset = zero_offset.as_string_literal_expr()?;
+        if !is_upper_case_z_string(z) {
             return None;
         }
 
         Some(Self {
             date: value,
-            parent: call.func(),
+            parent: func,
             zero_offset,
         })
     }

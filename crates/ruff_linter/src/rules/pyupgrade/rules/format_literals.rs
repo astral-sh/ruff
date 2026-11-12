@@ -93,23 +93,17 @@ pub(crate) fn format_literals(
     let arguments = if is_sequential(&summary.indices) {
         Arguments::Preserve
     } else {
-        // Ex) `"{1} {0}".format(foo=1, bar=2)`
-        if !call.arguments.keywords().is_empty() {
-            return;
-        }
-
-        // Ex) `"{1} {0}".format(foo)`
-        if call.arguments.args().len() < summary.indices.len() {
-            return;
-        }
-
-        // Ex) `"{1} {0}".format(*foo)`
-        if call
-            .arguments
-            .args()
-            .iter()
-            .take(summary.indices.len())
-            .any(ast::Expr::is_starred_expr)
+        if call.arguments.len() < summary.indices.len()
+            || call
+                .arguments
+                .iter_source_order()
+                .enumerate()
+                .any(|(index, item)| match item {
+                    ast::ArgOrKeyword::Arg(arg) => {
+                        index < summary.indices.len() && arg.is_starred_expr()
+                    }
+                    ast::ArgOrKeyword::Keyword(_) => true,
+                })
         {
             return;
         }

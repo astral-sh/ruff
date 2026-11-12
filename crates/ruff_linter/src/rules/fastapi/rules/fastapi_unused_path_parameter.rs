@@ -146,7 +146,16 @@ pub(crate) fn fastapi_unused_path_parameter(
     let mut named_args = vec![];
     let mut positional_only_args = vec![];
 
-    for parameter_with_default in function_def.parameters.iter_keyword_params() {
+    for item in function_def.parameters.items().iter() {
+        let parameter_with_default = match item {
+            ast::ParameterItem::PositionalOnly(param) => {
+                positional_only_args.push(param.name().as_str());
+                continue;
+            }
+            ast::ParameterItem::PositionalOrKeyword(param)
+            | ast::ParameterItem::KeywordOnly(param) => param,
+            ast::ParameterItem::Vararg(_) | ast::ParameterItem::Kwarg(_) => continue,
+        };
         let parameter = parameter_with_default.parameter();
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
@@ -180,10 +189,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         // Determine whether the path parameter is used as a positional-only argument. In this case,
         // the path parameter injection won't work, but we also can't fix it (yet), since we'd need
         // to make the parameter non-positional-only.
-        let is_positional = function_def
-            .parameters
-            .posonlyargs()
-            .any(|param| param.name() == path_param);
+        let is_positional = positional_only_args.contains(&path_param);
 
         let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {

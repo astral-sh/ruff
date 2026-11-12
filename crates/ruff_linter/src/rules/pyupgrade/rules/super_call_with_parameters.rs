@@ -250,8 +250,8 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call_fields: &ast::E
     let mut diagnostic =
         checker.report_diagnostic(SuperCallWithParameters, call_fields.arguments.range());
 
-    // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
-    if call_fields.arguments.keywords().is_empty() {
+    // The call already has two positional arguments.
+    if call_fields.arguments.len() == 2 {
         let applicability = if checker
             .comment_ranges()
             .intersects(call_fields.arguments.range())

@@ -153,19 +153,9 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     }
 
-    // *args
     if arguments
-        .args()
-        .iter()
-        .any(ruff_python_ast::Expr::is_starred_expr)
-    {
-        return None;
-    }
-    // **kwargs
-    if arguments
-        .keywords()
-        .iter()
-        .any(ruff_python_ast::Keyword::is_variadic)
+        .iter_source_order()
+        .any(ast::ArgOrKeyword::is_variadic)
     {
         return None;
     }

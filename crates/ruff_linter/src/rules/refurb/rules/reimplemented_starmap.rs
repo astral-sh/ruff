@@ -96,13 +96,13 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     let Some(call) = target.element().as_call_expr() else {
         return;
     };
-    let arguments = &call.arguments;
-    let func = call.func.as_ref();
+    let arguments = call.arguments();
+    let func = call.func();
 
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let Some([arg]) = args.as_array() else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
 
@@ -125,9 +125,10 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.elts().len() != args.len()
-                || std::iter::zip(tuple, args)
-                    .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
+            if tuple.elts().len() != arguments.len()
+                || !std::iter::zip(tuple, arguments.iter_source_order()).all(|(target, arg)| {
+                    matches!(arg, ast::ArgOrKeyword::Arg(expr) if ComparableExpr::from(target) == ComparableExpr::from(expr))
+                })
             {
                 return;
             }
@@ -281,19 +282,4 @@ fn match_comprehension_target(
         ExprKind::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
-}
-
-/// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: Expr<'_>) -> Option<(ast::FilteredNodes<'_, ast::kind::Expr>, Expr<'_>)> {
-    let expr_call = element.as_call_expr()?;
-    let func = expr_call.func();
-    let arguments = expr_call.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-
-    if !keywords.is_empty() {
-        return None;
-    }
-
-    Some((args, func))
 }

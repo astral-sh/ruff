@@ -556,6 +556,24 @@ type MappingPatternItemView<'a> = MappingPatternItem<Expr<'a>, Pattern<'a>, Iden
 pub struct MappingPatternItems<'a>(pub(super) NodeList<'a, crate::kind::Any>);
 
 impl<'a> MappingPatternItems<'a> {
+    /// Each entry has two children and each `**name` has one.
+    pub(crate) fn child_count(self) -> usize {
+        self.0.len()
+    }
+
+    pub fn keys(self) -> impl Iterator<Item = Expr<'a>> {
+        let mut ids = self.0.words().iter();
+        std::iter::from_fn(move || {
+            loop {
+                let node: super::SyntaxNode<'_> = self.0.ast.child(u64::from(*ids.next()?));
+                if let Some(key) = node.cast::<Expr>() {
+                    ids.next()?; // Skip the key's pattern without looking it up.
+                    return Some(key);
+                }
+            }
+        })
+    }
+
     pub fn entries(self) -> impl Iterator<Item = (Expr<'a>, Pattern<'a>)> {
         self.into_iter().filter_map(|item| match item {
             MappingPatternItem::Entry { key, pattern } => Some((key, pattern)),
@@ -564,7 +582,12 @@ impl<'a> MappingPatternItems<'a> {
     }
 
     pub fn rest(self) -> Option<Identifier<'a>> {
-        self.0.iter().rev().find_map(AstNode::cast::<Identifier>)
+        // Each entry after the last `**name` contributes a key followed by its pattern.
+        // Skip those keys when looking backward for the capture, including in recovered syntax.
+        self.0.words().iter().rev().step_by(2).find_map(|&id| {
+            let node: super::SyntaxNode<'_> = self.0.ast.child(u64::from(id));
+            node.cast::<Identifier>()
+        })
     }
 
     pub fn is_empty(self) -> bool {

@@ -325,20 +325,13 @@ fn isinstance_target<'a>(call: Expr<'a>, semantic: &'a SemanticModel) -> Option<
     let expr_call = call.as_call_expr()?;
     let func = expr_call.func();
     let arguments = expr_call.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-    if args.len() != 2 {
-        return None;
-    }
-    if !keywords.is_empty() {
-        return None;
-    }
+    let [target, _] = arguments.as_positional_array()?;
     if !semantic.match_builtin_expr(func, "isinstance") {
         return None;
     }
 
     // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
-    Some(args.at(0))
+    Some(target)
 }
 
 /// SIM101

@@ -1,6 +1,6 @@
 //! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
-use ruff_python_ast::{self as ast, BoolOp, Expr, ExprKind, Keyword, UnaryOp};
+use ruff_python_ast::{self as ast, BoolOp, Expr, ExprKind, UnaryOp};
 use ty_python_core::{Truthiness, expression::ExpressionContext};
 
 use crate::{Db, ProgramEnvironment, types::Type};
@@ -180,10 +180,8 @@ where
                         self.can_complete(call.func())
                             && call
                                 .arguments()
-                                .args()
-                                .iter()
-                                .chain(call.arguments().keywords().iter().map(Keyword::value))
-                                .all(|argument| self.can_complete(argument))
+                                .iter_source_order()
+                                .all(|argument| self.can_complete(argument.value()))
                     }
                     ast::ExprFields::Compare(ast::ExprCompareFields { node: compare, .. }) => {
                         // Later comparisons can be skipped by short-circuiting.

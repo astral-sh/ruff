@@ -71,12 +71,10 @@ pub(crate) fn lru_cache_with_maxsize_none(
         };
         let func = call.func();
         let arguments = call.arguments();
-        let args = arguments.args();
-        let keywords = arguments.keywords();
 
         // Look for, e.g., `import functools; @functools.lru_cache(maxsize=None)`.
-        if args.is_empty()
-            && keywords.len() == 1
+        if let Some([ruff_python_ast::ArgOrKeyword::Keyword(keyword)]) =
+            arguments.items().as_array()
             && checker
                 .semantic()
                 .resolve_qualified_name(func)
@@ -84,7 +82,6 @@ pub(crate) fn lru_cache_with_maxsize_none(
                     matches!(qualified_name.segments(), ["functools", "lru_cache"])
                 })
         {
-            let keyword = keywords.at(0);
             let arg = keyword.arg();
             let value = keyword.value();
             if arg.is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {

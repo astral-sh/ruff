@@ -246,7 +246,7 @@ fn can_pattern_omit_optional_parentheses(pattern: Pattern<'_>, context: &PyForma
                     !sequence.patterns().is_empty() || context.comments().has_dangling(pattern)
                 }
                 PatternKind::MatchMapping(mapping) => {
-                    mapping.items().entries().next().is_some()
+                    mapping.items().keys().next().is_some()
                         || context.comments().has_dangling(pattern)
                 }
                 PatternKind::MatchClass(class) => !class.arguments().patterns().is_empty(),

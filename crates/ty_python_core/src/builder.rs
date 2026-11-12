@@ -6124,11 +6124,7 @@ fn dunder_all_extend_argument(value: Expr<'_>) -> Option<Expr<'_>> {
         return None;
     }
 
-    if !arguments.keywords().is_empty() {
-        return None;
-    }
-
-    let [single_argument] = arguments.args().as_array()?;
+    let single_argument = arguments.as_single_positional()?;
 
     let expr_attribute_node = single_argument.as_attribute_expr()?;
     let value = expr_attribute_node.value();

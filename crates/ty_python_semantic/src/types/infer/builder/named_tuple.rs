@@ -60,9 +60,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let args = arguments_node.args();
         let keywords = arguments_node.keywords();
 
-        // Check for variadic arguments early, before extracting positional args.
-        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
-        let has_double_starred = keywords.iter().any(ruff_python_ast::Keyword::is_variadic);
+        let mut positional_count = 0;
+        let [mut first, mut second, mut first_extra] = [None; 3];
+        let [mut name_keyword, mut fields_keyword] = [None; 2];
+        let mut has_starred = false;
+        let mut has_double_starred = false;
+        for item in arguments_node.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Arg(value) => {
+                    match positional_count {
+                        0 => first = Some(value),
+                        1 => second = Some(value),
+                        2 => first_extra = Some(value),
+                        _ => {}
+                    }
+                    positional_count += 1;
+                    has_starred = has_starred || value.is_starred_expr();
+                }
+                ast::ArgOrKeyword::Keyword(kw) => {
+                    if kw.is_variadic() {
+                        has_double_starred = true;
+                    } else if matches!(kind, NamedTupleKind::Collections)
+                        && let Some(name) = kw.arg()
+                    {
+                        match name.as_str() {
+                            "typename" if name_keyword.is_none() => name_keyword = Some(kw),
+                            "field_names" if fields_keyword.is_none() => fields_keyword = Some(kw),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
 
         // Emit diagnostic for missing required arguments or unsupported variadic arguments.
         // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
@@ -83,25 +112,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        // Extract typename and fields from positional or keyword arguments.
-        // For `collections.namedtuple`, both `typename` and `field_names` can be keyword arguments.
-        // For `typing.NamedTuple`, only positional arguments are supported.
-        let (name_keyword, fields_keyword) = match kind {
-            NamedTupleKind::Collections => (
-                call_expr.arguments().find_keyword("typename"),
-                call_expr.arguments().find_keyword("field_names"),
-            ),
-            NamedTupleKind::Typing => (None, None),
-        };
-        let name_from_keyword = args.is_empty() && name_keyword.is_some();
-        let fields_from_keyword = args.len() < 2 && fields_keyword.is_some();
-        let name_arg = args
-            .first()
-            .or_else(|| name_keyword.map(ast::Keyword::value));
-        let fields_arg = args
-            .get(1)
-            .or_else(|| fields_keyword.map(ast::Keyword::value));
-        let rest = args.skip_front(2);
+        let name_from_keyword = first.is_none() && name_keyword.is_some();
+        let fields_from_keyword = second.is_none() && fields_keyword.is_some();
+        let name_arg = first.or_else(|| name_keyword.map(ast::Keyword::value));
+        let fields_arg = second.or_else(|| fields_keyword.map(ast::Keyword::value));
 
         // Check if we have both required arguments.
         let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
@@ -136,8 +150,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
 
-        for arg in rest {
-            self.infer_expression(arg, TypeContext::default());
+        if first_extra.is_some() {
+            for arg in args.iter().skip(2) {
+                self.infer_expression(arg, TypeContext::default());
+            }
         }
 
         // If any argument is a starred expression or any keyword is a double-starred expression,
@@ -160,14 +176,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Check for excess positional arguments (only `typename` and `fields` are expected).
-        if !rest.is_empty() {
+        if let Some(first_extra_arg) = first_extra {
             if let Some(builder) = self
                 .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, rest.at(0))
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, first_extra_arg)
             {
                 builder.into_diagnostic(format_args!(
-                    "Too many positional arguments to function `{kind}`: expected 2, got {}",
-                    args.len()
+                    "Too many positional arguments to function `{kind}`: expected 2, got {positional_count}"
                 ));
             }
         }
@@ -271,7 +286,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `typename` is valid as a keyword argument only for `collections.namedtuple`.
                 // If it was already provided positionally, emit an error.
                 "typename" if kind.is_collections() => {
-                    if !args.is_empty() {
+                    if first.is_some() {
                         if let Some(builder) =
                             self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
                         {
@@ -284,7 +299,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `field_names` is valid only for `collections.namedtuple`.
                 // If it was already provided positionally, emit an error.
                 "field_names" if kind.is_collections() => {
-                    if args.len() >= 2 {
+                    if second.is_some() {
                         if let Some(builder) =
                             self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
                         {

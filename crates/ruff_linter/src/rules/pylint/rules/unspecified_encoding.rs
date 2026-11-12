@@ -90,7 +90,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let Some((function_name, mode)) =
         Callee::try_from_call_expression(call.node, checker.semantic())
-            .filter(|segments| is_violation(call.node, segments))
+            .filter(|segments| is_violation(call.arguments, segments))
             .map(|segments| (segments.to_string(), segments.mode_argument()))
     else {
         return;
@@ -211,29 +211,18 @@ fn is_binary_mode(expr: Expr<'_>) -> Option<bool> {
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
-    // If we have something like `*args`, which might contain the encoding argument, abort.
-    if call
-        .arguments()
-        .args()
-        .iter()
-        .any(ast::Expr::is_starred_expr)
-    {
-        return false;
-    }
-    // If we have something like `**kwargs`, which might contain the encoding argument, abort.
-    if call
-        .arguments()
-        .keywords()
-        .iter()
-        .any(ruff_python_ast::Keyword::is_variadic)
+fn is_violation(arguments: ast::Arguments<'_>, qualified_name: &Callee) -> bool {
+    // An unpacked argument can supply the encoding.
+    if arguments
+        .iter_source_order()
+        .any(ast::ArgOrKeyword::is_variadic)
     {
         return false;
     }
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
             ["" | "builtins" | "codecs" | "_io", "open"] => {
-                if let Some(mode_arg) = call.arguments().find_argument_value("mode", 1) {
+                if let Some(mode_arg) = arguments.find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -248,7 +237,7 @@ fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
                 };
 
                 // else mode not specified, defaults to text mode
-                call.arguments()
+                arguments
                     .find_argument_value("encoding", encoding_param_pos)
                     .is_none()
             }
@@ -257,7 +246,7 @@ fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
                 tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
             ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
-                if let Some(mode_arg) = call.arguments().find_argument_value("mode", mode_pos) {
+                if let Some(mode_arg) = arguments.find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -266,37 +255,28 @@ fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
                     // defaults to binary mode
                     return false;
                 }
-                call.arguments()
+                arguments
                     .find_argument_value("encoding", mode_pos + 2)
                     .is_none()
             }
-            ["io" | "_io", "TextIOWrapper"] => call
-                .arguments()
-                .find_argument_value("encoding", 1)
-                .is_none(),
+            ["io" | "_io", "TextIOWrapper"] => {
+                arguments.find_argument_value("encoding", 1).is_none()
+            }
             _ => false,
         },
         Callee::Pathlib(attr) => match *attr {
             "open" => {
-                if let Some(mode_arg) = call.arguments().find_argument_value("mode", 0) {
+                if let Some(mode_arg) = arguments.find_argument_value("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
                 // else mode not specified, defaults to text mode
-                call.arguments()
-                    .find_argument_value("encoding", 2)
-                    .is_none()
+                arguments.find_argument_value("encoding", 2).is_none()
             }
-            "read_text" => call
-                .arguments()
-                .find_argument_value("encoding", 0)
-                .is_none(),
-            "write_text" => call
-                .arguments()
-                .find_argument_value("encoding", 1)
-                .is_none(),
+            "read_text" => arguments.find_argument_value("encoding", 0).is_none(),
+            "write_text" => arguments.find_argument_value("encoding", 1).is_none(),
             _ => false,
         },
     }

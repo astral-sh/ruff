@@ -83,12 +83,12 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     };
 
     let arguments = call.arguments();
-    let fields = match (arguments.args(), arguments.keywords()) {
+    let mut positional = arguments.args().iter();
+    let fields = match (positional.next(), positional.next()) {
+        // Ex) `NamedTuple("MyType")`
+        (Some(_), None) if arguments.len() == 1 => Vec::new(),
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
-        (args, keywords)
-            if let Some([_typename, fields]) = args.as_array()
-                && keywords.is_empty() =>
-        {
+        (Some(_), Some(fields)) if arguments.len() == 2 => {
             if let Some(fields) = fields_from_list(fields) {
                 fields
             } else {
@@ -97,8 +97,8 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             }
         }
         // Ex) `NamedTuple("MyType", a=int, b=str)`
-        (args, keywords) if let Some([_typename]) = args.as_array() => {
-            if let Some(fields) = ClassField::from_keywords(keywords) {
+        (Some(_), None) => {
+            if let Some(fields) = ClassField::from_keywords(arguments.keywords()) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse keywords");
