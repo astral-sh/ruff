@@ -70,7 +70,8 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if parameters.kwonlyargs().next().is_some() || (parameters.iter_positional_params().count()) > 1
+    if parameters.kwonlyargs().next().is_some()
+        || parameters.iter_positional_params().nth(1).is_some()
     {
         return;
     }

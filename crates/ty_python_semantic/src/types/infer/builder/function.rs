@@ -169,32 +169,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = self.scope().file_scope_id(db);
         // In a stub body, every symbol comes from a parameter. Repeated names can produce
         // assignment diagnostics when a later parameter rebinds an earlier one.
-        if is_stub_body(&function.body)
+        let (vararg, kwarg) = if is_stub_body(&function.body)
             && self.index.place_table(scope).symbols().len() == parameters.len()
         {
-            for parameter in parameters.iter_non_variadic_params() {
+            let (vararg, kwarg) = parameters.split_variadic(|parameter| {
                 self.infer_parameter_definition(parameter, None);
-            }
+            });
             for (parameter, component) in [
-                (parameters.vararg(), ParamSpecAttrKind::Args),
-                (parameters.kwarg(), ParamSpecAttrKind::Kwargs),
+                (vararg, ParamSpecAttrKind::Args),
+                (kwarg, ParamSpecAttrKind::Kwargs),
             ] {
                 if let Some(annotation) = parameter.and_then(ast::Parameter::annotation) {
                     self.variadic_parameter_annotation(annotation, component);
                 }
             }
+            (vararg, kwarg)
         } else {
             // Parameters have definitions in the body scope, but their annotations and defaults
             // belong to enclosing scopes. Visit them explicitly to collect their diagnostics.
-            for parameter in parameters.iter() {
-                self.infer_definition(parameter);
+            let mut vararg = None;
+            let mut kwarg = None;
+            for item in parameters.items_in_binding_order() {
+                self.infer_definition(item.as_ref());
+                match item {
+                    ast::ParameterItem::Vararg(p) => vararg = Some(p),
+                    ast::ParameterItem::Kwarg(p) => kwarg = Some(p),
+                    _ => {}
+                }
             }
-        }
+            (vararg, kwarg)
+        };
 
-        validate_paramspec_components(&self.context, self.index, parameters, |expr| {
-            self.file_expression_type(expr)
-        });
-        self.validate_unpacked_typed_dict_kwargs(parameters);
+        validate_paramspec_components(
+            &self.context,
+            self.index,
+            parameters,
+            vararg,
+            kwarg,
+            |expr| self.file_expression_type(expr),
+        );
+        if let Some(kwarg) = kwarg {
+            self.validate_unpacked_typed_dict_kwargs(parameters, kwarg);
+        }
 
         self.infer_scope_body(&function.body);
 
@@ -924,23 +940,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_parameters(
         &mut self,
         parameters: &ast::Parameters,
-        first_annotation_already_inferred: bool,
+        mut first_annotation_already_inferred: bool,
     ) {
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        for param_with_default in parameters
-            .iter_non_variadic_params()
-            .skip(usize::from(first_annotation_already_inferred))
-        {
-            self.infer_parameter_with_default(param_with_default);
-        }
-        if let Some(vararg) = parameters.vararg() {
+        let (vararg, kwarg) = parameters.split_variadic(|param| {
+            if first_annotation_already_inferred {
+                first_annotation_already_inferred = false;
+            } else {
+                self.infer_parameter_with_default(param);
+            }
+        });
+        if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
-        if let Some(kwarg) = parameters.kwarg() {
+        if let Some(kwarg) = kwarg {
             self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
             self.infer_parameter(kwarg);
             self.context
@@ -952,12 +969,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
     }
 
-    fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
+    fn validate_unpacked_typed_dict_kwargs(
+        &mut self,
+        parameters: &ast::Parameters,
+        kwargs: &ast::Parameter,
+    ) {
         let db = self.db();
         let env = self.program_environment();
-        let Some(kwargs) = parameters.kwarg() else {
-            return;
-        };
         let Some(annotation) = kwargs.annotation.as_deref() else {
             return;
         };
