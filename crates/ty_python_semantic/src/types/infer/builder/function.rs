@@ -985,19 +985,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accepted through `**kwargs`. The convention only applies to the leading
         // positional-or-keyword parameters that are actually converted to positional-only
         // parameters by `Parameters::from_parameters`.
-        let pep_484_positional_only_count = if parameters.posonlyargs().next().is_none() {
-            parameters
-                .args()
-                .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
-                .count()
-        } else {
-            0
-        };
-
+        let mut legacy_positional_prefix = true;
         let overlapping = parameters
-            .iter_keyword_params()
-            .skip(pep_484_positional_only_count)
-            .map(|parameter| &parameter.parameter)
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                ast::ParameterItem::PositionalOnly(_) => {
+                    legacy_positional_prefix = false;
+                    None
+                }
+                ast::ParameterItem::PositionalOrKeyword(p)
+                    if legacy_positional_prefix && p.uses_pep_484_positional_only_convention() =>
+                {
+                    None
+                }
+                ast::ParameterItem::PositionalOrKeyword(p) | ast::ParameterItem::KeywordOnly(p) => {
+                    legacy_positional_prefix = false;
+                    Some(&p.parameter)
+                }
+                ast::ParameterItem::Vararg(_) | ast::ParameterItem::Kwarg(_) => None,
+            })
             .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();
 

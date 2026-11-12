@@ -339,29 +339,37 @@ pub(crate) fn add_parameter(
     parameters: &Parameters,
     source: &str,
 ) -> Option<Edit> {
-    if let Some(last) = parameters.args().rfind(|arg| arg.default.is_none()) {
-        // Case 1: at least one regular parameter without a default, so append after the last one.
-        Some(Edit::insertion(format!(", {parameter}"), last.end()))
-    } else if let Some(first) = parameters.args().next() {
-        // Case 2: all regular parameters have defaults, so insert before the first one.
-        // However, if any positional-only parameter has a default, inserting a non-default
-        // parameter here would be a syntax error (the "default required" constraint carries
-        // through the `/` separator).
-        if parameters
-            .posonlyargs()
-            .next_back()
-            .is_some_and(|p| p.default.is_some())
-        {
-            return None;
+    let mut first_regular = None;
+    let mut last_positional_only = None;
+    let mut separator = None;
+    for item in parameters.items.iter().rev() {
+        match item {
+            ast::ParameterItem::PositionalOrKeyword(arg) => {
+                if arg.default.is_none() {
+                    return Some(Edit::insertion(format!(", {parameter}"), arg.end()));
+                }
+                first_regular = Some(arg);
+            }
+            ast::ParameterItem::PositionalOnly(arg) => {
+                last_positional_only.get_or_insert(arg);
+            }
+            ast::ParameterItem::Vararg(_) | ast::ParameterItem::KeywordOnly(_) => {
+                separator = Some(SimpleTokenKind::Star);
+            }
+            ast::ParameterItem::Kwarg(_) => {
+                separator.get_or_insert(SimpleTokenKind::DoubleStar);
+            }
         }
+    }
+
+    // The default requirement carries through the `/` separator. If the last
+    // positional-only parameter has a default, a required parameter cannot follow it.
+    if last_positional_only.is_some_and(|arg| arg.default.is_some()) {
+        return None;
+    }
+    if let Some(first) = first_regular {
         Some(Edit::insertion(format!("{parameter}, "), first.start()))
-    } else if let Some(last) = parameters.posonlyargs().next_back() {
-        // Case 3: no regular parameters, but positional-only parameters exist.
-        // If any positional-only parameter has a default, we can't add a non-default parameter
-        // after the `/` separator — that would be a syntax error.
-        if last.default.is_some() {
-            return None;
-        }
+    } else if let Some(last) = last_positional_only {
         // Insert after the `/` separator.
         let mut tokenizer = SimpleTokenizer::starts_at(last.end(), source);
         let slash = tokenizer
@@ -374,28 +382,12 @@ pub(crate) fn add_parameter(
         } else {
             Some(Edit::insertion(format!(", {parameter}"), slash.end()))
         }
-    } else if parameters.vararg().is_some() || parameters.kwonlyargs().next().is_some() {
-        // Case 4: no regular or positional-only parameters, but a vararg (`*args`) or
-        // keyword-only parameters exist. Insert before the `*` separator.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let star = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Star)
-            .expect("Unable to find `*` token");
-        Some(Edit::insertion(format!("{parameter}, "), star.start()))
-    } else if parameters.kwarg().is_some() {
-        // Case 5: only a `**kwargs` parameter exists. Insert before `**`.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let double_star = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::DoubleStar)
-            .expect("Unable to find `**` token");
-        Some(Edit::insertion(
-            format!("{parameter}, "),
-            double_star.start(),
-        ))
+    } else if let Some(separator) = separator {
+        let token = SimpleTokenizer::starts_at(parameters.start(), source)
+            .find(|token| token.kind == separator)?;
+        Some(Edit::insertion(format!("{parameter}, "), token.start()))
     } else {
-        // Case 6: no parameters at all, so add parameter after the opening parenthesis.
+        // Insert after the opening parenthesis of an empty parameter list.
         Some(Edit::insertion(
             parameter.to_string(),
             parameters.start() + TextSize::from(1),

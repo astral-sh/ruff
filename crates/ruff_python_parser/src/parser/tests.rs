@@ -1,3 +1,4 @@
+use ruff_python_ast::ParameterRole;
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -539,6 +540,27 @@ mod stack_growth {
         let source = format!("{}True\n", "not ".repeat(depth));
         parse_module(&source).unwrap();
     }
+}
+
+#[test]
+fn recovered_parameter_roles() {
+    let source = "def f(p, /, x, **kw, *args, y): pass";
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module))
+        .try_into_module()
+        .unwrap();
+    let [Stmt::FunctionDef(function)] = parsed.suite().as_slice() else {
+        panic!("expected one function")
+    };
+    let parameters = &function.parameters;
+    let expected = [
+        ParameterRole::PositionalOnly,
+        ParameterRole::PositionalOrKeyword,
+        ParameterRole::Kwarg,
+        ParameterRole::Vararg,
+        ParameterRole::KeywordOnly,
+    ];
+    assert!(parameters.roles().eq(expected));
+    assert!(parameters.roles().rev().eq(expected.into_iter().rev()));
 }
 
 #[test]

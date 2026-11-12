@@ -3305,6 +3305,16 @@ impl Ranged for AnyParameterRef<'_> {
     }
 }
 
+/// A parameter's role in a signature, ordered by argument binding order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParameterRole {
+    PositionalOnly,
+    PositionalOrKeyword,
+    Vararg,
+    KeywordOnly,
+    Kwarg,
+}
+
 /// One parameter in a function or lambda signature, in its written position.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -3317,13 +3327,13 @@ pub enum ParameterItem {
 }
 
 impl ParameterItem {
-    fn binding_order(&self) -> u8 {
+    fn role(&self) -> ParameterRole {
         match self {
-            Self::PositionalOnly(_) => 0,
-            Self::PositionalOrKeyword(_) => 1,
-            Self::Vararg(_) => 2,
-            Self::KeywordOnly(_) => 3,
-            Self::Kwarg(_) => 4,
+            Self::PositionalOnly(_) => ParameterRole::PositionalOnly,
+            Self::PositionalOrKeyword(_) => ParameterRole::PositionalOrKeyword,
+            Self::Vararg(_) => ParameterRole::Vararg,
+            Self::KeywordOnly(_) => ParameterRole::KeywordOnly,
+            Self::Kwarg(_) => ParameterRole::Kwarg,
         }
     }
 
@@ -3350,10 +3360,18 @@ pub struct Parameters {
 impl Parameters {
     fn is_in_binding_order(&self) -> bool {
         self.items.iter().is_sorted_by(|left, right| {
-            let a = left.binding_order();
-            let b = right.binding_order();
+            let a = left.role();
+            let b = right.role();
             a < b || (a == b && !matches!(left, ParameterItem::Vararg(_) | ParameterItem::Kwarg(_)))
         })
+    }
+
+    /// Iterates the parameter roles in source order.
+    pub fn roles(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = ParameterRole> + ExactSizeIterator + FusedIterator + Clone
+    {
+        self.items.iter().map(ParameterItem::role)
     }
 
     pub fn posonlyargs(&self) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {

@@ -664,9 +664,12 @@ pub(crate) fn definition(
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // If this is a non-static method, skip `cls` or `self`.
-    for parameter in parameters.iter_non_variadic_params().skip(usize::from(
-        is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
-    )) {
+    let mut skip_receiver =
+        is_method && !visibility::is_staticmethod(decorator_list, checker.semantic());
+    let (vararg, kwarg) = parameters.split_variadic(|parameter| {
+        if std::mem::take(&mut skip_receiver) {
+            return;
+        }
         // ANN401 for dynamically typed parameters
         if let Some(annotation) = parameter.annotation() {
             has_any_typed_arg = true;
@@ -695,10 +698,10 @@ pub(crate) fn definition(
                 }
             }
         }
-    }
+    });
 
     // ANN002, ANN401
-    if let Some(arg) = parameters.vararg() {
+    if let Some(arg) = vararg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {
@@ -724,7 +727,7 @@ pub(crate) fn definition(
     }
 
     // ANN003, ANN401
-    if let Some(arg) = parameters.kwarg() {
+    if let Some(arg) = kwarg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {

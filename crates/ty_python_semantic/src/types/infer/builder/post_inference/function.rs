@@ -354,7 +354,10 @@ fn check_legacy_positional_only_convention<'db>(
 
     // If the function has any PEP-570 positional-only parameters,
     // assume that `__`-prefixed parameters are not meant to be positional-only
-    if ast_parameters.posonlyargs().next().is_some() {
+    if ast_parameters
+        .roles()
+        .any(|role| role == ast::ParameterRole::PositionalOnly)
+    {
         return;
     }
     let parsed_parameters = signature.parameters();

@@ -1902,24 +1902,22 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
 
     // If this is a non-static method, skip `cls` or `self`.
-    for parameter in function
-        .parameters
-        .iter_non_variadic_params()
-        .skip(usize::from(
-            docstring.definition.is_method()
-                && !is_staticmethod(&function.decorator_list, checker.semantic()),
-        ))
-    {
+    let mut skip_receiver = docstring.definition.is_method()
+        && !is_staticmethod(&function.decorator_list, checker.semantic());
+    let (vararg, kwarg) = function.parameters.split_variadic(|parameter| {
+        if std::mem::take(&mut skip_receiver) {
+            return;
+        }
         let arg_name = parameter.name().as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
-    }
+    });
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if !checker.settings().pydocstyle.ignore_var_parameters() {
-        if let Some(arg) = function.parameters.vararg() {
+        if let Some(arg) = vararg {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");
             if !arg_name.starts_with('_')
@@ -1929,7 +1927,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg()
+        if let Some(arg) = kwarg
             && !has_unpack_annotation(checker, arg)
         {
             let arg_name = arg.name.as_str();

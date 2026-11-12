@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{AnyNodeRef, ParameterItem, Parameters};
+use ruff_python_ast::{AnyNodeRef, ParameterItem, ParameterRole, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -236,8 +236,14 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
         } else if num_parameters == 1
-            && item.posonlyargs().next().is_none()
-            && item.kwonlyargs().next().is_none()
+            && matches!(
+                item.roles().next(),
+                Some(
+                    ParameterRole::PositionalOrKeyword
+                        | ParameterRole::Vararg
+                        | ParameterRole::Kwarg
+                )
+            )
         {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
