@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use ruff_db::diagnostic::render::{
-    AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer,
+    AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer, GroupedRenderer,
     JsonLinesRenderer, JsonRenderer, JunitRenderer, PylintRenderer, RdjsonRenderer, Renderer,
     SarifRenderer,
 };
@@ -18,7 +18,6 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 
-pub(crate) use grouped::GroupedRenderer;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
@@ -28,8 +27,6 @@ use crate::registry::{Linter, Rule, RuleNamespace, RuleSet};
 use crate::rule_selector::PreviewOptions;
 use crate::settings::DEFAULT_SELECTORS;
 use crate::settings::types::OutputFormat;
-
-mod grouped;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -234,99 +231,5 @@ pub fn render_diagnostics(
         OutputFormat::Grouped => GroupedRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
             .write(writer, diagnostics),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use ruff_db::diagnostic::Diagnostic;
-    use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
-    use ruff_source_file::SourceFileBuilder;
-    use ruff_text_size::{TextRange, TextSize};
-
-    use crate::codes::Rule;
-    use crate::message::create_lint_diagnostic;
-    use crate::{Edit, Fix};
-
-    pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
-        let source = r"from os import
-
-if call(foo
-    def bar():
-        pass
-";
-        let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, ParseOptions::from(Mode::Module))
-            .errors()
-            .iter()
-            .map(|parse_error| {
-                Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
-            })
-            .collect()
-    }
-
-    pub(super) fn create_diagnostics() -> Vec<Diagnostic> {
-        let fib = r#"import os
-
-
-def fibonacci(n):
-    """Compute the nth number in the Fibonacci sequence."""
-    x = 1
-    if n == 0:
-        return 0
-    elif n == 1:
-        return 1
-    else:
-        return fibonacci(n - 1) + fibonacci(n - 2)
-"#;
-
-        let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
-
-        let unused_import_start = TextSize::from(7);
-        let unused_import = create_lint_diagnostic(
-            "`os` imported but unused",
-            Some("Remove unused import: `os`"),
-            TextRange::new(unused_import_start, TextSize::from(9)),
-            Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
-                TextSize::from(0),
-                TextSize::from(10),
-            )))),
-            None,
-            fib_source.clone(),
-            Some(unused_import_start),
-            Rule::UnusedImport,
-        );
-
-        let unused_variable_start = TextSize::from(94);
-        let unused_variable = create_lint_diagnostic(
-            "Local variable `x` is assigned to but never used",
-            Some("Remove assignment to unused variable `x`"),
-            TextRange::new(unused_variable_start, TextSize::from(95)),
-            Some(Fix::unsafe_edit(Edit::deletion(
-                TextSize::from(94),
-                TextSize::from(99),
-            ))),
-            None,
-            fib_source,
-            Some(unused_variable_start),
-            Rule::UnusedVariable,
-        );
-
-        let file_2 = r"if a == 1: pass";
-
-        let undefined_name_start = TextSize::from(3);
-        let undefined_name = create_lint_diagnostic(
-            "Undefined name `a`",
-            Option::<&'static str>::None,
-            TextRange::new(undefined_name_start, TextSize::from(4)),
-            None,
-            None,
-            SourceFileBuilder::new("undef.py", file_2).finish(),
-            Some(undefined_name_start),
-            Rule::UndefinedName,
-        );
-
-        vec![unused_import, unused_variable, undefined_name]
     }
 }

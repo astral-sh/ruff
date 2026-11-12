@@ -1,5 +1,5 @@
+use std::collections::BTreeMap;
 use std::path::Path;
-use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
@@ -118,20 +118,9 @@ const fn severity_name(severity: Severity) -> &'static str {
     }
 }
 
-// TODO(brent) this and `group_diagnostics_by_filename` are also used by the `grouped` output
-// format. I think they'd make more sense in that file, but I started here first. I'll move them to
-// that module when adding the `grouped` output format.
 struct DiagnosticWithLocation<'a> {
     diagnostic: &'a Diagnostic,
     start_location: Option<LineColumn>,
-}
-
-impl Deref for DiagnosticWithLocation<'_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        self.diagnostic
-    }
 }
 
 fn group_diagnostics_by_filename<'a>(

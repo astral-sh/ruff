@@ -26,6 +26,7 @@ pub use full::FullRenderer;
 pub use github::GithubRenderer;
 #[cfg(feature = "serde")]
 pub use gitlab::GitlabRenderer;
+pub use grouped::GroupedRenderer;
 #[cfg(feature = "serde")]
 pub use json::JsonRenderer;
 #[cfg(feature = "serde")]
@@ -44,6 +45,7 @@ mod full;
 mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
+mod grouped;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -185,8 +187,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: config.show_fix_status
-                && diag.has_applicable_fix(config.fix_applicability()),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config.fix_applicability),
             header_offset: diag.inner.header_offset,
         }
     }
@@ -2483,6 +2484,7 @@ watermelon
         #[default]
         Full,
         Concise,
+        Grouped,
         Azure,
         Github,
         Pylint,
@@ -2689,6 +2691,9 @@ watermelon
                 }
                 DiagnosticFormat::Concise => {
                     ConciseRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Grouped => {
+                    GroupedRenderer::new(&self.db, &self.config).render(f, diagnostics)
                 }
                 DiagnosticFormat::Azure => {
                     AzureRenderer::new(&self.db, &self.config).render(f, diagnostics)
