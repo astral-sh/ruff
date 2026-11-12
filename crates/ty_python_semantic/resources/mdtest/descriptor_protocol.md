@@ -243,7 +243,7 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
-### Nested classes as data descriptors
+### Nested classes as descriptors
 
 Assignments and deletions through an instance invoke `__set__` and `__delete__` on the nested
 class's metaclass.
@@ -286,8 +286,8 @@ Child().Inner = 1  # ok
 Child().Inner = "wrong"  # error: [invalid-assignment]
 ```
 
-On a metaclass, the nested descriptor takes precedence over a class's own attribute of the same
-name.
+A data descriptor on `Meta` takes precedence over `C`'s own nested class. Reading `C.Inner` invokes
+the descriptor's getter, and assignment and deletion invoke its setter and deleter.
 
 ```py
 class Meta(type):
@@ -296,9 +296,29 @@ class Meta(type):
 class C(metaclass=Meta):
     class Inner: ...
 
+reveal_type(C.Inner)  # revealed: object
 C.Inner = 1  # ok
 C.Inner = "wrong"  # error: [invalid-assignment]
 del C.Inner  # ok
+```
+
+If the descriptor defines only `__get__`, the class's own nested class takes precedence. Reading the
+attribute returns that exact class object, and the binding is read-only.
+
+```py
+class GetterOnly(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class NonDataMeta(type):
+    class Inner(metaclass=GetterOnly): ...
+
+class D(metaclass=NonDataMeta):
+    class Inner: ...
+
+reveal_type(D.Inner)  # revealed: <class 'Inner'>
+D.Inner = D.Inner  # error: [invalid-assignment]
+del D.Inner  # error: [invalid-assignment]
 ```
 
 If only one definition of a nested class is a data descriptor, we conservatively reject the write,
