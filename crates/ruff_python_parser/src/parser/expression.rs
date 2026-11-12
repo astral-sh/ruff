@@ -1001,23 +1001,8 @@ impl<'src> Parser<'src> {
         // test_ok parenthesized_star_index_py310
         // # parse_options: {"target-version": "3.10"}
         // out[(*(slice(None) for _ in range(2)), *ind)] = 1
-        if let Some(tuple) = slice.view(&self.storage).cast::<ast::ExprTuple>()
-            && !tuple.parenthesized()
-        {
-            let elts = tuple.elts().id();
-            for index in 0..elts.len() {
-                if let Some(elt) = self.storage.get_list(elts).get(index)
-                    && elt.node_kind() == ast::NodeKind::ExprStarred
-                {
-                    self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::StarExpressionInIndex,
-                        elt.range(),
-                    );
-                }
-            }
-        }
+        self.check_tuple_unpacking(&slice, UnsupportedSyntaxErrorKind::StarExpressionInIndex);
 
-        let [value, slice] = [value, slice];
         build::ExprSubscript {
             value: value.id,
             slice: slice.id,
@@ -1080,11 +1065,11 @@ impl<'src> Parser<'src> {
 
             // Now we know we're in a slice.
             if !lower.is_parenthesized {
-                match lower.expr.view(&self.storage).classify() {
-                    ExprKind::Starred(_) => {
+                match lower.expr.kind {
+                    ast::NodeKind::ExprStarred => {
                         self.add_error(ParseErrorType::InvalidStarredExpressionUsage, lower);
                     }
-                    ExprKind::Named(_) => {
+                    ast::NodeKind::ExprNamed => {
                         self.add_error(ParseErrorType::UnparenthesizedNamedExpression, lower);
                     }
                     _ => {}
@@ -2315,12 +2300,12 @@ impl<'src> Parser<'src> {
                 // Now, we know that it's either a dictionary expression or a dictionary comprehension.
                 // In either case, the key is limited to an `expression`.
                 if !key_or_element.is_parenthesized {
-                    match key_or_element.expr.view(&self.storage).classify() {
-                        ExprKind::Starred(_) => self.add_error(
+                    match key_or_element.expr.kind {
+                        ast::NodeKind::ExprStarred => self.add_error(
                             ParseErrorType::InvalidStarredExpressionUsage,
                             key_or_element.expr,
                         ),
-                        ExprKind::Named(_) => self.add_error(
+                        ast::NodeKind::ExprNamed => self.add_error(
                             ParseErrorType::UnparenthesizedNamedExpression,
                             key_or_element,
                         ),

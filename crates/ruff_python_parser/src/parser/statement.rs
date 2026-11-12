@@ -16,7 +16,7 @@ use crate::parser::{
     helpers,
 };
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind};
 
 use super::Parenthesized;
 use super::expression::ExpressionContext;
@@ -76,6 +76,12 @@ const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
     TokenKind::LeftShiftEqual,
     TokenKind::RightShiftEqual,
 ]);
+
+#[derive(Clone, Copy)]
+enum TargetKind {
+    Assignment,
+    Delete,
+}
 
 impl<'src> Parser<'src> {
     /// Returns `true` if the current token is the start of a compound statement.
@@ -522,12 +528,13 @@ impl<'src> Parser<'src> {
         if tuple.parenthesized() {
             return;
         }
-        let elements = tuple.elts().id();
-        for i in 0..elements.len() {
-            if let Some(element) = self.storage.get_list(elements).get(i)
-                && element.node_kind() == ast::NodeKind::ExprStarred
-            {
-                self.add_unsupported_syntax_error(kind, element.range());
+        for element in tuple.elts() {
+            if element.node_kind() == ast::NodeKind::ExprStarred {
+                self.unsupported_syntax_errors.push(UnsupportedSyntaxError {
+                    kind,
+                    range: element.range(),
+                    target_version: self.options.target_version,
+                });
             }
         }
     }
@@ -3884,26 +3891,7 @@ impl<'src> Parser<'src> {
     ///
     /// Report an error for each invalid assignment expression found.
     pub(super) fn validate_assignment_target(&mut self, expr: &id::Expr) {
-        let elements = match expr.view(&self.storage).classify() {
-            ExprKind::Starred(starred) => {
-                let child = id::Node::from_view(starred.value());
-                return self.validate_assignment_target(&child);
-            }
-            ExprKind::List(list) => list.elts().id(),
-            ExprKind::Tuple(tuple) => tuple.elts().id(),
-            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => return,
-            _ => return self.add_error(ParseErrorType::InvalidAssignmentTarget, expr.range()),
-        };
-        for i in 0..elements.len() {
-            if let Some(child) = self
-                .storage
-                .get_list(elements)
-                .get(i)
-                .map(id::Node::from_view)
-            {
-                self.validate_assignment_target(&child);
-            }
-        }
+        self.validate_target(expr, TargetKind::Assignment);
     }
 
     /// Validate that the given expression is a valid annotated assignment target.
@@ -3911,20 +3899,22 @@ impl<'src> Parser<'src> {
     /// Unlike [`Parser::validate_assignment_target`], starred, list and tuple
     /// expressions aren't allowed here.
     fn validate_annotated_assignment_target(&mut self, expr: &id::Expr) {
-        match expr.view(&self.storage).classify() {
-            ExprKind::List(_) => self.add_error(
+        match expr.kind {
+            ast::NodeKind::ExprList => self.add_error(
                 ParseErrorType::OtherError(
                     "Only single target (not list) can be annotated".to_string(),
                 ),
                 expr,
             ),
-            ExprKind::Tuple(_) => self.add_error(
+            ast::NodeKind::ExprTuple => self.add_error(
                 ParseErrorType::OtherError(
                     "Only single target (not tuple) can be annotated".to_string(),
                 ),
                 expr,
             ),
-            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => {}
+            ast::NodeKind::ExprName
+            | ast::NodeKind::ExprAttribute
+            | ast::NodeKind::ExprSubscript => {}
             _ => self.add_error(ParseErrorType::InvalidAnnotatedAssignmentTarget, expr),
         }
     }
@@ -3935,22 +3925,38 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180>
     fn validate_delete_target(&mut self, expr: &id::Expr) {
-        let elements = match expr.view(&self.storage).classify() {
-            ExprKind::List(list) => list.elts().id(),
-            ExprKind::Tuple(tuple) => tuple.elts().id(),
-            ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => return,
-            _ => return self.add_error(ParseErrorType::InvalidDeleteTarget, expr.range()),
-        };
-        for i in 0..elements.len() {
-            if let Some(child) = self
-                .storage
-                .get_list(elements)
-                .get(i)
-                .map(id::Node::from_view)
-            {
-                self.validate_delete_target(&child);
+        self.validate_target(expr, TargetKind::Delete);
+    }
+
+    fn validate_target(&mut self, target: &id::Expr, kind: TargetKind) {
+        fn visit(expr: ast::Expr, kind: TargetKind, errors: &mut Vec<ParseError>) {
+            let elements = match expr.classify() {
+                ExprKind::Starred(node) if matches!(kind, TargetKind::Assignment) => {
+                    return visit(node.value(), kind, errors);
+                }
+                ExprKind::Tuple(node) => node.elts(),
+                ExprKind::List(node) => node.elts(),
+                ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) => return,
+                _ => {
+                    let error = match kind {
+                        TargetKind::Assignment => ParseErrorType::InvalidAssignmentTarget,
+                        TargetKind::Delete => ParseErrorType::InvalidDeleteTarget,
+                    };
+                    return super::push_error(errors, error, expr.range());
+                }
+            };
+            for element in elements {
+                visit(element, kind, errors);
             }
         }
+
+        if matches!(
+            target.kind,
+            ast::NodeKind::ExprName | ast::NodeKind::ExprAttribute | ast::NodeKind::ExprSubscript
+        ) {
+            return;
+        }
+        visit(target.view(&self.storage), kind, &mut self.errors);
     }
 
     /// Classify the `match` soft keyword token.

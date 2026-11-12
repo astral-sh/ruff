@@ -95,6 +95,20 @@ pub(crate) struct Parser<'src> {
     elif_else_scratch: ScratchBuffer<BuildId<ast::kind::ElifElseClause>>,
 }
 
+fn push_error(errors: &mut Vec<ParseError>, error: ParseErrorType, range: TextRange) {
+    // Avoid flagging multiple errors at the same location
+    let is_same_location = errors
+        .last()
+        .is_some_and(|last| last.location.start() == range.start());
+
+    if !is_same_location {
+        errors.push(ParseError {
+            error,
+            location: range,
+        });
+    }
+}
+
 impl<'src> Parser<'src> {
     /// Create a new parser for the given source code.
     pub(crate) fn new(source: &'src str, options: ParseOptions) -> Self {
@@ -646,21 +660,7 @@ impl<'src> Parser<'src> {
     where
         T: Ranged,
     {
-        fn inner(errors: &mut Vec<ParseError>, error: ParseErrorType, range: TextRange) {
-            // Avoid flagging multiple errors at the same location
-            let is_same_location = errors
-                .last()
-                .is_some_and(|last| last.location.start() == range.start());
-
-            if !is_same_location {
-                errors.push(ParseError {
-                    error,
-                    location: range,
-                });
-            }
-        }
-
-        inner(&mut self.errors, error, ranged.range());
+        push_error(&mut self.errors, error, ranged.range());
     }
 
     /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
