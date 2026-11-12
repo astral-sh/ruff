@@ -805,10 +805,10 @@ pub fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     pattern_arguments: &'a PatternArguments,
 ) {
-    for pattern in &pattern_arguments.patterns {
+    for pattern in pattern_arguments.patterns() {
         visitor.visit_pattern(pattern);
     }
-    for keyword in &pattern_arguments.keywords {
+    for keyword in pattern_arguments.keywords() {
         visitor.visit_pattern_keyword(keyword);
     }
 }

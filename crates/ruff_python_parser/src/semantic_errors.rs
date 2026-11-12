@@ -2388,11 +2388,11 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
-                for pattern in &arguments.patterns {
+                for pattern in arguments.patterns() {
                     self.visit_pattern(pattern);
                 }
                 let mut seen = FxHashSet::default();
-                for keyword in &arguments.keywords {
+                for keyword in arguments.keywords() {
                     if !seen.insert(&keyword.attr.id) {
                         // test_err duplicate_match_class_attr
                         // match x:

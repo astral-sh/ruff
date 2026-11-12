@@ -604,23 +604,24 @@ Module(
                                                             arguments: PatternArguments {
                                                                 range: 211..214,
                                                                 node_index: NodeIndex(None),
-                                                                patterns: [
-                                                                    MatchAs(
-                                                                        PatternMatchAs {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 212..213,
-                                                                            pattern: None,
-                                                                            name: Some(
-                                                                                Identifier {
-                                                                                    id: Name("x"),
-                                                                                    range: 212..213,
-                                                                                    node_index: NodeIndex(None),
-                                                                                },
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Pattern(
+                                                                        MatchAs(
+                                                                            PatternMatchAs {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 212..213,
+                                                                                pattern: None,
+                                                                                name: Some(
+                                                                                    Identifier {
+                                                                                        id: Name("x"),
+                                                                                        range: 212..213,
+                                                                                        node_index: NodeIndex(None),
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -753,23 +754,24 @@ Module(
                                                             arguments: PatternArguments {
                                                                 range: 258..261,
                                                                 node_index: NodeIndex(None),
-                                                                patterns: [
-                                                                    MatchAs(
-                                                                        PatternMatchAs {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 259..260,
-                                                                            pattern: None,
-                                                                            name: Some(
-                                                                                Identifier {
-                                                                                    id: Name("a"),
-                                                                                    range: 259..260,
-                                                                                    node_index: NodeIndex(None),
-                                                                                },
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Pattern(
+                                                                        MatchAs(
+                                                                            PatternMatchAs {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 259..260,
+                                                                                pattern: None,
+                                                                                name: Some(
+                                                                                    Identifier {
+                                                                                        id: Name("a"),
+                                                                                        range: 259..260,
+                                                                                        node_index: NodeIndex(None),
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -796,23 +798,24 @@ Module(
                                                             arguments: PatternArguments {
                                                                 range: 267..270,
                                                                 node_index: NodeIndex(None),
-                                                                patterns: [
-                                                                    MatchAs(
-                                                                        PatternMatchAs {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 268..269,
-                                                                            pattern: None,
-                                                                            name: Some(
-                                                                                Identifier {
-                                                                                    id: Name("b"),
-                                                                                    range: 268..269,
-                                                                                    node_index: NodeIndex(None),
-                                                                                },
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Pattern(
+                                                                        MatchAs(
+                                                                            PatternMatchAs {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 268..269,
+                                                                                pattern: None,
+                                                                                name: Some(
+                                                                                    Identifier {
+                                                                                        id: Name("b"),
+                                                                                        range: 268..269,
+                                                                                        node_index: NodeIndex(None),
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -866,44 +869,46 @@ Module(
                                                             arguments: PatternArguments {
                                                                 range: 288..294,
                                                                 node_index: NodeIndex(None),
-                                                                patterns: [
-                                                                    MatchClass(
-                                                                        PatternMatchClass {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 289..293,
-                                                                            cls: Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 289..290,
-                                                                                    id: Name("D"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            arguments: PatternArguments {
-                                                                                range: 290..293,
+                                                                items: [
+                                                                    Pattern(
+                                                                        MatchClass(
+                                                                            PatternMatchClass {
                                                                                 node_index: NodeIndex(None),
-                                                                                patterns: [
-                                                                                    MatchAs(
-                                                                                        PatternMatchAs {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 291..292,
-                                                                                            pattern: None,
-                                                                                            name: Some(
-                                                                                                Identifier {
-                                                                                                    id: Name("a"),
-                                                                                                    range: 291..292,
+                                                                                range: 289..293,
+                                                                                cls: Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 289..290,
+                                                                                        id: Name("D"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                arguments: PatternArguments {
+                                                                                    range: 290..293,
+                                                                                    node_index: NodeIndex(None),
+                                                                                    items: [
+                                                                                        Pattern(
+                                                                                            MatchAs(
+                                                                                                PatternMatchAs {
                                                                                                     node_index: NodeIndex(None),
+                                                                                                    range: 291..292,
+                                                                                                    pattern: None,
+                                                                                                    name: Some(
+                                                                                                        Identifier {
+                                                                                                            id: Name("a"),
+                                                                                                            range: 291..292,
+                                                                                                            node_index: NodeIndex(None),
+                                                                                                        },
+                                                                                                    ),
                                                                                                 },
                                                                                             ),
-                                                                                        },
-                                                                                    ),
-                                                                                ],
-                                                                                keywords: [],
+                                                                                        ),
+                                                                                    ],
+                                                                                },
                                                                             },
-                                                                        },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -930,44 +935,46 @@ Module(
                                                             arguments: PatternArguments {
                                                                 range: 300..306,
                                                                 node_index: NodeIndex(None),
-                                                                patterns: [
-                                                                    MatchClass(
-                                                                        PatternMatchClass {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 301..305,
-                                                                            cls: Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 301..302,
-                                                                                    id: Name("D"),
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            arguments: PatternArguments {
-                                                                                range: 302..305,
+                                                                items: [
+                                                                    Pattern(
+                                                                        MatchClass(
+                                                                            PatternMatchClass {
                                                                                 node_index: NodeIndex(None),
-                                                                                patterns: [
-                                                                                    MatchAs(
-                                                                                        PatternMatchAs {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 303..304,
-                                                                                            pattern: None,
-                                                                                            name: Some(
-                                                                                                Identifier {
-                                                                                                    id: Name("b"),
-                                                                                                    range: 303..304,
+                                                                                range: 301..305,
+                                                                                cls: Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 301..302,
+                                                                                        id: Name("D"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                                arguments: PatternArguments {
+                                                                                    range: 302..305,
+                                                                                    node_index: NodeIndex(None),
+                                                                                    items: [
+                                                                                        Pattern(
+                                                                                            MatchAs(
+                                                                                                PatternMatchAs {
                                                                                                     node_index: NodeIndex(None),
+                                                                                                    range: 303..304,
+                                                                                                    pattern: None,
+                                                                                                    name: Some(
+                                                                                                        Identifier {
+                                                                                                            id: Name("b"),
+                                                                                                            range: 303..304,
+                                                                                                            node_index: NodeIndex(None),
+                                                                                                        },
+                                                                                                    ),
                                                                                                 },
                                                                                             ),
-                                                                                        },
-                                                                                    ),
-                                                                                ],
-                                                                                keywords: [],
+                                                                                        ),
+                                                                                    ],
+                                                                                },
                                                                             },
-                                                                        },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),

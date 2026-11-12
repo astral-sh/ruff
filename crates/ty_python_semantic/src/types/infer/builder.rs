@@ -2857,12 +2857,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
-            if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
+            let mut positional = pattern.arguments.patterns();
+            if let Some(first_excess_pattern) = positional.next() {
                 report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
                     0,
-                    pattern.arguments.patterns.len(),
+                    1 + positional.count(),
                     "collections.abc.Callable",
                 );
             }
@@ -2885,18 +2886,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            let positional_patterns = &pattern.arguments.patterns;
-            if let [first_positional_pattern, ..] = positional_patterns.as_slice()
+            let mut positional = pattern.arguments.patterns().peekable();
+            if let Some(&first_positional_pattern) = positional.peek()
                 && let Some(result) = class_pattern_positional_result(db, env, class)
             {
                 match result {
                     ClassPatternPositionalResult::Limit(limit) => {
-                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
+                        if let Some(first_excess_pattern) = positional.nth(limit) {
                             report_too_many_positional_patterns_for_class_pattern(
                                 &self.context,
                                 first_excess_pattern,
                                 limit,
-                                positional_patterns.len(),
+                                limit + 1 + positional.count(),
                                 cls_ty.display(db, env),
                             );
                         }
@@ -2945,10 +2946,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     cls,
                     arguments,
                 } = match_class;
-                for pattern in &arguments.patterns {
+                for pattern in arguments.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                for keyword in &arguments.keywords {
+                for keyword in arguments.keywords() {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
                 let cls_ty = self.infer_standalone_expression(cls, TypeContext::default());
@@ -2999,10 +3000,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     cls,
                     arguments,
                 } = match_class;
-                for pattern in &arguments.patterns {
+                for pattern in arguments.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                for keyword in &arguments.keywords {
+                for keyword in arguments.keywords() {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
                 let cls_ty = self.infer_maybe_standalone_expression(cls, TypeContext::default());

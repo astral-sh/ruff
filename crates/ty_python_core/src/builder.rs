@@ -2675,16 +2675,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }),
             ast::Pattern::MatchClass(pattern) => pattern
                 .arguments
-                .patterns
+                .items
                 .iter()
-                .chain(
-                    pattern
-                        .arguments
-                        .keywords
-                        .iter()
-                        .map(|keyword| &keyword.pattern),
-                )
-                .any(Self::pattern_has_bindings),
+                .any(|item| Self::pattern_has_bindings(item.pattern())),
             ast::Pattern::MatchStar(pattern) => pattern.name.is_some(),
             ast::Pattern::MatchAs(pattern) => {
                 pattern.name.is_some()
@@ -2728,14 +2721,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     class: cls,
                     positional: pattern
                         .arguments
-                        .patterns
-                        .iter()
+                        .patterns()
                         .map(|pattern| self.predicate_kind(pattern))
                         .collect(),
                     keywords: pattern
                         .arguments
-                        .keywords
-                        .iter()
+                        .keywords()
                         .map(|keyword| ClassPatternKeywordPredicateKind {
                             attr: keyword.attr.id.clone(),
                             pattern: self.predicate_kind(&keyword.pattern),

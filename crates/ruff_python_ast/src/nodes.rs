@@ -3171,8 +3171,8 @@ pub enum IrrefutablePatternKind {
 pub struct PatternArguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub patterns: ThinVec<Pattern>,
-    pub keywords: Vec<PatternKeyword>,
+    /// Positional and keyword patterns in source order, including in recovered syntax.
+    pub items: ThinVec<PatternOrKeyword>,
 }
 
 /// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
@@ -3188,56 +3188,38 @@ pub struct PatternKeyword {
     pub pattern: Pattern,
 }
 
+/// A positional pattern or a named attribute pattern in a class pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum PatternOrKeyword<P = Pattern, K = PatternKeyword> {
+    Pattern(P),
+    Keyword(K),
+}
+
+impl PatternOrKeyword {
+    pub fn pattern(&self) -> &Pattern {
+        match self {
+            Self::Pattern(pattern) => pattern,
+            Self::Keyword(keyword) => &keyword.pattern,
+        }
+    }
+}
+
 impl PatternArguments {
-    /// Returns an iterator over the patterns and keywords in source order.
-    pub fn iter_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
-        PatternArgumentsSourceOrder {
-            patterns: &self.patterns,
-            keywords: &self.keywords,
-            next_pattern: 0,
-            next_keyword: 0,
-        }
+    pub fn patterns(&self) -> impl DoubleEndedIterator<Item = &Pattern> {
+        self.items.iter().filter_map(|item| match item {
+            PatternOrKeyword::Pattern(pattern) => Some(pattern),
+            PatternOrKeyword::Keyword(_) => None,
+        })
+    }
+
+    pub fn keywords(&self) -> impl DoubleEndedIterator<Item = &PatternKeyword> {
+        self.items.iter().filter_map(|item| match item {
+            PatternOrKeyword::Pattern(_) => None,
+            PatternOrKeyword::Keyword(keyword) => Some(keyword),
+        })
     }
 }
-
-/// The iterator returned by [`PatternArguments::iter_source_order`].
-#[derive(Clone)]
-pub struct PatternArgumentsSourceOrder<'a> {
-    patterns: &'a [Pattern],
-    keywords: &'a [PatternKeyword],
-    next_pattern: usize,
-    next_keyword: usize,
-}
-
-/// An entry in the argument list of a class pattern.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum PatternOrKeyword<'a> {
-    Pattern(&'a Pattern),
-    Keyword(&'a PatternKeyword),
-}
-
-impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
-    type Item = PatternOrKeyword<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let pattern = self.patterns.get(self.next_pattern);
-        let keyword = self.keywords.get(self.next_keyword);
-
-        if let Some(pattern) = pattern
-            && keyword.is_none_or(|keyword| pattern.start() <= keyword.start())
-        {
-            self.next_pattern += 1;
-            Some(PatternOrKeyword::Pattern(pattern))
-        } else if let Some(keyword) = keyword {
-            self.next_keyword += 1;
-            Some(PatternOrKeyword::Keyword(keyword))
-        } else {
-            None
-        }
-    }
-}
-
-impl FusedIterator for PatternArgumentsSourceOrder<'_> {}
 
 impl TypeParam {
     pub const fn name(&self) -> &Identifier {
@@ -4205,7 +4187,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<StmtClassDef>(), 80);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
-        assert_eq!(std::mem::size_of::<Pattern>(), 72);
+        assert_eq!(std::mem::size_of::<Pattern>(), 64);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 32);
         assert_eq!(std::mem::size_of::<Expr>(), 56);
