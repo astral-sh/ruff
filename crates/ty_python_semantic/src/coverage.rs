@@ -16,7 +16,7 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::types::visitor::any_over_type_through_aliases;
 use crate::types::{KnownClass, ProgramEnvironment, Type};
@@ -61,6 +61,7 @@ pub fn line_coverage(db: &dyn Db, file: File) -> Vec<Line> {
         model,
         line_index,
         source,
+        signature_start: None,
     };
 
     let ast = parsed_module(db, file.python_file(db)).load(db);
@@ -74,12 +75,16 @@ struct CoverageVisitor<'db> {
     line_index: LineIndex,
     source: SourceText,
     lines: Vec<Line>,
+    /// While visiting the parameters and return annotation of a function, the start of the
+    /// function's name. Like mypy, we record the types in a function's signature on the line of its
+    /// `def`, so that a signature counts once even when it spans several lines.
+    signature_start: Option<TextSize>,
 }
 
 impl<'db> CoverageVisitor<'db> {
-    /// Returns the line on which the node at `range` starts.
-    fn line_mut(&mut self, range: TextRange) -> Option<&mut Line> {
-        let line_number = self.line_index.line_index(range.start()).to_zero_indexed();
+    /// Returns the line that contains `offset`.
+    fn line_mut(&mut self, offset: TextSize) -> Option<&mut Line> {
+        let line_number = self.line_index.line_index(offset).to_zero_indexed();
         self.lines.get_mut(line_number)
     }
 
@@ -89,14 +94,31 @@ impl<'db> CoverageVisitor<'db> {
     fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
         if let Some(ty) = ty {
             let coverage = classify(self.model.db(), &self.env, ty);
-            self.record_coverage(coverage, ty, range);
+            self.record_coverage(coverage, ty, range, range.start());
         }
     }
 
-    /// Records `coverage` for the node at `range`, whose type is `ty`.
-    fn record_coverage(&mut self, coverage: LineCoverage, ty: Type<'db>, range: TextRange) {
+    /// Records the type of a parameter or annotation at `range`, on the line of the enclosing
+    /// function's `def` if the node is part of a function signature.
+    fn record_in_signature(&mut self, ty: Option<Type<'db>>, range: TextRange) {
+        if let Some(ty) = ty {
+            let coverage = classify(self.model.db(), &self.env, ty);
+            let line_offset = self.signature_start.unwrap_or(range.start());
+            self.record_coverage(coverage, ty, range, line_offset);
+        }
+    }
+
+    /// Records `coverage` for the node at `range`, whose type is `ty`, on the line that contains
+    /// `line_offset`.
+    fn record_coverage(
+        &mut self,
+        coverage: LineCoverage,
+        ty: Type<'db>,
+        range: TextRange,
+        line_offset: TextSize,
+    ) {
         let note = (coverage > LineCoverage::Precise).then(|| self.note(ty, range));
-        let Some(line) = self.line_mut(range) else {
+        let Some(line) = self.line_mut(line_offset) else {
             return;
         };
 
@@ -162,6 +184,23 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             stmt if is_docstring_stmt(stmt) => return,
             ast::Stmt::FunctionDef(function) => {
                 self.record(function.inferred_type(&self.model), function.name.range());
+
+                for decorator in &function.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = &function.type_params {
+                    self.visit_type_params(type_params);
+                }
+
+                let enclosing_signature = self.signature_start.replace(function.name.start());
+                self.visit_parameters(&function.parameters);
+                if let Some(returns) = &function.returns {
+                    self.visit_annotation(returns);
+                }
+                self.signature_start = enclosing_signature;
+
+                self.visit_body(&function.body);
+                return;
             }
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
@@ -169,7 +208,7 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             // These statements have no expressions, but like mypy we count their lines as precise
             // rather than empty.
             ast::Stmt::Pass(_) | ast::Stmt::Break(_) | ast::Stmt::Continue(_) => {
-                if let Some(line) = self.line_mut(stmt.range()) {
+                if let Some(line) = self.line_mut(stmt.start()) {
                     line.coverage = line.coverage.max(LineCoverage::Precise);
                 }
             }
@@ -196,11 +235,11 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     /// imprecise. Visiting the annotation's sub-expressions would classify the `Any` inside it as
     /// dynamic, even though no value on the line has a dynamic type.
     fn visit_annotation(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.range());
+        self.record_in_signature(expr.inferred_type(&self.model), expr.range());
     }
 
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
-        self.record(parameter.inferred_type(&self.model), parameter.name.range());
+        self.record_in_signature(parameter.inferred_type(&self.model), parameter.name.range());
         source_order::walk_parameter(self, parameter);
     }
 
@@ -213,7 +252,7 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             } else {
                 LineCoverage::Precise
             };
-            self.record_coverage(coverage, ty, alias.range());
+            self.record_coverage(coverage, ty, alias.range(), alias.start());
         }
         source_order::walk_alias(self, alias);
     }
@@ -342,6 +381,34 @@ mod tests {
         P | def first(values: list[int]) -> list[int]:
         P |     return values[1:]
         ");
+    }
+
+    #[test]
+    fn multi_line_signatures() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            from typing import Any
+
+            def request(
+                method: str,
+                data: dict[str, Any] | None = None,
+                timeout=5.0,
+                default=len("x"),
+            ) -> None:
+                pass
+            "#
+        ), @r#"
+          | 
+        P | from typing import Any
+          | 
+        I | def request(  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None, `timeout`: Unknown | float*, `default`: Unknown | Literal[1]
+          |     method: str,
+        P |     data: dict[str, Any] | None = None,
+        P |     timeout=5.0,
+        P |     default=len("x"),
+          | ) -> None:
+        P |     pass
+        "#);
     }
 
     #[test]
