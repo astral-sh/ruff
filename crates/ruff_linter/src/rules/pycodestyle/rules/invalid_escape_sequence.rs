@@ -73,7 +73,8 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
             continue;
         }
         let state = match part {
-            // The parser preserves unknown escapes verbatim, including the backslash.
+            // The parser accepts unknown escapes like `\q` and preserves their backslash.
+            // If a successfully decoded value has no backslash, its source had no unknown escapes.
             StringLikePart::String(literal)
                 if !literal.flags.is_invalid() && !literal.value.as_bytes().contains(&b'\\') =>
             {
