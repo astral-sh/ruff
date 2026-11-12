@@ -128,6 +128,17 @@ static FREQTRADE: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
+static NUMPY: Benchmark = Benchmark::new(RealWorldProject {
+    name: "numpy",
+    repository: "https://github.com/numpy/numpy",
+    commit: "b92fa9da0b7b2bc650d9298085876fc8db28df5e",
+    paths: &["numpy"],
+    // ty uses its vendored typeshed stub for `typing_extensions`, so we omit the package here.
+    dependencies: &["hypothesis", "packaging", "pytest"],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py312,
+});
+
 static PANDAS: Benchmark = Benchmark::new(RealWorldProject {
     name: "pandas",
     repository: "https://github.com/pandas-dev/pandas",
@@ -197,6 +208,20 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
         });
 }
 
+#[track_caller]
+fn run_multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+
+    bencher
+        .with_inputs(|| benchmark.setup_iteration())
+        .bench_local_values(|db| {
+            thread_pool.install(|| {
+                check_project(&db, benchmark.project.name);
+                db
+            })
+        });
+}
+
 #[bench(sample_size = 2, sample_count = 3)]
 fn altair(bencher: Bencher) {
     run_single_threaded(bencher, &ALTAIR);
@@ -228,6 +253,12 @@ fn colour_science(bencher: Bencher) {
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
+fn numpy(bencher: Bencher) {
+    // Checking NumPy and its tests on a single thread takes too long for CI.
+    run_multithreaded(bencher, &NUMPY);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
 fn pandas(bencher: Bencher) {
     run_single_threaded(bencher, &PANDAS);
 }
@@ -239,16 +270,8 @@ fn sympy(bencher: Bencher) {
 
 #[bench(sample_size = 3, sample_count = 8)]
 fn multithreaded(bencher: Bencher) {
-    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
-
-    bencher
-        .with_inputs(|| ALTAIR.setup_iteration())
-        .bench_local_values(|db| {
-            thread_pool.install(|| {
-                check_project(&db, ALTAIR.project.name);
-                db
-            })
-        });
+    // Use the same workload as `altair` so we can compare single- and multithreaded check times.
+    run_multithreaded(bencher, &ALTAIR);
 }
 
 fn main() {
