@@ -417,7 +417,7 @@ RUF072 [*] Empty `finally` clause
 202 | |     pass
     | |________^
 203 |
-204 |   def f():
+204 |   try: foo();  # comment
     |
 help: Remove the `finally` clause
     |
@@ -430,16 +430,34 @@ help: Remove the `finally` clause
     |
 
 RUF072 [*] Empty `finally` clause
-   --> RUF072.py:206:5
+   --> RUF072.py:205:1
     |
-204 | def f():
-205 |     try: return 1
-206 |     finally: pass
+204 | try: foo();  # comment
+205 | finally: pass
+    | ^^^^^^^^^^^^^
+206 |
+207 | def f():
+    |
+help: Remove the `finally` clause
+    |
+203 |
+    - try: foo();  # comment
+    - finally: pass
+204 + foo();  # comment
+205 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:209:5
+    |
+207 | def f():
+208 |     try: return 1
+209 |     finally: pass
     |     ^^^^^^^^^^^^^
 help: Remove the `finally` clause
     |
-204 | def f():
+207 | def f():
     -     try: return 1
     -     finally: pass
-205 +     return 1
+208 +     return 1
     |

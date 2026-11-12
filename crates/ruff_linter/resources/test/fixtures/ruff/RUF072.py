@@ -201,6 +201,9 @@ try: foo()  # comment
 finally:
     pass
 
+try: foo();  # comment
+finally: pass
+
 def f():
     try: return 1
     finally: pass
