@@ -185,3 +185,22 @@ finally:
     1
 finally:
     pass
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/30344
+# (the `try` body is on the same line as `try:`)
+try: foo()
+finally: pass
+
+try: pass
+finally: ...
+
+try: a(); b()
+finally: pass
+
+try: foo()  # comment
+finally:
+    pass
+
+def f():
+    try: return 1
+    finally: pass

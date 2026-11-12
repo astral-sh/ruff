@@ -340,6 +340,9 @@ RUF072 [*] Empty `finally` clause
 186 | / finally:
 187 | |     pass
     | |________^
+188 |
+189 |   # Regression tests for https://github.com/astral-sh/ruff/issues/30344
+    |
 help: Remove the `finally` clause
     |
 183 | # (`try` is preceded by a form feed below)
@@ -348,4 +351,95 @@ help: Remove the `finally` clause
     - finally:
     -     pass
 184 + 1
+185 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:192:1
+    |
+190 | # (the `try` body is on the same line as `try:`)
+191 | try: foo()
+192 | finally: pass
+    | ^^^^^^^^^^^^^
+193 |
+194 | try: pass
+    |
+help: Remove the `finally` clause
+    |
+190 | # (the `try` body is on the same line as `try:`)
+    - try: foo()
+    - finally: pass
+191 + foo()
+192 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:195:1
+    |
+194 | try: pass
+195 | finally: ...
+    | ^^^^^^^^^^^^
+196 |
+197 | try: a(); b()
+    |
+help: Remove the `finally` clause
+    |
+193 |
+    - try: pass
+    - finally: ...
+194 + pass
+195 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:198:1
+    |
+197 | try: a(); b()
+198 | finally: pass
+    | ^^^^^^^^^^^^^
+199 |
+200 | try: foo()  # comment
+    |
+help: Remove the `finally` clause
+    |
+196 |
+    - try: a(); b()
+    - finally: pass
+197 + a(); b()
+198 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:201:1
+    |
+200 |   try: foo()  # comment
+201 | / finally:
+202 | |     pass
+    | |________^
+203 |
+204 |   def f():
+    |
+help: Remove the `finally` clause
+    |
+199 |
+    - try: foo()  # comment
+    - finally:
+    -     pass
+200 + foo()  # comment
+201 |
+    |
+
+RUF072 [*] Empty `finally` clause
+   --> RUF072.py:206:5
+    |
+204 | def f():
+205 |     try: return 1
+206 |     finally: pass
+    |     ^^^^^^^^^^^^^
+help: Remove the `finally` clause
+    |
+204 | def f():
+    -     try: return 1
+    -     finally: pass
+205 +     return 1
     |

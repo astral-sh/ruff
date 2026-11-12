@@ -126,25 +126,34 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
             return;
         };
 
-        let try_indentation = indentation(source, try_stmt).unwrap_or_default();
-
-        let Ok(adjusted) = crate::fix::edits::adjust_indentation(
-            TextRange::new(
-                source.line_start(first_body_stmt.start()),
-                source.full_line_end(last_body_stmt.end()),
-            ),
-            try_indentation,
-            checker.locator(),
-            checker.indexer(),
-            checker.stylist(),
-        ) else {
-            return;
-        };
-
-        let try_line_start = source.line_start(try_stmt.start());
+        let body_full_end = source.full_line_end(last_body_stmt.end());
         let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
-        let edit =
-            Edit::range_replacement(adjusted, TextRange::new(try_line_start, finally_full_end));
+
+        let edit = if indentation(source, first_body_stmt).is_none() {
+            // The body starts on the same line as `try:`, as in `try: foo()`. Replace
+            // everything from the `try` keyword onwards with the body, which keeps the
+            // indentation of the `try` statement.
+            Edit::replacement(
+                source[TextRange::new(first_body_stmt.start(), body_full_end)].to_string(),
+                try_stmt.start(),
+                finally_full_end,
+            )
+        } else {
+            let try_indentation = indentation(source, try_stmt).unwrap_or_default();
+
+            let Ok(adjusted) = crate::fix::edits::adjust_indentation(
+                TextRange::new(source.line_start(first_body_stmt.start()), body_full_end),
+                try_indentation,
+                checker.locator(),
+                checker.indexer(),
+                checker.stylist(),
+            ) else {
+                return;
+            };
+
+            let try_line_start = source.line_start(try_stmt.start());
+            Edit::range_replacement(adjusted, TextRange::new(try_line_start, finally_full_end))
+        };
         diagnostic.set_fix(Fix::safe_edit(edit));
     } else {
         // `try/except/finally: pass` — remove the finally clause
