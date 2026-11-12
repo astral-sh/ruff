@@ -3656,6 +3656,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "smallvec",
  "stacker",
  "static_assertions",
  "thin-vec",
