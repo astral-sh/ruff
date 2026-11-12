@@ -34,7 +34,10 @@ b = NoDunder()
 
 ## TypeVar with bounds
 
-TypeVars with bounds support unary operators if the bound type supports them.
+TypeVars with bounds support unary operators if the bound type supports them. For `Self` return
+types and literal bounds, see the examples for
+[legacy TypeVars](../generics/legacy/functions.md#unary-operators-on-bounded-type-variables) and
+[PEP 695 type parameters](../generics/pep695/functions.md#unary-operators-on-bounded-type-variables).
 
 ### TypeVar with `float` bound
 
@@ -71,6 +74,29 @@ def neg_int_bound(a: U) -> int:
 def invert_int_bound(a: U) -> int:
     reveal_type(~a)  # revealed: int
     return ~a
+```
+
+### Partially supported union bound
+
+If a member of the bound lacks the operator, the diagnostic names that member.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=int | str)
+
+def negate(value: T):
+    # snapshot: unsupported-operator
+    reveal_type(-value)  # revealed: int
+```
+
+```snapshot
+error[unsupported-operator]: Unary operator `-` is not supported for object of type `int | str`
+ --> src/mdtest_snippet.py:7:17
+  |
+7 |     reveal_type(-value)  # revealed: int
+  |                 ^^^^^^
+info: `str` does not implement `__neg__`
 ```
 
 ### Constrained TypeVar

@@ -1357,6 +1357,103 @@ def f(value: T):
     reveal_type(value + value)  # revealed: Unknown
 ```
 
+## Unary operators on bounded type variables
+
+When a unary method returns `Self`, the operator preserves the operand's type variable.
+
+```py
+from typing import TypeVar
+from typing_extensions import Self, assert_type
+
+class Number:
+    def __neg__(self) -> Self:
+        return self
+
+    __pos__ = __neg__
+    __invert__ = __neg__
+
+T = TypeVar("T", bound=Number)
+
+def check(value: T):
+    assert_type(+value, T)
+    assert_type(-value, T)
+    assert_type(~value, T)
+```
+
+The result is also assignable to the type variable when each member of a union bound implements the
+operator with a `Self` return type.
+
+```py
+class Other:
+    def __neg__(self) -> Self:
+        return self
+
+U = TypeVar("U", bound=Number | Other)
+
+def negate(value: U) -> U:
+    # TODO: Since U is bounded by Number | Other, the revealed union could simplify to U@negate.
+    return reveal_type(-value)  # revealed: (U@negate & Number) | (U@negate & Other)
+```
+
+## Unary operators on intersection bounds
+
+The result of a unary operator must satisfy the return type of each implementation on the bound. A
+method returning `Self` preserves the original type variable.
+
+```py
+from typing import TypeVar
+from typing_extensions import Self, assert_type
+from ty_extensions import Intersection
+
+class Left:
+    @staticmethod
+    def __neg__() -> object:
+        return 1
+
+    def __pos__(self) -> Self:
+        return self
+
+class Right:
+    @staticmethod
+    def __neg__() -> int:
+        return 1
+
+T = TypeVar("T", bound=Intersection[Left, Right])
+
+def check(value: T):
+    assert_type(-value, int)
+    assert_type(+value, T)
+```
+
+If a component has several possible implementations, its return type is their union.
+
+```py
+from typing import Callable, ClassVar
+
+class Alternative:
+    __neg__: ClassVar[Callable[[], int] | Callable[[], str]]
+
+U = TypeVar("U", bound=Intersection[Left, Alternative])
+
+def check_alternatives(value: U):
+    assert_type(-value, int | str)
+```
+
+## Unary operators on literal bounds
+
+An integer literal bound determines the exact value of each unary operation.
+
+```py
+from typing import Literal, TypeVar
+
+T = TypeVar("T", bound=Literal[3])
+
+def check(value: T):
+    reveal_type(+value)  # revealed: Literal[3]
+    reveal_type(-value)  # revealed: Literal[-3]
+    reveal_type(~value)  # revealed: Literal[-4]
+```
+
 ## All occurrences of the same typevar have the same type
 
 If a typevar appears multiple times in a function signature, all occurrences have the same type.
