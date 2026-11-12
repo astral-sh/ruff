@@ -148,11 +148,14 @@ We use the [Salsa](https://github.com/salsa-rs/salsa) library for incremental co
 methods take a Salsa database (usually `db: &'db dyn Db`) as an argument. This should always be the
 first argument (or second after `self`).
 
-### Adding a rule
+### Deciding when to use a separate rule
 
-Avoid broad rules that catch many different kinds of errors. Separate rules let users enable or
-disable each kind of diagnostic independently. If several other Python type checkers give users
-separate controls for the same cases, that's a strong signal that the distinction is useful.
+Avoid broad rules that catch many different kinds of errors. When deciding whether to reuse a
+rule for a new diagnostic or split an existing rule, consider whether users would benefit from
+enabling or disabling the cases independently. If several other Python type checkers give
+users separate controls for the same cases, that may be a signal that the distinction is useful.
+
+### Adding a rule
 
 Follow [Ruff's rule naming convention](../../docs/rule-proposals.md#rule-naming-convention).
 Name the pattern the rule reports so that its name reads naturally in a suppression such as
