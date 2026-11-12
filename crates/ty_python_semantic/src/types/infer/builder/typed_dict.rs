@@ -705,24 +705,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return schema;
         };
 
-        for (i, item) in dict_expr.iter().enumerate() {
-            let Some(key) = &item.key else {
-                for ast::DictItem { key, value } in &dict_expr.items[i + 1..] {
-                    if key.is_some() {
-                        self.infer_annotation_expression(value, self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+        let mut items = dict_expr.into_iter();
+        loop {
+            let Some(item) = items.next() else {
+                return schema;
             };
+            let Some(key) = &item.key else { break };
 
             let key_type = self.expression_type(key);
             let Some(key_literal) = key_type.as_string_literal() else {
-                for ast::DictItem { key, value } in &dict_expr.items[i..] {
-                    if key.is_some() {
-                        self.infer_annotation_expression(value, self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+                self.infer_annotation_expression(&item.value, self.deferred_state);
+                break;
             };
 
             let annotation = self.infer_typeddict_field(&item.value);
@@ -737,7 +730,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        schema
+        for item in items {
+            if !item.is_unpacking() {
+                self.infer_annotation_expression(&item.value, self.deferred_state);
+            }
+        }
+        TypedDictSchema::default()
     }
 
     /// Infer field types for functional `TypedDict` assignments in deferred phase, for example:
@@ -751,7 +749,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// may reference the `TypedDict` being defined.
     pub(super) fn infer_functional_typeddict_deferred(&mut self, arguments: &ast::Arguments) {
         if let Some(ast::Expr::Dict(dict_expr)) = arguments.args.get(1) {
-            for ast::DictItem { key, value } in dict_expr {
+            for ast::DictItem { key, value, .. } in dict_expr {
                 if key.is_some() {
                     self.infer_typeddict_field(value);
                 }
@@ -808,7 +806,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn validate_fields_arg(&mut self, fields_arg: &ast::Expr) {
         let db = self.db();
         if let ast::Expr::Dict(dict_expr) = fields_arg {
-            for ast::DictItem { key, value } in dict_expr {
+            for ast::DictItem { key, value, .. } in dict_expr {
                 if let Some(key) = key {
                     let key_type = self.infer_expression(key, TypeContext::default());
                     if !key_type.is_string_literal()

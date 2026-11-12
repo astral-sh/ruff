@@ -113,14 +113,8 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
                     continue;
                 };
 
-                if id == "__slots__" {
-                    for attribute in slots_attributes(value) {
-                        if let Some(attribute) = attribute {
-                            slots.insert(attribute);
-                        } else {
-                            return vec![];
-                        }
-                    }
+                if id == "__slots__" && add_slots(value, &mut slots).is_none() {
+                    return vec![];
                 }
             }
 
@@ -134,14 +128,8 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
                     continue;
                 };
 
-                if id == "__slots__" {
-                    for attribute in slots_attributes(value) {
-                        if let Some(attribute) = attribute {
-                            slots.insert(attribute);
-                        } else {
-                            return vec![];
-                        }
-                    }
+                if id == "__slots__" && add_slots(value, &mut slots).is_none() {
+                    return vec![];
                 }
             }
 
@@ -151,14 +139,8 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
                     continue;
                 };
 
-                if id == "__slots__" {
-                    for attribute in slots_attributes(value) {
-                        if let Some(attribute) = attribute {
-                            slots.insert(attribute);
-                        } else {
-                            return vec![];
-                        }
-                    }
+                if id == "__slots__" && add_slots(value, &mut slots).is_none() {
+                    return vec![];
                 }
             }
             _ => {}
@@ -258,32 +240,18 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     assignments
 }
 
-/// Return an iterator over the attributes enumerated in the given `__slots__` value.
-///
-/// If an attribute can't be statically determined, it will be `None`.
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Option<&str>> {
-    // Ex) `__slots__ = ("name",)`
-    let elts_iter = match expr {
+/// Collects known slots and returns `None` if a name in the container is unknown.
+fn add_slots<'a>(expr: &'a Expr, slots: &mut FxHashSet<&'a str>) -> Option<()> {
+    let mut insert = |expr: &'a Expr| {
+        slots.insert(expr.as_string_literal_expr()?.value.to_str());
+        Some(())
+    };
+    let elts = match expr {
+        Expr::Dict(dict) => return dict.iter_keys().try_for_each(|key| insert(key?)),
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().map(|elt| match elt {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value.to_str()),
-            _ => None,
-        })),
-        _ => None,
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts,
+        _ => return Some(()),
     };
-
-    // Ex) `__slots__ = {"name": ...}`
-    let keys_iter = match expr {
-        Expr::Dict(dict) => Some(dict.iter_keys().map(|key| match key {
-            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => Some(value.to_str()),
-            _ => None,
-        })),
-        _ => None,
-    };
-
-    elts_iter
-        .into_iter()
-        .flatten()
-        .chain(keys_iter.into_iter().flatten())
+    elts.iter().try_for_each(insert)
 }

@@ -101,7 +101,12 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
         };
 
         // Ex) `foo(**{**bar})`
-        if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
+        if let [
+            ast::DictItem {
+                key: None, value, ..
+            },
+        ] = dict.items.as_slice()
+        {
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
@@ -114,13 +119,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
         // Ensure that every keyword is a valid keyword argument (e.g., avoid errors for cases like
         // `foo(**{"bar-bar": 1})`).
-        let kwargs: Vec<&str> = dict
+        let Some(kwargs) = dict
             .iter_keys()
-            .filter_map(|key| key.and_then(as_kwarg))
-            .collect();
-        if kwargs.len() != dict.len() {
+            .map(|key| key.and_then(as_kwarg))
+            .collect::<Option<Vec<_>>>()
+        else {
             continue;
-        }
+        };
 
         let mut diagnostic = checker.report_diagnostic(UnnecessaryDictKwargs, keyword.range());
 

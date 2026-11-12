@@ -212,26 +212,24 @@ impl ExprRef<'_> {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DictItem {
+    pub range: TextRange,
+    pub node_index: AtomicNodeIndex,
     pub key: Option<Expr>,
     pub value: Expr,
 }
 
 impl DictItem {
+    /// Whether this item unpacks a mapping (`**mapping`).
+    pub const fn is_unpacking(&self) -> bool {
+        self.key.is_none()
+    }
+
     fn key(&self) -> Option<&Expr> {
         self.key.as_ref()
     }
 
     fn value(&self) -> &Expr {
         &self.value
-    }
-}
-
-impl Ranged for DictItem {
-    fn range(&self) -> TextRange {
-        TextRange::new(
-            self.key.as_ref().map_or(self.value.start(), Ranged::start),
-            self.value.end(),
-        )
     }
 }
 

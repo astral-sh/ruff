@@ -83,6 +83,16 @@ struct Slot<'a> {
     range: TextRange,
 }
 
+impl<'a> Slot<'a> {
+    fn from_expr(expr: &'a Expr) -> Option<Self> {
+        let string = expr.as_string_literal_expr()?;
+        Some(Self {
+            name: string.value.to_str(),
+            range: string.range,
+        })
+    }
+}
+
 impl std::cmp::PartialEq for Slot<'_> {
     // We will only ever be comparing slots
     // within a class and with the slots of
@@ -132,7 +142,7 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
                 };
 
                 if id == "__slots__" {
-                    members.extend(slots_attributes(value));
+                    collect_slots(value, &mut members);
                 }
             }
 
@@ -147,7 +157,7 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
                 };
 
                 if id == "__slots__" {
-                    members.extend(slots_attributes(value));
+                    collect_slots(value, &mut members);
                 }
             }
 
@@ -158,7 +168,7 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
                 };
 
                 if id == "__slots__" {
-                    members.extend(slots_attributes(value));
+                    collect_slots(value, &mut members);
                 }
             }
             _ => {}
@@ -167,48 +177,16 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     members
 }
 
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot<'_>> {
-    // Ex) `__slots__ = ("name",)`
-    let elts_iter = match expr {
+fn collect_slots<'a>(expr: &'a Expr, members: &mut FxHashSet<Slot<'a>>) {
+    match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().filter_map(|elt| match elt {
-            Expr::StringLiteral(ast::ExprStringLiteral {
-                value,
-                range,
-                node_index: _,
-            }) => Some(Slot {
-                name: value.to_str(),
-                range: *range,
-            }),
-            _ => None,
-        })),
-        _ => None,
-    };
-
-    // Ex) `__slots__ = {"name": ...}`
-    let keys_iter = match expr {
-        Expr::Dict(ast::ExprDict { .. }) => Some(
-            expr.as_dict_expr()
-                .unwrap()
-                .iter_keys()
-                .filter_map(|key| match key {
-                    Some(Expr::StringLiteral(ast::ExprStringLiteral {
-                        value,
-                        range,
-                        node_index: _,
-                    })) => Some(Slot {
-                        name: value.to_str(),
-                        range: *range,
-                    }),
-                    _ => None,
-                }),
-        ),
-        _ => None,
-    };
-
-    elts_iter
-        .into_iter()
-        .flatten()
-        .chain(keys_iter.into_iter().flatten())
+        | Expr::Set(ast::ExprSet { elts, .. }) => {
+            members.extend(elts.iter().filter_map(Slot::from_expr));
+        }
+        Expr::Dict(dict) => {
+            members.extend(dict.iter_keys().flatten().filter_map(Slot::from_expr));
+        }
+        _ => {}
+    }
 }
