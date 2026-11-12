@@ -353,7 +353,7 @@ P2 = ParamSpec("P2")
 # error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
-# error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
+# error: [invalid-type-argument-count] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 ```
 

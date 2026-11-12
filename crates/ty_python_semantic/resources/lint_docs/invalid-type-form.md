@@ -14,8 +14,13 @@ from typing import Annotated
 
 # Int literals are not allowed in this context in type expressions
 a: list[1]  # error
-# `Annotated` expects at least two arguments
+# `Annotated` requires at least one metadata argument after the type
 b: Annotated[int]  # error
 ```
+
+## Rule history
+
+- v0.0.102: Wrong counts of explicit type arguments for forms such as `Callable` now use
+    `invalid-type-argument-count`.
 
 [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

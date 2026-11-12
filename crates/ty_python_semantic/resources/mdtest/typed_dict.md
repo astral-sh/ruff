@@ -6201,15 +6201,18 @@ from typing_extensions import TypedDict, ReadOnly, Required, NotRequired
 
 class Foo(TypedDict):
     a: Required  # error: [invalid-type-form] "`Required` may not be used without a type argument"
-    b: Required[()]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 0"
-    c: Required[int, str]  # error: [invalid-type-form] "Type qualifier `typing.Required` expected exactly 1 argument, got 2"
+    b: Required[()]  # error: [invalid-type-argument-count] "Type qualifier `typing.Required` expected exactly 1 argument, got 0"
+    # error: [invalid-type-argument-count] "Type qualifier `typing.Required` expected exactly 1 argument, got 2"
+    c: Required[int, str]
     d: NotRequired  # error: [invalid-type-form] "`NotRequired` may not be used without a type argument"
-    e: NotRequired[()]  # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 0"
-    # error: [invalid-type-form] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 2"
+    # error: [invalid-type-argument-count] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 0"
+    e: NotRequired[()]
+    # error: [invalid-type-argument-count] "Type qualifier `typing.NotRequired` expected exactly 1 argument, got 2"
     f: NotRequired[int, str]
     g: ReadOnly  # error: [invalid-type-form] "`ReadOnly` may not be used without a type argument"
-    h: ReadOnly[()]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 0"
-    i: ReadOnly[int, str]  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 2"
+    h: ReadOnly[()]  # error: [invalid-type-argument-count] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 0"
+    # error: [invalid-type-argument-count] "Type qualifier `typing.ReadOnly` expected exactly 1 argument, got 2"
+    i: ReadOnly[int, str]
 ```
 
 ### `Required`, `NotRequired` and `ReadOnly` are not allowed outside `TypedDict`

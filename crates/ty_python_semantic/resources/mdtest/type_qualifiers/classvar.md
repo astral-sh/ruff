@@ -97,7 +97,7 @@ c.a = 2
 from typing import ClassVar
 
 class C:
-    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` expected exactly 1 argument, got 2"
+    # error: [invalid-type-argument-count] "Type qualifier `typing.ClassVar` expected exactly 1 argument, got 2"
     x: ClassVar[int, str] = 1
 ```
 

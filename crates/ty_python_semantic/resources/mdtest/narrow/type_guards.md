@@ -220,10 +220,10 @@ from typing_extensions import TypeGuard, TypeIs
 
 a = 123
 
-# error: [invalid-type-form] "Special form `typing.TypeGuard` expected exactly one type parameter"
+# error: [invalid-type-argument-count] "Special form `typing.TypeGuard` expected exactly one type parameter"
 def f(_) -> TypeGuard[int, str]: ...
 
-# error: [invalid-type-form] "Special form `typing.TypeIs` expected exactly one type parameter"
+# error: [invalid-type-argument-count] "Special form `typing.TypeIs` expected exactly one type parameter"
 def g(_) -> TypeIs[a, str]: ...
 
 reveal_type(f(0))  # revealed: Unknown

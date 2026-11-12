@@ -213,11 +213,16 @@ reveal_type(C[int]())  # revealed: C[int]
 reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
-The specialization must match the generic types:
+ty reports an error if an explicit specialization supplies too many arguments or omits a required
+argument:
 
 ```py
-# error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
+# error: [invalid-type-argument-count] "Too many type arguments to class `C`: expected 1, got 2"
 reveal_type(C[int, int]())  # revealed: C[Unknown]
+
+class Pair[T, U]: ...
+
+too_few: Pair[int]  # error: [invalid-type-argument-count]
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:
@@ -271,8 +276,74 @@ class WithDefault[T, U = int]: ...
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 
-# error: [invalid-type-arguments] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
+# error: [invalid-type-argument-count] "Too many type arguments to class `WithDefault`: expected between 1 and 2, got 3"
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
+```
+
+## Configuring type argument diagnostics independently
+
+The count check for a generic class and for a legacy alias such as `typing.List` uses the same rule.
+
+### Disabling invalid type arguments and invalid type forms
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-type-arguments = "ignore"
+invalid-type-form = "ignore"
+```
+
+```py
+from typing import List
+
+class Box[T: int]: ...
+
+wrong_count: Box[int, int]  # error: [invalid-type-argument-count]
+wrong_bound: Box[str]  # ok
+legacy_wrong_count: List[int, int]  # error: [invalid-type-argument-count]
+invalid_form: list[1]  # ok
+```
+
+### Disabling invalid type argument counts
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-type-argument-count = "ignore"
+```
+
+```py
+from typing import List
+
+class Box[T: int]: ...
+
+wrong_count: Box[int, int]  # ok
+wrong_bound: Box[str]  # error: [invalid-type-arguments]
+legacy_wrong_count: List[int, int]  # ok
+invalid_form: list[1]  # error: [invalid-type-form]
+```
+
+## Suppressing type argument diagnostics independently
+
+Each annotation has a wrong argument count and a bound violation. The rule code in the ignore
+comment selects which error to suppress.
+
+```py
+class Box[T: int]: ...
+
+# error: [invalid-type-arguments]
+a: tuple[Box[int, int], Box[str]]  # ty: ignore[invalid-type-argument-count]
+# error: [invalid-type-argument-count]
+b: tuple[Box[int, int], Box[str]]  # ty: ignore[invalid-type-arguments]
+
+# error: [invalid-type-arguments]
+c: tuple[Box[int, int], Box[str]]  # type: ignore[ty:invalid-type-argument-count]
+# error: [invalid-type-argument-count]
+d: tuple[Box[int, int], Box[str]]  # type: ignore[ty:invalid-type-arguments]
 ```
 
 ## Specializing generic class objects from context

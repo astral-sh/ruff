@@ -1456,7 +1456,7 @@ for i in range(10):
 from typing import Final
 
 class C:
-    # error: [invalid-type-form] "Type qualifier `typing.Final` expected exactly 1 argument, got 2"
+    # error: [invalid-type-argument-count] "Type qualifier `typing.Final` expected exactly 1 argument, got 2"
     x: Final[int, str] = 1
 ```
 

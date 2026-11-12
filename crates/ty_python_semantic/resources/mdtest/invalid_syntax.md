@@ -242,7 +242,7 @@ match 0:
 from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
-# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-argument-count] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```

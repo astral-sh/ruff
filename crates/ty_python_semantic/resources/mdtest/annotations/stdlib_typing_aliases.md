@@ -66,31 +66,31 @@ In case the incorrect number of type arguments is passed, a diagnostic is given.
 import typing
 
 def f(
-    # error: [invalid-type-form] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
+    # error: [invalid-type-argument-count] "Legacy alias `typing.List` expected exactly 1 argument, got 2"
     incorrect_list: typing.List[int, int],
-    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 3"
+    # error: [invalid-type-argument-count] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 3"
     incorrect_dict: typing.Dict[int, int, int],
-    # error: [invalid-type-form] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 1"
+    # error: [invalid-type-argument-count] "Legacy alias `typing.Dict` expected exactly 2 arguments, got 1"
     incorrect_dict2: typing.Dict[int],  # type argument is not a tuple here
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_set: typing.Set[int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_frozen_set: typing.FrozenSet[int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_chain_map: typing.ChainMap[int, int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_chain_map2: typing.ChainMap[int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_counter: typing.Counter[int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_default_dict: typing.DefaultDict[int, int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_default_dict2: typing.DefaultDict[int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_deque: typing.Deque[int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_ordered_dict: typing.OrderedDict[int, int, int],
-    # error: [invalid-type-form]
+    # error: [invalid-type-argument-count]
     incorrect_ordered_dict2: typing.OrderedDict[int],
 ):
     reveal_type(incorrect_list)  # revealed: list[Unknown]

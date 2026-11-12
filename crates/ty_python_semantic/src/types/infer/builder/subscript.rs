@@ -13,9 +13,9 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENT_COUNT,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPED_DICT_KEY, NOT_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable, typed_dict_subscript_key_lint,
 };
 use crate::types::dict::dict_literal_key_value_types;
@@ -333,8 +333,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Optional => {
                     if matches!(**slice, ast::Expr::Tuple(_))
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
                     {
                         builder.into_diagnostic(format_args!(
                             "`typing.Optional` requires exactly one argument"
@@ -366,8 +367,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
 
                         if tuple.is_empty()
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            && let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
                         {
                             builder.into_diagnostic(
                                 "`typing.Union` requires at least one type argument",
@@ -438,8 +440,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     if args.len() != expected_argument_number
-                        && let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
                     {
                         let noun = if expected_argument_number == 1 {
                             "argument"
@@ -1184,7 +1187,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if !missing_typevars.is_empty() {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, subscript) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
+            {
                 let description = CallableDescription::new(db, value_ty);
                 let s = if missing_typevars.len() > 1 { "s" } else { "" };
                 builder.into_diagnostic(format_args!(
@@ -1227,7 +1233,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 error = Some(ExplicitSpecializationError::NonGeneric);
             } else {
                 let node = expanded_type_arguments[first_excess_type_argument_index].node;
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENT_COUNT, node)
+                {
                     let description = CallableDescription::new(db, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",

@@ -95,7 +95,7 @@ reveal_type(Between[int, bool, bytes, str]().attr)  # revealed: tuple[int, bool,
 reveal_type(Between[int, *tuple[bool], str]().attr)  # revealed: tuple[int, bool, str]
 
 reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
-# error: [invalid-type-arguments] "No type argument provided for required type variable `U` of class `Between`"
+# error: [invalid-type-argument-count] "No type argument provided for required type variable `U` of class `Between`"
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
@@ -1995,7 +1995,7 @@ def _(
     a7: Prefix[bool, int, str],
     a8: Suffix[bool],
     a9: Suffix[int, str, bool],
-    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    # error: [invalid-type-argument-count] "No type argument provided for required type variable `U`"
     a10: Between[int],
 ):
     reveal_type(a1)  # revealed: tuple[()]

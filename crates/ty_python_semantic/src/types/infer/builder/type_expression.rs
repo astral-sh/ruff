@@ -13,10 +13,10 @@ use super::{DeferredExpressionState, InferenceRegion, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
-    INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg, report_missing_type_arguments,
-    report_unsupported_binary_operation,
+    INVALID_TYPE_ARGUMENT_COUNT, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    report_missing_type_arguments, report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
@@ -1850,7 +1850,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
                 }
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, slice) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, slice)
+                {
                     builder.into_diagnostic("type[...] must have exactly one type argument");
                 }
                 Type::unknown()
@@ -2415,7 +2418,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = alias.alias_spec();
 
         if args.len() != expected_argument_number {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript_node) {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript_node)
+            {
                 let noun = if expected_argument_number == 1 {
                     "argument"
                 } else {
@@ -2919,7 +2925,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_expression(arguments_slice, TypeContext::default());
                     }
 
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
+                    {
                         let diag = builder.into_diagnostic(
                             "Special form `typing.TypeIs` expected exactly one type parameter",
                         );
@@ -2945,7 +2954,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_expression(arguments_slice, TypeContext::default());
                     }
 
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
+                    {
                         let diag = builder.into_diagnostic(
                             "Special form `typing.TypeGuard` expected exactly one type parameter",
                         );
@@ -3485,7 +3497,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_expression(argument, TypeContext::default());
                     }
                 }
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
+                {
                     builder.into_diagnostic(format_args!(
                         "`typing.Concatenate` requires at least 2 arguments when used in a \
                         type expression (got {})",

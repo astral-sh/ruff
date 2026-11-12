@@ -4,7 +4,9 @@ use ty_python_core::definition::Definition;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
+use crate::types::diagnostic::{
+    INVALID_TYPE_ARGUMENT_COUNT, INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR,
+};
 use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::nearest_enclosing_class;
@@ -319,8 +321,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         PEP613Policy::Disallowed,
                                     );
                                 }
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_TYPE_ARGUMENT_COUNT, subscript)
                                 {
                                     let num_arguments = arguments.len();
                                     builder.into_diagnostic(format_args!(

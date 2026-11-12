@@ -68,11 +68,16 @@ def _(a: C[int], b: C[Literal[5]]):
     reveal_type(b)  # revealed: Literal[5]
 ```
 
-The specialization must match the generic types:
+ty reports an error if an explicit specialization supplies too many arguments or omits a required
+argument:
 
 ```py
-# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+# error: [invalid-type-argument-count] "Too many type arguments: expected 1, got 2"
 reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
+
+type Pair[T, U] = tuple[T, U]
+
+too_few: Pair[int]  # error: [invalid-type-argument-count]
 ```
 
 And non-generic types cannot be specialized:
