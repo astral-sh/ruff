@@ -53,8 +53,9 @@ jobs:
           # AWS CLI interprets 100MB as 100 MiB. Release artifacts do not currently
           # need multipart uploads. `--no-overwrite` is list-based rather than atomic,
           # so it does not make retries idempotent against immutable keys. If an
-          # artifact exceeds 100 MiB, supporting the multipart path will require an
-          # explicit object-existence check before upload.
+          # artifact exceeds 100 MiB, supporting multipart retries will require
+          # explicit reconciliation to verify that the published object matches the
+          # intended artifact.
           # https://developers.cloudflare.com/r2/objects/upload-objects/#choose-an-upload-method
           aws configure set default.s3.multipart_threshold 100MB
 
