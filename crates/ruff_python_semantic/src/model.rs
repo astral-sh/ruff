@@ -271,25 +271,15 @@ impl<'a> SemanticModel<'a> {
         if !self.seen_typing() {
             return false;
         }
-        match expr {
-            Expr::Attribute(attribute) if attribute.attr.as_str() != target => return false,
-            Expr::Name(name)
-                if name.id.as_str() != target
-                    && let Some(id) = self.resolve_name(name) =>
-            {
-                let Some(import) = self.binding(id).as_any_import() else {
-                    return false;
-                };
-                // Imports such as `from typing import Literal as L` already store their
-                // qualified name. Relative imports and unaliased submodule imports need resolution.
-                let qualified = import.qualified_name();
-                if !import.is_submodule_import() && !qualified.is_unresolved_import() {
-                    return self.match_typing_qualified_name(qualified, target);
-                }
-            }
-            _ => {}
+        if let Expr::Attribute(attribute) = expr
+            && attribute.attr.as_str() != target
+        {
+            return false;
         }
-        self.resolve_qualified_name(expr)
+        // A differently spelled name can match through an import alias, as in
+        // `from typing import Literal as L`.
+        let needs_alias = matches!(expr, Expr::Name(name) if name.id.as_str() != target);
+        self.resolve_qualified_name_if(expr, |binding| !needs_alias || binding.is_alias())
             .is_some_and(|qualified_name| self.match_typing_qualified_name(&qualified_name, target))
     }
 
@@ -1202,6 +1192,18 @@ impl<'a> SemanticModel<'a> {
     where
         'a: 'name,
     {
+        self.resolve_qualified_name_if(value, |_| true)
+    }
+
+    /// Skip qualified-name construction for bindings rejected by `accept_binding`.
+    fn resolve_qualified_name_if<'name, 'expr: 'name>(
+        &self,
+        value: &'expr Expr,
+        accept_binding: impl FnOnce(&Binding<'a>) -> bool,
+    ) -> Option<QualifiedName<'name>>
+    where
+        'a: 'name,
+    {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
         const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
             match value {
@@ -1227,6 +1229,10 @@ impl<'a> SemanticModel<'a> {
             }
             Symbol::Unbound => return None,
         };
+
+        if !accept_binding(binding) {
+            return None;
+        }
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => qualified_name.qualify(value),
