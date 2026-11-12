@@ -3894,6 +3894,70 @@ class WideOverride(NarrowBase):
     value: ClassVar = IntDescriptor()
 ```
 
+## Class variables with restricted descriptor access
+
+A getter that accepts only `None` as its instance cannot implement a readable property, even when
+its return type matches the property's.
+
+```py
+from typing import ClassVar
+
+class Readable:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ClassOnly:
+    def __get__(self, instance: None, owner: type) -> int:
+        return 1
+
+class Inferred(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar = ClassOnly()
+
+class Explicit(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar[ClassOnly] = ClassOnly()
+```
+
+The same conflict can come from two bases. When the base itself provides only class access, an
+override still needs to accept writes through the class.
+
+```py
+class ClassOnlyBase:
+    value: ClassVar = ClassOnly()
+
+class Combined(ClassOnlyBase, Readable): ...  # error: [incompatible-property-override]
+class NarrowClassOnly(ClassOnly): ...
+
+class NarrowOverride(ClassOnlyBase):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `ClassOnly`"
+    value: ClassVar = NarrowClassOnly()
+```
+
+A readable property can be implemented by an instance-only getter. A `ClassVar` that also supports
+class reads cannot lose that operation in a subclass.
+
+```py
+class InstanceOnly:
+    def __get__(self, instance: Readable, owner: type) -> int:
+        return 1
+
+class InstanceProperty(Readable):
+    value: ClassVar = InstanceOnly()  # ok
+
+class Both(InstanceOnly):
+    def __get__(self, instance: Readable | None, owner: type) -> int:
+        return 1
+
+class BothReads(Readable):
+    value: ClassVar = Both()
+
+class LosesClassRead(BothReads):
+    # error: [incompatible-attribute-override] "Attribute cannot be read through the class"
+    value: ClassVar = InstanceOnly()
+```
+
 ## Conditional property definitions
 
 The property override rule applies when an inherited property can have different definitions. Reads

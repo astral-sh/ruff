@@ -34,7 +34,8 @@ use crate::{
 /// A descriptor can accept a different type from the one it returns. Ordinary mutable
 /// attributes use the same type for both operations, making their types invariant.
 struct AttributeContract<'db> {
-    read: Type<'db>,
+    /// A descriptor whose getter rejects the receiver provides no read on that receiver.
+    instance_read: Option<Type<'db>>,
     /// A `ClassVar` also promises reads through the class, where `__get__` receives `None`.
     class_read: Option<Type<'db>>,
     write: Option<Type<'db>>,
@@ -274,22 +275,24 @@ fn bind_attribute<'db>(
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
-    let (read, class_read, write) = if is_class_var {
+    let (instance_read, class_read, write) = if is_class_var {
         // A class variable has no instance storage. Both reads bind its descriptor, but
         // assignment through the class replaces the stored value without calling its setter.
         let stored = ty.bind_self_typevars(db, env, receiver);
         let owner = receiver.to_meta_type(db, env);
         let read = |instance| {
-            let (member, _, _) = Type::try_call_dunder_get_on_attribute(
+            let (member, _, error) = Type::try_call_dunder_get_on_attribute(
                 db,
                 env,
                 Place::bound(stored).into(),
                 instance,
                 owner,
             );
-            member.ignore_possibly_undefined()
+            member
+                .ignore_possibly_undefined()
+                .filter(|_| error.is_none())
         };
-        (read(Some(receiver))?, read(None), Some(stored))
+        (read(Some(receiver)), read(None), Some(stored))
     } else if is_descriptor {
         let read = Type::resolve_descriptor_access(
             db,
@@ -327,13 +330,13 @@ fn bind_attribute<'db>(
                     .unwrap_or(read),
             )
         };
-        (read, None, write)
+        (Some(read), None, write)
     } else {
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
         (
-            read,
+            Some(read),
             None,
             Some(
                 owner
@@ -347,7 +350,7 @@ fn bind_attribute<'db>(
         .map_or(std::slice::from_ref(&ty), |union| union.elements(db));
     let is_frozen = literal.is_frozen_dataclass(db) == Some(true);
     Some(AttributeContract {
-        read,
+        instance_read,
         class_read,
         // Attributes on `object` are included here because typeshed declares attributes such as
         // `__module__: str` on `object`, which normally implies writable instance attributes. But
@@ -406,6 +409,21 @@ fn descriptor_write_domain<'db>(
     }
 }
 
+#[derive(Clone, Copy)]
+enum ReadAccess {
+    Instance,
+    Class,
+}
+
+impl ReadAccess {
+    const fn unavailable_message(self) -> &'static str {
+        match self {
+            Self::Instance => "Attribute cannot be read through an instance",
+            Self::Class => "Attribute cannot be read through the class",
+        }
+    }
+}
+
 enum AttributeViolation<'db> {
     Read {
         source: Type<'db>,
@@ -414,6 +432,7 @@ enum AttributeViolation<'db> {
     Write {
         target: Type<'db>,
     },
+    Unreadable(ReadAccess),
     ReadOnly,
 }
 
@@ -423,7 +442,9 @@ impl AttributeViolation<'_> {
         match self {
             _ if involves_property => &INCOMPATIBLE_PROPERTY_OVERRIDE,
             Self::Write { .. } => &INCOMPATIBLE_MUTABLE_OVERRIDE,
-            Self::Read { .. } | Self::ReadOnly => &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
+            Self::Read { .. } | Self::Unreadable(_) | Self::ReadOnly => {
+                &INCOMPATIBLE_ATTRIBUTE_OVERRIDE
+            }
         }
     }
 }
@@ -466,16 +487,21 @@ fn attribute_violation<'db>(
     {
         return None;
     }
-    if !source.read.is_assignable_to(db, env, target.read) {
-        return Some(AttributeViolation::Read {
-            source: source.read,
-            target: target.read,
-        });
-    }
-    if let Some((source, target)) = source.class_read.zip(target.class_read)
-        && !source.is_assignable_to(db, env, target)
-    {
-        return Some(AttributeViolation::Read { source, target });
+    for access in [ReadAccess::Instance, ReadAccess::Class] {
+        let (source, target) = match access {
+            ReadAccess::Instance => (source.instance_read, target.instance_read),
+            ReadAccess::Class if source.qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+                (source.class_read, target.class_read)
+            }
+            ReadAccess::Class => continue,
+        };
+        let Some(target) = target else { continue };
+        let Some(source) = source else {
+            return Some(AttributeViolation::Unreadable(access));
+        };
+        if !source.is_assignable_to(db, env, target) {
+            return Some(AttributeViolation::Read { source, target });
+        }
     }
     if target.method_kind != AttributeMethodKind::Other {
         // ty allows methods to be shadowed with instance attributes. For example, it allows
@@ -591,6 +617,9 @@ impl<'db> AttributeOverrideViolation<'db> {
                     target.display(db, env),
                 ));
             }
+            AttributeViolation::Unreadable(access) => {
+                diagnostic.set_primary_annotation_message(access.unavailable_message());
+            }
             AttributeViolation::ReadOnly => diagnostic.set_primary_annotation_message(
                 "Read-only attribute overrides a writable attribute",
             ),
@@ -679,7 +708,9 @@ pub(super) fn check_override<'db>(
     // must not hide an incompatible method signature.
     if source.method_kind == AttributeMethodKind::Method
         && target.qualifiers.contains(TypeQualifiers::FINAL)
-        && target.read.try_upcast_to_callable(db, env).is_some()
+        && target
+            .instance_read
+            .is_some_and(|read| read.try_upcast_to_callable(db, env).is_some())
     {
         return OverrideCheck::Callable;
     }
@@ -868,7 +899,7 @@ fn already_inherited<'db>(
             else {
                 return false;
             };
-            inherited.read == source.read
+            inherited.instance_read == source.instance_read
                 && inherited.class_read == source.class_read
                 && inherited.write == source.write
                 && inherited.is_frozen_field == source.is_frozen_field
@@ -1036,6 +1067,9 @@ pub(super) fn check_inherited_conflict<'db>(
                 "Inherited attribute does not accept writes of type `{}`",
                 target.display(db, env),
             )),
+            AttributeViolation::Unreadable(access) => {
+                diagnostic.info(access.unavailable_message());
+            }
             AttributeViolation::ReadOnly => {
                 diagnostic.info("Inherited read-only attribute replaces a writable attribute");
             }
