@@ -375,7 +375,7 @@ impl SemanticSyntaxChecker {
         }
 
         if self.check_debug_shadowing {
-            Self::debug_shadowing(stmt, ctx);
+            Self::debug_shadowing(kind, ctx);
         }
         Self::check_annotation(kind, ctx);
     }
@@ -606,46 +606,54 @@ impl SemanticSyntaxChecker {
     }
 
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
-    fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: ast::Stmt<'_>, ctx: &Ctx) {
-        match stmt.fields() {
-            ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-                name,
-                type_params,
-                parameters,
-                ..
-            }) => {
+    fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: StmtKind<'_>, ctx: &Ctx) {
+        let check_aliases = |names: NodeList<ast::kind::Alias>| {
+            // test_err debug_shadow_import
+            // import __debug__
+            // import debug as __debug__
+            // from x import __debug__
+            // from x import debug as __debug__
+
+            // test_ok debug_rename_import
+            // import __debug__ as debug
+            // from __debug__ import Some
+            // from x import __debug__ as debug
+            for name in names {
+                match name.asname() {
+                    Some(asname) => Self::check_identifier(asname, ctx),
+                    None => Self::check_identifier(name.name(), ctx),
+                }
+            }
+        };
+        match stmt {
+            StmtKind::FunctionDef(node) => {
                 // test_err debug_shadow_function
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
                 // lambda __debug__: 0  # lambda parameter name
-                Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                Self::check_identifier(node.name(), ctx);
+                if let Some(type_params) = node.type_params() {
                     for type_param in type_params {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
-                for parameter in parameters.iter() {
+                for parameter in node.parameters().iter() {
                     Self::check_identifier(parameter.name(), ctx);
                 }
             }
-            ast::StmtFields::ClassDef(ast::StmtClassDefFields {
-                name, type_params, ..
-            }) => {
+            StmtKind::ClassDef(node) => {
                 // test_err debug_shadow_class
                 // class __debug__: ...  # class name
                 // class C[__debug__]: ...  # type parameter name
-                Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                Self::check_identifier(node.name(), ctx);
+                if let Some(type_params) = node.type_params() {
                     for type_param in type_params {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
             }
-            ast::StmtFields::TypeAlias(ast::StmtTypeAliasFields {
-                type_params: Some(type_params),
-                ..
-            }) => {
+            StmtKind::TypeAlias(node) if let Some(type_params) = node.type_params() => {
                 // test_err debug_shadow_type_alias
                 // type __debug__ = list[int]  # visited as an Expr but still flagged
                 // type Debug[__debug__] = str
@@ -653,30 +661,14 @@ impl SemanticSyntaxChecker {
                     Self::check_identifier(type_param.name(), ctx);
                 }
             }
-            ast::StmtFields::Import(ast::StmtImportFields { names, .. })
-            | ast::StmtFields::ImportFrom(ast::StmtImportFromFields { names, .. }) => {
-                // test_err debug_shadow_import
-                // import __debug__
-                // import debug as __debug__
-                // from x import __debug__
-                // from x import debug as __debug__
-
-                // test_ok debug_rename_import
-                // import __debug__ as debug
-                // from __debug__ import Some
-                // from x import __debug__ as debug
-                for name in names {
-                    match name.asname() {
-                        Some(asname) => Self::check_identifier(asname, ctx),
-                        None => Self::check_identifier(name.name(), ctx),
-                    }
-                }
-            }
-            ast::StmtFields::Try(ast::StmtTryFields { handlers, .. }) => {
+            StmtKind::Import(node) => check_aliases(node.names()),
+            StmtKind::ImportFrom(node) => check_aliases(node.names()),
+            StmtKind::Try(node) => {
                 // test_err debug_shadow_try
                 // try: ...
                 // except Exception as __debug__: ...
-                for handler in handlers
+                for handler in node
+                    .handlers()
                     .iter()
                     .filter_map(ast::ExceptHandler::as_except_handler)
                 {
@@ -1259,10 +1251,10 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn check_rebound_variables<'a, Ctx: SemanticSyntaxContext>(
+    fn check_rebound_variables<Ctx: SemanticSyntaxContext>(
         expr: Expr<'_>,
-        targets: FxHashSet<&'a ast::name::Name>,
-        direct_targets: FxHashSet<&'a ast::name::Name>,
+        targets: FxHashSet<NameId>,
+        direct_targets: FxHashSet<NameId>,
         ctx: &Ctx,
     ) {
         let mut visitor = ReboundComprehensionVisitor {
@@ -2176,13 +2168,13 @@ fn names_may_repeat(names: impl Iterator<Item = NameId>) -> bool {
 
 fn comprehension_target_names(
     comprehensions: NodeList<'_, ast::kind::Comprehension>,
-) -> FxHashSet<&ast::name::Name> {
+) -> FxHashSet<NameId> {
     comprehensions
         .into_iter()
         .flat_map(|comprehension| comprehension.target().descendants())
         .filter_map(AstNode::cast::<ast::ExprName>)
         .filter(|name| name.ctx().is_store())
-        .map(ast::ExprName::id)
+        .map(ast::ExprName::name_id)
         .collect()
 }
 
@@ -2193,12 +2185,13 @@ struct ComprehensionIterableNamedExpressionVisitor {
 
 impl Visitor<'_> for ComprehensionIterableNamedExpressionVisitor {
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        if let ast::ExprFields::Named(ast::ExprNamedFields { target, range, .. }) = expr.fields()
-            && target.is_name_expr()
+        let kind = expr.classify();
+        if let ExprKind::Named(named) = kind
+            && named.target().is_name_expr()
         {
-            self.ranges.push(range);
+            self.ranges.push(named.range());
         }
-        walk_expr(self, expr.classify());
+        walk_expr(self, kind);
     }
 }
 
@@ -2240,15 +2233,15 @@ impl Visitor<'_> for ClassBodyNamedExpressionVisitor {
 
 /// Searches for named expressions (`x := y`) rebinding a comprehension or generator expression's
 /// iteration variables.
-struct ReboundComprehensionVisitor<'a> {
+struct ReboundComprehensionVisitor {
     /// Targets that apply inside nested comprehensions.
-    targets: FxHashSet<&'a ast::name::Name>,
+    targets: FxHashSet<NameId>,
     /// Targets from later filter clauses, which do not apply inside nested comprehensions.
-    direct_targets: FxHashSet<&'a ast::name::Name>,
+    direct_targets: FxHashSet<NameId>,
     ranges: Vec<TextRange>,
 }
 
-impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
+impl Visitor<'_> for ReboundComprehensionVisitor {
     fn visit_expr(&mut self, expr: Expr<'_>) {
         let kind = expr.classify();
         match kind {
@@ -2274,11 +2267,11 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
             ExprKind::Named(expr_named) => {
                 let target = expr_named.target();
 
-                if let ast::ExprFields::Name(ast::ExprNameFields { id, range, .. }) =
-                    target.fields()
-                    && (self.targets.contains(id) || self.direct_targets.contains(id))
+                if let Some(name) = target.as_name_expr()
+                    && (self.targets.contains(&name.name_id())
+                        || self.direct_targets.contains(&name.name_id()))
                 {
-                    self.ranges.push(range);
+                    self.ranges.push(name.range());
                 }
             }
             _ => {}
@@ -2321,7 +2314,7 @@ impl Visitor<'_> for ReturnVisitor {
 }
 
 struct MatchPatternVisitor<'a, Ctx> {
-    names: FxHashSet<&'a ast::name::Name>,
+    names: FxHashSet<NameId>,
     ctx: &'a Ctx,
 }
 
@@ -2450,7 +2443,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
                 let mut seen = FxHashSet::default();
                 for keyword in arguments.keywords() {
-                    if !seen.insert(keyword.attr().id()) {
+                    let attr = keyword.attr();
+                    if !seen.insert(attr.name_id()) {
                         // test_err duplicate_match_class_attr
                         // match x:
                         //     case Class(x=1, x=2): ...
@@ -2461,9 +2455,9 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
-                                keyword.attr().id().clone(),
+                                attr.id().clone(),
                             ),
-                            keyword.attr().range(),
+                            attr.range(),
                         );
                     }
                     self.visit_pattern(keyword.pattern());
@@ -2492,7 +2486,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 // match 2:
                 //     case Class(x) | [x] | x: ...
 
-                let mut previous_names: Option<FxHashSet<&ast::name::Name>> = None;
+                let mut previous_names: Option<FxHashSet<NameId>> = None;
                 for pattern in patterns {
                     let mut visitor = Self {
                         names: FxHashSet::default(),
@@ -2553,7 +2547,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
     /// Add an identifier to the set of visited names in `self` and emit a [`SemanticSyntaxError`]
     /// if `ident` has already been seen.
     fn insert(&mut self, ident: ast::Identifier<'a>) {
-        if !self.names.insert(ident.id()) {
+        if !self.names.insert(ident.name_id()) {
             SemanticSyntaxChecker::add_error(
                 self.ctx,
                 SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id().clone()),
