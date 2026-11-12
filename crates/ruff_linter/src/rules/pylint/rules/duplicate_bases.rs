@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{Arguments, ExprKind};
+use ruff_python_ast::Arguments;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -83,38 +83,37 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<A
     };
     let bases = arguments.args();
 
-    let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
+    let mut seen = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
     for base in bases {
-        if let ExprKind::Name(name_node) = base.classify() {
-            let id = name_node.id();
-            if !seen.insert(id) {
-                let mut diagnostic = checker.report_diagnostic(
-                    DuplicateBases {
-                        base: id.to_string(),
-                        class: name.to_string(),
-                    },
-                    base.range(),
-                );
-                diagnostic.try_set_fix(|| {
-                    remove_argument(
-                        &base,
-                        arguments,
-                        Parentheses::Remove,
-                        checker.locator().contents(),
-                        checker.tokens(),
+        if let Some(name_node) = base.as_name_expr()
+            && !seen.insert(name_node.name_id())
+        {
+            let mut diagnostic = checker.report_diagnostic(
+                DuplicateBases {
+                    base: name_node.id().to_string(),
+                    class: name.to_string(),
+                },
+                base.range(),
+            );
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    &base,
+                    arguments,
+                    Parentheses::Remove,
+                    checker.locator().contents(),
+                    checker.tokens(),
+                )
+                .map(|edit| {
+                    Fix::applicable_edit(
+                        edit,
+                        if checker.comment_ranges().intersects(arguments.range()) {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        },
                     )
-                    .map(|edit| {
-                        Fix::applicable_edit(
-                            edit,
-                            if checker.comment_ranges().intersects(arguments.range()) {
-                                Applicability::Unsafe
-                            } else {
-                                Applicability::Safe
-                            },
-                        )
-                    })
-                });
-            }
+                })
+            });
         }
     }
 }

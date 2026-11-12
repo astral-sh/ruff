@@ -72,13 +72,13 @@ pub(crate) fn loop_variable_overrides_iterator(
         clippy::iter_over_hash_type,
         reason = "iteration order does not affect the diagnostics produced"
     )]
-    for (name, expr) in target_names {
-        if iter_names.contains_key(name) {
+    for (id, name) in target_names {
+        if iter_names.contains_key(&id) {
             checker.report_diagnostic(
                 LoopVariableOverridesIterator {
-                    name: name.to_string(),
+                    name: name.id().to_string(),
                 },
-                expr.range(),
+                name.range(),
             );
         }
     }
@@ -86,14 +86,14 @@ pub(crate) fn loop_variable_overrides_iterator(
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FxHashMap<&'a str, Expr<'a>>,
+    names: FxHashMap<ast::NameId, ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
         let generators = match expr.classify() {
             ast::ExprKind::Name(name) => {
-                self.names.insert(name.id(), expr);
+                self.names.insert(name.name_id(), name);
                 return;
             }
             ast::ExprKind::ListComp(comp) => comp.generators(),
@@ -104,7 +104,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 visitor::walk_expr(self, lambda.body().classify());
                 if let Some(parameters) = lambda.parameters() {
                     for parameter in parameters.iter_non_variadic_params() {
-                        self.names.remove(parameter.name().as_str());
+                        self.names.remove(&parameter.name().name_id());
                     }
                 }
                 return;

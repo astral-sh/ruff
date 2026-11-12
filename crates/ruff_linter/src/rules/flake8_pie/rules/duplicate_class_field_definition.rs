@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
 
 /// PIE794
 pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: Suite<'_>) {
-    let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
+    let mut seen_targets = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
         let (target, value) = match stmt.classify() {
@@ -96,7 +96,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: Suite<'_
             continue;
         }
 
-        if !seen_targets.insert(target.id().as_str()) {
+        if !seen_targets.insert(target.name_id()) {
             let mut diagnostic = checker.report_diagnostic(
                 DuplicateClassFieldDefinition {
                     name: target.id().to_string(),
