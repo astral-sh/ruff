@@ -1979,8 +1979,10 @@ impl<'db> Type<'db> {
                 }
 
                 fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                    // This occurrence refers to the variable itself. Its declaration can refer
-                    // to other variables in bounds, constraints, or defaults.
+                    // Immediately return, since we don't need to recurse into the typevar's bounds,
+                    // constraints, or default. Those might contain other typevars, but those other
+                    // typevars are not free variables of this occurrence, and don't need to be added
+                    // to the final result.
                 }
 
                 fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
