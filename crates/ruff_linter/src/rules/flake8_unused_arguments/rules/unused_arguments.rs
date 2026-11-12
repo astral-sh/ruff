@@ -290,69 +290,21 @@ impl Argumentable {
     }
 }
 
-/// Check a plain function for unused arguments.
-fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
-    let ignore_variadic_names = checker
-        .settings()
-        .flake8_unused_arguments
-        .ignore_variadic_names;
-    let args = parameters
-        .iter_non_variadic_params()
-        .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(
-            parameters
-                .vararg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            parameters
-                .kwarg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(argumentable, args, scope, checker);
-}
-
-/// Check a method for unused arguments.
-fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
-    let ignore_variadic_names = checker
-        .settings()
-        .flake8_unused_arguments
-        .ignore_variadic_names;
-    let args = parameters
-        .iter_non_variadic_params()
-        .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(
-            parameters
-                .vararg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            parameters
-                .kwarg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(argumentable, args, scope, checker);
-}
-
-fn call<'a>(
+fn check_parameters(
     argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
+    parameters: &Parameters,
+    mut skip_receiver: bool,
     scope: &Scope,
     checker: &Checker,
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
-    for arg in parameters {
+    let check_argument = |arg: &Parameter| {
         let Some(binding) = scope
             .get(arg.name())
             .map(|binding_id| semantic.binding(binding_id))
         else {
-            continue;
+            return;
         };
         if binding.kind.is_argument()
             && binding.is_unused()
@@ -360,6 +312,18 @@ fn call<'a>(
         {
             argumentable.check_for(checker, arg.name.to_string(), binding.range());
         }
+    };
+    let (vararg, kwarg) = parameters.split_variadic(|parameter| {
+        if !std::mem::take(&mut skip_receiver) {
+            check_argument(&parameter.parameter);
+        }
+    });
+    if !checker
+        .settings()
+        .flake8_unused_arguments
+        .ignore_variadic_names
+    {
+        vararg.into_iter().chain(kwarg).for_each(check_argument);
     }
 }
 
@@ -456,7 +420,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(Argumentable::Function, parameters, scope, checker);
+                        check_parameters(Argumentable::Function, parameters, false, scope, checker);
                     }
                 }
                 function_type::FunctionType::Method => {
@@ -470,7 +434,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(Argumentable::Method, parameters, scope, checker);
+                        check_parameters(Argumentable::Method, parameters, true, scope, checker);
                     }
                 }
                 function_type::FunctionType::ClassMethod => {
@@ -484,7 +448,13 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(Argumentable::ClassMethod, parameters, scope, checker);
+                        check_parameters(
+                            Argumentable::ClassMethod,
+                            parameters,
+                            true,
+                            scope,
+                            checker,
+                        );
                     }
                 }
                 function_type::FunctionType::StaticMethod => {
@@ -498,7 +468,13 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(Argumentable::StaticMethod, parameters, scope, checker);
+                        check_parameters(
+                            Argumentable::StaticMethod,
+                            parameters,
+                            false,
+                            scope,
+                            checker,
+                        );
                     }
                 }
                 function_type::FunctionType::NewMethod => {
@@ -509,9 +485,14 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        // we use `method()` here rather than `function()`, as although `__new__` is
-                        // an implicit staticmethod, `__new__` methods must always have at least one parameter
-                        method(Argumentable::StaticMethod, parameters, scope, checker);
+                        // Although `__new__` is an implicit staticmethod, it must have at least one parameter
+                        check_parameters(
+                            Argumentable::StaticMethod,
+                            parameters,
+                            true,
+                            scope,
+                            checker,
+                        );
                     }
                 }
             }
@@ -519,7 +500,7 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
                 if checker.is_rule_enabled(Argumentable::Lambda.rule_code()) {
-                    function(Argumentable::Lambda, parameters, scope, checker);
+                    check_parameters(Argumentable::Lambda, parameters, false, scope, checker);
                 }
             }
         }

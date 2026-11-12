@@ -57,7 +57,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, file_to_module};
@@ -632,11 +632,16 @@ impl<'db> OverloadLiteral<'db> {
         ) -> bool {
             let parameters = &node.parameters;
 
-            if parameters.posonlyargs().next().is_some() {
-                return false;
-            }
-
-            let Some(first_param) = parameters.args().next() else {
+            let mut positional = parameters.items.iter().filter(|item| {
+                matches!(
+                    item,
+                    ast::ParameterItem::PositionalOnly(_)
+                        | ast::ParameterItem::PositionalOrKeyword(_)
+                )
+            });
+            // An explicit `/` makes the first positional parameter positional-only.
+            let Some(ast::ParameterItem::PositionalOrKeyword(first_param)) = positional.next()
+            else {
                 return false;
             };
 
@@ -654,10 +659,8 @@ impl<'db> OverloadLiteral<'db> {
 
             // `self` and `cls` are always positional-only if the next parameter uses the
             // PEP-484 convention.
-            if parameters
-                .args()
-                .nth(1)
-                .is_some_and(ParameterWithDefault::uses_pep_484_positional_only_convention)
+            if let Some(ast::ParameterItem::PositionalOrKeyword(next)) = positional.next()
+                && next.uses_pep_484_positional_only_convention()
             {
                 return true;
             }

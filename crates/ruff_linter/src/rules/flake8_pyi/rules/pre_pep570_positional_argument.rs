@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::ParameterItem;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::function_type;
 
@@ -62,13 +63,16 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
         return;
     }
 
-    if function_def.parameters.posonlyargs().next().is_some() {
+    let mut positional = function_def.parameters.items.iter().filter(|item| {
+        matches!(
+            item,
+            ParameterItem::PositionalOnly(_) | ParameterItem::PositionalOrKeyword(_)
+        )
+    });
+    // An explicit `/` makes the first positional parameter positional-only.
+    let Some(ParameterItem::PositionalOrKeyword(first)) = positional.next() else {
         return;
-    }
-
-    if function_def.parameters.args().next().is_none() {
-        return;
-    }
+    };
 
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
@@ -82,16 +86,20 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
     );
 
     // If the method has a `self` or `cls` argument, skip it.
-    let skip = usize::from(matches!(
+    let param = if matches!(
         function_type,
         function_type::FunctionType::Method
             | function_type::FunctionType::ClassMethod
             | function_type::FunctionType::NewMethod
-    ));
-
-    if let Some(param) = function_def.parameters.args().nth(skip) {
-        if param.uses_pep_484_positional_only_convention() {
-            checker.report_diagnostic(Pep484StylePositionalOnlyParameter, param.identifier());
-        }
+    ) {
+        let Some(ParameterItem::PositionalOrKeyword(second)) = positional.next() else {
+            return;
+        };
+        second
+    } else {
+        first
+    };
+    if param.uses_pep_484_positional_only_convention() {
+        checker.report_diagnostic(Pep484StylePositionalOnlyParameter, param.identifier());
     }
 }
