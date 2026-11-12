@@ -6024,8 +6024,8 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
         ) -> MemberLookupResult<'db> {
-            /// A class object read through an attribute can vary if the attribute is writable or
-            /// a subclass can override it.
+            /// Widen a class literal `<class 'C'>` to `type[C]` when this attribute read can
+            /// produce a different class.
             fn promote_attribute_class_literals<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
@@ -11951,8 +11951,10 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
-        /// A read-only attribute defined by a nested class statement. Subclasses can override it
-        /// covariantly, so reads that can see an override expose `type[C]`.
+        /// A read-only attribute introduced by a nested `class` statement. Subclasses can override
+        /// it covariantly. The class object has type `<class 'C'>` when read through the defining
+        /// class and `type[C]` when read through a receiver that includes subclasses and could see
+        /// an override.
         const NESTED_CLASS = 1 << 8;
     }
 }
