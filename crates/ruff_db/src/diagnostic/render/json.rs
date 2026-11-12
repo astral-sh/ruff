@@ -1,5 +1,5 @@
 use serde::{Serialize, Serializer, ser::SerializeSeq};
-use serde_json::{Value, json};
+use std::{fmt, io};
 
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::NotebookIndex;
@@ -28,24 +28,19 @@ impl<'a> JsonRenderer<'a> {
 
 impl Renderer for JsonRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
-        write!(
-            f,
-            "{:#}",
-            diagnostics_to_json_value(diagnostics, self.resolver, self.config)
-        )
+        let mut output = Vec::new();
+        self.write(&mut output, diagnostics)
+            .map_err(|_| fmt::Error)?;
+        f.write_str(str::from_utf8(&output).map_err(|_| fmt::Error)?)
     }
-}
 
-fn diagnostics_to_json_value<'a>(
-    diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
-    resolver: &dyn FileResolver,
-    config: &DisplayDiagnosticConfig,
-) -> Value {
-    let values: Vec<_> = diagnostics
-        .into_iter()
-        .map(|diag| diagnostic_to_json(diag, resolver, config))
-        .collect();
-    json!(values)
+    fn write(&self, writer: &mut dyn io::Write, diagnostics: &[Diagnostic]) -> io::Result<()> {
+        let values = diagnostics
+            .iter()
+            .map(|diag| diagnostic_to_json(diag, self.resolver, self.config));
+        serde_json::Serializer::pretty(writer).collect_seq(values)?;
+        Ok(())
+    }
 }
 
 pub(super) fn diagnostic_to_json<'a>(
@@ -209,14 +204,14 @@ impl Serialize for ExpandedEdits<'_> {
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
     code: Option<&'a str>,
-    name: &'a str,
-    severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
     location: Option<JsonLocation>,
     message: ConciseMessage<'a>,
+    name: &'a str,
     noqa_row: Option<OneIndexed>,
+    severity: Severity,
     url: Option<&'a str>,
 }
 
