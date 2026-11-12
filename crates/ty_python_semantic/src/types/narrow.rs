@@ -4206,12 +4206,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     else {
                         return;
                     };
-                    if function_type.known(db) != Some(KnownFunction::Len)
-                        || call.arguments.keywords().next().is_some()
-                    {
+                    if function_type.known(db) != Some(KnownFunction::Len) {
                         return;
                     }
-                    let Some([arg]) = call.arguments.args().collect_array() else {
+                    let Some(arg) = call.arguments.as_single_positional() else {
                         return;
                     };
                     let Some(length) = length_type.resolve_type_alias(db).as_int_like_literal()
@@ -4602,7 +4600,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
             // (str, list, etc.) are kept unchanged.
             Type::FunctionLiteral(function_type)
-                if let [ast::Argument::Positional(arg)] = expr_call.arguments.items.as_slice()
+                if let Some(arg) = expr_call.arguments.as_single_positional()
                     && function_type.known(db) == Some(KnownFunction::Len) =>
             {
                 let arg_ty = inference.expression_type(arg);
@@ -4710,7 +4708,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
             Type::ClassLiteral(class_type)
-                if let [ast::Argument::Positional(arg)] = expr_call.arguments.items.as_slice()
+                if let Some(arg) = expr_call.arguments.as_single_positional()
                     && class_type.is_known(db, KnownClass::Bool) =>
             {
                 self.evaluate_expression_node_predicate(arg, expression, is_positive)

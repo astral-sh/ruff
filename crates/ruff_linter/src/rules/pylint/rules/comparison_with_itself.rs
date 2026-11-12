@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCompare};
 use ruff_text_size::Ranged;
@@ -69,20 +68,14 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: &ExprCompare) {
             // Ex) `id(foo) == id(foo)`
             (Expr::Call(left_call), Expr::Call(right_call)) => {
                 // Both calls must take a single argument, of the same name.
-                if left_call.arguments.keywords().next().is_some()
-                    || right_call.arguments.keywords().next().is_some()
-                {
+                let Some(Expr::Name(left_arg)) = left_call.arguments.as_single_positional() else {
                     continue;
-                }
-                let Some([Expr::Name(left_arg)]) = left_call.arguments.args().collect_array()
+                };
+                let Some(Expr::Name(right_arg)) = right_call.arguments.as_single_positional()
                 else {
                     continue;
                 };
-                let Some([Expr::Name(right_right)]) = right_call.arguments.args().collect_array()
-                else {
-                    continue;
-                };
-                if left_arg.id != right_right.id {
+                if left_arg.id != right_arg.id {
                     continue;
                 }
 

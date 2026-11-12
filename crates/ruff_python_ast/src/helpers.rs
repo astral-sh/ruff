@@ -1484,9 +1484,7 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if let [ast::Argument::Positional(argument)] =
-                            arguments.items.as_slice()
-                        {
+                        } else if let Some(argument) = arguments.as_single_positional() {
                             // Ex) `list([1, 2, 3])`
                             match argument {
                                 // Return Unknown for types with definite truthiness that might
