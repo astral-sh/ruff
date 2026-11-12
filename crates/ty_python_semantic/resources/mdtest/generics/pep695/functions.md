@@ -2094,6 +2094,34 @@ def invalid_argument_with_context[S](value: Callable[[], S]) -> list[str]:
     return box_callable(value)  # error: [invalid-argument-type]
 ```
 
+## Forwarding a list through a bounded type variable
+
+The bound `list[Any]` accepts a list with any element type. When the argument is a `list[T]`, `keep`
+returns that same `list[T]`.
+
+```py
+from typing import Any
+
+def keep[L: list[Any]](items: L) -> L:
+    return items
+
+def forward[T](items: list[T]) -> list[T]:
+    return reveal_type(keep(items))  # revealed: list[T@forward]
+
+def wrong[T](items: list[str], sample: T) -> list[T]:
+    return keep(items)  # error: [invalid-return-type]
+```
+
+A bare `list` bound also preserves the caller's element type.
+
+```py
+def keep_bare[L: list](items: L) -> L:  # error: [missing-type-argument]
+    return items
+
+def forward_bare[T](items: list[T]) -> list[T]:
+    return reveal_type(keep_bare(items))  # revealed: list[T@forward_bare]
+```
+
 ## Inferring a bound from a narrowed protocol
 
 Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original

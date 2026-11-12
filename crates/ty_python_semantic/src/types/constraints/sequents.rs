@@ -14,8 +14,8 @@ use crate::types::constraints::variables::{
     TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
-    OwnedConstraintSet,
+    ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, EvidenceSource,
+    Node, OwnedConstraintSet,
 };
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
@@ -24,8 +24,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
-    TypeContext, TypeMapping, TypeVarVariance, UnionType,
+    ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType,
+    IntersectionType, Type, TypeContext, TypeMapping, TypeVarVariance, UnionType,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
@@ -147,8 +147,8 @@ pub(super) enum Sequent<C, FuelCost = ()> {
         ante1: C,
         ante2: C,
         post: C,
-        /// Whether this sequent represents a _substitution_ of `ante1` with `post`.
-        is_substitution: bool,
+        /// Whether `post` can replace `ante1` when choosing a solution.
+        can_replace_ante1: bool,
         fuel_cost: FuelCost,
     },
 }
@@ -343,22 +343,45 @@ impl<'db> SequentMapBuilder<'db> {
             ante1: InternedSequentConstraint::new(self.db, ante1),
             ante2: InternedSequentConstraint::new(self.db, ante2),
             post: InternedSequentConstraint::new(self.db, post),
-            is_substitution: false,
+            can_replace_ante1: false,
             fuel_cost: (),
         });
     }
 
+    /// Adds an implication whose `post` was derived by rewriting `original` using `equivalence`.
     fn add_substitution(
         &mut self,
-        substituted: AtomicConstraint<'db>,
-        ante: AtomicConstraint<'db>,
+        original: AtomicConstraint<'db>,
+        equivalence: AtomicConstraint<'db>,
         post: AtomicConstraint<'db>,
     ) {
+        // Consider a call to an identity function with a gradual bound.
+        //
+        //   from typing import Any
+        //
+        //   def keep[L: list[Any]](items: L) -> L: return items
+        //   def forward[T](items: list[T]) -> list[T]: return keep(items)
+        //
+        // The solver combines `list[T] ≤ L ≤ list[T]` with the declared bound `L ≤ list[Any]`
+        // and records `T = Any`, even though `T` is fixed by the caller. Substitution gives
+        // us `list[Any] ≤ L`. We still need the argument's `list[T] ≤ L` to infer `list[T]`.
+        //
+        // TODO(https://github.com/astral-sh/ty/issues/4696): Keep non-inferable type variables
+        // out of constraint solving. Until then, keeping the original argument constraint is a
+        // narrow workaround to avoid losing the caller's `T` to `Any` or `Unknown`.
+        let keep_argument_constraint = EvidenceSource::Inferred.includes(original.provenance())
+            && equivalence
+                .provenance()
+                .contains(ConstraintProvenance::DECLARED)
+            && matches!(
+                equivalence.as_concrete(),
+                Some((_, Type::Dynamic(DynamicType::Unknown | DynamicType::Any)))
+            );
         self.pending.push(Sequent::PairImplication {
-            ante1: InternedSequentConstraint::new(self.db, substituted),
-            ante2: InternedSequentConstraint::new(self.db, ante),
+            ante1: InternedSequentConstraint::new(self.db, original),
+            ante2: InternedSequentConstraint::new(self.db, equivalence),
             post: InternedSequentConstraint::new(self.db, post),
-            is_substitution: true,
+            can_replace_ante1: !keep_argument_constraint,
             fuel_cost: (),
         });
     }
