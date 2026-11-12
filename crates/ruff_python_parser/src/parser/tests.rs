@@ -555,6 +555,12 @@ fn recovered_parameters_keep_written_and_binding_order() {
     };
     let parameters = &function.parameters;
     assert_eq!(parameters.len(), 5);
+    assert!(
+        parameters
+            .items_in_binding_order()
+            .map(|item| item.as_ref().name().as_str())
+            .eq(parameters.iter().map(|p| p.name().as_str()))
+    );
     assert_eq!(
         parameters
             .iter_source_order()
