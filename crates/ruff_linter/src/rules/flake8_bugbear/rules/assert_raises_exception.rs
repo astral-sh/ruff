@@ -134,7 +134,18 @@ pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCa
     let arguments = call.arguments;
     let semantic = checker.semantic();
 
-    if arguments.args().len() < 2 && arguments.find_argument("func", 1).is_none() {
+    if arguments.len() < 2 {
+        return;
+    }
+    let mut positionals = 0;
+    let has_callable = arguments.iter_source_order().any(|item| match item {
+        ast::ArgOrKeyword::Arg(_) => {
+            positionals += 1;
+            positionals == 2
+        }
+        ast::ArgOrKeyword::Keyword(keyword) => keyword.arg().is_some_and(|name| name == "func"),
+    });
+    if !has_callable {
         return;
     }
 

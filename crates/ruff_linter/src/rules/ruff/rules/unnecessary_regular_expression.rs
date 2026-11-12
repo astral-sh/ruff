@@ -189,13 +189,13 @@ impl<'a> ReFunc<'a> {
             None => (None, call.range()),
         };
 
-        match (func_name, call.arguments().len()) {
-            // `split` is the safest of these to fix, as long as metacharacters
-            // have already been filtered out from the `pattern`
-            ("split", 2) => Some(ReFunc {
-                kind: ReFuncKind::Split,
-                pattern: call.arguments().find_argument_value("pattern", 0)?,
-                string: call.arguments().find_argument_value("string", 1)?,
+        let arguments = call.arguments();
+        let from_pattern_and_string = |kind| {
+            let [pattern, string] = arguments.find_argument_values(["pattern", "string"]);
+            Some(ReFunc {
+                kind,
+                pattern: pattern?,
+                string: string?,
                 comparison_to_none,
                 range,
             })
@@ -208,7 +208,11 @@ impl<'a> ReFunc<'a> {
             // allows it to be a function, which will *not* work in the str
             // version
             ("sub", 3) => {
-                let repl = call.arguments().find_argument_value("repl", 1)?;
+                let [Some(pattern), Some(repl), Some(string)] =
+                    arguments.find_argument_values(["pattern", "repl", "string"])
+                else {
+                    return None;
+                };
                 let lit = resolve_literal(repl, semantic)?;
                 let mut fixable = true;
 
@@ -255,33 +259,17 @@ impl<'a> ReFunc<'a> {
                     kind: ReFuncKind::Sub {
                         repl: fixable.then_some(repl),
                     },
-                    pattern: call.arguments().find_argument_value("pattern", 0)?,
-                    string: call.arguments().find_argument_value("string", 2)?,
+                    pattern,
+                    string,
                     comparison_to_none,
                     range,
                 })
             }
-            ("match" | "prefixmatch", 2) if in_truthy_context => Some(ReFunc {
-                kind: ReFuncKind::Match,
-                pattern: call.arguments().find_argument_value("pattern", 0)?,
-                string: call.arguments().find_argument_value("string", 1)?,
-                comparison_to_none,
-                range,
-            }),
-            ("search", 2) if in_truthy_context => Some(ReFunc {
-                kind: ReFuncKind::Search,
-                pattern: call.arguments().find_argument_value("pattern", 0)?,
-                string: call.arguments().find_argument_value("string", 1)?,
-                comparison_to_none,
-                range,
-            }),
-            ("fullmatch", 2) if in_truthy_context => Some(ReFunc {
-                kind: ReFuncKind::Fullmatch,
-                pattern: call.arguments().find_argument_value("pattern", 0)?,
-                string: call.arguments().find_argument_value("string", 1)?,
-                comparison_to_none,
-                range,
-            }),
+            ("match" | "prefixmatch", 2) if in_truthy_context => {
+                from_pattern_and_string(ReFuncKind::Match)
+            }
+            ("search", 2) if in_truthy_context => from_pattern_and_string(ReFuncKind::Search),
+            ("fullmatch", 2) if in_truthy_context => from_pattern_and_string(ReFuncKind::Fullmatch),
             _ => None,
         }
     }

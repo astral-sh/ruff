@@ -58,13 +58,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ExprCallFiel
 
     // any call to `zip()` with at least 2 iterables, or a starred argument.
     if semantic.match_builtin_expr(call.func, "zip")
-        && call.arguments.find_keyword("strict").is_none()
-        && (call.arguments.args().len() >= 2
-            || call
-                .arguments
-                .args()
-                .iter()
-                .any(ruff_python_ast::Expr::is_starred_expr))
+        && needs_strict_argument(call.arguments, 2)
         && !any_infinite_iterables(call.arguments.args().iter(), semantic)
     {
         checker

@@ -811,8 +811,7 @@ impl SemanticSyntaxChecker {
             return;
         }
 
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(args.keywords().len(), FxBuildHasher);
+        let mut all_arg_names = FxHashSet::default();
 
         for (ident, range) in args
             .keywords()

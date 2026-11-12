@@ -121,10 +121,8 @@ fn typing_generic_base_and_arguments<'a>(
     class_arguments: Arguments<'a>,
     semantic: &SemanticModel,
 ) -> Option<(ExprSubscript<'a>, Expr<'a>)> {
-    let (_, base @ expr_subscript) = find_generic(class_arguments, semantic)?;
-    let slice = expr_subscript.slice();
-
-    Some((base, slice))
+    let base = find_generic(class_arguments.args().iter(), semantic)?;
+    Some((base, base.slice()))
 }
 
 fn convert_type_vars(

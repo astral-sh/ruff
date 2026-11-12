@@ -77,10 +77,6 @@ pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCallFields<'_>, segm
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(call.arguments, &["path"]) {
-        return;
-    }
-
     check_os_pathlib_single_arg_calls(
         checker,
         call,

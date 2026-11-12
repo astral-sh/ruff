@@ -116,21 +116,19 @@ pub(crate) fn generic_not_last_base_class(
         return;
     }
 
-    let Some(last_base) = bases.args().last() else {
+    let mut remaining_bases = bases.args().iter();
+    let is_generic =
+        |base: ast::Expr<'_>| semantic.match_typing_expr(map_subscript(base), "Generic");
+    let Some(generic_base) = remaining_bases.find(|base| is_generic(*base)) else {
         return;
     };
 
-    let mut generic_base_iter = bases
-        .args()
-        .iter()
-        .filter(|base| semantic.match_typing_expr(map_subscript(*base), "Generic"));
-
-    let Some(generic_base) = generic_base_iter.next() else {
-        return;
-    };
-
-    // If `Generic[]` exists, but is the last base, don't emit a diagnostic.
-    if generic_base.range() == last_base.range() {
+    // Recovered syntax can give distinct bases the same range.
+    if remaining_bases
+        .clone()
+        .next_back()
+        .is_none_or(|last| last.range() == generic_base.range())
+    {
         return;
     }
 

@@ -99,10 +99,10 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCallFields<'_>, segments:
         return;
     }
 
-    let (Some(src), Some(dst)) = (
-        call.arguments.find_argument_value("src", 0),
-        call.arguments.find_argument_value("dst", 1),
-    ) else {
+    let [Some(src), Some(dst), target_is_directory] =
+        call.arguments
+            .find_argument_values(["src", "dst", "target_is_directory"])
+    else {
         return;
     };
 
@@ -123,9 +123,7 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCallFields<'_>, segments:
         let src_code = locator.slice(src.range());
         let dst_code = locator.slice(dst.range());
 
-        let target_is_directory = call
-            .arguments
-            .find_argument_value("target_is_directory", 2)
+        let target_is_directory = target_is_directory
             .and_then(|expr| {
                 let code = locator.slice(expr.range());
                 expr.as_boolean_literal_expr()

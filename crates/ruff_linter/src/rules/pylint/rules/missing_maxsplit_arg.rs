@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprKind, Number, UnaryOp};
+use ruff_python_ast::{self as ast, ArgOrKeyword, Expr, ExprKind, Number, UnaryOp};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -170,38 +170,32 @@ pub(crate) fn missing_maxsplit_arg(
         return;
     }
 
-    // Check the function does not have maxsplit set
-    if arguments.find_argument_value("maxsplit", 1).is_some() {
-        return;
-    }
-
-    // Check maxsplit kwarg not set via unpacked dict literal
-    for keyword in arguments.keywords() {
-        let value = keyword.value();
-
-        if let ExprKind::Dict(dict_node) = value.classify() {
-            let items = dict_node.items();
-            for item in items {
-                if let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                    value,
-                    ..
-                })) = item.key().map(Expr::fields)
-                {
-                    if value.to_str() == "maxsplit" {
+    let mut positional_count = Some(0);
+    let mut applicability = Applicability::Safe;
+    for item in arguments.iter_source_order() {
+        match item {
+            ArgOrKeyword::Arg(arg) => {
+                if arg.is_starred_expr() {
+                    // A subsequent positional argument could fill either parameter.
+                    positional_count = None;
+                    applicability = Applicability::Unsafe;
+                } else if let Some(count) = &mut positional_count {
+                    *count += 1;
+                    if *count == 2 {
                         return;
                     }
                 }
             }
             ArgOrKeyword::Keyword(keyword) => {
-                match keyword.arg.as_ref() {
+                match keyword.arg() {
                     Some(name) if name == "maxsplit" => return,
                     None => applicability = Applicability::Unsafe,
                     _ => {}
                 }
-                if let Some(dict) = keyword.value.as_dict_expr()
+                if let Some(dict) = keyword.value().as_dict_expr()
                     && dict.iter_keys().flatten().any(|key| {
                         key.as_string_literal_expr()
-                            .is_some_and(|key| key.value.to_str() == "maxsplit")
+                            .is_some_and(|key| key.value().to_str() == "maxsplit")
                     })
                 {
                     return;
@@ -239,14 +233,6 @@ pub(crate) fn missing_maxsplit_arg(
     diagnostic.set_fix(Fix::applicable_edits(
         maxsplit_argument_edit,
         split_type_edit,
-        // Mark the fix as unsafe, if there are `*args` or `**kwargs`
-        if arguments
-            .iter_source_order()
-            .any(ruff_python_ast::ArgOrKeyword::is_variadic)
-        {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        },
+        applicability,
     ));
 }

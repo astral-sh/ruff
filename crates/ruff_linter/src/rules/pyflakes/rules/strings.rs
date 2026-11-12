@@ -561,10 +561,6 @@ impl Violation for StringDotFormatMixingAutomatic {
     }
 }
 
-fn has_star_star_kwargs(keywords: ast::FilteredNodes<'_, ruff_python_ast::kind::Keyword>) -> bool {
-    keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
-}
-
 /// F502
 pub(crate) fn percent_format_expected_mapping(
     checker: &Checker,
@@ -793,30 +789,16 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 ) {
     let keywords = call_fields.arguments.keywords();
     let call = call_fields.node;
-    // If there are any **kwargs, abort.
-    if has_star_star_kwargs(keywords) {
-        return;
+    let mut missing = Vec::new();
+    for (index, keyword) in keywords.iter().enumerate() {
+        let Some(name) = keyword.arg() else {
+            // An unpacking may supply any of the format fields.
+            return;
+        };
+        if !summary.keywords.contains(name.id()) {
+            missing.push((index, name.id(), keyword.value()));
+        }
     }
-
-    let keyword_names = keywords.iter().filter_map(|keyword| {
-        let arg = keyword.arg();
-        let value = keyword.value();
-        Some((arg?, value))
-    });
-
-    let mut side_effects = false;
-    let missing: Vec<(usize, &Name)> = keyword_names
-        .enumerate()
-        .filter_map(|(index, (keyword, value))| {
-            if summary.keywords.contains(keyword.id()) {
-                None
-            } else {
-                side_effects |=
-                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
-                Some((index, keyword.id()))
-            }
-        })
-        .collect();
 
     if missing.is_empty() {
         return;
@@ -829,7 +811,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     );
     diagnostic.try_set_fix(|| {
         let side_effects = missing.iter().any(|(_, _, value)| {
-            contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+            contains_effect(*value, |id| checker.semantic().has_builtin_binding(id))
         });
         let indexes: Vec<usize> = missing.into_iter().map(|(index, _, _)| index).collect();
         let edit = remove_unused_keyword_arguments_from_format_call(
@@ -861,37 +843,18 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
     // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-    fn is_contiguous_from_end(indexes: &[usize], target_len: usize) -> bool {
-        if indexes.is_empty() {
-            return true;
-        }
-
-        let mut expected_index = target_len - 1;
-        for &index in indexes.iter().rev() {
-            if index != expected_index {
-                return false;
-            }
-
-            if expected_index == 0 {
-                break;
-            }
-
-            expected_index -= 1;
-        }
-
-        true
-    }
-
-    let args = call.arguments.args();
-
+    let mut missing = Vec::new();
     let mut side_effects = false;
-    let missing: Vec<usize> = args
-        .iter()
-        .enumerate()
-        .filter(|(i, arg)| {
-            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
-        })
-        .map(|(i, arg)| {
+    let mut can_fix = true;
+    for (index, arg) in call.arguments.args().iter().enumerate() {
+        if arg.is_starred_expr()
+            || summary.autos.contains(&index)
+            || summary.indices.contains(&index)
+        {
+            if !missing.is_empty() {
+                can_fix = false;
+            }
+        } else {
             side_effects |= contains_effect(arg, |id| checker.semantic().has_builtin_binding(id));
             missing.push(index);
         }
@@ -911,7 +874,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         call.range,
     );
 
-    if is_contiguous_from_end(&missing, args.len()) {
+    if can_fix {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,

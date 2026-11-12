@@ -459,8 +459,30 @@ impl<'a> crate::Parameters<'a> {
         )
     }
 
+    /// Returns the first parameter in argument-binding order.
+    pub fn first(self) -> Option<AnyParameter<'a>> {
+        let first = self.items().iter().next()?;
+        if matches!(
+            first,
+            crate::ParameterItem::PositionalOnly(_) | crate::ParameterItem::PositionalOrKeyword(_)
+        ) || self.items().is_in_binding_order()
+        {
+            Some(first.into_parameter())
+        } else {
+            self.iter_grouped().next()
+        }
+    }
+
     /// Iterates parameters in argument-binding order.
     pub fn iter(self) -> impl DoubleEndedIterator<Item = AnyParameter<'a>> {
+        if self.items().is_in_binding_order() {
+            itertools::Either::Left(self.iter_source_order())
+        } else {
+            itertools::Either::Right(self.iter_grouped())
+        }
+    }
+
+    fn iter_grouped(self) -> impl DoubleEndedIterator<Item = AnyParameter<'a>> {
         self.iter_positional_params()
             .map(AnyParameter::NonVariadic)
             .chain(
@@ -902,6 +924,38 @@ impl<'a> crate::Arguments<'a> {
     pub fn keywords(self) -> super::FilteredNodes<'a, crate::kind::Keyword> {
         super::FilteredNodes::new(self.items())
     }
+    /// Look up the first `N` parameters by position or keyword. An explicit
+    /// keyword takes precedence over a positional value, just like `find_argument`.
+    pub fn find_argument_values<const N: usize>(self, names: [&str; N]) -> [Option<Expr<'a>>; N] {
+        let mut values = [None; N];
+        let mut from_keyword = [false; N];
+        let mut position = 0;
+        for item in self.iter_source_order() {
+            match item {
+                ArgOrKeyword::Arg(arg) if position < N => {
+                    if arg.is_starred_expr() {
+                        position = N;
+                    } else {
+                        if !from_keyword[position] {
+                            values[position] = Some(arg);
+                        }
+                        position += 1;
+                    }
+                }
+                ArgOrKeyword::Keyword(keyword) if let Some(name) = keyword.arg() => {
+                    for (index, &requested) in names.iter().enumerate() {
+                        if !from_keyword[index] && name.as_str() == requested {
+                            values[index] = Some(keyword.value());
+                            from_keyword[index] = true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        values
+    }
+
     pub fn find_argument(self, name: &str, position: usize) -> Option<ArgOrKeyword<'a>> {
         self.find_argument_as(name, position, ArgOrKeyword::Keyword, ArgOrKeyword::Arg)
     }
@@ -1044,6 +1098,13 @@ impl ParameterWithDefault<'_> {
     pub fn uses_pep_484_positional_only_convention(self) -> bool {
         let name = self.name();
         name.starts_with("__") && !name.ends_with("__")
+    }
+}
+
+impl crate::DictItem<'_> {
+    /// Whether this item unpacks a mapping (`**mapping`).
+    pub fn is_unpacking(self) -> bool {
+        self.syntax.row.dict_item_key() == 0
     }
 }
 

@@ -867,25 +867,21 @@ pub(crate) fn parametrize(
         return;
     }
 
-    if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
-
-        if let (Some(names), Some(values)) = (names, values) {
+    let [names, Some(values)] = call
+        .arguments
+        .find_argument_values(["argnames", "argvalues"])
+    else {
+        return;
+    };
+    if let Some(names) = names {
+        if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType) {
             check_names(checker, call.node, names, values);
         }
-    }
-    if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
-
-        if let (Some(names), Some(values)) = (names, values) {
+        if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType) {
             check_values(checker, names, values);
         }
     }
     if checker.is_rule_enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
-            check_duplicates(checker, values);
-        }
+        check_duplicates(checker, values);
     }
 }

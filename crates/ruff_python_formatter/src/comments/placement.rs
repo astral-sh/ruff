@@ -232,8 +232,12 @@ fn handle_enclosed_comment<'a>(
         AnyNode::ExprNamed(_) => handle_named_expr_comment(comment, source),
         AnyNode::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
         AnyNode::ExprDict(_) => handle_bracketed_end_of_line_comment(comment, source),
-        AnyNode::DictItem(_) => handle_dict_unpacking_comment(comment, source)
-            .or_else(|comment| handle_key_value_comment(comment, source)),
+        AnyNode::DictItem(item) => match (comment.preceding_node(), comment.following_node()) {
+            // The two children of a keyed item are its key and value.
+            (Some(_), Some(_)) => CommentPlacement::dangling(comment.enclosing_node(), comment),
+            (None, Some(value)) if item.is_unpacking() => CommentPlacement::leading(value, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNode::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source))
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
@@ -1327,7 +1331,7 @@ fn handle_dict_unpacking_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node().classify(),
-        AnyNode::DictItem(_) | AnyNode::ExprDictComp(_)
+        AnyNode::ExprDictComp(_)
     );
 
     // no node after our comment so we can't be between `**` and the name (node)
@@ -1370,7 +1374,7 @@ fn handle_key_value_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node().classify(),
-        AnyNode::DictItem(_) | AnyNode::ExprDictComp(_)
+        AnyNode::ExprDictComp(_)
     );
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())

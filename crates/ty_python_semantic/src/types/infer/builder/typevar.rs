@@ -1307,12 +1307,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if let Some(starred) = arguments.args().iter().find(|arg| arg.is_starred_expr()) {
-            return error(
-                &self.context,
-                "Starred arguments are not supported in `TypeVar` creation",
-                starred,
-            );
+        let mut positional_name = None;
+        let mut first_constraint = None;
+        let mut multiple_constraints = false;
+        for (index, arg) in arguments.args().into_iter().enumerate() {
+            if arg.is_starred_expr() {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVar` creation",
+                    arg,
+                );
+            }
+            match index {
+                0 => positional_name = Some(arg),
+                1 => first_constraint = Some(arg),
+                _ => multiple_constraints = true,
+            }
         }
 
         for kwarg in arguments.keywords() {
@@ -1327,7 +1337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if !arguments.args().is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVar` can only be provided once.",
@@ -1574,23 +1584,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let num_constraints = arguments.args().len().saturating_sub(1);
-
-        let bound_or_constraints = match (has_bound, num_constraints) {
-            (false, 0) => None,
-            (true, 0) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
-            (true, _) => {
+        let bound_or_constraints = match (has_bound, first_constraint) {
+            (false, None) => None,
+            (true, None) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+            (true, Some(_)) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot have both a bound and constraints",
                     call_expr,
                 );
             }
-            (_, 1) => {
+            (false, Some(constraint)) if !multiple_constraints => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot have exactly one constraint",
-                    arguments.args().at(1),
+                    constraint,
                 );
             }
             (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),

@@ -64,16 +64,7 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ExprCallFiel
     let semantic = checker.semantic();
 
     if semantic.match_builtin_expr(call.func, "map")
-        && call.arguments.find_keyword("strict").is_none()
-        && (
-            // at least 2 iterables (+ 1 function), or a starred argument.
-            call.arguments.args().len() >= 3
-                || call
-                    .arguments
-                    .args()
-                    .iter()
-                    .any(ruff_python_ast::Expr::is_starred_expr)
-        )
+        && needs_strict_argument(call.arguments, 3)
         && !any_infinite_iterables(call.arguments.args().iter().skip(1), semantic)
     {
         checker

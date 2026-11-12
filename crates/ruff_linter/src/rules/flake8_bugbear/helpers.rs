@@ -1,5 +1,7 @@
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::{AstNodeId, Builder, Expr, ExprContext, ExprKind, ListId};
+use ruff_python_ast::{
+    ArgOrKeyword, Arguments, AstNodeId, Builder, Expr, ExprContext, ExprKind, ListId,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -50,30 +52,29 @@ pub(crate) fn is_infinite_iterable(arg: Expr<'_>, semantic: &SemanticModel) -> b
     };
     let func = call_node.func();
     let arguments = call_node.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
 
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| match qualified_name.segments() {
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
-                // Ex) `itertools.repeat(1)`
-                if keywords.is_empty() && args.len() == 1 {
-                    return true;
-                }
-
-                // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args.at(1).is_none_literal_expr() {
-                    return true;
-                }
-
-                // Ex) `itertools.repeat(1, times=None)`
-                for keyword in keywords {
-                    if keyword.arg().is_some_and(|name| name == "times")
-                        && keyword.value().is_none_literal_expr()
-                    {
-                        return true;
+                let mut positionals = 0;
+                let mut second_is_none = false;
+                for item in arguments.iter_source_order() {
+                    match item {
+                        ArgOrKeyword::Arg(arg) => {
+                            positionals += 1;
+                            if positionals == 2 {
+                                second_is_none = arg.is_none_literal_expr();
+                            }
+                        }
+                        ArgOrKeyword::Keyword(keyword)
+                            if keyword.arg().is_some_and(|name| name == "times")
+                                && keyword.value().is_none_literal_expr() =>
+                        {
+                            return true;
+                        }
+                        ArgOrKeyword::Keyword(_) => {}
                     }
                 }
                 (positionals == 1 && arguments.len() == 1) || (positionals == 2 && second_is_none)
@@ -84,11 +85,11 @@ pub(crate) fn is_infinite_iterable(arg: Expr<'_>, semantic: &SemanticModel) -> b
 
 /// Tests the positional arity for B905 and B912. An iterable unpacking can
 /// supply any number of arguments, while an explicit `strict` suppresses both rules.
-pub(crate) fn needs_strict_argument(arguments: &Arguments, mut required: usize) -> bool {
+pub(crate) fn needs_strict_argument(arguments: Arguments<'_>, mut required: usize) -> bool {
     for item in arguments.iter_source_order() {
         match item {
             ArgOrKeyword::Keyword(keyword)
-                if keyword.arg.as_ref().is_some_and(|name| name == "strict") =>
+                if keyword.arg().is_some_and(|name| name == "strict") =>
             {
                 return false;
             }

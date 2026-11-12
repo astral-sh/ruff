@@ -694,25 +694,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return schema;
         };
 
-        for (i, item) in dict_expr.items().iter().enumerate() {
-            let Some(key) = item.key() else {
-                for item in dict_expr.items().slice(i + 1..) {
-                    if item.key().is_some() {
-                        self.infer_annotation_expression(item.value(), self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+        let mut items = dict_expr.into_iter();
+        loop {
+            let Some(item) = items.next() else {
+                return schema;
             };
-            let Some(key) = &item.key else { break };
+            let Some(key) = item.key() else { break };
 
             let key_type = self.expression_type(key);
             let Some(key_literal) = key_type.as_string_literal() else {
-                for item in dict_expr.items().slice(i..) {
-                    if item.key().is_some() {
-                        self.infer_annotation_expression(item.value(), self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+                self.infer_annotation_expression(item.value(), self.deferred_state);
+                break;
             };
 
             let annotation = self.infer_typeddict_field(item.value());
@@ -729,7 +721,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         for item in items {
             if !item.is_unpacking() {
-                self.infer_annotation_expression(&item.value, self.deferred_state);
+                self.infer_annotation_expression(item.value(), self.deferred_state);
             }
         }
         TypedDictSchema::default()
@@ -747,7 +739,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_functional_typeddict_deferred(&mut self, arguments: ast::Arguments<'_>) {
         if let Some(ExprKind::Dict(dict_expr)) = arguments.args().get(1).map(ast::Expr::classify) {
             for item in dict_expr {
-                if item.key().is_some() {
+                if !item.is_unpacking() {
                     self.infer_typeddict_field(item.value());
                 }
             }

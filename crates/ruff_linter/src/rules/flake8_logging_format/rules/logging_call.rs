@@ -35,7 +35,7 @@ fn logging_f_string(
 
     // If there are existing positional arguments after the message, bail out.
     // This could indicate a mistake or complex usage we shouldn't try to fix.
-    if arguments.args().len() > msg_pos + 1 {
+    if arguments.args().get(msg_pos + 1).is_some() {
         return;
     }
 

@@ -2111,9 +2111,7 @@ impl KnownClass {
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
                         // `None` if the scope is not function-like, or has no parameters.
                         let first_param = match scope.node(db) {
-                            NodeWithScopeKind::Function(f) => {
-                                f.node(module).parameters().iter().next()
-                            }
+                            NodeWithScopeKind::Function(f) => f.node(module).parameters().first(),
                             NodeWithScopeKind::Lambda(l) => l
                                 .node(module)
                                 .parameters()

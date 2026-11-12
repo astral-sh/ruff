@@ -4014,6 +4014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.into_diagnostic("TypeVar constraint cannot be generic");
             }
         }
+        let has_multiple_constraints = constraint_tys.len() >= 2;
         let mut bound_or_constraints = if !constraint_tys.is_empty() {
             Some(TypeVarBoundOrConstraints::Constraints(
                 TypeVarConstraints::new(self.db(), constraint_tys.into_boxed_slice()),
@@ -4021,7 +4022,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             None
         };
-        if let Some(bound) = arguments.find_keyword("bound") {
+        let [bound, default] = arguments.find_keywords(["bound", "default"]);
+        if let Some(bound) = bound {
             let bound_type = self.infer_type_expression(bound.value());
             bound_or_constraints = Some(TypeVarBoundOrConstraints::UpperBound(bound_type));
 
@@ -4053,11 +4055,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_paramspec_default(default.value(), None);
             } else {
                 let default_ty = self.infer_type_expression(default.value());
-                let bound_or_constraints_node = arguments
-                    .find_keyword("bound")
+                let bound_or_constraints_node = bound
                     .map(|kw| BoundOrConstraintsNodes::Bound(kw.value()))
                     .or_else(|| {
-                        if arguments.args().len() < 3 {
+                        if !has_multiple_constraints {
                             return None;
                         }
                         Some(BoundOrConstraintsNodes::Constraints(

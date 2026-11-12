@@ -48,7 +48,7 @@ impl Violation for UnnecessarySpread {
 /// PIE800
 pub(crate) fn unnecessary_spread(checker: &Checker, dict: ast::ExprDict<'_>) {
     for item in dict {
-        if item.key().is_none()
+        if item.is_unpacking()
             && let ExprKind::Dict(inner) = item.value().classify()
         {
             let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, inner.range());

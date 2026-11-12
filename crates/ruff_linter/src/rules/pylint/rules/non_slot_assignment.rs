@@ -267,39 +267,18 @@ fn is_attributes_not_in_slots(body: Suite<'_>) -> Vec<AttributeAssignment<'_>> {
     assignments
 }
 
-/// Return an iterator over the attributes enumerated in the given `__slots__` value.
-///
-/// If an attribute can't be statically determined, it will be `None`.
-fn slots_attributes(expr: Expr<'_>) -> impl Iterator<Item = Option<&str>> {
-    // Ex) `__slots__ = ("name",)`
-    let elts_iter = match expr.fields() {
-        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
-            Some(elts.iter().map(|elt| match elt.classify() {
-                ExprKind::StringLiteral(expr_string_literal) => {
-                    let value = expr_string_literal.value();
-                    Some(value.to_str())
-                }
-                _ => None,
-            }))
-        }
-        _ => None,
+/// Collects known slots and returns `None` if a name in the container is unknown.
+fn add_slots<'a>(expr: Expr<'a>, slots: &mut FxHashSet<&'a str>) -> Option<()> {
+    let mut insert = |expr: Expr<'a>| {
+        slots.insert(expr.as_string_literal_expr()?.value().to_str());
+        Some(())
     };
-
-    // Ex) `__slots__ = {"name": ...}`
-    let keys_iter = match expr.classify() {
-        ExprKind::Dict(dict) => Some(dict.iter_keys().map(|key| match key.map(Expr::fields) {
-            Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                value, ..
-            })) => Some(value.to_str()),
-            _ => None,
-        })),
-        _ => None,
+    let elts = match expr.classify() {
+        ExprKind::Dict(dict) => return dict.iter_keys().try_for_each(|key| insert(key?)),
+        ExprKind::List(list) => list.elts(),
+        ExprKind::Tuple(tuple) => tuple.elts(),
+        ExprKind::Set(set) => set.elts(),
+        _ => return Some(()),
     };
-
-    elts_iter
-        .into_iter()
-        .flatten()
-        .chain(keys_iter.into_iter().flatten())
+    elts.iter().try_for_each(insert)
 }

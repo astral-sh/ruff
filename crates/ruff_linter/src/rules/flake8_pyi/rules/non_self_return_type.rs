@@ -264,7 +264,7 @@ fn replace_with_self_fix(
     let remove_first_argument_type_hint = || -> Option<Edit> {
         let stmt_function_def = stmt.as_function_def_stmt()?;
         let parameters = stmt_function_def.parameters();
-        let first = parameters.iter().next()?;
+        let first = parameters.first()?;
         let annotation = first.annotation()?;
 
         // The parameter's range includes any parentheses around the annotation, e.g. `self: (Foo)`.

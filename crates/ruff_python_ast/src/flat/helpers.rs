@@ -96,7 +96,7 @@ impl Truthiness {
                 // If the dict consists only of double-starred items (e.g., {**x, **y}),
                 // consider its truthiness unknown. This matches lists/sets/tuples containing
                 // only starred elements, which are also Unknown.
-                if items.iter().all(|item| item.key().is_none()) {
+                if items.iter().all(ast::DictItem::is_unpacking) {
                     // {**foo} / {**foo, **bar}
                     Self::Unknown
                 } else {

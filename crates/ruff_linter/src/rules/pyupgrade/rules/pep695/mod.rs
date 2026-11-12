@@ -7,7 +7,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprName, ExprSubscript, PythonVersion, TypeParam,
+    self as ast, Expr, ExprName, ExprSubscript, PythonVersion, TypeParam,
     visitor::{self, Visitor},
 };
 use ruff_python_semantic::SemanticModel;
@@ -281,7 +281,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 let default = arguments.find_keyword("default").map(ast::Keyword::value);
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(bound.value()))
-                } else if arguments.args().len() > 1 {
+                } else if arguments.args().get(1).is_some() {
                     Some(TypeVarRestriction::Constraint(
                         arguments.args().iter().skip(1).collect(),
                     ))
@@ -364,18 +364,14 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
 /// any), along with its index in the class's bases tuple.
 pub(crate) fn find_generic<'a>(
-    class_bases: Arguments<'a>,
+    mut class_bases: impl Iterator<Item = Expr<'a>>,
     semantic: &SemanticModel,
-) -> Option<(usize, ExprSubscript<'a>)> {
-    class_bases
-        .args()
-        .iter()
-        .enumerate()
-        .find_map(|(idx, expr)| {
-            expr.as_subscript_expr().and_then(|sub_expr| {
-                semantic
-                    .match_typing_expr(sub_expr.value(), "Generic")
-                    .then_some((idx, sub_expr))
-            })
+) -> Option<ExprSubscript<'a>> {
+    class_bases.find_map(|expr| {
+        expr.as_subscript_expr().and_then(|sub_expr| {
+            semantic
+                .match_typing_expr(sub_expr.value(), "Generic")
+                .then_some(sub_expr)
         })
+    })
 }

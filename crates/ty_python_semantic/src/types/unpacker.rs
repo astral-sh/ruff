@@ -724,7 +724,7 @@ fn literal_iterable_length(expression: Expr<'_>) -> Option<usize> {
             let items = expr_dict.items();
             items
                 .iter()
-                .all(|item| item.key().is_some())
+                .all(|item| !item.is_unpacking())
                 .then_some(items.len())
         }
         _ => None,

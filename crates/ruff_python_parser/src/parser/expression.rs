@@ -736,6 +736,7 @@ impl<'src> Parser<'src> {
         }
 
         let items_snapshot = self.argument_scratch.snapshot();
+        let mut bare_generators = SmallVec::<[TextRange; 1]>::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -850,19 +851,14 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
-        let arguments = build::Arguments {
-            range: self.node_range(start),
-            items: self
-                .argument_scratch
-                .take_range(items_snapshot, &mut self.storage),
-        }
-        .parsed(&mut self.storage);
-
+        let items = self
+            .argument_scratch
+            .take_range(items_snapshot, &mut self.storage);
         // A call may omit parentheses around its sole generator. Class bases always require them.
         if !bare_generators.is_empty()
             && (matches!(context, ArgumentsContext::ClassDefinition)
                 || has_trailing_comma
-                || arguments.len() > 1)
+                || items.len() > 1)
         {
             for range in bare_generators {
                 // test_ok args_unparenthesized_generator
@@ -877,8 +873,11 @@ impl<'src> Parser<'src> {
                 self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
             }
         }
-
-        arguments
+        build::Arguments {
+            range: self.node_range(start),
+            items,
+        }
+        .parsed(&mut self.storage)
     }
 
     fn parse_keyword_argument(&mut self, start: TextSize, name: Option<id::Identifier>) {
@@ -3100,51 +3099,6 @@ impl<'src> Parser<'src> {
         }
 
         command
-    }
-
-    /// Performs the following validations on the arguments:
-    /// - Generator expressions are parenthesized when required by the argument context.
-    fn validate_arguments(
-        &mut self,
-        arguments: &id::Arguments,
-        has_trailing_comma: bool,
-        context: ArgumentsContext,
-    ) {
-        let arguments = arguments.view(&self.storage);
-        let generator_must_be_parenthesized = match context {
-            ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
-            // CPython rejects an unparenthesized generator expression as a class base even though
-            // this restriction isn't specified in the class definition grammar.
-            ArgumentsContext::ClassDefinition => true,
-        };
-
-        if generator_must_be_parenthesized {
-            let items = arguments.items().id();
-            for index in 0..items.len() {
-                if let Some(generator) =
-                    self.storage
-                        .get_list(items)
-                        .get(index)
-                        .and_then(|argument| match argument {
-                            ast::ArgOrKeyword::Arg(expr) => expr.cast::<ast::ExprGenerator>(),
-                            ast::ArgOrKeyword::Keyword(_) => None,
-                        })
-                    && !generator.parenthesized()
-                {
-                    let range = generator.range();
-                    // test_ok args_unparenthesized_generator
-                    // zip((x for x in range(10)), (y for y in range(10)))
-                    // sum(x for x in range(10))
-                    // sum((x for x in range(10)),)
-
-                    // test_err args_unparenthesized_generator
-                    // sum(x for x in range(10), 5)
-                    // total(1, 2, x for x in range(5), 6)
-                    // sum(x for x in range(10),)
-                    self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
-                }
-            }
-        }
     }
 }
 

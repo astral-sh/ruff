@@ -103,7 +103,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
 
         // Ex) `foo(**{**bar})`
         if let Some([item]) = dict.items().as_array()
-            && item.key().is_none()
+            && item.is_unpacking()
         {
             let value = item.value();
             let edit = Edit::range_replacement(
