@@ -717,6 +717,14 @@ fn keyword_and_dotted_import_names_use_one_row_each() {
 }
 
 #[test]
+fn wildcard_patterns_do_not_allocate_identifier_rows() {
+    let parsed =
+        parse_module("match value:\n    case [_, *tail]: pass\n    case [head, *_]: pass\n")
+            .unwrap();
+    assert_eq!(parsed.ast().len(), parsed.root().descendants().count());
+}
+
+#[test]
 fn recovered_class_patterns_share_literal_rows() {
     let source = "match x:\n    case [[['value']()]()](): pass\n";
     let parsed = crate::parse_unchecked(source, ParseOptions::from(Mode::Module));

@@ -270,18 +270,21 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let ident = self.parse_identifier();
+        let ident = self.parse_identifier_with_context(ExpressionContext::default());
 
         build::PatternMatchStar {
             range: self.node_range(start),
-            name: if ident.view(&self.storage).id() == "_" {
-                None
-            } else {
-                Some(ident)
-            }
-            .map(|node| node.id),
+            name: self.capture_identifier(ident),
         }
         .parsed(&mut self.storage)
+    }
+
+    /// Wildcards have no identifier child in the AST.
+    fn capture_identifier(
+        &mut self,
+        ident: build::Identifier,
+    ) -> Option<ast::BuildId<ast::kind::Identifier>> {
+        (self.storage.name(ident.id).as_str() != "_").then(|| self.storage.add(ident))
     }
 
     /// Parses a binding target in an `as` or mapping pattern.
@@ -291,11 +294,11 @@ impl Parser<'_> {
         //     case 1 as _: ...
         //     case {**_}: ...
         // after = 1
-        let identifier = self.parse_identifier();
-        if identifier.view(&self.storage).id() == "_" {
-            self.add_error(ParseErrorType::InvalidMatchPatternTarget, identifier);
+        let identifier = self.parse_identifier_with_context(ExpressionContext::default());
+        if self.storage.name(identifier.id).as_str() == "_" {
+            self.add_error(ParseErrorType::InvalidMatchPatternTarget, identifier.range);
         }
-        identifier
+        identifier.parsed(&mut self.storage)
     }
 
     /// Parses a parenthesized pattern or a sequence pattern.
@@ -590,7 +593,8 @@ impl Parser<'_> {
                         //     case match: ...
                         // match foo:
                         //     case type: ...
-                        let ident = self.parse_identifier();
+                        let ident =
+                            self.parse_identifier_with_context(ExpressionContext::default());
 
                         // test_ok match_as_pattern
                         // match foo:
@@ -601,12 +605,7 @@ impl Parser<'_> {
                             build::PatternMatchAs {
                                 range: ident.range,
                                 pattern: None,
-                                name: if ident.view(&self.storage).id() == "_" {
-                                    None
-                                } else {
-                                    Some(ident)
-                                }
-                                .map(|node| node.id),
+                                name: self.capture_identifier(ident),
                             }
                             .parsed(&mut self.storage),
                         )
