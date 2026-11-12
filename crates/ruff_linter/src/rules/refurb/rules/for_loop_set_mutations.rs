@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -77,9 +76,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     let Expr::Attribute(expr_attr) = expr_call.func.as_ref() else {
         return;
     };
-    if expr_call.arguments.keywords().next().is_some() {
-        return;
-    }
 
     let (method_name, batch_method_name) = match expr_attr.attr.as_str() {
         "add" => ("add", "update"),
@@ -89,6 +85,9 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         }
     };
 
+    let Some(arg) = expr_call.arguments.as_single_positional() else {
+        return;
+    };
     let Expr::Name(set) = expr_attr.value.as_ref() else {
         return;
     };
@@ -100,9 +99,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     {
         return;
     }
-    let Some([arg]) = expr_call.arguments.args().collect_array() else {
-        return;
-    };
 
     let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), arg) {

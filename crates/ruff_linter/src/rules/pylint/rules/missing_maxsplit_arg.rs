@@ -217,8 +217,9 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         maxsplit_argument_edit,
         split_type_edit,
         // Mark the fix as unsafe, if there are `*args` or `**kwargs`
-        if arguments.args().any(Expr::is_starred_expr)
-            || arguments.keywords().any(|keyword| keyword.arg.is_none())
+        if arguments
+            .iter_source_order()
+            .any(ruff_python_ast::ArgOrKeyword::is_variadic)
         {
             Applicability::Unsafe
         } else {

@@ -175,13 +175,8 @@ where
                         self.can_complete(&call.func)
                             && call
                                 .arguments
-                                .args()
-                                .chain(
-                                    call.arguments
-                                        .keywords()
-                                        .map(|keyword| keyword.value.as_ref()),
-                                )
-                                .all(|argument| self.can_complete(argument))
+                                .iter_source_order()
+                                .all(|argument| self.can_complete(argument.value()))
                     }
                     ast::Expr::Compare(compare) => {
                         // Later comparisons can be skipped by short-circuiting.

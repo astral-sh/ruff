@@ -264,12 +264,7 @@ fn keyword_argument_hover_contents<'db>(
 
     let name = keyword.arg.as_ref()?.as_str();
     let signature = resolved_call_signature(model, call_expression)?;
-    let argument_index = call_expression
-        .arguments
-        .iter_source_order()
-        .position(|argument| {
-            matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range == keyword.range)
-        })?;
+    let argument_index = call_expression.arguments.keyword_position(keyword)?;
     let argument_mapping = signature
         .argument_to_parameter_mapping
         .get(argument_index)?;

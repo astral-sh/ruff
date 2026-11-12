@@ -106,13 +106,8 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
 
     let mut diagnostic = checker.report_diagnostic(FalsyDictGetFallback, fallback_arg.range());
 
-    // All arguments to `dict.get` are positional-only.
-    if call.arguments.keywords().next().is_some() {
-        return;
-    }
-
-    // And there are only two of them, at most.
-    if call.arguments.args().nth(2).is_some() {
+    // Only offer the fix for a valid two-positional-argument call.
+    if call.arguments.as_positional_array::<2>().is_none() {
         return;
     }
 

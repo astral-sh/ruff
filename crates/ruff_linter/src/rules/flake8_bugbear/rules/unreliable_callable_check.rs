@@ -93,12 +93,10 @@ pub(crate) fn unreliable_callable_check(
     func: &Expr,
     arguments: &ast::Arguments,
 ) {
-    if arguments.keywords().next().is_some() {
-        return;
-    }
-    let mut args = arguments.args();
-    let (Some(obj), Some(attr)) = (args.next(), args.next()) else {
-        return;
+    let (obj, attr) = match arguments.len() {
+        2 if let Some([obj, attr]) = arguments.as_positional_array() => (obj, attr),
+        3 if let Some([obj, attr, _]) = arguments.as_positional_array() => (obj, attr),
+        _ => return,
     };
     let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = attr else {
         return;
@@ -110,20 +108,8 @@ pub(crate) fn unreliable_callable_check(
         return;
     };
 
-    // Validate function arguments based on function name
-    let valid_args = match builtins_function {
-        "hasattr" => {
-            // hasattr should have exactly 2 positional arguments and no keywords
-            arguments.len() == 2
-        }
-        "getattr" => {
-            // getattr should have 2 or 3 positional arguments and no keywords
-            matches!(arguments.len(), 2 | 3)
-        }
-        _ => return,
-    };
-
-    if !valid_args {
+    if !(builtins_function == "getattr" || (builtins_function == "hasattr" && arguments.len() == 2))
+    {
         return;
     }
 
