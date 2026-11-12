@@ -64,6 +64,9 @@ pub(crate) fn banned_attribute_access(
     qualified_name: &QualifiedName,
 ) {
     let banned_api = &checker.settings().flake8_tidy_imports.banned_api;
+    if !expr.is_attribute_expr() || banned_api.is_empty() {
+        return;
+    }
     // Preserve the empty leading segment for attributes of implicit builtins.
     if let Some((banned_path, ban)) = banned_api
         .get_key_value(&qualified_name.segments().join("."))

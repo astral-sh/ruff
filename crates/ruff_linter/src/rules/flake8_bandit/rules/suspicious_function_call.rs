@@ -982,12 +982,15 @@ pub(crate) fn suspicious_function_call(
     suspicious_function(checker, qualified_name, Some(&call.arguments), call.range());
 }
 
-pub(crate) fn is_suspicious_function_reference(checker: &Checker, func: &Expr) -> bool {
+pub(crate) fn suspicious_function_reference(
+    checker: &Checker,
+    func: &Expr,
+    qualified_name: &QualifiedName,
+) {
     if !is_suspicious_function_reference_enabled(checker.settings())
-        || checker.semantic().in_type_definition()
         || matches!(func, Expr::Attribute(attribute) if attribute.ctx != ast::ExprContext::Load)
     {
-        return false;
+        return;
     }
 
     match checker.semantic().current_expression_parent() {
@@ -998,7 +1001,7 @@ pub(crate) fn is_suspicious_function_reference(checker: &Checker, func: &Expr) -
         //   shelve.open(lorem, ipsum)
         // # ^^^^^^ Should not be reported as a reference
         // ```
-        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => false,
+        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => return,
         Some(Expr::Attribute(_)) => {
             // Avoid duplicate diagnostics. For example:
             //
@@ -1007,18 +1010,12 @@ pub(crate) fn is_suspicious_function_reference(checker: &Checker, func: &Expr) -
             //   shelve.open
             // # ^^^^^^ Should not be reported as a reference
             // ```
-            false
+            return;
         }
-        _ => true,
+        _ => {}
     }
-}
 
-pub(crate) fn suspicious_function_reference(
-    checker: &Checker,
-    expr: &Expr,
-    qualified_name: &QualifiedName,
-) {
-    suspicious_function(checker, qualified_name, None, expr.range());
+    suspicious_function(checker, qualified_name, None, func.range());
 }
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
@@ -1090,6 +1087,10 @@ fn suspicious_function(
             }) => leading_chars(left),
             _ => None,
         }
+    }
+
+    if checker.semantic().in_type_definition() {
+        return;
     }
 
     match qualified_name.segments() {
@@ -1324,7 +1325,6 @@ fn suspicious_function(
 pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
     if !is_suspicious_function_reference_enabled(checker.settings())
-        && !checker.semantic().in_type_definition()
         && let Some(qualified_name) = checker
             .semantic()
             .resolve_qualified_name(&decorator.expression)

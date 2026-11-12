@@ -3,6 +3,7 @@ use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -58,6 +59,10 @@ impl Violation for DatetimeTimezoneUTC {
 
 /// UP017
 pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+    if !expr.is_attribute_expr() || checker.target_version() < PythonVersion::PY311 {
+        return;
+    }
+
     if qualified_name.segments() == ["datetime", "timezone", "utc"] {
         let mut diagnostic = checker.report_diagnostic(DatetimeTimezoneUTC, expr.range());
         diagnostic.try_set_fix(|| {

@@ -1492,7 +1492,11 @@ const SUSPICIOUS_FUNCTION_RULES: RuleSet = RuleSet::from_rules(&[
 
 /// Run rules that resolve a name or attribute to the same imported symbol.
 fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
-    const MODULE_RULES: RuleSet = RuleSet::from_rules(&[
+    const QUALIFIED_NAME_RULES: RuleSet = RuleSet::from_rules(&[
+        Rule::BannedApi,
+        Rule::DatetimeTimezoneUTC,
+        Rule::SixPY3,
+        Rule::UndocumentedWarn,
         Rule::NumpyDeprecatedTypeAlias,
         Rule::NumpyDeprecatedFunction,
         Rule::Numpy2Deprecation,
@@ -1508,63 +1512,37 @@ fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
         Rule::Airflow3SuggestedUpdate,
         Rule::Airflow3MovedToProvider,
         Rule::Airflow3SuggestedToMoveToProvider,
-    ]);
+    ])
+    .union(&SUSPICIOUS_FUNCTION_RULES);
 
-    let is_reference = !matches!(expr, Expr::Name(name) if !name.ctx.is_load());
-    let semantic = checker.semantic();
-    // Banned APIs can come from any module, including builtins.
-    let check_banned_api = checker.is_rule_enabled(Rule::BannedApi)
-        && expr.is_attribute_expr()
-        && !checker.settings().flake8_tidy_imports.banned_api.is_empty();
-    let check_suspicious_reference = checker
-        .context
-        .rules
-        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
-        && flake8_bandit::rules::is_suspicious_function_reference(checker, expr);
-    let check_module_rules = checker.context.rules.any_enabled_in(&MODULE_RULES)
-        && semantic.seen_module(
-            Modules::NUMPY
-                | Modules::TYPING
-                | Modules::TYPING_EXTENSIONS
-                | Modules::RE
-                | Modules::DATETIME
-                | Modules::COLLECTIONS
-                | Modules::AIRFLOW,
-        );
-    let check_six = checker.is_rule_enabled(Rule::SixPY3) && semantic.seen_module(Modules::SIX);
-    let check_warn =
-        checker.is_rule_enabled(Rule::UndocumentedWarn) && semantic.seen_module(Modules::LOGGING);
-    let check_datetime_utc = checker.is_rule_enabled(Rule::DatetimeTimezoneUTC)
-        && checker.target_version() >= PythonVersion::PY311
-        && expr.is_attribute_expr();
-    let check_references = is_reference
-        && (check_banned_api
-            || check_suspicious_reference
-            || check_module_rules
-            || check_datetime_utc);
-    if !check_six && !check_warn && !check_references {
+    if !checker.context.rules.any_enabled_in(&QUALIFIED_NAME_RULES) {
         return;
     }
+    let semantic = checker.semantic();
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
         return;
     };
-    if check_six {
+    if checker.is_rule_enabled(Rule::SixPY3) {
         flake8_2020::rules::name_or_attribute(checker, expr, &qualified_name);
     }
-    if check_warn {
+    if checker.is_rule_enabled(Rule::UndocumentedWarn) {
         flake8_logging::rules::undocumented_warn(checker, expr, &qualified_name);
     }
-    if !check_references {
+    if matches!(expr, Expr::Name(name) if !name.ctx.is_load()) {
         return;
     }
 
     if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
         flake8_pyi::rules::collections_named_tuple(checker, expr, &qualified_name);
     }
-    if check_datetime_utc {
+    if checker.is_rule_enabled(Rule::DatetimeTimezoneUTC) {
         pyupgrade::rules::datetime_utc_alias(checker, expr, &qualified_name);
     }
-    if check_suspicious_reference {
+    if checker
+        .context
+        .rules
+        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
+    {
         flake8_bandit::rules::suspicious_function_reference(checker, expr, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::RegexFlagAlias) {
@@ -1576,7 +1554,7 @@ fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
     if checker.is_rule_enabled(Rule::ByteStringUsage) {
         flake8_pyi::rules::bytestring_attribute(checker, expr, &qualified_name);
     }
-    if check_banned_api {
+    if checker.is_rule_enabled(Rule::BannedApi) {
         flake8_tidy_imports::rules::banned_attribute_access(checker, expr, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::Airflow3Removal) {
@@ -1730,20 +1708,20 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::PytestWarnsTooBroad,
         Rule::PytestFailWithoutMessage,
         Rule::PytestRaisesAmbiguousPattern,
-    ]);
+    ])
+    .union(&SUSPICIOUS_FUNCTION_RULES);
 
-    let check_suspicious_call = checker
-        .context
-        .rules
-        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
-        && !checker.semantic().in_type_definition();
-    if !check_suspicious_call && !checker.context.rules.any_enabled_in(&QUALIFIED_CALL_RULES) {
+    if !checker.context.rules.any_enabled_in(&QUALIFIED_CALL_RULES) {
         return;
     }
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
         return;
     };
-    if check_suspicious_call {
+    if checker
+        .context
+        .rules
+        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
+    {
         flake8_bandit::rules::suspicious_function_call(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::RedundantOpenModes) {
