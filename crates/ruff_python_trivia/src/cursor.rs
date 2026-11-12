@@ -160,6 +160,8 @@ impl<'a> Cursor<'a> {
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
     pub fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+        // It was tried making optimized version of this for eg. line comments, but
+        // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.first()) && !self.is_eof() {
             self.bump();
         }
@@ -167,6 +169,8 @@ impl<'a> Cursor<'a> {
 
     /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
     pub(crate) fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+        // It was tried making optimized version of this for eg. line comments, but
+        // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.last()) && !self.is_eof() {
             self.bump_back();
         }
