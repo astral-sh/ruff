@@ -2119,9 +2119,7 @@ impl KnownClass {
                                 .node(module)
                                 .parameters
                                 .as_ref()
-                                .into_iter()
-                                .flatten()
-                                .next(),
+                                .and_then(|parameters| parameters.iter().next()),
                             _ => None,
                         };
 

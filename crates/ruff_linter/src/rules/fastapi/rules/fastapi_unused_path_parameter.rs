@@ -179,8 +179,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         // to make the parameter non-positional-only.
         let is_positional = function_def
             .parameters
-            .posonlyargs
-            .iter()
+            .posonlyargs()
             .any(|param| param.name() == path_param);
 
         let mut diagnostic = checker.report_diagnostic(
@@ -212,9 +211,8 @@ fn non_posonly_non_variadic_parameters(
 ) -> impl Iterator<Item = &ParameterWithDefault> {
     function_def
         .parameters
-        .args
-        .iter()
-        .chain(&function_def.parameters.kwonlyargs)
+        .args()
+        .chain(function_def.parameters.kwonlyargs())
 }
 
 #[derive(Debug, is_macro::Is)]

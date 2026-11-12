@@ -118,16 +118,15 @@ pub(crate) fn fastapi_non_annotated_dependency(
     // A `noqa` or a conflicting edit can prevent an earlier fix from removing its default.
     let parameters = &function_def.parameters;
     let mut seen_default = parameters
-        .posonlyargs
-        .iter()
+        .posonlyargs()
         .any(|parameter| parameter.default.is_some());
-    for parameter in &parameters.args {
+    for parameter in parameters.args() {
         check_parameter(checker, parameter, seen_default);
         seen_default |= parameter.default.is_some();
     }
 
     // Keyword-only parameters can be required after a parameter with a default.
-    for parameter in &parameters.kwonlyargs {
+    for parameter in parameters.kwonlyargs() {
         check_parameter(checker, parameter, false);
     }
 }

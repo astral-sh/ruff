@@ -145,8 +145,7 @@ fn in_vararg(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
 
     parent
         .parameters
-        .vararg
-        .as_ref()
+        .vararg()
         .and_then(|vararg| vararg.annotation())
         .and_then(Expr::as_subscript_expr)
         == Some(expr)

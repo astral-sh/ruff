@@ -81,7 +81,7 @@ fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
         && (function.returns.is_some()
             || function
                 .parameters
-                .iter()
+                .iter_source_order()
                 .any(|param| param.annotation().is_some()))
 }
 
@@ -176,8 +176,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_parameter_definition(parameter, None);
             }
             for (parameter, component) in [
-                (parameters.vararg.as_deref(), ParamSpecAttrKind::Args),
-                (parameters.kwarg.as_deref(), ParamSpecAttrKind::Kwargs),
+                (parameters.vararg(), ParamSpecAttrKind::Args),
+                (parameters.kwarg(), ParamSpecAttrKind::Kwargs),
             ] {
                 if let Some(annotation) = parameter.and_then(ast::Parameter::annotation) {
                     self.variadic_parameter_annotation(annotation, component);
@@ -186,7 +186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             // Parameters have definitions in the body scope, but their annotations and defaults
             // belong to enclosing scopes. Visit them explicitly to collect their diagnostics.
-            for parameter in parameters {
+            for parameter in parameters.iter() {
                 self.infer_definition(parameter);
             }
         }
@@ -890,9 +890,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<bool> {
         let receiver = function
             .parameters
-            .posonlyargs
-            .first()
-            .or_else(|| function.parameters.args.first())?;
+            .posonlyargs()
+            .next()
+            .or_else(|| function.parameters.args().next())?;
         let annotation = receiver.parameter.annotation.as_deref()?;
         let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
 
@@ -926,16 +926,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         parameters: &ast::Parameters,
         first_annotation_already_inferred: bool,
     ) {
-        let ast::Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs: _,
-            args: _,
-            vararg,
-            kwonlyargs: _,
-            kwarg,
-        } = parameters;
-
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
         for param_with_default in parameters
             .iter_non_variadic_params()
@@ -943,14 +933,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             self.infer_parameter_with_default(param_with_default);
         }
-        if let Some(vararg) = vararg {
+        if let Some(vararg) = parameters.vararg() {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_VARARG_ANNOTATION);
         }
-        if let Some(kwarg) = kwarg {
+        if let Some(kwarg) = parameters.kwarg() {
             self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
             self.infer_parameter(kwarg);
             self.context
@@ -965,7 +955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
         let db = self.db();
         let env = self.program_environment();
-        let Some(kwargs) = parameters.kwarg.as_ref() else {
+        let Some(kwargs) = parameters.kwarg() else {
             return;
         };
         let Some(annotation) = kwargs.annotation.as_deref() else {
@@ -997,10 +987,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accepted through `**kwargs`. The convention only applies to the leading
         // positional-or-keyword parameters that are actually converted to positional-only
         // parameters by `Parameters::from_parameters`.
-        let pep_484_positional_only_count = if parameters.posonlyargs.is_empty() {
+        let pep_484_positional_only_count = if parameters.posonlyargs().next().is_none() {
             parameters
-                .args
-                .iter()
+                .args()
                 .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
                 .count()
         } else {
@@ -1010,7 +999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let fields = typed_dict.items(db);
         let overlapping = parameters
             .iter_non_variadic_params()
-            .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
+            .skip(parameters.posonlyargs().count() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
             .filter(|parameter| fields.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();
@@ -1025,10 +1014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .collect::<Vec<_>>()
             .join(", ");
 
-        if let Some(builder) = self
-            .context
-            .report_lint(&INVALID_TYPE_FORM, kwargs.as_ref())
-        {
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, kwargs) {
             if overlapping.len() == 1 {
                 builder.into_diagnostic(format_args!(
                     "Parameter {overlapping_names} overlaps with unpacked TypedDict key in \

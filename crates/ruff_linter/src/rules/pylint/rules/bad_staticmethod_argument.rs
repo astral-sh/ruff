@@ -93,9 +93,9 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         parameter: self_or_cls,
         ..
     }) = parameters
-        .posonlyargs
-        .first()
-        .or_else(|| parameters.args.first())
+        .posonlyargs()
+        .next()
+        .or_else(|| parameters.args().next())
     else {
         return;
     };

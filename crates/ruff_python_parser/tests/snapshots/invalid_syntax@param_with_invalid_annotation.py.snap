@@ -25,43 +25,41 @@ Module(
                     parameters: Parameters {
                         range: 7..18,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 8..17,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 8..17,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 8..11,
+                                    parameter: Parameter {
+                                        range: 8..17,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 13..17,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 14..17,
-                                                        id: Name("int"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
+                                        name: Identifier {
+                                            id: Name("arg"),
+                                            range: 8..11,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 13..17,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 14..17,
+                                                            id: Name("int"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -95,44 +93,42 @@ Module(
                     parameters: Parameters {
                         range: 31..47,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 32..46,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 32..46,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 32..35,
+                                    parameter: Parameter {
+                                        range: 32..46,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Yield(
-                                            ExprYield {
-                                                node_index: NodeIndex(None),
-                                                range: 37..46,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 43..46,
-                                                            id: Name("int"),
-                                                            ctx: Load,
-                                                        },
+                                        name: Identifier {
+                                            id: Name("arg"),
+                                            range: 32..35,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 37..46,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 43..46,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
                                                     ),
-                                                ),
-                                            },
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -166,51 +162,51 @@ Module(
                     parameters: Parameters {
                         range: 60..75,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 61..67,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 61..67,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 61..64,
+                                    parameter: Parameter {
+                                        range: 61..67,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 66..67,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
+                                        name: Identifier {
+                                            id: Name("arg"),
+                                            range: 61..64,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 66..67,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 71..74,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ),
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 71..74,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("int"),
+                                    parameter: Parameter {
                                         range: 71..74,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("int"),
+                                            range: 71..74,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [

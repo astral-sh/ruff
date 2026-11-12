@@ -49,16 +49,6 @@ impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters
 
 impl FormatNodeRule<Parameters> for FormatParameters {
     fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = item;
-
         let (slash, star) = find_parameter_separators(f.context().source(), item);
 
         let comments = f.context().comments().clone();
@@ -114,7 +104,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
-            for parameter_with_default in posonlyargs {
+            for parameter_with_default in item.posonlyargs() {
                 joiner.entry(&parameter_with_default.format());
 
                 last_node = Some(parameter_with_default.into());
@@ -128,7 +118,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             //     y,
             //     z,
             // ): ...
-            let slash_comments_end = if posonlyargs.is_empty() {
+            let slash_comments_end = if item.posonlyargs().next().is_none() {
                 0
             } else {
                 let slash_comments_end = parameters_dangling.partition_point(|comment| {
@@ -152,7 +142,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 slash_comments_end
             };
 
-            for parameter_with_default in args {
+            for parameter_with_default in item.args() {
                 joiner.entry(&parameter_with_default.format());
 
                 last_node = Some(parameter_with_default.into());
@@ -161,14 +151,14 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // kw only args need either a `*args` ahead of them capturing all var args or a `*`
             // pseudo-argument capturing all fields. We can also have `*args` without any kwargs
             // afterwards.
-            if let Some(vararg) = vararg {
+            if let Some(vararg) = item.vararg() {
                 joiner.entry(&format_args![
-                    leading_node_comments(vararg.as_ref()),
+                    leading_node_comments(vararg),
                     token("*"),
                     vararg.format()
                 ]);
-                last_node = Some(vararg.as_ref().into());
-            } else if !kwonlyargs.is_empty() {
+                last_node = Some(vararg.into());
+            } else if item.kwonlyargs().next().is_some() {
                 // Given very strange comment placement, comments here may not actually have been
                 // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
                 // a stable formatting in this case
@@ -191,19 +181,19 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 });
             }
 
-            for parameter_with_default in kwonlyargs {
+            for parameter_with_default in item.kwonlyargs() {
                 joiner.entry(&parameter_with_default.format());
 
                 last_node = Some(parameter_with_default.into());
             }
 
-            if let Some(kwarg) = kwarg {
+            if let Some(kwarg) = item.kwarg() {
                 joiner.entry(&format_args![
-                    leading_node_comments(kwarg.as_ref()),
+                    leading_node_comments(kwarg),
                     token("**"),
                     kwarg.format()
                 ]);
-                last_node = Some(kwarg.as_ref().into());
+                last_node = Some(kwarg.into());
             }
 
             joiner.finish()?;
@@ -248,7 +238,10 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
-        } else if num_parameters == 1 && posonlyargs.is_empty() && kwonlyargs.is_empty() {
+        } else if num_parameters == 1
+            && item.posonlyargs().next().is_none()
+            && item.kwonlyargs().next().is_none()
+        {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
@@ -347,7 +340,7 @@ pub(crate) fn find_parameter_separators(
 ) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
-    let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
+    let slash = if let Some(preceding_end) = parameters.posonlyargs().next_back().map(Ranged::end) {
         // ```text
         // def f(a1=1, a2=2, /, a3, a4): pass
         //                 ^^^^^^^^^^^ the range (defaults)
@@ -372,18 +365,18 @@ pub(crate) fn find_parameter_separators(
     };
 
     // If we have a vararg we have a node that the comments attach to
-    let star = if parameters.vararg.is_some() {
+    let star = if parameters.vararg().is_some() {
         // When the vararg is present the comments attach there and we don't need to do manual
         // formatting
         None
-    } else if let Some(first_keyword_argument) = parameters.kwonlyargs.first() {
+    } else if let Some(first_keyword_argument) = parameters.kwonlyargs().next() {
         // Check in that order:
         // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
         // * `f(a, /, *, b)`
         // * `f(*, b)` (else branch)
         let after_parameters = parameters
-            .args
-            .last()
+            .args()
+            .next_back()
             .map(|arg| arg.range.end())
             .or(slash.map(|(_, slash)| slash.end()));
         if let Some(preceding_end) = after_parameters {
@@ -440,12 +433,12 @@ pub(crate) fn find_parameter_separators(
     // * `f(a, /, *, **b)`
     // * `f(a, /)`
     let slash_following_start = parameters
-        .args
-        .first()
+        .args()
+        .next()
         .map(Ranged::start)
-        .or(parameters.vararg.as_ref().map(|first| first.start()))
+        .or(parameters.vararg().map(Ranged::start))
         .or(star.as_ref().map(|star| star.separator.start()))
-        .or(parameters.kwarg.as_deref().map(Ranged::start))
+        .or(parameters.kwarg().map(Ranged::start))
         .unwrap_or(parameters.end());
     let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,
@@ -662,11 +655,11 @@ fn has_trailing_comma(
         return false;
     };
 
-    let ends_with_pos_only_argument_separator = !parameters.posonlyargs.is_empty()
-        && parameters.args.is_empty()
-        && parameters.vararg.is_none()
-        && parameters.kwonlyargs.is_empty()
-        && parameters.kwarg.is_none();
+    let ends_with_pos_only_argument_separator = parameters.posonlyargs().next().is_some()
+        && parameters.args().next().is_none()
+        && parameters.vararg().is_none()
+        && parameters.kwonlyargs().next().is_none()
+        && parameters.kwarg().is_none();
 
     let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();
     // `def a(b, c, /): ... `

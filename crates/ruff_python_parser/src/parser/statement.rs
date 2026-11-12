@@ -1,5 +1,7 @@
 use std::fmt::{Display, Write};
 
+use thin_vec::ThinVec;
+
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -3330,15 +3332,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Lpar);
         }
 
-        // TODO(dhruvmanila): This has the same problem as `parse_match_pattern_mapping`
-        // has where if there are multiple kwarg or vararg, the last one will win and
-        // the parser will drop the previous ones. Another thing is the vararg and kwarg
-        // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
-        // recover well from `*args=(1, 2)`.
-        let mut parameters = ast::Parameters::default();
-        let parameters_snapshot = self.parameter_scratch.snapshot();
-        let mut args_snapshot = None;
-        let mut kwonlyargs_snapshot = None;
+        let snapshot = self.parameter_scratch.snapshot();
+        let mut slash_index = None;
+        let mut seen_vararg = false;
+        let mut last_kwarg = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3351,7 +3348,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
             let param_start = parser.node_start();
 
-            if parameters.kwarg.is_some() {
+            if last_kwarg.is_some() {
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
@@ -3364,8 +3361,6 @@ impl<'src> Parser<'src> {
                 TokenKind::Star => {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
-
-                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
                     if parser.at_identifier_or_soft_keyword() {
                         let param = parser.parse_parameter(
@@ -3384,7 +3379,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if seen_keyword_only_separator || parameters.vararg.is_some() {
+                        if seen_keyword_only_separator || seen_vararg {
                             // test_err params_multiple_varargs
                             // def foo(a, *, *args, b): ...
                             // # def foo(a, *, b, c, *args): ...
@@ -3398,10 +3393,12 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
-                        // choose to keep the first one so that the parameters remain in preorder.
-                        if parameters.vararg.is_none() {
-                            parameters.vararg = Some(Box::new(param));
+                        // Keep the first variadic positional parameter when recovering from duplicates.
+                        if !seen_vararg {
+                            parser
+                                .parameter_scratch
+                                .push(ast::ParameterItem::Vararg(param));
+                            seen_vararg = true;
                         }
 
                         last_keyword_only_separator_range = None;
@@ -3418,7 +3415,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if parameters.vararg.is_some() {
+                        if seen_vararg {
                             // test_err params_star_separator_after_star_param
                             // def foo(a, *args, *, b): ...
                             // def foo(a, *args, b, c, *): ...
@@ -3444,7 +3441,7 @@ impl<'src> Parser<'src> {
                         parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
-                    if parameters.kwarg.is_some() {
+                    if last_kwarg.is_some() {
                         // test_err params_multiple_kwargs
                         // def foo(a, **kwargs1, **kwargs2): ...
                         parser.add_error(
@@ -3477,17 +3474,18 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    parameters.kwarg = Some(Box::new(param));
+                    last_kwarg = Some(parser.parameter_scratch.len_since(&snapshot));
+                    parser
+                        .parameter_scratch
+                        .push(ast::ParameterItem::Kwarg(param));
+
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Slash => {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parser.parameter_scratch.is_empty(&parameters_snapshot)
-                        && parameters.vararg.is_none()
-                        && parameters.kwarg.is_none()
-                    {
+                    if parser.parameter_scratch.is_empty(&snapshot) {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
                         // def foo(/, a): ...
@@ -3512,7 +3510,7 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
+                    if seen_keyword_only_separator || seen_vararg {
                         // test_err params_star_after_slash
                         // def foo(*a, /): ...
                         // def foo(a, *args, b, /): ...
@@ -3529,9 +3527,7 @@ impl<'src> Parser<'src> {
                     if !seen_positional_only_separator {
                         // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        if kwonlyargs_snapshot.is_none() {
-                            args_snapshot = Some(parser.parameter_scratch.snapshot());
-                        }
+                        slash_index = Some(parser.parameter_scratch.len_since(&snapshot));
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3560,7 +3556,7 @@ impl<'src> Parser<'src> {
                     if param.default.is_none()
                         && seen_default_param
                         && !seen_keyword_only_separator
-                        && parameters.vararg.is_none()
+                        && !seen_vararg
                     {
                         // test_ok params_non_default_after_star
                         // def foo(a=10, *, b, c=11, d): ...
@@ -3577,7 +3573,14 @@ impl<'src> Parser<'src> {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    parser.parameter_scratch.push(param);
+                    parser
+                        .parameter_scratch
+                        .push(if seen_keyword_only_separator || seen_vararg {
+                            ast::ParameterItem::KeywordOnly(param)
+                        } else {
+                            ast::ParameterItem::PositionalOrKeyword(param)
+                        });
+
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3601,21 +3604,25 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
-            parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
+        let retained = self.parameter_scratch.drain_snapshot(snapshot);
+        let mut items = ThinVec::with_capacity(retained.len());
+        for (i, item) in retained.enumerate() {
+            match item {
+                ast::ParameterItem::PositionalOrKeyword(param)
+                    if slash_index.is_some_and(|slash| i < slash) =>
+                {
+                    items.push(ast::ParameterItem::PositionalOnly(param));
+                }
+                // Keep the last variadic keyword parameter when recovering from duplicates.
+                ast::ParameterItem::Kwarg(_) if Some(i) != last_kwarg => {}
+                item => items.push(item),
+            }
         }
-        if let Some(args_snapshot) = args_snapshot {
-            parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
-            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
-        } else if seen_positional_only_separator {
-            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
-        } else {
-            parameters.args = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        ast::Parameters {
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+            items,
         }
-
-        parameters.range = self.node_range(start);
-
-        parameters
     }
 
     /// Try to parse a type parameter list. If the parser is not at the start of a
