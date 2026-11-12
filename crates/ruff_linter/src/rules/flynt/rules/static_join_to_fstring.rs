@@ -167,7 +167,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
 
     // If there are kwargs or more than one argument, this is some non-standard
     // string join call.
-    let [ast::Argument::Positional(arg)] = arguments.items.as_slice() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

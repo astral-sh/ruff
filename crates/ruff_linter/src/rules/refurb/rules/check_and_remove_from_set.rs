@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -162,13 +161,11 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         return None;
     };
 
-    let [arg] = arguments.args().collect_array()?;
-
-    if func_name != "remove" || arguments.keywords().next().is_some() {
+    if func_name != "remove" {
         return None;
     }
 
-    Some((arg, set))
+    Some((arguments.as_single_positional()?, set))
 }
 
 /// Construct the fix suggestion, ie `set.discard(element)`.

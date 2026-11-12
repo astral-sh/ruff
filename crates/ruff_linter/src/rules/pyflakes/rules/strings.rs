@@ -567,10 +567,6 @@ fn has_star_star_kwargs(arguments: &ast::Arguments) -> bool {
         .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
 }
 
-fn has_star_args(arguments: &ast::Arguments) -> bool {
-    arguments.args().any(Expr::is_starred_expr)
-}
-
 /// F502
 pub(crate) fn percent_format_expected_mapping(
     checker: &Checker,
@@ -935,20 +931,18 @@ pub(crate) fn string_dot_format_missing_argument(
     call: &ast::ExprCall,
     summary: &FormatSummary,
 ) {
-    if has_star_args(&call.arguments) || has_star_star_kwargs(&call.arguments) {
-        return;
+    let mut positional_count = 0;
+    let mut keywords = FxHashSet::default();
+    for argument in call.arguments.iter_source_order() {
+        match argument {
+            ast::ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => positional_count += 1,
+            ast::ArgOrKeyword::Keyword(keyword) if let Some(name) = &keyword.arg => {
+                keywords.insert(name.id());
+            }
+            _ => return,
+        }
     }
 
-    let keywords: FxHashSet<_> = call
-        .arguments
-        .keywords()
-        .filter_map(|k| {
-            let Keyword { arg, .. } = &k;
-            arg.as_ref().map(ruff_python_ast::Identifier::id)
-        })
-        .collect();
-
-    let positional_count = call.arguments.args().count();
     let missing: Vec<String> = summary
         .autos
         .iter()

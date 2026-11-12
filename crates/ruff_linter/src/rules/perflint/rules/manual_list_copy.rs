@@ -77,7 +77,7 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     };
     let call_range = value.range();
 
-    let [ast::Argument::Positional(arg)] = arguments.items.as_slice() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 
