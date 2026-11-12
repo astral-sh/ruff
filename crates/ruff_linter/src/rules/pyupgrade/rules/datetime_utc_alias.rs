@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -56,11 +57,8 @@ impl Violation for DatetimeTimezoneUTC {
 }
 
 /// UP017
-pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
-    if checker
-        .semantic()
-        .matches_qualified_name(expr, &["datetime", "timezone", "utc"])
-    {
+pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+    if qualified_name.segments() == ["datetime", "timezone", "utc"] {
         let mut diagnostic = checker.report_diagnostic(DatetimeTimezoneUTC, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(

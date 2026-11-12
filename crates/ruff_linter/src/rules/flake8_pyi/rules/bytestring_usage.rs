@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -60,7 +61,10 @@ impl std::fmt::Display for ByteStringOrigin {
 }
 
 /// PYI057
-pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
+pub(crate) fn bytestring_attribute(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+    let Expr::Attribute(attribute) = expr else {
+        return;
+    };
     let semantic = checker.semantic();
     if !semantic
         .seen
@@ -68,9 +72,6 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
     {
         return;
     }
-    let Some(qualified_name) = semantic.resolve_qualified_name(attribute) else {
-        return;
-    };
     let origin = match qualified_name.segments() {
         ["typing", "ByteString"] => ByteStringOrigin::Typing,
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,

@@ -6,9 +6,10 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprName};
+use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
-use ruff_text_size::TextRange;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of deprecated or moved Airflow functions and values in Airflow 3.1.
@@ -78,20 +79,6 @@ impl Violation for Airflow31Moved {
     }
 }
 
-/// AIR321
-pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
-    match expr {
-        Expr::Attribute(ExprAttribute { range, .. }) | Expr::Name(ExprName { range, .. }) => {
-            check_name(checker, expr, *range);
-        }
-        _ => {}
-    }
-}
-
 /// Check whether a removed Airflow name is used.
 ///
 /// For example:
@@ -107,13 +94,16 @@ pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
 /// # Or, directly
 /// convert_to_utc(datetime.now())
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
-    let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+pub(crate) fn airflow_3_1_moved_expr(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
-    };
+    }
 
+    let range = expr.range();
     let replacement = match qualified_name.segments() {
         // airflow.utils.setup_teardown
         [

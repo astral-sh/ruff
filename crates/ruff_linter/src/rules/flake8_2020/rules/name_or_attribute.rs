@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -48,15 +48,8 @@ impl Violation for SixPY3 {
 }
 
 /// YTT202
-pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::SIX) {
-        return;
-    }
-
-    if checker
-        .semantic()
-        .matches_qualified_name(expr, &["six", "PY3"])
-    {
+pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+    if qualified_name.segments() == ["six", "PY3"] {
         checker.report_diagnostic(SixPY3, expr.range());
     }
 }

@@ -3,6 +3,7 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::find_binding_value;
@@ -973,18 +974,20 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
-    suspicious_function(
-        checker,
-        call.func.as_ref(),
-        Some(&call.arguments),
-        call.range(),
-    );
+pub(crate) fn suspicious_function_call(
+    checker: &Checker,
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    suspicious_function(checker, qualified_name, Some(&call.arguments), call.range());
 }
 
-pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
-    if !is_suspicious_function_reference_enabled(checker.settings()) {
-        return;
+pub(crate) fn is_suspicious_function_reference(checker: &Checker, func: &Expr) -> bool {
+    if !is_suspicious_function_reference_enabled(checker.settings())
+        || checker.semantic().in_type_definition()
+        || matches!(func, Expr::Attribute(attribute) if attribute.ctx != ast::ExprContext::Load)
+    {
+        return false;
     }
 
     match checker.semantic().current_expression_parent() {
@@ -995,9 +998,7 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
         //   shelve.open(lorem, ipsum)
         // # ^^^^^^ Should not be reported as a reference
         // ```
-        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => {
-            return;
-        }
+        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => false,
         Some(Expr::Attribute(_)) => {
             // Avoid duplicate diagnostics. For example:
             //
@@ -1006,18 +1007,24 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
             //   shelve.open
             // # ^^^^^^ Should not be reported as a reference
             // ```
-            return;
+            false
         }
-        _ => {}
+        _ => true,
     }
+}
 
-    suspicious_function(checker, func, None, func.range());
+pub(crate) fn suspicious_function_reference(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    suspicious_function(checker, qualified_name, None, expr.range());
 }
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
     checker: &Checker,
-    func: &Expr,
+    qualified_name: &QualifiedName,
     arguments: Option<&Arguments>,
     range: TextRange,
 ) {
@@ -1084,14 +1091,6 @@ fn suspicious_function(
             _ => None,
         }
     }
-
-    if checker.semantic().in_type_definition() {
-        return;
-    }
-
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
 
     match qualified_name.segments() {
         // Pickle
@@ -1324,7 +1323,12 @@ fn suspicious_function(
 /// S308
 pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
-    if !is_suspicious_function_reference_enabled(checker.settings()) {
-        suspicious_function(checker, &decorator.expression, None, decorator.range);
+    if !is_suspicious_function_reference_enabled(checker.settings())
+        && !checker.semantic().in_type_definition()
+        && let Some(qualified_name) = checker
+            .semantic()
+            .resolve_qualified_name(&decorator.expression)
+    {
+        suspicious_function(checker, &qualified_name, None, decorator.range);
     }
 }
