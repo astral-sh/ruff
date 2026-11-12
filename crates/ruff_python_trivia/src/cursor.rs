@@ -14,6 +14,7 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    #[inline]
     pub fn new(source: &'a str) -> Self {
         Self {
             source_length: source.text_len(),
@@ -22,33 +23,39 @@ impl<'a> Cursor<'a> {
     }
 
     /// Retrieves the current offset of the cursor within the source code.
+    #[inline]
     pub fn offset(&self) -> TextSize {
         self.source_length - self.text_len()
     }
 
     /// Return the remaining input as a string slice.
+    #[inline]
     pub fn chars(&self) -> Chars<'a> {
         self.chars.clone()
     }
 
     /// Returns the remaining input as byte slice.
+    #[inline]
     pub fn as_bytes(&self) -> &'a [u8] {
         self.as_str().as_bytes()
     }
 
     /// Returns the remaining input as string slice.
+    #[inline]
     pub fn as_str(&self) -> &'a str {
         self.chars.as_str()
     }
 
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
+    #[inline]
     pub fn first(&self) -> char {
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
 
     /// Peeks the second character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the position is past the end of the file.
+    #[inline]
     pub fn second(&self) -> char {
         let mut chars = self.chars.clone();
         chars.next();
@@ -61,24 +68,29 @@ impl<'a> Cursor<'a> {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
+    #[inline]
     pub fn text_len(&self) -> TextSize {
         self.chars.as_str().text_len()
     }
 
+    #[inline]
     pub fn token_len(&self) -> TextSize {
         self.source_length - self.text_len()
     }
 
+    #[inline]
     pub fn start_token(&mut self) {
         self.source_length = self.text_len();
     }
 
     /// Returns `true` if the file is at the end of the file.
+    #[inline]
     pub fn is_eof(&self) -> bool {
         self.chars.as_str().is_empty()
     }
 
     /// Consumes the next character
+    #[inline]
     pub fn bump(&mut self) -> Option<char> {
         self.chars.next()
     }
@@ -88,6 +100,7 @@ impl<'a> Cursor<'a> {
         self.chars.next_back()
     }
 
+    #[inline]
     pub fn eat_char(&mut self, c: char) -> bool {
         if self.first() == c {
             self.bump();
@@ -99,6 +112,7 @@ impl<'a> Cursor<'a> {
 
     /// Eats the next two characters if they are `c1` and `c2`. Does not
     /// consume any input otherwise, even if the first character matches.
+    #[inline]
     pub fn eat_char2(&mut self, c1: char, c2: char) -> bool {
         let mut chars = self.chars.clone();
         if chars.next() == Some(c1) && chars.next() == Some(c2) {
@@ -112,6 +126,7 @@ impl<'a> Cursor<'a> {
 
     /// Eats the next three characters if they are `c1`, `c2` and `c3`
     /// Does not consume any input otherwise, even if the first character matches.
+    #[inline]
     pub fn eat_char3(&mut self, c1: char, c2: char, c3: char) -> bool {
         let mut chars = self.chars.clone();
         if chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3) {
@@ -145,8 +160,6 @@ impl<'a> Cursor<'a> {
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
     pub fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for eg. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.first()) && !self.is_eof() {
             self.bump();
         }
@@ -154,8 +167,6 @@ impl<'a> Cursor<'a> {
 
     /// Eats symbols from the back while predicate returns true or until the beginning of file is reached.
     pub(crate) fn eat_back_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for eg. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.last()) && !self.is_eof() {
             self.bump_back();
         }
@@ -166,6 +177,7 @@ impl<'a> Cursor<'a> {
     /// ## Panics
     ///  - If `count` is larger than the remaining bytes in the input stream.
     ///  - If `count` indexes into a multi-byte character.
+    #[inline]
     pub fn skip_bytes(&mut self, count: usize) {
         self.chars = self.chars.as_str()[count..].chars();
     }
