@@ -3721,6 +3721,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.typevar_binding_context = previous_typevar_binding_context;
 
+                if assignment.owner() == BindingsOwner::Definition {
+                    self.check_dynamic_class_name(target, value, value_ty);
+                }
+
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -4944,6 +4948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::declared(Some(declared.inner_type())),
             );
+            self.check_dynamic_class_name(target, value, inferred_ty);
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.

@@ -139,6 +139,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISMATCHED_TYPEDDICT_NAME);
     registry.register_lint(&MISMATCHED_TYPEVAR_NAME);
     registry.register_lint(&MISMATCHED_TYPEVARTUPLE_NAME);
+    registry.register_lint(&MISMATCHED_DYNAMIC_TYPE_NAME);
     registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
@@ -826,6 +827,15 @@ declare_lint! {
         summary: "detects mismatched names in `TypeVarTuple` definitions",
         status: LintStatus::stable("0.0.102"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-dynamic-type-name.md")]
+    pub(crate) static MISMATCHED_DYNAMIC_TYPE_NAME = {
+        summary: "detects mismatched names in dynamically created classes",
+        status: LintStatus::stable("0.0.102"),
+        default_level: Level::Ignore,
     }
 }
 

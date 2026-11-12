@@ -6,13 +6,16 @@ use crate::types::class::{DynamicClassLiteral, DynamicClassScopeOffset};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
-    IncompatibleBases, SUBCLASS_OF_FINAL_CLASS, UNSUPPORTED_DYNAMIC_BASE,
-    report_inconsistent_generic_bases,
+    IncompatibleBases, MISMATCHED_DYNAMIC_TYPE_NAME, SUBCLASS_OF_FINAL_CLASS,
+    UNSUPPORTED_DYNAMIC_BASE, report_inconsistent_generic_bases, report_mismatched_type_name,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
+use crate::types::function::KnownFunction;
 use crate::types::infer::builder::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
-use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
+use crate::types::{
+    ClassBase, ClassLiteral, KnownClass, Type, extract_fixed_length_iterable_element_types,
+};
 
 /// Whether a dynamic class is being created via `type()` or `types.new_class()`.
 ///
@@ -36,6 +39,59 @@ impl DynamicClassKind {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Check the runtime class name when a constructor call is assigned directly to one variable.
+    pub(super) fn check_dynamic_class_name(
+        &self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        value_ty: Type<'db>,
+    ) {
+        let (
+            Type::ClassLiteral(ClassLiteral::Dynamic(_)),
+            ast::Expr::Name(target),
+            ast::Expr::Call(call),
+        ) = (value_ty, target, value)
+        else {
+            return;
+        };
+        if !self.context.is_lint_enabled(&MISMATCHED_DYNAMIC_TYPE_NAME) {
+            return;
+        }
+
+        let db = self.db();
+        let (constructor, name_arg) = match self.try_expression_type(&call.func) {
+            Some(Type::ClassLiteral(class))
+                if class.is_known(db, KnownClass::Type) && call.arguments.args.len() == 3 =>
+            {
+                ("type", call.arguments.find_positional(0))
+            }
+            Some(Type::FunctionLiteral(function))
+                if function.is_known(db, KnownFunction::NewClass) =>
+            {
+                (
+                    "types.new_class",
+                    call.arguments.find_argument_value("name", 0),
+                )
+            }
+            _ => return,
+        };
+        if let Some(name_arg) = name_arg
+            && let Some(name_ty) = self.try_expression_type(name_arg)
+            && let Some(name) = name_ty.as_string_literal()
+            && name.value(db) != target.id.as_str()
+        {
+            report_mismatched_type_name(
+                &self.context,
+                &MISMATCHED_DYNAMIC_TYPE_NAME,
+                name_arg,
+                constructor,
+                &target.id,
+                Some(name.value(db)),
+                name_ty,
+            );
+        }
+    }
+
     /// Identify a dangling dynamic-class call without retaining an absolute source position.
     pub(super) fn dynamic_class_scope_offset(
         &self,
