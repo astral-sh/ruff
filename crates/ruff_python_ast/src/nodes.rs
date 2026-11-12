@@ -3068,6 +3068,13 @@ pub struct Keyword {
     pub value: Box<Expr>,
 }
 
+impl Keyword {
+    /// Return whether this keyword is a mapping unpacking (`**expression`).
+    pub const fn is_variadic(&self) -> bool {
+        self.arg.is_none()
+    }
+}
+
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -3691,13 +3698,13 @@ impl<'a> ArgOrKeyword<'a> {
     pub const fn is_variadic(self) -> bool {
         match self {
             ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
-            ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
+            ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
         }
     }
 
     pub const fn as_variadic(self) -> Option<&'a Keyword> {
         match self {
-            ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none() => Some(keyword),
+            ArgOrKeyword::Keyword(keyword) if keyword.is_variadic() => Some(keyword),
             _ => None,
         }
     }
@@ -3732,6 +3739,15 @@ impl Ranged for ArgOrKeyword<'_> {
 }
 
 impl Arguments {
+    /// Return the `N` positional arguments if the call has exactly that shape.
+    /// A starred argument counts as positional.
+    pub fn as_positional_array<const N: usize>(&self) -> Option<[&Expr; N]> {
+        if self.len() != N {
+            return None;
+        }
+        itertools::Itertools::collect_array(self.items.iter().map_while(Argument::as_positional))
+    }
+
     /// Return the argument if the call contains exactly one positional argument and no keywords.
     pub fn as_single_positional(&self) -> Option<&Expr> {
         let [Argument::Positional(arg)] = self.items.as_slice() else {

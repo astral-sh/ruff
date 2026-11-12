@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
@@ -117,15 +116,11 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     };
 
-    if arguments.keywords().next().is_some() {
-        return expr;
-    }
-
     if func.as_name_expr().is_none_or(|name| name.id != "list") {
         return expr;
     }
 
-    let Some([arg]) = arguments.args().collect_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return expr;
     };
 

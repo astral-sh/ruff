@@ -110,7 +110,7 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let [ast::Argument::Positional(expr)] = arguments.items.as_slice() else {
+    let Some(expr) = arguments.as_single_positional() else {
         return false;
     };
     if as_nan_float_string_literal(expr).is_none() {

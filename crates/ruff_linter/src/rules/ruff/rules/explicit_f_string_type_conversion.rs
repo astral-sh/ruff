@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::fmt::Display;
 
 use anyhow::Result;
@@ -101,12 +100,8 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             }
             Conversion::Str | Conversion::Repr | Conversion::Ascii => {
                 // Can't be a conversion otherwise.
-                if call.arguments.keywords().next().is_some() {
-                    continue;
-                }
-
                 // Can't be a conversion otherwise.
-                let Some([arg]) = call.arguments.args().collect_array() else {
+                let Some(arg) = call.arguments.as_single_positional() else {
                     continue;
                 };
                 arg
