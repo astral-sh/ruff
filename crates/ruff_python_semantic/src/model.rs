@@ -268,12 +268,29 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        self.seen_typing()
-            && self
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| {
-                    self.match_typing_qualified_name(&qualified_name, target)
-                })
+        if !self.seen_typing() {
+            return false;
+        }
+        match expr {
+            Expr::Attribute(attribute) if attribute.attr.as_str() != target => return false,
+            Expr::Name(name)
+                if name.id.as_str() != target
+                    && let Some(id) = self.resolve_name(name) =>
+            {
+                let Some(import) = self.binding(id).as_any_import() else {
+                    return false;
+                };
+                // Imports such as `from typing import Literal as L` already store their
+                // qualified name. Relative imports and unaliased submodule imports need resolution.
+                let qualified = import.qualified_name();
+                if !import.is_submodule_import() && !qualified.is_unresolved_import() {
+                    return self.match_typing_qualified_name(qualified, target);
+                }
+            }
+            _ => {}
+        }
+        self.resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| self.match_typing_qualified_name(&qualified_name, target))
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
