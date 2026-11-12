@@ -1057,8 +1057,18 @@
           ]
         },
         "invalid-paramspec": {
-          "title": "detects invalid ParamSpec usage",
-          "description": "## What it does\n\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\n# ParamSpec requires a name\nP2 = ParamSpec()  # error\n```\n\n## References\n\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
+          "title": "detects invalid ParamSpec definitions",
+          "description": "## What it does\n\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\n# ParamSpec requires a name\nP2 = ParamSpec()  # error\n```\n\n## References\n\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)\n\n## Rule history\n\n- v0.0.102: Checks on the use of `P.args` and `P.kwargs` moved to `invalid-paramspec-components`.\n    Use the new name in rule settings and suppression comments for these checks.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-paramspec-components": {
+          "title": "detects invalid uses of ParamSpec components",
+          "description": "## What it does\n\nChecks that `P.args` and `P.kwargs` annotate a function's variadic positional and keyword\nparameters, respectively. Both components must come from the same `ParamSpec` and appear together\nwith no keyword-only parameters between them.\n\n## Why is this bad?\n\nA `ParamSpec` captures a callable's full parameter list. A caller can often pass the same argument\nby position or by keyword. A wrapper needs both components to forward either call correctly.\nInserting a keyword-only parameter between the components can also intercept a keyword intended for\nthe wrapped callable.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom collections.abc import Callable\n\n\ndef call[**P](\n    f: Callable[P, int],\n    /,\n    *args: P.args,\n    debug: bool,  # error\n    **kwargs: P.kwargs,\n) -> int:\n    if debug:  # \"debug\" could also be a keyword argument to f\n        print(f)\n    return f(*args, **kwargs)\n```\n\nMake `debug` positional-only so the caller can pass `debug=` through to `f`:\n\n```python\nfrom collections.abc import Callable\n\n\ndef call[**P](\n    f: Callable[P, int], debug: bool, /, *args: P.args, **kwargs: P.kwargs\n) -> int:\n    if debug:\n        print(f)\n    return f(*args, **kwargs)\n```\n\n## References\n\n- [Typing specification: The components of a ParamSpec](https://typing.python.org/en/latest/spec/generics.html#the-components-of-a-paramspec)\n\n## Rule history\n\n- v0.0.102: Split from `invalid-paramspec` and `invalid-type-form`.",
           "default": "error",
           "oneOf": [
             {
@@ -1148,7 +1158,7 @@
         },
         "invalid-type-form": {
           "title": "detects invalid type forms",
-          "description": "## What it does\n\nChecks for expressions that are used as [type expressions] but cannot validly be interpreted as\nsuch.\n\n## Why is this bad?\n\nSuch expressions cannot be understood by ty. In some cases, they might raise errors at runtime.\n\n## Examples\n\n```python\nfrom typing import Annotated\n\n# Int literals are not allowed in this context in type expressions\na: list[1]  # error\n# `Annotated` expects at least two arguments\nb: Annotated[int]  # error\n```\n\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+          "description": "## What it does\n\nChecks for expressions that are used as [type expressions] but cannot validly be interpreted as\nsuch.\n\n## Why is this bad?\n\nSuch expressions cannot be understood by ty. In some cases, they might raise errors at runtime.\n\n## Examples\n\n```python\nfrom typing import Annotated\n\n# Int literals are not allowed in this context in type expressions\na: list[1]  # error\n# `Annotated` expects at least two arguments\nb: Annotated[int]  # error\n```\n\n## Rule history\n\n- v0.0.102: Using `P.kwargs` on `*args` or `P.args` on `**kwargs` now triggers\n    `invalid-paramspec-components`. Use the new name in rule settings and suppression comments for\n    these annotations.\n\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
           "default": "error",
           "oneOf": [
             {

@@ -125,6 +125,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
+    registry.register_lint(&INVALID_PARAMSPEC_COMPONENTS);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&MISMATCHED_TYPE_NAME);
@@ -698,8 +699,17 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-paramspec.md")]
     pub(crate) static INVALID_PARAMSPEC = {
-        summary: "detects invalid ParamSpec usage",
+        summary: "detects invalid ParamSpec definitions",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-paramspec-components.md")]
+    pub(crate) static INVALID_PARAMSPEC_COMPONENTS = {
+        summary: "detects invalid uses of ParamSpec components",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }

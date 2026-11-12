@@ -149,43 +149,43 @@ from typing import Callable
 def foo[**P](c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
-    # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+    # error: [invalid-paramspec-components] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+    # error: [invalid-paramspec-components] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
     def nested2(*args: P.kwargs, **kwargs: P.args) -> None: ...
 
-    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested3(*args: P.args) -> None: ...
 
-    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
+    # error: [invalid-paramspec-components] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    # error: [invalid-paramspec-components] "`P.args` is only valid for annotating `*args`"
     def nested6(x: P.args) -> None: ...
     def nested7(
         *args: P.args,
-        # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+        # error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
         **kwargs: int,
     ) -> None: ...
 ```
 
-And, they need to be used together.
+The two components must belong to the same `ParamSpec`:
 
 ```py
-def foo[**P](c: Callable[P, int]) -> None:
-    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
-    def nested1(*args: P.args) -> None: ...
+# error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+def mixed[**P, **Q](*args: P.args, **kwargs: Q.kwargs) -> None: ...
+```
 
-    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
-    def nested2(**kwargs: P.kwargs) -> None: ...
+The components cannot annotate class attributes:
 
+```py
 class Foo[**P]:
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
+    # error: [invalid-paramspec-components] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
+    # error: [invalid-paramspec-components] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 
@@ -197,27 +197,27 @@ class Foo3[**P]:
     def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
     def method2(
         self,
-        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        # error: [invalid-paramspec-components] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
         *paramspec_args: P.kwargs,
-        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        # error: [invalid-paramspec-components] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
         **paramspec_kwargs: P.args,
     ) -> None: ...
 ```
 
-Error messages for `invalid-paramspec` also use the actual parameter names:
+Error messages for `invalid-paramspec-components` also use the actual parameter names:
 
 ```py
 def bar[**P](c: Callable[P, int]) -> None:
-    # error: [invalid-paramspec] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
     def f1(*my_args: P.args, **my_kwargs: int) -> None: ...
 
-    # error: [invalid-paramspec] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def f2(*positional: P.args) -> None: ...
 
-    # error: [invalid-paramspec] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
+    # error: [invalid-paramspec-components] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
     def f3(**keyword: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
+    # error: [invalid-paramspec-components] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
     def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
 ```
 
@@ -227,10 +227,22 @@ It isn't allowed to annotate an instance attribute either:
 class Foo4[**P]:
     def __init__(self, fn: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
         self.fn = fn
-        # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
+        # error: [invalid-paramspec-components] "`P.args` is only valid for annotating `*args` function parameters"
         self.args: P.args = args
-        # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
+        # error: [invalid-paramspec-components] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
         self.kwargs: P.kwargs = kwargs
+```
+
+## Suppressing a mismatched component
+
+When `**kwargs` is annotated with `P.kwargs`, ty reports a mismatched `*args` annotation on `*args`.
+An ignore comment on that annotation suppresses the error for the pair.
+
+```py
+def mismatched[**P](
+    *args: int,  # ty: ignore[invalid-paramspec-components]
+    **kwargs: P.kwargs,
+) -> None: ...
 ```
 
 ## Class `ParamSpec` bindings remain visible in nested classes

@@ -565,28 +565,38 @@ P = ParamSpec("P")
 def foo1(c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
     def nested2(
-        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        # snapshot: invalid-paramspec-components
         *args: P.kwargs,
-        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        # error: [invalid-paramspec-components] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
         **kwargs: P.args,
     ) -> None: ...
 
-    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested3(*args: P.args) -> None: ...
 
-    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
+    # error: [invalid-paramspec-components] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    # error: [invalid-paramspec-components] "`P.args` is only valid for annotating `*args`"
     def nested6(x: P.args) -> None: ...
     def nested7(
         *args: P.args,
-        # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+        # error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
         **kwargs: int,
     ) -> None: ...
+```
+
+```snapshot
+error[invalid-paramspec-components]: `P.kwargs` is valid only in `**kwargs` annotation
+  --> src/mdtest_snippet.py:10:16
+   |
+10 |         *args: P.kwargs,
+   |                ^^^^^^^^ Did you mean `P.args`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 `P.args` and `P.kwargs` do not bind `P` themselves. They must refer to a `ParamSpec` bound by
@@ -666,21 +676,24 @@ def nested_components_factory() -> Callable[P, int]:
     return outer
 ```
 
-And, they need to be used together.
+The two components must belong to the same `ParamSpec`:
 
 ```py
-def foo2(c: Callable[P, int]) -> None:
-    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
-    def nested1(*args: P.args) -> None: ...
+Q = ParamSpec("Q")
 
-    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
-    def nested2(**kwargs: P.kwargs) -> None: ...
+def mixed(first: Callable[P, int], second: Callable[Q, int]) -> None:
+    # error: [invalid-paramspec-components] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    def inner(*args: P.args, **kwargs: Q.kwargs) -> None: ...
+```
 
+The components cannot annotate class attributes:
+
+```py
 class Foo2:
-    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
+    # error: [invalid-paramspec-components] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
+    # error: [invalid-paramspec-components] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 
@@ -692,27 +705,27 @@ class Foo3(Generic[P]):
     def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
     def method2(
         self,
-        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        # error: [invalid-paramspec-components] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
         *paramspec_args: P.kwargs,
-        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        # error: [invalid-paramspec-components] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
         **paramspec_kwargs: P.args,
     ) -> None: ...
 ```
 
-Error messages for `invalid-paramspec` also use the actual parameter names:
+Error messages for `invalid-paramspec-components` also use the actual parameter names:
 
 ```py
 def bar(c: Callable[P, int]) -> None:
-    # error: [invalid-paramspec] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
     def f1(*my_args: P.args, **my_kwargs: int) -> None: ...
 
-    # error: [invalid-paramspec] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    # error: [invalid-paramspec-components] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def f2(*positional: P.args) -> None: ...
 
-    # error: [invalid-paramspec] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
+    # error: [invalid-paramspec-components] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
     def f3(**keyword: P.kwargs) -> None: ...
 
-    # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
+    # error: [invalid-paramspec-components] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
     def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
 ```
 
