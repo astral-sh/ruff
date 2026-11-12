@@ -128,3 +128,13 @@ TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 34 |
 35 | # relative imports are respected
    |
+
+TID251 `.dict.fromkeys` is banned: Use a dict comprehension instead.
+  --> TID251.py:41:1
+   |
+39 | import builtins
+40 |
+41 | dict.fromkeys([])
+   | ^^^^^^^^^^^^^
+42 | builtins.dict.fromkeys([])
+   |
