@@ -84,9 +84,8 @@ pub(crate) fn too_many_positional_arguments(
     // Count the number of positional arguments.
     let num_positional_args = function_def
         .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function_def.parameters.args)
+        .posonlyargs()
+        .chain(function_def.parameters.args())
         .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 

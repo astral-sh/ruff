@@ -8822,27 +8822,25 @@ Module(
                                 Parameters {
                                     range: 5731..5736,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [
-                                        ParameterWithDefault {
-                                            range: 5731..5736,
-                                            node_index: NodeIndex(None),
-                                            parameter: Parameter {
+                                    items: [
+                                        PositionalOrKeyword(
+                                            ParameterWithDefault {
                                                 range: 5731..5736,
                                                 node_index: NodeIndex(None),
-                                                name: Identifier {
-                                                    id: Name("query"),
+                                                parameter: Parameter {
                                                     range: 5731..5736,
                                                     node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("query"),
+                                                        range: 5731..5736,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    annotation: None,
                                                 },
-                                                annotation: None,
+                                                default: None,
                                             },
-                                            default: None,
-                                        },
+                                        ),
                                     ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
                                 },
                             ),
                             body: Compare(

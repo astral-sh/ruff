@@ -1208,7 +1208,7 @@ fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    for param in &function.parameters {
+    for param in function.parameters.iter() {
         parameters.push(param.name());
     }
     parameters
@@ -1358,7 +1358,7 @@ pub(crate) fn check_docstring(
     // DOC102
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
         // Don't report extraneous parameters if the signature defines *args or **kwargs
-        if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
+        if function_def.parameters.vararg().is_none() && function_def.parameters.kwarg().is_none() {
             if let Some(docstring_params) = docstring_sections.parameters {
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters.contains(&docstring_param.name) {

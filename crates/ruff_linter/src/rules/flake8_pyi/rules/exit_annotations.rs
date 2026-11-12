@@ -153,12 +153,8 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         return;
     };
 
-    let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .skip(1)
-        .collect();
+    let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> =
+        parameters.iter_positional_params().skip(1).collect();
 
     if is_overload(decorator_list, semantic) {
         check_positional_args_for_overloaded_method(
@@ -193,11 +189,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
     }
 
     // ...as should all keyword-only arguments.
-    for parameter in parameters
-        .kwonlyargs
-        .iter()
-        .filter(|arg| arg.default.is_none())
-    {
+    for parameter in parameters.kwonlyargs().filter(|arg| arg.default.is_none()) {
         checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
@@ -213,7 +205,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
 fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: FuncKind) {
-    if let Some(varargs) = &parameters.vararg {
+    if let Some(varargs) = parameters.vararg() {
         if let Some(annotation) = varargs.annotation().filter(|ann| {
             !checker.match_maybe_stringized_annotation(ann, |expr| {
                 is_object_or_unused(expr, checker.semantic())
@@ -353,28 +345,8 @@ fn check_positional_args_for_overloaded_method(
             return;
         }
 
-        // If any overloads have any variadic arguments, don't do any checking
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg: None,
-            kwonlyargs,
-            kwarg: None,
-        } = &**parameters
-        else {
-            return;
-        };
-
-        // If any overloads have any keyword-only arguments, don't do any checking
-        if !kwonlyargs.is_empty() {
-            return;
-        }
-
-        // If the number of non-keyword-only arguments is not exactly equal to 4
-        // for any overloads, don't do any checking
-        if posonlyargs.len() + args.len() != 4 {
+        // Each overload must have exactly four positional parameters, including self.
+        if parameters.len() != 4 || parameters.iter_positional_params().count() != 4 {
             return;
         }
     }

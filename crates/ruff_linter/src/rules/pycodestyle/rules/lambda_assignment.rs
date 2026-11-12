@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
-    ParameterWithDefault, Parameters, Stmt,
+    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Stmt,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
@@ -203,44 +202,19 @@ fn function(
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
-            // A `lambda` expression can only have positional-only and positional-or-keyword
-            // arguments. The order is always positional-only first, then positional-or-keyword.
-            let new_posonlyargs = parameters
-                .posonlyargs
-                .iter()
-                .enumerate()
-                .map(|(idx, parameter)| ParameterWithDefault {
-                    parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx)
-                            .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.parameter.clone()
-                    },
-                    ..parameter.clone()
-                })
-                .collect::<ast::ParameterWithDefaults>();
-            let new_args = parameters
-                .args
-                .iter()
-                .enumerate()
-                .map(|(idx, parameter)| ParameterWithDefault {
-                    parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx + new_posonlyargs.len())
-                            .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.parameter.clone()
-                    },
-                    ..parameter.clone()
-                })
-                .collect::<ast::ParameterWithDefaults>();
+            let mut parameters = parameters;
+            let positional = parameters.items.iter_mut().filter_map(|item| match item {
+                ast::ParameterItem::PositionalOnly(p)
+                | ast::ParameterItem::PositionalOrKeyword(p) => Some(&mut p.parameter),
+                _ => None,
+            });
+            for (idx, parameter) in positional.enumerate() {
+                parameter.annotation = arg_types.get(idx).cloned().map(Box::new);
+            }
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
-                parameters: Box::new(Parameters {
-                    posonlyargs: new_posonlyargs,
-                    args: new_args,
-                    ..parameters
-                }),
+                parameters: Box::new(parameters),
                 body: ast::Suite::from([body]),
                 decorator_list: ast::DecoratorList::new(),
                 returns: Some(Box::new(return_type)),

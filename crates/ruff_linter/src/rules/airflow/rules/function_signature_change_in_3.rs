@@ -118,19 +118,16 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
         },
     ) {
         let parameters = &function_def.parameters;
-        let positional_count = parameters.posonlyargs.len() + parameters.args.len();
+        let positional_count = parameters.iter_positional_params().count();
 
         let is_valid_signature = match positional_count {
             // check valid signature `def get_link(self, operator, *, ti_key)`
             2 => parameters
-                .kwonlyargs
-                .iter()
+                .kwonlyargs()
                 .any(|p| p.name().as_str() == "ti_key"),
             // check valid signature `def get_link(self, operator, ti_key)`
             3 => parameters
-                .posonlyargs
-                .iter()
-                .chain(parameters.args.iter())
+                .iter_positional_params()
                 .nth(2)
                 .is_some_and(|p| p.name().as_str() == "ti_key"),
             _ => false,

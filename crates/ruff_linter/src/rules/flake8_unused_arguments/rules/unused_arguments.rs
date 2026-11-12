@@ -301,15 +301,13 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
             parameters
-                .vararg
-                .as_deref()
+                .vararg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
             parameters
-                .kwarg
-                .as_deref()
+                .kwarg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
@@ -328,15 +326,13 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
             parameters
-                .vararg
-                .as_deref()
+                .vararg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
             parameters
-                .kwarg
-                .as_deref()
+                .kwarg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );

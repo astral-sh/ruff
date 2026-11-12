@@ -99,8 +99,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     // function.
     if parameters.as_ref().is_some_and(|parameters| {
         parameters
-            .args
-            .iter()
+            .args()
             .any(|ParameterWithDefault { default, .. }| default.is_some())
     }) {
         return;
@@ -141,7 +140,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
                 .collect::<Vec<_>>();
 
             // Ex) `lambda **kwargs: func(**kwargs)`
-            match parameters.kwarg.as_ref() {
+            match parameters.kwarg() {
                 None => {
                     if !call_kwargs.is_empty() {
                         return;
@@ -163,7 +162,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
             }
 
             // Ex) `lambda *args: func(*args)`
-            match parameters.vararg.as_ref() {
+            match parameters.vararg() {
                 None => {
                     if !call_varargs.is_empty() {
                         return;
@@ -186,8 +185,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
 
             // Ex) `lambda x, y: func(x, y)`
             let lambda_posargs: Vec<&Parameter> = parameters
-                .args
-                .iter()
+                .args()
                 .map(|ParameterWithDefault { parameter, .. }| parameter)
                 .collect::<Vec<_>>();
             if call_posargs.len() != lambda_posargs.len() {

@@ -3194,14 +3194,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(ParameterDefinitionNodeRef::Parameter)
             .chain(
                 parameters
-                    .vararg
-                    .as_deref()
+                    .vararg()
                     .map(ParameterDefinitionNodeRef::VariadicPositionalParameter),
             )
             .chain(
                 parameters
-                    .kwarg
-                    .as_deref()
+                    .kwarg()
                     .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
             );
         if is_stub_body {
@@ -3250,15 +3248,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) {
         let mut index = 0;
-        for parameter in &parameters.posonlyargs {
+        for parameter in parameters.posonlyargs() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        for parameter in &parameters.args {
+        for parameter in parameters.args() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        if let Some(vararg) = parameters.vararg.as_ref() {
+        if let Some(vararg) = parameters.vararg() {
             let symbol = self.add_symbol(vararg.name.id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
@@ -3273,11 +3271,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
             index += 1;
         }
-        for parameter in &parameters.kwonlyargs {
+        for parameter in parameters.kwonlyargs() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
+        if let Some(kwarg) = parameters.kwarg() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
