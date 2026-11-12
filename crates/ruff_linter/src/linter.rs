@@ -26,7 +26,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
@@ -151,10 +151,7 @@ pub fn check_path(
     }
 
     // Run the token-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_tokens())
-    {
+    if context.has_rules_for(LintSource::Tokens) {
         check_tokens(
             tokens,
             path,
@@ -168,10 +165,7 @@ pub fn check_path(
     }
 
     // Run the filesystem-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_filesystem())
-    {
+    if context.has_rules_for(LintSource::Filesystem) {
         check_file_path(
             path,
             package,
@@ -184,10 +178,7 @@ pub fn check_path(
     }
 
     // Run the logical line-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_logical_lines())
-    {
+    if context.has_rules_for(LintSource::LogicalLines) {
         crate::checkers::logical_lines::check_logical_lines(
             tokens, locator, indexer, stylist, settings, &context,
         );
@@ -215,10 +206,7 @@ pub fn check_path(
             &context,
         ));
 
-        let use_imports = !directives.isort.skip_file
-            && context
-                .iter_enabled_rules()
-                .any(|rule_code| rule_code.lint_source().is_imports());
+        let use_imports = !directives.isort.skip_file && context.has_rules_for(LintSource::Imports);
         if use_imports || use_doc_lines {
             if use_imports {
                 check_imports(
@@ -248,10 +236,7 @@ pub fn check_path(
     }
 
     // Run the lines-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_physical_lines())
-    {
+    if context.has_rules_for(LintSource::PhysicalLines) {
         check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &context);
     }
 
@@ -330,11 +315,7 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if noqa.is_enabled()
-        || context
-            .iter_enabled_rules()
-            .any(|rule_code| rule_code.lint_source().is_noqa())
-    {
+    if noqa.is_enabled() || context.has_rules_for(LintSource::Noqa) {
         let ignored = check_noqa(
             &mut context,
             path,

@@ -14,6 +14,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::comments::shebang::leading_shebang_range;
 use crate::noqa::NoqaMapping;
+use crate::registry::LintSource;
 use crate::settings::LinterSettings;
 
 bitflags! {
@@ -28,8 +29,7 @@ impl Flags {
     pub fn from_settings(settings: &LinterSettings) -> Self {
         if settings
             .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_imports())
+            .any_enabled_in(LintSource::Imports.rule_set())
         {
             Self::NOQA | Self::ISORT
         } else {

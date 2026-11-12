@@ -2,6 +2,7 @@
 //! with some helper symbols
 
 use ruff_db::diagnostic::LintName;
+use strum::{EnumCount, VariantArray};
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -230,7 +231,7 @@ pub trait RuleNamespace: Sized {
     fn url(&self) -> Option<&'static str>;
 }
 
-#[derive(is_macro::Is, Copy, Clone)]
+#[derive(is_macro::Is, Copy, Clone, strum_macros::EnumCount)]
 pub enum LintSource {
     Ast,
     Io,
@@ -242,6 +243,24 @@ pub enum LintSource {
     Filesystem,
     /// A TOML config file, either `pyproject.toml`, `ruff.toml`, or `.ruff.toml`.
     Toml,
+}
+
+impl LintSource {
+    /// Returns all rules checked by this lint source. The sets are built at compile time so
+    /// the linter can skip a pass when its set has no overlap with the enabled rules.
+    pub(crate) const fn rule_set(self) -> &'static RuleSet {
+        static RULES: [RuleSet; LintSource::COUNT] = {
+            let mut groups = [const { RuleSet::empty() }; LintSource::COUNT];
+            let mut remaining = Rule::VARIANTS;
+            while let [rule, rest @ ..] = remaining {
+                let group = &mut groups[rule.lint_source() as usize];
+                *group = RuleSet::from_rule(*rule).union(group);
+                remaining = rest;
+            }
+            groups
+        };
+        &RULES[self as usize]
+    }
 }
 
 impl Rule {
