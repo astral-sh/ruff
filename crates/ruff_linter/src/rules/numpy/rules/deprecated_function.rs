@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -57,40 +58,34 @@ impl Violation for NumpyDeprecatedFunction {
 }
 
 /// NPY003
-pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
+pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
 
-    if let Some((existing, replacement)) =
-        checker
-            .semantic()
-            .resolve_qualified_name(expr)
-            .and_then(|qualified_name| match qualified_name.segments() {
-                ["numpy", "round_"] => Some(("round_", "round")),
-                ["numpy", "product"] => Some(("product", "prod")),
-                ["numpy", "cumproduct"] => Some(("cumproduct", "cumprod")),
-                ["numpy", "sometrue"] => Some(("sometrue", "any")),
-                ["numpy", "alltrue"] => Some(("alltrue", "all")),
-                _ => None,
-            })
-    {
-        let mut diagnostic = checker.report_diagnostic(
-            NumpyDeprecatedFunction {
-                existing: existing.to_string(),
-                replacement: replacement.to_string(),
-            },
-            expr.range(),
-        );
-        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("numpy", replacement),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, expr.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
-    }
+    let (existing, replacement) = match qualified_name.segments() {
+        ["numpy", "round_"] => ("round_", "round"),
+        ["numpy", "product"] => ("product", "prod"),
+        ["numpy", "cumproduct"] => ("cumproduct", "cumprod"),
+        ["numpy", "sometrue"] => ("sometrue", "any"),
+        ["numpy", "alltrue"] => ("alltrue", "all"),
+        _ => return,
+    };
+    let mut diagnostic = checker.report_diagnostic(
+        NumpyDeprecatedFunction {
+            existing: existing.to_string(),
+            replacement: replacement.to_string(),
+        },
+        expr.range(),
+    );
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("numpy", replacement),
+            expr.start(),
+            checker.semantic(),
+        )?;
+        let replacement_edit = Edit::range_replacement(binding, expr.range());
+        Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+    });
 }

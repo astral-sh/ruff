@@ -1,8 +1,9 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_semantic::Modules;
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,7 +52,11 @@ impl Violation for TypingTextStrAlias {
 }
 
 /// UP019
-pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
     if !checker
         .semantic()
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
@@ -59,28 +64,26 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
-        let segments = qualified_name.segments();
-        let module = match segments {
-            ["typing", "Text"] => TypingModule::Typing,
-            ["typing_extensions", "Text"] => TypingModule::TypingExtensions,
-            _ => return,
-        };
+    let segments = qualified_name.segments();
+    let module = match segments {
+        ["typing", "Text"] => TypingModule::Typing,
+        ["typing_extensions", "Text"] => TypingModule::TypingExtensions,
+        _ => return,
+    };
 
-        let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias { module }, expr.range());
-        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
-                "str",
-                expr.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::safe_edits(
-                Edit::range_replacement(binding, expr.range()),
-                import_edit,
-            ))
-        });
-    }
+    let mut diagnostic = checker.report_diagnostic(TypingTextStrAlias { module }, expr.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "str",
+            expr.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, expr.range()),
+            import_edit,
+        ))
+    });
 }
 
 #[derive(Copy, Clone, Debug)]

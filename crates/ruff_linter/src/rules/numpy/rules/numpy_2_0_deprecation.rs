@@ -1,9 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
+use ruff_python_semantic::Modules;
+use ruff_python_semantic::{Exceptions, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -159,16 +161,16 @@ enum Compatibility {
 }
 
 /// NPY201
-pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
-    let semantic = checker.semantic();
-
-    if !semantic.seen_module(Modules::NUMPY) {
+pub(crate) fn numpy_2_0_deprecation(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return;
-    };
+    let semantic = checker.semantic();
 
     let replacement = match qualified_name.segments() {
         // NumPy's main namespace np.* members removed in 2.0
