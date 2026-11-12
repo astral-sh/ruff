@@ -110,7 +110,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
                 return;
             };
 
-            let Some(parent_arg) = parent_parameters.args.first() else {
+            let Some(parent_arg) = parent_parameters.args().next() else {
                 return;
             };
 
@@ -126,7 +126,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
             body,
             ..
         }) => {
-            let Some(parent_arg) = parent_parameters.args.first() else {
+            let Some(parent_arg) = parent_parameters.args().next() else {
                 return;
             };
 

@@ -25,11 +25,7 @@ Module(
                     parameters: Parameters {
                         range: 55..57,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -170,11 +166,7 @@ Module(
                     parameters: Parameters {
                         range: 133..135,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -326,11 +318,7 @@ Module(
                     parameters: Parameters {
                         range: 211..213,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

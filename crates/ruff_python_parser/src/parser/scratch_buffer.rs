@@ -34,6 +34,12 @@ impl<T> ScratchBuffer<T> {
         self.buffer.len() == snapshot.len
     }
 
+    /// The number of items pushed by this frame, excluding nested frames already restored.
+    #[inline]
+    pub(super) fn len_since(&self, snapshot: &ScratchSnapshot) -> usize {
+        self.buffer.len() - snapshot.len
+    }
+
     #[inline]
     pub(super) fn snapshot(&self) -> ScratchSnapshot {
         ScratchSnapshot {
@@ -61,7 +67,7 @@ impl<T> ScratchBuffer<T> {
     }
 
     #[inline]
-    fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
+    pub(super) fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
         debug_assert!(
             self.buffer.len() >= snapshot.len,
             "Scratch buffer snapshots must be restored in reverse order of creation."

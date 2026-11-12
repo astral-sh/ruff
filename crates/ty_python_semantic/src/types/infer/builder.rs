@@ -9187,8 +9187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
-                .posonlyargs
-                .iter()
+                .posonlyargs()
                 .map(|param| {
                     let parameter = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -9205,8 +9204,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
-                .args
-                .iter()
+                .args()
                 .map(|param| {
                     let parameter = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -9222,13 +9220,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 })
                 .collect::<Vec<_>>();
-            let variadic = parameters.vararg.as_ref().map(|param| {
+            let variadic = parameters.vararg().map(|param| {
                 Parameter::variadic(param.name().id.clone())
                     .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
             });
             let keyword_only = parameters
-                .kwonlyargs
-                .iter()
+                .kwonlyargs()
                 .map(|param| {
                     Parameter::keyword_only(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -9238,7 +9235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }))
                 })
                 .collect::<Vec<_>>();
-            let keyword_variadic = parameters.kwarg.as_ref().map(|param| {
+            let keyword_variadic = parameters.kwarg().map(|param| {
                 Parameter::keyword_variadic(param.name().id.clone())
                     .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
             });
@@ -11116,7 +11113,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_parameters = &*current_function.parameters;
 
         // `self`/`cls` can't be a keyword-only parameter.
-        if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
+        if function_parameters.posonlyargs().next().is_none()
+            && function_parameters.args().next().is_none()
+        {
             return;
         }
 

@@ -1919,7 +1919,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if !checker.settings().pydocstyle.ignore_var_parameters() {
-        if let Some(arg) = function.parameters.vararg.as_ref() {
+        if let Some(arg) = function.parameters.vararg() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");
             if !arg_name.starts_with('_')
@@ -1929,7 +1929,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref()
+        if let Some(arg) = function.parameters.kwarg()
             && !has_unpack_annotation(checker, arg)
         {
             let arg_name = arg.name.as_str();

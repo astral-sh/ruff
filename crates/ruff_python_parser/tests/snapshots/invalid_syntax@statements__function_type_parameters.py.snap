@@ -58,11 +58,7 @@ Module(
                     parameters: Parameters {
                         range: 817..819,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -129,11 +125,7 @@ Module(
                     parameters: Parameters {
                         range: 855..857,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -200,11 +192,7 @@ Module(
                     parameters: Parameters {
                         range: 889..891,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -258,11 +246,7 @@ Module(
                     parameters: Parameters {
                         range: 931..933,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -316,11 +300,7 @@ Module(
                     parameters: Parameters {
                         range: 976..976,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

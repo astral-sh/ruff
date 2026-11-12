@@ -5542,16 +5542,6 @@ impl<'db> Parameters<'db> {
         has_implicitly_positional_first_parameter: bool,
         annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
-        let ast::Parameters {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-            range: _,
-            node_index: _,
-        } = parameters;
-
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| {
                 ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
@@ -5571,9 +5561,10 @@ impl<'db> Parameters<'db> {
             )
         };
 
-        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
+        let mut positional_only: Vec<Parameter> =
+            parameters.posonlyargs().map(pos_only_param).collect();
 
-        let mut pos_or_keyword_iter = args.iter();
+        let mut pos_or_keyword_iter = parameters.args().peekable();
 
         // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
         // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
@@ -5584,11 +5575,11 @@ impl<'db> Parameters<'db> {
                 positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
             }
 
-            positional_only.extend(
-                pos_or_keyword_iter
-                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
-                    .map(pos_only_param),
-            );
+            while let Some(param) =
+                pos_or_keyword_iter.next_if(|param| param.uses_pep_484_positional_only_convention())
+            {
+                positional_only.push(pos_only_param(param));
+            }
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
@@ -5604,7 +5595,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let variadic = vararg.as_ref().map(|arg| {
+        let variadic = parameters.vararg().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 index,
@@ -5616,7 +5607,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let keyword_only = kwonlyargs.iter().map(|arg| {
+        let keyword_only = parameters.kwonlyargs().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 index,
@@ -5629,7 +5620,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let keywords = kwarg.as_ref().map(|arg| {
+        let keywords = parameters.kwarg().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 index,

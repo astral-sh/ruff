@@ -497,27 +497,25 @@ Module(
                                                 Parameters {
                                                     range: 211..212,
                                                     node_index: NodeIndex(None),
-                                                    posonlyargs: [],
-                                                    args: [
-                                                        ParameterWithDefault {
-                                                            range: 211..212,
-                                                            node_index: NodeIndex(None),
-                                                            parameter: Parameter {
+                                                    items: [
+                                                        PositionalOrKeyword(
+                                                            ParameterWithDefault {
                                                                 range: 211..212,
                                                                 node_index: NodeIndex(None),
-                                                                name: Identifier {
-                                                                    id: Name("y"),
+                                                                parameter: Parameter {
                                                                     range: 211..212,
                                                                     node_index: NodeIndex(None),
+                                                                    name: Identifier {
+                                                                        id: Name("y"),
+                                                                        range: 211..212,
+                                                                        node_index: NodeIndex(None),
+                                                                    },
+                                                                    annotation: None,
                                                                 },
-                                                                annotation: None,
+                                                                default: None,
                                                             },
-                                                            default: None,
-                                                        },
+                                                        ),
                                                     ],
-                                                    vararg: None,
-                                                    kwonlyargs: [],
-                                                    kwarg: None,
                                                 },
                                             ),
                                             body: Name(
@@ -803,27 +801,25 @@ Module(
                                                     Parameters {
                                                         range: 357..358,
                                                         node_index: NodeIndex(None),
-                                                        posonlyargs: [],
-                                                        args: [
-                                                            ParameterWithDefault {
-                                                                range: 357..358,
-                                                                node_index: NodeIndex(None),
-                                                                parameter: Parameter {
+                                                        items: [
+                                                            PositionalOrKeyword(
+                                                                ParameterWithDefault {
                                                                     range: 357..358,
                                                                     node_index: NodeIndex(None),
-                                                                    name: Identifier {
-                                                                        id: Name("y"),
+                                                                    parameter: Parameter {
                                                                         range: 357..358,
                                                                         node_index: NodeIndex(None),
+                                                                        name: Identifier {
+                                                                            id: Name("y"),
+                                                                            range: 357..358,
+                                                                            node_index: NodeIndex(None),
+                                                                        },
+                                                                        annotation: None,
                                                                     },
-                                                                    annotation: None,
+                                                                    default: None,
                                                                 },
-                                                                default: None,
-                                                            },
+                                                            ),
                                                         ],
-                                                        vararg: None,
-                                                        kwonlyargs: [],
-                                                        kwarg: None,
                                                     },
                                                 ),
                                                 body: Name(

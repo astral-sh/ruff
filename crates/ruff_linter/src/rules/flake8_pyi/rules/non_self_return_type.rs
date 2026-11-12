@@ -161,7 +161,7 @@ pub(crate) fn non_self_return_type(
         return;
     };
 
-    if parameters.args.is_empty() && parameters.posonlyargs.is_empty() {
+    if parameters.args().next().is_none() && parameters.posonlyargs().next().is_none() {
         return;
     }
 

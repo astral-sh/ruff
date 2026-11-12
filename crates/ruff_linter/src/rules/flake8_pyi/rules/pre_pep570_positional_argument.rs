@@ -62,11 +62,11 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
         return;
     }
 
-    if !function_def.parameters.posonlyargs.is_empty() {
+    if function_def.parameters.posonlyargs().next().is_some() {
         return;
     }
 
-    if function_def.parameters.args.is_empty() {
+    if function_def.parameters.args().next().is_none() {
         return;
     }
 
@@ -89,7 +89,7 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
             | function_type::FunctionType::NewMethod
     ));
 
-    if let Some(param) = function_def.parameters.args.get(skip) {
+    if let Some(param) = function_def.parameters.args().nth(skip) {
         if param.uses_pep_484_positional_only_convention() {
             checker.report_diagnostic(Pep484StylePositionalOnlyParameter, param.identifier());
         }

@@ -1,7 +1,10 @@
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
+use crate::{
+    Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module,
+    parse_unchecked,
+};
 
 #[test]
 fn test_modes() {
@@ -536,4 +539,34 @@ mod stack_growth {
         let source = format!("{}True\n", "not ".repeat(depth));
         parse_module(&source).unwrap();
     }
+}
+
+#[test]
+fn recovered_parameters_keep_written_and_binding_order() {
+    let parsed = parse_unchecked(
+        "def f(**old, x, /, *first, *discarded, y, **last, z): pass",
+        ParseOptions::from(Mode::Module),
+    )
+    .try_into_module()
+    .unwrap();
+    assert!(!parsed.errors().is_empty());
+    let [Stmt::FunctionDef(function)] = parsed.suite().as_slice() else {
+        panic!("expected one function")
+    };
+    let parameters = &function.parameters;
+    assert_eq!(parameters.len(), 5);
+    assert_eq!(
+        parameters
+            .iter_source_order()
+            .map(|p| p.name().as_str())
+            .collect::<Vec<_>>(),
+        ["x", "first", "y", "last", "z"],
+    );
+    assert_eq!(
+        parameters
+            .iter()
+            .map(|p| p.name().as_str())
+            .collect::<Vec<_>>(),
+        ["x", "first", "y", "z", "last"],
+    );
 }

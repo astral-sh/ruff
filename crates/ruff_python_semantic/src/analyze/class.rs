@@ -348,12 +348,12 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
         }
 
         // Check that there is no variadic parameter
-        if parameters.vararg.is_some() {
+        if parameters.vararg().is_some() {
             continue;
         }
 
         // Check that the last parameter is keyword-variadic (**kwargs)
-        if parameters.kwarg.is_none() {
+        if parameters.kwarg().is_none() {
             continue;
         }
 
