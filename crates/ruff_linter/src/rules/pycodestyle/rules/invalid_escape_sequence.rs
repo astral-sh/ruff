@@ -73,6 +73,17 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
             continue;
         }
         let state = match part {
+            // The parser preserves unknown escapes verbatim, including the backslash.
+            StringLikePart::String(literal)
+                if !literal.flags.is_invalid() && !literal.value.as_bytes().contains(&b'\\') =>
+            {
+                continue;
+            }
+            StringLikePart::Bytes(literal)
+                if !literal.flags.is_invalid() && !literal.value.contains(&b'\\') =>
+            {
+                continue;
+            }
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 analyze_escape_chars(locator, part.range(), flags)
             }
