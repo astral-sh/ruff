@@ -3228,7 +3228,13 @@ impl<'db> StaticClassLiteral<'db> {
                         inner: Place::Defined(DefinedPlace {
                             ty: UnionType::from_two_elements(db, env, declared_ty, implicit.ty),
                             origin: TypeOrigin::Declared,
-                            definedness: declaredness,
+                            // An unconditional receiver annotation can declare the field even when
+                            // the class body annotation is conditional.
+                            definedness: if implicit.origin.is_declared() {
+                                declaredness.max(implicit.definedness)
+                            } else {
+                                declaredness
+                            },
                             public_type_policy: PublicTypePolicy::Raw,
                             provenance: implicit.provenance.or(declared_provenance),
                         })

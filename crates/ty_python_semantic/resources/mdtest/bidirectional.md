@@ -2340,7 +2340,7 @@ x2: tuple[list[str] | list[int]] = wrap_tuple((
 ))
 ```
 
-## Correlated overload specializations from declared type
+## Correlated overload specializations from an expected type
 
 A declared return type can be satisfied by correlated specializations even when merging the type
 arguments independently would violate the declared constraints:
@@ -2362,6 +2362,19 @@ type Choice = tuple[list[int], list[str]] | tuple[list[str], list[int]]
 
 # revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
 result: tuple[Choice] = reveal_type(f(callback))
+```
+
+The same applies when the expected tuple type is inferred from a previous assignment:
+
+```py
+def initial() -> tuple[Choice]:
+    return (([1], ["s"]),)
+
+class Fields:
+    pair = initial()
+
+# revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
+Fields.pair = reveal_type(f(callback))
 ```
 
 ## Literal union context for generic calls
@@ -2536,6 +2549,54 @@ class Callbacks:
     def __init__(self):
         self.values = [{"x": 0}, {"x": lambda x: 0}]
         self.identities = [{"x": 0}, {"x": lambda x: x}]
+```
+
+An inferred attribute type does not provide a declared type preference to later assignments:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+class Fields:
+    class_value = None
+
+    def __init__(self, value: Any):
+        self.value = None
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Any
+
+def _(value: Any):
+    Fields.class_value = reveal_type(identity(value))  # revealed: Any
+    reveal_type(Fields.class_value)  # revealed: Any
+```
+
+The inferred attribute type is, however, used to fill in unsolved type variables:
+
+```py
+class Collections:
+    numbers = [1]
+    items = iter([1])
+
+def _():
+    Collections.numbers = reveal_type(list())  # revealed: list[int]
+    Collections.items = reveal_type(iter(list()))  # revealed: Iterator[int]
+```
+
+An annotated instance attribute provides a declared type preference even if the class body
+conditionally annotated the same field:
+
+```py
+def _(flag: bool, value: Any):
+    class Conditional:
+        if flag:
+            field: int
+
+        def __init__(self):
+            self.field: int = 0
+
+    obj = Conditional()
+    obj.field = identity(value)
+    reveal_type(obj.field)  # revealed: int
 ```
 
 ## Overload evaluation

@@ -824,7 +824,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.declared_type().is_some() {
+        if tcx.expected_type().is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)
@@ -859,7 +859,7 @@ pub(super) struct ScopeWithContext<'db> {
 
 impl<'db> InferScope<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
-        if tcx.declared_type().is_some() {
+        if tcx.expected_type().is_some() {
             InferScope::WithContext(ScopeWithContext::new(db, scope, tcx))
         } else {
             InferScope::Bare(scope)

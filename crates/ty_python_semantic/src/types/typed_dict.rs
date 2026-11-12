@@ -2664,7 +2664,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty = expression_type_fn(
                 arg,
-                TypeContext::declared(Some(positional_inference_target_ty)),
+                TypeContext::preference(Some(positional_inference_target_ty)),
             );
 
             if let Some(provided_keys) = validate_from_typed_dict_argument(
@@ -2717,7 +2717,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
+        let arg_ty = expression_type_fn(arg, TypeContext::preference(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
@@ -2809,7 +2809,7 @@ fn validate_from_keywords<'db, 'ast>(
 
             let value_tcx = typed_dict
                 .item(db, arg_name.id.as_str())
-                .map(|field| TypeContext::declared(Some(field.declared_ty)))
+                .map(|field| TypeContext::preference(Some(field.declared_ty)))
                 .unwrap_or_default();
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
@@ -2894,7 +2894,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                     {
                         let value_ty = expression_type_fn(
                             &item.value,
-                            TypeContext::declared(Some(expected_ty)),
+                            TypeContext::preference(Some(expected_ty)),
                         );
                         if !value_ty.is_assignable_to(db, env, expected_ty) {
                             valid = false;
@@ -2941,7 +2941,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             if !is_shadowed {
                 let value_tcx = typed_dict
                     .item(db, key.as_str())
-                    .map(|field| TypeContext::declared(Some(field.declared_ty)))
+                    .map(|field| TypeContext::preference(Some(field.declared_ty)))
                     .unwrap_or_default();
                 let value_ty = expression_type_fn(&item.value, value_tcx);
                 valid &= TypedDictKeyAssignment {

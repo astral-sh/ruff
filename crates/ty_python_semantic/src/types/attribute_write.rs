@@ -52,10 +52,10 @@ pub(super) enum AttributeWriteRequirement<'db> {
     Unconstrained,
     /// The attribute cannot be assigned.
     CannotAssign,
-    /// A module symbol, with its declared type when the symbol is known.
+    /// A module symbol, with its type and origin when the symbol is known.
     ///
     /// `None` represents an unresolved module attribute rather than an unconstrained write.
-    Module(Option<Type<'db>>),
+    Module(Option<(Type<'db>, TypeOrigin)>),
     /// The effective instance-write requirement of a declared protocol member.
     ///
     /// `write` is `None` for a read-only member. Qualifiers are retained so assignment inference
@@ -247,6 +247,7 @@ pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Check the assigned value directly against the member's effective write type.
     AssignableTo {
         ty: Type<'db>,
+        origin: TypeOrigin,
         qualifiers: TypeQualifiers,
     },
 }
@@ -266,6 +267,7 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
         ty: Type<'db>,
+        origin: TypeOrigin,
         qualifiers: TypeQualifiers,
         possibly_missing: bool,
     },
@@ -504,7 +506,7 @@ pub(super) fn attribute_write_requirement<'db>(
                     .map_or_else(|_| Place::Undefined.into(), |member| member.member(db))
             };
             AttributeWriteRequirement::Module(match symbol.place {
-                Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
+                Place::Defined(DefinedPlace { ty, origin, .. }) => Some((ty, origin)),
                 Place::Undefined => None,
             })
         }
@@ -647,7 +649,7 @@ fn instance_attribute_write_requirement<'db>(
     let member = match type_member {
         type_member if type_member.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers,
         } => {
             // A receiver annotation can make an inherited nested class writable, but it cannot
@@ -669,7 +671,10 @@ fn instance_attribute_write_requirement<'db>(
                 env,
                 object_ty,
                 attribute,
-                bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
+                (
+                    bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
+                    origin,
+                ),
                 qualifiers,
                 receiver,
             );
@@ -786,7 +791,7 @@ fn class_attribute_write_requirement<'db>(
                     env,
                     object_ty,
                     attribute,
-                    descriptor_ty,
+                    (descriptor_ty, place.origin),
                     qualifiers,
                     None,
                 ),
@@ -882,13 +887,13 @@ fn explicit_attribute_write_requirement<'db>(
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
-    attr_ty: Type<'db>,
+    (attr_ty, origin): (Type<'db>, TypeOrigin),
     qualifiers: TypeQualifiers,
     receiver: Option<Type<'db>>,
 ) -> ExplicitAttributeWriteRequirement<'db> {
     if matches!(attr_ty, Type::SlotDescriptor(_))
         && let PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers: storage_qualifiers,
         } = object_ty.instance_member(db, env, attribute)
     {
@@ -900,6 +905,7 @@ fn explicit_attribute_write_requirement<'db>(
                 attribute,
                 bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
             ),
+            origin,
             qualifiers: qualifiers.union(storage_qualifiers),
         };
     }
@@ -928,6 +934,7 @@ fn explicit_attribute_write_requirement<'db>(
                     .method_shadowing_contract(db, env, receiver.unwrap_or(object_ty))
                     .unwrap_or_else(|| shadowed_descriptor_write_type(db, env, attr_ty)),
             ),
+            origin,
             qualifiers,
         }
     }
@@ -971,9 +978,13 @@ fn instance_fallback_write_requirement<'db>(
     receiver: Option<Type<'db>>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -982,6 +993,7 @@ fn instance_fallback_write_requirement<'db>(
     let ty = bind_attribute_self_typevars(db, env, ty, object_ty, receiver);
     FallbackAttributeWriteRequirement::AssignableTo {
         ty: effective_write_type(db, env, object_ty, attribute, ty),
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -1034,9 +1046,13 @@ fn class_fallback_write_requirement<'db>(
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -1053,6 +1069,7 @@ fn class_fallback_write_requirement<'db>(
     };
     FallbackAttributeWriteRequirement::AssignableTo {
         ty,
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -1612,7 +1629,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             AttributeWriteRequirement::Unconstrained => self.always(),
             AttributeWriteRequirement::CannotAssign => self.never(),
-            AttributeWriteRequirement::Module(Some(write_ty)) => {
+            AttributeWriteRequirement::Module(Some((write_ty, _))) => {
                 self.check_type_pair(db, value_ty, *write_ty)
             }
             AttributeWriteRequirement::ProtocolMember {
