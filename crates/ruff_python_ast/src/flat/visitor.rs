@@ -529,26 +529,10 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: Arguments<'a>) {
-    // In `f(first(), key=second(), *third())`, Python evaluates `first` and
-    // `third` before `second`. Only the suffix after the first keyword can
-    // still contain positional arguments that must move ahead of it.
-    let mut items = arguments.iter_source_order();
-    let first_keyword = loop {
-        match items.next() {
-            Some(ArgOrKeyword::Arg(arg)) => visitor.visit_expr(arg),
-            Some(ArgOrKeyword::Keyword(keyword)) => break keyword,
-            None => return,
-        }
-    };
-    for item in items.clone() {
-        if let ArgOrKeyword::Arg(arg) = item {
-            visitor.visit_expr(arg);
-        }
-    }
-    visitor.visit_keyword(first_keyword);
-    for keyword in items.filter_map(ArgOrKeyword::as_keyword) {
-        visitor.visit_keyword(keyword);
-    }
+    arguments.for_each_in_evaluation_order(|argument| match argument {
+        ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
+        ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
+    });
 }
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: Parameters<'a>) {

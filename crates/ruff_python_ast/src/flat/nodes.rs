@@ -846,6 +846,30 @@ impl Ranged for ArgOrKeyword<'_> {
     }
 }
 impl<'a> crate::Arguments<'a> {
+    /// Visits positional arguments (including starred arguments) before keywords.
+    pub fn for_each_in_evaluation_order(self, mut visit: impl FnMut(ArgOrKeyword<'a>)) {
+        let mut items = self.iter_source_order();
+        // In f(a, key=b, *c), only the suffix after key=b can contain positional
+        // arguments that must move ahead of it.
+        let first_keyword = loop {
+            match items.next() {
+                Some(arg @ ArgOrKeyword::Arg(_)) => visit(arg),
+                Some(keyword @ ArgOrKeyword::Keyword(_)) => break keyword,
+                None => return,
+            }
+        };
+        for arg in items
+            .clone()
+            .filter(|item| matches!(item, ArgOrKeyword::Arg(_)))
+        {
+            visit(arg);
+        }
+        visit(first_keyword);
+        for keyword in items.filter(|item| matches!(item, ArgOrKeyword::Keyword(_))) {
+            visit(keyword);
+        }
+    }
+
     pub fn iter_source_order(self) -> ArgumentsSourceOrder<'a> {
         self.items().iter()
     }

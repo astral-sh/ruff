@@ -1,4 +1,7 @@
+use std::hash::{BuildHasher, RandomState};
+
 use ruff_python_ast::AstNode as _;
+use ruff_python_ast::comparable::{ComparableExpr, ComparableStmt};
 use ruff_python_ast::{self as ast, IpyEscapeKind, Number};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -862,4 +865,45 @@ fn flat_storage_notebook_cells() {
         }
     }
     assert_eq!(names, ["first", "second", "third", "fourth"]);
+}
+
+#[test]
+fn argument_evaluation_order() {
+    for (source, order) in [
+        ("f()", &[][..]),
+        ("f(x, y)", &["x", "y"]),
+        ("f(a=x, b=y)", &["x", "y"]),
+        ("f(a=x, *y, b=z)", &["*y", "x", "z"]),
+        ("f(w, a=x, *y, b=z)", &["w", "*y", "x", "z"]),
+    ] {
+        let parsed = parse_expression(source).unwrap();
+        let call = parsed.expr().as_call_expr().unwrap();
+        let mut actual = Vec::new();
+        call.arguments().for_each_in_evaluation_order(|argument| {
+            actual.push(&source[argument.value().range()]);
+        });
+        assert_eq!(actual, order);
+    }
+    let a = parse_expression("f(first, a=x, *y, b=z)").unwrap();
+    let b = parse_expression("f(first, *y, a=x, b=z)").unwrap();
+    let reordered = parse_expression("f(first, *y, b=z, a=x)").unwrap();
+    let a = ComparableExpr::from(a.expr());
+    let b = ComparableExpr::from(b.expr());
+    assert_eq!(a, b);
+    assert_ne!(a, ComparableExpr::from(reordered.expr()));
+    let hash = RandomState::new();
+    assert_eq!(hash.hash_one(a), hash.hash_one(b));
+}
+
+#[test]
+fn comparable_class_arguments_can_be_absent_or_empty() {
+    let absent = parse_module("class C: pass").unwrap();
+    let empty = parse_module("class C(): pass").unwrap();
+    let base = parse_module("class C(B): pass").unwrap();
+    let absent = ComparableStmt::from(absent.suite().first().unwrap());
+    let empty = ComparableStmt::from(empty.suite().first().unwrap());
+    assert_eq!(absent, empty);
+    assert_ne!(absent, ComparableStmt::from(base.suite().first().unwrap()));
+    let hash = RandomState::new();
+    assert_eq!(hash.hash_one(absent), hash.hash_one(empty));
 }

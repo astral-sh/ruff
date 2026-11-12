@@ -1239,12 +1239,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ExprKind::Call(call) => {
-                for arg in call.arguments().args() {
-                    Self::walk_narrowing_alias_predicate(arg, f);
-                }
-                for keyword in call.arguments().keywords() {
-                    Self::walk_narrowing_alias_predicate(keyword.value(), f);
-                }
+                call.arguments().for_each_in_evaluation_order(|argument| {
+                    Self::walk_narrowing_alias_predicate(argument.value(), f);
+                });
             }
             ExprKind::If(expr_if) => {
                 Self::walk_narrowing_alias_predicate(expr_if.test(), f);
