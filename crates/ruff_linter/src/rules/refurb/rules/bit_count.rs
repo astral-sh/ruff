@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
@@ -81,10 +80,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if call.arguments.keywords().next().is_some() {
-        return;
-    }
-    let Some([arg]) = call.arguments.args().collect_array() else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 
@@ -107,10 +103,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if arguments.keywords().next().is_some() {
-        return;
-    }
-    let Some([arg]) = arguments.args().collect_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

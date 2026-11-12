@@ -1179,8 +1179,9 @@ fn suspicious_function(
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
                 // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
-                if arguments.args().all(|arg| !arg.is_starred_expr())
-                    && arguments.keywords().all(|keyword| keyword.arg.is_some())
+                if !arguments
+                    .iter_source_order()
+                    .any(ruff_python_ast::ArgOrKeyword::is_variadic)
                 {
                     if let Some(url_expr) = arguments.find_argument_value("url", 0)
                         && expression_starts_with_http_prefix(url_expr, checker.semantic())
@@ -1202,8 +1203,9 @@ fn suspicious_function(
             "urlopen" | "urlretrieve",
         ] => {
             if let Some(arguments) = arguments {
-                if arguments.args().all(|arg| !arg.is_starred_expr())
-                    && arguments.keywords().all(|keyword| keyword.arg.is_some())
+                if !arguments
+                    .iter_source_order()
+                    .any(ruff_python_ast::ArgOrKeyword::is_variadic)
                 {
                     match arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.

@@ -97,18 +97,16 @@ impl Violation for LoggingTooManyArgs {
 /// PLE1205
 /// PLE1206
 pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
-    // If there are any starred arguments, abort.
-    if call.arguments.args().any(Expr::is_starred_expr) {
-        return;
-    }
-
-    // If there are any starred keyword arguments, abort.
-    if call
-        .arguments
-        .keywords()
-        .any(|keyword| keyword.arg.is_none())
-    {
-        return;
+    let mut first = None;
+    let mut num_positional = 0;
+    for argument in call.arguments.iter_source_order() {
+        if argument.is_variadic() {
+            return;
+        }
+        if let ast::ArgOrKeyword::Arg(expr) = argument {
+            first.get_or_insert(expr);
+            num_positional += 1;
+        }
     }
 
     match call.func.as_ref() {
@@ -141,9 +139,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         _ => return,
     }
 
-    let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) =
-        call.arguments.find_positional(0)
-    else {
+    let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = first else {
         return;
     };
 
@@ -159,8 +155,8 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let num_message_args = call.arguments.args().count() - 1;
-    let num_keywords = call.arguments.keywords().count();
+    let num_message_args = num_positional - 1;
+    let has_keywords = call.arguments.len() != num_positional;
 
     if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
@@ -169,7 +165,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     if checker.is_rule_enabled(Rule::LoggingTooFewArgs) {
-        if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
+        if num_message_args > 0 && !has_keywords && summary.num_positional > num_message_args {
             checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
         }
     }

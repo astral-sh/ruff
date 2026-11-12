@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_edits::unwrapped_call_argument;
@@ -159,13 +158,7 @@ fn single_argument_to_int_call<'a>(
         return None;
     }
 
-    if arguments.keywords().next().is_some() {
-        return None;
-    }
-
-    let [argument] = arguments.args().collect_array()?;
-
-    Some(argument)
+    arguments.as_single_positional()
 }
 
 /// Determines the [`Applicability`] for a `round(..)` call.

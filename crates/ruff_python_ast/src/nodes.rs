@@ -3708,6 +3708,14 @@ impl Ranged for ArgOrKeyword<'_> {
 }
 
 impl Arguments {
+    /// Return the argument if the call contains exactly one positional argument and no keywords.
+    pub fn as_single_positional(&self) -> Option<&Expr> {
+        let [Argument::Positional(arg)] = self.items.as_slice() else {
+            return None;
+        };
+        Some(arg)
+    }
+
     /// Positional arguments, including iterable unpacking.
     pub fn args(&self) -> impl DoubleEndedIterator<Item = &Expr> + FusedIterator + Clone {
         self.items.iter().filter_map(Argument::as_positional)

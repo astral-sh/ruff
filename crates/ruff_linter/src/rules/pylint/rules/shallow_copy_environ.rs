@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
@@ -75,11 +74,7 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if call.arguments.keywords().next().is_some() {
-        return;
-    }
-
-    let Some([arg]) = call.arguments.args().collect_array() else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 
