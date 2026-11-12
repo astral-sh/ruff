@@ -1403,10 +1403,10 @@ def _():
     reveal_type(x8)  # revealed: X
 ```
 
-## Declared type preference
+## Sources of declared type preference
 
-We prefer the declared solution of a given type variable if it is mutually assignable with the
-inferred solution.
+The solver prefers the solution for a type variable from a declared type if it is mutually
+assignable with the inferred solution. An annotated assignment supplies such a preference:
 
 ```py
 from typing import Any, reveal_type
@@ -1433,9 +1433,238 @@ def _(number: int):
     reveal_type(x1)  # revealed: int
 ```
 
+An earlier annotation on the same variable also supplies a preference:
+
+```py
+def _(dynamic: Any):
+    value: int
+    value = reveal_type(identity(dynamic))  # revealed: int
+```
+
+A function's declared return type provides a preference for a return expression. A generator's
+declared yield type does the same for `yield` and `yield from`:
+
+```py
+from collections.abc import Iterator
+
+def result(dynamic: Any) -> int:
+    return reveal_type(identity(dynamic))  # revealed: int
+
+def values(dynamic: Any) -> Iterator[int]:
+    yield reveal_type(identity(dynamic))  # revealed: int
+    yield from reveal_type(identity(dynamic))  # revealed: Iterable[int]
+```
+
+A parameter annotation provides a preference for its default value, for assignments to the parameter
+in the function body, and for arguments at a call site:
+
+```py
+def dynamic_value() -> Any: ...
+def takes_int(value: int = reveal_type(identity(dynamic_value()))):  # revealed: int
+    value = reveal_type(identity(dynamic_value()))  # revealed: int
+
+takes_int(reveal_type(identity(dynamic_value())))  # revealed: int
+```
+
+Declared attribute types and property setter annotations supply a preference on assignment. An
+inferred attribute type leaves the inferred solution in place:
+
+```py
+class Fields:
+    class_value: int = 0
+    inferred = 0
+
+    def __init__(self, dynamic: Any):
+        self.value: int = reveal_type(identity(dynamic))  # revealed: int
+
+    @property
+    def count(self) -> int:
+        return 0
+
+    @count.setter
+    def count(self, value: int) -> None: ...
+
+def _(fields: Fields, dynamic: Any):
+    Fields.class_value = reveal_type(identity(dynamic))  # revealed: int
+    fields.count = reveal_type(identity(dynamic))  # revealed: int
+    Fields.inferred = reveal_type(identity(dynamic))  # revealed: Any
+```
+
+A `TypedDict` field annotation supplies a preference in a constructor call and on a subscript write.
+For other subscript writes, the parameter type of `__setitem__` supplies the preference:
+
+```py
+from typing import TypedDict
+
+class Entry(TypedDict):
+    count: int
+
+def _(dynamic: Any, items: list[int]):
+    entry = Entry(count=reveal_type(identity(dynamic)))  # revealed: int
+    entry["count"] = reveal_type(identity(dynamic))  # revealed: int
+    items[0] = reveal_type(identity(dynamic))  # revealed: int
+```
+
+[Type variable upper bounds](#upper-bound-type-context) also leave a compatible inferred solution in
+place.
+
+During overload resolution, the solver preserves the inferred solution. All three overloads match an
+argument of type `Any`, even when it comes from a generic call:
+
+```py
+from typing import overload
+
+@overload
+def pick(x: int) -> int: ...
+@overload
+def pick(x: str) -> str: ...
+@overload
+def pick(x: list[Any]) -> int: ...
+def pick(x: object) -> int | str:
+    raise NotImplementedError
+
+def _(dynamic: Any):
+    reveal_type(pick(dynamic))  # revealed: Unknown
+    reveal_type(pick(identity(dynamic)))  # revealed: Unknown
+```
+
+After overload resolution, the chosen overload's parameter annotation again supplies a preference:
+
+```py
+def _(items: list[int]):
+    result = pick(reveal_type(identity(items)))  # revealed: list[Any]
+    reveal_type(result)  # revealed: int
+```
+
+Preserving the inferred solution can also keep a call unambiguous. A `list[int]` implements
+`FloatSequence`, and the `Any` on its `count` method would otherwise let the list constructor infer
+`list[Any]` and match both overloads:
+
+```py
+from typing import Protocol
+
+class FloatSequence(Protocol):
+    def __getitem__(self, index: int, /) -> float: ...
+    def count(self, value: Any, /) -> int: ...
+
+@overload
+def pick_sequence(x: FloatSequence) -> tuple[float]: ...
+@overload
+def pick_sequence(x: list[complex]) -> tuple[complex]: ...
+def pick_sequence(x: object) -> tuple[complex]:
+    raise NotImplementedError
+
+items = list(range(2))
+reveal_type(pick_sequence(items))  # revealed: tuple[float]
+reveal_type(pick_sequence(list(range(2))))  # revealed: tuple[float]
+```
+
+An annotation on the result can specialize the chosen overload. During selection, the first overload
+accepts every `list[Any]`. Preferring `T = int` at that point would leave both overloads in play and
+make the call ambiguous.
+
+```py
+@overload
+def f[T](xs: list[T]) -> list[T]: ...
+@overload
+def f(xs: list[str]) -> list[str]: ...
+def f(xs: list[Any]) -> list[Any]:
+    return xs
+
+def _(xs: list[Any]):
+    reveal_type(f(xs))  # revealed: list[Any]
+    result: list[int] = reveal_type(f(xs))  # revealed: list[int]
+```
+
+The final specialization can also propagate between arguments. The expected return type specializes
+`A` to `Any`, which changes the return type of `make` and therefore the parameter type of `use`.
+
+```py
+from collections.abc import Callable
+
+@overload
+def pipe[A, B](seed: A, make: Callable[[A], B], use: Callable[[B], None]) -> list[A]: ...
+@overload
+def pipe(seed: bytes, make: int, use: int) -> bytes: ...
+def pipe(seed: object, make: object, use: object) -> object:
+    raise NotImplementedError
+
+def _(seed: int):
+    result: list[Any] = pipe(seed, lambda a: [a], lambda b: print(reveal_type(b)))  # revealed: list[Any]
+```
+
+A generic overload is specialized using the final argument type. Here `pair` uses the chosen
+parameter's `list[Any]` to infer `T = Any`, so the second element and the call result are both
+`Any`.
+
+```py
+def pair[T](value: T) -> tuple[list[T], T]:
+    return [value], value
+
+@overload
+def second[T](pair: tuple[list[Any], T], key: int) -> T: ...
+@overload
+def second(pair: tuple[list[Any], str], key: int) -> str: ...
+@overload
+def second(pair: object, key: str) -> int: ...
+def second(pair: object, key: int | str) -> object:
+    raise NotImplementedError
+
+def _(number: int):
+    result = second(reveal_type(pair(number)), 0)  # revealed: tuple[list[Any], Any]
+    reveal_type(result)  # revealed: Any
+```
+
+The expected return type also specializes the chosen overload after union argument expansion:
+
+```py
+def _(items: tuple[list[Any], Any], key: int | str):
+    expanded: int = reveal_type(second(items, key))  # revealed: int
+```
+
+The final solve keeps the overloads selected for each union member. For an `int` key, the first two
+overloads cover all values of `arg` and both return tuples. The third overload is selected for the
+`str` key.
+
+```py
+from collections.abc import Sequence
+
+@overload
+def lookup(key: int | bytes, arg: int) -> tuple[int]: ...
+@overload
+def lookup(key: int, arg: object) -> tuple[object]: ...
+@overload
+def lookup(key: int | str, arg: object) -> Sequence[object]: ...
+def lookup(key: object, arg: object) -> object:
+    raise NotImplementedError
+
+def _(key: int | str | bytes, arg: Any):
+    result: object = reveal_type(lookup(key, arg))  # revealed: Sequence[object]
+```
+
+A failed overload's inferred type variables do not provide evidence for the next round of overload
+resolution. Here the default element type of `Box()` rules out the overload bounded by `int`.
+
+```py
+class Box[T = object]: ...
+
+class Group[T]:
+    @overload
+    def __init__[A: int](self: "Group[A]", box: Box[A]) -> None: ...
+    @overload
+    def __init__[B](self: "Group[B]", box: Box[B]) -> None: ...
+    def __init__(self, box: object) -> None: ...
+
+reveal_type(Group(Box()))  # revealed: Group[object]
+```
+
+## Declared type preference
+
 The same declared type heuristic applies when inferring the specialization of a generic class:
 
 ```py
+from typing import Any
+
 class UnusedTypeParameter[T]:
     pass
 

@@ -78,6 +78,16 @@ impl<'db> TypeContext<'db> {
         Self::new(expected_type, TypeContextKind::Expected { prefer: false })
     }
 
+    /// Keep an expected type as a fallback when comparing overloads. Evidence inferred from
+    /// other arguments retains its usual meaning across fixpoint iterations.
+    pub(crate) fn without_preference(self) -> Self {
+        if self.expected_type.is_some() && self.kind == TypeContextKind::preference() {
+            Self::expected(self.expected_type)
+        } else {
+            self
+        }
+    }
+
     pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
         match origin {
             TypeOrigin::Declared => Self::preference(Some(ty)),

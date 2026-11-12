@@ -1429,6 +1429,17 @@ impl<'db> Bindings<'db> {
         // Generic call inference must maintain a stable set of overloads until the final round
         // of fixpoint iteration.
         if mode.is_provisional() {
+            for binding in self.iter_flat_mut() {
+                // A failed overload can remain a candidate in the next round, but feeding its
+                // failed inference back as argument context can make it displace a valid match.
+                if binding.overloads.len() > 1 && binding.matching_overloads().next().is_some() {
+                    for overload in &mut binding.overloads {
+                        if overload.has_errors_affecting_overload_resolution() {
+                            overload.inference = None;
+                        }
+                    }
+                }
+            }
             return Ok(());
         }
 
@@ -1468,7 +1479,22 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
+        overload_resolution: Option<(&CallArguments<'_, 'db>, TypeContext<'db>)>,
     ) -> Result<(), CallErrorKind> {
+        if let Some((matching_arguments, result_tcx)) = overload_resolution
+            && (result_tcx.without_preference() != result_tcx
+                || !matching_arguments.same_inferred_types(call_arguments))
+        {
+            for binding in self.iter_flat_mut() {
+                binding.check_selected_overloads(
+                    db,
+                    env,
+                    matching_arguments,
+                    call_arguments,
+                    result_tcx,
+                );
+            }
+        }
         self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers);
 
         for constructor in self.iter_constructor_items_mut() {
@@ -1480,6 +1506,7 @@ impl<'db> Bindings<'db> {
                     env,
                     call_arguments,
                     dataclass_field_specifiers,
+                    overload_resolution,
                 );
             }
         }
@@ -1489,6 +1516,40 @@ impl<'db> Bindings<'db> {
         }
 
         self.as_result(db)
+    }
+
+    /// Start from the selected annotations, without treating provisional solutions from
+    /// overload resolution as argument evidence for the final solve.
+    pub(crate) fn for_selected_argument_inference(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Self {
+        let mut selected = self.clone();
+        let _ = selected.finalize_argument_inference(
+            db,
+            env,
+            arguments,
+            dataclass_field_specifiers,
+            None,
+        );
+        selected.clear_argument_context_inference();
+        selected
+    }
+
+    fn clear_argument_context_inference(&mut self) {
+        for binding in self.iter_flat_mut() {
+            for overload in &mut binding.overloads {
+                overload.inference = None;
+            }
+        }
+        for constructor in self.iter_constructor_items_mut() {
+            if let Some(downstream) = constructor.downstream_constructor_mut() {
+                downstream.clear_argument_context_inference();
+            }
+        }
     }
 
     /// Returns true if this is a single callable (not a union or intersection).
@@ -4156,7 +4217,7 @@ impl<'db> CallableBinding<'db> {
         // the non-expanded argument types.
         let post_evaluation_snapshot = snapshotter.take(self);
 
-        for expansion in expansions {
+        for (expansion_index, expansion) in expansions.enumerate() {
             let expanded_argument_lists = match expansion {
                 Expansion::LimitReached(index) => {
                     snapshotter.restore(self, post_evaluation_snapshot);
@@ -4283,6 +4344,7 @@ impl<'db> CallableBinding<'db> {
                             env,
                             cases.iter().map(|case| case.return_type),
                         ),
+                        expansion_index,
                         cases: cases.into_boxed_slice(),
                     }),
                 ));
@@ -4296,6 +4358,92 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+    }
+
+    fn check_selected_overloads(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        matching_arguments: &CallArguments<'_, 'db>,
+        final_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        let final_arguments = final_arguments.with_self(self.bound_type);
+        let Some(OverloadCallResult::ArgumentTypeExpansion(mut expanded)) = self
+            .overload_call_result
+            .take_if(|result| matches!(result, OverloadCallResult::ArgumentTypeExpansion(_)))
+        else {
+            self.check_selected_signatures(db, env, &final_arguments, call_expression_tcx);
+            return;
+        };
+        let matching_arguments = matching_arguments.with_self(self.bound_type);
+        let expansions = matching_arguments.expansions(db, env);
+        if let Some(Expansion::Expanded(arguments)) = expansions
+            .apply_to(&final_arguments)
+            .nth(expanded.expansion_index)
+        {
+            let mut merged: Option<CallableBindingSnapshot<'db>> = None;
+            for (case, arguments) in expanded.cases.iter_mut().zip(arguments) {
+                // Each expanded argument list has its own selected overloads and specializations.
+                case.snapshot.swap_with(self);
+                self.check_selected_signatures(db, env, &arguments, call_expression_tcx);
+                if self.matching_overloads().next().is_none() {
+                    // Every expanded list must succeed. Keep this case's errors for diagnostics.
+                    self.overload_call_result = None;
+                    return;
+                }
+                case.return_type = self.return_type();
+                case.snapshot.swap_with(self);
+                match &mut merged {
+                    Some(merged) => merged.update(&case.snapshot),
+                    None => merged = Some(case.snapshot.clone()),
+                }
+            }
+            expanded.return_type = UnionType::from_elements(
+                db,
+                env,
+                expanded.cases.iter().map(|case| case.return_type),
+            );
+            if let Some(mut merged) = merged {
+                merged.swap_with(self);
+            }
+        }
+        self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(expanded));
+    }
+
+    fn check_selected_signatures(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        final_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        let selected: SmallVec<[_; 2]> =
+            self.selected_overloads().map(|(index, _)| index).collect();
+        for index in selected {
+            let overload = &mut self.overloads[index];
+            overload.reset(db);
+            overload.match_parameters(db, env, final_arguments);
+            overload.check_types(db, env, final_arguments, call_expression_tcx);
+            if self.overload_call_result.is_none()
+                && overload.has_errors_affecting_overload_resolution()
+            {
+                // Step 6 picked this overload from signatures with equivalent return types.
+                // Report its error without switching to a signature that wasn't selected.
+                for (_, other) in self.matching_overloads_mut() {
+                    other.mark_as_unmatched_overload();
+                }
+            }
+        }
+
+        if matches!(
+            self.overload_call_result,
+            Some(OverloadCallResult::Ambiguous(_))
+        ) {
+            self.overload_call_result = Some(OverloadCallResult::Ambiguous(
+                self.merge_ambiguous_return_types(db, env),
+            ));
+        }
     }
 
     /// Defer type checking for overloads ruled out by a literal argument. If another candidate
@@ -4696,10 +4844,11 @@ impl<'db> CallableBinding<'db> {
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
     }
 
-    /// Returns the overloads selected for deprecation reporting without changing the matches
-    /// retained for argument inference. Equivalent return types select the first match;
-    /// ambiguous calls retain every match, and argument expansion combines its selected matches.
-    fn selected_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
+    /// Equivalent return types select the first match, ambiguous calls retain every match,
+    /// and argument expansion combines the overloads selected by each case.
+    pub(crate) fn selected_overloads(
+        &self,
+    ) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
         let matching = self.matching_overloads();
         let Some(result) = &self.overload_call_result else {
             return Either::Left(matching.take(1));
@@ -5058,6 +5207,8 @@ enum OverloadCallResult<'db> {
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpandedOverloadCall<'db> {
     return_type: Type<'db>,
+    /// Which argument expansion produced these cases, in source order.
+    expansion_index: usize,
     cases: Box<[ExpandedCallEvaluation<'db>]>,
 }
 
@@ -9797,7 +9948,7 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn restore(&mut self, snapshot: BindingSnapshot<'db>) {
+    fn swap_snapshot(&mut self, snapshot: &mut BindingSnapshot<'db>) {
         let BindingSnapshot {
             return_ty,
             inferable_typevars,
@@ -9806,13 +9957,12 @@ impl<'db> Binding<'db> {
             parameter_tys,
             errors,
         } = snapshot;
-
-        self.return_ty = return_ty;
-        self.inferable_typevars = inferable_typevars;
-        self.inference = inference;
-        self.argument_matches = argument_matches;
-        self.parameter_tys = parameter_tys;
-        self.errors = errors;
+        std::mem::swap(&mut self.return_ty, return_ty);
+        std::mem::swap(&mut self.inferable_typevars, inferable_typevars);
+        std::mem::swap(&mut self.inference, inference);
+        std::mem::swap(&mut self.argument_matches, argument_matches);
+        std::mem::swap(&mut self.parameter_tys, parameter_tys);
+        std::mem::swap(&mut self.errors, errors);
     }
 
     /// Returns a vector where each index corresponds to an argument position,
@@ -9883,7 +10033,15 @@ struct CallableBindingSnapshot<'db> {
     matching_overloads: Vec<(usize, BindingSnapshot<'db>)>,
 }
 
-impl CallableBindingSnapshot<'_> {
+impl<'db> CallableBindingSnapshot<'db> {
+    /// Install this case's state in the binding, keeping the previous state for restoration.
+    fn swap_with(&mut self, binding: &mut CallableBinding<'db>) {
+        std::mem::swap(&mut self.overload_result, &mut binding.overload_call_result);
+        for (index, snapshot) in &mut self.matching_overloads {
+            binding.overloads[*index].swap_snapshot(snapshot);
+        }
+    }
+
     /// Merge another expanded argument list's bindings into this snapshot. Both snapshots must
     /// originate from the same snapshotter, so their overload indexes have the same order.
     fn update(&mut self, other: &Self) {
@@ -9954,13 +10112,10 @@ impl CallableBindingSnapshotter {
     fn restore<'db>(
         &self,
         binding: &mut CallableBinding<'db>,
-        snapshot: CallableBindingSnapshot<'db>,
+        mut snapshot: CallableBindingSnapshot<'db>,
     ) {
         debug_assert_eq!(self.0.len(), snapshot.matching_overloads.len());
-        binding.overload_call_result = snapshot.overload_result;
-        for (index, snapshot) in snapshot.matching_overloads {
-            binding.overloads[index].restore(snapshot);
-        }
+        snapshot.swap_with(binding);
     }
 }
 
