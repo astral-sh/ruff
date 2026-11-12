@@ -1,6 +1,6 @@
 use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Builder, ExprFields, ExprKind, ExprListFields, ExprTupleFields, NodeList};
+use ruff_python_ast::{Builder, ExprKind, NodeList};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -632,9 +632,7 @@ fn trailing_comma(element: Expr<'_>, source: &str, max_index: TextSize) -> TextS
 
 /// PT014
 fn check_duplicates(checker: &Checker, values: Expr<'_>) {
-    let (ExprFields::List(ExprListFields { elts, .. })
-    | ExprFields::Tuple(ExprTupleFields { elts, .. })) = values.fields()
-    else {
+    let Some(elts) = values.as_list_or_tuple_elements() else {
         return;
     };
 
@@ -732,19 +730,11 @@ fn handle_single_name(checker: &Checker, argnames: Expr<'_>, value: Expr<'_>, ar
 /// If the elements of `expr` are not literal lists or tuples, `None` is returned to avoid changing
 /// behavior.
 fn unpack_single_element_items(checker: &Checker, expr: Expr<'_>) -> Option<Vec<Edit>> {
-    let (ExprFields::List(ExprListFields { elts, .. })
-    | ExprFields::Tuple(ExprTupleFields { elts, .. })) = expr.fields()
-    else {
-        return None;
-    };
+    let elts = expr.as_list_or_tuple_elements()?;
 
     let mut edits = Vec::with_capacity(elts.len());
     for value in elts {
-        let (ExprFields::List(ExprListFields { elts, .. })
-        | ExprFields::Tuple(ExprTupleFields { elts, .. })) = value.fields()
-        else {
-            return None;
-        };
+        let elts = value.as_list_or_tuple_elements()?;
 
         let [elt] = elts.as_array()?;
 

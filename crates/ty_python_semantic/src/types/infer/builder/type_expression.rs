@@ -447,8 +447,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        match expression.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => match name.ctx() {
+        match expression.classify() {
+            ast::ExprKind::Name(name) => match name.ctx() {
                 ast::ExprContext::Load => {
                     let (ty, definition) = self.infer_type_expression_reference(expression);
                     self.infer_name_or_attribute_type_expression(ty, definition, expression)
@@ -459,10 +459,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             },
 
-            ast::ExprFields::Attribute(ast::ExprAttributeFields {
-                node: attribute_expression,
-                ..
-            }) => {
+            ast::ExprKind::Attribute(attribute_expression) => {
                 if is_dotted_name(expression) {
                     match attribute_expression.ctx() {
                         ast::ExprContext::Load => {
@@ -490,18 +487,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            ast::ExprFields::NoneLiteral(ast::ExprNoneLiteralFields { node: _literal, .. }) => {
-                Type::none(db, env)
-            }
+            ast::ExprKind::NoneLiteral(_) => Type::none(db, env),
 
             // https://typing.python.org/en/latest/spec/annotations.html#string-annotations
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                node: string, ..
-            }) => self.infer_string_type_expression(string),
+            ast::ExprKind::StringLiteral(string) => self.infer_string_type_expression(string),
 
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                node: subscript, ..
-            }) => {
+            ast::ExprKind::Subscript(subscript) => {
                 let value = subscript.value();
                 let slice = subscript.slice();
 
@@ -549,7 +540,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            ast::ExprFields::BinOp(ast::ExprBinOpFields { node: binary, .. }) => {
+            ast::ExprKind::BinOp(binary) => {
                 match binary.op() {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr if self.should_check_runtime_errors(binary) => {
@@ -626,7 +617,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::unknown` in these cases.
             // =====================================================================================
-            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { node: bytes, .. }) => {
+            ast::ExprKind::BytesLiteral(bytes) => {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -650,64 +641,54 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Int(int),
-                ..
-            }) => {
-                if let Some(mut diagnostic) = self.report_invalid_type_expression(
-                    expression,
-                    format_args!(
-                        "Int literals are not allowed in this context in a {}",
-                        self.type_expression_context()
-                    ),
-                ) {
-                    if let Some(int) = int.as_i64() {
-                        diagnostic.set_primary_annotation_message(format_args!(
-                            "Did you mean `typing.Literal[{int}]`?"
-                        ));
-                        diagnostic::autofix_with_literal(
-                            &self.context,
-                            &mut diagnostic,
-                            expression,
-                        );
+            ast::ExprKind::NumberLiteral(number) => match number.value() {
+                ast::Number::Int(int) => {
+                    if let Some(mut diagnostic) = self.report_invalid_type_expression(
+                        expression,
+                        format_args!(
+                            "Int literals are not allowed in this context in a {}",
+                            self.type_expression_context()
+                        ),
+                    ) {
+                        if let Some(int) = int.as_i64() {
+                            diagnostic.set_primary_annotation_message(format_args!(
+                                "Did you mean `typing.Literal[{int}]`?"
+                            ));
+                            diagnostic::autofix_with_literal(
+                                &self.context,
+                                &mut diagnostic,
+                                expression,
+                            );
+                        }
                     }
+
+                    Type::unknown()
                 }
 
-                Type::unknown()
-            }
+                ast::Number::Float(_) => {
+                    self.report_invalid_type_expression(
+                        expression,
+                        format_args!(
+                            "Float literals are not allowed in {}s",
+                            self.type_expression_context()
+                        ),
+                    );
+                    Type::unknown()
+                }
 
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Float(_),
-                ..
-            }) => {
-                self.report_invalid_type_expression(
-                    expression,
-                    format_args!(
-                        "Float literals are not allowed in {}s",
-                        self.type_expression_context()
-                    ),
-                );
-                Type::unknown()
-            }
+                ast::Number::Complex { .. } => {
+                    self.report_invalid_type_expression(
+                        expression,
+                        format_args!(
+                            "Complex literals are not allowed in {}s",
+                            self.type_expression_context()
+                        ),
+                    );
+                    Type::unknown()
+                }
+            },
 
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Complex { .. },
-                ..
-            }) => {
-                self.report_invalid_type_expression(
-                    expression,
-                    format_args!(
-                        "Complex literals are not allowed in {}s",
-                        self.type_expression_context()
-                    ),
-                );
-                Type::unknown()
-            }
-
-            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
-                node: bool_value,
-                ..
-            }) => {
+            ast::ExprKind::BooleanLiteral(bool_value) => {
                 if let Some(mut diagnostic) = self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -724,7 +705,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::List(ast::ExprListFields { node: list, .. }) => {
+            ast::ExprKind::List(list) => {
                 if !self.in_string_annotation() {
                     self.infer_list_expression(list, TypeContext::default());
                 }
@@ -767,7 +748,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) => {
+            ast::ExprKind::Tuple(tuple) => {
                 if tuple.parenthesized() {
                     if !self.in_string_annotation() {
                         for element in tuple {
@@ -847,7 +828,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::BoolOp(ast::ExprBoolOpFields { node: bool_op, .. }) => {
+            ast::ExprKind::BoolOp(bool_op) => {
                 if !self.in_string_annotation() {
                     self.infer_boolean_expression(bool_op, TypeContext::default());
                 }
@@ -861,7 +842,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Named(ast::ExprNamedFields { node: named, .. }) => {
+            ast::ExprKind::Named(named) => {
                 if !self.in_string_annotation() {
                     self.infer_named_expression(named);
                 }
@@ -875,12 +856,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                node: unary,
-                op: ast::UnaryOp::Invert,
-                operand,
-                ..
-            }) => {
+            ast::ExprKind::UnaryOp(unary) if unary.op() == ast::UnaryOp::Invert => {
+                let operand = unary.operand();
                 if let Some(builder) = self.context.report_lint(&EXPERIMENTAL_SYNTAX, unary) {
                     builder.into_diagnostic("Negation type syntax is experimental");
                 }
@@ -911,7 +888,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 operand_ty.negate(db, env)
             }
 
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { node: unary, .. }) => {
+            ast::ExprKind::UnaryOp(unary) => {
                 if !self.in_string_annotation() {
                     self.infer_unary_expression(unary);
                 }
@@ -925,10 +902,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Lambda(ast::ExprLambdaFields {
-                node: lambda_expression,
-                ..
-            }) => {
+            ast::ExprKind::Lambda(lambda_expression) => {
                 if !self.in_string_annotation() {
                     self.infer_lambda_expression(lambda_expression, TypeContext::default());
                 }
@@ -942,10 +916,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::If(ast::ExprIfFields {
-                node: if_expression,
-                ..
-            }) => {
+            ast::ExprKind::If(if_expression) => {
                 if !self.in_string_annotation() {
                     self.infer_if_expression(if_expression, TypeContext::default());
                 }
@@ -959,7 +930,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Dict(ast::ExprDictFields { node: dict, .. }) => {
+            ast::ExprKind::Dict(dict) => {
                 if !self.in_string_annotation() {
                     self.infer_dict_expression(dict, TypeContext::default());
                 }
@@ -1021,7 +992,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Set(ast::ExprSetFields { node: set, .. }) => {
+            ast::ExprKind::Set(set) => {
                 if !self.in_string_annotation() {
                     self.infer_set_expression(set, TypeContext::default());
                 }
@@ -1072,7 +1043,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::DictComp(ast::ExprDictCompFields { node: dictcomp, .. }) => {
+            ast::ExprKind::DictComp(dictcomp) => {
                 if !self.in_string_annotation() {
                     self.infer_dict_comprehension_expression(dictcomp, TypeContext::default());
                 }
@@ -1086,7 +1057,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::ListComp(ast::ExprListCompFields { node: listcomp, .. }) => {
+            ast::ExprKind::ListComp(listcomp) => {
                 if !self.in_string_annotation() {
                     self.infer_list_comprehension_expression(listcomp, TypeContext::default());
                 }
@@ -1100,7 +1071,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::SetComp(ast::ExprSetCompFields { node: setcomp, .. }) => {
+            ast::ExprKind::SetComp(setcomp) => {
                 if !self.in_string_annotation() {
                     self.infer_set_comprehension_expression(setcomp, TypeContext::default());
                 }
@@ -1114,9 +1085,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Generator(ast::ExprGeneratorFields {
-                node: generator, ..
-            }) => {
+            ast::ExprKind::Generator(generator) => {
                 if !self.in_string_annotation() {
                     self.infer_generator_expression(generator, TypeContext::default());
                 }
@@ -1130,10 +1099,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Await(ast::ExprAwaitFields {
-                node: await_expression,
-                ..
-            }) => {
+            ast::ExprKind::Await(await_expression) => {
                 if !self.in_string_annotation() {
                     self.infer_await_expression(await_expression, TypeContext::default());
                 }
@@ -1147,10 +1113,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Yield(ast::ExprYieldFields {
-                node: yield_expression,
-                ..
-            }) => {
+            ast::ExprKind::Yield(yield_expression) => {
                 if !self.in_string_annotation() {
                     self.infer_yield_expression(yield_expression);
                 }
@@ -1164,9 +1127,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::YieldFrom(ast::ExprYieldFromFields {
-                node: yield_from, ..
-            }) => {
+            ast::ExprKind::YieldFrom(yield_from) => {
                 if !self.in_string_annotation() {
                     self.infer_yield_from_expression(yield_from);
                 }
@@ -1180,7 +1141,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Compare(ast::ExprCompareFields { node: compare, .. }) => {
+            ast::ExprKind::Compare(compare) => {
                 if !self.in_string_annotation() {
                     self.infer_compare_expression(compare);
                 }
@@ -1194,9 +1155,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Call(ast::ExprCallFields {
-                node: call_expr, ..
-            }) => {
+            ast::ExprKind::Call(call_expr) => {
                 if !self.in_string_annotation() {
                     self.infer_call_expression(call_expr, TypeContext::default());
                 }
@@ -1210,7 +1169,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::FString(ast::ExprFStringFields { node: fstring, .. }) => {
+            ast::ExprKind::FString(fstring) => {
                 if !self.in_string_annotation() {
                     self.infer_fstring_expression(fstring);
                 }
@@ -1224,7 +1183,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::TString(ast::ExprTStringFields { node: tstring, .. }) => {
+            ast::ExprKind::TString(tstring) => {
                 if !self.in_string_annotation() {
                     self.infer_tstring_expression(tstring);
                 }
@@ -1238,7 +1197,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Slice(ast::ExprSliceFields { node: slice, .. }) => {
+            ast::ExprKind::Slice(slice) => {
                 if !self.in_string_annotation() {
                     self.infer_slice_expression(slice);
                 }
@@ -1260,11 +1219,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // lint configuration in `Cargo.toml`. At time of writing,
             // 2025-08-22, this was the only usage of `todo!` in ruff/ty.
             // ---AG
-            ast::ExprFields::IpyEscapeCommand(_) => {
+            ast::ExprKind::IpyEscapeCommand(_) => {
                 todo!("Implement Ipy escape command support")
             }
 
-            ast::ExprFields::EllipsisLiteral(_) => {
+            ast::ExprKind::EllipsisLiteral(_) => {
                 self.report_invalid_type_expression(
                     expression,
                     format_args!(
@@ -1275,9 +1234,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
 
-            ast::ExprFields::Starred(ast::ExprStarredFields { node: starred, .. }) => {
-                self.infer_starred_type_expression(starred)
-            }
+            ast::ExprKind::Starred(starred) => self.infer_starred_type_expression(starred),
         }
     }
 
@@ -3168,8 +3125,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Result<Type<'db>, Vec<ast::Expr<'param>>> {
         let db = self.db();
         let env = self.program_environment();
-        let ty = match parameters.fields() {
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
+        let ty = match parameters.classify() {
+            ast::ExprKind::Subscript(subscript) => {
+                let value = subscript.value();
+                let slice = subscript.slice();
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
                     let ty = self.infer_literal_parameter_type(slice)?;
@@ -3185,9 +3144,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Err(vec![parameters]);
                 }
             }
-            ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. })
-                if !tuple.parenthesized() =>
-            {
+            ast::ExprKind::Tuple(tuple) if !tuple.parenthesized() => {
                 let mut errors = vec![];
                 let mut builder = UnionBuilder::new(db, env);
                 for elt in tuple {
@@ -3215,31 +3172,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            literal @ (ast::ExprFields::StringLiteral(_)
-            | ast::ExprFields::BytesLiteral(_)
-            | ast::ExprFields::BooleanLiteral(_)
-            | ast::ExprFields::NoneLiteral(_)) => {
-                self.infer_expression(literal.view(), TypeContext::default())
+            ast::ExprKind::StringLiteral(_)
+            | ast::ExprKind::BytesLiteral(_)
+            | ast::ExprKind::BooleanLiteral(_)
+            | ast::ExprKind::NoneLiteral(_) => {
+                self.infer_expression(parameters, TypeContext::default())
             }
-            literal @ ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value, ..
-            }) if value.is_int() => self.infer_expression(literal.view(), TypeContext::default()),
+            ast::ExprKind::NumberLiteral(number) if number.value().is_int() => {
+                self.infer_expression(parameters, TypeContext::default())
+            }
 
             // for negative and positive numbers
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                node: unary,
-                op,
-                operand,
-                ..
-            }) if matches!(op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && operand.as_int_literal().is_some() =>
+            ast::ExprKind::UnaryOp(unary)
+                if matches!(unary.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                    && unary.operand().as_int_literal().is_some() =>
             {
                 let ty = self.infer_unary_expression(unary);
                 self.store_expression_type(parameters, ty);
                 ty
             }
             // enum members and aliases to literal types
-            ast::ExprFields::Name(_) | ast::ExprFields::Attribute(_) => {
+            ast::ExprKind::Name(_) | ast::ExprKind::Attribute(_) => {
                 let subscript_ty = self.infer_expression(parameters, TypeContext::default());
                 match subscript_ty {
                     // type aliases to literal types

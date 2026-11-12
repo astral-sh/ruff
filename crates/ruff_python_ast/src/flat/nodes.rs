@@ -79,7 +79,23 @@ impl<'a> LiteralExpression<'a> {
     }
 }
 
+impl<'a> ExprKind<'a> {
+    /// Returns the elements of a list or tuple expression.
+    pub fn as_list_or_tuple_elements(self) -> Option<super::NodeList<'a, crate::kind::Expr>> {
+        match self {
+            ExprKind::List(list) => Some(list.elts()),
+            ExprKind::Tuple(tuple) => Some(tuple.elts()),
+            _ => None,
+        }
+    }
+}
+
 impl<'a> Expr<'a> {
+    /// Returns the elements of a list or tuple expression.
+    pub fn as_list_or_tuple_elements(self) -> Option<super::NodeList<'a, crate::kind::Expr>> {
+        self.classify().as_list_or_tuple_elements()
+    }
+
     /// Returns the value of an integer literal.
     #[inline]
     pub fn as_int_literal(self) -> Option<&'a crate::Int> {

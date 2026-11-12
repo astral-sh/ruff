@@ -194,25 +194,31 @@ impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
 
 impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.fields() {
-            ast::StmtFields::ClassDef(_) | ast::StmtFields::FunctionDef(_) => {
+        let kind = stmt.classify();
+        match kind {
+            StmtKind::ClassDef(_) | StmtKind::FunctionDef(_) => {
                 // Do not recurse into nested class/function bodies.
                 self.sibling = Some(stmt);
                 return;
             }
-            ast::StmtFields::Global(ast::StmtGlobalFields { names, .. })
-            | ast::StmtFields::Nonlocal(ast::StmtNonlocalFields { names, .. }) => {
-                self.non_locals.extend(names.iter().map(Identifier::as_str));
+            StmtKind::Global(global) => {
+                self.non_locals
+                    .extend(global.names().iter().map(Identifier::as_str));
             }
-            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { target, value, .. }) => {
+            StmtKind::Nonlocal(nonlocal) => {
+                self.non_locals
+                    .extend(nonlocal.names().iter().map(Identifier::as_str));
+            }
+            StmtKind::AnnAssign(assign) => {
                 // Ex) `x: int`
-                if value.is_none()
-                    && let ExprKind::Name(name) = target.classify()
+                if assign.value().is_none()
+                    && let Some(name) = assign.target().as_name_expr()
                 {
                     self.annotations.insert(name.id().as_str());
                 }
             }
-            ast::StmtFields::Expr(ast::StmtExprFields { value, .. }) => {
+            StmtKind::Expr(expr) => {
+                let value = expr.value();
                 if matches!(
                     value.classify(),
                     ExprKind::Yield(_) | ExprKind::YieldFrom(_)
@@ -239,7 +245,7 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
         }
 
         self.sibling = Some(stmt);
-        visitor::walk_stmt(self, stmt.classify());
+        visitor::walk_stmt(self, kind);
     }
 
     fn visit_body(&mut self, body: Suite<'a>) {

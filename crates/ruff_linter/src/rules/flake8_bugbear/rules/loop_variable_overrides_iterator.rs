@@ -91,37 +91,31 @@ struct NameFinder<'a> {
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => {
-                self.names.insert(id, expr);
+        let generators = match expr.classify() {
+            ast::ExprKind::Name(name) => {
+                self.names.insert(name.id(), expr);
+                return;
             }
-            ast::ExprFields::ListComp(ast::ExprListCompFields { generators, .. })
-            | ast::ExprFields::SetComp(ast::ExprSetCompFields { generators, .. })
-            | ast::ExprFields::Generator(ast::ExprGeneratorFields { generators, .. }) => {
-                for comp in generators {
-                    self.visit_expr(comp.iter());
-                }
-            }
-            ast::ExprFields::DictComp(ast::ExprDictCompFields { generators, .. }) => {
-                for comp in generators {
-                    self.visit_expr(comp.iter());
-                }
-            }
-            ast::ExprFields::Lambda(ast::ExprLambdaFields {
-                parameters,
-                body,
-                range: _,
-                node: _,
-            }) => {
-                visitor::walk_expr(self, body.classify());
-
-                if let Some(parameters) = parameters {
+            ast::ExprKind::ListComp(comp) => comp.generators(),
+            ast::ExprKind::SetComp(comp) => comp.generators(),
+            ast::ExprKind::DictComp(comp) => comp.generators(),
+            ast::ExprKind::Generator(comp) => comp.generators(),
+            ast::ExprKind::Lambda(lambda) => {
+                visitor::walk_expr(self, lambda.body().classify());
+                if let Some(parameters) = lambda.parameters() {
                     for parameter in parameters.iter_non_variadic_params() {
                         self.names.remove(parameter.name().as_str());
                     }
                 }
+                return;
             }
-            _ => visitor::walk_expr(self, expr.classify()),
+            kind => {
+                visitor::walk_expr(self, kind);
+                return;
+            }
+        };
+        for comp in generators {
+            self.visit_expr(comp.iter());
         }
     }
 }

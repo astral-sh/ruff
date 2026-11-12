@@ -169,24 +169,17 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         if self.modified {
             return;
         }
-        if let Some(subscript_node) = expr.as_subscript_expr() {
-            let value = subscript_node.value();
-            let slice = subscript_node.slice();
-            let range = subscript_node.range();
-            if let Some(name_node_view) = value.as_name_expr() {
-                let id = name_node_view.id();
-                if id == self.sequence_name {
-                    if let Some(name_node_view) = slice.as_name_expr() {
-                        let id = name_node_view.id();
-                        if id == self.index_name {
-                            self.accesses.push(range);
-                        }
-                    }
-                }
-            }
+        let kind = expr.classify();
+        if let ExprKind::Subscript(subscript) = kind
+            && let Some(sequence) = subscript.value().as_name_expr()
+            && sequence.id() == self.sequence_name
+            && let Some(index) = subscript.slice().as_name_expr()
+            && index.id() == self.index_name
+        {
+            self.accesses.push(subscript.range());
         }
 
-        visitor::walk_expr(self, expr.classify());
+        visitor::walk_expr(self, kind);
     }
 }
 

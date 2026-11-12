@@ -33,39 +33,27 @@ impl Violation for PotentialIndexError {
 /// PLE0643
 pub(crate) fn potential_index_error(checker: &Checker, value: Expr<'_>, slice: Expr<'_>) {
     // Determine the length of the sequence.
-    let length = match value.fields() {
-        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
-            if elts.iter().any(ast::Expr::is_starred_expr) {
-                return;
-            }
-            match i64::try_from(elts.len()) {
-                Ok(length) => length,
-                Err(_) => return,
-            }
-        }
-        _ => {
-            return;
-        }
+    let Some(elts) = value.as_list_or_tuple_elements() else {
+        return;
+    };
+    if elts.iter().any(Expr::is_starred_expr) {
+        return;
+    }
+    let Ok(length) = i64::try_from(elts.len()) else {
+        return;
     };
 
     // Determine the index value.
-    let index = match slice.fields() {
-        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: ast::Number::Int(number_value),
-            ..
-        }) => number_value.as_i64(),
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: ast::UnaryOp::USub,
-            operand,
-            ..
-        }) => match operand.fields() {
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Int(number_value),
-                ..
-            }) => number_value.as_i64().map(|number| -number),
-            _ => return,
-        },
+    let index = match slice.classify() {
+        ast::ExprKind::NumberLiteral(number) if let Some(int) = number.value().as_int() => {
+            int.as_i64()
+        }
+        ast::ExprKind::UnaryOp(unary)
+            if unary.op() == ast::UnaryOp::USub
+                && let Some(int) = unary.operand().as_int_literal() =>
+        {
+            int.as_i64().map(|number| -number)
+        }
         _ => return,
     };
 

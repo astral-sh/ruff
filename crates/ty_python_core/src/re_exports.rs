@@ -24,7 +24,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ExprKind, PatternKind};
 
 use ruff_python_ast::{
-    Alias, Expr, ExprContext, Identifier, Pattern, Stmt,
+    Alias, Expr, Identifier, Pattern, Stmt, StmtKind,
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
@@ -174,76 +174,48 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
     }
 
     fn visit_stmt(&mut self, stmt: Stmt<'db>) {
-        match stmt.fields() {
-            ast::StmtFields::ClassDef(ast::StmtClassDefFields {
-                name,
-                decorator_list,
-                arguments,
-                type_params: _, // We don't want to visit the type params of the class
-                body: _,        // We don't want to visit the body of the class
-                range: _,
-                node: _,
-            }) => {
-                self.possibly_add_export(name.id(), PossibleExportKind::Normal);
-                for decorator in decorator_list {
+        let kind = stmt.classify();
+        match kind {
+            StmtKind::ClassDef(class) => {
+                self.possibly_add_export(class.name().id(), PossibleExportKind::Normal);
+                for decorator in class.decorator_list() {
                     self.visit_decorator(decorator);
                 }
-                if let Some(arguments) = arguments {
+                if let Some(arguments) = class.arguments() {
                     self.visit_arguments(arguments);
                 }
+                // The class body and type parameters introduce their own scopes.
             }
 
-            ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-                name,
-                decorator_list,
-                parameters,
-                returns,
-                type_params: _, // We don't want to visit the type params of the function
-                body: _,        // We don't want to visit the body of the function
-                range: _,
-                node: _,
-                is_async: _,
-            }) => {
-                self.possibly_add_export(name.id(), PossibleExportKind::Normal);
-                for decorator in decorator_list {
+            StmtKind::FunctionDef(function) => {
+                self.possibly_add_export(function.name().id(), PossibleExportKind::Normal);
+                for decorator in function.decorator_list() {
                     self.visit_decorator(decorator);
                 }
-                self.visit_parameters(parameters);
-                if let Some(returns) = returns {
+                self.visit_parameters(function.parameters());
+                if let Some(returns) = function.returns() {
                     self.visit_expr(returns);
                 }
+                // The function body and type parameters introduce their own scopes.
             }
 
-            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-                target,
-                value,
-                annotation,
-                simple: _,
-                range: _,
-                node: _,
-            }) => {
+            StmtKind::AnnAssign(assign) => {
+                let value = assign.value();
                 if value.is_some() || self.visiting_stub_file {
-                    self.visit_expr(target);
+                    self.visit_expr(assign.target());
                 }
-                self.visit_expr(annotation);
+                self.visit_expr(assign.annotation());
                 if let Some(value) = value {
                     self.visit_expr(value);
                 }
             }
 
-            ast::StmtFields::TypeAlias(ast::StmtTypeAliasFields {
-                name,
-                type_params: _,
-                value: _,
-                range: _,
-                node: _,
-            }) => {
-                self.visit_expr(name);
-                // Neither walrus expressions nor statements cannot appear in type aliases;
-                // no need to recursively visit the `value` or `type_params`
+            StmtKind::TypeAlias(alias) => {
+                self.visit_expr(alias.name());
+                // Neither walrus expressions nor statements can appear in type aliases.
             }
 
-            ast::StmtFields::ImportFrom(ast::StmtImportFromFields { node, .. }) => {
+            StmtKind::ImportFrom(node) => {
                 let mut found_star = false;
                 for name in node.names() {
                     if name.name().id() == "*" {
@@ -279,27 +251,27 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 }
             }
 
-            ast::StmtFields::Import(_)
-            | ast::StmtFields::AugAssign(_)
-            | ast::StmtFields::While(_)
-            | ast::StmtFields::If(_)
-            | ast::StmtFields::With(_)
-            | ast::StmtFields::Assert(_)
-            | ast::StmtFields::Try(_)
-            | ast::StmtFields::Expr(_)
-            | ast::StmtFields::For(_)
-            | ast::StmtFields::Assign(_)
-            | ast::StmtFields::Match(_) => walk_stmt(self, stmt.classify()),
+            StmtKind::Import(_)
+            | StmtKind::AugAssign(_)
+            | StmtKind::While(_)
+            | StmtKind::If(_)
+            | StmtKind::With(_)
+            | StmtKind::Assert(_)
+            | StmtKind::Try(_)
+            | StmtKind::Expr(_)
+            | StmtKind::For(_)
+            | StmtKind::Assign(_)
+            | StmtKind::Match(_) => walk_stmt(self, kind),
 
-            ast::StmtFields::Global(_)
-            | ast::StmtFields::Raise(_)
-            | ast::StmtFields::Return(_)
-            | ast::StmtFields::Break(_)
-            | ast::StmtFields::Continue(_)
-            | ast::StmtFields::IpyEscapeCommand(_)
-            | ast::StmtFields::Delete(_)
-            | ast::StmtFields::Nonlocal(_)
-            | ast::StmtFields::Pass(_) => {}
+            StmtKind::Global(_)
+            | StmtKind::Raise(_)
+            | StmtKind::Return(_)
+            | StmtKind::Break(_)
+            | StmtKind::Continue(_)
+            | StmtKind::IpyEscapeCommand(_)
+            | StmtKind::Delete(_)
+            | StmtKind::Nonlocal(_)
+            | StmtKind::Pass(_) => {}
         }
     }
 
@@ -382,15 +354,11 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             ExprKind::Named(expr_named) => {
                 let target = expr_named.target();
 
-                if let ast::ExprFields::Name(ast::ExprNameFields {
-                    id,
-                    ctx: ExprContext::Store,
-                    range: _,
-                    node: _,
-                }) = target.fields()
+                if let Some(name) = target.as_name_expr()
+                    && name.ctx().is_store()
                 {
                     self.export_finder
-                        .possibly_add_export(id, PossibleExportKind::Normal);
+                        .possibly_add_export(name.id(), PossibleExportKind::Normal);
                 }
             }
 

@@ -1085,10 +1085,10 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(orelse, precedence::IF_EXP);
                 });
             }
-            ast::ExprFields::Dict(ast::ExprDictFields { node: dict, .. }) => {
+            ast::ExprFields::Dict(ast::ExprDictFields { items, .. }) => {
                 self.p("{");
                 let mut first = true;
-                for item in dict.items() {
+                for item in items {
                     let value = item.value();
                     self.p_delim(&mut first, ", ");
                     if let Some(key) = item.key() {
@@ -1102,13 +1102,13 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            ast::ExprFields::Set(ast::ExprSetFields { node: set, .. }) => {
-                if set.elts().is_empty() {
+            ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
+                if elts.is_empty() {
                     self.p("set()");
                 } else {
                     self.p("{");
                     let mut first = true;
-                    for item in set.elts() {
+                    for item in elts {
                         self.p_delim(&mut first, ", ");
                         self.unparse_expr(item, precedence::COMMA);
                     }
@@ -1200,11 +1200,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            ast::ExprFields::Compare(ast::ExprCompareFields { node: compare, .. }) => {
+            ast::ExprFields::Compare(ast::ExprCompareFields { operands, ops, .. }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(compare.first_operand(), new_lvl);
-                    for (op, cmp) in compare.operators_and_comparators() {
+                    self.unparse_expr(operands.at(0), new_lvl);
+                    for (op, cmp) in ops.iter().zip(operands.slice(1..)) {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1345,17 +1345,17 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => self.p(id.as_str()),
-            ast::ExprFields::List(ast::ExprListFields { node: list, .. }) => {
+            ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
                 self.p("[");
                 let mut first = true;
-                for item in list.elts() {
+                for item in elts {
                     self.p_delim(&mut first, ", ");
                     self.unparse_expr(item, precedence::COMMA);
                 }
                 self.p("]");
             }
-            ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) => {
-                if tuple.elts().is_empty() {
+            ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+                if elts.is_empty() {
                     self.p("()");
                 } else {
                     let lvl = match self.mode {
@@ -1364,11 +1364,11 @@ impl<'a> Generator<'a> {
                     };
                     group_if!(lvl, {
                         let mut first = true;
-                        for item in tuple {
+                        for item in elts {
                             self.p_delim(&mut first, ", ");
                             self.unparse_expr(item, precedence::COMMA);
                         }
-                        self.p_if(tuple.elts().len() == 1, ",");
+                        self.p_if(elts.len() == 1, ",");
                     });
                 }
             }

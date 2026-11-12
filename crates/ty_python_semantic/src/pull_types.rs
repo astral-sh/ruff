@@ -7,7 +7,7 @@ use crate::{Db, HasType, SemanticModel};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{
-    self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt, StmtKind,
+    Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt, StmtKind,
 };
 use ty_python_core::ProgramFile;
 
@@ -31,14 +31,12 @@ impl<'db> PullTypesVisitor<'db> {
     }
 
     fn visit_target(&mut self, target: Expr<'_>) {
-        match target.fields() {
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
-                for element in elts {
-                    self.visit_target(element);
-                }
+        if let Some(elts) = target.as_list_or_tuple_elements() {
+            for element in elts {
+                self.visit_target(element);
             }
-            _ => self.visit_expr(target),
+        } else {
+            self.visit_expr(target);
         }
     }
 }

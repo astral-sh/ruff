@@ -1,7 +1,4 @@
-use ruff_python_ast::{
-    BuildId, Builder, ExprBoolOpFields, ExprFields, ExprKind, ExprNameFields, ExprUnaryOpFields,
-    build,
-};
+use ruff_python_ast::{BuildId, Builder, ExprBoolOp, ExprKind, build};
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -307,16 +304,9 @@ impl AlwaysFixableViolation for ExprAndFalse {
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: Expr<'a>, b: Expr<'a>) -> Option<&'a str> {
-    if let (
-        ExprFields::Name(ExprNameFields { id: a, .. }),
-        ExprFields::Name(ExprNameFields { id: b, .. }),
-    ) = (a.fields(), b.fields())
-    {
-        if a == b {
-            return Some(a);
-        }
-    }
-    None
+    let a = a.as_name_expr()?.id();
+    let b = b.as_name_expr()?.id();
+    (a == b).then_some(a.as_str())
 }
 
 /// If `call` is an `isinstance()` call, return its target.
@@ -335,16 +325,11 @@ fn isinstance_target<'a>(call: Expr<'a>, semantic: &'a SemanticModel) -> Option<
 }
 
 /// SIM101
-pub(crate) fn duplicate_isinstance_call(checker: &Checker, &expr: &Expr<'_>) {
-    let ExprFields::BoolOp(ExprBoolOpFields {
-        op: BoolOp::Or,
-        values,
-        range: _,
-        node: _,
-    }) = expr.fields()
-    else {
+pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: ExprBoolOp<'_>) {
+    if expr.op() != BoolOp::Or {
         return;
-    };
+    }
+    let values = expr.values();
 
     // Locate duplicate `isinstance` calls, represented as a vector of vectors
     // of indices of the relevant `Expr` instances in `values`.
@@ -471,16 +456,11 @@ fn match_eq_target(expr: Expr<'_>) -> Option<(&Name, Expr<'_>)> {
 }
 
 /// SIM109
-pub(crate) fn compare_with_tuple(checker: &Checker, &expr: &Expr<'_>) {
-    let ExprFields::BoolOp(ExprBoolOpFields {
-        op: BoolOp::Or,
-        values,
-        range: _,
-        node: _,
-    }) = expr.fields()
-    else {
+pub(crate) fn compare_with_tuple(checker: &Checker, expr: ExprBoolOp<'_>) {
+    if expr.op() != BoolOp::Or {
         return;
-    };
+    }
+    let values = expr.values();
 
     // Given `a == "foo" or a == "bar"`, we generate `{"a": [(0, "foo"), (1,
     // "bar")]}`.
@@ -580,16 +560,11 @@ pub(crate) fn compare_with_tuple(checker: &Checker, &expr: &Expr<'_>) {
 }
 
 /// SIM220
-pub(crate) fn expr_and_not_expr(checker: &Checker, &expr: &Expr<'_>) {
-    let ExprFields::BoolOp(ExprBoolOpFields {
-        op: BoolOp::And,
-        values,
-        range: _,
-        node: _,
-    }) = expr.fields()
-    else {
+pub(crate) fn expr_and_not_expr(checker: &Checker, expr: ExprBoolOp<'_>) {
+    if expr.op() != BoolOp::And {
         return;
-    };
+    }
+    let values = expr.values();
     if values.len() < 2 {
         return;
     }
@@ -598,14 +573,10 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, &expr: &Expr<'_>) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprFields::UnaryOp(ExprUnaryOpFields {
-            op: UnaryOp::Not,
-            operand,
-            range: _,
-            node: _,
-        }) = expr.fields()
+        if let Some(unary) = expr.as_unary_op_expr()
+            && unary.op() == UnaryOp::Not
         {
-            negated_expr.push(operand);
+            negated_expr.push(unary.operand());
         } else {
             non_negated_expr.push(expr);
         }
@@ -615,7 +586,7 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, &expr: &Expr<'_>) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)) {
+    if contains_effect(expr.into(), |id| checker.semantic().has_builtin_binding(id)) {
         return;
     }
 
@@ -638,16 +609,11 @@ pub(crate) fn expr_and_not_expr(checker: &Checker, &expr: &Expr<'_>) {
 }
 
 /// SIM221
-pub(crate) fn expr_or_not_expr(checker: &Checker, &expr: &Expr<'_>) {
-    let ExprFields::BoolOp(ExprBoolOpFields {
-        op: BoolOp::Or,
-        values,
-        range: _,
-        node: _,
-    }) = expr.fields()
-    else {
+pub(crate) fn expr_or_not_expr(checker: &Checker, expr: ExprBoolOp<'_>) {
+    if expr.op() != BoolOp::Or {
         return;
-    };
+    }
+    let values = expr.values();
     if values.len() < 2 {
         return;
     }
@@ -656,14 +622,10 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, &expr: &Expr<'_>) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprFields::UnaryOp(ExprUnaryOpFields {
-            op: UnaryOp::Not,
-            operand,
-            range: _,
-            node: _,
-        }) = expr.fields()
+        if let Some(unary) = expr.as_unary_op_expr()
+            && unary.op() == UnaryOp::Not
         {
-            negated_expr.push(operand);
+            negated_expr.push(unary.operand());
         } else {
             non_negated_expr.push(expr);
         }
@@ -673,7 +635,7 @@ pub(crate) fn expr_or_not_expr(checker: &Checker, &expr: &Expr<'_>) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)) {
+    if contains_effect(expr.into(), |id| checker.semantic().has_builtin_binding(id)) {
         return;
     }
 
@@ -722,24 +684,21 @@ fn get_short_circuit_edit(
 }
 
 fn is_short_circuit(
-    expr: Expr<'_>,
+    expr: ExprBoolOp<'_>,
     expected_op: BoolOp,
     checker: &Checker,
 ) -> Option<(Edit, ContentAround)> {
-    let ExprKind::BoolOp(bool_op) = expr.classify() else {
-        return None;
-    };
-    let op = bool_op.op();
-    let values = bool_op.values();
+    let op = expr.op();
     if op != expected_op {
         return None;
     }
+    let values = expr.values();
     let short_circuit_truthiness = match op {
         BoolOp::And => false,
         BoolOp::Or => true,
     };
 
-    let mut furthest = expr;
+    let mut furthest = Expr::from(expr);
     let mut edit = None;
     let mut remove = None;
 
@@ -812,7 +771,7 @@ fn is_short_circuit(
 }
 
 /// SIM222
-pub(crate) fn expr_or_true(checker: &Checker, &expr: &Expr<'_>) {
+pub(crate) fn expr_or_true(checker: &Checker, expr: ExprBoolOp<'_>) {
     if checker.semantic().in_string_type_definition() {
         return;
     }
@@ -830,7 +789,7 @@ pub(crate) fn expr_or_true(checker: &Checker, &expr: &Expr<'_>) {
 }
 
 /// SIM223
-pub(crate) fn expr_and_false(checker: &Checker, &expr: &Expr<'_>) {
+pub(crate) fn expr_and_false(checker: &Checker, expr: ExprBoolOp<'_>) {
     if checker.semantic().in_string_type_definition() {
         return;
     }

@@ -1,6 +1,6 @@
 //! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
-use ruff_python_ast::{self as ast, BoolOp, Expr, ExprKind, UnaryOp};
+use ruff_python_ast::{BoolOp, Expr, ExprKind, UnaryOp};
 use ty_python_core::{Truthiness, expression::ExpressionContext};
 
 use crate::{Db, ProgramEnvironment, types::Type};
@@ -167,23 +167,19 @@ where
                     ExpressionContext::Condition => Some(outcome),
                 }
             }
-            _ => {
-                let operands_complete = match expression.fields() {
-                    ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) => {
-                        self.can_complete(operand)
-                    }
-                    ast::ExprFields::Named(ast::ExprNamedFields { value, .. })
-                    | ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
-                        self.can_complete(value)
-                    }
-                    ast::ExprFields::Call(ast::ExprCallFields { node: call, .. }) => {
+            kind => {
+                let operands_complete = match kind {
+                    ExprKind::UnaryOp(unary) => self.can_complete(unary.operand()),
+                    ExprKind::Named(named) => self.can_complete(named.value()),
+                    ExprKind::Starred(starred) => self.can_complete(starred.value()),
+                    ExprKind::Call(call) => {
                         self.can_complete(call.func())
                             && call
                                 .arguments()
                                 .iter_source_order()
                                 .all(|argument| self.can_complete(argument.value()))
                     }
-                    ast::ExprFields::Compare(ast::ExprCompareFields { node: compare, .. }) => {
+                    ExprKind::Compare(compare) => {
                         // Later comparisons can be skipped by short-circuiting.
                         self.can_complete(compare.first_operand())
                             && compare

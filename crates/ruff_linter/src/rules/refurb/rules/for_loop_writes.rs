@@ -117,15 +117,14 @@ pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &ast::StmtForFie
 /// ```
 fn binding_names(for_target: Expr<'_>) -> Vec<ExprName<'_>> {
     fn collect_names<'a>(expr: Expr<'a>, names: &mut Vec<ExprName<'a>>) {
-        match expr.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => names.push(name),
+        match expr.classify() {
+            ExprKind::Name(name) => names.push(name),
 
-            ast::ExprFields::Starred(ast::ExprStarredFields { node: starred, .. }) => {
+            ExprKind::Starred(starred) => {
                 collect_names(starred.value(), names);
             }
 
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => elts
+            kind if let Some(elts) = kind.as_list_or_tuple_elements() => elts
                 .iter()
                 .for_each(|element| collect_names(element, names)),
 

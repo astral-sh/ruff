@@ -143,8 +143,8 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
 /// Returns `true` if `expr` evaluates to a number or a boolean, looking through
 /// any unary operators applied to a number or boolean literal.
 fn is_number_or_bool_constant(mut expr: Expr<'_>) -> bool {
-    while let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) = expr.fields() {
-        expr = operand;
+    while let Some(unary) = expr.as_unary_op_expr() {
+        expr = unary.operand();
     }
 
     expr.is_number_literal_expr() || expr.is_boolean_literal_expr()

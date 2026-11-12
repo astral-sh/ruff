@@ -297,32 +297,30 @@ fn is_valid_default_value_with_annotation(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> bool {
-    match default.fields() {
-        ast::ExprFields::StringLiteral(_)
-        | ast::ExprFields::BytesLiteral(_)
-        | ast::ExprFields::NumberLiteral(_)
-        | ast::ExprFields::BooleanLiteral(_)
-        | ast::ExprFields::NoneLiteral(_)
-        | ast::ExprFields::EllipsisLiteral(_) => {
+    let valid_elements = |elts: ast::NodeList<'_, ast::kind::Expr>| {
+        allow_container
+            && elts.len() <= 10
+            && elts
+                .iter()
+                .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic))
+    };
+    match default.classify() {
+        ExprKind::StringLiteral(_)
+        | ExprKind::BytesLiteral(_)
+        | ExprKind::NumberLiteral(_)
+        | ExprKind::BooleanLiteral(_)
+        | ExprKind::NoneLiteral(_)
+        | ExprKind::EllipsisLiteral(_) => {
             return true;
         }
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::Set(ast::ExprSetFields {
-            elts,
-            range: _,
-            node: _,
-        }) => {
+        ExprKind::List(list) => return valid_elements(list.elts()),
+        ExprKind::Tuple(tuple) => return valid_elements(tuple.elts()),
+        ExprKind::Set(set) => return valid_elements(set.elts()),
+        ExprKind::Dict(dict) => {
+            let items = dict.items();
             return allow_container
-                && elts.len() <= 10
-                && elts
-                    .iter()
-                    .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
-        }
-        ast::ExprFields::Dict(ast::ExprDictFields { node: dict, .. }) => {
-            return allow_container
-                && dict.items().len() <= 10
-                && dict.items().iter().all(|item| {
+                && items.len() <= 10
+                && items.iter().all(|item| {
                     item.key().is_some_and(|key| {
                         is_valid_default_value_with_annotation(key, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(
@@ -333,12 +331,8 @@ fn is_valid_default_value_with_annotation(
                     )
                 });
         }
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: UnaryOp::USub,
-            operand,
-            range: _,
-            node: _,
-        }) => {
+        ExprKind::UnaryOp(unary) if unary.op() == UnaryOp::USub => {
+            let operand = unary.operand();
             match operand.classify() {
                 // Ex) `-1`, `-3.14`, `2j`
                 ExprKind::NumberLiteral(_) => return true,
@@ -354,46 +348,30 @@ fn is_valid_default_value_with_annotation(
                 _ => {}
             }
         }
-        ast::ExprFields::BinOp(ast::ExprBinOpFields {
-            left,
-            op: Operator::Add | Operator::Sub,
-            right,
-            range: _,
-            node: _,
-        }) => {
+        ExprKind::BinOp(binary) if matches!(binary.op(), Operator::Add | Operator::Sub) => {
+            let left = binary.left();
+            let right = binary.right();
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
-            if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Complex { .. },
-                ..
-            }) = right.fields()
+            if right
+                .as_number_literal_expr()
+                .is_some_and(|literal| literal.value().is_complex())
             {
-                // Ex) `1 + 2j`, `1 - 2j`
-                if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: ast::Number::Int(..) | ast::Number::Float(..),
-                    ..
-                }) = left.fields()
-                {
-                    return locator.slice(left).len() <= 10;
-                } else if let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                    op: UnaryOp::USub,
-                    operand,
-                    range: _,
-                    node: _,
-                }) = left.fields()
-                {
-                    // Ex) `-1 + 2j`, `-1 - 2j`
-                    if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                        value: ast::Number::Int(..) | ast::Number::Float(..),
-                        ..
-                    }) = operand.fields()
-                    {
-                        return locator.slice(operand).len() <= 10;
+                let number = match left.classify() {
+                    ExprKind::NumberLiteral(number) => Some(number),
+                    ExprKind::UnaryOp(unary) if unary.op() == UnaryOp::USub => {
+                        unary.operand().as_number_literal_expr()
                     }
+                    _ => None,
+                };
+                if let Some(number) = number
+                    && matches!(number.value(), ast::Number::Int(_) | ast::Number::Float(_))
+                {
+                    return locator.slice(number).len() <= 10;
                 }
             }
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
-        ast::ExprFields::Attribute(_)
+        ExprKind::Attribute(_)
             if semantic
                 .resolve_qualified_name(default)
                 .as_ref()

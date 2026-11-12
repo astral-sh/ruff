@@ -69,14 +69,15 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let Some(ast::ExprFields::Name(ast::ExprNameFields { node: expr, id, .. })) = call
+    let Some(expr) = call
         .arguments
         .find_argument_value("name", 0)
-        .map(Expr::fields)
+        .and_then(Expr::as_name_expr)
     else {
         return;
     };
 
+    let id = expr.id();
     if !matches!(id.as_ref(), "__file__" | "__cached__") {
         return;
     }

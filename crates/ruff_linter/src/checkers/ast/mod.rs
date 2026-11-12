@@ -728,20 +728,20 @@ impl<'a> Checker<'a> {
         // Attribute docstrings are also recognized in conditional suites within a class.
         let allows_attribute_docstring =
             self.semantic.at_top_level() || self.semantic.current_scope().kind.is_class();
-        match suite.previous_sibling().map(Stmt::fields) {
+        match suite.previous_sibling().map(Stmt::classify) {
             None => matches!(
                 parent.map(Stmt::classify),
                 None | Some(StmtKind::FunctionDef(_) | StmtKind::ClassDef(_))
             ),
-            Some(ast::StmtFields::Assign(ast::StmtAssignFields { targets, .. })) => {
+            Some(StmtKind::Assign(assign)) => {
                 allows_attribute_docstring
-                    && matches!(
-                        targets.as_array().map(|items| items.map(Expr::classify)),
-                        Some([ExprKind::Name(_)])
-                    )
+                    && assign
+                        .targets()
+                        .as_array()
+                        .is_some_and(|[target]| target.is_name_expr())
             }
-            Some(ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { target, .. })) => {
-                allows_attribute_docstring && target.is_name_expr()
+            Some(StmtKind::AnnAssign(assign)) => {
+                allows_attribute_docstring && assign.target().is_name_expr()
             }
             Some(_) => false,
         }
@@ -2052,30 +2052,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         for arg in args {
-                            match arg.fields() {
-                                // Ex) NamedTuple("a", [("a", int)])
-                                ast::ExprFields::List(ast::ExprListFields { elts, .. })
-                                | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
-                                    for elt in elts {
-                                        match elt.fields() {
-                                            ast::ExprFields::List(ast::ExprListFields {
-                                                elts,
-                                                ..
-                                            })
-                                            | ast::ExprFields::Tuple(ast::ExprTupleFields {
-                                                elts,
-                                                ..
-                                            }) if elts.len() == 2 => {
-                                                self.visit_non_type_definition(elts.at(0));
-                                                self.visit_type_definition(elts.at(1));
-                                            }
-                                            _ => {
-                                                self.visit_non_type_definition(elt);
-                                            }
-                                        }
-                                    }
+                            // Ex) NamedTuple("a", [("a", int)])
+                            let Some(elts) = arg.as_list_or_tuple_elements() else {
+                                self.visit_non_type_definition(arg);
+                                continue;
+                            };
+                            for elt in elts {
+                                if let Some([name, annotation]) = elt
+                                    .as_list_or_tuple_elements()
+                                    .and_then(ast::List::as_array)
+                                {
+                                    self.visit_non_type_definition(name);
+                                    self.visit_type_definition(annotation);
+                                } else {
+                                    self.visit_non_type_definition(elt);
                                 }
-                                _ => self.visit_non_type_definition(arg),
                             }
                         }
 
@@ -3244,17 +3235,15 @@ impl<'a> Checker<'a> {
             for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
-                let Some(ast::ExprFields::Lambda(ast::ExprLambdaFields {
-                    parameters,
-                    body,
-                    range: _,
-                    node: _,
-                })) = self.semantic.current_expression().map(Expr::fields)
+                let Some(lambda) = self
+                    .semantic
+                    .current_expression()
+                    .and_then(Expr::as_lambda_expr)
                 else {
                     unreachable!("Expected Expr::Lambda");
                 };
 
-                if let Some(parameters) = parameters {
+                if let Some(parameters) = lambda.parameters() {
                     self.visit_parameters(parameters);
                 }
 
@@ -3281,7 +3270,7 @@ impl<'a> Checker<'a> {
                     false
                 };
 
-                self.visit_expr(body);
+                self.visit_expr(lambda.body());
 
                 // Pop the DunderClassCell scope if it was added
                 if added_dunder_class_scope {

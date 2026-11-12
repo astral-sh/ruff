@@ -23,24 +23,27 @@ impl Truthiness {
     where
         F: Fn(&str) -> bool,
     {
-        match expr.fields() {
-            ast::ExprFields::Lambda(_) => Self::Truthy,
-            ast::ExprFields::Generator(_) => Self::Truthy,
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }) => {
+        match expr.classify() {
+            ast::ExprKind::Lambda(_) => Self::Truthy,
+            ast::ExprKind::Generator(_) => Self::Truthy,
+            ast::ExprKind::StringLiteral(literal) => {
+                let value = literal.value();
                 if value.is_empty() {
                     Self::Falsey
                 } else {
                     Self::Truthy
                 }
             }
-            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { value, .. }) => {
+            ast::ExprKind::BytesLiteral(literal) => {
+                let value = literal.value();
                 if value.is_empty() {
                     Self::Falsey
                 } else {
                     Self::Truthy
                 }
             }
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields { value, .. }) => {
+            ast::ExprKind::NumberLiteral(literal) => {
+                let value = literal.value();
                 match value {
                     Number::Int(int) => {
                         if *int == 0 {
@@ -65,12 +68,13 @@ impl Truthiness {
                     }
                 }
             }
-            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { value, .. }) => {
+            ast::ExprKind::BooleanLiteral(literal) => {
+                let value = literal.value();
                 if value { Self::True } else { Self::False }
             }
-            ast::ExprFields::NoneLiteral(_) => Self::None,
-            ast::ExprFields::EllipsisLiteral(_) => Self::Truthy,
-            ast::ExprFields::FString(ast::ExprFStringFields { node: f_string, .. }) => {
+            ast::ExprKind::NoneLiteral(_) => Self::None,
+            ast::ExprKind::EllipsisLiteral(_) => Self::Truthy,
+            ast::ExprKind::FString(f_string) => {
                 if is_empty_f_string(f_string) {
                     Self::Falsey
                 } else if is_non_empty_f_string(f_string) {
@@ -79,68 +83,52 @@ impl Truthiness {
                     Self::Unknown
                 }
             }
-            ast::ExprFields::TString(_) => Self::Truthy,
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Set(ast::ExprSetFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
-                if elts.is_empty() {
-                    return Self::Falsey;
-                }
-
-                if elts
-                    .iter()
-                    .all(super::super::generated::Expr::is_starred_expr)
-                {
-                    // [*foo] / [*foo, *bar]
-                    Self::Unknown
-                } else {
-                    Self::Truthy
-                }
-            }
-            ast::ExprFields::Dict(ast::ExprDictFields { node: dict, .. }) => {
-                if dict.items().is_empty() {
+            ast::ExprKind::TString(_) => Self::Truthy,
+            ast::ExprKind::List(list) => Self::from_elements(list.elts()),
+            ast::ExprKind::Set(set) => Self::from_elements(set.elts()),
+            ast::ExprKind::Tuple(tuple) => Self::from_elements(tuple.elts()),
+            ast::ExprKind::Dict(dict) => {
+                let items = dict.items();
+                if items.is_empty() {
                     return Self::Falsey;
                 }
 
                 // If the dict consists only of double-starred items (e.g., {**x, **y}),
                 // consider its truthiness unknown. This matches lists/sets/tuples containing
                 // only starred elements, which are also Unknown.
-                if dict.items().iter().all(|item| item.key().is_none()) {
+                if items.iter().all(|item| item.key().is_none()) {
                     // {**foo} / {**foo, **bar}
                     Self::Unknown
                 } else {
                     Self::Truthy
                 }
             }
-            ast::ExprFields::Call(ast::ExprCallFields {
-                func, arguments, ..
-            }) => {
-                if let Some(name) = func.as_name_expr() {
-                    if is_iterable_initializer(name.id().as_str(), |id| is_builtin(id)) {
-                        if arguments.is_empty() {
-                            // Ex) `list()`
-                            Self::Falsey
-                        } else if let Some(argument) = arguments.as_single_positional() {
-                            // Ex) `list([1, 2, 3])`
-                            match argument.classify() {
-                                // Return Unknown for types with definite truthiness that might
-                                // result in empty iterables (t-strings and generators) or will
-                                // raise a type error (non-iterable types like numbers, booleans,
-                                // None, etc.).
-                                flat::ExprKind::NumberLiteral(_)
-                                | flat::ExprKind::BooleanLiteral(_)
-                                | flat::ExprKind::NoneLiteral(_)
-                                | flat::ExprKind::EllipsisLiteral(_)
-                                | flat::ExprKind::TString(_)
-                                | flat::ExprKind::Lambda(_)
-                                | flat::ExprKind::Generator(_) => Self::Unknown,
-                                // Recurse for all other types - collections, comprehensions, variables, etc.
-                                // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
-                                // correctly handles their truthiness (checking if empty or not).
-                                _ => Self::from_expr(argument, is_builtin),
-                            }
-                        } else {
-                            Self::Unknown
+            ast::ExprKind::Call(call) => {
+                if let Some(name) = call.func().as_name_expr()
+                    && is_iterable_initializer(name.id().as_str(), |id| is_builtin(id))
+                {
+                    let arguments = call.arguments();
+                    if arguments.is_empty() {
+                        // Ex) `list()`
+                        Self::Falsey
+                    } else if let Some(argument) = arguments.as_single_positional() {
+                        // Ex) `list([1, 2, 3])`
+                        match argument.classify() {
+                            // Return Unknown for types with definite truthiness that might
+                            // result in empty iterables (t-strings and generators) or will
+                            // raise a type error (non-iterable types like numbers, booleans,
+                            // None, etc.).
+                            flat::ExprKind::NumberLiteral(_)
+                            | flat::ExprKind::BooleanLiteral(_)
+                            | flat::ExprKind::NoneLiteral(_)
+                            | flat::ExprKind::EllipsisLiteral(_)
+                            | flat::ExprKind::TString(_)
+                            | flat::ExprKind::Lambda(_)
+                            | flat::ExprKind::Generator(_) => Self::Unknown,
+                            // Recurse for all other types - collections, comprehensions, variables, etc.
+                            // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
+                            // correctly handles their truthiness (checking if empty or not).
+                            _ => Self::from_expr(argument, is_builtin),
                         }
                     } else {
                         Self::Unknown
@@ -150,6 +138,19 @@ impl Truthiness {
                 }
             }
             _ => Self::Unknown,
+        }
+    }
+
+    fn from_elements(elts: ast::NodeList<'_, ast::kind::Expr>) -> Self {
+        if elts.is_empty() {
+            return Self::Falsey;
+        }
+
+        if elts.iter().all(Expr::is_starred_expr) {
+            // [*foo] / [*foo, *bar]
+            Self::Unknown
+        } else {
+            Self::Truthy
         }
     }
 }

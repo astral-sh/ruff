@@ -322,14 +322,11 @@ fn is_trusted_element(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
 /// We assume that any str, list[str] or tuple[str] literal can be trusted,
 /// as well as `sys.executable`.
 fn is_trusted_input(arg: Expr<'_>, semantic: &SemanticModel) -> bool {
-    match arg.fields() {
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+    match arg.classify() {
+        kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
             elts.iter().all(|elt| is_trusted_element(elt, semantic))
         }
-        ast::ExprFields::Named(ast::ExprNamedFields { node: named, .. }) => {
-            is_trusted_input(named.value(), semantic)
-        }
+        ast::ExprKind::Named(named) => is_trusted_input(named.value(), semantic),
         _ => is_trusted_element(arg, semantic),
     }
 }

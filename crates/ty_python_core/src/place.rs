@@ -63,11 +63,13 @@ impl PlaceExpr {
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub fn try_from_expr<'e>(expr: impl Into<ast::Expr<'e>>) -> Option<Self> {
-        let expr = expr.into();
+        Self::try_from_expr_kind(expr.into().classify())
+    }
 
+    pub(crate) fn try_from_expr_kind(expr: ExprKind<'_>) -> Option<Self> {
         // For named expressions (walrus operator), extract the target. The grammar only permits
         // names as targets; parser recovery may still produce other expressions here.
-        let name = match expr.classify() {
+        let name = match expr {
             ExprKind::Named(named) => named.target().as_name_expr()?,
             ExprKind::Name(name) => name,
             _ => return MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr),

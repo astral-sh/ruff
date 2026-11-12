@@ -1749,7 +1749,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         };
 
-        if let Some(target) = MemberExprBuilder::visit_expr(target) {
+        if let Some(target) = MemberExprBuilder::visit_expr(target.classify()) {
             self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
         }
     }
@@ -2482,8 +2482,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Only a definitely bound name in the current flow state is known to be safe. In particular,
     /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
-    fn place_access_can_raise(&mut self, expr: Expr<'_>, is_use: bool) -> bool {
-        let ExprKind::Name(name) = expr.classify() else {
+    fn place_access_can_raise(&mut self, expr: ExprKind<'_>, is_use: bool) -> bool {
+        let ExprKind::Name(name) = expr else {
             return true;
         };
 
@@ -2510,17 +2510,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// if value: ...  # can raise
     /// ```
     fn condition_evaluation_is_known_safe(expr: Expr<'_>) -> bool {
-        if expr.is_literal_expr() || matches!(expr.classify(), ExprKind::Lambda(_)) {
+        if expr.is_literal_expr() {
             return true;
         }
 
         match expr.classify() {
+            ExprKind::Lambda(_) => true,
             ExprKind::Named(named) if named.target().is_name_expr() => {
                 Self::condition_evaluation_is_known_safe(named.value())
             }
-            ExprKind::List(_) | ExprKind::Tuple(_) => {
-                Self::expression_evaluation_is_known_safe(expr)
-            }
+            ExprKind::List(list) => list
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
+            ExprKind::Tuple(tuple) => tuple
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
             ExprKind::BoolOp(expr_bool_op) => {
                 let values = expr_bool_op.values();
 
@@ -2530,17 +2536,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let operand = expr_unary_op.operand();
                 Self::condition_evaluation_is_known_safe(operand)
             }
-            ExprKind::Compare(expr_compare) => {
-                let ops = expr_compare.ops();
-                let operands = expr_compare.operands();
-
-                ops.iter().all(|op| matches!(op, CmpOp::Is | CmpOp::IsNot))
-                    && operands
-                        .iter()
-                        .all(Self::expression_evaluation_is_known_safe)
-            }
+            ExprKind::Compare(compare) => Self::comparison_evaluation_is_known_safe(compare),
             _ => false,
         }
+    }
+
+    fn comparison_evaluation_is_known_safe(compare: ast::ExprCompare<'_>) -> bool {
+        compare
+            .ops()
+            .iter()
+            .all(|op| matches!(op, CmpOp::Is | CmpOp::IsNot))
+            && compare
+                .operands()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe)
     }
 
     /// Returns whether evaluating `expr` cannot invoke Python user code.
@@ -2548,23 +2557,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Unlike [`Self::condition_evaluation_is_known_safe`], this does not truth-test the resulting
     /// value, so loading a name is safe even when that value's `__bool__` method could raise.
     fn expression_evaluation_is_known_safe(expr: Expr<'_>) -> bool {
-        if expr.is_literal_expr()
-            || matches!(expr.classify(), ExprKind::Name(_) | ExprKind::Lambda(_))
-        {
+        if expr.is_literal_expr() {
             return true;
         }
 
-        match expr.fields() {
-            ast::ExprFields::Named(ast::ExprNamedFields { node: named, .. })
-                if named.target().is_name_expr() =>
-            {
+        match expr.classify() {
+            ExprKind::Name(_) | ExprKind::Lambda(_) => true,
+            ExprKind::Named(named) if named.target().is_name_expr() => {
                 Self::expression_evaluation_is_known_safe(named.value())
             }
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
-                elts.iter().all(Self::expression_evaluation_is_known_safe)
-            }
-            ast::ExprFields::Compare(_) => Self::condition_evaluation_is_known_safe(expr),
+            ExprKind::List(list) => list
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
+            ExprKind::Tuple(tuple) => tuple
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
+            ExprKind::Compare(compare) => Self::comparison_evaluation_is_known_safe(compare),
             _ => false,
         }
     }
@@ -2577,13 +2587,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// for value in values: ...  # can invoke user-defined iteration
     /// ```
     fn iteration_is_known_safe(expr: Expr<'_>) -> bool {
-        matches!(
-            expr.classify(),
-            ExprKind::StringLiteral(_)
-                | ExprKind::BytesLiteral(_)
-                | ExprKind::List(_)
-                | ExprKind::Tuple(_)
-        ) && Self::expression_evaluation_is_known_safe(expr)
+        match expr.classify() {
+            ExprKind::StringLiteral(_) | ExprKind::BytesLiteral(_) => true,
+            ExprKind::List(list) => list
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
+            ExprKind::Tuple(tuple) => tuple
+                .elts()
+                .iter()
+                .all(Self::expression_evaluation_is_known_safe),
+            _ => false,
+        }
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
@@ -3638,7 +3653,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // child evaluation can introduce bindings (for example via walrus operators),
         // and those bindings need to exist before we register parent/member associations.
         let mut deferred_effects = None;
-        if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
+        if let Some(mut place_expr) = PlaceExpr::try_from_expr_kind(kind) {
             if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
                 && let PlaceExpr::Member(member) = &mut place_expr
                 && member.is_instance_attribute_candidate()
@@ -3689,7 +3704,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !is_use {
             self.ast_ids.record_expression(&expr, self.current_scope());
         }
-        let can_raise = self.place_access_can_raise(expr, is_use);
+        let can_raise = self.place_access_can_raise(kind, is_use);
         self.record_exception_checkpoint_if(can_raise);
 
         if let Some((place_expr, is_use, is_definition)) = deferred_effects {

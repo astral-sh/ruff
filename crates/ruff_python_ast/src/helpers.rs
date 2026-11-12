@@ -74,11 +74,10 @@ impl SideEffect {
         match expr.classify() {
             // Empty initializers for known builtins are side-effect-free.
             ast::ExprKind::Call(call) if call.arguments().is_empty() => {
-                let func = call.func();
-                if let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) = func.fields() {
-                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        return Self::Absent;
-                    }
+                if let Some(name) = call.func().as_name_expr()
+                    && is_iterable_initializer(name.id().as_str(), |id| is_builtin(id))
+                {
+                    return Self::Absent;
                 }
                 Self::Present
             }
@@ -352,13 +351,7 @@ pub use crate::flat::helpers::map_subscript;
 
 /// Given an [`Expr`] that can be starred, return the underlying starred expression.
 pub fn map_starred(expr: Expr<'_>) -> Expr<'_> {
-    if let ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) = expr.fields() {
-        // Ex) `*args`
-        value
-    } else {
-        // Ex) `args`
-        expr
-    }
+    expr.as_starred_expr().map_or(expr, ast::ExprStarred::value)
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
@@ -369,16 +362,14 @@ where
     F: Fn(&str) -> bool,
 {
     any_over_body(body, |expr| {
-        if let ast::ExprFields::Call(ast::ExprCallFields { func, .. }) = expr.fields() {
-            if let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) = func.fields() {
-                if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
-                    if is_builtin(id.as_str()) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        let Some(name) = expr
+            .as_call_expr()
+            .and_then(|call| call.func().as_name_expr())
+        else {
+            return false;
+        };
+        let id = name.id().as_str();
+        matches!(id, "locals" | "globals" | "vars" | "exec" | "eval") && is_builtin(id)
     })
 }
 
@@ -625,32 +616,13 @@ pub struct RaiseStatementVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.fields() {
-            ast::StmtFields::Raise(raise) => {
-                self.raises.push(raise.node);
-            }
-            ast::StmtFields::ClassDef(_)
-            | ast::StmtFields::FunctionDef(_)
-            | ast::StmtFields::Try(_) => {}
-            ast::StmtFields::If(ast::StmtIfFields {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                crate::flat::statement_visitor::walk_body(self, body);
-                for clause in elif_else_clauses {
-                    self.visit_elif_else_clause(clause);
-                }
-            }
-            ast::StmtFields::While(ast::StmtWhileFields { body, .. })
-            | ast::StmtFields::With(ast::StmtWithFields { body, .. })
-            | ast::StmtFields::For(ast::StmtForFields { body, .. }) => {
-                crate::flat::statement_visitor::walk_body(self, body);
-            }
-            ast::StmtFields::Match(ast::StmtMatchFields { cases, .. }) => {
-                for case in cases {
-                    crate::flat::statement_visitor::walk_body(self, case.body());
-                }
+        match stmt.classify() {
+            flat::StmtKind::Raise(raise) => self.raises.push(raise),
+            // Visit the main suite of a loop, excluding its else suite.
+            flat::StmtKind::While(stmt) => self.visit_body(stmt.body()),
+            flat::StmtKind::For(stmt) => self.visit_body(stmt.body()),
+            kind @ (flat::StmtKind::If(_) | flat::StmtKind::With(_) | flat::StmtKind::Match(_)) => {
+                crate::flat::statement_visitor::walk_stmt(self, kind);
             }
             _ => {}
         }
@@ -665,23 +637,18 @@ pub struct AwaitVisitor {
 
 impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: Stmt<'_>) {
-        match stmt.fields() {
-            ast::StmtFields::FunctionDef(_) | ast::StmtFields::ClassDef(_) => (),
-            ast::StmtFields::With(ast::StmtWithFields { is_async: true, .. }) => {
-                self.seen_await = true;
-            }
-            ast::StmtFields::For(ast::StmtForFields { is_async: true, .. }) => {
-                self.seen_await = true;
-            }
-            _ => crate::flat::visitor::walk_stmt(self, stmt.classify()),
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {}
+            flat::StmtKind::With(with) if with.is_async() => self.seen_await = true,
+            flat::StmtKind::For(for_stmt) if for_stmt.is_async() => self.seen_await = true,
+            kind => crate::flat::visitor::walk_stmt(self, kind),
         }
     }
 
     fn visit_expr(&mut self, expr: Expr<'_>) {
-        if let ast::ExprFields::Await(ast::ExprAwaitFields { .. }) = expr.fields() {
-            self.seen_await = true;
-        } else {
-            crate::flat::visitor::walk_expr(self, expr.classify());
+        match expr.classify() {
+            flat::ExprKind::Await(_) => self.seen_await = true,
+            kind => crate::flat::visitor::walk_expr(self, kind),
         }
     }
 

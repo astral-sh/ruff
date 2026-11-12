@@ -165,7 +165,7 @@ pub(crate) struct MemberExpr {
 impl MemberExpr {
     #[cfg(test)]
     fn try_from_expr(expression: Expr<'_>) -> Option<Self> {
-        MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
+        MemberExprBuilder::visit_expr(expression.classify()).and_then(Self::try_from_builder)
     }
 
     pub(super) fn try_from_builder(builder: MemberExprBuilder) -> Option<Self> {
@@ -214,18 +214,17 @@ pub(super) struct MemberExprBuilder {
 }
 
 impl MemberExprBuilder {
-    pub(super) fn visit_expr(expr: Expr<'_>) -> Option<MemberExprBuilder> {
-        match expr.classify() {
-            ExprKind::Name(name) => {
-                return Some(MemberExprBuilder {
-                    path: CharStr::from(name.id().clone()),
-                    segments: SmallVec::new_const(),
-                });
-            }
-            ExprKind::Named(named) if named.target().is_name_expr() => {
-                return Self::visit_expr(named.target());
-            }
-            _ => {}
+    pub(super) fn visit_expr(expr: ExprKind<'_>) -> Option<MemberExprBuilder> {
+        let name = match expr {
+            ExprKind::Name(name) => Some(name),
+            ExprKind::Named(named) => Some(named.target().as_name_expr()?),
+            _ => None,
+        };
+        if let Some(name) = name {
+            return Some(MemberExprBuilder {
+                path: CharStr::from(name.id().clone()),
+                segments: SmallVec::new_const(),
+            });
         }
 
         let mut parts = SmallVec::new_const();
@@ -240,25 +239,25 @@ impl MemberExprBuilder {
     }
 
     fn collect_expr<'a>(
-        expr: Expr<'a>,
+        expr: ExprKind<'a>,
         parts: &mut SmallVec<[MemberPathPart<'a>; 8]>,
         segments: &mut SmallVec<[SegmentInfo; 8]>,
         path_len: &mut TextSize,
     ) -> Option<()> {
-        match expr.classify() {
+        match expr {
             ExprKind::Name(name) => {
                 let text = name.id().as_str();
                 *path_len += text.text_len();
                 parts.push(MemberPathPart::Borrowed(text));
                 Some(())
             }
-            ExprKind::Named(named) if named.target().is_name_expr() => {
-                Self::collect_expr(named.target(), parts, segments, path_len)
+            ExprKind::Named(named) => {
+                let name = named.target().as_name_expr()?;
+                Self::collect_expr(ExprKind::Name(name), parts, segments, path_len)
             }
-            ExprKind::Named(_) => None,
 
             ExprKind::Attribute(attribute) => {
-                Self::collect_expr(attribute.value(), parts, segments, path_len)?;
+                Self::collect_expr(attribute.value().classify(), parts, segments, path_len)?;
 
                 let start_offset = *path_len;
                 let text = attribute.attr().id().as_str();
@@ -269,7 +268,7 @@ impl MemberExprBuilder {
                 Some(())
             }
             ExprKind::Subscript(subscript) => {
-                Self::collect_expr(subscript.value(), parts, segments, path_len)?;
+                Self::collect_expr(subscript.value().classify(), parts, segments, path_len)?;
 
                 let start_offset = *path_len;
                 let (kind, part) = Self::subscript_part(subscript.slice())?;

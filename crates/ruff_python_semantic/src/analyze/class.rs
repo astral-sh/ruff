@@ -169,86 +169,34 @@ where
         boundness: ClassMemberBoundness,
     ) -> bool {
         body.iter().any(|stmt| {
-            let kind = match stmt.fields() {
-                ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-                    node: function_def,
-                    ..
-                }) => Some(ClassMemberKind::FunctionDef(function_def)),
-                ast::StmtFields::Assign(ast::StmtAssignFields { node: assign, .. }) => {
-                    Some(ClassMemberKind::Assign(assign))
+            let mut nested =
+                |body| any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound);
+            let kind = match stmt.classify() {
+                ast::StmtKind::FunctionDef(node) => ClassMemberKind::FunctionDef(node),
+                ast::StmtKind::Assign(assign) => ClassMemberKind::Assign(assign),
+                ast::StmtKind::AnnAssign(assign) => ClassMemberKind::AnnAssign(assign),
+                ast::StmtKind::With(node) => return nested(node.body()),
+                ast::StmtKind::For(node) => return nested(node.body()) || nested(node.orelse()),
+                ast::StmtKind::While(node) => return nested(node.body()) || nested(node.orelse()),
+                ast::StmtKind::If(node) => {
+                    return nested(node.body())
+                        || node
+                            .elif_else_clauses()
+                            .iter()
+                            .any(|clause| nested(clause.body()));
                 }
-                ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { node: assign, .. }) => {
-                    Some(ClassMemberKind::AnnAssign(assign))
+                ast::StmtKind::Match(node) => {
+                    return node.cases().iter().any(|case| nested(case.body()));
                 }
-                ast::StmtFields::With(ast::StmtWithFields { body, .. }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound) {
-                        return true;
-                    }
-
-                    None
-                }
-
-                ast::StmtFields::For(ast::StmtForFields { body, orelse, .. })
-                | ast::StmtFields::While(ast::StmtWhileFields { body, orelse, .. }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
-                    {
-                        return true;
-                    }
-
-                    None
-                }
-
-                ast::StmtFields::If(ast::StmtIfFields {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || elif_else_clauses.iter().any(|it| {
-                            any_stmt_in_body(it.body(), func, ClassMemberBoundness::PossiblyUnbound)
-                        })
-                    {
-                        return true;
-                    }
-                    None
-                }
-
-                ast::StmtFields::Match(ast::StmtMatchFields { cases, .. }) => {
-                    if cases.iter().any(|it| {
-                        any_stmt_in_body(it.body(), func, ClassMemberBoundness::PossiblyUnbound)
-                    }) {
-                        return true;
-                    }
-
-                    None
-                }
-
-                ast::StmtFields::Try(ast::StmtTryFields {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
-                        || handlers
+                ast::StmtKind::Try(node) => {
+                    return nested(node.body())
+                        || nested(node.orelse())
+                        || nested(node.finalbody())
+                        || node
+                            .handlers()
                             .iter()
                             .filter_map(ruff_python_ast::ExceptHandler::as_except_handler)
-                            .any(|it| {
-                                any_stmt_in_body(
-                                    it.body(),
-                                    func,
-                                    ClassMemberBoundness::PossiblyUnbound,
-                                )
-                            })
-                    {
-                        return true;
-                    }
-
-                    None
+                            .any(|handler| nested(handler.body()));
                 }
                 // Technically, a method can be defined using a few more methods:
                 //
@@ -263,31 +211,24 @@ where
                 // ```
                 //
                 // Those cases are not yet supported because they're rare.
-                ast::StmtFields::ClassDef(_)
-                | ast::StmtFields::Return(_)
-                | ast::StmtFields::Delete(_)
-                | ast::StmtFields::AugAssign(_)
-                | ast::StmtFields::TypeAlias(_)
-                | ast::StmtFields::Raise(_)
-                | ast::StmtFields::Assert(_)
-                | ast::StmtFields::Import(_)
-                | ast::StmtFields::ImportFrom(_)
-                | ast::StmtFields::Global(_)
-                | ast::StmtFields::Nonlocal(_)
-                | ast::StmtFields::Expr(_)
-                | ast::StmtFields::Pass(_)
-                | ast::StmtFields::Break(_)
-                | ast::StmtFields::Continue(_)
-                | ast::StmtFields::IpyEscapeCommand(_) => None,
+                ast::StmtKind::ClassDef(_)
+                | ast::StmtKind::Return(_)
+                | ast::StmtKind::Delete(_)
+                | ast::StmtKind::AugAssign(_)
+                | ast::StmtKind::TypeAlias(_)
+                | ast::StmtKind::Raise(_)
+                | ast::StmtKind::Assert(_)
+                | ast::StmtKind::Import(_)
+                | ast::StmtKind::ImportFrom(_)
+                | ast::StmtKind::Global(_)
+                | ast::StmtKind::Nonlocal(_)
+                | ast::StmtKind::Expr(_)
+                | ast::StmtKind::Pass(_)
+                | ast::StmtKind::Break(_)
+                | ast::StmtKind::Continue(_)
+                | ast::StmtKind::IpyEscapeCommand(_) => return false,
             };
-
-            if let Some(kind) = kind {
-                if func(ClassMemberDeclaration { kind, boundness }) {
-                    return true;
-                }
-            }
-
-            false
+            func(ClassMemberDeclaration { kind, boundness })
         })
     }
 

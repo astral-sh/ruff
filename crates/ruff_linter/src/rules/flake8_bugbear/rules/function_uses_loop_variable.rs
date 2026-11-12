@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Comprehension, Expr, ExprContext, ExprKind, ExprName, Stmt, StmtKind, visitor,
+    Comprehension, Expr, ExprContext, ExprKind, ExprName, Stmt, StmtKind, visitor,
 };
 use ruff_text_size::Ranged;
 
@@ -221,20 +221,21 @@ struct NamesFromAssignmentsVisitor<'a> {
 /// `Visitor` to collect all names used in an assignment expression.
 impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        match expr.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => {
-                self.names.push(id.as_str());
+        let elts = match expr.classify() {
+            ExprKind::Name(name) => {
+                self.names.push(name.id().as_str());
+                return;
             }
-            ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
-                self.visit_expr(value);
+            ExprKind::Starred(starred) => {
+                self.visit_expr(starred.value());
+                return;
             }
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
-                for expr in elts {
-                    self.visit_expr(expr);
-                }
-            }
-            _ => {}
+            ExprKind::List(list) => list.elts(),
+            ExprKind::Tuple(tuple) => tuple.elts(),
+            _ => return,
+        };
+        for expr in elts {
+            self.visit_expr(expr);
         }
     }
 }
@@ -247,39 +248,35 @@ struct AssignedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        if stmt.is_function_def_stmt() {
-            // Don't recurse.
-            return;
-        }
-
-        match stmt.fields() {
-            ast::StmtFields::Assign(ast::StmtAssignFields { targets, .. }) => {
+        let kind = stmt.classify();
+        let target = match kind {
+            StmtKind::FunctionDef(_) => return,
+            StmtKind::Assign(assign) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
-                for expr in targets {
+                for expr in assign.targets() {
                     visitor.visit_expr(expr);
                 }
                 self.names.extend(visitor.names);
+                None
             }
-            ast::StmtFields::AugAssign(ast::StmtAugAssignFields { target, .. })
-            | ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { target, .. })
-            | ast::StmtFields::For(ast::StmtForFields { target, .. }) => {
-                let mut visitor = NamesFromAssignmentsVisitor::default();
-                visitor.visit_expr(target);
-                self.names.extend(visitor.names);
-            }
-            _ => {}
+            StmtKind::AugAssign(assign) => Some(assign.target()),
+            StmtKind::AnnAssign(assign) => Some(assign.target()),
+            StmtKind::For(for_stmt) => Some(for_stmt.target()),
+            _ => None,
+        };
+        if let Some(target) = target {
+            let mut visitor = NamesFromAssignmentsVisitor::default();
+            visitor.visit_expr(target);
+            self.names.extend(visitor.names);
         }
-
-        visitor::walk_stmt(self, stmt.classify());
+        visitor::walk_stmt(self, kind);
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if expr.is_lambda_expr() {
-            // Don't recurse.
-            return;
+        match expr.classify() {
+            ExprKind::Lambda(_) => {}
+            kind => visitor::walk_expr(self, kind),
         }
-
-        visitor::walk_expr(self, expr.classify());
     }
 
     fn visit_comprehension(&mut self, comprehension: Comprehension<'a>) {

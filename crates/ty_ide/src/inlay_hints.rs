@@ -726,33 +726,29 @@ fn call_matches_name(expr: Expr<'_>, name: &str) -> bool {
 ///
 /// This is used to suppress inlay hints for things like `x = 1`, `x, y = (1, 2)`, etc.
 fn type_hint_is_excessive_for_expr(expr: Expr<'_>) -> bool {
-    match expr.fields() {
+    match expr.classify() {
         // A tuple of all literals is excessive to typehint
-        ast::ExprFields::Tuple(ast::ExprTupleFields {
-            node: expr_tuple, ..
-        }) => expr_tuple
+        ExprKind::Tuple(expr_tuple) => expr_tuple
             .elts()
             .iter()
             .all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        ast::ExprFields::BytesLiteral(_)
-        | ast::ExprFields::NumberLiteral(_)
-        | ast::ExprFields::BooleanLiteral(_)
-        | ast::ExprFields::StringLiteral(_) => true,
+        ExprKind::BytesLiteral(_)
+        | ExprKind::NumberLiteral(_)
+        | ExprKind::BooleanLiteral(_)
+        | ExprKind::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        ast::ExprFields::NoneLiteral(_) => true,
+        ExprKind::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        ast::ExprFields::FString(_) => true,
+        ExprKind::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        ast::ExprFields::TString(_) => true,
+        ExprKind::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: UnaryOp::UAdd | UnaryOp::USub,
-            operand,
-            ..
-        }) => matches!(operand.classify(), ExprKind::NumberLiteral(_)),
+        ExprKind::UnaryOp(unary) if matches!(unary.op(), UnaryOp::UAdd | UnaryOp::USub) => {
+            unary.operand().is_number_literal_expr()
+        }
 
         // Everything else is reasonable
         _ => false,

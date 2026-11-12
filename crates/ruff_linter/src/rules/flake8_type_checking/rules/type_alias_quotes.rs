@@ -197,20 +197,20 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
 /// not available at runtime and thus need to be quoted, unless they would
 /// become available through `[Rule::RuntimeImportInTypeCheckingBlock]`.
 fn collect_typing_references<'a>(checker: &Checker, expr: Expr<'a>, names: &mut Vec<ExprName<'a>>) {
-    match expr.fields() {
-        ast::ExprFields::BinOp(ast::ExprBinOpFields { left, right, .. }) => {
-            collect_typing_references(checker, left, names);
-            collect_typing_references(checker, right, names);
+    match expr.classify() {
+        ast::ExprKind::BinOp(binary) => {
+            collect_typing_references(checker, binary.left(), names);
+            collect_typing_references(checker, binary.right(), names);
         }
-        ast::ExprFields::Starred(ast::ExprStarredFields {
-            value,
-            ctx: ExprContext::Load,
-            ..
-        })
-        | ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => {
-            collect_typing_references(checker, value, names);
+        ast::ExprKind::Starred(starred) if starred.ctx() == ExprContext::Load => {
+            collect_typing_references(checker, starred.value(), names);
         }
-        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
+        ast::ExprKind::Attribute(attribute) => {
+            collect_typing_references(checker, attribute.value(), names);
+        }
+        ast::ExprKind::Subscript(subscript) => {
+            let value = subscript.value();
+            let slice = subscript.slice();
             collect_typing_references(checker, value, names);
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(value) {
                 if is_standard_library_literal(qualified_name.segments()) {
@@ -231,13 +231,12 @@ fn collect_typing_references<'a>(checker: &Checker, expr: Expr<'a>, names: &mut 
             }
             collect_typing_references(checker, slice, names);
         }
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+        kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
             for elt in elts {
                 collect_typing_references(checker, elt, names);
             }
         }
-        ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => {
+        ast::ExprKind::Name(name) => {
             let Some(binding_id) = checker.semantic().resolve_name(name) else {
                 return;
             };
@@ -333,17 +332,15 @@ fn quotes_are_unremovable(
     expr: Expr<'_>,
     target_version: PythonVersion,
 ) -> bool {
-    match expr.fields() {
-        ast::ExprFields::BinOp(ast::ExprBinOpFields {
-            left, right, op, ..
-        }) => {
-            match op {
+    match expr.classify() {
+        ast::ExprKind::BinOp(binary) => {
+            match binary.op() {
                 Operator::BitOr => {
                     if target_version < PythonVersion::PY310 {
                         return true;
                     }
-                    quotes_are_unremovable(semantic, left, target_version)
-                        || quotes_are_unremovable(semantic, right, target_version)
+                    quotes_are_unremovable(semantic, binary.left(), target_version)
+                        || quotes_are_unremovable(semantic, binary.right(), target_version)
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
@@ -352,12 +349,12 @@ fn quotes_are_unremovable(
                 _ => true,
             }
         }
-        ast::ExprFields::Starred(ast::ExprStarredFields {
-            value,
-            ctx: ExprContext::Load,
-            ..
-        }) => quotes_are_unremovable(semantic, value, target_version),
-        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
+        ast::ExprKind::Starred(starred) if starred.ctx() == ExprContext::Load => {
+            quotes_are_unremovable(semantic, starred.value(), target_version)
+        }
+        ast::ExprKind::Subscript(subscript) => {
+            let value = subscript.value();
+            let slice = subscript.slice();
             // for subscripts we don't know whether it's safe to do at runtime
             // since the operation may only be available at type checking time.
             // E.g. stubs only generics.
@@ -381,15 +378,15 @@ fn quotes_are_unremovable(
             }
             quotes_are_unremovable(semantic, slice, target_version)
         }
-        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => {
+        ast::ExprKind::Attribute(attribute) => {
+            let value = attribute.value();
             // for attributes we also don't know whether it's safe
             if !semantic.in_type_checking_block() {
                 return true;
             }
             quotes_are_unremovable(semantic, value, target_version)
         }
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+        kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
             for elt in elts {
                 if quotes_are_unremovable(semantic, elt, target_version) {
                     return true;
@@ -397,7 +394,7 @@ fn quotes_are_unremovable(
             }
             false
         }
-        ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => {
+        ast::ExprKind::Name(name) => {
             semantic.resolve_name(name).is_some()
                 && semantic
                     .simulate_runtime_load(name, semantic.in_type_checking_block().into())

@@ -189,19 +189,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     ) {
         let db = self.db();
         let env = self.context.program_environment();
-        let targets = match target.fields() {
-            ast::ExprFields::Name(_)
-            | ast::ExprFields::Attribute(_)
-            | ast::ExprFields::Subscript(_) => {
+        let targets = match target.classify() {
+            ast::ExprKind::Name(_) | ast::ExprKind::Attribute(_) | ast::ExprKind::Subscript(_) => {
                 self.targets.insert(target.into(), value.ty);
                 return;
             }
-            ast::ExprFields::Starred(ast::ExprStarredFields { node: starred, .. }) => {
+            ast::ExprKind::Starred(starred) => {
                 self.unpack_inner(starred.value(), value_expr, value, value_inference);
                 return;
             }
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => elts,
+            ast::ExprKind::List(list) => list.elts(),
+            ast::ExprKind::Tuple(tuple) => tuple.elts(),
             _ => {
                 // Recovered syntax can still create assignment definitions for descendants of
                 // malformed targets. Give the whole subtree an unknown type so later lookups

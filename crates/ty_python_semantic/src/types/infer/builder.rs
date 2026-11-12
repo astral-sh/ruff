@@ -3420,22 +3420,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_assigned_ty: Option<&dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>>,
     ) {
         let db = self.db();
-        match target.fields() {
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => {
+        match target.classify() {
+            ast::ExprKind::Name(name) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     infer_assigned_ty(self, TypeContext::default());
                 }
 
                 self.infer_definition(name);
             }
-            ast::ExprFields::Starred(ast::ExprStarredFields {
-                value: starred_value,
-                ..
-            }) => {
+            ast::ExprKind::Starred(starred) => {
+                let starred_value = starred.value();
                 self.infer_target_impl(starred_value, value, infer_assigned_ty);
             }
-            ast::ExprFields::List(ast::ExprListFields { elts, .. })
-            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+            kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
                 let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
 
                 if let Some(tuple_spec) = assigned_ty
@@ -3455,13 +3452,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-            ast::ExprFields::Attribute(ast::ExprAttributeFields {
-                node: attr_expr,
-                value: object,
-                ctx: ExprContext::Store,
-                attr,
-                ..
-            }) => {
+            ast::ExprKind::Attribute(attr_expr) if attr_expr.ctx() == ExprContext::Store => {
+                let object = attr_expr.value();
+                let attr = attr_expr.attr();
                 let object_ty = self.infer_expression(object, TypeContext::default());
                 self.report_undeclared_protocol_attribute(attr_expr);
 
@@ -3482,10 +3475,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                node: subscript_expr,
-                ..
-            }) => {
+            ast::ExprKind::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let object_ty =
                         self.infer_expression(subscript_expr.value(), TypeContext::default());

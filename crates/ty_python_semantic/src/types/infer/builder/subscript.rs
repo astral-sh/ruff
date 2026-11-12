@@ -1382,21 +1382,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Type<'db>, ()> {
         let db = self.db();
 
-        match expr.fields() {
-            ast::ExprFields::EllipsisLiteral(_) => {
+        match expr.classify() {
+            ast::ExprKind::EllipsisLiteral(_) => {
                 return Ok(Type::paramspec_value_callable(
                     db,
                     Parameters::gradual_form(),
                 ));
             }
 
-            ast::ExprFields::Tuple(_) if !exactly_one_paramspec => {
+            ast::ExprKind::Tuple(_) if !exactly_one_paramspec => {
                 // Tuple expression is only allowed when the generic context contains only one
                 // `ParamSpec` type variable and no other type variables.
             }
 
-            ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-            | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
+            kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
                 // Whether to infer `Todo` for the parameters
@@ -1439,9 +1438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, parameters));
             }
 
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                node: subscript, ..
-            }) if inferred_type.is_none() => {
+            ast::ExprKind::Subscript(subscript) if inferred_type.is_none() => {
                 let value_ty = self.infer_expression(subscript.value(), TypeContext::default());
 
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
@@ -1455,12 +1452,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) if name.is_invalid() => {
+            ast::ExprKind::Name(name) if name.is_invalid() => {
                 return Err(());
             }
-            _ if matches!(expr.classify(), ExprKind::Name(_) | ExprKind::Attribute(_))
+            kind if matches!(kind, ExprKind::Name(_) | ExprKind::Attribute(_))
                 || inferred_type.is_some()
-                    && (expr.is_subscript_expr()
+                    && (matches!(kind, ExprKind::Subscript(_))
                         || self
                             .type_expression_flags(expr)
                             .contains(TypeExpressionFlags::UNPACK)) =>

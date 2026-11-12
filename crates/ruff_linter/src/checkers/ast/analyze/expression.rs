@@ -1672,31 +1672,31 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 pylint::rules::boolean_chained_comparison(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::MultipleStartsEndsWith) {
-                flake8_pie::rules::multiple_starts_ends_with(checker, &expr);
+                flake8_pie::rules::multiple_starts_ends_with(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::DuplicateIsinstanceCall) {
-                flake8_simplify::rules::duplicate_isinstance_call(checker, &expr);
+                flake8_simplify::rules::duplicate_isinstance_call(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::CompareWithTuple) {
-                flake8_simplify::rules::compare_with_tuple(checker, &expr);
+                flake8_simplify::rules::compare_with_tuple(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::ExprAndNotExpr) {
-                flake8_simplify::rules::expr_and_not_expr(checker, &expr);
+                flake8_simplify::rules::expr_and_not_expr(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::ExprOrNotExpr) {
-                flake8_simplify::rules::expr_or_not_expr(checker, &expr);
+                flake8_simplify::rules::expr_or_not_expr(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::ExprOrTrue) {
-                flake8_simplify::rules::expr_or_true(checker, &expr);
+                flake8_simplify::rules::expr_or_true(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::ExprAndFalse) {
-                flake8_simplify::rules::expr_and_false(checker, &expr);
+                flake8_simplify::rules::expr_and_false(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryKeyCheck) {
-                ruff::rules::unnecessary_key_check(checker, &expr);
+                ruff::rules::unnecessary_key_check(checker, bool_op);
             }
             if checker.is_rule_enabled(Rule::ParenthesizeChainedOperators) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);

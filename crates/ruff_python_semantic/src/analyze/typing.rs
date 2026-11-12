@@ -649,7 +649,7 @@ pub trait TypeChecker {
 ///       lists. This also implies no interfile analysis.
 pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
-        BindingKind::Assignment => match binding.statement(semantic).map(ast::Stmt::fields) {
+        BindingKind::Assignment => match binding.statement(semantic).map(ast::Stmt::classify) {
             // Given:
             //
             // ```python
@@ -657,18 +657,22 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // ```
             //
             // The type checker might know how to infer the type based on `init_expr`.
-            Some(ast::StmtFields::Assign(ast::StmtAssignFields { targets, value, .. })) => targets
-                .iter()
-                .find_map(|target| match_value(binding, target, value))
-                .is_some_and(|value| T::match_initializer(value, semantic)),
+            Some(ast::StmtKind::Assign(assign)) => {
+                let value = assign.value();
+                assign
+                    .targets()
+                    .iter()
+                    .find_map(|target| match_value(binding, target, value))
+                    .is_some_and(|value| T::match_initializer(value, semantic))
+            }
 
             // ```python
             // x: annotation = some_expr
             // ```
             //
             // In this situation, we check only the annotation.
-            Some(ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { annotation, .. })) => {
-                T::match_annotation(annotation, semantic)
+            Some(ast::StmtKind::AnnAssign(assign)) => {
+                T::match_annotation(assign.annotation(), semantic)
             }
 
             _ => false,
@@ -693,12 +697,13 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
         }
 
         BindingKind::WithItemVar => {
-            match binding.statement(semantic).map(ast::Stmt::fields) {
+            match binding.statement(semantic).map(ast::Stmt::classify) {
                 // ```python
                 // with open("file.txt") as x:
                 //     ...
                 // ```
-                Some(ast::StmtFields::With(ast::StmtWithFields { items, .. })) => items
+                Some(ast::StmtKind::With(with)) => with
+                    .items()
                     .iter()
                     .find_map(|item| {
                         let target = item.optional_vars()?;
@@ -711,17 +716,15 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             }
         }
 
-        BindingKind::Argument => match binding.statement(semantic).map(ast::Stmt::fields) {
+        BindingKind::Argument => match binding.statement(semantic).map(ast::Stmt::classify) {
             // ```python
             // def foo(x: annotation):
             //   ...
             // ```
             //
             // We trust the annotation and see if the type checker matches the annotation.
-            Some(ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-                parameters, ..
-            })) => {
-                let Some(parameter) = find_parameter(parameters, binding) else {
+            Some(ast::StmtKind::FunctionDef(function)) => {
+                let Some(parameter) = find_parameter(function.parameters(), binding) else {
                     return false;
                 };
                 let Some(annotation) = parameter.annotation() else {
@@ -733,27 +736,27 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             _ => false,
         },
 
-        BindingKind::Annotation => match binding.statement(semantic).map(ast::Stmt::fields) {
+        BindingKind::Annotation => match binding.statement(semantic).map(ast::Stmt::classify) {
             // ```python
             // x: annotation
             // ```
             //
             // It's a typed declaration, type annotation is the only source of information.
-            Some(ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { annotation, .. })) => {
-                T::match_annotation(annotation, semantic)
+            Some(ast::StmtKind::AnnAssign(assign)) => {
+                T::match_annotation(assign.annotation(), semantic)
             }
             _ => false,
         },
 
         BindingKind::FunctionDefinition(_) => {
-            match binding.statement(semantic).map(ast::Stmt::fields) {
+            match binding.statement(semantic).map(ast::Stmt::classify) {
                 // ```python
                 // def foo() -> int:
                 //   ...
                 // ```
-                Some(ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-                    returns, ..
-                })) => returns.is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
+                Some(ast::StmtKind::FunctionDef(function)) => function
+                    .returns()
+                    .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
 
                 _ => false,
             }
@@ -1215,11 +1218,9 @@ pub fn resolve_assignment<'a>(
     // Resolve any attribute chain.
     let mut head_expr = expr;
     let mut reversed_tail: SmallVec<[_; 4]> = smallvec![];
-    while let ast::ExprFields::Attribute(ast::ExprAttributeFields { value, attr, .. }) =
-        head_expr.fields()
-    {
-        head_expr = value;
-        reversed_tail.push(attr.as_str());
+    while let Some(attribute) = head_expr.as_attribute_expr() {
+        head_expr = attribute.value();
+        reversed_tail.push(attribute.attr().as_str());
     }
 
     // Resolve the left-most name, e.g. `foo` in `foo.bar.baz` to a qualified name,
@@ -1227,19 +1228,13 @@ pub fn resolve_assignment<'a>(
     let name = head_expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
-    match statement.fields() {
-        ast::StmtFields::Assign(ast::StmtAssignFields { value, .. })
-        | ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-            value: Some(value), ..
-        }) => {
-            let expr_call_node = value.as_call_expr()?;
-            let func = expr_call_node.func();
-
-            let qualified_name = semantic.resolve_qualified_name(func)?;
-            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
-        }
-        _ => None,
-    }
+    let value = match statement.classify() {
+        ast::StmtKind::Assign(assign) => assign.value(),
+        ast::StmtKind::AnnAssign(assign) => assign.value()?,
+        _ => return None,
+    };
+    let qualified_name = semantic.resolve_qualified_name(value.as_call_expr()?.func())?;
+    Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
 }
 
 /// Find the assigned [`Expr`] for a given symbol, if any.
@@ -1268,120 +1263,71 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-#[expect(clippy::single_match)]
 pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<Expr<'a>> {
     match binding.kind {
         // Ex) `x := 1`
         BindingKind::NamedExprAssignment => {
-            let parent_id = binding.source?;
-            let parent = semantic
-                .expressions(parent_id)
-                .find_map(ast::Expr::as_named_expr);
-            if let Some(ast::ExprNamedFields { target, value, .. }) =
-                parent.map(ast::ExprNamed::fields)
-            {
-                return match_value(binding, target, value);
-            }
+            let named = semantic
+                .expressions(binding.source?)
+                .find_map(ast::Expr::as_named_expr)?;
+            match_value(binding, named.target(), named.value())
         }
         // Ex) `x = 1`
-        BindingKind::Assignment => match binding.statement(semantic).map(ast::Stmt::fields) {
-            Some(ast::StmtFields::Assign(ast::StmtAssignFields { value, targets, .. })) => {
-                return targets
+        BindingKind::Assignment => match binding.statement(semantic)?.classify() {
+            ast::StmtKind::Assign(assign) => {
+                let value = assign.value();
+                assign
+                    .targets()
                     .iter()
-                    .find_map(|target| match_value(binding, target, value));
+                    .find_map(|target| match_value(binding, target, value))
             }
-            Some(ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-                value: Some(value),
-                target,
-                ..
-            })) => {
-                return match_value(binding, target, value);
+            ast::StmtKind::AnnAssign(assign) => {
+                match_value(binding, assign.target(), assign.value()?)
             }
-            _ => {}
-        },
-        // Ex) `with open("file.txt") as f:`
-        BindingKind::WithItemVar => match binding.statement(semantic).map(ast::Stmt::fields) {
-            Some(ast::StmtFields::With(ast::StmtWithFields { items, .. })) => {
-                return items.iter().find_map(|item| {
-                    let target = item.optional_vars()?;
-                    let value = item.context_expr();
-                    match_value(binding, target, value)
-                });
-            }
-            _ => {}
-        },
-        _ => {}
-    }
-    None
-}
-
-/// Given a target and value, find the value that's assigned to the given symbol.
-fn match_value<'a>(binding: &Binding, target: Expr<'_>, value: Expr<'a>) -> Option<Expr<'a>> {
-    match target.fields() {
-        ast::ExprFields::Name(ast::ExprNameFields { node: name, .. })
-            if name.range() == binding.range() =>
-        {
-            Some(value)
-        }
-        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => match value.fields() {
-            ast::ExprFields::Tuple(ast::ExprTupleFields {
-                elts: value_elts, ..
-            })
-            | ast::ExprFields::List(ast::ExprListFields {
-                elts: value_elts, ..
-            })
-            | ast::ExprFields::Set(ast::ExprSetFields {
-                elts: value_elts, ..
-            }) => match_target(binding, elts, value_elts),
             _ => None,
         },
+        // Ex) `with open("file.txt") as f:`
+        BindingKind::WithItemVar => binding
+            .statement(semantic)?
+            .as_with_stmt()?
+            .items()
+            .iter()
+            .find_map(|item| match_value(binding, item.optional_vars()?, item.context_expr())),
         _ => None,
     }
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
+fn match_value<'a>(binding: &Binding, target: Expr<'_>, value: Expr<'a>) -> Option<Expr<'a>> {
+    let targets = match target.classify() {
+        ast::ExprKind::Name(name) => return (name.range() == binding.range()).then_some(value),
+        ast::ExprKind::Tuple(tuple) => tuple.elts(),
+        ast::ExprKind::List(list) => list.elts(),
+        _ => return None,
+    };
+    match_target(binding, targets, value)
+}
+
+/// Search nested destructuring assignments, e.g. `(a, b, [c, d]) = [1, 2, {3, 4}]`.
 fn match_target<'a>(
     binding: &Binding,
     targets: NodeList<'_, ast::kind::Expr>,
-    values: NodeList<'a, ast::kind::Expr>,
+    value: Expr<'a>,
 ) -> Option<Expr<'a>> {
-    for (target, value) in targets.iter().zip(values) {
-        match target.fields() {
-            ast::ExprFields::Tuple(ast::ExprTupleFields {
-                elts: target_elts, ..
-            })
-            | ast::ExprFields::List(ast::ExprListFields {
-                elts: target_elts, ..
-            })
-            | ast::ExprFields::Set(ast::ExprSetFields {
-                elts: target_elts, ..
-            }) => {
-                // Collection types can be mismatched like in: (a, b, [c, d]) = [1, 2, {3, 4}]
-                match value.fields() {
-                    ast::ExprFields::Tuple(ast::ExprTupleFields {
-                        elts: value_elts, ..
-                    })
-                    | ast::ExprFields::List(ast::ExprListFields {
-                        elts: value_elts, ..
-                    })
-                    | ast::ExprFields::Set(ast::ExprSetFields {
-                        elts: value_elts, ..
-                    }) => {
-                        if let Some(result) = match_target(binding, target_elts, value_elts) {
-                            return Some(result);
-                        }
-                    }
-                    _ => (),
-                }
-            }
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. })
-                if name.range() == binding.range() =>
-            {
-                return Some(value);
-            }
-            _ => (),
-        }
-    }
-    None
+    let values = match value.classify() {
+        ast::ExprKind::Tuple(tuple) => tuple.elts(),
+        ast::ExprKind::List(list) => list.elts(),
+        ast::ExprKind::Set(set) => set.elts(),
+        _ => return None,
+    };
+    targets.iter().zip(values).find_map(|(target, value)| {
+        let targets = match target.classify() {
+            ast::ExprKind::Name(name) => return (name.range() == binding.range()).then_some(value),
+            ast::ExprKind::Tuple(tuple) => tuple.elts(),
+            ast::ExprKind::List(list) => list.elts(),
+            ast::ExprKind::Set(set) => set.elts(),
+            _ => return None,
+        };
+        match_target(binding, targets, value)
+    })
 }

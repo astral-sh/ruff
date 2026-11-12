@@ -3,7 +3,7 @@
 //! Enables rules to make module members available (that may be not yet be imported) during fix
 //! execution.
 
-use ruff_python_ast::{self as ast, StmtKind, Suite};
+use ruff_python_ast::{StmtKind, Suite};
 use std::error::Error;
 
 use anyhow::Result;
@@ -255,10 +255,8 @@ impl<'a> Importer<'a> {
         let test = if_stmt.test();
 
         let mut source = test;
-        while let ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) =
-            source.fields()
-        {
-            source = value;
+        while let Some(attribute) = source.as_attribute_expr() {
+            source = attribute.value();
         }
         semantic
             .binding(semantic.resolve_name(source.as_name_expr()?)?)

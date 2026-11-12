@@ -1,4 +1,4 @@
-use ruff_python_ast::{Builder, ExprBoolOpFields, ExprFields, ExprKind, build};
+use ruff_python_ast::{Builder, ExprBoolOp, ExprKind, build};
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -71,16 +71,11 @@ impl AlwaysFixableViolation for MultipleStartsEndsWith {
 }
 
 /// PIE810
-pub(crate) fn multiple_starts_ends_with(checker: &Checker, &expr: &Expr<'_>) {
-    let ExprFields::BoolOp(ExprBoolOpFields {
-        op: BoolOp::Or,
-        values,
-        range: _,
-        node: _,
-    }) = expr.fields()
-    else {
+pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: ExprBoolOp<'_>) {
+    if expr.op() != BoolOp::Or {
         return;
-    };
+    }
+    let values = expr.values();
 
     let mut duplicates = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {

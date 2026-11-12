@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprKind};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
@@ -113,25 +113,23 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: Expr<'_>) {
 }
 
 fn check_expr(checker: &Checker, target: Expr<'_>, method_type: MethodType) {
-    match target.fields() {
-        ast::ExprFields::Name(_) => {
-            if let ExprKind::Name(name_node) = target.classify() {
-                let id = name_node.id();
-                if id.as_str() == method_type.arg_name() {
-                    checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
-                }
+    let elts = match target.classify() {
+        ExprKind::Name(name) => {
+            if name.id().as_str() == method_type.arg_name() {
+                checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
             }
+            return;
         }
-        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
-            for element in elts {
-                check_expr(checker, element, method_type);
-            }
+        ExprKind::Starred(starred) => {
+            check_expr(checker, starred.value(), method_type);
+            return;
         }
-        ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
-            check_expr(checker, value, method_type);
-        }
-        _ => {}
+        ExprKind::List(list) => list.elts(),
+        ExprKind::Tuple(tuple) => tuple.elts(),
+        _ => return,
+    };
+    for element in elts {
+        check_expr(checker, element, method_type);
     }
 }
 

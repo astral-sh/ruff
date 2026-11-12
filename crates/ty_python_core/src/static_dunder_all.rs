@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, walk_expr as walk_source_order_expr, walk_stmt,
 };
-use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier, NodeList, Stmt, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, Identifier, NodeList, Stmt, StmtKind};
 
 use crate::{Db, ProgramFile};
 
@@ -30,11 +30,7 @@ fn literal_dunder_all_assignment(
     if !matches!(target.classify(), ExprKind::Name(name) if name.id() == "__all__") {
         return None;
     }
-    match value.fields() {
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => Some(elts),
-        _ => None,
-    }
+    value.as_list_or_tuple_elements()
 }
 
 /// Returns a literal `__all__` without resolving imports or indexing the file.

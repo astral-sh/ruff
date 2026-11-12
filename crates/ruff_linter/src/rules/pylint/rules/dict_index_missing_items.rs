@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprContext, ExprKind, ExprName, StmtFor, visitor};
+use ruff_python_ast::{Expr, ExprContext, ExprKind, ExprName, StmtFor, visitor};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::is_dict;
@@ -126,14 +126,11 @@ impl<'a, 'b> SubscriptVisitor<'a, 'b> {
 impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
         // Given `obj[key]`, `value` must be `obj` and `slice` must be `key`.
-        if let ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-            value,
-            slice,
-            ctx: ExprContext::Load,
-            ..
-        }) = expr.fields()
+        let kind = expr.classify();
+        if let ExprKind::Subscript(subscript) = kind
+            && subscript.ctx() == ExprContext::Load
         {
-            let ExprKind::Name(name) = value.classify() else {
+            let Some(name) = subscript.value().as_name_expr() else {
                 return;
             };
 
@@ -143,7 +140,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
             }
 
             // Check that the sliced value is the same as the target of the `for` loop.
-            if ComparableExpr::from(slice) != ComparableExpr::from(self.target) {
+            if ComparableExpr::from(subscript.slice()) != ComparableExpr::from(self.target) {
                 return;
             }
 
@@ -159,44 +156,29 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
 
             guard.secondary_annotation_without_message(expr);
         } else {
-            visitor::walk_expr(self, expr.classify());
+            visitor::walk_expr(self, kind);
         }
     }
 }
 
 /// Extracts the name of the dictionary from the expression.
 fn extract_dict_name(expr: Expr<'_>) -> Option<ExprName<'_>> {
-    // Ex) `for key in obj:`
-    if let Some(name_expr) = expr.as_name_expr() {
-        return Some(name_expr);
-    }
-
-    // Ex) `for key in obj.keys():`
-    if let ExprKind::Call(call) = expr.classify() {
-        let func = call.func();
-        if let ExprKind::Attribute(attribute) = func.classify() {
-            let attr = attribute.attr();
-            let value = attribute.value();
-            if attr == "keys" {
-                if let ExprKind::Name(var_name) = value.classify() {
-                    return Some(var_name);
-                }
+    match expr.classify() {
+        // Ex) `for key in obj:`
+        ExprKind::Name(name) => Some(name),
+        // Ex) `for key in obj.keys():`
+        ExprKind::Call(call) => {
+            let attr = call.func().as_attribute_expr()?;
+            if attr.attr() == "keys" {
+                attr.value().as_name_expr()
+            } else {
+                None
             }
         }
+        // Ex) `for key in (my_dict := {"foo": "bar"}):`
+        ExprKind::Named(named) if named.value().is_dict_expr() => named.target().as_name_expr(),
+        _ => None,
     }
-
-    // Ex) `for key in (my_dict := {"foo": "bar"}):`
-    if let ExprKind::Named(named) = expr.classify() {
-        let target = named.target();
-        let value = named.value();
-        if let ast::ExprFields::Dict(ast::ExprDictFields { .. }) = value.fields() {
-            if let ExprKind::Name(var_name) = target.classify() {
-                return Some(var_name);
-            }
-        }
-    }
-
-    None
 }
 
 /// Returns `true` if the binding is a dictionary, inferred from the type.

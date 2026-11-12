@@ -370,19 +370,15 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
     // Treat only unambiguous union, `Literal`, and `Annotated` expressions as implicit aliases.
     // Other expressions may also be aliases, but a false negative is preferable to incorrectly
     // hiding a value that exists at runtime.
-    match (ty, assignment.value(&module).fields()) {
-        (
-            Type::KnownInstance(KnownInstanceType::UnionType(_)),
-            ast::ExprFields::BinOp(ast::ExprBinOpFields {
-                op: ast::Operator::BitOr,
-                ..
-            }),
-        ) => false,
+    match (ty, assignment.value(&module).classify()) {
+        (Type::KnownInstance(KnownInstanceType::UnionType(_)), ast::ExprKind::BinOp(binary))
+            if binary.op() == ast::Operator::BitOr =>
+        {
+            false
+        }
         (
             Type::KnownInstance(KnownInstanceType::Literal(_) | KnownInstanceType::Annotated(_)),
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                node: subscript, ..
-            }),
+            ast::ExprKind::Subscript(subscript),
         ) => !matches!(
             subscript.value().inferred_type(&model),
             Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))

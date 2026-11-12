@@ -79,27 +79,21 @@ pub(crate) fn static_key_dict_comprehension(
 /// Returns `true` if the given expression is a constant in the context of the dictionary
 /// comprehension.
 fn is_constant(key: Expr<'_>, names: &FxHashMap<&str, ExprName<'_>>) -> bool {
-    match key.fields() {
-        ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) => {
-            tuple.iter().all(|elem| is_constant(elem, names))
+    match key.classify() {
+        ast::ExprKind::Tuple(tuple) => tuple.iter().all(|elem| is_constant(elem, names)),
+        ast::ExprKind::Name(name) => !names.contains_key(name.id().as_str()),
+        ast::ExprKind::Attribute(attribute) => is_constant(attribute.value(), names),
+        ast::ExprKind::Subscript(subscript) => {
+            is_constant(subscript.value(), names) && is_constant(subscript.slice(), names)
         }
-        ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => !names.contains_key(id.as_str()),
-        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => {
-            is_constant(value, names)
+        ast::ExprKind::BinOp(binary) => {
+            is_constant(binary.left(), names) && is_constant(binary.right(), names)
         }
-        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
-            is_constant(value, names) && is_constant(slice, names)
-        }
-        ast::ExprFields::BinOp(ast::ExprBinOpFields { left, right, .. }) => {
-            is_constant(left, names) && is_constant(right, names)
-        }
-        ast::ExprFields::BoolOp(ast::ExprBoolOpFields { values, .. }) => {
-            values.iter().all(|value| is_constant(value, names))
-        }
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) => {
-            is_constant(operand, names)
-        }
-        expr if expr.view().is_literal_expr() => true,
-        _ => false,
+        ast::ExprKind::BoolOp(boolean) => boolean
+            .values()
+            .iter()
+            .all(|value| is_constant(value, names)),
+        ast::ExprKind::UnaryOp(unary) => is_constant(unary.operand(), names),
+        _ => key.is_literal_expr(),
     }
 }

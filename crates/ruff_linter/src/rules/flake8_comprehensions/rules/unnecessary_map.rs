@@ -138,9 +138,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call_fields: &ast::ExprCallFiel
             };
 
             if object_type == ObjectType::Dict {
-                let (ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-                | ast::ExprFields::List(ast::ExprListFields { elts, .. })) = lambda.body().fields()
-                else {
+                let Some(elts) = lambda.body().as_list_or_tuple_elements() else {
                     return;
                 };
 

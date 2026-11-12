@@ -52,38 +52,25 @@ impl Terminal {
         let mut terminal = Terminal::None;
 
         for stmt in stmts {
-            match stmt.fields() {
-                ast::StmtFields::For(ast::StmtForFields { body, orelse, .. })
-                | ast::StmtFields::While(ast::StmtWhileFields { body, orelse, .. }) => {
-                    if always_breaks(body) {
-                        continue;
-                    }
-
-                    terminal = terminal.and_then(Self::from_body(body, semantic));
-
-                    if !sometimes_breaks(body, semantic) {
-                        terminal = terminal.and_then(Self::from_body(orelse, semantic));
-                    }
+            match stmt.classify() {
+                StmtKind::For(node) => {
+                    terminal = terminal.and_then_loop(node.body(), node.orelse(), semantic);
                 }
-                ast::StmtFields::If(ast::StmtIfFields {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
-                    let branch_terminal = Terminal::branches(
-                        std::iter::once(Self::from_body(body, semantic)).chain(
-                            elif_else_clauses
-                                .iter()
-                                .map(|clause| Self::from_body(clause.body(), semantic)),
-                        ),
-                    );
+                StmtKind::While(node) => {
+                    terminal = terminal.and_then_loop(node.body(), node.orelse(), semantic);
+                }
+                StmtKind::If(node) => {
+                    let mut branch_terminal = Self::from_body(node.body(), semantic);
+                    let mut has_else = false;
+                    for clause in node.elif_else_clauses() {
+                        has_else = has_else || clause.test().is_none();
+                        branch_terminal =
+                            branch_terminal.branch(Self::from_body(clause.body(), semantic));
+                    }
 
                     // If the `if` statement is known to be exhaustive (by way of including an
                     // `else`)...
-                    if elif_else_clauses
-                        .iter()
-                        .any(|clause| clause.test().is_none())
-                    {
+                    if has_else {
                         // And all branches return, then the `if` statement returns.
                         terminal = terminal.and_then(branch_terminal);
                     } else if branch_terminal.has_any_return() {
@@ -92,16 +79,19 @@ impl Terminal {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
                 }
-                ast::StmtFields::Match(ast::StmtMatchFields { cases, .. }) => {
-                    let branch_terminal = terminal.and_then(Terminal::branches(
-                        cases
-                            .iter()
-                            .map(|case| Self::from_body(case.body(), semantic)),
-                    ));
+                StmtKind::Match(node) => {
+                    let mut branch_terminal = Self::None;
+                    let mut has_wildcard = false;
+                    for case in node.cases() {
+                        has_wildcard = has_wildcard || is_wildcard(case);
+                        branch_terminal =
+                            branch_terminal.branch(Self::from_body(case.body(), semantic));
+                    }
+                    let branch_terminal = terminal.and_then(branch_terminal);
 
                     // If the `match` is known to be exhaustive (by way of including a wildcard
                     // pattern)...
-                    if cases.iter().any(is_wildcard) {
+                    if has_wildcard {
                         // And all branches return, then the `match` statement returns.
                         terminal = terminal.and_then(branch_terminal);
                     } else {
@@ -112,13 +102,14 @@ impl Terminal {
                         }
                     }
                 }
-                ast::StmtFields::Try(ast::StmtTryFields {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
+                StmtKind::Try(node) => {
+                    let ast::StmtTryFields {
+                        body,
+                        handlers,
+                        orelse,
+                        finalbody,
+                        ..
+                    } = node.fields();
                     // If the body returns, then this can't be a non-returning function. We assume
                     // that _any_ statement in the body could raise an exception, so we don't
                     // consider the body to be exhaustive. In other words, we assume the exception
@@ -152,13 +143,13 @@ impl Terminal {
                         );
                     }
                 }
-                ast::StmtFields::With(ast::StmtWithFields { body, .. }) => {
-                    terminal = terminal.and_then(Self::from_body(body, semantic));
+                StmtKind::With(node) => {
+                    terminal = terminal.and_then(Self::from_body(node.body(), semantic));
                 }
-                ast::StmtFields::Return(_) => {
+                StmtKind::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
                 }
-                ast::StmtFields::Raise(ast::StmtRaiseFields { node: raise, .. }) => {
+                StmtKind::Raise(raise) => {
                     // Check if this raise is NotImplementedError
                     let is_not_implemented = raise.exc().is_some_and(|exc| {
                         let exc = map_callable(exc);
@@ -178,6 +169,18 @@ impl Terminal {
         match terminal {
             Terminal::None => Terminal::Implicit,
             _ => terminal,
+        }
+    }
+
+    fn and_then_loop(self, body: Suite<'_>, orelse: Suite<'_>, semantic: &SemanticModel) -> Self {
+        if always_breaks(body) {
+            return self;
+        }
+        let terminal = self.and_then(Self::from_body(body, semantic));
+        if sometimes_breaks(body, semantic) {
+            terminal
+        } else {
+            terminal.and_then(Self::from_body(orelse, semantic))
         }
     }
 

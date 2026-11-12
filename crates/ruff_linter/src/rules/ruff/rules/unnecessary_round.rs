@@ -186,10 +186,10 @@ pub(super) fn rounded_and_ndigits<'a>(
         },
     };
 
-    let ndigits_kind = match ndigits.map(Expr::fields) {
-        None | Some(ast::ExprFields::NoneLiteral(_)) => NdigitsValue::NotGivenOrNone,
+    let ndigits_kind = match ndigits.map(Expr::classify) {
+        None | Some(ExprKind::NoneLiteral(_)) => NdigitsValue::NotGivenOrNone,
 
-        Some(ast::ExprFields::Name(ast::ExprNameFields { node: name, .. })) => {
+        Some(ExprKind::Name(name)) => {
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
                     NdigitsValue::Int(InferredType::AssignableTo)
@@ -198,15 +198,14 @@ pub(super) fn rounded_and_ndigits<'a>(
             }
         }
 
-        Some(ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: Number::Int(int),
-            ..
-        })) => match int.as_i64() {
-            None => NdigitsValue::Int(InferredType::Equivalent),
-            Some(value) => NdigitsValue::LiteralInt {
-                is_negative: value < 0,
-            },
-        },
+        Some(ExprKind::NumberLiteral(number)) if let Number::Int(int) = number.value() => {
+            match int.as_i64() {
+                None => NdigitsValue::Int(InferredType::Equivalent),
+                Some(value) => NdigitsValue::LiteralInt {
+                    is_negative: value < 0,
+                },
+            }
+        }
 
         Some(ndigits) => match ResolvedPythonType::from(ndigits.view()) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {

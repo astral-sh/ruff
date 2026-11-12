@@ -182,17 +182,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let env = self.program_environment();
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
-        let inferred = match annotation.fields() {
+        let inferred = match annotation.classify() {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                node: string, ..
-            }) => {
+            ast::ExprKind::StringLiteral(string) => {
                 AnnotationExpressionInference::new(self.infer_string_annotation_expression(string))
             }
 
-            ast::ExprFields::Attribute(ast::ExprAttributeFields {
-                node: attribute, ..
-            }) => {
+            ast::ExprKind::Attribute(attribute) => {
                 if !is_dotted_name(annotation) {
                     return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
                 }
@@ -214,7 +210,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => match name.ctx() {
+            ast::ExprKind::Name(name) => match name.ctx() {
                 ast::ExprContext::Load => infer_name_or_attribute(
                     self.infer_type_expression_reference(annotation),
                     annotation,
@@ -231,12 +227,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             },
 
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                node: subscript,
-                value,
-                slice,
-                ..
-            }) => {
+            ast::ExprKind::Subscript(subscript) => {
+                let value = subscript.value();
+                let slice = subscript.slice();
                 if !is_dotted_name(value) {
                     return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
                 }

@@ -208,29 +208,27 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: ast::ExprDict<'_>) {
 }
 
 fn is_literal_key(expr: Expr<'_>) -> bool {
-    match expr.fields() {
-        ast::ExprFields::StringLiteral(_)
-        | ast::ExprFields::BytesLiteral(_)
-        | ast::ExprFields::NumberLiteral(_)
-        | ast::ExprFields::BooleanLiteral(_)
-        | ast::ExprFields::NoneLiteral(_)
-        | ast::ExprFields::EllipsisLiteral(_)
-        | ast::ExprFields::Tuple(_)
-        | ast::ExprFields::FString(_) => true,
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
-            operand,
-            ..
-        }) => signed_number_literal(operand).is_some(),
-        ast::ExprFields::BinOp(ast::ExprBinOpFields {
-            left,
-            op: ast::Operator::Add | ast::Operator::Sub,
-            right,
-            ..
-        }) => {
-            signed_number_literal(left).is_some_and(|number| {
+    match expr.classify() {
+        ast::ExprKind::StringLiteral(_)
+        | ast::ExprKind::BytesLiteral(_)
+        | ast::ExprKind::NumberLiteral(_)
+        | ast::ExprKind::BooleanLiteral(_)
+        | ast::ExprKind::NoneLiteral(_)
+        | ast::ExprKind::EllipsisLiteral(_)
+        | ast::ExprKind::Tuple(_)
+        | ast::ExprKind::FString(_) => true,
+        ast::ExprKind::UnaryOp(unary)
+            if matches!(unary.op(), ast::UnaryOp::UAdd | ast::UnaryOp::USub) =>
+        {
+            signed_number_literal(unary.operand()).is_some()
+        }
+        ast::ExprKind::BinOp(binary)
+            if matches!(binary.op(), ast::Operator::Add | ast::Operator::Sub) =>
+        {
+            signed_number_literal(binary.left()).is_some_and(|number| {
                 matches!(number.value(), ast::Number::Int(_) | ast::Number::Float(_))
-            }) && right
+            }) && binary
+                .right()
                 .as_number_literal_expr()
                 .is_some_and(|number| number.value().is_complex())
         }
@@ -238,16 +236,16 @@ fn is_literal_key(expr: Expr<'_>) -> bool {
     }
 }
 
-fn signed_number_literal(expr: Expr<'_>) -> Option<ast::ExprNumberLiteral<'_>> {
-    match expr.fields() {
-        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields { node: number, .. }) => {
-            Some(number)
+fn signed_number_literal(mut expr: Expr<'_>) -> Option<ast::ExprNumberLiteral<'_>> {
+    loop {
+        match expr.classify() {
+            ast::ExprKind::NumberLiteral(number) => return Some(number),
+            ast::ExprKind::UnaryOp(unary)
+                if matches!(unary.op(), ast::UnaryOp::UAdd | ast::UnaryOp::USub) =>
+            {
+                expr = unary.operand();
+            }
+            _ => return None,
         }
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
-            operand,
-            ..
-        }) => signed_number_literal(operand),
-        _ => None,
     }
 }

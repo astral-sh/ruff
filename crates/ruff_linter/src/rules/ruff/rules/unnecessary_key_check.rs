@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, ExprKind};
+use ruff_python_ast::{BoolOp, CmpOp, ExprBoolOp, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::side_effect;
@@ -50,19 +50,15 @@ impl AlwaysFixableViolation for UnnecessaryKeyCheck {
 }
 
 /// RUF019
-pub(crate) fn unnecessary_key_check(checker: &Checker, &expr: &Expr<'_>) {
+pub(crate) fn unnecessary_key_check(checker: &Checker, expr: ExprBoolOp<'_>) {
     if !checker.semantic().in_boolean_test() {
         return;
     }
 
-    let ast::ExprFields::BoolOp(ast::ExprBoolOpFields {
-        op: BoolOp::And,
-        values,
-        ..
-    }) = expr.fields()
-    else {
+    if expr.op() != BoolOp::And {
         return;
-    };
+    }
+    let values = expr.values();
 
     let Some([left, right]) = values.as_array() else {
         return;

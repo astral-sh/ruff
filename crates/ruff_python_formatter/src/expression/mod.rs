@@ -4,7 +4,7 @@ use std::slice;
 use ruff_formatter::{FormatOwnedWithRule, FormatRule, FormatRuleWithOptions, write};
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
-use ruff_python_ast::{self as ast, AstNode, Expr, ExprKind, Operator, SyntaxNode};
+use ruff_python_ast::{AstNode, Expr, ExprKind, Operator, SyntaxNode};
 use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
@@ -949,7 +949,7 @@ impl CallChainLayout {
     /// 3. If the root is parenthesized, add 1 to that value.
     /// 4. If the total is at least 2, return `Fluent`. Otherwise
     ///    return `NonFluent`
-    fn from_expression(mut expr: Expr<'_>, context: &PyFormatContext) -> Self {
+    fn from_expression(expr: Expr<'_>, context: &PyFormatContext) -> Self {
         // TODO(dylan): Once the fluent layout preview style is
         // stabilized, see if it is possible to simplify some of
         // the logic around parenthesized roots. (While supporting
@@ -995,54 +995,31 @@ impl CallChainLayout {
         // this should be fluently formatted, and also means we should make
         // our first break after this value.
         let mut root_value_parenthesized = false;
+        let mut kind = expr.classify();
         loop {
-            match expr.fields() {
-                ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => {
-                    // ```
-                    // f().g
-                    // ^^^ value
-                    // data[:100].T
-                    // ^^^^^^^^^^ value
-                    // ```
-                    if context.is_expression_parenthesized(value) {
-                        // `(a).b`. We preserve these parentheses so don't recurse
-                        root_value_parenthesized = true;
-                        break;
-                    } else if matches!(value.classify(), ExprKind::Call(_) | ExprKind::Subscript(_))
-                    {
-                        computed_attribute_values_after_parentheses += 1;
-                    }
+            let inner = match kind {
+                ExprKind::Attribute(attribute) => attribute.value(),
+                ExprKind::Call(call) => call.func(),
+                ExprKind::Subscript(subscript) => subscript.value(),
+                _ => break,
+            };
+            let is_attribute = matches!(kind, ExprKind::Attribute(_));
+            if context.is_expression_parenthesized(inner) {
+                // Preserve the parentheses in e.g. `(a).b` and `(a)[0].x()`.
+                root_value_parenthesized = is_attribute;
+                break;
+            }
 
-                    expr = value;
+            kind = inner.classify();
+            let inner_is_call_like = matches!(kind, ExprKind::Call(_) | ExprKind::Subscript(_));
+            if is_attribute {
+                // Count `f().g` and `data[:100].T`.
+                if inner_is_call_like {
+                    computed_attribute_values_after_parentheses += 1;
                 }
-                // ```
-                // f()
-                // ^^^ expr
-                // ^ func
-                // data[:100]
-                // ^^^^^^^^^^ expr
-                // ^^^^ value
-                // ```
-                ast::ExprFields::Call(ast::ExprCallFields { func: inner, .. })
-                | ast::ExprFields::Subscript(ast::ExprSubscriptFields { value: inner, .. }) => {
-                    // We preserve these parentheses so don't recurse
-                    // e.g. (a)[0].x().y().z()
-                    //         ^stop here
-                    if context.is_expression_parenthesized(inner) {
-                        break;
-                    }
-
-                    // Accumulate the `call_like_count`, but we only
-                    // want to count things like `a()[0]()()` once.
-                    if !inner.is_call_expr() && !inner.is_subscript_expr() {
-                        call_like_count += 1;
-                    }
-
-                    expr = inner;
-                }
-                _ => {
-                    break;
-                }
+            } else if !inner_is_call_like {
+                // Count consecutive calls and subscripts, e.g. `a()[0]()()`, only once.
+                call_like_count += 1;
             }
         }
 
