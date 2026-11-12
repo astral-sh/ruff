@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -203,8 +203,9 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
         };
         let targets = assign.targets();
         let value = assign.value();
-        let Some([ast::ExprFields::Name(ast::ExprNameFields { id, .. })]) =
-            targets.as_array().map(|[target]| [target.fields()])
+        let Some(name) = targets
+            .as_array()
+            .and_then(|[target]| target.as_name_expr())
         else {
             continue;
         };
@@ -236,7 +237,7 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
         checker
             .report_diagnostic(
                 UnusedPrivateTypeVar {
-                    type_var_like_name: id.to_string(),
+                    type_var_like_name: name.id().to_string(),
                     type_var_like_kind: type_var_like_kind.to_string(),
                 },
                 binding.range(),

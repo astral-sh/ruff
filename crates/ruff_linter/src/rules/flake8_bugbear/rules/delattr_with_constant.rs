@@ -1,7 +1,5 @@
 use ruff_python_ast::Arguments;
-use ruff_python_ast::{
-    Builder, Expr, ExprContext, ExprFields, ExprStringLiteralFields, StmtKind, build,
-};
+use ruff_python_ast::{Builder, Expr, ExprContext, StmtKind, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -77,20 +75,16 @@ pub(crate) fn delattr_with_constant(
         return;
     }
 
-    let Some(
-        [
-            obj,
-            ExprFields::StringLiteral(ExprStringLiteralFields { value: name, .. }),
-        ],
-    ) = args.as_array().map(|items| items.map(Expr::fields))
-    else {
+    let Some([obj, name]) = args.as_array() else {
         return;
     };
-    if obj.view().is_starred_expr() {
+    if obj.is_starred_expr() {
         return;
     }
-
-    let attr_name = name.to_str();
+    let Some(name) = name.as_string_literal_expr() else {
+        return;
+    };
+    let attr_name = name.value().to_str();
 
     // Ignore if the attribute name is `__debug__` (syntax error), not a valid
     // identifier (eg, keywords), or otherwise a name that would be mangled.
@@ -113,7 +107,7 @@ pub(crate) fn delattr_with_constant(
         if expr == child {
             let mut diagnostic = checker.report_diagnostic(DelAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
-                generate_del_statement(obj.view(), attr_name, checker.generator()),
+                generate_del_statement(obj, attr_name, checker.generator()),
                 expr.range(),
             );
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability));

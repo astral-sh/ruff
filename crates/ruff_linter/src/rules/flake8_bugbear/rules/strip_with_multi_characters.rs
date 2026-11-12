@@ -89,11 +89,13 @@ pub(crate) fn strip_with_multi_characters(
         return;
     };
 
-    let Some([ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })]) =
-        args.as_array().map(|items| items.map(Expr::fields))
+    let Some(string) = args
+        .as_array()
+        .and_then(|[arg]| arg.as_string_literal_expr())
     else {
         return;
     };
+    let value = string.value();
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
         let (strip, range) = if is_b005_precise_diagnostic_enabled(checker.settings()) {

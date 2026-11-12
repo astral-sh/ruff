@@ -144,15 +144,8 @@ fn match_check(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>)
 
 /// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
 fn match_remove(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>)> {
-    let Some([ast::StmtFields::Expr(ast::StmtExprFields { value: expr, .. })]) = if_stmt
-        .body()
-        .as_array()
-        .map(|items| items.map(ast::Stmt::fields))
-    else {
-        return None;
-    };
-
-    let expr_call = expr.as_call_expr()?;
+    let [stmt] = if_stmt.body().as_array()?;
+    let expr_call = stmt.as_expr_stmt()?.value().as_call_expr()?;
     let attr = expr_call.func();
     let arguments = expr_call.arguments();
 

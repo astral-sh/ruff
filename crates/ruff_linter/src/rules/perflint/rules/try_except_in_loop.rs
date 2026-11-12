@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, PythonVersion, Stmt, StmtKind, Suite};
+use ruff_python_ast::{PythonVersion, Stmt, StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -94,19 +94,16 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: Suite<'_>) {
         return;
     }
 
-    let Some([ast::StmtFields::Try(ast::StmtTryFields { handlers, body, .. })]) =
-        body.as_array().map(|items| items.map(Stmt::fields))
-    else {
+    let Some(try_stmt) = body.as_array().and_then(|[stmt]| stmt.as_try_stmt()) else {
         return;
     };
-
-    let Some(handler) = handlers.first() else {
+    let Some(handler) = try_stmt.handlers().first() else {
         return;
     };
 
     // Avoid flagging `try`-`except` blocks that contain `break` or `continue`,
     // which rely on the exception handling mechanism.
-    if has_break_or_continue(body) {
+    if has_break_or_continue(try_stmt.body()) {
         return;
     }
 

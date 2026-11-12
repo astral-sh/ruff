@@ -2,9 +2,7 @@ use anyhow::Context;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{
-    self as ast, Expr, ExprKind, Identifier, Stmt, StmtAssign, StmtKind, Suite, visitor,
-};
+use ruff_python_ast::{Expr, ExprKind, Identifier, Stmt, StmtAssign, StmtKind, Suite, visitor};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -101,13 +99,19 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
         let ExprKind::Name(name_node) = value.classify() else {
             continue;
         };
-        let yielded_id = name_node.id();
+        let Some(assigned) = assign
+            .targets()
+            .as_array()
+            .and_then(|[target]| target.as_name_expr())
+        else {
+            continue;
+        };
+        if name_node.name_id() != assigned.name_id() {
+            continue;
+        }
+        let assigned_id = assigned.id();
 
-        if let Some([ast::ExprFields::Name(ast::ExprNameFields {
-            id: assigned_id, ..
-        })]) = assign.targets().as_array().map(|items| items.map(Expr::fields))
-            && *yielded_id == *assigned_id
-            && !visitor.annotations.contains(assigned_id.as_str())
+        if !visitor.annotations.contains(assigned_id.as_str())
             && !visitor.non_locals.contains(assigned_id.as_str())
             && let Some(assigned_binding) = function_scope
                 .get(assigned_id)

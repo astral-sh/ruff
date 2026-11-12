@@ -113,13 +113,14 @@ fn is_attributes_not_in_slots(body: Suite<'_>) -> Vec<AttributeAssignment<'_>> {
                 let targets = stmt_assign.targets();
                 let value = stmt_assign.value();
 
-                let Some([ast::ExprFields::Name(ast::ExprNameFields { id, .. })]) =
-                    targets.as_array().map(|items| items.map(Expr::fields))
+                let Some(name) = targets
+                    .as_array()
+                    .and_then(|[target]| target.as_name_expr())
                 else {
                     continue;
                 };
 
-                if id == "__slots__" && add_slots(value, &mut slots).is_none() {
+                if name.id() == "__slots__" && add_slots(value, &mut slots).is_none() {
                     return vec![];
                 }
             }

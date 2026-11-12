@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, BoolOp, BuildId, Builder, ExprKind, Stmt, build};
+use ruff_python_ast::{self as ast, BoolOp, BuildId, Builder, ExprKind, build};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::TextRange;
 
@@ -120,30 +120,16 @@ pub(crate) fn if_else_block_instead_of_if_exp(
     else {
         return;
     };
-    let Some(
-        [
-            ast::StmtFields::Assign(ast::StmtAssignFields {
-                targets: body_targets,
-                value: body_value,
-                ..
-            }),
-        ],
-    ) = body.as_array().map(|items| items.map(Stmt::fields))
-    else {
+    let (Some(body_assign), Some(else_assign)) = (
+        body.as_array().and_then(|[stmt]| stmt.as_assign_stmt()),
+        else_body
+            .as_array()
+            .and_then(|[stmt]| stmt.as_assign_stmt()),
+    ) else {
         return;
     };
-    let Some(
-        [
-            ast::StmtFields::Assign(ast::StmtAssignFields {
-                targets: else_targets,
-                value: else_value,
-                ..
-            }),
-        ],
-    ) = else_body.as_array().map(|[stmt]| [stmt.fields()])
-    else {
-        return;
-    };
+    let body_targets = body_assign.targets();
+    let else_targets = else_assign.targets();
     let (Some([body_target]), Some([else_target])) =
         (body_targets.as_array(), else_targets.as_array())
     else {
@@ -161,6 +147,8 @@ pub(crate) fn if_else_block_instead_of_if_exp(
         return;
     }
 
+    let body_value = body_assign.value();
+    let else_value = else_assign.value();
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
     // TODO(charlie): Fix precedence handling for yields in generator.
     if matches!(

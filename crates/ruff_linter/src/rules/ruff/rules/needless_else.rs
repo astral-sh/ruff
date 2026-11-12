@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Stmt, StmtFor, StmtIf, StmtTry, StmtWhile, Suite};
+use ruff_python_ast::{Stmt, StmtFor, StmtIf, StmtTry, StmtWhile, Suite};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -79,13 +79,13 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
 
 /// Whether `body` contains only one `pass` or `...` statement.
 fn body_is_no_op(body: Suite<'_>) -> bool {
-    match body.as_array().map(|items| items.map(Stmt::fields)) {
-        Some([ast::StmtFields::Pass(_)]) => true,
-        Some([ast::StmtFields::Expr(ast::StmtExprFields { value, .. })]) => {
-            value.is_ellipsis_literal_expr()
-        }
-        _ => false,
-    }
+    let Some([stmt]) = body.as_array() else {
+        return false;
+    };
+    stmt.is_pass_stmt()
+        || stmt
+            .as_expr_stmt()
+            .is_some_and(|expr| expr.value().is_ellipsis_literal_expr())
 }
 
 fn else_contains_comments(

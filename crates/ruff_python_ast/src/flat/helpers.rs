@@ -304,20 +304,12 @@ pub fn extract_handled_exceptions(
 ) -> Vec<Expr<'_>> {
     let mut handled_exceptions = Vec::new();
     for handler in handlers {
-        match handler.fields() {
-            ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-                type_,
-                ..
-            }) => {
-                if let Some(type_) = type_ {
-                    if let flat::ExprKind::Tuple(tuple) = type_.classify() {
-                        for type_ in tuple.elts() {
-                            handled_exceptions.push(type_);
-                        }
-                    } else {
-                        handled_exceptions.push(type_);
-                    }
-                }
+        let flat::ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+        if let Some(type_) = handler.type_() {
+            if let Some(tuple) = type_.as_tuple_expr() {
+                handled_exceptions.extend(tuple.elts());
+            } else {
+                handled_exceptions.push(type_);
             }
         }
     }

@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, visitor};
+use ruff_python_ast::{self as ast, AstNode, Builder, Expr, ExprKind, visitor};
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
@@ -198,15 +198,10 @@ fn generate_fix(
     // Only replace context managers with a single assignment or annotated assignment in the body.
     // The assignment's RHS must also be the same as the `read` call in `expr`, otherwise this fix
     // would remove the rest of the expression.
-    let replacement = match with_stmt
-        .body()
-        .as_array()
-        .map(|items| items.map(ast::Stmt::fields))
-    {
-        Some([ast::StmtFields::Assign(ast::StmtAssignFields { targets, value, .. })])
-            if value.range() == expr.range() =>
-        {
-            match targets {
+    let [stmt] = with_stmt.body().as_array()?;
+    let replacement = match stmt.classify() {
+        ast::StmtKind::Assign(assign) if assign.value().is_same_node(expr) => {
+            match assign.targets() {
                 args if let Some([expr]) = args.as_array()
                     && let ExprKind::Name(name) = expr.classify() =>
                 {
@@ -223,33 +218,28 @@ fn generate_fix(
                 _ => return None,
             }
         }
-        Some(
-            [
-                ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-                    target,
-                    annotation,
-                    value: Some(value),
-                    ..
-                }),
-            ],
-        ) if value.range() == expr.range() => match target.classify() {
-            ExprKind::Name(name) => {
-                let target = match open.argument {
-                    OpenArgument::Builtin { filename } => {
-                        let filename_code = locator.slice(filename.range());
-                        format!("{binding}({filename_code})")
-                    }
-                    OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
-                };
+        ast::StmtKind::AnnAssign(assign)
+            if assign.value().is_some_and(|value| value.is_same_node(expr)) =>
+        {
+            match assign.target().classify() {
+                ExprKind::Name(name) => {
+                    let target = match open.argument {
+                        OpenArgument::Builtin { filename } => {
+                            let filename_code = locator.slice(filename.range());
+                            format!("{binding}({filename_code})")
+                        }
+                        OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
+                    };
 
-                format!(
-                    "{var}: {ann} = {target}.{suggestion}",
-                    var = name.id(),
-                    ann = locator.slice(annotation.range())
-                )
+                    format!(
+                        "{var}: {ann} = {target}.{suggestion}",
+                        var = name.id(),
+                        ann = locator.slice(assign.annotation().range())
+                    )
+                }
+                _ => return None,
             }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 

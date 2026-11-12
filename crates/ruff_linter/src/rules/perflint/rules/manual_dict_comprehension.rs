@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtFor, StmtKind};
+use ruff_python_ast::{self as ast, Expr, ExprKind, StmtFor, StmtKind};
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -89,38 +89,31 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: StmtFor<'_>
     let target = for_stmt.target();
     let iter = for_stmt.iter();
 
-    let (stmt, if_test) = match body.as_array().map(|items| items.map(Stmt::fields)) {
+    let Some([body_stmt]) = body.as_array() else {
+        return;
+    };
+    let (stmt, if_test) = match body_stmt.as_if_stmt() {
         // ```python
         // for idx, name in enumerate(names):
         //     if idx % 2 == 0:
         //         result[name] = idx
         // ```
-        Some(
-            [
-                ast::StmtFields::If(ast::StmtIfFields {
-                    body,
-                    elif_else_clauses,
-                    test,
-                    ..
-                }),
-            ],
-        ) => {
+        Some(if_stmt) => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
             // same structure.
-            if !elif_else_clauses.is_empty() {
+            if !if_stmt.elif_else_clauses().is_empty() {
                 return;
             }
-            let Some([stmt]) = body.as_array() else {
+            let Some([stmt]) = if_stmt.body().as_array() else {
                 return;
             };
-            (stmt, Some(test))
+            (stmt, Some(if_stmt.test()))
         }
         // ```python
         // for idx, name in enumerate(names):
         //     result[name] = idx
         // ```
-        Some([stmt]) => (stmt.view(), None),
-        _ => return,
+        None => (body_stmt, None),
     };
 
     let StmtKind::Assign(assign_node) = stmt.classify() else {
@@ -130,18 +123,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: StmtFor<'_>
     let value = assign_node.value();
     let range = assign_node.range();
 
-    let Some(
-        [
-            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
-                value: subscript_value,
-                slice: key,
-                ..
-            }),
-        ],
-    ) = targets.as_array().map(|items| items.map(Expr::fields))
+    let Some(subscript) = targets
+        .as_array()
+        .and_then(|[target]| target.as_subscript_expr())
     else {
         return;
     };
+    let subscript_value = subscript.value();
+    let key = subscript.slice();
 
     // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
     // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.

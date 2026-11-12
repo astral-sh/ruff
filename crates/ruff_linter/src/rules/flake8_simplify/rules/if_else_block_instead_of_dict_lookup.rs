@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Stmt};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 
 use crate::Violation;
@@ -71,13 +71,11 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(
     let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
-    let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
-        body.as_array().map(|items| items.map(Stmt::fields))
-    else {
+    let Some(return_stmt) = body.as_array().and_then(|[stmt]| stmt.as_return_stmt()) else {
         return;
     };
 
-    if value.is_some_and(|value| {
+    if return_stmt.value().is_some_and(|value| {
         contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
     }) {
         return;
@@ -100,22 +98,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(
     for clause in elif_else_clauses {
         let test = clause.test();
         let body = clause.body();
-        let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
-            body.as_array().map(|items| items.map(Stmt::fields))
-        else {
+        let Some(return_stmt) = body.as_array().and_then(|[stmt]| stmt.as_return_stmt()) else {
             return;
         };
 
         match test.map(Expr::classify) {
             // `else`
             None => {
-                // The else must also be a single effect-free return statement
-                let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
-                    body.as_array().map(|items| items.map(Stmt::fields))
-                else {
-                    return;
-                };
-                if value.is_some_and(|value| {
+                if return_stmt.value().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
@@ -137,7 +127,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(
                     return;
                 };
 
-                if value.is_some_and(|value| {
+                if return_stmt.value().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;

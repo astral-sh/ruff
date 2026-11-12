@@ -183,14 +183,10 @@ impl FunctionLike<'_> {
     fn body(&self) -> Option<Expr<'_>> {
         match self {
             Self::Lambda(expr) => Some(expr.body()),
-            Self::Function(stmt) => match stmt
-                .body()
-                .as_array()
-                .map(|items| items.map(ast::Stmt::fields))
-            {
-                Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) => value,
-                _ => None,
-            },
+            Self::Function(stmt) => {
+                let [stmt] = stmt.body().as_array()?;
+                stmt.as_return_stmt()?.value()
+            }
         }
     }
 

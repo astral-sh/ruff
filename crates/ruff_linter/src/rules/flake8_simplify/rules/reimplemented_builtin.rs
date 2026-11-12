@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{
-    BuildId, Builder, Expr, ExprFields, ExprKind, ExprUnaryOpFields, ListId, Stmt, StmtFields,
-    StmtIfFields, StmtKind, StmtReturnFields, UnaryOp, build, traversal,
+    BuildId, Builder, Expr, ExprFields, ExprKind, ExprUnaryOpFields, ListId, Stmt, StmtKind,
+    UnaryOp, build, traversal,
 };
 use ruff_python_codegen::Generator;
 use ruff_source_file::LineRanges;
@@ -251,23 +251,13 @@ fn match_loop(stmt: Stmt<'_>) -> Option<Loop<'_>> {
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let Some(
-        [
-            StmtFields::If(StmtIfFields {
-                body: nested_body,
-                test: nested_test,
-                elif_else_clauses: nested_elif_else_clauses,
-                ..
-            }),
-        ],
-    ) = body.as_array().map(|items| items.map(Stmt::fields))
-    else {
-        return None;
-    };
-    if !nested_elif_else_clauses.is_empty() {
+    let [stmt] = body.as_array()?;
+    let nested_if = stmt.as_if_stmt()?;
+    if !nested_if.elif_else_clauses().is_empty() {
         return None;
     }
-    let [stmt] = nested_body.as_array()?;
+    let nested_test = nested_if.test();
+    let [stmt] = nested_if.body().as_array()?;
     let value = stmt.as_return_stmt()?.value()?;
     let ExprKind::BooleanLiteral(boolean_literal) = value.classify() else {
         return None;
@@ -299,17 +289,8 @@ fn match_else_return(stmt: Stmt<'_>) -> Option<Terminal<'_>> {
     let orelse = for_stmt.orelse();
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let Some(
-        [
-            StmtFields::Return(StmtReturnFields {
-                value: Some(next_value),
-                ..
-            }),
-        ],
-    ) = orelse.as_array().map(|items| items.map(Stmt::fields))
-    else {
-        return None;
-    };
+    let [return_stmt] = orelse.as_array()?;
+    let next_value = return_stmt.as_return_stmt()?.value()?;
     let ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };

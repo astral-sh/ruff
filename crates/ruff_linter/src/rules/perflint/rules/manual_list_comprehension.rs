@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtFor, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, StmtFor, StmtKind};
 
 use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -102,40 +102,29 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: StmtFor<'_>
     };
     let for_stmt_target_id = name_node.id();
 
-    let (stmt, if_test) = match for_stmt
-        .body()
-        .as_array()
-        .map(|items| items.map(Stmt::fields))
-    {
+    let Some([body_stmt]) = for_stmt.body().as_array() else {
+        return;
+    };
+    let (stmt, if_test) = match body_stmt.as_if_stmt() {
         // ```python
         // for x in y:
         //     if z:
         //         filtered.append(x)
         // ```
-        Some(
-            [
-                ast::StmtFields::If(ast::StmtIfFields {
-                    body,
-                    elif_else_clauses,
-                    test,
-                    ..
-                }),
-            ],
-        ) => {
-            if !elif_else_clauses.is_empty() {
+        Some(if_stmt) => {
+            if !if_stmt.elif_else_clauses().is_empty() {
                 return;
             }
-            let Some([stmt]) = body.as_array() else {
+            let Some([stmt]) = if_stmt.body().as_array() else {
                 return;
             };
-            (stmt, Some(test))
+            (stmt, Some(if_stmt.test()))
         }
         // ```python
         // for x in y:
         //     filtered.append(f(x))
         // ```
-        Some([stmt]) => (stmt.view(), None),
-        _ => return,
+        None => (body_stmt, None),
     };
 
     let StmtKind::Expr(expr_node) = stmt.classify() else {

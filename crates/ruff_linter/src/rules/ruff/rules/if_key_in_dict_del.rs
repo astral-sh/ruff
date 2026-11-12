@@ -93,17 +93,9 @@ fn extract_dict_and_key_from_test(test: Expr<'_>) -> Option<(Dict<'_>, Key<'_>)>
 fn extract_dict_and_key_from_del(
     targets: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) -> Option<(Dict<'_>, Key<'_>)> {
-    let Some([ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. })]) =
-        targets.as_array().map(|items| items.map(Expr::fields))
-    else {
-        return None;
-    };
-
-    let ExprKind::Name(dict) = value.classify() else {
-        return None;
-    };
-
-    Some((dict, slice))
+    let [target] = targets.as_array()?;
+    let subscript = target.as_subscript_expr()?;
+    Some((subscript.value().as_name_expr()?, subscript.slice()))
 }
 
 fn is_same_key(test: Key<'_>, del: Key<'_>) -> bool {
