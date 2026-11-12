@@ -1,5 +1,3 @@
-use super::AstNode;
-use super::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt::{self, Formatter};
 
@@ -11,50 +9,21 @@ use std::fmt::{self, Formatter};
 /// ## Panics
 /// Panics if `range` is not contained within `root`.
 pub fn covering_node(root: crate::SyntaxNode<'_>, range: TextRange) -> CoveringNode<'_> {
-    struct Visitor<'a> {
-        range: TextRange,
-        found: bool,
-        ancestors: Vec<crate::SyntaxNode<'a>>,
-    }
-
-    impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-        fn enter_node(&mut self, kind: crate::AnyNode<'a>) -> TraversalSignal {
-            let node = kind.syntax_node();
-            // If the node fully contains the range, than it is a possible match but traverse into its children
-            // to see if there's a node with a narrower range.
-            if !self.found && node.range().contains_range(self.range) {
-                self.ancestors.push(node);
-                TraversalSignal::Traverse
-            } else {
-                TraversalSignal::Skip
-            }
-        }
-
-        fn leave_node(&mut self, node: crate::AnyNode<'a>) {
-            if !self.found
-                && self
-                    .ancestors
-                    .last()
-                    .is_some_and(|last| last.is_same_node(node.syntax_node()))
-            {
-                self.found = true;
-            }
-        }
-    }
-
     assert!(
         root.range().contains_range(range),
         "Range is not contained within root"
     );
 
-    let mut visitor = Visitor {
-        range,
-        found: false,
-        ancestors: Vec::new(),
-    };
-
-    super::visitor::source_order::walk_node(&mut visitor, root.into());
-    CoveringNode::from_ancestors(visitor.ancestors)
+    let mut node = root;
+    let mut ancestors = vec![node];
+    while let Some(child) = node
+        .children()
+        .find(|child| child.range().contains_range(range))
+    {
+        ancestors.push(child);
+        node = child;
+    }
+    CoveringNode::from_ancestors(ancestors)
 }
 
 /// The node with a minimal range that fully contains the search range.
