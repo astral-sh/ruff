@@ -29,12 +29,14 @@ use crate::{
     },
 };
 
-/// The instance operations promised by one attribute declaration.
+/// The operations promised by one attribute declaration.
 ///
 /// A descriptor can accept a different type from the one it returns. Ordinary mutable
 /// attributes use the same type for both operations, making their types invariant.
 struct AttributeContract<'db> {
     read: Type<'db>,
+    /// A `ClassVar` also promises reads through the class, where `__get__` receives `None`.
+    class_read: Option<Type<'db>>,
     write: Option<Type<'db>>,
     is_property: bool,
     method_kind: AttributeMethodKind,
@@ -272,7 +274,23 @@ fn bind_attribute<'db>(
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
-    let (read, write) = if is_descriptor {
+    let (read, class_read, write) = if is_class_var {
+        // A class variable has no instance storage. Both reads bind its descriptor, but
+        // assignment through the class replaces the stored value without calling its setter.
+        let stored = ty.bind_self_typevars(db, env, receiver);
+        let owner = receiver.to_meta_type(db, env);
+        let read = |instance| {
+            let (member, _, _) = Type::try_call_dunder_get_on_attribute(
+                db,
+                env,
+                Place::bound(stored).into(),
+                instance,
+                owner,
+            );
+            member.ignore_possibly_undefined()
+        };
+        (read(Some(receiver))?, read(None), Some(stored))
+    } else if is_descriptor {
         let read = Type::resolve_descriptor_access(
             db,
             env,
@@ -309,13 +327,14 @@ fn bind_attribute<'db>(
                     .unwrap_or(read),
             )
         };
-        (read, write)
+        (read, None, write)
     } else {
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
         (
             read,
+            None,
             Some(
                 owner
                     .converter_input_type_for_field(db, name)
@@ -329,6 +348,7 @@ fn bind_attribute<'db>(
     let is_frozen = literal.is_frozen_dataclass(db) == Some(true);
     Some(AttributeContract {
         read,
+        class_read,
         // Attributes on `object` are included here because typeshed declares attributes such as
         // `__module__: str` on `object`, which normally implies writable instance attributes. But
         // `object()` provides no instance-attribute storage, so it does not actually guarantee
@@ -451,6 +471,11 @@ fn attribute_violation<'db>(
             source: source.read,
             target: target.read,
         });
+    }
+    if let Some((source, target)) = source.class_read.zip(target.class_read)
+        && !source.is_assignable_to(db, env, target)
+    {
+        return Some(AttributeViolation::Read { source, target });
     }
     if target.method_kind != AttributeMethodKind::Other {
         // ty allows methods to be shadowed with instance attributes. For example, it allows
@@ -844,6 +869,7 @@ fn already_inherited<'db>(
                 return false;
             };
             inherited.read == source.read
+                && inherited.class_read == source.class_read
                 && inherited.write == source.write
                 && inherited.is_frozen_field == source.is_frozen_field
                 && inherited.qualifiers == source.qualifiers

@@ -3846,6 +3846,54 @@ class IncompatibleProperty(ClassBase):
         return ""
 ```
 
+A descriptor stored in a class variable can implement a property. Its getter determines the type
+read through an instance, whether the class variable's type is inferred or explicit.
+
+```py
+from typing_extensions import Self, overload
+
+class IntDescriptor:
+    @overload
+    def __get__(self, instance: None, owner: type) -> Self: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> int: ...
+    def __get__(self, instance: object, owner: type) -> Self | int:
+        return self if instance is None else 1
+
+class InferredDescriptor(Base):
+    value: ClassVar = IntDescriptor()  # ok
+
+class ExplicitDescriptor(Base):
+    value: ClassVar[IntDescriptor] = IntDescriptor()  # ok
+
+class TextBase:
+    @property
+    def value(self) -> str:
+        return ""
+
+class IncompatibleDescriptor(TextBase):
+    # error: [incompatible-property-override] "Read type `int` is not assignable to inherited read type `str`"
+    value: ClassVar = IntDescriptor()
+```
+
+Reading through the class returns the descriptor itself, and assigning through the class replaces
+it. An override must preserve both operations even when instance reads always return `int`.
+
+```py
+class NarrowDescriptor(IntDescriptor): ...
+
+class NarrowOverride(ExplicitDescriptor):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `IntDescriptor`"
+    value: ClassVar[NarrowDescriptor] = NarrowDescriptor()
+
+class NarrowBase:
+    value: ClassVar = NarrowDescriptor()
+
+class WideOverride(NarrowBase):
+    # error: [incompatible-attribute-override] "Type `IntDescriptor` is not assignable to inherited type `NarrowDescriptor`"
+    value: ClassVar = IntDescriptor()
+```
+
 ## Conditional property definitions
 
 The property override rule applies when an inherited property can have different definitions. Reads
