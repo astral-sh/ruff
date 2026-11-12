@@ -161,8 +161,9 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     }
 
-    let rounded = arguments.find_argument_value("number", 0)?;
-    let ndigits = arguments.find_argument_value("ndigits", 1);
+    let [Some(rounded), ndigits] = arguments.find_argument_values(["number", "ndigits"]) else {
+        return None;
+    };
 
     let rounded_kind = match rounded {
         Expr::Name(name) => match semantic.only_binding(name).map(|id| semantic.binding(id)) {

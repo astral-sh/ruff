@@ -157,10 +157,9 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
-    let (Some(path_expr), Some(second_expr)) = (
-        call.arguments.find_argument_value(path_arg, 0),
-        call.arguments.find_argument_value(second_arg, 1),
-    ) else {
+    let [Some(path_expr), Some(second_expr)] =
+        call.arguments.find_argument_values([path_arg, second_arg])
+    else {
         return;
     };
 
