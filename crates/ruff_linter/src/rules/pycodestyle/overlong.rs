@@ -24,11 +24,7 @@ impl Overlong {
     ) -> Option<Self> {
         // A tab can span several columns. For a line without tabs, the byte length
         // alone bounds its display width.
-        let limit_columns = usize::from(limit.value());
-        if line.len() <= limit_columns
-            && (line.len() * tab_size.as_usize() <= limit_columns
-                || !line.as_bytes().contains(&b'\t'))
-        {
+        if line.len() <= usize::from(limit.value()) && !line.as_bytes().contains(&b'\t') {
             return None;
         }
 
