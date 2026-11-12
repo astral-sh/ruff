@@ -103,17 +103,11 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::type_alias::TypeAliasType;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
-};
-use crate::types::variance::VarianceInferable;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -1295,7 +1289,7 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    /// Interns all of the typevars mentioned in a type in a stable order.
+    /// Interns the free type variables in a constraint bound in a stable order.
     fn intern_mentioned_typevars_in_type(
         &mut self,
         db: &'db dyn Db,
@@ -1303,78 +1297,11 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        struct InternMentionedTypevars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-            support: RefCell<&'a mut Support>,
-            recursion_guard: TypeCollector<'db>,
+        let (typevars, skipped_lazy) = ty.free_typevars(db, env);
+        *support |= &Support::from_typevar_set(db, self, typevars);
+        if skipped_lazy {
+            support.mark_incomplete();
         }
-
-        impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn notify_skipped_lazy_type_attributes(&self) {
-                self.support.borrow_mut().mark_incomplete();
-            }
-
-            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                // Declaration bounds, constraints, and defaults are not occurrences in the
-                // constraint itself and must not contribute to its support.
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                self.notify_skipped_lazy_type_attributes();
-                let Some(specialization) = alias.specialization(db) else {
-                    return;
-                };
-                let parameters = specialization.generic_context(db).variables(db);
-                let origin = alias.unspecialized(db);
-                for (parameter, &argument) in parameters.zip(specialization.types(db)) {
-                    // With `type Constant[T] = int`, the value of T has no effect on the bound.
-                    let variance = origin.variance_of(db, self.env, parameter.identity(db));
-                    if variance.evaluate(db) != TypeVarVariance::Bivariant {
-                        self.visit_type(db, argument);
-                    }
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if let Type::TypeVar(bound_typevar) = ty {
-                    let mut storage = self.storage.borrow_mut();
-                    let typevar = storage.intern_typevar(db, bound_typevar);
-                    let mut support = self.support.borrow_mut();
-                    support.insert(typevar);
-                    // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
-                    // also depends on P itself, so solving or quantifying P must update it.
-                    if bound_typevar.paramspec_attr(db).is_some() {
-                        support.insert(
-                            storage.intern_typevar(db, bound_typevar.without_paramspec_attr(db)),
-                        );
-                    }
-                }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        InternMentionedTypevars {
-            env,
-            storage: RefCell::new(self),
-            support: RefCell::new(support),
-            recursion_guard: TypeCollector::default(),
-        }
-        .visit_type(db, ty);
     }
 
     /// Interns all of the typevars mentioned in a constraint in a stable order.
@@ -5188,6 +5115,7 @@ mod tests {
     use crate::types::generics::ApplySpecialization;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarInstance,
     };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
