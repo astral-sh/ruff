@@ -177,7 +177,7 @@ class C:
     def __init__(self):
         self.__call__ = lambda *a, **kw: None
 
-# error: [call-non-callable]
+# error: [not-callable]
 C()()
 
 # error: [invalid-assignment]

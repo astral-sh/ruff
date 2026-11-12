@@ -456,16 +456,6 @@
             }
           ]
         },
-        "call-non-callable": {
-          "title": "detects calls to non-callable objects",
-          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "call-top-callable": {
           "title": "detects calls to the top callable type",
           "description": "## What it does\n\nChecks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all callable\ntypes with return type `T`).\n\n## Why is this bad?\n\nWhen `analysis.strict-generic-narrowing` is enabled, `callable(x)` and `isinstance(x, Callable)`\nnarrow an object to `Top[Callable[..., object]]`. We know the object is callable, but we don't know\nits precise signature. This type represents the set of all possible callable types (including, e.g.,\nfunctions that take no arguments and functions that require arguments), so no specific set of\narguments can be guaranteed to be valid.\n\n## Examples\n\n```toml\n[analysis]\nstrict-generic-narrowing = true\n```\n\n```python\ndef f(x: object):\n    if callable(x):\n        # We know `x` is callable, but not what arguments it accepts\n        x()  # error\n```",
@@ -1419,6 +1409,16 @@
         "non-literal-typed-dict-key": {
           "title": "detects non-literal string keys in TypedDict subscripts",
           "description": "## What it does\n\nReports attempts to subscript `TypedDict` instances with a key of type `str`.\n\n## Why is this bad?\n\nA `TypedDict` declares a mapping type where a known set of keys may exist and each key may have a\ndistinct value type. Given an arbitrary `str`, ty cannot check for possible `KeyError`s, and cannot\ninfer a precise type for the subscript expression.\n\n## Example\n\n```python\nfrom typing import TypedDict\n\n\nclass Movie(TypedDict):\n    title: str\n    year: int\n\n\ndef get_field(movie: Movie, key: str) -> str | int:\n    return movie[key]  # error: [non-literal-typed-dict-key]\n```\n\nUse instead:\n\n```py\nfrom typing import Literal\n\n\ndef get_known_field(movie: Movie, key: Literal[\"title\", \"year\"]) -> str | int:\n    return movie[key]\n```\n\n## See also\n\n- `invalid-typed-dict-key` reports other invalid subscripts, such as a misspelled field name or an\n    integer key.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "not-callable": {
+          "title": "detects calls to non-callable objects",
+          "description": "## What it does\n\nChecks for calls to non-callable objects.\n\n## Why is this bad?\n\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Example\n\n```python\n# TypeError: 'int' object is not callable\n4()  # error\n```\n\n## See also\n\n- `abstract-class-instantiation` reports attempts to instantiate a protocol class or a class with\n    unimplemented abstract methods.\n\n## Rule history\n\n- v0.0.102: Renamed from `call-non-callable`, which remains as a deprecated alias for this rule.",
           "default": "error",
           "oneOf": [
             {

@@ -69,7 +69,6 @@ const RUNTIME_CHECKABLE_DOCS_URL: &str =
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
-    registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
@@ -158,6 +157,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
+    registry.register_lint(&NOT_CALLABLE);
+    registry.register_alias(LintName::of("call-non-callable"), &NOT_CALLABLE);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
@@ -263,8 +264,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/call-non-callable.md")]
-    pub(crate) static CALL_NON_CALLABLE = {
+    #[doc = include_str!("../../resources/lint_docs/not-callable.md")]
+    pub(crate) static NOT_CALLABLE = {
         summary: "detects calls to non-callable objects",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,

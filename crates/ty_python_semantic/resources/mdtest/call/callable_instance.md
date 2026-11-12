@@ -54,7 +54,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: [call-non-callable] "Object of type `NonCallable` is not callable"
+# error: [not-callable] "Object of type `NonCallable` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 
@@ -70,7 +70,7 @@ def _(flag: bool):
                 return 1
 
     a = NonCallable()
-    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    # error: [not-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(a())  # revealed: Unknown | int
 ```
 
@@ -122,6 +122,6 @@ def outer(cond1: bool):
         else:
             a = Other()
 
-        # error: [call-non-callable] "Object of type `Test` is not callable (possibly missing `__call__` method)"
+        # error: [not-callable] "Object of type `Test` is not callable (possibly missing `__call__` method)"
         a()
 ```

@@ -15,7 +15,7 @@ use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
+    INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_CALLABLE, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
     report_not_subscriptable, report_slice_step_size_zero, typed_dict_subscript_key_lint,
 };
@@ -362,7 +362,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 callable_ty,
             } => match kind {
                 CallErrorKind::NotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                    if let Some(builder) = context.report_lint(&NOT_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
@@ -395,7 +395,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
                 CallErrorKind::PossiblyNotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                    if let Some(builder) = context.report_lint(&NOT_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",

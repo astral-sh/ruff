@@ -588,7 +588,7 @@ python-version = "3.12"
 ```py
 from typing_extensions import Protocol
 
-# error: [call-non-callable]
+# error: [not-callable]
 reveal_type(Protocol())  # revealed: Unknown
 
 class MyProtocol(Protocol):

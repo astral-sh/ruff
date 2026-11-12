@@ -183,9 +183,9 @@ def make_item() -> Item:
 ```
 
 Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
-make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
+make the lambda parameter an `int` and report `not-callable`. We therefore fall back to the
 inference attempt that does not use the type context, and emit neither `redundant-cast` nor
-`call-non-callable`:
+`not-callable`:
 
 ```py
 from typing import Callable
