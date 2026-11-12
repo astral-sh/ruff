@@ -3842,12 +3842,36 @@ impl Arguments {
     /// where `*args` and `args2` are `args` while `a=1` and `kwargs` are `keywords`.
     ///
     /// Python evaluates positional arguments before keyword arguments, even when a starred
-    /// argument appears after a keyword. Evaluation-order visitors use the two groups separately.
+    /// argument appears after a keyword. See [`Self::for_each_in_evaluation_order`].
     pub fn iter_source_order(
         &self,
     ) -> impl DoubleEndedIterator<Item = ArgOrKeyword<'_>> + ExactSizeIterator + FusedIterator + Clone
     {
         self.items.iter().map(Argument::as_ref)
+    }
+
+    /// Visits positional arguments (including starred arguments) before keywords.
+    pub fn for_each_in_evaluation_order<'a>(&'a self, mut visit: impl FnMut(ArgOrKeyword<'a>)) {
+        let mut items = self.iter_source_order();
+        // In f(a, key=b, *c), only the suffix after key=b can contain positional
+        // arguments that must move ahead of it.
+        let first_keyword = loop {
+            match items.next() {
+                Some(arg @ ArgOrKeyword::Arg(_)) => visit(arg),
+                Some(keyword @ ArgOrKeyword::Keyword(_)) => break keyword,
+                None => return,
+            }
+        };
+        for arg in items
+            .clone()
+            .filter(|item| matches!(item, ArgOrKeyword::Arg(_)))
+        {
+            visit(arg);
+        }
+        visit(first_keyword);
+        for keyword in items.filter(|item| matches!(item, ArgOrKeyword::Keyword(_))) {
+            visit(keyword);
+        }
     }
 
     pub fn inner_range(&self) -> TextRange {
