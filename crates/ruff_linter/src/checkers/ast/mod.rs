@@ -2506,7 +2506,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
         walk_pattern(self, pattern);
 
         // Step 4: Analysis
-        analyze::pattern(pattern, self);
+        if let Some(name) = name {
+            analyze::pattern_name(name, self);
+        }
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {

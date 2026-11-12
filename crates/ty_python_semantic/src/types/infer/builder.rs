@@ -2979,10 +2979,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (key, _) in match_mapping.entries() {
                     self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
-                for (_, pattern) in match_mapping.entries() {
-                    self.infer_nested_match_pattern(pattern);
+                let mut rest = None;
+                for item in &match_mapping.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.infer_nested_match_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
-                if let Some(rest) = match_mapping.rest() {
+                if let Some(rest) = rest {
                     self.infer_definition(rest);
                 }
             }

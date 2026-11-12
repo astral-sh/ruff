@@ -2319,10 +2319,17 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchMapping(mapping) => {
-                for (_, pattern) in mapping.entries() {
-                    self.visit_pattern(pattern);
+                // Bind the final capture after nested patterns, including in recovered syntax.
+                let mut rest = None;
+                for item in &mapping.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.visit_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
-                if let Some(rest) = mapping.rest() {
+                if let Some(rest) = rest {
                     self.insert(rest);
                 }
 

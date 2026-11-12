@@ -2744,16 +2744,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchMapping(pattern) => {
+                let mut entries = Vec::new();
+                let mut rest = None;
+                for item in &pattern.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            entries.push(MappingPatternEntryPredicateKind {
+                                key: self.add_standalone_expression(key),
+                                pattern: self.predicate_kind(pattern),
+                            });
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
+                }
+
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
-                    entries: pattern
-                        .entries()
-                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
-                            key: self.add_standalone_expression(key),
-                            pattern: self.predicate_kind(pattern),
-                        })
-                        .collect(),
-                    rest: pattern.rest().map(|name| name.id.clone()),
+                    entries: entries.into_boxed_slice(),
+                    rest: rest.map(|name| name.id.clone()),
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
