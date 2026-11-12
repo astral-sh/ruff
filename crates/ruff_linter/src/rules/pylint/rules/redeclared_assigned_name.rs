@@ -1,7 +1,6 @@
-use ruff_python_ast::{Expr, ExprKind, NodeList};
+use ruff_python_ast::{Expr, ExprKind, NameId, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -53,14 +52,14 @@ pub(crate) fn redeclared_assigned_name(
     checker: &Checker,
     targets: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) {
-    let mut names: Vec<Name> = Vec::new();
+    let mut names = Vec::new();
 
     for target in targets {
         check_expr(checker, target, &mut names);
     }
 }
 
-fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut Vec<Name>) {
+fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut Vec<NameId>) {
     match expr.classify() {
         ExprKind::Tuple(tuple) => {
             for target in tuple.elts() {
@@ -76,13 +75,13 @@ fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut Vec<Name>) {
             check_expr(checker, starred.value(), names);
         }
         ExprKind::Name(expr_name) => {
-            let id = expr_name.id();
-
-            if checker.settings().dummy_variable_rgx.is_match(id) {
-                // Ignore dummy variable assignments
+            let name_id = expr_name.name_id();
+            if !names.contains(&name_id) {
+                names.push(name_id);
                 return;
             }
-            if names.contains(id) {
+            let id = expr_name.id();
+            if !checker.settings().dummy_variable_rgx.is_match(id) {
                 checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),
@@ -90,7 +89,6 @@ fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut Vec<Name>) {
                     expr.range(),
                 );
             }
-            names.push(id.clone());
         }
         _ => {}
     }
