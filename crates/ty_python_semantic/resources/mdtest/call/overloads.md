@@ -2710,3 +2710,50 @@ def takes_str_or_float(x: float | str): ...
 
 takes_str_or_float(round(1.0))
 ```
+
+## An uninhabited argument to overloads with different return types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, overload
+
+@overload
+def convert(value: bytes) -> str: ...
+@overload
+def convert(value: None) -> None: ...
+def convert(value: bytes | None) -> str | None:
+    return None if value is None else value.decode()
+
+type Bottom = Never
+type OtherBottom = Bottom | Never
+
+def check(value: Never, alias: Bottom, nested: OtherBottom):
+    reveal_type(convert(value))  # revealed: Unknown
+    reveal_type(convert(alias))  # revealed: Unknown
+    reveal_type(convert(nested))  # revealed: Unknown
+```
+
+A bare `Never` drops out of the argument tuple during overload filtering. An argument of type
+`tuple[Never]` still occupies a position, as does a `NewType` with that tuple as its base.
+
+```py
+from typing import Never, NewType, overload
+
+Payload = NewType("Payload", tuple[Never])
+
+@overload
+def choose(value: object, flag: bool) -> int: ...
+@overload
+def choose(value: tuple[object, ...], flag: object) -> int | str: ...
+def choose(value: object, flag: object) -> int | str:
+    return 0
+
+def check_object_parameter(bottom: Never, items: tuple[Never], payload: Payload):
+    reveal_type(choose(bottom, True))  # revealed: Unknown
+    reveal_type(choose(items, True))  # revealed: int
+    reveal_type(choose(payload, True))  # revealed: int
+```

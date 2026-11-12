@@ -191,6 +191,11 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
+    /// Whether normalizing the union memoizes comparisons across the whole input.
+    pub(super) fn is_wide(self, db: &'db dyn Db) -> bool {
+        self.elements(db).len() >= WIDE_UNION
+    }
+
     /// Returns `true` if the union contains exactly the provided type as a member.
     ///
     /// Note that this method constructs and Salsa-memoizes an index for large unions to avoid

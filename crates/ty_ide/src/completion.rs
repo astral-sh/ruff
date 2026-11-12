@@ -5457,6 +5457,30 @@ bar(o<CURSOR>
         );
     }
 
+    #[test]
+    fn call_keyword_from_later_generic_overload() {
+        let builder = completion_test_builder(
+            "\
+from typing import overload
+
+@overload
+def pick(value: str) -> str: ...
+@overload
+def pick[T](value: T, *, fallback: T = ...) -> T: ...
+def pick(value, *, fallback=None):
+    return value
+
+def check(value: str):
+    pick(value, <CURSOR>)
+",
+        )
+        .skip_auto_import()
+        .filter(|c| c.name == "fallback")
+        .type_signatures();
+
+        assert_snapshot!(builder.build().snapshot(), @"fallback= :: str");
+    }
+
     // Regression test for https://github.com/astral-sh/ty/issues/3803
     #[test]
     fn call_keyword_only_argument_between_variadic_parameters() {
@@ -7934,6 +7958,30 @@ func(1, "<CURSOR>")
         w :: Literal["w"]
         "#,
         );
+    }
+
+    #[test]
+    fn string_literal_completions_from_later_overload_specialization() {
+        completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+type Color = Literal["red", "blue"]
+
+@overload
+def contains(items: list[Color], value: str) -> bool: ...
+@overload
+def contains[T](items: list[T], value: T) -> bool: ...
+def contains(items: list, value: object) -> bool:
+    return value in items
+
+def check(colors: list[Color]):
+    contains(colors, "<CURSOR>red")
+"#,
+        )
+        .build()
+        .contains("blue")
+        .contains("red");
     }
 
     #[test]
