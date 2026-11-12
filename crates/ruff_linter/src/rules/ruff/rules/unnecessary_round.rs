@@ -154,12 +154,10 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     }
 
-    // *args
-    if arguments.args().any(Expr::is_starred_expr) {
-        return None;
-    }
-    // **kwargs
-    if arguments.keywords().any(|kw| kw.arg.is_none()) {
+    if arguments
+        .iter_source_order()
+        .any(ruff_python_ast::ArgOrKeyword::is_variadic)
+    {
         return None;
     }
 

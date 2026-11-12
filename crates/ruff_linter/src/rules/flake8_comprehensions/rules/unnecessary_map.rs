@@ -98,10 +98,6 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    if arguments.keywords().next().is_some() {
-        return;
-    }
-
     let Some(object_type) = ObjectType::from(func, semantic) else {
         return;
     };
@@ -128,7 +124,10 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         }
 
         ObjectType::List | ObjectType::Set | ObjectType::Dict => {
-            let Some([Expr::Call(inner_call)]) = arguments.args().collect_array() else {
+            let Some(inner_call) = arguments
+                .as_single_positional()
+                .and_then(Expr::as_call_expr)
+            else {
                 return;
             };
 

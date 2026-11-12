@@ -36,6 +36,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
 
         let arguments = &call_expr.arguments;
+        if let Some(arg) = arguments.as_single_positional() {
+            return self
+                .infer_expression(arg, TypeContext::default())
+                .dunder_class(db, env);
+        }
 
         for keyword in arguments.keywords() {
             self.infer_expression(&keyword.value, TypeContext::default());
@@ -49,23 +54,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             positional.next(),
         ) {
             (Some(single), None, None, None) => {
-                let arg_type = self.infer_expression(single, TypeContext::default());
-
-                return if arguments.keywords().next().is_none() {
-                    arg_type.dunder_class(db, env)
-                } else {
-                    if arguments.keywords().any(|keyword| keyword.arg.is_some())
-                        && let Some(builder) =
-                            self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
-                    {
-                        let mut diagnostic = builder
-                            .into_diagnostic("No overload of class `type` matches arguments");
-                        diagnostic.help(format_args!(
-                            "`builtins.type()` expects no keyword arguments",
-                        ));
-                    }
-                    SubclassOfType::subclass_of_unknown()
-                };
+                self.infer_expression(single, TypeContext::default());
+                if arguments.keywords().any(|keyword| keyword.arg.is_some())
+                    && let Some(builder) =
+                        self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
+                {
+                    let mut diagnostic =
+                        builder.into_diagnostic("No overload of class `type` matches arguments");
+                    diagnostic.help(format_args!(
+                        "`builtins.type()` expects no keyword arguments",
+                    ));
+                }
+                return SubclassOfType::subclass_of_unknown();
             }
 
             (Some(first), Some(second), None, None) if second.is_starred_expr() => {

@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
@@ -96,14 +95,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
                     return false;
                 }
 
-                if arguments.keywords().next().is_some() {
-                    return false;
-                }
-
-                matches!(
-                    arguments.args().collect_array(),
-                    Some([Expr::NoneLiteral(_)])
-                )
+                arguments
+                    .as_single_positional()
+                    .is_some_and(Expr::is_none_literal_expr)
             }
 
             // Ex) `(type(None),)`

@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{Expr, ExprCall, token::parenthesized_range};
+use ruff_python_ast::{ArgOrKeyword, Expr, ExprCall, token::parenthesized_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -61,47 +61,44 @@ impl Violation for StarmapZip {
 
 /// RUF058
 pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
-    let semantic = checker.semantic();
-
+    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
+        return;
+    }
     let [
-        ruff_python_ast::Argument::Positional(_map_func),
+        ruff_python_ast::Argument::Positional(_),
         ruff_python_ast::Argument::Positional(Expr::Call(iterable_call)),
     ] = call.arguments.items.as_slice()
     else {
         return;
     };
+    if !checker
+        .semantic()
+        .match_builtin_expr(&iterable_call.func, "zip")
+    {
+        return;
+    }
 
-    let mut keywords = iterable_call.arguments.keywords();
-
-    match checker.target_version().cmp(&PythonVersion::PY314) {
-        // Keyword arguments not supported for `map` before Python 3.14
-        std::cmp::Ordering::Less => {
-            if keywords.next().is_some() {
-                return;
+    let mut has_positional = false;
+    let mut has_plain_positional = false;
+    let mut has_strict = false;
+    for item in iterable_call.arguments.iter_source_order() {
+        match item {
+            ArgOrKeyword::Arg(arg) => {
+                has_positional = true;
+                has_plain_positional = has_plain_positional || !arg.is_starred_expr();
             }
-        }
-        // Only supported keyword argument is `strict` starting in 3.14
-        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-            if let Some(keyword) = keywords.next()
-                && (keyword.arg.as_deref() != Some("strict") || keywords.next().is_some())
+            ArgOrKeyword::Keyword(keyword)
+                if !has_strict
+                    && checker.target_version() >= PythonVersion::PY314
+                    && keyword.arg.as_ref().is_some_and(|name| name == "strict") =>
             {
-                return;
+                has_strict = true;
             }
+            ArgOrKeyword::Keyword(_) => return,
         }
     }
-
-    let mut positionals = iterable_call.arguments.args().peekable();
-
-    // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
-    if positionals.peek().is_some() && positionals.all(Expr::is_starred_expr) {
-        return;
-    }
-
-    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
-        return;
-    }
-
-    if !semantic.match_builtin_expr(&iterable_call.func, "zip") {
+    // `zip(*a)` can be empty, whereas `map(func, *a)` requires an iterable.
+    if has_positional && !has_plain_positional {
         return;
     }
 
