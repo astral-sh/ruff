@@ -1318,12 +1318,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
-            return error(
-                &self.context,
-                "Starred arguments are not supported in `TypeVar` creation",
-                starred,
-            );
+        let mut positional_name = None;
+        let mut first_constraint = None;
+        let mut multiple_constraints = false;
+        for (index, arg) in arguments.args().enumerate() {
+            if arg.is_starred_expr() {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVar` creation",
+                    arg,
+                );
+            }
+            match index {
+                0 => positional_name = Some(arg),
+                1 => first_constraint = Some(arg),
+                _ => multiple_constraints = true,
+            }
         }
 
         for kwarg in arguments.keywords() {
@@ -1338,7 +1348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if arguments.args().next().is_some() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVar` can only be provided once.",
@@ -1467,9 +1477,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -1485,7 +1493,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         };
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1589,8 +1597,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let mut args = arguments.args();
-        let first_constraint = args.nth(1);
         let bound_or_constraints = match (has_bound, first_constraint) {
             (false, None) => None,
             (true, None) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
@@ -1601,7 +1607,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     call_expr,
                 );
             }
-            (false, Some(constraint)) if args.next().is_none() => {
+            (false, Some(constraint)) if !multiple_constraints => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot have exactly one constraint",

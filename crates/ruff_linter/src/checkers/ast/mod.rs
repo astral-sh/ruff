@@ -2153,10 +2153,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     Some(typing::Callable::TypedDict) => {
                         // Ex) TypedDict("a", {"a": int})
                         let mut args = arguments.args();
+                        // Before Python 3.13, field names could be passed as keyword arguments when
+                        // the field mapping is omitted or `None`:
+                        //
+                        // ```pycon
+                        // >>> from typing import TypedDict
+                        // >>> TypedDict("a", closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // >>> TypedDict("a", None, closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // ```
+                        let mut legacy_fields = false;
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
+                            legacy_fields = self.target_version() < PythonVersion::PY313;
                         }
-                        for arg in args {
+                        for (index, arg) in args.enumerate() {
+                            legacy_fields =
+                                legacy_fields && index == 0 && arg.is_none_literal_expr();
                             if let Expr::Dict(ast::ExprDict {
                                 items,
                                 range: _,
@@ -2173,24 +2187,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 self.visit_non_type_definition(arg);
                             }
                         }
-
-                        // Before Python 3.13, field names could be passed as keyword arguments when
-                        // the field mapping is omitted or `None`:
-                        //
-                        // ```pycon
-                        // >>> from typing import TypedDict
-                        // >>> TypedDict("a", closed=int).__required_keys__
-                        // frozenset({'closed'})
-                        // >>> TypedDict("a", None, closed=int).__required_keys__
-                        // frozenset({'closed'})
-                        // ```
-                        let legacy_fields = self.target_version() < PythonVersion::PY313 && {
-                            let mut args = arguments.args();
-                            matches!(
-                                (args.next(), args.next(), args.next()),
-                                (Some(_), None, _) | (Some(_), Some(Expr::NoneLiteral(_)), None)
-                            )
-                        };
 
                         for Keyword { arg, value, .. } in arguments.keywords() {
                             let is_type = match arg.as_deref() {

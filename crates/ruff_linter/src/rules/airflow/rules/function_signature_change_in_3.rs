@@ -161,12 +161,11 @@ fn check_method_arguments(
     attr: &Identifier,
     arguments: &Arguments,
 ) {
-    let has_positional_args =
-        arguments.find_positional(0).is_some() || arguments.args().any(Expr::is_starred_expr);
-
-    if let ["airflow", "lineage", "hook", "HookLineageCollector"] = qualified_name.segments() {
-        if attr.as_str() == "create_asset" && has_positional_args {
-            checker.report_diagnostic(
+    if let ["airflow", "lineage", "hook", "HookLineageCollector"] = qualified_name.segments()
+        && attr.as_str() == "create_asset"
+        && arguments.args().next().is_some()
+    {
+        checker.report_diagnostic(
                 Airflow3IncompatibleFunctionSignature {
                     function_name: attr.to_string(),
                     change: FunctionSignatureChange::Message(
@@ -175,7 +174,6 @@ fn check_method_arguments(
                 },
                 attr.range(),
             );
-        }
     }
 }
 

@@ -3799,6 +3799,38 @@ impl Arguments {
         self.find_argument(name, position).map(ArgOrKeyword::value)
     }
 
+    /// Look up the first `N` parameters by position or keyword. An explicit
+    /// keyword takes precedence over a positional value, just like `find_argument`.
+    pub fn find_argument_values<const N: usize>(&self, names: [&str; N]) -> [Option<&Expr>; N] {
+        let mut values = [None; N];
+        let mut from_keyword = [false; N];
+        let mut position = 0;
+        for item in self.iter_source_order() {
+            match item {
+                ArgOrKeyword::Arg(arg) if position < N => {
+                    if arg.is_starred_expr() {
+                        position = N;
+                    } else {
+                        if !from_keyword[position] {
+                            values[position] = Some(arg);
+                        }
+                        position += 1;
+                    }
+                }
+                ArgOrKeyword::Keyword(keyword) if let Some(name) = keyword.arg.as_ref() => {
+                    for (index, &requested) in names.iter().enumerate() {
+                        if !from_keyword[index] && name.as_str() == requested {
+                            values[index] = Some(&keyword.value);
+                            from_keyword[index] = true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        values
+    }
+
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
