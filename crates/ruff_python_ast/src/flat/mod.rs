@@ -849,37 +849,42 @@ impl Builder {
         expr: BuildId<crate::kind::Expr>,
         context: crate::ExprContext,
     ) {
-        let slot = expr.slot();
-        let encoded = context.encode().to_le_bytes()[0];
-        let elements = match self.get(expr).classify() {
-            ExprKind::Name(_) => return self.ast.rows[slot].set_expr_name_ctx(encoded),
-            ExprKind::Attribute(_) => return self.ast.rows[slot].set_expr_attribute_ctx(encoded),
-            ExprKind::Subscript(_) => return self.ast.rows[slot].set_expr_subscript_ctx(encoded),
-            ExprKind::Starred(value) => {
-                let child = value.value().build_id();
-                self.ast.rows[slot].set_expr_starred_ctx(encoded);
-                return self.set_expr_context(child, context);
-            }
-            ExprKind::UnaryOp(value) => {
-                return self.set_expr_context(value.operand().build_id(), context);
-            }
-            ExprKind::Tuple(value) => {
-                let elements = value.elts().id();
-                self.ast.rows[slot].set_expr_tuple_ctx(encoded);
-                elements
-            }
-            ExprKind::List(value) => {
-                let elements = value.elts().id();
-                self.ast.rows[slot].set_expr_list_ctx(encoded);
-                elements
-            }
-            _ => return,
-        };
-        for i in 0..elements.len() {
-            if let Some(child) = self.get_list(elements).get(i) {
-                self.set_expr_context(child.build_id(), context);
+        fn set(rows: &mut [Row], extra: &[u32], slot: u32, context: u8) {
+            let row = &mut rows[slot as usize];
+            let elements = match row.kind() {
+                NodeKind::ExprName => return row.set_expr_name_ctx(context),
+                NodeKind::ExprAttribute => return row.set_expr_attribute_ctx(context),
+                NodeKind::ExprSubscript => return row.set_expr_subscript_ctx(context),
+                NodeKind::ExprStarred => {
+                    row.set_expr_starred_ctx(context);
+                    let child = row.expr_starred_value();
+                    return set(rows, extra, child, context);
+                }
+                NodeKind::ExprUnaryOp => {
+                    let child = row.expr_unary_op_operand();
+                    return set(rows, extra, child, context);
+                }
+                NodeKind::ExprTuple => {
+                    row.set_expr_tuple_ctx(context);
+                    row.expr_tuple_elts()
+                }
+                NodeKind::ExprList => {
+                    row.set_expr_list_ctx(context);
+                    row.expr_list_elts()
+                }
+                _ => return,
+            };
+            for &child in &extra[Interval::decode(elements).indices()] {
+                set(rows, extra, child, context);
             }
         }
+
+        set(
+            &mut self.ast.rows,
+            &self.ast.extra,
+            expr.slot,
+            context.encode().to_le_bytes()[0],
+        );
     }
 
     #[inline]
