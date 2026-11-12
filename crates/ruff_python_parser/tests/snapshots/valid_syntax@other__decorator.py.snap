@@ -38,11 +38,7 @@ Module(
                     parameters: Parameters {
                         range: 28..30,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -118,11 +114,7 @@ Module(
                     parameters: Parameters {
                         range: 99..101,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -193,11 +185,7 @@ Module(
                     parameters: Parameters {
                         range: 121..123,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -280,11 +268,7 @@ Module(
                     parameters: Parameters {
                         range: 146..148,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -486,27 +470,25 @@ Module(
                                         Parameters {
                                             range: 222..223,
                                             node_index: NodeIndex(None),
-                                            posonlyargs: [],
-                                            args: [
-                                                ParameterWithDefault {
-                                                    range: 222..223,
-                                                    node_index: NodeIndex(None),
-                                                    parameter: Parameter {
+                                            items: [
+                                                PositionalOrKeyword(
+                                                    ParameterWithDefault {
                                                         range: 222..223,
                                                         node_index: NodeIndex(None),
-                                                        name: Identifier {
-                                                            id: Name("x"),
+                                                        parameter: Parameter {
                                                             range: 222..223,
                                                             node_index: NodeIndex(None),
+                                                            name: Identifier {
+                                                                id: Name("x"),
+                                                                range: 222..223,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                            annotation: None,
                                                         },
-                                                        annotation: None,
+                                                        default: None,
                                                     },
-                                                    default: None,
-                                                },
+                                                ),
                                             ],
-                                            vararg: None,
-                                            kwonlyargs: [],
-                                            kwarg: None,
                                         },
                                     ),
                                     body: Name(
@@ -623,11 +605,7 @@ Module(
                     parameters: Parameters {
                         range: 262..264,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -689,11 +667,7 @@ Module(
                     parameters: Parameters {
                         range: 373..375,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -752,11 +726,7 @@ Module(
                     parameters: Parameters {
                         range: 400..402,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

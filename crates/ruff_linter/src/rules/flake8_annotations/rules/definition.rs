@@ -698,7 +698,7 @@ pub(crate) fn definition(
     }
 
     // ANN002, ANN401
-    if let Some(arg) = &parameters.vararg {
+    if let Some(arg) = parameters.vararg() {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {
@@ -724,7 +724,7 @@ pub(crate) fn definition(
     }
 
     // ANN003, ANN401
-    if let Some(arg) = &parameters.kwarg {
+    if let Some(arg) = parameters.kwarg() {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {
@@ -965,9 +965,9 @@ pub(crate) fn definition(
         || (is_method
             && !visibility::is_staticmethod(decorator_list, checker.semantic())
             && parameters
-                .posonlyargs
-                .first()
-                .or_else(|| parameters.args.first())
+                .posonlyargs()
+                .next()
+                .or_else(|| parameters.args().next())
                 .is_some_and(|first_param| first_param.annotation().is_some()));
 
     if !diagnostics_enabled {

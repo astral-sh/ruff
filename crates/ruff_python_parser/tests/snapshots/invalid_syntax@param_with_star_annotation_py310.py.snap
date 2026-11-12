@@ -25,38 +25,36 @@ Module(
                     parameters: Parameters {
                         range: 51..63,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: Some(
-                            Parameter {
-                                range: 52..62,
-                                node_index: NodeIndex(None),
-                                name: Identifier {
-                                    id: Name("args"),
-                                    range: 53..57,
+                        items: [
+                            Vararg(
+                                Parameter {
+                                    range: 52..62,
                                     node_index: NodeIndex(None),
-                                },
-                                annotation: Some(
-                                    Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 59..62,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 60..62,
-                                                    id: Name("Ts"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            ctx: Load,
-                                        },
+                                    name: Identifier {
+                                        id: Name("args"),
+                                        range: 53..57,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                node_index: NodeIndex(None),
+                                                range: 59..62,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 60..62,
+                                                        id: Name("Ts"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                            },
-                        ),
-                        kwonlyargs: [],
-                        kwarg: None,
+                                },
+                            ),
+                        ],
                     },
                     returns: None,
                     body: [

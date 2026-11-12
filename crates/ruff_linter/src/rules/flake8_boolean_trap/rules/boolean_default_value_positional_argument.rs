@@ -126,7 +126,7 @@ pub(crate) fn boolean_default_value_positional_argument(
         return;
     }
 
-    for param in parameters.posonlyargs.iter().chain(&parameters.args) {
+    for param in parameters.iter_positional_params() {
         if param.default().is_some_and(Expr::is_boolean_literal_expr) {
             // Allow Boolean defaults in setters.
             if decorator_list.iter().any(|decorator| {

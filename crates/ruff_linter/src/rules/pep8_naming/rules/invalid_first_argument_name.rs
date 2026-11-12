@@ -253,9 +253,9 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         parameter: self_or_cls,
         ..
     }) = parameters
-        .posonlyargs
-        .first()
-        .or_else(|| parameters.args.first())
+        .posonlyargs()
+        .next()
+        .or_else(|| parameters.args().next())
     else {
         return;
     };

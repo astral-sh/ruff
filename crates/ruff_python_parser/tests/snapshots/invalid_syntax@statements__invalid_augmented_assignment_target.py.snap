@@ -172,27 +172,25 @@ Module(
                                 Parameters {
                                     range: 154..155,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [
-                                        ParameterWithDefault {
-                                            range: 154..155,
-                                            node_index: NodeIndex(None),
-                                            parameter: Parameter {
+                                    items: [
+                                        PositionalOrKeyword(
+                                            ParameterWithDefault {
                                                 range: 154..155,
                                                 node_index: NodeIndex(None),
-                                                name: Identifier {
-                                                    id: Name("_"),
+                                                parameter: Parameter {
                                                     range: 154..155,
                                                     node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("_"),
+                                                        range: 154..155,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    annotation: None,
                                                 },
-                                                annotation: None,
+                                                default: None,
                                             },
-                                            default: None,
-                                        },
+                                        ),
                                     ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
                                 },
                             ),
                             body: NumberLiteral(

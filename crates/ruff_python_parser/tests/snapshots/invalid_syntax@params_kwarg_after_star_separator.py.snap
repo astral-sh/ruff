@@ -25,22 +25,20 @@ Module(
                     parameters: Parameters {
                         range: 7..20,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: Some(
-                            Parameter {
-                                range: 11..19,
-                                node_index: NodeIndex(None),
-                                name: Identifier {
-                                    id: Name("kwargs"),
-                                    range: 13..19,
+                        items: [
+                            Kwarg(
+                                Parameter {
+                                    range: 11..19,
                                     node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("kwargs"),
+                                        range: 13..19,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
                                 },
-                                annotation: None,
-                            },
-                        ),
+                            ),
+                        ],
                     },
                     returns: None,
                     body: [
