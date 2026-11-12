@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -93,11 +92,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             continue;
         };
 
-        if arguments.keywords().next().is_some() {
-            continue;
-        }
-
-        let Some([arg]) = arguments.args().collect_array() else {
+        let Some(arg) = arguments.as_single_positional() else {
             continue;
         };
 

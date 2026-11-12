@@ -88,10 +88,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
-            if arguments.keywords().next().is_some() {
-                return;
-            }
-            let Some([arg]) = arguments.args().collect_array() else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
             if !is_zero(arg) {

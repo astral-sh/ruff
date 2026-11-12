@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
@@ -97,12 +96,9 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
     }
 
     // Single argument and no keyword arguments
-    let Some([argument]) = arguments.args().collect_array() else {
+    let Some(argument) = arguments.as_single_positional() else {
         return;
     };
-    if arguments.keywords().next().is_some() {
-        return;
-    }
 
     // Simple inferred sequence type (e.g., list, set, dict, tuple, string, bytes, varargs, kwargs).
     if !is_sequence(argument, semantic) && !is_indirect_sequence(argument, semantic) {
