@@ -2423,6 +2423,54 @@ class Callbacks:
         self.identities = [{"x": 0}, {"x": lambda x: x}]
 ```
 
+An inferred attribute type does not provide a declared type preference to later assignments:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+class Fields:
+    class_value = None
+
+    def __init__(self, value: Any):
+        self.value = None
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Any
+
+def _(value: Any):
+    Fields.class_value = reveal_type(identity(value))  # revealed: Any
+    reveal_type(Fields.class_value)  # revealed: Any
+```
+
+The inferred attribute type is, however, used to fill in unsolved type variables:
+
+```py
+class Collections:
+    numbers = [1]
+    items = iter([1])
+
+def _():
+    Collections.numbers = reveal_type(list())  # revealed: list[int]
+    Collections.items = reveal_type(iter(list()))  # revealed: Iterator[int]
+```
+
+An annotated instance attribute provides a declared type preference even if the class body
+conditionally annotated the same field:
+
+```py
+def _(flag: bool, value: Any):
+    class Conditional:
+        if flag:
+            field: int
+
+        def __init__(self):
+            self.field: int = 0
+
+    obj = Conditional()
+    obj.field = identity(value)
+    reveal_type(obj.field)  # revealed: int
+```
+
 ## Overload evaluation
 
 The type context of all matching overloads are considered during argument inference:
