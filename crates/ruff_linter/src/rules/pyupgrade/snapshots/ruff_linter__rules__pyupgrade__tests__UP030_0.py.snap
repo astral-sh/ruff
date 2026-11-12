@@ -486,10 +486,143 @@ UP030 [*] Use implicit references for positional format fields
 64 |
 65 | "{{{0}}}".format(123)
    | ^^^^^^^^^^^^^^^^^^^^^
+66 |
+67 | r"{0}{1}".format(1, 2)
+   |
 help: Remove explicit positional indices
    |
 64 |
    - "{{{0}}}".format(123)
 65 + "{{{}}}".format(123)
+66 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:67:1
+   |
+65 | "{{{0}}}".format(123)
+66 |
+67 | r"{0}{1}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^
+68 |
+69 | "{0}{1}{2}{3}".format(1, 2, 3, 4)
+   |
+help: Remove explicit positional indices
+   |
+66 |
+   - r"{0}{1}".format(1, 2)
+67 + r"{}{}".format(1, 2)
+68 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:69:1
+   |
+67 | r"{0}{1}".format(1, 2)
+68 |
+69 | "{0}{1}{2}{3}".format(1, 2, 3, 4)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+70 |
+71 | "{1}{0}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+68 |
+   - "{0}{1}{2}{3}".format(1, 2, 3, 4)
+69 + "{}{}{}{}".format(1, 2, 3, 4)
+70 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:71:1
+   |
+69 | "{0}{1}{2}{3}".format(1, 2, 3, 4)
+70 |
+71 | "{1}{0}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^
+72 |
+73 | "{{{0}}}{{{1}}}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+70 |
+   - "{1}{0}".format(1, 2)
+71 + "{}{}".format(2, 1)
+72 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:73:1
+   |
+71 | "{1}{0}".format(1, 2)
+72 |
+73 | "{{{0}}}{{{1}}}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |
+75 | "{0}{{1}}{1}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+72 |
+   - "{{{0}}}{{{1}}}".format(1, 2)
+73 + "{{{}}}{{{}}}".format(1, 2)
+74 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:75:1
+   |
+73 | "{{{0}}}{{{1}}}".format(1, 2)
+74 |
+75 | "{0}{{1}}{1}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+76 |
+77 | "{0!r:>5}{1.attr}{2[0]}".format(1, 2, [3])
+   |
+help: Remove explicit positional indices
+   |
+74 |
+   - "{0}{{1}}{1}".format(1, 2)
+75 + "{}{{1}}{}".format(1, 2)
+76 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:77:1
+   |
+75 | "{0}{{1}}{1}".format(1, 2)
+76 |
+77 | "{0!r:>5}{1.attr}{2[0]}".format(1, 2, [3])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+78 |
+79 | "\N{SNOWMAN}{0}{1}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+76 |
+   - "{0!r:>5}{1.attr}{2[0]}".format(1, 2, [3])
+77 + "{!r:>5}{.attr}{[0]}".format(1, 2, [3])
+78 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:79:1
+   |
+77 | "{0!r:>5}{1.attr}{2[0]}".format(1, 2, [3])
+78 |
+79 | "\N{SNOWMAN}{0}{1}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove explicit positional indices
+   |
+78 |
+   - "\N{SNOWMAN}{0}{1}".format(1, 2)
+79 + "\N{SNOWMAN}{}{}".format(1, 2)
    |
 note: This is an unsafe fix and may change runtime behavior
