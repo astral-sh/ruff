@@ -132,6 +132,19 @@ pub enum StringLikePartKind<'a> {
     TString(ast::TString<'a>),
 }
 
+impl StringLikePartKind<'_> {
+    /// Returns the [`AnyStringFlags`] for the current string-like part.
+    #[inline]
+    pub fn flags(self) -> AnyStringFlags {
+        match self {
+            StringLikePartKind::String(string) => AnyStringFlags::from(string.flags()),
+            StringLikePartKind::Bytes(bytes) => AnyStringFlags::from(bytes.flags()),
+            StringLikePartKind::FString(f_string) => AnyStringFlags::from(f_string.flags()),
+            StringLikePartKind::TString(t_string) => AnyStringFlags::from(t_string.flags()),
+        }
+    }
+}
+
 impl<'a> StringLikePart<'a> {
     #[inline]
     pub fn classify(self) -> StringLikePartKind<'a> {
@@ -147,12 +160,7 @@ impl<'a> StringLikePart<'a> {
     /// Returns the [`AnyStringFlags`] for the current string-like part.
     #[inline]
     pub fn flags(&self) -> AnyStringFlags {
-        match self.classify() {
-            StringLikePartKind::String(string) => AnyStringFlags::from(string.flags()),
-            StringLikePartKind::Bytes(bytes) => AnyStringFlags::from(bytes.flags()),
-            StringLikePartKind::FString(f_string) => AnyStringFlags::from(f_string.flags()),
-            StringLikePartKind::TString(t_string) => AnyStringFlags::from(t_string.flags()),
-        }
+        self.classify().flags()
     }
 
     /// Returns the range of the string's content in the source (minus prefix and quotes).
