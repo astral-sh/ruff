@@ -1464,6 +1464,21 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
+    pub(super) fn flatten_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db, env);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.flatten_typevars(db, env));
+        }
+        for negative in self.negative(db) {
+            builder.add_negative_in_place(negative.flatten_typevars(db, env));
+        }
+        builder.build()
+    }
+
     /// Return a version of this intersection type where any type variables in the positive elements
     /// have been replaced by their bounds or constraints, and where any newtypes in the positive elements
     /// have been replaced by their concrete base types.

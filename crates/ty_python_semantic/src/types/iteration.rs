@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, IntersectionType, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, MemberLookupPolicy,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -243,10 +243,24 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        self.try_iterate_with_receiver(db, env, mode, None)
+    }
+
+    /// Describe the values yielded by iterating `self` as a [`TupleSpec`].
+    ///
+    /// Look up the iterable's methods on `self`, binding them to `receiver` when supplied.
+    fn try_iterate_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
+        receiver: Option<Type<'db>>,
+    ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
+            receiver: Option<Type<'db>>,
         ) -> Option<Cow<'db, TupleSpec<'db>>> {
             // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
             // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
@@ -254,13 +268,18 @@ impl<'db> Type<'db> {
             // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
             const MAX_TUPLE_LENGTH: usize = 128;
 
+            let try_iterate = |ty: Type<'db>, receiver| {
+                ty.try_iterate_with_receiver(db, env, EvaluationMode::Sync, receiver)
+                    .ok()
+            };
+
             match ty {
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
                 Type::NewTypeInstance(newtype) => {
-                    non_async_special_case(db, env, newtype.concrete_base_type(db))
+                    non_async_special_case(db, env, newtype.concrete_base_type(db), receiver)
                 }
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
                     TupleSpec::homogeneous(todo_type!("*tuple[] annotations")),
@@ -306,35 +325,36 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),
-                Type::Recursive(recursive) => {
-                    non_async_special_case(db, env, recursive.unfold(db, env).into_unfolded()?)
+                Type::TypeAlias(alias) => {
+                    non_async_special_case(db, env, alias.value_type(db), receiver)
                 }
+                Type::Recursive(recursive) => non_async_special_case(
+                    db,
+                    env,
+                    recursive.unfold(db, env).into_unfolded()?,
+                    receiver,
+                ),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        non_async_special_case(db, env, bound)
+                        non_async_special_case(db, env, bound, receiver)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        non_async_special_case(db, env, constraints.as_type(db, env))
+                        non_async_special_case(db, env, constraints.as_type(db, env), receiver)
                     }
                 },
                 Type::Union(union) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
-                        let mut elements_iter = elements.iter();
-                        let first_element_spec = elements_iter
-                            .next()?
-                            .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                            .ok()?;
-                        let mut builder = TupleSpecBuilder::from(&*first_element_spec);
-                        for element in elements_iter {
-                            builder = builder.union(
-                                db,
-                                env,
-                                &*element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                                    .ok()?,
-                            );
+                        let mut specs = elements.iter().map(|&element| {
+                            let receiver = receiver.map(|receiver| {
+                                IntersectionType::from_two_elements(db, env, receiver, element)
+                            });
+                            try_iterate(element, receiver)
+                        });
+                        let first_spec = specs.next()??;
+                        let mut builder = TupleSpecBuilder::from(&*first_spec);
+                        for spec in specs {
+                            builder = builder.union(db, env, &*spec?);
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
@@ -342,50 +362,35 @@ impl<'db> Type<'db> {
                     }
                 }
                 Type::Intersection(intersection) => {
-                    // For intersections containing TypeVars with union bounds, we need to
-                    // flatten the TypeVars first. This distributes the intersection over
-                    // the union and simplifies, e.g.:
-                    // `T & tuple[object, ...]` where `T: tuple[int, ...] | list[str]`
-                    // becomes `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-                    // which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-                    //
-                    // After flattening, the result may be:
-                    // - An intersection (if no union-bound typevars, or they didn't simplify).
-                    // - A union of intersections (if distribution happened).
-                    // - A simpler type (if it fully simplified).
-                    //
-                    // We then iterate over the flattened type.
-                    let flattened = ty.flatten_typevars(db, env);
-
-                    // If flattening didn't change anything, iterate the intersection directly.
-                    if flattened == ty {
-                        let mut specs_iter = intersection
-                            .positive_elements_or_object(db)
-                            .filter_map(|element| {
-                                element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                                    .ok()
-                            });
-                        let first_spec = specs_iter.next()?;
-                        let mut builder = TupleSpecBuilder::from(&*first_spec);
-                        for spec in specs_iter {
-                            // Two tuples cannot have incompatible specs unless the tuples themselves
-                            // are disjoint. `IntersectionBuilder` eagerly simplifies such
-                            // intersections to `Never`, so this should always return `Some`.
-                            let Some(intersected) = builder.intersect(db, env, &spec) else {
-                                return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
-                            };
-                            builder = intersected;
-                        }
-                        return Some(Cow::Owned(builder.build()));
+                    let receiver = receiver.unwrap_or(ty);
+                    if let Some(expansion) =
+                        intersection.expand_iteration_typevars(db, env, receiver)
+                    {
+                        return try_iterate(expansion.lookup_type, Some(expansion.receiver));
                     }
 
-                    // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db, env).ok()
+                    let mut specs_iter = intersection
+                        .positive_elements_or_object(db)
+                        .filter_map(|element| try_iterate(element, Some(receiver)));
+                    let first_spec = specs_iter.next()?;
+                    let mut builder = TupleSpecBuilder::from(&*first_spec);
+                    for spec in specs_iter {
+                        // Two tuples cannot have incompatible specs unless the tuples themselves
+                        // are disjoint. `IntersectionBuilder` eagerly simplifies such
+                        // intersections to `Never`, so this should always return `Some`.
+                        let Some(intersected) = builder.intersect(db, env, &spec) else {
+                            return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
+                        };
+                        builder = intersected;
+                    }
+                    Some(Cow::Owned(builder.build()))
                 }
-                Type::EnumComplement(complement) => {
-                    non_async_special_case(db, env, complement.remaining_literal_union(db, env))
-                }
+                Type::EnumComplement(complement) => non_async_special_case(
+                    db,
+                    env,
+                    complement.remaining_literal_union(db, env),
+                    receiver,
+                ),
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
@@ -421,12 +426,29 @@ impl<'db> Type<'db> {
             }
         }
 
+        let try_call_dunder = |name, mut arguments| {
+            self.try_call_dunder_with_policy_and_receiver(
+                db,
+                env,
+                name,
+                &mut arguments,
+                TypeContext::default(),
+                MemberLookupPolicy::default(),
+                receiver,
+            )
+        };
+
         if mode.is_async() {
-            if let Type::Intersection(_) = self {
-                let flattened = self.flatten_typevars(db, env);
-                if flattened != self {
-                    return flattened.try_iterate_with_mode(db, env, mode);
-                }
+            if let Type::Intersection(intersection) = self
+                && let Some(expansion) =
+                    intersection.expand_iteration_typevars(db, env, receiver.unwrap_or(self))
+            {
+                return expansion.lookup_type.try_iterate_with_receiver(
+                    db,
+                    env,
+                    mode,
+                    Some(expansion.receiver),
+                );
             }
 
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
@@ -446,13 +468,7 @@ impl<'db> Type<'db> {
                     })
             };
 
-            return match self.try_call_dunder(
-                db,
-                env,
-                "__aiter__",
-                CallArguments::none(),
-                TypeContext::default(),
-            ) {
+            return match try_call_dunder("__aiter__", CallArguments::none()) {
                 Ok(dunder_aiter_bindings) => {
                     let iterator = dunder_aiter_bindings.return_type(db, env);
                     match try_call_dunder_anext_on_iterator(iterator) {
@@ -500,17 +516,14 @@ impl<'db> Type<'db> {
             };
         }
 
-        if let Some(special_case) = non_async_special_case(db, env, self) {
+        if let Some(special_case) = non_async_special_case(db, env, self, receiver) {
             return Ok(special_case);
         }
 
         let try_call_dunder_getitem = || {
-            self.try_call_dunder(
-                db,
-                env,
+            try_call_dunder(
                 "__getitem__",
                 CallArguments::positional([KnownClass::Int.to_instance(db, env)]),
-                TypeContext::default(),
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db, env))
         };
@@ -527,14 +540,7 @@ impl<'db> Type<'db> {
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db, env))
         };
 
-        let dunder_iter_result = self
-            .try_call_dunder(
-                db,
-                env,
-                "__iter__",
-                CallArguments::none(),
-                TypeContext::default(),
-            )
+        let dunder_iter_result = try_call_dunder("__iter__", CallArguments::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db, env));
 
         match dunder_iter_result {
@@ -612,6 +618,65 @@ impl<'db> Type<'db> {
                     },
                 ),
         }
+    }
+}
+
+/// The expanded lookup type and the receiver that retains type variables for `Self` binding.
+#[derive(Debug)]
+struct IterationTypeExpansion<'db> {
+    lookup_type: Type<'db>,
+    receiver: Type<'db>,
+}
+
+impl<'db> IntersectionType<'db> {
+    /// Expand the intersection's type variables for lookup while preserving them for `Self`
+    /// binding. If `__aiter__` returns `Self`, each surviving alternative supplies `__anext__`.
+    ///
+    /// ```python
+    /// from typing import Self, reveal_type
+    ///
+    /// class Cursor:
+    ///     def __aiter__(self) -> Self:
+    ///         return self
+    ///
+    ///     async def __anext__(self) -> Self:
+    ///         raise StopAsyncIteration
+    ///
+    /// class A(Cursor): ...
+    /// class B(Cursor): ...
+    ///
+    /// async def read[T: Cursor | None](cursor: T) -> None:
+    ///     if cursor is not None:
+    ///         async for item in cursor:
+    ///             reveal_type(item)  # T@read & Cursor
+    ///
+    /// async def read_either[T: A | B | None](cursor: T) -> None:
+    ///     if cursor is not None:
+    ///         async for item in cursor:
+    ///             reveal_type(item)  # (T@read_either & A) | (T@read_either & B)
+    /// ```
+    fn expand_iteration_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> Option<IterationTypeExpansion<'db>> {
+        let lookup_type = self.flatten_typevars(db, env);
+        if lookup_type == Type::Intersection(self) {
+            return None;
+        }
+
+        // Union lookup intersects the receiver with each alternative. Intersecting with the
+        // whole union here would repeat that work.
+        let receiver = if lookup_type.is_union() {
+            receiver
+        } else {
+            Self::from_two_elements(db, env, receiver, lookup_type)
+        };
+        Some(IterationTypeExpansion {
+            lookup_type,
+            receiver,
+        })
     }
 }
 

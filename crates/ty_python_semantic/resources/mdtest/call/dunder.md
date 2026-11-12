@@ -476,6 +476,9 @@ async def _(c: C & Other):
 
 ### Iteration
 
+When an iterable yields values annotated with `Self`, loops preserve the full receiver type in the
+yielded values, including refinements from truthiness narrowing.
+
 #### Synchronous
 
 ```py
@@ -501,8 +504,28 @@ def _(c: C & Other):
 
     reveal_type(c.__iter__().__next__())  # revealed: C & Other
     for item in c:
-        # TODO: This should retain `C & Other`, just like the explicit calls.
-        reveal_type(item)  # revealed: C
+        reveal_type(item)  # revealed: C & Other
+```
+
+#### `for` loops preserve truthiness-narrowed `Self`
+
+```py
+from collections.abc import Iterator
+from typing import Self
+
+class Records:
+    def __bool__(self) -> bool:
+        return True
+
+    def __iter__(self) -> Iterator[Self]:
+        yield self
+
+    def each(self) -> list[Self]:
+        if not self:
+            return []
+        for record in self:
+            reveal_type(record)  # revealed: Self@each & ~AlwaysFalsy
+        return [record for record in self]
 ```
 
 #### Asynchronous
@@ -531,4 +554,23 @@ async def _(c: C & Other):
     reveal_type(await c.__aiter__().__anext__())  # revealed: C & Other
     async for item in c:
         reveal_type(item)  # revealed: C & Other
+```
+
+#### `async for` loops preserve truthiness-narrowed `Self`
+
+```py
+from collections.abc import AsyncIterator
+from typing import Self
+
+class Records:
+    def __bool__(self) -> bool:
+        return True
+
+    async def __aiter__(self) -> AsyncIterator[Self]:
+        yield self
+
+    async def each(self: Self) -> None:
+        if self:
+            async for record in self:
+                reveal_type(record)  # revealed: Self@each & ~AlwaysFalsy
 ```
