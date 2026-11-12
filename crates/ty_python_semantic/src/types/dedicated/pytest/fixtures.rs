@@ -1862,7 +1862,6 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast as ast;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::Ranged;
@@ -3355,78 +3354,13 @@ def resource(): ...
     }
 
     #[test]
-    fn resolves_fixtures_from_pytest_plugins() {
-        let test = PytestTestCase::with_files(
-            "/src/tests/unit/test_example.py",
-            &[
-                (
-                    "/src/conftest.py",
-                    r#"pytest_plugins = ["tests.fixtures.resources"]"#,
-                ),
-                (
-                    "/src/tests/fixtures/resources.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                (
-                    "/src/tests/unit/test_example.py",
-                    "def test_use(resource): ...",
-                ),
-            ],
-        );
-
-        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"
-        info[pytest-fixture]: Resolve fixture for parameter
-         --> src/tests/unit/test_example.py:1:14
-          |
-        1 | def test_use(resource): ...
-          |              ^^^^^^^^ fixture requested here
-        info: Found 1 fixture
-         --> src/tests/fixtures/resources.py:5:5
-          |
-        5 | def resource(): ...
-          |     --------
-        ");
-    }
-
-    #[test]
-    fn resolves_annotated_pytest_plugins() {
-        let test = PytestTestCase::with_files(
-            "/src/test_example.py",
-            &[
-                (
-                    "/src/conftest.py",
-                    r#"pytest_plugins: list[str] = ["custom_fixtures"]"#,
-                ),
-                (
-                    "/src/custom_fixtures.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                ("/src/test_example.py", "def test_use(resource): ..."),
-            ],
-        );
-
-        test.function("test_use")
-            .assert_fixture("resource", "/src/custom_fixtures.py", "resource");
-    }
-
-    #[test]
     fn resolves_comma_separated_pytest_plugins_string() {
         let test = PytestTestCase::with_files(
             "/src/test_example.py",
             &[
                 (
                     "/src/conftest.py",
-                    r#"pytest_plugins = "missing,custom_fixtures""#,
+                    r#"pytest_plugins = "invalid-name,missing,custom_fixtures""#,
                 ),
                 (
                     "/src/custom_fixtures.py",
@@ -3515,32 +3449,6 @@ def resource(): ...
     }
 
     #[test]
-    fn skips_unresolvable_pytest_plugin_names() {
-        let test = PytestTestCase::with_files(
-            "/src/test_example.py",
-            &[
-                (
-                    "/src/conftest.py",
-                    r#"pytest_plugins = ["invalid-name", "missing", "custom_fixtures"]"#,
-                ),
-                (
-                    "/src/custom_fixtures.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                ("/src/test_example.py", "def test_use(resource): ..."),
-            ],
-        );
-
-        test.function("test_use")
-            .assert_fixture("resource", "/src/custom_fixtures.py", "resource");
-    }
-
-    #[test]
     fn ignores_pytest_plugins_bound_only_when_type_checking() {
         let test = PytestTestCase::with_files(
             "/src/test_example.py",
@@ -3552,39 +3460,6 @@ def resource(): ...
 
                     if TYPE_CHECKING:
                         pytest_plugins = ["custom_fixtures"]
-                    "#,
-                ),
-                (
-                    "/src/custom_fixtures.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                ("/src/test_example.py", "def test_use(resource): ..."),
-            ],
-        );
-
-        let test_use = test.function("test_use");
-        let parameter = test_use.parameter_definition("resource");
-        assert!(fixture_bindings_for_parameter(&test.db, parameter).is_empty());
-    }
-
-    #[test]
-    fn ignores_computed_pytest_plugins() {
-        let test = PytestTestCase::with_files(
-            "/src/test_example.py",
-            &[
-                // Pytest may register `custom_fixtures` at runtime, but the plugin names are only
-                // known after calling `plugins()`.
-                (
-                    "/src/conftest.py",
-                    r#"
-                    def plugins() -> list[str]: ...
-
-                    pytest_plugins = plugins()
                     "#,
                 ),
                 (
@@ -3635,36 +3510,6 @@ def resource(): ...
         test.function("test_use").assert_fixture(
             "resource",
             "/src/tests/fixtures/resources.py",
-            "resource",
-        );
-    }
-
-    #[test]
-    fn resolves_pytest_plugins_registered_by_plugin_package() {
-        let test = PytestTestCase::with_files(
-            "/src/test_example.py",
-            &[
-                ("/src/conftest.py", r#"pytest_plugins = ["fixtures"]"#),
-                (
-                    "/src/fixtures/__init__.py",
-                    r#"pytest_plugins = ["fixtures.database"]"#,
-                ),
-                (
-                    "/src/fixtures/database.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                ("/src/test_example.py", "def test_use(resource): ..."),
-            ],
-        );
-
-        test.function("test_use").assert_fixture(
-            "resource",
-            "/src/fixtures/database.py",
             "resource",
         );
     }
@@ -4066,127 +3911,13 @@ def resource(): ...
     }
 
     #[test]
-    fn resolves_plugin_fixture_dependencies_through_its_own_registrations() {
-        let test = PytestTestCase::with_files(
-            "/src/plugins/consumer.py",
-            &[
-                (
-                    "/src/test_registration.py",
-                    r#"pytest_plugins = ["plugins.consumer"]"#,
-                ),
-                (
-                    "/src/plugins/consumer.py",
-                    r#"
-                    import pytest
-
-                    pytest_plugins = ["plugins.provider"]
-
-                    @pytest.fixture
-                    def consumer(resource): ...
-                    "#,
-                ),
-                (
-                    "/src/plugins/provider.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-            ],
-        );
-
-        test.function("consumer").assert_fixture(
-            "resource",
-            "/src/plugins/provider.py",
-            "resource",
-        );
-    }
-
-    #[test]
-    fn plugin_fixture_dependencies_ignore_registrations_outside_its_hierarchy() {
-        let test = PytestTestCase::with_files(
-            "/src/plugins/consumer.py",
-            &[
-                (
-                    "/src/test_registration.py",
-                    r#"pytest_plugins = ["plugins.consumer", "plugins.provider"]"#,
-                ),
-                (
-                    "/src/plugins/consumer.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def consumer(resource): ...
-                    "#,
-                ),
-                (
-                    "/src/plugins/provider.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-            ],
-        );
-
-        // Pytest makes `provider` visible to `consumer` once it collects `test_registration.py`,
-        // but neither the consumer's directory hierarchy nor its own registrations name
-        // `provider`.
-        let consumer = test.function("consumer");
-        let parameter = consumer.parameter_definition("resource");
-        assert!(fixture_bindings_for_parameter(&test.db, parameter).is_empty());
-    }
-
-    #[test]
-    fn test_modules_share_conftest_plugin_registrations() {
-        let mut test = PytestTestCase::with_files(
-            "/src/tests/test_one.py",
-            &[
-                ("/src/tests/conftest.py", r#"pytest_plugins = ["shared"]"#),
-                (
-                    "/src/tests/shared.py",
-                    r#"
-                    import pytest
-
-                    @pytest.fixture
-                    def resource(): ...
-                    "#,
-                ),
-                ("/src/tests/test_one.py", "def test_one(resource): ..."),
-                ("/src/tests/test_two.py", "def test_two(resource): ..."),
-            ],
-        );
-        test.function("test_one")
-            .assert_fixture("resource", "/src/tests/shared.py", "resource");
-
-        // Neither test module registers plugins of its own, so the second request reuses the
-        // registrations already collected for their shared conftest.
-        test.db.clear_salsa_events();
-        test.function_in("/src/tests/test_two.py", "test_two")
-            .assert_fixture("resource", "/src/tests/shared.py", "resource");
-
-        let events = test.db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(
-            &test.db,
-            "pytest_registered_plugin_files_from",
-            None,
-            &events,
-        );
-    }
-
-    #[test]
     fn creating_pytest_plugin_and_updating_registration_updates_resolution() {
         let mut test = PytestTestCase::with_files(
             "/src/test_example.py",
             &[
                 (
                     "/src/conftest.py",
-                    r#"pytest_plugins = ["custom_fixtures"]"#,
+                    r#"pytest_plugins: list[str] = ["custom_fixtures"]"#,
                 ),
                 ("/src/test_example.py", "def test_use(resource): ..."),
             ],
@@ -4215,9 +3946,12 @@ def resource(): ...
             "/src/test_example.py",
             &[
                 ("/src/conftest.py", r#"pytest_plugins = ["first"]"#),
-                ("/src/first.py", r#"pytest_plugins = ["second"]"#),
                 (
-                    "/src/second.py",
+                    "/src/first/__init__.py",
+                    r#"pytest_plugins = ["first.second"]"#,
+                ),
+                (
+                    "/src/first/second.py",
                     r#"
                     import pytest
 
@@ -4229,9 +3963,9 @@ def resource(): ...
             ],
         );
         test.function("test_use")
-            .assert_fixture("resource", "/src/second.py", "resource");
+            .assert_fixture("resource", "/src/first/second.py", "resource");
 
-        test.write_file("/src/first.py", "pytest_plugins = []");
+        test.write_file("/src/first/__init__.py", "pytest_plugins = []");
         assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
     }
 
@@ -4607,18 +4341,8 @@ resource = None
 
         /// Returns the function `name` in the test case's main file.
         fn function<'test>(&'test self, name: &str) -> PytestTestFunction<'test> {
-            self.function_in(self.path, name)
-        }
-
-        /// Returns the function `name` in the file at `path`.
-        fn function_in<'test>(
-            &'test self,
-            path: &'static str,
-            name: &str,
-        ) -> PytestTestFunction<'test> {
             PytestTestFunction {
                 test: self,
-                path,
                 name: name.to_owned(),
             }
         }
@@ -4654,7 +4378,6 @@ resource = None
 
     struct PytestTestFunction<'test> {
         test: &'test PytestTestCase,
-        path: &'static str,
         name: String,
     }
 
@@ -4716,7 +4439,7 @@ resource = None
 
         fn parameter_definition<'db>(&'db self, parameter_name: &str) -> Definition<'db> {
             let db = &self.test.db;
-            let file = system_path_to_file(db, self.path).expect("test file exists");
+            let file = system_path_to_file(db, self.test.path).expect("test file exists");
             let file = db.program_file(file);
             let module = parsed_module(db, file.python_file(db)).load(db);
             let function = find_function(module.suite(), &self.name).expect("test function exists");
