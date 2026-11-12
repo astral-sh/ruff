@@ -59,6 +59,23 @@ def _(obj: WithSpam):
         reveal_type(obj)  # revealed: Never
 ```
 
+An assignment inside a `hasattr` guard can create the attribute on the first call. We still check
+the initializer when it reads another attribute of the receiver.
+
+```py
+class Config:
+    def getint(self) -> int:
+        return 1
+
+class Storage:
+    config: Config | type
+
+    def initialize(self):
+        if not hasattr(self, "limit"):
+            reveal_type(self.config)  # revealed: Config | type
+            self.limit: int = self.config.getint()  # error: [unresolved-attribute]
+```
+
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
 the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch:
 
