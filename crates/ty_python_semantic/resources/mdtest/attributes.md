@@ -1160,14 +1160,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(C.pure_class_variable2)  # revealed: int
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.pure_class_variable2)  # revealed: int
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
@@ -1183,8 +1183,7 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
-If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
-`ClassVar`s:
+A `Final` class variable with no explicit type argument keeps its literal type.
 
 ```py
 from typing import Final

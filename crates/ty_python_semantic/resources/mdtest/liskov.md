@@ -3846,6 +3846,119 @@ class IncompatibleProperty(ClassBase):
         return ""
 ```
 
+For an inherited getter-only property, ty checks the instance read type. A descriptor stored in a
+bare or explicitly typed `ClassVar` can supply that type even when class access returns the
+descriptor.
+
+```py
+from typing_extensions import Self, overload
+
+class IntDescriptor:
+    @overload
+    def __get__(self, instance: None, owner: type) -> Self: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> int: ...
+    def __get__(self, instance: object, owner: type) -> Self | int:
+        return self if instance is None else 1
+
+class InferredDescriptor(Base):
+    value: ClassVar = IntDescriptor()  # ok
+
+class ExplicitDescriptor(Base):
+    value: ClassVar[IntDescriptor] = IntDescriptor()  # ok
+
+class TextBase:
+    @property
+    def value(self) -> str:
+        return ""
+
+class IncompatibleDescriptor(TextBase):
+    # error: [incompatible-property-override] "Read type `int` is not assignable to inherited read type `str`"
+    value: ClassVar = IntDescriptor()
+```
+
+When the base declares a mutable `ClassVar`, subclasses must also preserve class reads and
+assignments. Here a class read returns the descriptor itself, and assignment replaces it.
+
+```py
+class NarrowDescriptor(IntDescriptor): ...
+
+class NarrowOverride(ExplicitDescriptor):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `IntDescriptor`"
+    value: ClassVar[NarrowDescriptor] = NarrowDescriptor()
+
+class NarrowBase:
+    value: ClassVar = NarrowDescriptor()
+
+class WideOverride(NarrowBase):
+    # error: [incompatible-attribute-override] "Type `IntDescriptor` is not assignable to inherited type `NarrowDescriptor`"
+    value: ClassVar = IntDescriptor()
+```
+
+## Class variables with restricted descriptor access
+
+A getter that accepts only `None` as its instance cannot implement a readable property, even when
+its return type matches the property's.
+
+```py
+from typing import ClassVar
+
+class Readable:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ClassOnly:
+    def __get__(self, instance: None, owner: type) -> int:
+        return 1
+
+class Inferred(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar = ClassOnly()
+
+class Explicit(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar[ClassOnly] = ClassOnly()
+```
+
+The same conflict can come from two bases. When the base itself provides only class access, an
+override still needs to accept writes through the class.
+
+```py
+class ClassOnlyBase:
+    value: ClassVar = ClassOnly()
+
+class Combined(ClassOnlyBase, Readable): ...  # error: [incompatible-property-override]
+class NarrowClassOnly(ClassOnly): ...
+
+class NarrowOverride(ClassOnlyBase):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `ClassOnly`"
+    value: ClassVar = NarrowClassOnly()
+```
+
+A readable property can be implemented by an instance-only getter. A `ClassVar` that also supports
+class reads cannot lose that operation in a subclass.
+
+```py
+class InstanceOnly:
+    def __get__(self, instance: Readable, owner: type) -> int:
+        return 1
+
+class InstanceProperty(Readable):
+    value: ClassVar = InstanceOnly()  # ok
+
+class Both(InstanceOnly):
+    def __get__(self, instance: Readable | None, owner: type) -> int:
+        return 1
+
+class BothReads(Readable):
+    value: ClassVar = Both()
+
+class LosesClassRead(BothReads):
+    # error: [incompatible-attribute-override] "Attribute cannot be read through the class"
+    value: ClassVar = InstanceOnly()
+```
+
 ## Conditional property definitions
 
 The property override rule applies when an inherited property can have different definitions. Reads

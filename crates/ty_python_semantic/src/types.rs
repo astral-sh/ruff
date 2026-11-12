@@ -5338,6 +5338,27 @@ impl<'db> Type<'db> {
         try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
     }
 
+    /// Reads a value stored on a class, binding its descriptor to the given instance or class.
+    /// A descriptor that rejects this access cannot satisfy a read requirement.
+    fn class_variable_read_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (member, _, error) = Self::try_call_dunder_get_on_attribute(
+            db,
+            env,
+            Place::bound(self).into(),
+            instance,
+            owner,
+        );
+        member
+            .ignore_possibly_undefined()
+            .filter(|_| error.is_none())
+    }
+
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
     /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
     /// and intersections explicitly.
@@ -5895,6 +5916,20 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Variance accounts for aliases without expanding recursive specializations and ignores
+    /// parameters used only in bivariant positions, such as unused type alias arguments.
+    fn depends_on_type_parameters(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        generic_context.variables(db).any(|typevar| {
+            self.variance_of(db, env, typevar.identity(db)).evaluate(db)
+                != TypeVarVariance::Bivariant
+        })
+    }
+
     /// Whether class access exposes an instance attribute whose type depends on the class's
     /// type parameters. Specializing a class does not give it separate attribute storage:
     /// `Box[int].value` and `Box[str].value` both refer to `Box.value` at runtime.
@@ -5966,12 +6001,7 @@ impl<'db> Type<'db> {
             // Descriptors define their own class-access behavior, but do not exempt other
             // alternatives in a union from the restriction on generic instance storage.
             ty.class_member(db, env, "__get__").is_undefined()
-                // Variance accounts for aliases without expanding recursive specializations,
-                // and ignores alias arguments that do not affect the resulting type.
-                && generic_context.variables(db).any(|typevar| {
-                    ty.variance_of(db, env, typevar.identity(db)).evaluate(db)
-                        != TypeVarVariance::Bivariant
-                })
+                && ty.depends_on_type_parameters(db, env, generic_context)
         })
     }
 
@@ -12063,28 +12093,22 @@ impl TypeQualifiers {
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
 #[derive(Clone, Debug, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct TypeAndQualifiers<'db> {
-    inner: Type<'db>,
+pub(crate) struct TypeAndQualifiers<'db, T = Type<'db>> {
+    inner: T,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
     provenance: Provenance<'db>,
 }
 
-impl<'db> TypeAndQualifiers<'db> {
-    pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
+/// A bare qualifier such as `Final` can declare a name without specifying its type.
+pub(crate) type DeclaredType<'db> = TypeAndQualifiers<'db, Option<Type<'db>>>;
+
+impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
+    pub(crate) fn new(inner: T, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
         Self {
             inner,
             origin,
             qualifiers,
-            provenance: Provenance::Unknown,
-        }
-    }
-
-    fn declared(inner: Type<'db>) -> Self {
-        Self {
-            inner,
-            origin: TypeOrigin::Declared,
-            qualifiers: TypeQualifiers::empty(),
             provenance: Provenance::Unknown,
         }
     }
@@ -12098,8 +12122,7 @@ impl<'db> TypeAndQualifiers<'db> {
         self.provenance
     }
 
-    /// Forget about type qualifiers and only return the inner type.
-    pub(crate) fn inner_type(&self) -> Type<'db> {
+    pub(crate) fn inner_type(&self) -> T {
         self.inner
     }
 
@@ -12117,14 +12140,31 @@ impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
+}
 
-    fn map_type(&self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> TypeAndQualifiers<'db> {
-        TypeAndQualifiers {
-            inner: f(self.inner),
-            origin: self.origin,
-            qualifiers: self.qualifiers,
-            provenance: self.provenance,
-        }
+impl<'db> TypeAndQualifiers<'db> {
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = f(self.inner);
+        self
+    }
+}
+
+impl<'db> DeclaredType<'db> {
+    fn from_type(ty: Type<'db>) -> Self {
+        Self::new(Some(ty), TypeOrigin::Declared, TypeQualifiers::empty())
+    }
+
+    fn inner_type_or_unknown(self) -> Type<'db> {
+        self.inner.unwrap_or_else(Type::unknown)
+    }
+
+    fn is_bare_final(self) -> bool {
+        self.inner.is_none() && self.qualifiers.contains(TypeQualifiers::FINAL)
+    }
+
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = self.inner.map(f);
+        self
     }
 }
 
