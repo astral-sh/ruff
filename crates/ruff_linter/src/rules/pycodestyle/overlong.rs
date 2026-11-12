@@ -22,11 +22,13 @@ impl Overlong {
         task_tags: &[String],
         tab_size: IndentWidth,
     ) -> Option<Self> {
-        // The maximum width of the line is the number of bytes multiplied by the tab size (the
-        // worst-case scenario is that the line is all tabs). If the maximum width is less than the
-        // limit, then the line is not overlong.
-        let max_width = line.len() * tab_size.as_usize();
-        if max_width < limit.value() as usize {
+        // A tab can span several columns. For a line without tabs, the byte length
+        // alone bounds its display width.
+        let limit_columns = usize::from(limit.value());
+        if line.len() <= limit_columns
+            && (line.len() * tab_size.as_usize() <= limit_columns
+                || !line.as_bytes().contains(&b'\t'))
+        {
             return None;
         }
 
