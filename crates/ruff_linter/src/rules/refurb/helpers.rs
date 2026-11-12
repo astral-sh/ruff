@@ -262,15 +262,6 @@ fn find_file_open<'a>(
         func, arguments, ..
     } = item.context_expr.as_call_expr()?;
 
-    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
-    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
-    // arguments, like `buffering`.
-    if arguments.args().any(Expr::is_starred_expr)
-        || arguments.keywords().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
-
     if !semantic.match_builtin_expr(func, "open") {
         return None;
     }
@@ -310,22 +301,20 @@ fn find_path_open<'a>(
     let ast::ExprCall {
         func, arguments, ..
     } = item.context_expr.as_call_expr()?;
-    if arguments.args().any(Expr::is_starred_expr)
-        || arguments.keywords().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
 
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
 
     let attr = func.as_attribute_expr()?;
-    let mode = if arguments.args().next().is_none() {
-        OpenMode::ReadText
-    } else {
-        match_open_mode(arguments.args().next()?)?
+    let mut positional = arguments.args();
+    let mode = match positional.next() {
+        Some(mode) => match_open_mode(mode)?,
+        None => OpenMode::ReadText,
     };
+    if positional.any(Expr::is_starred_expr) {
+        return None;
+    }
 
     let (keywords, kw_mode) = match_open_keywords(arguments, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
@@ -346,14 +335,16 @@ fn find_path_open<'a>(
 /// Match positional arguments. Return expression for the file name and open mode.
 fn match_open_args(arguments: &ast::Arguments) -> Option<(&Expr, OpenMode)> {
     let mut args = arguments.args();
-    match (args.next(), args.next(), args.next()) {
-        (Some(filename), None, _) => Some((filename, OpenMode::ReadText)),
-        (Some(filename), Some(mode_literal), None) => {
-            match_open_mode(mode_literal).map(|mode| (filename, mode))
-        }
-        // The third positional argument is `buffering` and the pathlib methods don't support it.
-        _ => None,
+    let filename = args.next()?;
+    if filename.is_starred_expr() {
+        return None;
     }
+    let mode = match args.next() {
+        Some(mode) => match_open_mode(mode)?,
+        None => OpenMode::ReadText,
+    };
+    // The third positional argument is `buffering` and the pathlib methods don't support it.
+    args.next().is_none().then_some((filename, mode))
 }
 
 /// Match keyword arguments. Return keyword arguments to forward and mode.

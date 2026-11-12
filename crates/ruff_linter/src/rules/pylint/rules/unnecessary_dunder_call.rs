@@ -132,8 +132,11 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
     }
 
-    // If the call has keywords, abort.
-    if call.arguments.keywords().next().is_some() {
+    let singleton = call.arguments.as_single_positional();
+    if singleton.is_none()
+        && !call.arguments.is_empty()
+        && call.arguments.keywords().next().is_some()
+    {
         return;
     }
 
@@ -143,9 +146,10 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     let mut title: Option<String> = None;
 
     if let Some(dunder) = DunderReplacement::from_method(attr) {
-        let mut args = call.arguments.args();
-        match (args.next(), args.next(), dunder) {
-            (None, _, DunderReplacement::Builtin(replacement, message)) => {
+        match (singleton, dunder) {
+            (None, DunderReplacement::Builtin(replacement, message))
+                if call.arguments.is_empty() =>
+            {
                 if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
@@ -159,7 +163,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 ));
                 title = Some(message.to_string());
             }
-            (Some(arg), None, DunderReplacement::Operator(replacement, message, precedence)) => {
+            (Some(arg), DunderReplacement::Operator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value.as_ref());
                 let arg_slice = checker.locator().slice(arg);
 
@@ -179,7 +183,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
 
                 title = Some(message.to_string());
             }
-            (Some(arg), None, DunderReplacement::ROperator(replacement, message, precedence)) => {
+            (Some(arg), DunderReplacement::ROperator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value.as_ref());
                 let arg_slice = checker.locator().slice(arg);
 
@@ -198,7 +202,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 }
                 title = Some(message.to_string());
             }
-            (_, _, DunderReplacement::MessageOnly(message)) => {
+            (_, DunderReplacement::MessageOnly(message)) => {
                 title = Some(message.to_string());
             }
             _ => {}

@@ -18,6 +18,25 @@ fn interleaved_call_arguments() {
 }
 
 #[test]
+fn find_multiple_keywords_in_source_order() {
+    let source = "f(pos, sep=first, *items, **mapping, last=end, sep=duplicate)";
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Expression));
+    let call = parsed
+        .syntax()
+        .as_expression()
+        .unwrap()
+        .body
+        .as_call_expr()
+        .unwrap();
+    let arguments = &call.arguments;
+    let values = arguments
+        .find_keywords(["last", "sep", "missing", "sep"])
+        .map(|keyword| keyword.map(|kw| &source[kw.value.range()]));
+    assert_eq!(values, [Some("end"), Some("first"), None, Some("first")]);
+    assert!(arguments.find_keywords([]).is_empty());
+}
+
+#[test]
 fn find_call_argument_in_source_order() {
     let source = "f(first, *rest, named=keyword, *more)";
     let parsed = parse_expression(source).unwrap();

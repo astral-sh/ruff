@@ -790,7 +790,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args().nth(1).is_some() {
+        let mut positional = arguments.args();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`TypeVarTuple` can only have one positional argument",
@@ -798,7 +800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `TypeVarTuple` creation",
@@ -816,7 +818,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match identifier.id().as_str() {
                 "name" => {
-                    if arguments.args().next().is_some() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVarTuple` can only be provided once",
@@ -971,9 +973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -989,7 +989,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         };
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1064,7 +1064,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args().nth(1).is_some() {
+        let mut positional = arguments.args();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`ParamSpec` can only have one positional argument",
@@ -1072,7 +1074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `ParamSpec` creation",
@@ -1092,7 +1094,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if arguments.args().next().is_some() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `ParamSpec` can only be provided once",
@@ -1224,9 +1226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -1242,7 +1242,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         };
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
