@@ -49,3 +49,9 @@ qualifiers also cause a runtime error when annotations are evaluated eagerly:
 ...     x: ClassVar[int]
 TypeError: typing.ClassVar[int] is not valid as type argument
 ```
+
+## Rule history
+
+- v0.0.102: Split out `non-literal-named-tuple-fields`. To preserve an existing severity for both
+    rules, also configure the new rule at that level. Update rule-specific ignores for computed
+    fields to use the new name.

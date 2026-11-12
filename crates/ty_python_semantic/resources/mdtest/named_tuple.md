@@ -422,15 +422,27 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, reveal_mro
 
 fields = (("host", str), ("port", int))
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# snapshot
 Url = NamedTuple("Url", fields)
+```
 
+```snapshot
+error[non-literal-named-tuple-fields]: Invalid argument to parameter `fields` of `NamedTuple()`
+ --> src/mdtest_snippet.py:7:25
+  |
+7 | Url = NamedTuple("Url", fields)
+  |                         ^^^^^^ `fields` must be a literal list or tuple
+```
+
+ty still recognizes the generated class, but attribute lookup falls back to `Any`.
+
+```py
 url = Url("localhost", 8080)
 reveal_type(url.host)  # revealed: Any
 reveal_type(url.port)  # revealed: Any
 
 generic_fields = (("items", list[int]), ("mapping", dict[str, bool]))
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [non-literal-named-tuple-fields] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Container = NamedTuple("Container", generic_fields)
 container = Container([1, 2, 3], {"a": True})
 reveal_type(container.items)  # revealed: Any
@@ -459,6 +471,44 @@ reveal_type(url[1])  # revealed: Unknown
 
 # will error at runtime, but we can't detect that
 reveal_type(url[2])  # revealed: Unknown
+```
+
+### Computed field pairs and names
+
+ty reports `non-literal-named-tuple-fields` when a computed pair has the expected `(name, type)`
+shape, or when a field name has type `str` with no known literal value.
+
+```py
+from typing import NamedTuple
+
+def make_record(field: tuple[str, type], name: str):
+    Record = NamedTuple("Record", [field])  # error: [non-literal-named-tuple-fields]
+    Named = NamedTuple("Named", [(name, int)])  # error: [non-literal-named-tuple-fields]
+```
+
+Field pairs supplied by unpacking also prevent ty from determining the fields.
+
+```py
+def unpack_fields(fields: list[tuple[str, type]], field: tuple[str, type]):
+    Many = NamedTuple("Many", [*fields])  # error: [non-literal-named-tuple-fields]
+    One = NamedTuple("One", [(*field,)])  # error: [non-literal-named-tuple-fields]
+```
+
+A pair with the wrong number of items or a non-string name is invalid.
+
+```py
+def invalid(field: tuple[str, type, type], name: int):
+    Triple = NamedTuple("Triple", [field])  # error: [invalid-named-tuple]
+    Numbered = NamedTuple("Numbered", [(name, int)])  # error: [invalid-named-tuple]
+```
+
+A `list[str | type]` could contain `["host", str]`. A `list[int]` cannot supply a field name or an
+annotation, regardless of its length.
+
+```py
+def list_pair(field: list[str | type], numbers: list[int]):
+    Record = NamedTuple("Record", [field])  # error: [non-literal-named-tuple-fields]
+    Invalid = NamedTuple("Invalid", [numbers])  # error: [invalid-named-tuple]
 ```
 
 ### Functional syntax with Final variable field names
@@ -499,7 +549,7 @@ def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], .
     return (("x", int), ("y", str))
 
 fields = get_fields()
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [non-literal-named-tuple-fields] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 NT = NamedTuple("NT", fields)
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
@@ -625,7 +675,7 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [non-literal-named-tuple-fields] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 class Url(NamedTuple("Url", fields)):
     def with_port(self, port: int) -> Self:
         # Fields are unknown, so attribute access returns Any.
