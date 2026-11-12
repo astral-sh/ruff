@@ -1262,6 +1262,11 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         "impl Builder { pub(super) fn copy_any<R: super::Rewriter + ?Sized>(&mut self, node: super::SyntaxNode<'_>, rewriter: &mut R) -> BuildId<crate::kind::Any> { match node.classify() {"
     )
     for node in ast.all_nodes:
+        if node.name == "ExprCompare":
+            out.append(
+                "AnyNode::ExprCompare(node) => self.copy_comparison(node, rewriter).cast(),"
+            )
+            continue
         fields = [f"{field.name}: {copy_field(field, nodes)}," for field in node.fields]
         out.append(
             f"AnyNode::{node.name}(node) => build::{node.name} {{ range: node.range(), "

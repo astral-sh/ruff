@@ -234,21 +234,22 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: Stmt<'_>) {
                 }
 
                 ExprKind::Compare(expr_compare)
-                    if let Some(
-                        [
-                            op @ (ast::CmpOp::Eq
-                            | ast::CmpOp::NotEq
-                            | ast::CmpOp::In
-                            | ast::CmpOp::NotIn
-                            | ast::CmpOp::Is
-                            | ast::CmpOp::IsNot),
-                        ],
-                    ) = expr_compare.ops().as_array() =>
+                    if let Some((
+                        left,
+                        op @ (ast::CmpOp::Eq
+                        | ast::CmpOp::NotEq
+                        | ast::CmpOp::In
+                        | ast::CmpOp::NotIn
+                        | ast::CmpOp::Is
+                        | ast::CmpOp::IsNot),
+                        right,
+                    )) = expr_compare.as_single() =>
                 {
                     Some(syntax::with_comparison_op(
                         &mut builder,
-                        expr_compare,
+                        left,
                         op.negate(),
+                        right,
                     ))
                 }
 

@@ -178,15 +178,17 @@ pub(crate) fn negation_with_equal_op(
         return;
     }
 
+    let left = compare.first_operand();
+    let right = compare.second_operand();
     let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
-            left: checker.generator().expr(compare.first_operand()),
-            right: checker.generator().expr(compare.second_operand()),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(right),
         },
         expr.range(),
     );
     let mut builder = Builder::default();
-    let replacement = syntax::with_comparison_op(&mut builder, compare, CmpOp::NotEq);
+    let replacement = syntax::with_comparison_op(&mut builder, left, CmpOp::NotEq, right);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(builder.get(replacement)),
         expr.range(),
@@ -220,15 +222,17 @@ pub(crate) fn negation_with_not_equal_op(
         return;
     }
 
+    let left = compare.first_operand();
+    let right = compare.second_operand();
     let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
-            left: checker.generator().expr(compare.first_operand()),
-            right: checker.generator().expr(compare.second_operand()),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(right),
         },
         expr.range(),
     );
     let mut builder = Builder::default();
-    let replacement = syntax::with_comparison_op(&mut builder, compare, CmpOp::Eq);
+    let replacement = syntax::with_comparison_op(&mut builder, left, CmpOp::Eq, right);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(builder.get(replacement)),
         expr.range(),

@@ -5325,14 +5325,7 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyNode::ExprCompare(node) => build::ExprCompare {
-                range: node.range(),
-                ops: self.list(node.ops()),
-                operands: self.map_list(node.operands(), |b, child| b.copy_with(child, rewriter)),
-            }
-            .emit(self)
-            .0
-            .cast(),
+            AnyNode::ExprCompare(node) => self.copy_comparison(node, rewriter).cast(),
             AnyNode::ExprCall(node) => build::ExprCall {
                 range: node.range(),
                 func: self.copy_with(node.func(), rewriter),

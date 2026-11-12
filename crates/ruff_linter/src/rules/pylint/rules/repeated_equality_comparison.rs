@@ -192,11 +192,11 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: ExprBoolO
                 syntax::tuple(&mut builder, elts)
             };
             let left = builder.copy_node(expr);
-            let operands = builder.list([left, comparator]);
             let ops = builder.list([match bool_op.op {
                 BoolOp::Or => CmpOp::In,
                 BoolOp::And => CmpOp::NotIn,
             }]);
+            let operands = builder.list([left, comparator]);
             let membership = builder
                 .add(build::ExprCompare {
                     range: bool_op.range,

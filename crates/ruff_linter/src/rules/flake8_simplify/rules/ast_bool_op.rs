@@ -512,8 +512,8 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: ExprBoolOp<'_>) {
         let name = syntax::name(&mut builder, id.as_str());
         let elts = builder.copy_nodes(comparators);
         let choices = syntax::tuple(&mut builder, elts);
-        let operands = builder.list([name, choices]);
         let ops = builder.list([CmpOp::In]);
+        let operands = builder.list([name, choices]);
         let in_expr: BuildId<ruff_python_ast::kind::Expr> = builder
             .add(build::ExprCompare {
                 ops,

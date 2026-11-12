@@ -2,8 +2,8 @@
 
 use ruff_python_ast::kind;
 use ruff_python_ast::{
-    AstNodeId, BuildId, Builder, CmpOp, ConversionFlag, Expr, ExprCompare, ExprContext, ExprKind,
-    FStringFlags, ListId, Operator, StringLiteralFlags, UnaryOp, build,
+    AstNodeId, BuildId, Builder, CmpOp, ConversionFlag, Expr, ExprContext, ExprKind, FStringFlags,
+    ListId, Operator, StringLiteralFlags, UnaryOp, build,
 };
 use ruff_text_size::TextRange;
 
@@ -187,8 +187,8 @@ pub(crate) fn compare(
     op: CmpOp,
     right: BuildId<kind::Expr>,
 ) -> BuildId<kind::Expr> {
-    let operands = builder.list([left, right]);
     let ops = builder.list([op]);
+    let operands = builder.list([left, right]);
     builder
         .add(build::ExprCompare {
             range: TextRange::default(),
@@ -347,16 +347,11 @@ fn copy_union_member(builder: &mut Builder, member: Expr<'_>) -> BuildId<kind::E
 /// Rebuilds a single comparison with the given operator.
 pub(crate) fn with_comparison_op(
     builder: &mut Builder,
-    comparison: ExprCompare<'_>,
+    left: Expr<'_>,
     op: CmpOp,
+    right: Expr<'_>,
 ) -> BuildId<kind::Expr> {
-    let operands = builder.copy_nodes(comparison.operands());
-    let ops = builder.list([op]);
-    builder
-        .add(build::ExprCompare {
-            range: TextRange::default(),
-            operands,
-            ops,
-        })
-        .into()
+    let left = builder.copy_node(left);
+    let right = builder.copy_node(right);
+    compare(builder, left, op, right)
 }

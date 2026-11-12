@@ -1031,6 +1031,10 @@ impl Builder {
             let word = encode(self, item);
             self.scratch.push(word);
         }
+        self.finish_list(start)
+    }
+
+    fn finish_list<E>(&mut self, start: usize) -> ListId<E> {
         let items = &self.scratch[start..];
         let range = Interval::new(self.ast.extra.len(), items.len());
         self.ast.extra.extend_from_slice(items);

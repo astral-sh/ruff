@@ -154,9 +154,9 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: Stmt<'_>) {
                 {
                     builder.copy_node(operand)
                 } else if let ExprKind::Compare(compare) = loop_.test.classify()
-                    && let Some((_, op, _)) = compare.as_single()
+                    && let Some((left, op, right)) = compare.as_single()
                 {
-                    syntax::with_comparison_op(&mut builder, compare, op.negate())
+                    syntax::with_comparison_op(&mut builder, left, op.negate(), right)
                 } else {
                     syntax::not_expr(&mut builder, loop_.test)
                 }
