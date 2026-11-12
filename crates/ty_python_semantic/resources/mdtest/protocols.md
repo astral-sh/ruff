@@ -2499,7 +2499,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of
 
 class Setter(type):
-    def __set__(cls, instance: object, value: type) -> None: ...
+    def __set__(cls, instance: object, value: int) -> None: ...
 
 class HasDescriptor(Protocol):
     class attribute(metaclass=Setter): ...
@@ -2507,9 +2507,9 @@ class HasDescriptor(Protocol):
 def access(obj: HasDescriptor, cls: type[HasDescriptor]):
     reveal_type(obj.attribute)  # revealed: type[attribute]
     reveal_type(cls.attribute)  # revealed: type[attribute]
-    obj.attribute = int  # ok
-    obj.attribute = 1  # error: [invalid-assignment]
-    cls.attribute = HasDescriptor.attribute  # error: [invalid-assignment]
+    obj.attribute = 1  # ok
+    obj.attribute = "wrong"  # error: [invalid-assignment]
+    cls.attribute = 1  # error: [invalid-assignment]
 ```
 
 An instance property cannot satisfy the class-side read contract.
@@ -2521,7 +2521,7 @@ class InvalidInstanceOnly:
         return HasDescriptor.attribute
 
     @attribute.setter
-    def attribute(self, value: type) -> None: ...
+    def attribute(self, value: int) -> None: ...
 
 static_assert(not is_subtype_of(InvalidInstanceOnly, HasDescriptor))
 ```
