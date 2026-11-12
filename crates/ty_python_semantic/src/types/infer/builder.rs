@@ -10901,13 +10901,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_parameters = current_function.parameters();
 
         // `self`/`cls` can't be a keyword-only parameter.
-        if function_parameters.posonlyargs().next().is_none()
-            && function_parameters.args().next().is_none()
-        {
-            return;
-        }
-
-        let Some(first_parameter) = function_parameters.iter_non_variadic_params().next() else {
+        let Some(first_parameter) = function_parameters.iter_positional_params().next() else {
             return;
         };
 

@@ -930,6 +930,25 @@ mod tests {
     }
 
     #[test]
+    fn keyword_parameters_follow_source_order() {
+        for (source, expected) in [
+            ("def f(p, /, x, *args, y, **kw): pass", &["x", "y"][..]),
+            ("def f(p, /, *args, **kw): pass", &[]),
+            ("def f(x, **kw, *args, y): pass", &["x", "y"]),
+        ] {
+            let parsed = parse_unchecked_source(source, PySourceType::Python);
+            let parameters = parsed
+                .root()
+                .descendants()
+                .find_map(AstNode::cast::<ruff_python_ast::Parameters>)
+                .unwrap();
+            let names = parameters.iter_keyword_params().map(|p| p.name().as_str());
+            assert!(names.clone().eq(expected.iter().copied()), "{source}");
+            assert!(names.rev().eq(expected.iter().rev().copied()), "{source}");
+        }
+    }
+
+    #[test]
     fn recovered_parameters_iterate_in_argument_order() {
         let parsed = parse_unchecked_source("def f(**kw, x): pass", PySourceType::Python);
         let parameters = parsed

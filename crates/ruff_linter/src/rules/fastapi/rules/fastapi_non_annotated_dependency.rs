@@ -118,11 +118,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
     // avoid emitting fixes that would remove defaults and cause a syntax error.
     let mut seen_default = false;
 
-    for parameter in function_def
-        .parameters
-        .args()
-        .chain(function_def.parameters.kwonlyargs())
-    {
+    for parameter in function_def.parameters.iter_keyword_params() {
         let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
         else {
             seen_default |= parameter.default().is_some();

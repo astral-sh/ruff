@@ -146,7 +146,7 @@ pub(crate) fn fastapi_unused_path_parameter(
     let mut named_args = vec![];
     let mut positional_only_args = vec![];
 
-    for parameter_with_default in non_posonly_non_variadic_parameters(function_def.node) {
+    for parameter_with_default in function_def.parameters.iter_keyword_params() {
         let parameter = parameter_with_default.parameter();
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
@@ -206,16 +206,6 @@ pub(crate) fn fastapi_unused_path_parameter(
             }
         }
     }
-}
-
-/// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
-fn non_posonly_non_variadic_parameters(
-    function_def: ast::StmtFunctionDef<'_>,
-) -> impl Iterator<Item = ParameterWithDefault<'_>> {
-    function_def
-        .parameters()
-        .args()
-        .chain(function_def.parameters().kwonlyargs())
 }
 
 #[derive(Debug, is_macro::Is)]
@@ -346,7 +336,7 @@ impl<'a> Dependency<'a> {
                 };
 
                 let parameter_names = function_def
-                    .parameters
+                    .parameters()
                     .iter_keyword_params()
                     .map(|param| param.name().as_str())
                     .collect();
@@ -413,7 +403,7 @@ impl<'a> Dependency<'a> {
                 .find(|func_def| func_def.name().as_str() == method_name)?;
             // Skip `self` parameter
             method_def
-                .parameters
+                .parameters()
                 .iter_keyword_params()
                 .skip(1)
                 .map(|param| param.name().as_str())

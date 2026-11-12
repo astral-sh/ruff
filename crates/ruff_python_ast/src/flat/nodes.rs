@@ -328,6 +328,18 @@ impl<'a> crate::Parameters<'a> {
         })
     }
 
+    /// Positional-or-keyword and keyword-only parameters, in source order.
+    pub fn iter_keyword_params(
+        self,
+    ) -> impl DoubleEndedIterator<Item = ParameterWithDefault<'a>> + Clone {
+        self.items().matching(|role| {
+            matches!(
+                role,
+                super::ParameterItems::POSITIONAL_OR_KEYWORD | super::ParameterItems::KEYWORD_ONLY
+            )
+        })
+    }
+
     /// Parameters which can have defaults, including keyword-only parameters.
     pub fn iter_non_variadic_params(
         self,
