@@ -211,18 +211,26 @@ impl Parser<'_> {
                 let pattern = parser.parse_match_pattern_lhs(AllowStarPattern::No);
                 let range = pattern.range();
                 let key = match pattern.view(&parser.storage).classify() {
-                    PatternKind::MatchValue(node) => id::Node::from_view(node.value()),
-                    PatternKind::MatchSingleton(node) => match node.value() {
-                        Singleton::None => build::ExprNoneLiteral { range }
+                    PatternKind::MatchValue(node) => {
+                        let value = id::Node::from_view(node.value());
+                        parser.storage.discard_pattern_wrapper(pattern.id);
+                        value
+                    }
+                    PatternKind::MatchSingleton(node) => {
+                        let value = node.value();
+                        parser.storage.discard_pattern_wrapper(pattern.id);
+                        match value {
+                            Singleton::None => build::ExprNoneLiteral { range }
+                                .parsed(&mut parser.storage)
+                                .into(),
+                            value => build::ExprBooleanLiteral {
+                                range,
+                                value: value == Singleton::True,
+                            }
                             .parsed(&mut parser.storage)
                             .into(),
-                        value => build::ExprBooleanLiteral {
-                            range,
-                            value: value == Singleton::True,
                         }
-                        .parsed(&mut parser.storage)
-                        .into(),
-                    },
+                    }
                     _ => {
                         parser.add_error(
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
@@ -659,10 +667,12 @@ impl Parser<'_> {
 
         let lhs_value =
             if let Some(matched) = lhs.view(&self.storage).cast::<ast::PatternMatchValue>() {
-                let value = id::Node::from_view(matched.value());
-                if !is_real_number(matched.value()) {
+                let expr = matched.value();
+                let value = id::Node::from_view(expr);
+                if !is_real_number(expr) {
                     self.add_error(ParseErrorType::ExpectedRealNumber, lhs);
                 }
+                self.storage.discard_pattern_wrapper(lhs.id);
                 value
             } else {
                 self.add_error(ParseErrorType::ExpectedRealNumber, lhs);
@@ -674,10 +684,12 @@ impl Parser<'_> {
             .view(&self.storage)
             .cast::<ast::PatternMatchValue>()
         {
-            let value = id::Node::from_view(matched.value());
-            if !is_complex_number(matched.value()) {
+            let expr = matched.value();
+            let value = id::Node::from_view(expr);
+            if !is_complex_number(expr) {
                 self.add_error(ParseErrorType::ExpectedImaginaryNumber, rhs_pattern);
             }
+            self.storage.discard_pattern_wrapper(rhs_pattern.id);
             value
         } else {
             self.add_error(ParseErrorType::ExpectedImaginaryNumber, rhs_pattern);
@@ -740,14 +752,16 @@ impl Parser<'_> {
                 if node.pattern().is_none()
                     && let Some(ident) = node.name() =>
             {
-                let ctx = if ident.id().is_empty() {
+                let name = id::Node::from_view(ident);
+                let ident = self.storage.take_pattern_name(cls.id, name.id);
+                let ctx = if self.storage.name(ident.id).is_empty() {
                     ExprContext::Invalid
                 } else {
                     ExprContext::Load
                 };
                 build::ExprName {
-                    range: ident.range(),
-                    id: ident.name_id(),
+                    range: ident.range,
+                    id: ident.id,
                     ctx,
                 }
                 .parsed(&mut self.storage)
@@ -756,7 +770,9 @@ impl Parser<'_> {
             PatternKind::MatchValue(node)
                 if node.value().node_kind() == ast::NodeKind::ExprAttribute =>
             {
-                id::Node::from_view(node.value())
+                let value = id::Node::from_view(node.value());
+                self.storage.discard_pattern_wrapper(cls.id);
+                value
             }
             _ => {
                 self.add_error(
@@ -786,7 +802,9 @@ impl Parser<'_> {
                         && node.pattern().is_none()
                         && let Some(name) = node.name()
                     {
-                        id::Node::from_view(name)
+                        let key = id::Node::from_view(name);
+                        parser.storage.discard_pattern_wrapper(pattern.id);
+                        key
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(

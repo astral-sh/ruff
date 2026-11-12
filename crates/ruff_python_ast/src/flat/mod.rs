@@ -741,6 +741,35 @@ impl Builder {
         }
     }
 
+    /// Discards a temporary pattern after its child becomes a dictionary key or class keyword.
+    /// Handles to the wrapper expire if it is the final arena row.
+    pub fn discard_pattern_wrapper(&mut self, pattern: BuildId<crate::kind::Pattern>) {
+        self.discard_if_last(pattern);
+    }
+
+    /// In `case Point()`, the parser recognizes a capture before discovering that its name
+    /// belongs to the class expression. Keep the name and span and release both temporary rows.
+    pub fn take_pattern_name(
+        &mut self,
+        pattern: BuildId<crate::kind::Pattern>,
+        name: BuildId<crate::kind::Identifier>,
+    ) -> build::Identifier {
+        let row = &self.ast.rows[name.slot()];
+        let identifier = build::Identifier {
+            range: row.range(),
+            id: NameId(row.identifier_id()),
+        };
+        self.discard_if_last(pattern);
+        self.discard_if_last(name);
+        identifier
+    }
+
+    fn discard_if_last<T>(&mut self, id: BuildId<T>) {
+        if id.slot() + 1 == self.ast.rows.len() {
+            self.ast.rows.pop();
+        }
+    }
+
     pub fn checkpoint(&self) -> Checkpoint {
         Checkpoint {
             rows: self.ast.rows.len(),

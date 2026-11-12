@@ -717,10 +717,16 @@ fn keyword_and_dotted_import_names_use_one_row_each() {
 }
 
 #[test]
-fn wildcard_patterns_do_not_allocate_identifier_rows() {
-    let parsed =
-        parse_module("match value:\n    case [_, *tail]: pass\n    case [head, *_]: pass\n")
-            .unwrap();
+fn pattern_keys_and_class_heads_only_allocate_reachable_rows() {
+    let source = "\
+match value:
+    case [_, *tail]: pass
+    case [head, *_]: pass
+    case Point(): pass
+    case graphics.Point(x, y=_): pass
+    case {True: _, constants.key: _, 1+2j: _, **rest}: pass
+";
+    let parsed = parse_module(source).unwrap();
     assert_eq!(parsed.ast().len(), parsed.root().descendants().count());
 }
 
