@@ -312,9 +312,7 @@ impl Violation for UnixCommandWildcardInjection {
 fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::StringLiteral(_) => true,
-        _ => semantic
-            .resolve_qualified_name(expr)
-            .is_some_and(|name| matches!(name.segments(), ["sys", "executable"])),
+        _ => semantic.matches_qualified_name(expr, &["sys", "executable"]),
     }
 }
 

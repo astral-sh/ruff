@@ -63,10 +63,7 @@ impl TypeChecker for HttpxClientChecker {
         semantic: &ruff_python_semantic::SemanticModel,
     ) -> bool {
         // match base annotation directly
-        if semantic
-            .resolve_qualified_name(annotation)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
-        {
+        if semantic.matches_qualified_name(annotation, &["httpx", "Client"]) {
             return true;
         }
 
@@ -74,12 +71,7 @@ impl TypeChecker for HttpxClientChecker {
         let mut found = false;
         traverse_union_and_optional(
             &mut |inner_expr, _| {
-                if semantic
-                    .resolve_qualified_name(inner_expr)
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["httpx", "Client"])
-                    })
-                {
+                if semantic.matches_qualified_name(inner_expr, &["httpx", "Client"]) {
                     found = true;
                 }
             },
@@ -97,9 +89,7 @@ impl TypeChecker for HttpxClientChecker {
             return false;
         };
 
-        semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
+        semantic.matches_qualified_name(func, &["httpx", "Client"])
     }
 }
 

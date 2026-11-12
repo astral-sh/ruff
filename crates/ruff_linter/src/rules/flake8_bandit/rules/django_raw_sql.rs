@@ -42,16 +42,10 @@ pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["django", "db", "models", "expressions", "RawSQL"]
-            )
-        })
-    {
+    if checker.semantic().matches_qualified_name(
+        &call.func,
+        &["django", "db", "models", "expressions", "RawSQL"],
+    ) {
         if !call
             .arguments
             .find_argument_value("sql", 0)

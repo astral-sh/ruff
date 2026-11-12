@@ -183,15 +183,12 @@ fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Opt
 }
 
 fn find_func_parent_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
-    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
-
-    match qualified_name.segments() {
-        ["os", "makedirs"] => call
-            .arguments
-            .find_keyword("parent_mode")
-            .map(|keyword| &keyword.value),
-        _ => None,
+    if !semantic.matches_qualified_name(&call.func, &["os", "makedirs"]) {
+        return None;
     }
+    call.arguments
+        .find_keyword("parent_mode")
+        .map(|keyword| &keyword.value)
 }
 
 fn find_method_parent_mode_arg<'a>(

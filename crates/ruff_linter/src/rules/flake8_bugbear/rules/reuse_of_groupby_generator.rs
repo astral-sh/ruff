@@ -349,8 +349,7 @@ pub(crate) fn reuse_of_groupby_generator(
     // Check if the function call is `itertools.groupby`
     if !checker
         .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["itertools", "groupby"]))
+        .matches_qualified_name(func, &["itertools", "groupby"])
     {
         return;
     }

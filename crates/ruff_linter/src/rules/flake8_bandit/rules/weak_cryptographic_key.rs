@@ -121,10 +121,9 @@ fn extract_cryptographic_key(
             "ec" => {
                 let argument = call.arguments.find_argument_value("curve", 0)?;
                 let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
-                let qualified_name = checker.semantic().resolve_qualified_name(value)?;
-                if matches!(
-                    qualified_name.segments(),
-                    ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]
+                if checker.semantic().matches_qualified_name(
+                    value,
+                    &["cryptography", "hazmat", "primitives", "asymmetric", "ec"],
                 ) {
                     Some((
                         CryptographicKey::Ec {

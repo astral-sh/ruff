@@ -246,11 +246,10 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
     // Determine whether the assignment is in a `@dataclass` class definition.
     if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
         if class_def.decorator_list.iter().any(|decorator| {
-            semantic
-                .resolve_qualified_name(map_callable(&decorator.expression))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
-                })
+            semantic.matches_qualified_name(
+                map_callable(&decorator.expression),
+                &["dataclasses", "dataclass"],
+            )
         }) {
             // Determine whether the annotation is `typing.ClassVar`, `dataclasses.InitVar`, or `dataclasses.KW_ONLY`.
             return semantic

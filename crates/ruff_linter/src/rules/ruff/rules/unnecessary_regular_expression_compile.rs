@@ -112,7 +112,5 @@ fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str
 
 /// Returns `true` if `func` resolves to `re.compile`.
 fn is_re_compile(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["re", "compile"]))
+    semantic.matches_qualified_name(func, &["re", "compile"])
 }
