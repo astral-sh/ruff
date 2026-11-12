@@ -534,17 +534,9 @@ fn member_attribute_write_requirement<'db>(
         object_ty,
         Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
     ) {
-        return class_attribute_write_requirement(db, env, object_ty, attribute, members);
-    }
-    let Some(member) = instance_attribute_write_member_requirement(
-        db, env, object_ty, attribute, receiver, members,
-    ) else {
-        return AttributeWriteRequirement::CannotAssign;
-    };
-    AttributeWriteRequirement::Instance {
-        object_ty,
-        receiver,
-        member,
+        class_attribute_write_requirement(db, env, object_ty, attribute, members)
+    } else {
+        instance_attribute_write_requirement(db, env, object_ty, attribute, receiver, members)
     }
 }
 
@@ -615,34 +607,37 @@ pub(super) fn nested_class_instance_override<'db>(
 ///
 /// The returned requirement preserves a possibly-defined class member and its instance fallback,
 /// because both runtime paths must accept the write. If neither exists, the caller must evaluate
-/// `__setattr__`. Returns `None` for a read-only nested class.
-fn instance_attribute_write_member_requirement<'db>(
+/// `__setattr__`.
+fn instance_attribute_write_requirement<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     receiver: Option<Type<'db>>,
     members: Option<AssignmentAttributeMembers<'db>>,
-) -> Option<InstanceAttributeWriteMember<'db>> {
-    let Some(members) = members else {
-        return Some(InstanceAttributeWriteMember::SetAttr);
+) -> AttributeWriteRequirement<'db> {
+    let instance = |member| AttributeWriteRequirement::Instance {
+        object_ty,
+        receiver,
+        member,
     };
     let fallback_requirement = |member| {
         instance_fallback_write_requirement(db, env, object_ty, attribute, member, receiver)
     };
     let (type_member, receiver_fallback) = match members {
-        AssignmentAttributeMembers::TypeMember {
+        Some(AssignmentAttributeMembers::TypeMember {
             member,
             receiver_fallback,
-        } => (member, receiver_fallback),
-        AssignmentAttributeMembers::ReceiverMember(member) => {
-            return Some(InstanceAttributeWriteMember::Instance(
+        }) => (member, receiver_fallback),
+        Some(AssignmentAttributeMembers::ReceiverMember(member)) => {
+            return instance(InstanceAttributeWriteMember::Instance(
                 fallback_requirement(member),
             ));
         }
+        None => return instance(InstanceAttributeWriteMember::SetAttr),
     };
 
-    Some(match type_member {
+    let member = match type_member {
         type_member if type_member.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
@@ -653,9 +648,12 @@ fn instance_attribute_write_member_requirement<'db>(
             let instance_override = if qualifiers.contains(TypeQualifiers::NESTED_CLASS)
                 && !ty.is_data_descriptor(db, env)
             {
-                Some(nested_class_instance_override(
-                    db, env, object_ty, attribute, receiver,
-                )?)
+                let Some(member) =
+                    nested_class_instance_override(db, env, object_ty, attribute, receiver)
+                else {
+                    return AttributeWriteRequirement::CannotAssign;
+                };
+                Some(member)
             } else {
                 None
             };
@@ -680,18 +678,14 @@ fn instance_attribute_write_member_requirement<'db>(
                     .and_then(|class| class.static_class_literal(db))
                     .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute))
             {
-                return Some(InstanceAttributeWriteMember::SetAttr);
-            }
-
-            if let Some(instance_override) = instance_override {
-                return Some(InstanceAttributeWriteMember::Instance(
-                    fallback_requirement(instance_override),
-                ));
-            }
-
-            InstanceAttributeWriteMember::Explicit {
-                member,
-                fallback: receiver_fallback.map(fallback_requirement),
+                InstanceAttributeWriteMember::SetAttr
+            } else if let Some(instance_override) = instance_override {
+                InstanceAttributeWriteMember::Instance(fallback_requirement(instance_override))
+            } else {
+                InstanceAttributeWriteMember::Explicit {
+                    member,
+                    fallback: receiver_fallback.map(fallback_requirement),
+                }
             }
         }
         PlaceAndQualifiers {
@@ -706,7 +700,8 @@ fn instance_attribute_write_member_requirement<'db>(
             ) => InstanceAttributeWriteMember::Instance(fallback_requirement(fallback)),
             _ => InstanceAttributeWriteMember::SetAttr,
         },
-    })
+    };
+    instance(member)
 }
 
 /// Resolve a class-object write against the metaclass and then the class object's attributes.
