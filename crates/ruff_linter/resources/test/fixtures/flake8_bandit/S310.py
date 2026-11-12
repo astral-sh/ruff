@@ -64,3 +64,11 @@ urllib.request.Request(concatenated_url)
 nested_concatenated = "http://" + "example.com" + "/data.csv"
 urllib.request.urlopen(nested_concatenated)
 urllib.request.Request(nested_concatenated)
+
+# An explicit url keyword wins when the call also contains a positional URL.
+urllib.request.urlopen("file:///data", url="https://example.com")
+urllib.request.urlopen("https://example.com", url="file:///data")
+
+# A later unpacking can still make a call ambiguous after an explicit URL.
+urllib.request.Request(url="https://example.com", *args)
+urllib.request.urlopen("https://example.com", *args, timeout=2)
