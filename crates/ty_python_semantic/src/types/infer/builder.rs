@@ -10361,18 +10361,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    /// An unannotated generator's signature uses `Unknown` for its return type.
-    /// Only an explicit return annotation provides an expected type for yielded values.
-    fn declared_yield_type(
-        &self,
-        function: FunctionType<'db>,
-        yield_ty: Option<Type<'db>>,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let definition = function.literal(db).last_definition;
-        yield_ty.filter(|_| definition.has_explicit_return_annotation(db))
-    }
-
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -10392,7 +10380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ReturnCallableTypeVarScope::Public,
         )
         .return_ty;
-        let return_type_span = enclosing_function.spans(self.db()).return_type;
+        let return_type_span = enclosing_function.spans(db).return_type;
 
         let Some(generator_type_params) =
             declared_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
@@ -10401,8 +10389,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
 
-        let expected_yield_ty =
-            self.declared_yield_type(enclosing_function, generator_type_params.yield_ty);
+        // An unannotated generator's synthesized `Unknown` supplies no expected type.
+        let expected_yield_ty = generator_type_params
+            .yield_ty
+            .filter(|_| return_type_span.is_some());
         let tcx = TypeContext::declared(expected_yield_ty);
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
@@ -10451,9 +10441,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
-        let return_type_span = enclosing_function.spans(self.db()).return_type;
+        let return_type_span = enclosing_function.spans(db).return_type;
 
-        let outer_yield_ty = self.declared_yield_type(enclosing_function, outer_expected.yield_ty);
+        let outer_yield_ty = outer_expected
+            .yield_ty
+            .filter(|_| return_type_span.is_some());
         let tcx = TypeContext::declared(outer_yield_ty.map(|yielded_ty| {
             KnownClass::Iterable.to_specialized_instance(db, env, &[yielded_ty])
         }));

@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
@@ -1305,7 +1305,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
             continue;
         };
 
-        if origin.is_declared() {
+        if origin == TypeOrigin::Declared {
             let mut reported_incompatible_binding = false;
             for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
                 let Some(definition) = binding.binding.definition() else {

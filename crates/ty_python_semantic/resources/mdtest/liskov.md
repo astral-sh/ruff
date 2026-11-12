@@ -3846,8 +3846,9 @@ class IncompatibleProperty(ClassBase):
         return ""
 ```
 
-A descriptor stored in a class variable can implement a property. Its getter determines the type
-read through an instance, whether the class variable's type is inferred or explicit.
+For an inherited getter-only property, ty checks the instance read type. A descriptor stored in a
+bare or explicitly typed `ClassVar` can supply that type even when class access returns the
+descriptor.
 
 ```py
 from typing_extensions import Self, overload
@@ -3876,8 +3877,8 @@ class IncompatibleDescriptor(TextBase):
     value: ClassVar = IntDescriptor()
 ```
 
-Reading through the class returns the descriptor itself, and assigning through the class replaces
-it. An override must preserve both operations even when instance reads always return `int`.
+When the base declares a mutable `ClassVar`, subclasses must also preserve class reads and
+assignments. Here a class read returns the descriptor itself, and assignment replaces it.
 
 ```py
 class NarrowDescriptor(IntDescriptor): ...

@@ -19,12 +19,15 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{place_table, use_def_map};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// Add a secondary annotation to a diagnostic pointing to the `Final` declaration site.
+    /// Point to the `Final` declaration when its location is known.
     fn annotate_final_declaration(
         &self,
         diagnostic: &mut Diagnostic,
-        declaration: Definition<'db>,
+        declaration: Option<Definition<'db>>,
     ) {
+        let Some(declaration) = declaration else {
+            return;
+        };
         let db = self.db();
         let file = declaration.file(db);
         let module = parsed_module(db, declaration.python_file(db)).load(db);
@@ -130,9 +133,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"
             });
-            if let Some(final_declaration) = final_declaration {
-                self.annotate_final_declaration(&mut diagnostic, final_declaration);
-            }
+            self.annotate_final_declaration(&mut diagnostic, final_declaration);
         };
 
         if !is_in_allowed_initializer {
@@ -180,9 +181,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diagnostic.set_primary_annotation_message(
                         "Only the class that declares a final attribute can initialize it",
                     );
-                    if let Some(declaration) = final_declaration {
-                        self.annotate_final_declaration(&mut diagnostic, declaration);
-                    }
+                    self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }
                 return true;
             }
@@ -199,9 +198,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diagnostic.set_primary_annotation_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
-                    if let Some(final_declaration) = final_declaration {
-                        self.annotate_final_declaration(&mut diagnostic, final_declaration);
-                    }
+                    self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }
 
                 return true;
@@ -224,24 +221,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         }
 
-        if emit_diagnostics {
+        if emit_diagnostics
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ASSIGNMENT, target.range())
+        {
             let final_declaration = self
                 .final_attribute_declaration(object_ty, attribute)
                 .and_then(|(_, definition)| definition);
-
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(db, self.program_environment())
-                ));
-                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
-                if let Some(final_declaration) = final_declaration {
-                    self.annotate_final_declaration(&mut diagnostic, final_declaration);
-                }
-            }
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot delete final attribute `{attribute}` on type `{}`",
+                object_ty.display(db, self.program_environment())
+            ));
+            diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
+            self.annotate_final_declaration(&mut diagnostic, final_declaration);
         }
 
         true

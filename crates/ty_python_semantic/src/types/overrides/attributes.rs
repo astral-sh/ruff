@@ -280,18 +280,7 @@ fn bind_attribute<'db>(
         // assignment through the class replaces the stored value without calling its setter.
         let stored = ty.bind_self_typevars(db, env, receiver);
         let owner = receiver.to_meta_type(db, env);
-        let read = |instance| {
-            let (member, _, error) = Type::try_call_dunder_get_on_attribute(
-                db,
-                env,
-                Place::bound(stored).into(),
-                instance,
-                owner,
-            );
-            member
-                .ignore_possibly_undefined()
-                .filter(|_| error.is_none())
-        };
+        let read = |instance| stored.class_variable_read_type(db, env, instance, owner);
         (read(Some(receiver)), read(None), Some(stored))
     } else if is_descriptor {
         let read = Type::resolve_descriptor_access(

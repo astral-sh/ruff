@@ -892,6 +892,9 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place: Option<DefinedPlace<'db, Option<Type<'db>>>>,
     qualifiers: TypeQualifiers,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    /// At least one reachable declaration supplies qualifiers without a type, even if other
+    /// declarations of the same place specify a type.
+    pub(crate) has_qualifier_only_declaration: bool,
     /// Contains the first reachable declaration for this place, if any.
     /// This field is used for backreferences in diagnostics.
     pub(crate) first_declaration: Option<Definition<'db>>,
@@ -2137,25 +2140,15 @@ impl<'db> PublicTypeBuilder<'db> {
 
 /// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
 /// and eventually builds a union from them.
+#[derive(Default)]
 struct DeclaredTypeBuilder<'db> {
-    inner: PublicTypeBuilder<'db>,
-    has_declared_type: bool,
+    inner: Option<PublicTypeBuilder<'db>>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        DeclaredTypeBuilder {
-            inner: PublicTypeBuilder::new(db, env),
-            has_declared_type: false,
-            qualifiers: TypeQualifiers::empty(),
-            first_type: None,
-            conflicting_types: FxOrderSet::default(),
-        }
-    }
-
     fn add(
         &mut self,
         db: &'db dyn Db,
@@ -2163,14 +2156,15 @@ impl<'db> DeclaredTypeBuilder<'db> {
         element: DeclaredType<'db>,
         reachability: Truthiness,
     ) {
-        debug_assert!(std::ptr::eq(db, self.inner.db));
-
         self.qualifiers |= element.qualifiers();
         let Some(element_ty) = element.inner_type() else {
             return;
         };
-        self.has_declared_type = true;
-        if self.inner.add(element_ty, reachability) {
+        let inner = self
+            .inner
+            .get_or_insert_with(|| PublicTypeBuilder::new(db, env));
+        debug_assert!(std::ptr::eq(db, inner.db));
+        if inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(db, env, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -2182,7 +2176,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
-        let ty = self.has_declared_type.then(|| self.inner.build());
+        let ty = self.inner.map(PublicTypeBuilder::build);
         let ty = DeclaredType::new(ty, TypeOrigin::Declared, self.qualifiers);
         if self.conflicting_types.is_empty() {
             (ty, None)
@@ -2278,7 +2272,7 @@ fn place_from_declarations_impl<'db>(
 
     if let Some((first, first_reachability)) = types.next() {
         let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
-            let mut builder = DeclaredTypeBuilder::new(db, env);
+            let mut builder = DeclaredTypeBuilder::default();
             builder.add(db, env, first, first_reachability);
             builder.add(db, env, second, second_reachability);
             for (element, reachability) in types {
@@ -2306,6 +2300,7 @@ fn place_from_declarations_impl<'db>(
             ),
             qualifiers: declared.qualifiers(),
             conflicting_types: conflicting,
+            has_qualifier_only_declaration,
             first_declaration,
         }
     } else {

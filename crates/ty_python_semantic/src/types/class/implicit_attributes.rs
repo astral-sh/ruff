@@ -160,7 +160,6 @@ impl<'db> StaticClassLiteral<'db> {
             // is a classmethod or staticmethod. This is more reliable than checking the
             // final evaluated type, which may be wrapped by other decorators like @cache.
             let function_node = method_def.node(&module);
-            let method_name = function_node.name.as_str();
             if initializer_only && !is_final_attribute_initializer(db, index, function_node) {
                 return false;
             }
@@ -182,6 +181,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             // Also check for implicit classmethods/staticmethods based on method name
+            let method_name = function_node.name.as_str();
             if is_implicit_classmethod(method_name) {
                 is_classmethod = true;
             }

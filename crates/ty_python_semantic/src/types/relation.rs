@@ -3606,7 +3606,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     return self.always();
                 };
                 let result = self
-                    .protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                    .protocol_member_has_disjoint_type_from_ty(db, &member, other, attribute_type)
                     .or(db, self.constraints, || {
                         self.protocol_member_write_is_definitely_missing_from_ty(db, &member, other)
                     })
@@ -4259,6 +4259,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 }) => self.protocol_member_has_disjoint_type_from_ty(
                                     db,
                                     &member,
+                                    other,
                                     attribute_type,
                                 ),
                                 Place::Undefined => self.never(),
