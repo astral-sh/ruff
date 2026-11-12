@@ -105,14 +105,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
 
     let parameters = &function_def.parameters;
 
-    if parameters.kwonlyargs().next().is_some()
-        || parameters.kwarg().is_some()
-        || parameters.vararg().is_some()
-    {
-        return;
-    }
-
-    if (parameters.iter_positional_params().count()) != 1 {
+    if parameters.len() != 1 || parameters.iter_positional_params().next().is_none() {
         return;
     }
 
