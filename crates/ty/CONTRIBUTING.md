@@ -150,6 +150,10 @@ first argument (or second after `self`).
 
 ### Adding a rule
 
+Avoid broad rules that catch many different kinds of errors. Separate rules let users enable or
+disable each kind of diagnostic independently. If several other Python type checkers give users
+separate controls for the same cases, that's a strong signal that the distinction is useful.
+
 Follow [Ruff's rule naming convention](../../docs/rule-proposals.md#rule-naming-convention).
 Name the pattern the rule reports so that its name reads naturally in a suppression such as
 `# ty: ignore[invalid-assignment]`.
