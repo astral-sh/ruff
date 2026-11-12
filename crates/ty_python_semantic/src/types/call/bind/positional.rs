@@ -34,7 +34,9 @@ pub(super) fn match_arguments<'db>(
     if signature.generic_context.is_some()
         || !parameters.is_standard()
         || variadic.is_some_and(|(_, parameter)| parameter.has_starred_annotation())
-        || parameters.keyword_variadic().is_some()
+        || parameters
+            .keyword_variadic()
+            .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
         || !arguments
             .iter()
             .any(|argument| matches!(argument, CallArgument::Variadic(_)))
@@ -124,6 +126,7 @@ pub(super) fn match_arguments<'db>(
             .skip(parameter_count)
             .all(|(index, parameter)| {
                 parameter.is_variadic()
+                    || parameter.is_keyword_variadic()
                     || parameter.has_default()
                     || matcher.explicit_keyword_parameters.contains(&index)
             });
