@@ -179,7 +179,9 @@ impl<'a> SectionContexts<'a> {
                 continue;
             }
 
-            if let Some((section_name, section_kind)) = suspected_as_section(&line, style) {
+            if let Some((section_name, section_kind)) =
+                suspected_as_section(&line[indent.len()..], style)
+            {
                 let section_name_size = section_name.text_len();
 
                 if is_docstring_section(
@@ -430,8 +432,8 @@ impl Debug for SectionContext<'_> {
     }
 }
 
-fn suspected_as_section(line: &str, style: SectionStyle) -> Option<(&str, SectionKind)> {
-    let title = line.trim();
+fn suspected_as_section(unindented: &str, style: SectionStyle) -> Option<(&str, SectionKind)> {
+    let title = unindented.trim_end();
     let name = title.strip_suffix(':').unwrap_or(title);
     let kind = SectionKind::from_str(name)?;
     style.sections().contains(&kind).then_some((name, kind))
