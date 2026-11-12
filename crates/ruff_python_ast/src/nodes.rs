@@ -231,6 +231,11 @@ pub struct DictItem {
 }
 
 impl DictItem {
+    /// Whether this item unpacks a mapping (`**mapping`).
+    pub const fn is_unpacking(&self) -> bool {
+        self.key.is_none()
+    }
+
     fn key(&self) -> Option<&Expr> {
         self.key.as_ref()
     }
