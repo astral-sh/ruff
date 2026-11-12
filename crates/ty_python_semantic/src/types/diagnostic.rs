@@ -208,6 +208,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
+    registry.register_lint(&INCOMPATIBLE_TYPED_DICT_OPENNESS);
     registry.register_lint(&INCOMPATIBLE_ATTRIBUTE_OVERRIDE);
     registry.register_alias(
         LintName::of("invalid-attribute-override"),
@@ -1423,6 +1424,15 @@ declare_lint! {
     pub(crate) static INVALID_TYPED_DICT_HEADER = {
         summary: "detects invalid statements in `TypedDict` class headers",
         status: LintStatus::stable("0.0.14"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/incompatible-typed-dict-openness.md")]
+    pub(crate) static INCOMPATIBLE_TYPED_DICT_OPENNESS = {
+        summary: "detects `TypedDict` subclasses with incompatible extra items",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }

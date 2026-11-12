@@ -14,7 +14,8 @@ use crate::{
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
-            INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+            INCOMPATIBLE_TYPED_DICT_OPENNESS, INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_HEADER,
+            INVALID_TYPED_DICT_STATEMENT,
         },
         typed_dict::{TypedDictField, TypedDictOpenness},
     },
@@ -161,12 +162,10 @@ fn validate_typed_dict_openness<'db>(
     if let Some(arguments) = class_node.arguments.as_deref()
         && arguments.find_keyword("closed").is_some()
         && arguments.find_keyword("extra_items").is_some()
+        && let Some(builder) =
+            context.report_lint(&INVALID_TYPED_DICT_HEADER, class.header_range(db))
     {
-        report_invalid_typed_dict_openness(
-            context,
-            class,
-            "`closed` and `extra_items` cannot both be specified",
-        );
+        builder.into_diagnostic("`closed` and `extra_items` cannot both be specified");
     }
 
     for base in direct_bases {
@@ -178,7 +177,7 @@ fn validate_typed_dict_openness<'db>(
             TypedDictOpenness::ImplicitlyOpen => {}
             TypedDictOpenness::Closed => {
                 if !child_openness.is_closed() {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -194,7 +193,7 @@ fn validate_typed_dict_openness<'db>(
                     .iter()
                     .find(|(field_name, _)| !base_items.contains_key(*field_name))
                 {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -207,7 +206,7 @@ fn validate_typed_dict_openness<'db>(
             TypedDictOpenness::Extra(base_extra_items) if base_extra_items.is_read_only() => {
                 match child_openness {
                     TypedDictOpenness::ImplicitlyOpen => {
-                        report_invalid_typed_dict_openness(
+                        report_incompatible_typed_dict_openness(
                             context,
                             class,
                             format_args!(
@@ -225,7 +224,7 @@ fn validate_typed_dict_openness<'db>(
                             env,
                             base_extra_items.declared_ty,
                         ) {
-                            report_invalid_typed_dict_openness(
+                            report_incompatible_typed_dict_openness(
                                 context,
                                 class,
                                 format_args!(
@@ -248,7 +247,7 @@ fn validate_typed_dict_openness<'db>(
                             base_extra_items.declared_ty,
                         )
                 }) {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -262,7 +261,7 @@ fn validate_typed_dict_openness<'db>(
             }
             TypedDictOpenness::Extra(base_extra_items) => {
                 let Some(child_extra_items) = child_openness.explicit_extra_items() else {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -286,7 +285,7 @@ fn validate_typed_dict_openness<'db>(
                         child_extra_items.declared_ty,
                     )
                 {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -314,7 +313,7 @@ fn validate_typed_dict_openness<'db>(
                                 field.declared_ty,
                             ))
                 }) {
-                    report_invalid_typed_dict_openness(
+                    report_incompatible_typed_dict_openness(
                         context,
                         class,
                         format_args!(
@@ -329,14 +328,15 @@ fn validate_typed_dict_openness<'db>(
     }
 }
 
-fn report_invalid_typed_dict_openness(
+fn report_incompatible_typed_dict_openness(
     context: &InferContext<'_, '_>,
     class: StaticClassLiteral<'_>,
     message: impl std::fmt::Display,
 ) {
-    if let Some(builder) =
-        context.report_lint(&INVALID_TYPED_DICT_HEADER, class.header_range(context.db()))
-    {
+    if let Some(builder) = context.report_lint(
+        &INCOMPATIBLE_TYPED_DICT_OPENNESS,
+        class.header_range(context.db()),
+    ) {
         builder.into_diagnostic(message);
     }
 }
