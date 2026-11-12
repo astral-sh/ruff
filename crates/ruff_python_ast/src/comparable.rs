@@ -444,7 +444,7 @@ type ComparableComprehensionSlice<'a> =
 type ComparableExprSlice<'a> = ComparableSlice<'a, Expr, ComparableExpr<'a>>;
 
 #[derive(Default)]
-struct ComparableArguments<'a>(&'a [ast::Argument]);
+struct ComparableArguments<'a>(Option<&'a ast::Arguments>);
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum ComparableArgument<'a> {
@@ -452,27 +452,71 @@ enum ComparableArgument<'a> {
     Keyword(ComparableKeyword<'a>),
 }
 
-impl<'a> ComparableArguments<'a> {
-    fn iter(&self) -> impl Iterator<Item = ComparableArgument<'a>> {
-        // Calls evaluate all positional arguments before their keywords, including a starred
-        // argument written after a named argument.
-        let positional = self.0.iter().filter_map(ast::Argument::as_positional);
-        let keywords = self.0.iter().filter_map(ast::Argument::as_keyword);
-        positional
-            .map(|expr| ComparableArgument::Positional(expr.into()))
-            .chain(keywords.map(|keyword| ComparableArgument::Keyword(keyword.into())))
+impl<'a> From<ast::ArgOrKeyword<'a>> for ComparableArgument<'a> {
+    fn from(argument: ast::ArgOrKeyword<'a>) -> Self {
+        match argument {
+            ast::ArgOrKeyword::Arg(expr) => Self::Positional(expr.into()),
+            ast::ArgOrKeyword::Keyword(keyword) => Self::Keyword(keyword.into()),
+        }
     }
+}
+
+fn grouped_arguments<'a>(
+    items: impl Iterator<Item = ast::ArgOrKeyword<'a>> + Clone,
+) -> impl Iterator<Item = ComparableArgument<'a>> {
+    items
+        .clone()
+        .filter(|item| matches!(item, ast::ArgOrKeyword::Arg(_)))
+        .chain(items.filter(|item| matches!(item, ast::ArgOrKeyword::Keyword(_))))
+        .map(ComparableArgument::from)
 }
 
 impl fmt::Debug for ComparableArguments<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.iter()).finish()
+        let mut list = f.debug_list();
+        if let Some(arguments) = self.0 {
+            arguments.for_each_in_evaluation_order(|arg| {
+                list.entry(&ComparableArgument::from(arg));
+            });
+        }
+        list.finish()
     }
 }
 
 impl PartialEq for ComparableArguments<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.len() == other.0.len() && self.iter().eq(other.iter())
+        let (left_args, right_args) = match (self.0, other.0) {
+            (Some(left), Some(right)) => (left, right),
+            (Some(args), None) | (None, Some(args)) => return args.is_empty(),
+            (None, None) => return true,
+        };
+        if left_args.len() != right_args.len() {
+            return false;
+        }
+        for (index, (left, right)) in left_args
+            .iter_source_order()
+            .zip(right_args.iter_source_order())
+            .enumerate()
+        {
+            let equal = match (left, right) {
+                (ast::ArgOrKeyword::Arg(left), ast::ArgOrKeyword::Arg(right)) => {
+                    ComparableExpr::from(left) == ComparableExpr::from(right)
+                }
+                (ast::ArgOrKeyword::Keyword(left), ast::ArgOrKeyword::Keyword(right)) => {
+                    ComparableKeyword::from(left) == ComparableKeyword::from(right)
+                }
+                // f(key=x, *ys) and f(*ys, key=x) evaluate their arguments in the same order.
+                _ => {
+                    return grouped_arguments(left_args.iter_source_order().skip(index)).eq(
+                        grouped_arguments(right_args.iter_source_order().skip(index)),
+                    );
+                }
+            };
+            if !equal {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -480,21 +524,18 @@ impl Eq for ComparableArguments<'_> {}
 
 impl Hash for ComparableArguments<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.len().hash(state);
-        for argument in self.iter() {
-            argument.hash(state);
-        }
+        let Some(arguments) = self.0 else {
+            0usize.hash(state);
+            return;
+        };
+        arguments.len().hash(state);
+        arguments.for_each_in_evaluation_order(|arg| ComparableArgument::from(arg).hash(state));
     }
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
-        let ast::Arguments {
-            items,
-            range: _,
-            node_index: _,
-        } = arguments;
-        Self(items)
+        Self(Some(arguments))
     }
 }
 
