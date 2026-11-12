@@ -92,7 +92,7 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
         func, arguments, ..
     }: &ast::ExprCall,
 ) {
-    let [ast::Argument::Positional(value_passed)] = arguments.items.as_slice() else {
+    let Some(value_passed) = arguments.as_single_positional() else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &**func else {

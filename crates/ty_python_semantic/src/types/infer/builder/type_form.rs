@@ -138,7 +138,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let arguments = &call_expression.arguments;
 
-        if let [ast::Argument::Positional(argument)] = arguments.items.as_slice()
+        if let Some(argument) = arguments.as_single_positional()
             && !matches!(argument, ast::Expr::Starred(_))
         {
             return TypeFormType::from_type_expression(
