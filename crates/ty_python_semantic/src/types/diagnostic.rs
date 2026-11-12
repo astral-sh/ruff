@@ -69,7 +69,11 @@ const RUNTIME_CHECKABLE_DOCS_URL: &str =
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
-    registry.register_lint(&CALL_TOP_CALLABLE);
+    registry.register_lint(&CALL_TO_FUNCTION_WITH_UNKNOWN_SIGNATURE);
+    registry.register_alias(
+        LintName::of("call-top-callable"),
+        &CALL_TO_FUNCTION_WITH_UNKNOWN_SIGNATURE,
+    );
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
@@ -277,8 +281,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/call-top-callable.md")]
-    pub(crate) static CALL_TOP_CALLABLE = {
+    #[doc = include_str!("../../resources/lint_docs/call-to-function-with-unknown-signature.md")]
+    pub(crate) static CALL_TO_FUNCTION_WITH_UNKNOWN_SIGNATURE = {
         summary: "detects calls to the top callable type",
         status: LintStatus::stable("0.0.7"),
         default_level: Level::Error,
