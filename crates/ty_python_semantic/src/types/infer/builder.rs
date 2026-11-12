@@ -2857,12 +2857,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
-            if let Some(first_excess_pattern) = pattern.arguments.patterns().next() {
+            let mut positional = pattern.arguments.patterns();
+            if let Some(first_excess_pattern) = positional.next() {
                 report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
                     0,
-                    pattern.arguments.patterns().count(),
+                    1 + positional.count(),
                     "collections.abc.Callable",
                 );
             }
@@ -2885,18 +2886,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            if let Some(first_positional_pattern) = pattern.arguments.patterns().next()
+            let mut positional = pattern.arguments.patterns().peekable();
+            if let Some(&first_positional_pattern) = positional.peek()
                 && let Some(result) = class_pattern_positional_result(db, env, class)
             {
                 match result {
                     ClassPatternPositionalResult::Limit(limit) => {
-                        if let Some(first_excess_pattern) = pattern.arguments.patterns().nth(limit)
-                        {
+                        if let Some(first_excess_pattern) = positional.nth(limit) {
                             report_too_many_positional_patterns_for_class_pattern(
                                 &self.context,
                                 first_excess_pattern,
                                 limit,
-                                pattern.arguments.patterns().count(),
+                                limit + 1 + positional.count(),
                                 cls_ty.display(db, env),
                             );
                         }

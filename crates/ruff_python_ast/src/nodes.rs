@@ -3196,6 +3196,15 @@ pub enum PatternOrKeyword<P = Pattern, K = PatternKeyword> {
     Keyword(K),
 }
 
+impl PatternOrKeyword {
+    pub fn pattern(&self) -> &Pattern {
+        match self {
+            Self::Pattern(pattern) => pattern,
+            Self::Keyword(keyword) => &keyword.pattern,
+        }
+    }
+}
+
 impl PatternArguments {
     pub fn patterns(&self) -> impl DoubleEndedIterator<Item = &Pattern> {
         self.items.iter().filter_map(|item| match item {
