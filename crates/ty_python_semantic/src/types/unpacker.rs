@@ -710,7 +710,7 @@ fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
             .then_some(elts.len()),
         ast::Expr::Dict(ast::ExprDict { items, .. }) => items
             .iter()
-            .all(|item| item.key.is_some())
+            .all(|item| !item.is_unpacking())
             .then_some(items.len()),
         _ => None,
     }

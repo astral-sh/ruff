@@ -233,8 +233,12 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, source),
         AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
         AnyNodeRef::ExprDict(_) => handle_bracketed_end_of_line_comment(comment, source),
-        AnyNodeRef::DictItem(_) => handle_dict_unpacking_comment(comment, source)
-            .or_else(|comment| handle_key_value_comment(comment, source)),
+        AnyNodeRef::DictItem(item) => match (comment.preceding_node(), comment.following_node()) {
+            // The two children of a keyed item are its key and value.
+            (Some(_), Some(_)) => CommentPlacement::dangling(comment.enclosing_node(), comment),
+            (None, Some(value)) if item.is_unpacking() => CommentPlacement::leading(value, comment),
+            _ => CommentPlacement::Default(comment),
+        },
         AnyNodeRef::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source))
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
@@ -1319,10 +1323,7 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert_matches!(
-        comment.enclosing_node(),
-        AnyNodeRef::DictItem(_) | AnyNodeRef::ExprDictComp(_)
-    );
+    debug_assert_matches!(comment.enclosing_node(), AnyNodeRef::ExprDictComp(_));
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
@@ -1362,10 +1363,7 @@ fn handle_key_value_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert_matches!(
-        comment.enclosing_node(),
-        AnyNodeRef::DictItem(_) | AnyNodeRef::ExprDictComp(_)
-    );
+    debug_assert_matches!(comment.enclosing_node(), AnyNodeRef::ExprDictComp(_));
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())
     else {

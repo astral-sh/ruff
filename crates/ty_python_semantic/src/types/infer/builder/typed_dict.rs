@@ -705,24 +705,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return schema;
         };
 
-        for (i, item) in dict_expr.iter().enumerate() {
-            let Some(key) = &item.key else {
-                for ast::DictItem { key, value, .. } in &dict_expr.items[i + 1..] {
-                    if key.is_some() {
-                        self.infer_annotation_expression(value, self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+        let mut items = dict_expr.into_iter();
+        loop {
+            let Some(item) = items.next() else {
+                return schema;
             };
+            let Some(key) = &item.key else { break };
 
             let key_type = self.expression_type(key);
             let Some(key_literal) = key_type.as_string_literal() else {
-                for ast::DictItem { key, value, .. } in &dict_expr.items[i..] {
-                    if key.is_some() {
-                        self.infer_annotation_expression(value, self.deferred_state);
-                    }
-                }
-                return TypedDictSchema::default();
+                self.infer_annotation_expression(&item.value, self.deferred_state);
+                break;
             };
 
             let annotation = self.infer_typeddict_field(&item.value);
@@ -737,7 +730,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        schema
+        for item in items {
+            if !item.is_unpacking() {
+                self.infer_annotation_expression(&item.value, self.deferred_state);
+            }
+        }
+        TypedDictSchema::default()
     }
 
     /// Infer field types for functional `TypedDict` assignments in deferred phase, for example:
