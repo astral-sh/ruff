@@ -2119,6 +2119,7 @@ enum HashableExprKind<'a> {
         value: Box<HashableExprKind<'a>>,
     },
     Tuple(Vec<HashableExprKind<'a>>),
+    FlatTuple(ComparableSlice<'a, Expr, HashableExpr<'a>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -2228,6 +2229,15 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
             }
 
             let kind = match expr {
+                // Flat and nested tuples cannot compare equal. Borrow a flat tuple's elements
+                // and normalize each scalar when hashing or comparing it.
+                Expr::Tuple(tuple)
+                    if tuple
+                        .iter()
+                        .all(|elt| elt.is_literal_expr() || as_number(elt).is_some()) =>
+                {
+                    HashableExprKind::FlatTuple(ComparableSlice::new(&tuple.elts))
+                }
                 Expr::Tuple(tuple) => HashableExprKind::Tuple(
                     tuple
                         .iter()
