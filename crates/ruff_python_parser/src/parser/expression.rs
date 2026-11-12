@@ -2583,7 +2583,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut additional = Vec::new();
+        let additional = self.dict_item_scratch.snapshot();
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             let item_start = parser.node_start();
             let (key, value) = if parser.eat(TokenKind::DoubleStar) {
@@ -2600,7 +2600,7 @@ impl<'src> Parser<'src> {
                     parser.parse_conditional_expression_or_higher().expr,
                 )
             };
-            additional.push(
+            parser.dict_item_scratch.push(
                 build::DictItem {
                     range: parser.node_range(item_start),
                     key,
@@ -2615,8 +2615,10 @@ impl<'src> Parser<'src> {
 
         build::ExprDict {
             range: self.node_range(start),
-
-            items: self.storage.list(iter::once(first.id).chain(additional)),
+            items: self.dict_item_scratch.take(additional, |items| {
+                self.storage
+                    .list(iter::once(first.id).chain(items.iter().copied()))
+            }),
         }
         .parsed(&mut self.storage)
     }

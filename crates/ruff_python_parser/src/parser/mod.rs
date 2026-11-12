@@ -79,6 +79,9 @@ pub(crate) struct Parser<'src> {
     /// Reusable, nesting-safe scratch storage for expression lists.
     expr_scratch: ScratchBuffer<BuildId<ast::kind::Expr>>,
 
+    /// Dictionary entries awaiting a contiguous list in the arena.
+    dict_item_scratch: ScratchBuffer<BuildId<ast::kind::DictItem>>,
+
     /// Reusable, nesting-safe scratch storage for call arguments in source order.
     argument_scratch: ScratchBuffer<ast::ArgumentId>,
 
@@ -148,6 +151,7 @@ impl<'src> Parser<'src> {
             recursion_depth: 0,
             current_token_id: TokenId::default(),
             expr_scratch: ScratchBuffer::with_capacity(16),
+            dict_item_scratch: ScratchBuffer::new(),
             argument_scratch: ScratchBuffer::new(),
             parameter_scratch: ScratchBuffer::new(),
             stmt_scratch: ScratchBuffer::with_capacity(32),

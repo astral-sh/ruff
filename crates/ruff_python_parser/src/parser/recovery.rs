@@ -65,35 +65,32 @@ impl Parser<'_> {
                         }
                     })
                     .collect();
-                let items: Vec<_> = entries
-                    .into_iter()
-                    .map(|item| {
-                        let (key, value, range) = match item {
-                            ast::MappingPatternItem::Entry { key, pattern } => {
-                                let value = self.pattern_to_expr(pattern);
-                                let range = self.storage.get(key).range().cover(value.range());
-                                (Some(key), value.id, range)
-                            }
-                            ast::MappingPatternItem::Rest(name) => {
-                                // The pattern stores the identifier. The dictionary entry also
-                                // covers its `**`, including any trivia before the identifier.
-                                let range = self
-                                    .tokens
-                                    .previous_non_trivia(name.range.start())
-                                    .filter(|token| token.kind() == TokenKind::DoubleStar)
-                                    .map_or(name.range, |stars| stars.range().cover(name.range));
-                                let name = name.parsed(&mut self.storage);
-                                (None, name.id.into(), range)
-                            }
-                        };
-                        build::DictItem { key, value, range }
-                            .parsed(&mut self.storage)
-                            .id
-                    })
-                    .collect();
+                let items = self.dict_item_scratch.snapshot();
+                for item in entries {
+                    let (key, value, range) = match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            let value = self.pattern_to_expr(pattern);
+                            let range = self.storage.get(key).range().cover(value.range());
+                            (Some(key), value.id, range)
+                        }
+                        ast::MappingPatternItem::Rest(name) => {
+                            // The pattern stores the identifier. The dictionary entry also
+                            // covers its `**`, including any trivia before the identifier.
+                            let range = self
+                                .tokens
+                                .previous_non_trivia(name.range.start())
+                                .filter(|token| token.kind() == TokenKind::DoubleStar)
+                                .map_or(name.range, |stars| stars.range().cover(name.range));
+                            let name = name.parsed(&mut self.storage);
+                            (None, name.id.into(), range)
+                        }
+                    };
+                    let item = self.storage.add(build::DictItem { key, value, range });
+                    self.dict_item_scratch.push(item);
+                }
                 build::ExprDict {
                     range,
-                    items: self.storage.list(items),
+                    items: self.dict_item_scratch.take_range(items, &mut self.storage),
                 }
                 .parsed(&mut self.storage)
                 .into()
@@ -104,7 +101,7 @@ impl Parser<'_> {
                 let arguments_range = arguments.range();
                 debug_assert_eq!(range.end(), arguments_range.end());
                 let items = arguments.items().id();
-                let mut converted = Vec::with_capacity(items.len());
+                let converted = self.argument_scratch.snapshot();
                 for index in 0..items.len() {
                     let argument = match self.storage.get_list(items).at(index) {
                         ast::PatternOrKeyword::Pattern(pattern) => {
@@ -123,11 +120,13 @@ impl Parser<'_> {
                             ast::ArgumentId::Keyword(keyword.id)
                         }
                     };
-                    converted.push(argument);
+                    self.argument_scratch.push(argument);
                 }
                 let arguments = build::Arguments {
                     range: arguments_range,
-                    items: self.storage.list(converted),
+                    items: self
+                        .argument_scratch
+                        .take_range(converted, &mut self.storage),
                 }
                 .parsed(&mut self.storage);
                 build::ExprCall {
