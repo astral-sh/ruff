@@ -45,6 +45,20 @@ pub(crate) fn remove_imports<'a>(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Option<String>> {
+    let names = match stmt {
+        Stmt::Import(import) => &import.names,
+        Stmt::ImportFrom(import) => &import.names,
+        _ => bail!("Expected import statement"),
+    };
+    let mut member_names = member_names.peekable();
+    // Deleting the only named import leaves no formatting to preserve.
+    if let [alias] = names.as_slice()
+        && alias.name.as_str() != "*"
+        && member_names.peek().copied() == Some(alias.name.as_str())
+    {
+        return Ok(None);
+    }
+
     let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
