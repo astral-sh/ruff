@@ -4120,7 +4120,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             None
         };
-        if let Some(bound) = arguments.find_keyword("bound") {
+        let [bound, default] = arguments.find_keywords(["bound", "default"]);
+        if let Some(bound) = bound {
             let bound_type = self.infer_type_expression(&bound.value);
             bound_or_constraints = Some(TypeVarBoundOrConstraints::UpperBound(bound_type));
 
@@ -4132,7 +4133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.into_diagnostic("TypeVar upper bound cannot be generic");
             }
         }
-        if let Some(default) = arguments.find_keyword("default") {
+        if let Some(default) = default {
             if matches!(
                 known_class,
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
@@ -4152,8 +4153,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_paramspec_default(&default.value, None);
             } else {
                 let default_ty = self.infer_type_expression(&default.value);
-                let bound_or_constraints_node = arguments
-                    .find_keyword("bound")
+                let bound_or_constraints_node = bound
                     .map(|kw| BoundOrConstraintsNodes::Bound(kw.value.as_ref()))
                     .or_else(|| {
                         let mut args = arguments.args();

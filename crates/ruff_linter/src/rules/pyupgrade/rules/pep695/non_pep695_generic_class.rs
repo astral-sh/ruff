@@ -180,8 +180,9 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     };
 
-    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
-        find_generic(arguments, checker.semantic())
+    let mut bases = arguments.args();
+    let Some(generic_expr @ ExprSubscript { slice, range, .. }) =
+        find_generic(&mut bases, checker.semantic())
     else {
         return;
     };
@@ -201,7 +202,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
-    if generic_idx != arguments.args().count() - 1 {
+    if bases.next().is_some() {
         return;
     }
 
