@@ -245,30 +245,27 @@ impl<'a> ImplementationsFinder<'a> {
     }
 
     /// Returns implementations contributed by classes defined in `file`.
-    ///
-    /// Returns `None` without loading an AST if the source text rules out implementations.
-    /// Otherwise, returns the definitions, which may be empty.
     pub fn implementations_for_file<'scan>(
         &'scan self,
         db: &'scan dyn Db,
         file: ProgramFile<'scan>,
-    ) -> Option<Vec<ResolvedDefinition<'scan>>> {
+    ) -> Vec<ResolvedDefinition<'scan>> {
         let source = source_text(db, file.file(db));
 
         // Member implementations must mention the member name.
         if let ImplementationsFinderKind::MemberFamily { name_matcher, .. } = &self.kind
             && !name_matcher.may_match(&source)
         {
-            return None;
+            return Vec::new();
         }
 
         // Both class and member searches look for implementations in class definitions.
         if !CLASS_MATCHER.may_match(&source) {
-            return None;
+            return Vec::new();
         }
 
         let roots = &self.roots;
-        Some(match &self.kind {
+        match &self.kind {
             ImplementationsFinderKind::ClassFamily => {
                 class_implementations_for_file(db, file, roots)
             }
@@ -277,7 +274,7 @@ impl<'a> ImplementationsFinder<'a> {
                 accessor_role,
                 ..
             } => member_implementations_for_file(db, file, roots, name, *accessor_role),
-        })
+        }
     }
 
     /// Returns the definitions selected directly for the finder's roots.
