@@ -172,6 +172,31 @@ def _(group: Subgroup):
     reveal_type(group[0])  # revealed: tuple[Negation | Subgroup | str, ...]
 ```
 
+### Recursive fields with a wide union
+
+Two named tuples can share a field type that refers back to both of them. The repeated `int` members
+exercise normalization of a wide union. Both fields must retain `Leaf`.
+
+```py
+from typing import NamedTuple, Union
+from typing_extensions import assert_type
+
+class Leaf(NamedTuple):
+    value: "Metadata"
+
+class Closure(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+class Partial(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+Metadata = Closure | Partial
+
+def check(closure: Closure, partial: Partial) -> None:
+    assert_type(closure.entries, int | Leaf)
+    assert_type(partial.entries, int | Leaf)
+```
+
 ### Explicit dataclass-transform metaclass
 
 `models.pyi`:
