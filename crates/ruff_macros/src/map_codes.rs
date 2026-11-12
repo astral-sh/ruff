@@ -459,6 +459,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         #[derive(
             EnumIter,
+            ::strum_macros::VariantArray,
             Debug,
             PartialEq,
             Eq,

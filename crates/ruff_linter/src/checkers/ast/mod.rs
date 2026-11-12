@@ -72,7 +72,7 @@ use crate::package::PackageRoot;
 use crate::preview::{
     is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
 };
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
@@ -3732,8 +3732,8 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
-        self.rules.iter_enabled()
+    pub(crate) fn has_rules_for(&self, source: LintSource) -> bool {
+        self.rules.any_enabled_in(source.rules())
     }
 
     #[inline]
