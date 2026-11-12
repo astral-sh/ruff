@@ -45,8 +45,10 @@ reveal_type(f(*("a", "b")))  # revealed: Unknown
 
 ## Type checking
 
-The second step is to perform type checking. This is done for all the overloads that passed the
-arity check.
+The second step checks argument types against the overloads that passed the arity check. If a
+literal argument rules out an overload, ty can check the other candidates first. If any of them
+matches, ty skips type checking the deferred overloads. If none matches, ty checks them too so it
+can use their errors to choose the closest overload for diagnostics.
 
 ### Single match
 
@@ -112,6 +114,51 @@ reveal_type(f(*("a",)))  # revealed: Unknown
 
 More examples of this diagnostic can be found in the
 [single_matching_overload.md](../diagnostics/single_matching_overload.md) document.
+
+### Overloads distinguished by a string literal
+
+A literal-valued variable can select an overload by keyword.
+
+```py
+from functools import partial
+from typing import Literal, overload
+
+@overload
+def select(key: Literal["number"], value: int) -> int: ...
+@overload
+def select(key: Literal["text"], value: str) -> str: ...
+def select(key: str, value: int | str) -> int | str:
+    return value
+
+def use(key: Literal["text"]):
+    reveal_type(select(key=key, value="hello"))  # revealed: str
+```
+
+Binding the literal with `functools.partial` selects the same overload for later calls.
+
+```py
+select_text = partial(select, "text")
+reveal_type(select_text)  # revealed: partial[(value: str) -> str]
+select_text(1)  # error: [invalid-argument-type]
+```
+
+### Type context when no overload matches
+
+Both overloads reject the value, but only the first also rejects the key. The second overload
+therefore supplies the type of the lambda parameter.
+
+```py
+from typing import Callable, Literal, overload
+
+@overload
+def visit(value: int, callback: Callable[[int], object], *, key: Literal["number"]) -> None: ...
+@overload
+def visit(value: str, callback: Callable[[str], object], *, key: Literal["text"]) -> None: ...
+def visit(value, callback, *, key): ...
+
+# error: [no-matching-overload]
+visit(b"bad", lambda x: reveal_type(x), key="text")  # revealed: str
+```
 
 ### Multiple matches
 
