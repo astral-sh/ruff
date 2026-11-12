@@ -220,16 +220,17 @@ Module(
                                     arguments: PatternArguments {
                                         range: 233..237,
                                         node_index: NodeIndex(None),
-                                        patterns: [
-                                            MatchStar(
-                                                PatternMatchStar {
-                                                    node_index: NodeIndex(None),
-                                                    range: 234..236,
-                                                    name: None,
-                                                },
+                                        items: [
+                                            Pattern(
+                                                MatchStar(
+                                                    PatternMatchStar {
+                                                        node_index: NodeIndex(None),
+                                                        range: 234..236,
+                                                        name: None,
+                                                    },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
@@ -261,24 +262,25 @@ Module(
                                     arguments: PatternArguments {
                                         range: 264..270,
                                         node_index: NodeIndex(None),
-                                        patterns: [],
-                                        keywords: [
-                                            PatternKeyword {
-                                                range: 265..269,
-                                                node_index: NodeIndex(None),
-                                                attr: Identifier {
-                                                    id: Name("x"),
-                                                    range: 265..266,
+                                        items: [
+                                            Keyword(
+                                                PatternKeyword {
+                                                    range: 265..269,
                                                     node_index: NodeIndex(None),
-                                                },
-                                                pattern: MatchStar(
-                                                    PatternMatchStar {
+                                                    attr: Identifier {
+                                                        id: Name("x"),
+                                                        range: 265..266,
                                                         node_index: NodeIndex(None),
-                                                        range: 267..269,
-                                                        name: None,
                                                     },
-                                                ),
-                                            },
+                                                    pattern: MatchStar(
+                                                        PatternMatchStar {
+                                                            node_index: NodeIndex(None),
+                                                            range: 267..269,
+                                                            name: None,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ],
                                     },
                                 },

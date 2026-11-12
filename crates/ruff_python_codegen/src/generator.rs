@@ -823,7 +823,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(cls, precedence::MAX);
                 self.p("(");
                 let mut first = true;
-                for pattern_or_keyword in arguments.iter_source_order() {
+                for pattern_or_keyword in &arguments.items {
                     self.p_delim(&mut first, ", ");
                     match pattern_or_keyword {
                         PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),

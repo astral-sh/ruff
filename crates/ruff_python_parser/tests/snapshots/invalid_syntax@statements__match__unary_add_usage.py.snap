@@ -236,70 +236,73 @@ Module(
                                     arguments: PatternArguments {
                                         range: 174..186,
                                         node_index: NodeIndex(None),
-                                        patterns: [],
-                                        keywords: [
-                                            PatternKeyword {
-                                                range: 175..179,
-                                                node_index: NodeIndex(None),
-                                                attr: Identifier {
-                                                    id: Name("x"),
-                                                    range: 175..176,
+                                        items: [
+                                            Keyword(
+                                                PatternKeyword {
+                                                    range: 175..179,
                                                     node_index: NodeIndex(None),
-                                                },
-                                                pattern: MatchValue(
-                                                    PatternMatchValue {
+                                                    attr: Identifier {
+                                                        id: Name("x"),
+                                                        range: 175..176,
                                                         node_index: NodeIndex(None),
-                                                        range: 177..179,
-                                                        value: UnaryOp(
-                                                            ExprUnaryOp {
-                                                                node_index: NodeIndex(None),
-                                                                range: 177..179,
-                                                                op: UAdd,
-                                                                operand: NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 178..179,
-                                                                        value: Int(
-                                                                            1,
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                            },
-                                                        ),
                                                     },
-                                                ),
-                                            },
-                                            PatternKeyword {
-                                                range: 181..185,
-                                                node_index: NodeIndex(None),
-                                                attr: Identifier {
-                                                    id: Name("y"),
-                                                    range: 181..182,
+                                                    pattern: MatchValue(
+                                                        PatternMatchValue {
+                                                            node_index: NodeIndex(None),
+                                                            range: 177..179,
+                                                            value: UnaryOp(
+                                                                ExprUnaryOp {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 177..179,
+                                                                    op: UAdd,
+                                                                    operand: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 178..179,
+                                                                            value: Int(
+                                                                                1,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            Keyword(
+                                                PatternKeyword {
+                                                    range: 181..185,
                                                     node_index: NodeIndex(None),
-                                                },
-                                                pattern: MatchValue(
-                                                    PatternMatchValue {
+                                                    attr: Identifier {
+                                                        id: Name("y"),
+                                                        range: 181..182,
                                                         node_index: NodeIndex(None),
-                                                        range: 183..185,
-                                                        value: UnaryOp(
-                                                            ExprUnaryOp {
-                                                                node_index: NodeIndex(None),
-                                                                range: 183..185,
-                                                                op: USub,
-                                                                operand: NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 184..185,
-                                                                        value: Int(
-                                                                            2,
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                            },
-                                                        ),
                                                     },
-                                                ),
-                                            },
+                                                    pattern: MatchValue(
+                                                        PatternMatchValue {
+                                                            node_index: NodeIndex(None),
+                                                            range: 183..185,
+                                                            value: UnaryOp(
+                                                                ExprUnaryOp {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 183..185,
+                                                                    op: USub,
+                                                                    operand: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 184..185,
+                                                                            value: Int(
+                                                                                2,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ],
                                     },
                                 },

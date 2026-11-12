@@ -1,6 +1,7 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Pattern};
 use ruff_text_size::{Ranged, TextLen, TextRange};
+use thin_vec::ThinVec;
 
 /// Convert the given [`Pattern`] to an [`Expr`].
 ///
@@ -94,28 +95,30 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }) => {
             debug_assert_eq!(range.end(), arguments.end());
 
+            let mut args = ThinVec::new();
+            let mut keywords = ThinVec::new();
+            for item in arguments.items {
+                match item {
+                    ast::PatternOrKeyword::Pattern(pattern) => {
+                        args.push(pattern_to_expr(pattern));
+                    }
+                    ast::PatternOrKeyword::Keyword(keyword) => keywords.push(ast::Keyword {
+                        range: keyword.range,
+                        node_index: node_index.clone(),
+                        arg: Some(keyword.attr),
+                        value: pattern_to_expr(keyword.pattern),
+                    }),
+                }
+            }
             Expr::Call(ast::ExprCall {
                 range_start: range.start(),
                 node_index: node_index.clone(),
                 func: cls,
                 arguments: ast::Arguments {
                     range: arguments.range,
-                    node_index: node_index.clone(),
-                    args: arguments
-                        .patterns
-                        .into_iter()
-                        .map(pattern_to_expr)
-                        .collect(),
-                    keywords: arguments
-                        .keywords
-                        .into_iter()
-                        .map(|keyword_pattern| ast::Keyword {
-                            range: keyword_pattern.range,
-                            node_index: node_index.clone(),
-                            arg: Some(keyword_pattern.attr),
-                            value: pattern_to_expr(keyword_pattern.pattern),
-                        })
-                        .collect(),
+                    node_index,
+                    args,
+                    keywords,
                 },
             })
         }

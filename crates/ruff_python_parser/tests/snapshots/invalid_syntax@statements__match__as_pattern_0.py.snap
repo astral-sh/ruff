@@ -41,37 +41,40 @@ Module(
                                     arguments: PatternArguments {
                                         range: 140..146,
                                         node_index: NodeIndex(None),
-                                        patterns: [
-                                            MatchAs(
-                                                PatternMatchAs {
-                                                    node_index: NodeIndex(None),
-                                                    range: 141..142,
-                                                    pattern: None,
-                                                    name: Some(
-                                                        Identifier {
-                                                            id: Name("a"),
-                                                            range: 141..142,
-                                                            node_index: NodeIndex(None),
-                                                        },
-                                                    ),
-                                                },
+                                        items: [
+                                            Pattern(
+                                                MatchAs(
+                                                    PatternMatchAs {
+                                                        node_index: NodeIndex(None),
+                                                        range: 141..142,
+                                                        pattern: None,
+                                                        name: Some(
+                                                            Identifier {
+                                                                id: Name("a"),
+                                                                range: 141..142,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
                                             ),
-                                            MatchAs(
-                                                PatternMatchAs {
-                                                    node_index: NodeIndex(None),
-                                                    range: 144..145,
-                                                    pattern: None,
-                                                    name: Some(
-                                                        Identifier {
-                                                            id: Name("b"),
-                                                            range: 144..145,
-                                                            node_index: NodeIndex(None),
-                                                        },
-                                                    ),
-                                                },
+                                            Pattern(
+                                                MatchAs(
+                                                    PatternMatchAs {
+                                                        node_index: NodeIndex(None),
+                                                        range: 144..145,
+                                                        pattern: None,
+                                                        name: Some(
+                                                            Identifier {
+                                                                id: Name("b"),
+                                                                range: 144..145,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
