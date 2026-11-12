@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
-use call::{CallDunderError, CallError, CallErrorKind};
+use call::{CallDunderError, CallError, CallErrorKind, OperatorResult};
 use context::InferContext;
 pub use context::ProgramEnvironment;
 use ruff_db::Instant;
@@ -8383,24 +8383,39 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         receiver: Option<Type<'db>>,
-    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+    ) -> Result<OperatorResult<'db>, CallDunderError<'db>> {
         let mut arguments = CallArguments::none();
         let tcx = TypeContext::default();
-        if let (Type::Union(union), Some(receiver)) = (self, receiver) {
-            return union.try_call_dunder(db, env, &mut arguments, tcx, |element| {
-                lookup_member_on_union_element(
+        let bindings = match (self, receiver) {
+            (Type::Union(union), Some(receiver)) => {
+                union.try_call_dunder(db, env, &mut arguments, tcx, |element| {
+                    lookup_member_on_union_element(
+                        db,
+                        env,
+                        element,
+                        name,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        Some(receiver),
+                    )
+                })
+            }
+            (Type::Intersection(intersection), _) => {
+                let bindings = intersection.try_call_dunder_with_policy(
                     db,
                     env,
-                    element,
+                    receiver.unwrap_or(self),
                     name,
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    Some(receiver),
-                )
-            });
-        }
-        receiver
-            .unwrap_or(self)
-            .try_call_dunder(db, env, name, arguments, tcx)
+                    &mut arguments,
+                    tcx,
+                    MemberLookupPolicy::default(),
+                )?;
+                return Ok(bindings.operator_result(db, env));
+            }
+            _ => receiver
+                .unwrap_or(self)
+                .try_call_dunder(db, env, name, arguments, tcx),
+        }?;
+        Ok(OperatorResult::from_bindings(db, env, &bindings))
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -8443,7 +8458,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         if let Type::Intersection(intersection) = self {
             return intersection
-                .try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy)
+                .try_call_dunder_with_policy(db, env, self, name, argument_types, tcx, policy)
                 .map(|bindings| bindings.into_bindings(self));
         }
 
@@ -11125,6 +11140,35 @@ enum DunderBindings<'db> {
 }
 
 impl<'db> DunderBindings<'db> {
+    fn operator_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> OperatorResult<'db> {
+        let components = match self {
+            Self::Single(bindings) => return OperatorResult::from_bindings(db, env, bindings),
+            Self::Intersection(components) => components,
+        };
+        let mut deprecated_functions = Vec::new();
+        // One non-deprecated component can supply the implementation for the whole intersection.
+        for component in components {
+            let start = deprecated_functions.len();
+            deprecated_functions.extend(
+                component
+                    .deprecated_functions(db)
+                    .map(|(_, function)| function),
+            );
+            if deprecated_functions.len() == start {
+                deprecated_functions.clear();
+                break;
+            }
+        }
+        OperatorResult {
+            return_type: self.return_type(db, env),
+            deprecated_functions: deprecated_functions.into_boxed_slice(),
+        }
+    }
+
     fn into_bindings(self, receiver: Type<'db>) -> Bindings<'db> {
         match self {
             Self::Single(bindings) => *bindings,
@@ -11178,10 +11222,12 @@ impl<'db> IntersectionType<'db> {
     //
     // TODO: we might be able to remove this after fixing
     // https://github.com/astral-sh/ty/issues/2428.
+    #[expect(clippy::too_many_arguments)]
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
         name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
@@ -11197,7 +11243,6 @@ impl<'db> IntersectionType<'db> {
         // An inherited `object` method on an otherwise undefined component is only a fallback
         // for the whole intersection: `object.__eq__` must not restrict another component's
         // custom comparison result to `bool`.
-        let receiver = Type::Intersection(self);
         let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         let component_policy = policy | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
         let lookup = |element: Type<'db>, policy| {

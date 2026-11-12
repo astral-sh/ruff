@@ -832,6 +832,28 @@ def deprecated_intersection(value: Deprecated) -> None:
         ~value
 ```
 
+If one component defines the operator conditionally, a deprecated branch can still be selected.
+
+```py
+def flag() -> bool:
+    return True
+
+class Conditional:
+    if flag():
+        @deprecated("conditional inversion")
+        def __invert__(self) -> int:
+            return 1
+
+    else:
+        def __invert__(self) -> int:
+            return 2
+
+def conditional_intersection(value: Conditional) -> None:
+    if isinstance(value, AlsoDeprecated):
+        # error: [deprecated] "`Conditional.__invert__`, `AlsoDeprecated.__invert__`"
+        ~value
+```
+
 A gradually typed comparison can produce an intersection of `bool` and `Any`. The unknown
 alternative might provide a non-deprecated operator, so inverting it should not warn.
 

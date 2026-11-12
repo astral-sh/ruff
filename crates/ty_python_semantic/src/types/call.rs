@@ -16,12 +16,28 @@ pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
 
-/// The return type and deprecations retained from binary operator resolution.
+/// The return type and deprecations retained from operator resolution.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct BinaryOperationResult<'db> {
+pub(crate) struct OperatorResult<'db> {
     pub(crate) return_type: Type<'db>,
     /// Deprecated implementations or overloads selected for the operation.
     pub(crate) deprecated_functions: Box<[OverloadLiteral<'db>]>,
+}
+
+impl<'db> OperatorResult<'db> {
+    pub(super) fn from_bindings(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: &Bindings<'db>,
+    ) -> Self {
+        Self {
+            return_type: bindings.return_type(db, env),
+            deprecated_functions: bindings
+                .deprecated_functions(db)
+                .map(|(_, function)| function)
+                .collect(),
+        }
+    }
 }
 
 /// Whether the right operand's reflected method has priority based on the possible runtime
@@ -153,6 +169,7 @@ impl<'db> Type<'db> {
                     .try_call_dunder_with_policy(
                         db,
                         env,
+                        receiver,
                         name,
                         &mut arguments,
                         TypeContext::default(),
@@ -204,7 +221,7 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Option<&'db BinaryOperationResult<'db>> {
+    ) -> Option<&'db OperatorResult<'db>> {
         #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
@@ -212,17 +229,11 @@ impl<'db> Type<'db> {
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
-        ) -> Option<BinaryOperationResult<'db>> {
+        ) -> Option<OperatorResult<'db>> {
             let env = &ProgramEnvironment::from_program(program);
             Type::try_call_bin_op(db, env, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| BinaryOperationResult {
-                    return_type: bindings.return_type(db, env),
-                    deprecated_functions: bindings
-                        .deprecated_functions(db)
-                        .map(|(_, function)| function)
-                        .collect(),
-                })
+                .map(|bindings| OperatorResult::from_bindings(db, env, &bindings))
         }
 
         try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty).as_ref()
@@ -476,6 +487,25 @@ pub(super) enum CallDunderError<'db> {
 }
 
 impl<'db> CallDunderError<'db> {
+    /// A method can be deprecated even when it is missing on some union members or its
+    /// signature rejects the implicit call.
+    pub(super) fn deprecated_functions(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = OverloadLiteral<'db>> {
+        let bindings = match self {
+            Self::CallError(_, bindings, _) | Self::PossiblyUnbound { bindings, .. } => {
+                Some(bindings)
+            }
+            Self::MethodNotAvailable => None,
+        };
+        bindings.into_iter().flat_map(move |bindings| {
+            bindings
+                .deprecated_functions(db)
+                .map(|(_, function)| function)
+        })
+    }
+
     pub(super) fn provenance(&self) -> Provenance<'db> {
         match self {
             Self::CallError(_, _, provenance) => *provenance,
