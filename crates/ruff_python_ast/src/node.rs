@@ -237,7 +237,7 @@ impl ast::PatternArguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for pattern_or_keyword in self.iter_source_order() {
+        for pattern_or_keyword in &self.items {
             match pattern_or_keyword {
                 crate::PatternOrKeyword::Pattern(pattern) => visitor.visit_pattern(pattern),
                 crate::PatternOrKeyword::Keyword(keyword) => {
