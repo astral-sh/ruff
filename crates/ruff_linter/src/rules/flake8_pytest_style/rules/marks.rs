@@ -162,10 +162,7 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             range_start: _,
             node_index: _,
         }) => {
-            if !checker.settings().flake8_pytest_style.mark_parentheses
-                && arguments.args().next().is_none()
-                && arguments.keywords().next().is_none()
-            {
+            if !checker.settings().flake8_pytest_style.mark_parentheses && arguments.is_empty() {
                 let fix = Fix::applicable_edit(
                     Edit::range_deletion(arguments.range()),
                     if checker.comment_ranges().intersects(arguments.range()) {

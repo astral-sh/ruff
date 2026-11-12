@@ -51,7 +51,7 @@ pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::
         return;
     };
 
-    if arguments.args().next().is_some() || arguments.keywords().next().is_some() {
+    if !arguments.is_empty() {
         return;
     }
 
