@@ -198,9 +198,10 @@ impl UvEnvironments {
 
     /// Requests background synchronization for `file`'s environment.
     ///
-    /// On the first synchronization request, `availability` determines whether diagnostics
-    /// wait, even if a semantic query already created the default environment. A synchronized
-    /// environment stays available during a refresh.
+    /// On the first sync, `availability` controls when ty can report type errors. `Available`
+    /// allows checking with the current Python version and import paths while uv runs. `Pending`
+    /// defers those diagnostics until ty applies the uv result. During later syncs, ty keeps
+    /// checking against the previous environment.
     ///
     /// If another synchronization is pending, records the latest request to run afterward and
     /// cancels the queued job if it has not started. Running uv processes are allowed to finish.
@@ -237,7 +238,15 @@ impl UvEnvironments {
                 }
                 *environment
             }
-            ScriptEnvironmentState::Synchronizing { sync, .. } => {
+            ScriptEnvironmentState::Synchronizing {
+                availability: current_availability,
+                sync,
+                ..
+            } => {
+                // A script first synchronized on save can be reopened before uv finishes.
+                if matches!(availability, ScriptEnvironmentAvailability::Pending) {
+                    *current_availability = availability;
+                }
                 if !sync.update_next_request(task.request.clone()) {
                     tracing::trace!(
                         "Script environment synchronization for `{}` is already requested",
@@ -1040,6 +1049,43 @@ mod tests {
         }
 
         #[test]
+        fn reopening_during_initial_save_waits_for_synchronization() -> anyhow::Result<()> {
+            let mut case = UvTestCase::script(
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["attrs==25.4.0"]
+                # ///
+                from attrs import define
+                "#,
+            )?;
+            let environments = case.db.uv_environments().clone();
+
+            // Saving new script metadata keeps diagnostics visible. Reopening the saved
+            // script before uv finishes defers diagnostics until its dependencies are ready.
+            environments.request_sync(
+                &mut case.db,
+                case.file,
+                ScriptEnvironmentAvailability::Available,
+                &|_, _| None,
+            );
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
+            environments.request_sync(
+                &mut case.db,
+                case.file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
+            assert!(environments.is_initialization_pending(&case.db, case.file));
+
+            assert_eq!(case.wait_for_synchronizations()?.scripts, vec![case.file]);
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
+            case.assert_can_import("attrs")?;
+
+            Ok(())
+        }
+
+        #[test]
         fn default_environment_is_pending_during_initial_synchronization() -> anyhow::Result<()> {
             let mut case = UvTestCase::script(
                 r#"
@@ -1131,6 +1177,7 @@ mod tests {
                 ScriptEnvironmentAvailability::Pending,
                 &|_, _| None,
             );
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
 
             let mut changed = environments.poll_sync(&mut case.db).scripts;
             changed.extend(case.wait_for_synchronizations()?.scripts);
