@@ -577,6 +577,27 @@ fn siblings_in_compound_statements() {
 }
 
 #[test]
+fn expression_search_stops_at_the_first_matching_descendant() {
+    let parsed = parse_expression("f(x if p else y, k=g(z))").unwrap();
+    let root = parsed.expr();
+    let expected: Vec<_> = root
+        .descendants()
+        .filter_map(ast::AstNode::cast::<ast::Expr>)
+        .map(ast::AstNode::node_id)
+        .collect();
+
+    for stop in 0..=expected.len() {
+        let mut visited = Vec::new();
+        let found = ast::helpers::any_over_expr(root, |expr| {
+            visited.push(expr.node_id());
+            expected.get(stop) == visited.last()
+        });
+        assert_eq!(found, stop < expected.len());
+        assert_eq!(visited, expected[..(stop + 1).min(expected.len())]);
+    }
+}
+
+#[test]
 fn descendants_visit_a_subtree_in_source_order() {
     let parsed = parse_expression("outside(call(keyword=x, *ys), sibling)").unwrap();
     let call = parsed

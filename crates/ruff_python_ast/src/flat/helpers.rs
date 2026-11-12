@@ -1,4 +1,5 @@
 use crate as ast;
+use crate::flat::children::Pending;
 use crate::flat::{self, AstNode};
 use crate::helpers::{Truthiness, is_iterable_initializer};
 use crate::{Expr, ExprFString, InterpolatedStringElement, Number};
@@ -10,11 +11,20 @@ pub fn any_over_expr<'a>(expr: Expr<'a>, predicate: impl FnMut(Expr<'a>) -> bool
 
 pub(crate) fn any_expression<'a>(
     root: crate::SyntaxNode<'a>,
-    predicate: impl FnMut(Expr<'a>) -> bool,
+    mut predicate: impl FnMut(Expr<'a>) -> bool,
 ) -> bool {
-    root.descendants()
-        .filter_map(AstNode::cast::<Expr>)
-        .any(predicate)
+    let mut node = root;
+    let mut pending = Pending::default();
+    loop {
+        if node.cast::<Expr>().is_some_and(&mut predicate) {
+            return true;
+        }
+        let next = root.ast.next_descendant(node, &mut pending);
+        if next == 0 {
+            return false;
+        }
+        node = root.ast.child(u64::from(next));
+    }
 }
 
 impl Truthiness {
