@@ -1,8 +1,5 @@
-use std::sync::LazyLock;
-
 use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
-use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -126,41 +123,63 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?x)
-            (?P<prefix>
-                ^|[^{]|(?:\{{2})+  # preceded by nothing, a non-brace, or an even number of braces
+/// Remove explicit positional indices from all replacement fields in a string literal.
+fn remove_format_indices(literal: &str) -> String {
+    let bytes = literal.as_bytes();
+    let mut output = String::with_capacity(literal.len());
+    let mut last_copied = 0;
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i] != b'{' {
+            i += 1;
+            continue;
+        }
+
+        // Skip escaped `{{` pairs so literal braces like `{{0}}` are untouched.
+        if bytes.get(i + 1) == Some(&b'{') {
+            i += 2;
+            continue;
+        }
+
+        let mut digits_end = i + 1;
+        while bytes.get(digits_end).is_some_and(u8::is_ascii_digit) {
+            digits_end += 1;
+        }
+
+        if digits_end > i + 1
+            && matches!(
+                bytes.get(digits_end),
+                Some(b'}' | b'.' | b'[' | b'!' | b':')
             )
-            \{                     # opening curly brace
-                (?P<int>\d+)       # followed by any integer
-                (?P<fmt>.*?)       # followed by any text
-            }                      # followed by a closing brace
-        ",
-    )
-    .unwrap()
-});
+        {
+            output.push_str(&literal[last_copied..=i]);
+            last_copied = digits_end;
+            i = match bytes[digits_end..].iter().position(|&b| b == b'}') {
+                Some(rel_end) => digits_end + rel_end + 1,
+                None => digits_end,
+            };
+        } else {
+            i += 1;
+        }
+    }
+
+    output.push_str(&literal[last_copied..]);
+    output
+}
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
-            expr.value = arena.alloc(
-                FORMAT_SPECIFIER
-                    .replace_all(expr.value, "$prefix{$fmt}")
-                    .to_string(),
-            );
+            expr.value = arena.alloc(remove_format_indices(expr.value));
         }
         Expression::ConcatenatedString(expr) => {
             let mut stack = vec![&mut expr.left, &mut expr.right];
             while let Some(string) = stack.pop() {
                 match string.as_mut() {
                     libcst_native::String::Simple(string) => {
-                        string.value = arena.alloc(
-                            FORMAT_SPECIFIER
-                                .replace_all(string.value, "$prefix{$fmt}")
-                                .to_string(),
-                        );
+                        string.value = arena.alloc(remove_format_indices(string.value));
                     }
                     libcst_native::String::Concatenated(string) => {
                         stack.push(&mut string.left);
