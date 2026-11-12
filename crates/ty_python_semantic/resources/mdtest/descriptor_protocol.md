@@ -245,7 +245,8 @@ C2().attr = 1
 
 ### Nested classes as data descriptors
 
-Assignments and deletions through an instance invoke the methods on the nested class's metaclass.
+Assignments and deletions through an instance invoke `__set__` and `__delete__` on the nested
+class's metaclass.
 
 ```py
 class DescriptorMeta(type):
@@ -260,6 +261,13 @@ class Base:
 
 Base().Inner = 1  # ok
 del Base().Inner  # ok
+```
+
+Reading `Base.Inner` calls the descriptor's `__get__` with `None` and `Base`. Assigning to or
+deleting `Base.Inner` would replace or remove the read-only binding in `Base`'s namespace, so ty
+rejects both operations.
+
+```py
 Base.Inner = Base.Inner  # error: [invalid-assignment]
 del Base.Inner  # error: [invalid-assignment]
 ```
