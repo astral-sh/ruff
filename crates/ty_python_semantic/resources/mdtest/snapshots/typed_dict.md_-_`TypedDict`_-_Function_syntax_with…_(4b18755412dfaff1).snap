@@ -25,12 +25,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 10 | # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 11 | Bad1 = TypedDict(123, {"name": str})
 12 | 
-13 | # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+13 | # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
 15 | reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 16 | 
 17 | def f(x: str) -> None:
-18 |     # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+18 |     # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
 19 |     Y = TypedDict(x, {})
 20 | 
 21 | def g(x: str) -> None:
@@ -150,7 +150,7 @@ error[invalid-argument-type]: Invalid argument to parameter `typename` of `Typed
 ```
 
 ```
-warning[mismatched-type-name]: The name passed to `TypedDict` must match the variable it is assigned to
+warning[mismatched-typeddict-name]: The name passed to `TypedDict` must match the variable it is assigned to
   --> src/mdtest_snippet.py:14:27
    |
 14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
@@ -159,7 +159,7 @@ warning[mismatched-type-name]: The name passed to `TypedDict` must match the var
 ```
 
 ```
-warning[mismatched-type-name]: The name passed to `TypedDict` must match the variable it is assigned to
+warning[mismatched-typeddict-name]: The name passed to `TypedDict` must match the variable it is assigned to
   --> src/mdtest_snippet.py:19:19
    |
 19 |     Y = TypedDict(x, {})

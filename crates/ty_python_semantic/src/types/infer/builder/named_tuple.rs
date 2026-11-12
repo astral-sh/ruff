@@ -7,9 +7,9 @@ use crate::{
             DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
         },
         diagnostic::{
-            INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
-            PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-            report_mismatched_type_name,
+            INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISMATCHED_NAMEDTUPLE_NAME,
+            MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
+            UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
         extract_fixed_length_iterable_element_types,
         function::KnownFunction,
@@ -350,8 +350,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_NAMEDTUPLE_NAME,
                 name_arg,
-                &kind.to_string(),
+                kind,
                 &assigned_name,
                 Some(actual_name),
                 name_type,

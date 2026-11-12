@@ -530,6 +530,8 @@ def collect_ty_diagnostics(
             "--error=ambiguous-protocol-member",
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
+            # Older ty versions only know the original name. It selects all eight
+            # replacement rules in newer versions, so both binaries use the same policy.
             "--error=mismatched-type-name",
             "--error=invalid-named-tuple-override",
             "--error=deprecated",

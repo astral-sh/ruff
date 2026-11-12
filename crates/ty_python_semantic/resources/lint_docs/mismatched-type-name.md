@@ -1,29 +1,31 @@
-## What it does
+## Migration
 
-Checks for functional typing definitions whose declared name does not match the variable they are
-assigned to.
+ty now reports name mismatches under a separate rule for each kind of type:
 
-## Why is this bad?
+- `mismatched-enum-name`
+- `mismatched-namedtuple-name`
+- `mismatched-newtype-name`
+- `mismatched-paramspec-name`
+- `mismatched-type-alias-name`
+- `mismatched-typeddict-name`
+- `mismatched-typevar-name`
+- `mismatched-typevartuple-name`
 
-Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`
-all take a name argument that is normally expected to match the assigned variable. A mismatch is
-usually a typo and makes later diagnostics harder to understand.
+Existing configuration entries and ignore comments using `mismatched-type-name` still apply to all
+eight rules. A specific rule takes precedence within the same table. For example, to keep a policy
+that treats name mismatches as errors but allow named tuples to have a different runtime name, use
+these settings in `ty.toml`:
 
-`mismatched-sentinel-name` is a similar but distinct rule, disabled by default.
-
-## Default level
-
-This rule is a warning by default because ty can usually recover and continue understanding the
-resulting type.
-
-## Examples
-
-```python
-from typing import NewType, ParamSpec, TypeVar
-from typing_extensions import TypedDict
-
-T = TypeVar("U")  # error: [mismatched-type-name]
-P = ParamSpec("Q")  # error: [mismatched-type-name]
-UserId = NewType("Id", int)  # error: [mismatched-type-name]
-Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
+```toml
+[rules]
+mismatched-type-name = "error"
+mismatched-namedtuple-name = "ignore"
 ```
+
+On the command line, the last matching flag takes precedence.
+`ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.
+
+`mismatched-enum-name` and `mismatched-namedtuple-name` are disabled by default. An explicit setting
+for `mismatched-type-name` still sets their severity.
+
+The separate `mismatched-sentinel-name` rule remains opt-in.
