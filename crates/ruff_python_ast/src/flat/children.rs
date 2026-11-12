@@ -5,7 +5,7 @@ use std::slice;
 
 use smallvec::SmallVec;
 
-use super::{Ast, AstNode, AstNodeId, SyntaxNode};
+use super::{Ast, AstNode, AstNodeId, Row, SyntaxNode};
 use crate::Stmt;
 
 /// The immediate children of a syntax node, in source order.
@@ -24,35 +24,17 @@ enum ChildSource<'a> {
         rows: slice::Iter<'a, u32>,
         last: Option<AstNodeId<crate::kind::Any>>,
     },
-    Fields(Fields<'a>),
-}
-
-struct Fields<'a> {
-    node: AstNodeId<crate::kind::Any>,
-    unvisited: std::ops::Range<u8>,
-    rows: slice::Iter<'a, u32>,
+    Fields {
+        row: &'a Row,
+        unvisited: std::ops::Range<u8>,
+        rows: slice::Iter<'a, u32>,
+    },
 }
 
 /// A child field holds either a single node or a list of arena rows.
 pub(super) enum Field<'a> {
     One(Option<AstNodeId<crate::kind::Any>>),
     Rows(&'a [u32]),
-}
-
-impl<'a> Fields<'a> {
-    fn next(&mut self, ast: &'a Ast) -> Option<AstNodeId<crate::kind::Any>> {
-        loop {
-            if let Some(&word) = self.rows.next() {
-                return Some(AstNodeId::from_word(word));
-            }
-            let field = self.unvisited.next()?;
-            match ast.child_field(ast.at(self.node), field) {
-                Field::One(Some(handle)) => return Some(handle),
-                Field::One(None) => {}
-                Field::Rows(words) => self.rows = words.iter(),
-            }
-        }
-    }
 }
 
 impl<'a> Children<'a> {
@@ -98,14 +80,13 @@ impl<'a> Children<'a> {
     }
 
     pub(super) fn fields(node: SyntaxNode<'a>, count: u8) -> Self {
-        let fields = Fields {
-            node: node.node_id(),
-            unvisited: 0..count,
-            rows: slice::Iter::default(),
-        };
         Self {
             ast: node.ast,
-            source: ChildSource::Fields(fields),
+            source: ChildSource::Fields {
+                row: node.row,
+                unvisited: 0..count,
+                rows: slice::Iter::default(),
+            },
         }
     }
 }
@@ -126,7 +107,21 @@ impl<'a> Iterator for Children<'a> {
                 .take()
                 .or_else(|| rows.next().copied().map(AstNodeId::from_word))
                 .or_else(|| last.take())?,
-            ChildSource::Fields(fields) => fields.next(self.ast)?,
+            ChildSource::Fields {
+                row,
+                unvisited,
+                rows,
+            } => loop {
+                if let Some(&word) = rows.next() {
+                    break AstNodeId::from_word(word);
+                }
+                let parent = SyntaxNode { ast: self.ast, row };
+                match self.ast.child_field(parent, unvisited.next()?) {
+                    Field::One(Some(handle)) => break handle,
+                    Field::One(None) => {}
+                    Field::Rows(words) => *rows = words.iter(),
+                }
+            },
         };
         Some(self.ast.at(handle))
     }
