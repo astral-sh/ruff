@@ -536,7 +536,14 @@ fn member_attribute_write_requirement<'db>(
     ) {
         class_attribute_write_requirement(db, env, object_ty, attribute, members)
     } else {
-        instance_attribute_write_requirement(db, env, object_ty, attribute, receiver, members)
+        instance_attribute_write_requirement(
+            db,
+            env,
+            object_ty,
+            attribute,
+            receiver,
+            members.as_ref(),
+        )
     }
 }
 
@@ -614,7 +621,7 @@ fn instance_attribute_write_requirement<'db>(
     object_ty: Type<'db>,
     attribute: &str,
     receiver: Option<Type<'db>>,
-    members: Option<AssignmentAttributeMembers<'db>>,
+    members: Option<&AssignmentAttributeMembers<'db>>,
 ) -> AttributeWriteRequirement<'db> {
     let instance = |member| AttributeWriteRequirement::Instance {
         object_ty,
@@ -625,11 +632,11 @@ fn instance_attribute_write_requirement<'db>(
         instance_fallback_write_requirement(db, env, object_ty, attribute, member, receiver)
     };
     let (type_member, receiver_fallback) = match members {
-        Some(AssignmentAttributeMembers::TypeMember {
+        Some(&AssignmentAttributeMembers::TypeMember {
             member,
             receiver_fallback,
         }) => (member, receiver_fallback),
-        Some(AssignmentAttributeMembers::ReceiverMember(member)) => {
+        Some(&AssignmentAttributeMembers::ReceiverMember(member)) => {
             return instance(InstanceAttributeWriteMember::Instance(
                 fallback_requirement(member),
             ));
