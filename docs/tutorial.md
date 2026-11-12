@@ -346,13 +346,17 @@ For more in-depth instructions on ignoring errors, please see [_Error suppressio
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
-Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` directive to each
-line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
-flag to add `# noqa` directives to all existing `UP035` violations:
+Ruff enables this workflow via the `--add-ignore` flag, which will add a `# ruff: ignore` comment
+to each line based on its existing violations (alternatively, `--add-noqa` can be used to add
+legacy `# noqa` comments). In preview mode, `--add-ignore` uses human-readable rule names in place
+of rule codes.
+
+We can combine `--add-ignore` with the `--select` command-line flag to add `# ruff: ignore`
+directives to all existing `UP035` violations:
 
 ```console
-$ uv run ruff check --select UP035 --add-noqa .
-Added 1 noqa directive.
+$ uv run ruff check --select UP035 --add-ignore .
+Added 1 ignore directive.
 ```
 
 Running `git diff` shows the following:
@@ -364,11 +368,10 @@ index 71fca60c8d..e92d839f1b 100644
 +++ b/numbers/src/numbers/calculate.py
 @@ -1,4 +1,4 @@
 -from typing import Iterable
-+from typing import Iterable  # noqa: UP035
++from typing import Iterable  # ruff: ignore[UP035]
 ```
 
-To add `# ruff: ignore[...]` comments instead, use the `--add-ignore` flag. In preview mode,
-`--add-ignore` uses human-readable rule names in place of rule codes.
+To add `# noqa` directives instead, use the `--add-noqa` flag.
 
 ## Integrations
 

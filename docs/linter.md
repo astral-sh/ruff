@@ -469,61 +469,14 @@ see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
 
 ### Comments
 
-Ruff supports multiple forms of suppression comments, including inline and file-level `noqa` and
-`ruff: ignore` comments, and range suppressions.
+Ruff supports multiple forms of suppression comments, including `ruff: ignore` comments, range
+suppressions, file-level directives, and `noqa` comments.
 
 In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in `ruff: ignore`,
 `ruff: file-ignore`, `ruff: disable`, and `ruff: enable` comments instead of rule codes (e.g.
 `F401`).
 
 #### Line-level
-
-Ruff supports a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
-To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
-
-```python
-# Ignore F841.
-x = 1  # noqa: F841
-
-# Ignore E741 and F841.
-i = 1  # noqa: E741, F841
-
-# Ignore _all_ violations.
-x = 1  # noqa
-```
-
-For multi-line strings (like docstrings), the `noqa` directive should come at the end of the string
-(after the closing triple quote), and will apply to the entire string, like so:
-
-```python
-"""Lorem ipsum dolor sit amet.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
-"""  # noqa: E501
-```
-
-For import sorting, the `noqa` should come at the end of the first line in the import block, and
-will apply to all imports in the block, like so:
-
-```python
-import os  # noqa: I001
-import abc
-```
-
-The full inline comment specification is as follows:
-
-- An inline blanket `noqa` comment is given by a case-insensitive match for
-  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
-  end of the comment, the beginning of a new comment (`#`), or whitespace
-  followed by any character other than `:`.
-- An inline `noqa` suppression is given by first finding a case-insensitive match
-  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
-  after `noqa`, and followed by the symbol `:`. After this we are expected to
-  have a list of rule codes which is given by sequences of uppercase ASCII
-  characters followed by ASCII digits, separated by whitespace or commas. The
-  list ends at the last valid code. We will attempt to interpret rules with a
-  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
-  case.
 
 To cover an entire "logical" line (a multi-line statement or suite header),
 an "ignore" comment may be placed above the first line:
@@ -579,6 +532,56 @@ The full line-level suppression comment specification is as follows:
 - Rules to be suppressed must be separated by commas, with optional whitespace
   before or after each rule name, and may be followed by an optional trailing comma
   after the last rule name.
+
+##### `noqa` comments
+
+For compatibility with [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html) and
+other linters, Ruff also supports `noqa` suppression comments.
+To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
+
+```python
+# Ignore F841.
+x = 1  # noqa: F841
+
+# Ignore E741 and F841.
+i = 1  # noqa: E741, F841
+
+# Ignore _all_ violations.
+x = 1  # noqa
+```
+
+For multi-line strings (like docstrings), the `noqa` directive should come at the end of the string
+(after the closing triple quote), and will apply to the entire string, like so:
+
+```python
+"""Lorem ipsum dolor sit amet.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+"""  # noqa: E501
+```
+
+For import sorting, the `noqa` should come at the end of the first line in the import block, and
+will apply to all imports in the block, like so:
+
+```python
+import os  # noqa: I001
+import abc
+```
+
+The full inline comment specification is as follows:
+
+- An inline blanket `noqa` comment is given by a case-insensitive match for
+  `#noqa` with optional whitespace after the `#` symbol, followed by either: the
+  end of the comment, the beginning of a new comment (`#`), or whitespace
+  followed by any character other than `:`.
+- An inline `noqa` suppression is given by first finding a case-insensitive match
+  for `#noqa` with optional whitespace after the `#` symbol, optional whitespace
+  after `noqa`, and followed by the symbol `:`. After this we are expected to
+  have a list of rule codes which is given by sequences of uppercase ASCII
+  characters followed by ASCII digits, separated by whitespace or commas. The
+  list ends at the last valid code. We will attempt to interpret rules with a
+  missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
+  case.
 
 
 #### Block-level
@@ -645,34 +648,7 @@ The full range suppression comment specification is as follows:
 
 #### File-level
 
-To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
-preferably towards the top, like so:
-
-```python
-# ruff: noqa
-```
-
-To ignore a specific rule across an entire file, add the line `# ruff: noqa: {code}` anywhere in the
-file, preferably towards the top, like so:
-
-```python
-# ruff: noqa: F841
-```
-
-Global `noqa` comments must be on their own line to disambiguate from comments which ignore
-violations on a single line.
-
-Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
-equivalent to `# ruff: noqa`.
-
-The file-level suppression comment specification is as follows:
-
-- A file-level exemption comment is given by a case-sensitive match for `#ruff:`
-  or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
-  optional whitespace and a case-insensitive match for `noqa`. After this, the
-  specification is as in the inline `noqa` suppressions above.
-
-One or more rules can also be ignored across an entire file with a `file-ignore` comment on its own
+One or more rules can be ignored across an entire file with a `file-ignore` comment on its own
 line, at global module scope, and preferably near the top of the file:
 
 ```python
@@ -687,6 +663,34 @@ The file-level suppression comment specification is as follows:
 - Rules to be suppressed must be separated by commas, with optional whitespace
   before or after each rule name, and may be followed by an optional trailing comma
   after the last rule name.
+
+##### `noqa` comments
+
+Ruff also supports file-level `noqa` comments. To ignore all violations across an entire file, add
+the line `# ruff: noqa` anywhere in the file, preferably towards the top, like so:
+
+```python
+# ruff: noqa
+```
+
+To ignore a specific rule across an entire file using `noqa`, add the line `# ruff: noqa: {code}`:
+
+```python
+# ruff: noqa: F841
+```
+
+Global `noqa` comments must be on their own line to disambiguate from comments which ignore
+violations on a single line.
+
+Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
+equivalent to `# ruff: noqa`.
+
+The file-level `noqa` suppression comment specification is as follows:
+
+- A file-level exemption comment is given by a case-sensitive match for `#ruff:`
+  or `#flake8:`, with optional whitespace after `#` and before `:`, followed by
+  optional whitespace and a case-insensitive match for `noqa`. After this, the
+  specification is as in the inline `noqa` suppressions above.
 
 ### Detecting unused suppressions
 
@@ -710,12 +714,12 @@ $ ruff check /path/to/file.py --extend-select RUF100 --fix
 
 Ruff can _automatically add_ suppression comments to all lines that contain violations, which is
 useful when migrating a new codebase to Ruff. To add the appropriate comments to all relevant lines,
-run Ruff with `--add-noqa` to add `noqa` comments or with `--add-ignore` to add `ruff: ignore`
-comments:
+run Ruff with `--add-ignore` to add `ruff: ignore` comments or with `--add-noqa` to add legacy
+`noqa` comments:
 
 ```shell-session
-$ ruff check /path/to/file.py --add-noqa
 $ ruff check /path/to/file.py --add-ignore
+$ ruff check /path/to/file.py --add-noqa
 ```
 
 Both of these flags use rule codes on stable. To add `ruff: ignore` comments with human-readable
